@@ -1108,23 +1108,24 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
-    // Re-pinned by T03.F12 (one-tick founder gestation): 199 births became
-    // 229 at the default rate; rate 0.0 reproduces the pre-feature pin.
+    // Re-pinned by T16.F02 at both rates: founders pay the 0.05 eat effort
+    // from their first Eat and the ramped failed-action penalty is gone
+    // (default 229 -> 195 births, rate 0.0 199 -> 297; old digests in
+    // docs/progress/readings/t16-f02.md). Measured on macOS aarch64.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            229,
+            195,
             0,
-            "14ad665bdac20920d65824d7457a13207a19051c1990997d9925b0402e6ec105".to_owned()
+            "89d60dc0f467a597a6dc32229cf7cb0c02c378c0931f705c511f9adeb1a4c477".to_owned()
         )
     );
-    // Measured on macOS aarch64 (T24.F02, keyed food stream); earlier pins also matched GNU/Linux aarch64.
     assert_eq!(
         founder_only_trajectory(Some(0.0)),
         (
-            199,
+            297,
             0,
-            "bd04b0e429e199fcb673b57f44ecfab53a56251da61889d4f39945e2ddf09015".to_owned()
+            "4a5941e899a878853adf125db91a0430fbbbce2139aad6ebab9cf43de646d61c".to_owned()
         )
     );
 }

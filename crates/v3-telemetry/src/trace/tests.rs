@@ -228,12 +228,13 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "runtime.vm.step_ramp_allowance",
         "runtime.vm.step_ramp_cost",
     ]);
-    let mut actions = config_keys(&[
+    let actions = config_keys(&[
         "energy.costs.move_cost",
         "energy.costs.eat_cost",
         "energy.costs.eat_reward_per_food",
         "energy.costs.noop_cost",
         "energy.costs.reproduce_cost",
+        "energy.costs.reproduce_attempt_cost",
         "energy.complexity_cost.enabled",
         "energy.complexity_cost.threshold",
         "energy.complexity_cost.scaling_factor",
@@ -254,7 +255,6 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "predation.steal_cost_rate",
         "predation.kill_complexity_bonus_multiplier",
     ]);
-    actions.insert("petri.failed_action_penalty".to_owned());
     let reward_learning = config_keys(&["runtime.reward_learning_cost"]);
     [
         tick,
@@ -339,10 +339,11 @@ fn a_synthetic_seam_encodes_tick_six_phases_and_the_food_passes_with_predicted_i
             .as_str()
     );
     let actions = &trace.spans[5];
+    assert_eq!(actions.attribute("petri.failed_action_penalty"), None);
     assert_eq!(
-        actions.attribute("petri.failed_action_penalty"),
+        actions.attribute("petri.config.energy.costs.reproduce_attempt_cost"),
         Some(
-            f64::from(config.failed_action_penalty_for_tick(4))
+            f64::from(config.energy.costs.reproduce_attempt_cost)
                 .to_string()
                 .as_str()
         )

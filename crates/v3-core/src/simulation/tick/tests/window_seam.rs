@@ -499,12 +499,10 @@ fn an_action_heavy_tick_records_every_applied_action() {
 }
 
 #[test]
-fn charge_penalty_and_reward_match_the_energy_flow_deltas() {
+fn charge_and_reward_match_the_energy_flow_deltas() {
     // A rewarded eat then a move blocked by a neighbor.
     let (mut sim, a, _) = make_sim_two_creatures(100.0, 100.0);
     sim.config.energy.costs.eat_cost = 0.5;
-    sim.config.energy.costs.failed_action_penalty = 7.5;
-    sim.config.startup.ramps.failed_action_penalty.enabled = false;
     sim.creatures[a].genome = eat_then_move_genome();
     sim.world.set_food(Position::new(5, 5), 0.5);
     let mut trace = Some(ActiveTrace::new(a, 1));
@@ -515,15 +513,13 @@ fn charge_penalty_and_reward_match_the_energy_flow_deltas() {
     assert_eq!(eat.entry.result, ActionResult::Success);
     assert!(eat.reward > 0.0);
     assert!(eat.charge > 0.0);
-    assert_eq!(eat.penalty, 0.0);
     let moved = &outcome.applied[1];
     assert_eq!(moved.entry.result, ActionResult::Blocked);
-    assert!(moved.penalty > 0.0);
+    assert!(moved.charge > 0.0);
     assert_eq!(moved.reward, 0.0);
     // The deltas account for every energy change the two actions logged.
     let spent = eat.entry.energy_before - moved.entry.energy_after;
-    let accounted =
-        eat.charge + eat.penalty - eat.reward + moved.charge + moved.penalty - moved.reward;
+    let accounted = eat.charge - eat.reward + moved.charge - moved.reward;
     assert!(
         (f64::from(spent) - accounted).abs() < 1e-3,
         "{spent} {accounted}"
@@ -647,14 +643,10 @@ fn bidding(mut genome: CreatureGenome) -> CreatureGenome {
 fn a_creature_dying_in_the_action_phase_keeps_what_it_applied() {
     let (mut sim, id) = make_sim_with_custom_genome(1.0, eat_then_move_genome());
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-    sim.config.startup.ramps.failed_action_penalty.enabled = false;
+    sim.config.energy.costs.eat_cost = 1.0;
     let creature = &sim.creatures[id];
-    let fatal = sim.config.energy.adjusted_action_cost(
+    let fatal = sim.config.energy.action_effort(
         sim.config.energy.costs.eat_cost,
-        creature.cached_complexity,
-        creature.age,
-    ) + sim.config.energy.adjusted_action_cost(
-        sim.config.energy.costs.failed_action_penalty,
         creature.cached_complexity,
         creature.age,
     );
@@ -675,7 +667,6 @@ fn decisions_discarded_by_a_death_match_the_untraced_run() {
     fn dying() -> (Simulation, CreatureId) {
         let (mut sim, id) = make_sim_with_custom_genome(1.0, eat_then_move_genome());
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-        sim.config.startup.ramps.failed_action_penalty.enabled = false;
         sim.creatures[id].energy = 0.01;
         (sim, id)
     }

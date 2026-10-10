@@ -29,6 +29,9 @@
 //! more numbers and appends a vote edge, which moves all four digests.
 //! Re-pinned by T11.F29 after two agreeing runs: the `AddFeedbackRoute`
 //! entry remaps every topology draw, which moves all four digests.
+//! Re-pinned by T16.F02 after two agreeing runs: every Eat pays the 0.05
+//! effort, a reproduce attempt pays its effort before the gates, and the
+//! failed-action penalty is gone, which moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -40,11 +43,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "aaf4c417c0c1f7ff043aaeeecb19610c559684d1bf975ca28c05d51c82fc9bde"
+        "98e6517eec9def7283343fd0a914713379a3638c5c9a2bd1b4e73cb21ecc3d2f"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "ca8569d22a023229006324318e6c1af68ac28888ef13ae516b8919e303cb55fa"
+        "0a6131485f7f14b565d8e3daf2f7d0712610ce90da9c1d63023278f9818413a8"
     );
 }
 
@@ -117,11 +120,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "0aa9d015f58e92e294088435e8decc9dfd9a712a2bf01668fdf11179b200c679"
+        "8e839ff92e03d52141afcc563197321c81ea56650062e129d32c67c3a20306d0"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "a43abf80658509e6d7df3271038669a43f3b5d6c3e7047352c4d3f57df5f59fb"
+        "54fab293c4d516a3a99d680899bfd5c97da2ac3d008d1a87cd7319b9f19ccc9a"
     );
 }
 

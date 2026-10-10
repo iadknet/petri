@@ -23,7 +23,7 @@ mod recipe_tests {
     use serde_json::{json, Value};
 
     #[test]
-    fn recipe_rejects_shapes_unknown_fields_and_invalid_ramps() {
+    fn recipe_rejects_shapes_and_unknown_fields() {
         for patch in [
             json!(null),
             json!([]),
@@ -31,9 +31,6 @@ mod recipe_tests {
             json!({"seed": 1}),
             json!({"world":{"stale":1}}),
             json!({"world":null}),
-            json!({"startup":{"ramps":{"failed_action_penalty":{"target_tick":0}}}}),
-            json!({"startup":{"ramps":{"failed_action_penalty":{"start":-1}}}}),
-            json!({"startup":{"ramps":{"failed_action_penalty":{"end":-1}}}}),
         ] {
             assert!(
                 resolve_config(&SimulationConfig::default(), patch.clone()).is_err(),
@@ -61,6 +58,26 @@ mod recipe_tests {
                 json!({"mutation": {key: value}}),
             )
             .unwrap_err();
+            assert!(error.to_string().contains(key), "{key}: {error}");
+        }
+    }
+
+    /// T16.F02: the failed-action penalty and the `startup` section that
+    /// held only its ramp are retired with no alias; a recipe naming either
+    /// fails to resolve and names the key.
+    #[test]
+    fn recipe_rejects_the_retired_failed_action_penalty_keys() {
+        for (key, patch) in [
+            (
+                "failed_action_penalty",
+                json!({"energy": {"costs": {"failed_action_penalty": 1.0}}}),
+            ),
+            (
+                "startup",
+                json!({"startup": {"ramps": {"failed_action_penalty": {"enabled": false}}}}),
+            ),
+        ] {
+            let error = resolve_config(&SimulationConfig::default(), patch).unwrap_err();
             assert!(error.to_string().contains(key), "{key}: {error}");
         }
     }
@@ -114,11 +131,9 @@ mod recipe_tests {
     }
 
     #[test]
-    fn recipe_validation_reports_fields_and_accepts_first_ramp_tick() {
+    fn recipe_validation_reports_fields() {
         let error = resolve_config(&SimulationConfig::default(), json!(null)).unwrap_err();
         assert_eq!(error.to_string(), "config: recipe must be a JSON object");
-        let config = resolve_config(&SimulationConfig::default(), json!({"startup":{"ramps":{"failed_action_penalty":{"target_tick":1,"start":0,"end":0}}}})).unwrap();
-        assert_eq!(config.startup.ramps.failed_action_penalty.target_tick, 1);
     }
     proptest! {
         #[test]
@@ -128,11 +143,11 @@ mod recipe_tests {
             prop_assert_eq!(base, json!({"nested":{"keep":true,"replace":seed},"array":values,"nullable":null}));
         }
         #[test]
-        fn recipe_effective_config_roundtrips_and_hashes(seed in any::<u64>(), width in 1u16..100, penalty in 0u16..100) {
-            let patch = json!({"world":{"width":width,"world_seed":seed},"runtime":{"max_actions_per_turn":0},"startup":{"ramps":{"failed_action_penalty":{"enabled":true,"end":penalty}}}});
+        fn recipe_effective_config_roundtrips_and_hashes(seed in any::<u64>(), width in 1u16..100, eat_cost in 0u16..100) {
+            let patch = json!({"world":{"width":width,"world_seed":seed},"runtime":{"max_actions_per_turn":0},"energy":{"costs":{"eat_cost":eat_cost}}});
             let config = resolve_config(&SimulationConfig::default(), patch.clone()).unwrap();
             prop_assert_eq!(config.world.world_seed, Some(seed));
-            prop_assert_eq!(config.energy.costs.failed_action_penalty, f32::from(penalty));
+            prop_assert_eq!(config.energy.costs.eat_cost, f32::from(eat_cost));
             let full = serde_json::to_value(&config).unwrap();
             let reloaded = resolve_config(&SimulationConfig::default(), serde_json::from_str(&serde_json::to_string_pretty(&full).unwrap()).unwrap()).unwrap();
             prop_assert_eq!(serde_json::to_value(&reloaded).unwrap(), full);
@@ -141,7 +156,6 @@ mod recipe_tests {
             deep_merge(&mut manual, patch);
             let mut manual: SimulationConfig = serde_json::from_value(manual).unwrap();
             manual.normalize();
-            manual.apply_startup_overrides();
             prop_assert_eq!(config_digest(&config), config_digest(&manual));
             let digest = config_digest(&config);
             prop_assert_eq!(digest.len(), 71);

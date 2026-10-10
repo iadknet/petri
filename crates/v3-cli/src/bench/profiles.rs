@@ -311,9 +311,6 @@ pub fn build_config(params: &ProfileParams) -> SimulationConfig {
         }
     }
     config.normalize();
-    if params.recipe.is_some() {
-        config.apply_startup_overrides();
-    }
     config
 }
 

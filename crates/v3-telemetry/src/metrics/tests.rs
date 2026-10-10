@@ -337,7 +337,6 @@ fn run_families(families: &mut Vec<Family>) {
     }
     let mut flows = strings(
         [
-            "failed_action_penalty",
             "vm_compute",
             "priority_bid",
             "graph_compute",

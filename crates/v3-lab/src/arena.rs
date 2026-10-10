@@ -2,7 +2,7 @@
 //!
 //! Resolution order: production defaults → arena → overlay (an RFC 7396
 //! merge patch over the arena config's JSON) → deserialize (unknown keys are
-//! errors) → normalize → startup overrides → lab invariants.
+//! errors) → normalize → lab invariants.
 
 use serde_json::Value;
 use v3_core::config::{resolve_config, SimulationConfig, WorldEdgeMode};
@@ -40,8 +40,7 @@ pub enum Role {
     User,
 }
 
-/// Production defaults as `v3-cli` resolves them: normalized, with startup
-/// overrides applied.
+/// Production defaults as `v3-cli` resolves them: normalized.
 ///
 /// # Panics
 ///
@@ -158,7 +157,7 @@ pub fn refused_key(overlay: &Value) -> Option<String> {
 }
 
 /// Resolve an arm config: `overlay` merged over the arena config at `size`,
-/// deserialized, normalized, startup overrides applied, then the lab
+/// deserialized, normalized, then the lab
 /// invariants re-applied and validated.
 ///
 /// # Errors
@@ -187,7 +186,6 @@ pub fn resolve_arm(
             let mut config: SimulationConfig = serde_json::from_value(value)
                 .map_err(|error| LabError::Config(format!("overlay: {error}")))?;
             config.normalize();
-            config.apply_startup_overrides();
             config
         }
     };

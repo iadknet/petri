@@ -200,10 +200,23 @@ excluded from the reward steps.
 
 Each world action is applied at the acting creature's turn per Section 5.
 
+### Action effort
+
+Every committed action charges its effort on every attempt, whatever the
+outcome (T16.F02): `effort = adjusted_action_cost(max(base, noop_cost),
+complexity, age)` (`EnergyConfig::action_effort`). The actions share the
+multiplier, so no action's effort is below `NoOp`'s, and `NoOp`'s is above
+zero (`noop_cost > 0`); a base at or above `noop_cost` is charged exactly
+`adjusted_action_cost(base, …)`. A failed attempt (a blocked move, an eat
+finding no food, a rejected reproduce, a steal with no victim) pays its effort
+and nothing more: there is no failed-action penalty. The debit lands in
+`energy_flows.action_charges.<action>`, and on a failed attempt also in its
+subset `energy_flows.failed_action_effort.<action>`.
+
 ### NoOp
 
 - No world effects.
-- Deduct `energy.costs.noop_cost` from creature energy.
+- Deduct the effort of base `energy.costs.noop_cost`.
 
 ### Eat
 
@@ -213,7 +226,8 @@ Each world action is applied at the acting creature's turn per Section 5.
   `energy.costs.eat_reward_per_food` when absent/null:
   `energy += consumed_amount * effective_type_reward`.
 - Clamp energy to `energy.lifecycle.max_energy` before charging the action cost.
-- Deduct `energy.costs.eat_cost` from creature energy.
+- Deduct the effort of base `energy.costs.eat_cost`, whether or not food was
+  found.
 
 ### Move
 
@@ -221,15 +235,24 @@ Each world action is applied at the acting creature's turn per Section 5.
   `v3-world-grid-spec.md`.
 - If valid: update creature position and world occupancy.
 - If invalid: no position change.
-- Deduct `energy.costs.move_cost` from creature energy regardless of move
+- Deduct the effort of base `energy.costs.move_cost` regardless of move
   success.
 
 ### Reproduce
 
 - Full flow per `v3-reproduction-spec.md` and `v3-runtime-config-spec.md`
   Section 4.
-- `energy.costs.reproduce_cost` is deducted within reproduction transfer
-  sequencing (not as a separate post-action step).
+- Step 0 deducts the effort of base `energy.costs.reproduce_attempt_cost`
+  before any gate; the replication cost `energy.costs.reproduce_cost` is
+  deducted within reproduction transfer sequencing only on a conception (not
+  as a separate post-action step).
+
+### StealEnergy
+
+- Deduct the effort of base `predation.steal_cost_rate` times the sanitized
+  requested amount before the target resolves; a zero or invalid amount pays
+  `NoOp`'s effort. Transfer, kill and bonus rules are owned by the predation
+  action.
 
 ### Energy after action
 

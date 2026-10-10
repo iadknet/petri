@@ -446,21 +446,29 @@ pub struct EnergyCostsConfig {
     pub move_cost: f32,
     pub eat_cost: f32,
     pub eat_reward_per_food: f32,
+    /// The effort floor (T16.F02): every action's effort is at least this,
+    /// so it must be finite and above 0 (normalization falls back to 0.05).
     pub noop_cost: f32,
+    /// Replication cost, paid only on a conception (T16.F01).
     pub reproduce_cost: f32,
-    /// Additional energy penalty applied when an action fails (move blocked, eat empty cell, etc.).
-    pub failed_action_penalty: f32,
+    /// Effort of a reproduce attempt, paid before any gate (T16.F02).
+    #[serde(default = "default_reproduce_attempt_cost")]
+    pub reproduce_attempt_cost: f32,
+}
+
+fn default_reproduce_attempt_cost() -> f32 {
+    0.05
 }
 
 impl Default for EnergyCostsConfig {
     fn default() -> Self {
         Self {
             move_cost: 0.2,
-            eat_cost: 0.0,
+            eat_cost: 0.05,
             eat_reward_per_food: 5.0,
             noop_cost: 0.05,
             reproduce_cost: 0.1,
-            failed_action_penalty: 1.0,
+            reproduce_attempt_cost: default_reproduce_attempt_cost(),
         }
     }
 }
@@ -589,60 +597,18 @@ impl EnergyConfig {
     pub fn adjusted_action_cost(&self, base_cost: f32, complexity: u32, age: u64) -> f32 {
         base_cost * self.action_cost_multiplier(complexity, age)
     }
-}
 
-/// Startup ramp for failed action penalty.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FailedActionPenaltyRampConfig {
-    pub enabled: bool,
-    pub start: f32,
-    pub end: f32,
-    pub target_tick: u64,
-}
-
-impl Default for FailedActionPenaltyRampConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            start: 0.0,
-            end: 1.0,
-            target_tick: 62680,
-        }
-    }
-}
-
-impl FailedActionPenaltyRampConfig {
-    /// Returns true while interpolation should still be applied.
+    /// The effort an action charges (T16.F02):
+    /// `adjusted_action_cost(max(base, noop_cost), complexity, age)`.
+    ///
+    /// Every action shares the multiplier, so no effort is below `NoOp`'s;
+    /// a base at or above `noop_cost` is charged exactly what
+    /// `adjusted_action_cost` charges. A NaN base is floored to `noop_cost`.
+    #[inline]
     #[must_use]
-    pub fn is_active(&self, tick: u64) -> bool {
-        let target_tick = self.target_tick.max(1);
-        self.enabled && tick < target_tick
+    pub fn action_effort(&self, base: f32, complexity: u32, age: u64) -> f32 {
+        self.adjusted_action_cost(base.max(self.costs.noop_cost), complexity, age)
     }
-
-    /// Returns linearly interpolated ramp value for a tick.
-    #[must_use]
-    pub fn value_for_tick(&self, tick: u64) -> f32 {
-        let target_tick = self.target_tick.max(1);
-        let progress = (tick as f32 / target_tick as f32).clamp(0.0, 1.0);
-        self.start + (self.end - self.start) * progress
-    }
-}
-
-/// Startup-time ramp controls for values that should vary early in a run.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct StartupRampsConfig {
-    #[serde(default)]
-    pub failed_action_penalty: FailedActionPenaltyRampConfig,
-}
-
-/// Startup-only controls persisted in config and applied on restart/startup.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct StartupConfig {
-    #[serde(default)]
-    pub ramps: StartupRampsConfig,
 }
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
@@ -972,8 +938,6 @@ impl Default for PopulationConfig {
 pub struct SimulationConfig {
     pub world: WorldConfig,
     pub energy: EnergyConfig,
-    #[serde(default)]
-    pub startup: StartupConfig,
     pub runtime: RuntimeConfig,
     pub mutation: MutationConfig,
     pub population: PopulationConfig,
@@ -986,34 +950,6 @@ pub struct SimulationConfig {
 }
 
 impl SimulationConfig {
-    /// Apply startup-time config overrides that should pin runtime-visible values.
-    pub fn apply_startup_overrides(&mut self) {
-        let ramp = &self.startup.ramps.failed_action_penalty;
-        if ramp.enabled {
-            self.energy.costs.failed_action_penalty = ramp.end;
-        }
-    }
-
-    /// Whether the startup failed action penalty ramp is currently active.
-    #[must_use]
-    pub fn failed_action_penalty_ramp_active(&self, tick: u64) -> bool {
-        self.startup.ramps.failed_action_penalty.is_active(tick)
-    }
-
-    /// Effective failed action penalty for a given tick.
-    ///
-    /// During an active startup ramp, this interpolates from `start` to `end`.
-    /// Otherwise it returns the runtime config value.
-    #[must_use]
-    pub fn failed_action_penalty_for_tick(&self, tick: u64) -> f32 {
-        let ramp = &self.startup.ramps.failed_action_penalty;
-        if ramp.is_active(tick) {
-            ramp.value_for_tick(tick)
-        } else {
-            self.energy.costs.failed_action_penalty
-        }
-    }
-
     /// Apply normalization/fallback for out-of-range values per spec constraints.
     pub fn normalize(&mut self) {
         for layer in &mut self.world.terrain {
@@ -1047,18 +983,17 @@ impl SimulationConfig {
         let ec = &mut self.energy.costs;
         ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
-        ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
-        ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
+        ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.05);
+        ec.noop_cost = if ec.noop_cost.is_finite() && ec.noop_cost > 0.0 {
+            ec.noop_cost
+        } else {
+            0.05
+        };
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
-        ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 1.0);
-        let failed_penalty_fallback = ec.failed_action_penalty;
-
-        let ramp = &mut self.startup.ramps.failed_action_penalty;
-        ramp.start = normalize_f32_finite_nonneg(ramp.start, failed_penalty_fallback);
-        ramp.end = normalize_f32_finite_nonneg(ramp.end, failed_penalty_fallback);
-        if ramp.target_tick < 1 {
-            ramp.target_tick = 1;
-        }
+        ec.reproduce_attempt_cost = normalize_f32_finite_nonneg(
+            ec.reproduce_attempt_cost,
+            default_reproduce_attempt_cost(),
+        );
 
         let cc = &mut self.energy.complexity_cost;
         cc.scaling_factor = normalize_f32_finite_nonneg(cc.scaling_factor, 0.002);
@@ -1437,15 +1372,10 @@ mod tests {
         assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
-        assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.eat_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
-        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
-        // Startup ramps
-        assert!(cfg.startup.ramps.failed_action_penalty.enabled);
-        assert!((cfg.startup.ramps.failed_action_penalty.start - 0.0).abs() < 1e-6);
-        assert!((cfg.startup.ramps.failed_action_penalty.end - 1.0).abs() < 1e-6);
-        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 62680);
+        assert!((cfg.energy.costs.reproduce_attempt_cost - 0.05).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 64);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
@@ -1805,26 +1735,21 @@ mod tests {
         assert!((cfg.predation.steal_cost_rate - cfg2.predation.steal_cost_rate).abs() < 1e-6);
     }
 
+    /// T16.F02: the penalty and its startup ramp are retired with no alias;
+    /// a config naming either fails to load and names the key.
     #[test]
-    fn config_default_failed_action_penalty() {
-        let cfg = SimulationConfig::default();
-        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn config_normalize_failed_action_penalty_nan() {
-        let mut cfg = SimulationConfig::default();
-        cfg.energy.costs.failed_action_penalty = f32::NAN;
-        cfg.normalize();
-        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn config_normalize_failed_action_penalty_negative_falls_back() {
-        let mut cfg = SimulationConfig::default();
-        cfg.energy.costs.failed_action_penalty = -3.0;
-        cfg.normalize();
-        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
+    fn retired_failed_action_penalty_keys_are_rejected_by_name() {
+        let mut json = serde_json::to_value(SimulationConfig::default()).unwrap();
+        json["energy"]["costs"]["failed_action_penalty"] = serde_json::json!(1.0);
+        let error = serde_json::from_value::<SimulationConfig>(json).unwrap_err();
+        assert!(
+            error.to_string().contains("failed_action_penalty"),
+            "{error}"
+        );
+        let mut json = serde_json::to_value(SimulationConfig::default()).unwrap();
+        json["startup"] = serde_json::json!({});
+        let error = serde_json::from_value::<SimulationConfig>(json).unwrap_err();
+        assert!(error.to_string().contains("startup"), "{error}");
     }
 
     #[test]
@@ -2077,7 +2002,7 @@ mod tests {
     #[test]
     fn age_cost_config_serde_default_when_missing() {
         // EnergyConfig without age_cost field should get defaults via #[serde(default)]
-        let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"eat_reward_per_food":5.0,"noop_cost":0.05,"reproduce_cost":0.1,"failed_action_penalty":5.0},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
+        let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"eat_reward_per_food":5.0,"noop_cost":0.05,"reproduce_cost":0.1},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
         let ec: EnergyConfig = serde_json::from_str(json).unwrap();
         assert!(ec.age_cost.enabled);
         assert_eq!(ec.age_cost.grace_ticks, 100);
@@ -2359,6 +2284,93 @@ mod tests {
         assert!((result - 0.0).abs() < f32::EPSILON);
     }
 
+    // ── EnergyConfig::action_effort tests (T16.F02) ───────────────────────
+
+    proptest! {
+        /// Invariant 1: every action's effort is at least `NoOp`'s, which is
+        /// above zero, and a base at or above `noop_cost` is charged bit for
+        /// bit what `adjusted_action_cost` charged before the floor. The
+        /// `to_bits` comparison is intentional: the spec pins exact equality.
+        #[test]
+        fn action_effort_is_floored_at_noop_and_exact_above_it(
+            base in 0.0f32..1_000.0,
+            noop_cost in 1e-6f32..100.0,
+            complexity in any::<u32>(),
+            age in 0u64..1_000_000,
+            complexity_enabled in any::<bool>(),
+            age_enabled in any::<bool>(),
+        ) {
+            let mut ec = EnergyConfig::default();
+            ec.costs.noop_cost = noop_cost;
+            ec.complexity_cost.enabled = complexity_enabled;
+            ec.age_cost.enabled = age_enabled;
+            let effort = ec.action_effort(base, complexity, age);
+            let noop = ec.action_effort(noop_cost, complexity, age);
+            prop_assert!(noop > 0.0, "noop effort {noop}");
+            prop_assert!(effort >= noop, "effort {effort} < noop {noop}");
+            if base >= noop_cost {
+                prop_assert_eq!(
+                    effort.to_bits(),
+                    ec.adjusted_action_cost(base, complexity, age).to_bits()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn action_effort_floors_a_zero_or_invalid_base_to_noop() {
+        let ec = EnergyConfig::default();
+        let noop = ec.action_effort(ec.costs.noop_cost, 0, 0);
+        assert_eq!(noop, 0.05);
+        for base in [0.0, 0.01, f32::NAN] {
+            assert_eq!(ec.action_effort(base, 0, 0).to_bits(), noop.to_bits());
+        }
+    }
+
+    #[test]
+    fn effort_cost_defaults_are_pinned() {
+        let costs = EnergyCostsConfig::default();
+        assert_eq!(costs.eat_cost, 0.05);
+        assert_eq!(costs.noop_cost, 0.05);
+        assert_eq!(costs.move_cost, 0.2);
+        assert_eq!(costs.reproduce_attempt_cost, 0.05);
+        assert_eq!(costs.reproduce_cost, 0.1);
+    }
+
+    #[test]
+    fn effort_cost_normalization_falls_back_to_the_defaults() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.costs.noop_cost = invalid;
+            cfg.energy.costs.eat_cost = invalid;
+            cfg.energy.costs.reproduce_attempt_cost = invalid;
+            cfg.normalize();
+            assert_eq!(cfg.energy.costs.noop_cost, 0.05, "{invalid}");
+            assert_eq!(cfg.energy.costs.eat_cost, 0.05, "{invalid}");
+            assert_eq!(cfg.energy.costs.reproduce_attempt_cost, 0.05, "{invalid}");
+        }
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.costs.noop_cost = 0.0;
+        cfg.energy.costs.eat_cost = 0.0;
+        cfg.energy.costs.reproduce_attempt_cost = 0.0;
+        cfg.normalize();
+        assert_eq!(
+            cfg.energy.costs.noop_cost, 0.05,
+            "noop_cost must be above 0"
+        );
+        assert_eq!(cfg.energy.costs.eat_cost, 0.0);
+        assert_eq!(cfg.energy.costs.reproduce_attempt_cost, 0.0);
+    }
+
+    #[test]
+    fn energy_costs_without_reproduce_attempt_cost_load_the_default() {
+        let costs: EnergyCostsConfig = serde_json::from_str(
+            r#"{"move_cost":0.2,"eat_cost":0.0,"eat_reward_per_food":5.0,"noop_cost":0.05,"reproduce_cost":0.1}"#,
+        )
+        .unwrap();
+        assert_eq!(costs.reproduce_attempt_cost, 0.05);
+    }
+
     // ── ReachableBiasConfig tests ─────────────────────────────────────────
 
     #[test]
@@ -2508,43 +2520,6 @@ mod tests {
         cfg.mutation.executed_window_ticks = 7;
         cfg.normalize();
         assert_eq!(cfg.mutation.executed_window_ticks, 7);
-    }
-
-    #[test]
-    fn startup_failed_action_penalty_ramp_defaults_to_enabled() {
-        let cfg = SimulationConfig::default();
-        assert!(cfg.startup.ramps.failed_action_penalty.enabled);
-        assert!((cfg.startup.ramps.failed_action_penalty.start - 0.0).abs() < 1e-6);
-        assert!((cfg.startup.ramps.failed_action_penalty.end - 1.0).abs() < 1e-6);
-        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 62680);
-        assert!((cfg.failed_action_penalty_for_tick(0) - 0.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn startup_failed_action_penalty_ramp_interpolates_until_target_tick() {
-        let mut cfg = SimulationConfig::default();
-        cfg.startup.ramps.failed_action_penalty.enabled = true;
-        cfg.startup.ramps.failed_action_penalty.start = 5.0;
-        cfg.startup.ramps.failed_action_penalty.end = 30.0;
-        cfg.startup.ramps.failed_action_penalty.target_tick = 1000;
-        cfg.apply_startup_overrides();
-
-        assert!((cfg.energy.costs.failed_action_penalty - 30.0).abs() < 1e-6);
-        assert!((cfg.failed_action_penalty_for_tick(0) - 5.0).abs() < 1e-6);
-        assert!((cfg.failed_action_penalty_for_tick(500) - 17.5).abs() < 1e-5);
-        assert!((cfg.failed_action_penalty_for_tick(1000) - 30.0).abs() < 1e-6);
-        assert!((cfg.failed_action_penalty_for_tick(2000) - 30.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn startup_failed_action_penalty_ramp_active_only_before_target_tick() {
-        let mut cfg = SimulationConfig::default();
-        cfg.startup.ramps.failed_action_penalty.enabled = true;
-        cfg.startup.ramps.failed_action_penalty.target_tick = 3;
-
-        assert!(cfg.failed_action_penalty_ramp_active(0));
-        assert!(cfg.failed_action_penalty_ramp_active(2));
-        assert!(!cfg.failed_action_penalty_ramp_active(3));
     }
 
     // ── Food config / FertilityConfig / AnnealingConfig tests ─────────────

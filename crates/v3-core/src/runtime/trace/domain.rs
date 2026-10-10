@@ -61,8 +61,6 @@ pub struct AppliedAction {
     pub entry: crate::creature::action_log::ActionLogEntry,
     /// `action_charges` delta.
     pub charge: f64,
-    /// `failed_action_penalty` delta.
-    pub penalty: f64,
     /// `food_intake_by_type`, `predation_attacker_credit` and
     /// `predation_kill_bonus_credit` deltas.
     pub reward: f64,
@@ -94,8 +92,6 @@ pub struct TickOutcome {
     pub uses_typed_local_food: bool,
     /// Whether sensor assembly built the extended perception banks.
     pub uses_extended_perception: bool,
-    /// The failed-action penalty in force for the tick.
-    pub failed_action_penalty: f32,
     /// Applied actions in order.
     pub applied: Vec<AppliedAction>,
     /// Energy stolen from the creature this tick, lethal or not.

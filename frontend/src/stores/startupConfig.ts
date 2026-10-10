@@ -29,16 +29,6 @@ export interface StartupPreset {
 	energy: {
 		initial_energy: number;
 	};
-	startup: {
-		ramps: {
-			failed_action_penalty: {
-				enabled: boolean;
-				start: number;
-				end: number;
-				target_tick: number;
-			};
-		};
-	};
 }
 
 export interface StartupConfigState {
@@ -337,16 +327,6 @@ function buildDefaultPreset(): StartupPreset {
 			food: buildDefaultFoodConfig(),
 		},
 		energy: { initial_energy: 20.0 },
-		startup: {
-			ramps: {
-				failed_action_penalty: {
-					enabled: true,
-					start: 0.0,
-					end: 1.0,
-					target_tick: 62680,
-				},
-			},
-		},
 	};
 }
 
@@ -363,16 +343,6 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 			food: fromServerFoodConfig(config.world.food),
 		},
 		energy: { initial_energy: config.energy.lifecycle.initial_energy },
-		startup: {
-			ramps: {
-				failed_action_penalty: {
-					enabled: config.startup.ramps.failed_action_penalty.enabled,
-					start: config.startup.ramps.failed_action_penalty.start,
-					end: config.startup.ramps.failed_action_penalty.end,
-					target_tick: config.startup.ramps.failed_action_penalty.target_tick,
-				},
-			},
-		},
 	};
 }
 
@@ -611,13 +581,6 @@ export function buildStartupRequest(preset: StartupPreset): StartupRequest {
 		},
 		energy: {
 			lifecycle: { initial_energy: preset.energy.initial_energy },
-		},
-		startup: {
-			ramps: {
-				failed_action_penalty: {
-					...preset.startup.ramps.failed_action_penalty,
-				},
-			},
 		},
 	};
 }

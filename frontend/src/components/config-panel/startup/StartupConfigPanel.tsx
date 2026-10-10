@@ -6,7 +6,6 @@ import { FoodTypesSection } from "./FoodTypesSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
 import { RecipeControls } from "./RecipeControls.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
-import { StartupRampsSection } from "./StartupRampsSection.tsx";
 import { TerrainSection } from "./TerrainSection.tsx";
 import { WorldTopologySection } from "./WorldTopologySection.tsx";
 
@@ -51,10 +50,6 @@ export function StartupConfigPanel({
 				updateStartupPreset={updateStartupPreset}
 				addFertilityLayer={addFertilityLayer}
 				updateFertilityLayerTarget={updateFertilityLayerTarget}
-			/>
-			<StartupRampsSection
-				startupPreset={startupPreset}
-				updateStartupPreset={updateStartupPreset}
 			/>
 		</Section>
 	);

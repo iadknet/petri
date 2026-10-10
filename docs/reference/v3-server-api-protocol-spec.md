@@ -169,21 +169,11 @@ Request (conceptual v3alpha4 shape):
     },
     "costs": {
       "move_cost": 0.2,
-      "eat_cost": 0.0,
+      "eat_cost": 0.05,
       "eat_reward_per_food": 5.0,
       "noop_cost": 0.05,
       "reproduce_cost": 0.1,
-      "failed_action_penalty": 1.0
-    }
-  },
-  "startup": {
-    "ramps": {
-      "failed_action_penalty": {
-        "enabled": true,
-        "start": 5.0,
-        "end": 30.0,
-        "target_tick": 1000
-      }
+      "reproduce_attempt_cost": 0.05
     }
   },
   "runtime": {
@@ -223,9 +213,8 @@ Request rules:
   and the drift walk and recruitment-paths instruments draw the same rule on
   the canonical founder's 97 units. The keys of the retired per-birth rule
   are unknown fields and are rejected (T11.F20).
-- Startup-only controls live under `startup.*` and are restart-only, as are
-  `population.initial_creatures` and `population.founder_profile` (Section
-  4.8).
+- `population.initial_creatures` and `population.founder_profile` are
+  restart-only (Section 4.8).
 - `population.founder_profile` is optional and selects the founder genome
   profile applied uniformly to every seeded founder. Wire values are the
   `snake_case` profile names tabulated in `v3-startup-seeding-spec.md`
@@ -494,11 +483,11 @@ Response:
       },
       "costs": {
         "move_cost": 0.2,
-        "eat_cost": 0.0,
+        "eat_cost": 0.05,
         "eat_reward_per_food": 5.0,
         "noop_cost": 0.05,
         "reproduce_cost": 0.1,
-        "failed_action_penalty": 1.0
+        "reproduce_attempt_cost": 0.05
       }
     },
     "runtime": {
@@ -545,7 +534,6 @@ Rules:
   `world.terrain`, `world.world_seed`) are restart-only and rejected from PATCH
   by key presence, including null/empty values, atomically without state changes.
 - Runtime and energy fields are editable in `idle` and `paused`.
-- `startup.*` fields are restart-only and rejected from PATCH.
 - `population.initial_creatures` is restart-only and rejected from PATCH:
   founders are seeded only by `POST /v3/simulation/startup`, so a patched value
   would never take effect. `population.founder_profile` is restart-only and
@@ -554,8 +542,10 @@ Rules:
   reproduction cap and stays editable.
 - `world.food.types[]` and `world.food.fertility.layers` are restart-only and
   rejected from PATCH.
-- `energy.costs.failed_action_penalty` is rejected while an active startup
-  failed-action-penalty ramp is still in progress (`tick < target_tick`).
+- A startup request or PATCH naming a retired key (`energy.costs.failed_action_penalty`,
+  the `startup` section, both retired by T16.F02) is rejected with
+  `422 validation_rejected` as an unknown field naming the key; there is no
+  alias or migration.
 - Editing configuration in disallowed states returns
   `409 invalid_state_transition`.
 

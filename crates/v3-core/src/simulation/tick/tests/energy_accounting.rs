@@ -54,10 +54,9 @@ fn noop_counts_each_applied_attempt() {
     }
 }
 
-/// Reproduce is absent: since T16.F01 the reproduce charge lands only after
-/// the energy gates pass (`energy - cost >= transfer > 0`), so it can never
-/// cross zero; `reproduce_below_cost_rejects_free_and_records_no_crossing`
-/// pins that instead.
+/// Reproduce crosses at its Step 0 attempt effort (T16.F02); the
+/// replication cost lands only after the energy gates pass, so it never
+/// crosses zero.
 #[test]
 fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
     for (action, cause) in [
@@ -67,6 +66,13 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             DeathCause::ActionEat,
         ),
         (WorldAction::Move(Direction::N), DeathCause::ActionMove),
+        (
+            WorldAction::Reproduce {
+                direction: Direction::N,
+                energy_transfer_fraction: 1.0,
+            },
+            DeathCause::ActionReproduce,
+        ),
         (
             WorldAction::StealEnergy {
                 direction: Direction::N,
@@ -80,8 +86,7 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         sim.config.energy.costs.noop_cost = 2.0;
         sim.config.energy.costs.eat_cost = 2.0;
         sim.config.energy.costs.move_cost = 2.0;
-        sim.config.energy.costs.reproduce_cost = 2.0;
-        sim.config.energy.costs.failed_action_penalty = 0.0;
+        sim.config.energy.costs.reproduce_attempt_cost = 2.0;
         sim.config.energy.lifecycle.min_reproduce_age = 0;
         sim.config.predation.steal_cost_rate = 2.0;
         execute(&mut sim, id, action);
@@ -92,6 +97,7 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             DeathCause::ActionNoop => charges.noop,
             DeathCause::ActionEat => charges.eat,
             DeathCause::ActionMove => charges.r#move,
+            DeathCause::ActionReproduce => charges.reproduce,
             DeathCause::ActionStealEnergy => charges.steal_energy,
             _ => unreachable!(),
         };
@@ -104,67 +110,14 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
 }
 
 #[test]
-fn reproduce_below_cost_rejects_free_and_records_no_crossing() {
-    let (mut sim, id) = make_sim_with_one_creature(1.0);
-    sim.config.energy.complexity_cost.enabled = false;
-    sim.config.energy.costs.reproduce_cost = 2.0;
-    sim.config.energy.costs.failed_action_penalty = 0.0;
-    sim.config.energy.lifecycle.min_reproduce_age = 0;
-    execute(
-        &mut sim,
-        id,
-        WorldAction::Reproduce {
-            direction: Direction::N,
-            energy_transfer_fraction: 1.0,
-        },
-    );
-    assert_eq!(sim.stats.mortality.count(DeathCause::ActionReproduce), 0);
-    assert_eq!(sim.stats.energy_flows.action_charges.reproduce, 0.0);
-    assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
-    assert_eq!(sim.creatures[id].energy, 1.0);
-    assert!(sim.creatures[id].pending_death_cause.is_none());
-}
-
-#[test]
-fn failed_penalty_is_a_separate_exhausting_debit_on_every_rejected_action() {
-    for action in [
-        WorldAction::eat(OrdinaryFoodTypeId::default()),
-        WorldAction::Move(Direction::N),
-        WorldAction::Reproduce {
-            direction: Direction::N,
-            energy_transfer_fraction: 1.0,
-        },
-        WorldAction::StealEnergy {
-            direction: Direction::N,
-            amount: 1.0,
-        },
-    ] {
-        let (mut sim, id) = make_sim_with_one_creature(1.0);
-        sim.world
-            .set_barrier(crate::contracts::Position::new(5, 4), true);
-        sim.config.energy.complexity_cost.enabled = false;
-        sim.config.energy.costs.eat_cost = 0.0;
-        sim.config.energy.costs.move_cost = 0.0;
-        sim.config.energy.costs.failed_action_penalty = 2.0;
-        sim.config.startup.ramps.failed_action_penalty.enabled = false;
-        sim.config.predation.steal_cost_rate = 0.0;
-        execute(&mut sim, id, action);
-        assert_eq!(
-            sim.stats.mortality.count(DeathCause::FailedActionPenalty),
-            1
-        );
-        assert_eq!(sim.stats.energy_flows.failed_action_penalty, 2.0);
-        assert_eq!(sim.stats.energy_flows.zero_floor_credit, 1.0);
-    }
-}
-
-#[test]
 fn parental_transfer_counts_only_a_successful_birth_and_newborn_starts_clear() {
     for (starting, spawned) in [(5.0, true), (3.0, false)] {
         let (mut sim, id) = make_sim_with_one_creature(starting);
         sim.config.energy.complexity_cost.enabled = false;
         sim.config.energy.costs.reproduce_cost = 1.0;
-        sim.config.energy.costs.failed_action_penalty = 0.0;
+        // A zero effort floor isolates the replication charge (T16.F02).
+        sim.config.energy.costs.noop_cost = 0.0;
+        sim.config.energy.costs.reproduce_attempt_cost = 0.0;
         sim.config.energy.lifecycle.min_reproduce_age = 0;
         sim.config.energy.lifecycle.min_reproduce_energy = 0.0;
         // T17.F01: the whole post-cost energy goes to the child; the litter
@@ -204,34 +157,7 @@ fn parental_transfer_counts_only_a_successful_birth_and_newborn_starts_clear() {
 }
 
 #[test]
-fn failed_penalty_observes_the_ramped_scaled_debit_and_rounded_away_charges() {
-    let (mut sim, id) = make_sim_with_one_creature(1000.0);
-    sim.tick = 25;
-    sim.creatures[id].age = 250;
-    sim.creatures[id].cached_complexity = 200;
-    sim.config.energy.complexity_cost.enabled = true;
-    sim.config.energy.costs.eat_cost = 0.0;
-    sim.config.energy.costs.failed_action_penalty = 99.0;
-    let ramp = &mut sim.config.startup.ramps.failed_action_penalty;
-    ramp.enabled = true;
-    ramp.start = 2.0;
-    ramp.end = 6.0;
-    ramp.target_tick = 100;
-    let expected_charge = sim.config.energy.adjusted_action_cost(3.0, 200, 250);
-    assert!(expected_charge > 3.0);
-    execute(
-        &mut sim,
-        id,
-        WorldAction::eat(OrdinaryFoodTypeId::default()),
-    );
-    let after = 1000.0f32 - expected_charge;
-    assert_eq!(sim.creatures[id].energy.to_bits(), after.to_bits());
-    assert_eq!(
-        sim.stats.energy_flows.failed_action_penalty,
-        1000.0 - f64::from(after)
-    );
-    assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
-
+fn a_charge_rounded_away_records_no_debit() {
     let (mut sim, id) = make_sim_with_one_creature(100.0);
     sim.config.energy.costs.noop_cost = f32::EPSILON;
     execute(&mut sim, id, WorldAction::NoOp);
@@ -250,6 +176,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         sim.config.runtime.vm.opcode_cost_multiplier = 1.0;
         sim.config.runtime.vm.step_ramp_cost = 0.0;
         sim.config.predation.steal_cost_rate = 0.0;
+        sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
         sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
         let queue = [attacker, victim];
         let inputs = super::super::assemble_sensor_inputs(&sim, &queue);
@@ -290,6 +217,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
 fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(9.0, 2.0);
     sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
     sim.config.energy.lifecycle.max_energy = 10.0;
     sim.creatures[victim].cached_complexity = 4;
@@ -303,6 +231,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
 
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
     sim.creatures[victim].cached_complexity = 3;
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
@@ -329,6 +258,7 @@ fn zero_carrying_rate_keeps_exposure_and_food_lower_floor_is_observed() {
     sim.creatures[id].energy = -10.0;
     sim.creatures[id].pending_death_cause = Some(DeathCause::VmCompute);
     sim.config.energy.costs.eat_cost = 0.0;
+    sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.energy.costs.eat_reward_per_food = 2.0;
     sim.world.set_food_type(
         sim.creatures[id].position,
@@ -366,6 +296,7 @@ fn rounded_compute_exhaustion_preserves_the_queued_eat_recovery() {
     sim.config.runtime.vm.step_ramp_cost = 0.0;
     sim.config.energy.costs.eat_reward_per_food = 2.0;
     sim.config.energy.costs.eat_cost = 0.0;
+    sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.world.set_food_type(
         sim.creatures[id].position,
         OrdinaryFoodTypeId::default(),
@@ -572,6 +503,7 @@ fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() 
 fn predation_retains_exhausted_victim_cause_and_signed_reverse_transfer() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     sim.creatures[victim].pending_death_cause = Some(DeathCause::VmCompute);
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
@@ -640,9 +572,7 @@ fn tick_compute_passes_and_decided_passes_accumulate_across_creatures_and_ticks(
 }
 
 /// T16.F02 invariant 5: `failed_action_effort.k` adds the very debit
-/// `action_charges.k` records whenever the attempt failed. A rejected
-/// reproduce pays no effort before the engine change, so its subset stays
-/// equal to its (zero) charge.
+/// `action_charges.k` records whenever the attempt failed.
 #[test]
 fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
     use crate::simulation::energy_accounting::{ActionCharges, FailedActionEffort};
@@ -690,9 +620,8 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
             },
             "{action:?}"
         );
-        let reproducing = matches!(action, WorldAction::Reproduce { .. });
         assert!(
-            reproducing || r#move + eat + steal_energy > 0.0,
+            r#move + eat + reproduce + steal_energy > 0.0,
             "{action:?} must have paid an effort"
         );
         assert!(sim.creatures.contains_key(id), "{action:?}");

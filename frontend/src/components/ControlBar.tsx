@@ -166,11 +166,7 @@ export function ControlBar() {
 			// the panel shows what actually applied.
 			if (prevConfig) {
 				const patch: Record<string, unknown> = {};
-				const failedPenaltyRampEnabled = startup.startup.ramps.failed_action_penalty.enabled;
 				for (const field of RUNTIME_PATCH_FIELDS) {
-					if (failedPenaltyRampEnabled && field.path === "energy.costs.failed_action_penalty") {
-						continue;
-					}
 					mergePatch(patch, buildPatch(field.path, getByPath(prevConfig, field.path) as number));
 				}
 				try {

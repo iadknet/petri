@@ -197,7 +197,11 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// `mutation.neutral_input_recruitment: Off` must recover the pre-F04 digests,
 /// preserving both historical precision guards. T03.F12 re-pinned all three
 /// after two agreeing runs for `energy.lifecycle.gestation_ticks_per_founder_genome:
-/// 1.0`; removing only that key recovers the T20.F05 digests.
+/// 1.0`; removing only that key recovers the T20.F05 digests. T16.F02
+/// re-pinned all three after two agreeing runs: the resolved config drops
+/// `energy.costs.failed_action_penalty` and `startup`, adds
+/// `energy.costs.reproduce_attempt_cost: 0.05`, and `eat_cost` defaults to
+/// 0.05; undoing exactly those recovers the T03.F12 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -213,14 +217,56 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:12ea63f7191ad3286011e06a2f068e6c15e208af0f875a4ea6eac71f274edf08",
+            "sha256:6112372c8e990697cebbee72ec054d31b1f2c8c0485bc87159f9c28bf87e9db7",
+            "sha256:39d3a045c89ff08b35ef87177a378c116f53b8394d60933f54fb5c1f6a14a843",
+        ]
+    );
+
+    // Undoing T16.F02's config shape recovers the T03.F12 digests: restore
+    // the retired penalty and its startup ramp at their old defaults, drop
+    // `reproduce_attempt_cost`, and return `eat_cost` to 0.
+    let f12_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        let costs = value["energy"]["costs"].as_object_mut().unwrap();
+        assert_eq!(
+            costs.remove("reproduce_attempt_cost"),
+            Some(json!(f64::from(0.05_f32)))
+        );
+        assert_eq!(
+            costs.insert("eat_cost".into(), json!(0.0)),
+            Some(json!(f64::from(0.05_f32)))
+        );
+        assert_eq!(
+            costs.insert("failed_action_penalty".into(), json!(1.0)),
+            None
+        );
+        let ramp = json!({"enabled": true, "start": 0.0, "end": 1.0, "target_tick": 62680});
+        let startup = json!({"ramps": {"failed_action_penalty": ramp}});
+        assert_eq!(
+            value
+                .as_object_mut()
+                .unwrap()
+                .insert("startup".into(), startup),
+            None
+        );
+        value
+    });
+    let f12 = f12_values.each_ref().map(|value| {
+        let canonical =
+            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
+        format!("sha256:{}", artifacts::sha256(&canonical))
+    });
+    assert_eq!(
+        f12,
+        [
             "sha256:b8be15d0615cd7f70edba6073025abf9412de28a3fc5debed35f79db87428620",
             "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
             "sha256:441f348222578888e41be99c4f4924a91809b4ef50c55dcd6de80b91cc37586d",
         ]
     );
 
-    let f05_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let f05_values = f12_values.map(|mut value| {
         assert_eq!(
             value["energy"]["lifecycle"]
                 .as_object_mut()

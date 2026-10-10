@@ -37,7 +37,8 @@ impl PredationActionResult {
 
 /// Apply a StealEnergy action: attempt to steal energy from a neighbor.
 ///
-/// The attacker always pays `steal_cost_rate * requested_amount` regardless of outcome.
+/// The attacker always pays the effort of `steal_cost_rate * requested_amount`,
+/// floored at `NoOp`'s (T16.F02), regardless of outcome, and nothing more.
 /// If a victim exists, the actual transfer is `min(requested_amount, victim.energy)`.
 /// If the victim's energy drops to zero or below, the victim is killed and removed,
 /// and the attacker receives a complexity bonus.
@@ -59,8 +60,9 @@ pub fn apply_steal_energy(
     sim.stats.predation_actions_attempted_total += 1;
     sim.stats.last_tick_steal += 1;
 
-    // Step 2: Deduct cost (based on attempted amount, not actual; scaled by genome complexity and age).
-    let cost = sim.config.energy.adjusted_action_cost(
+    // Step 2: Deduct the effort (based on attempted amount, not actual;
+    // floored at NoOp's; scaled by genome complexity and age).
+    let cost = sim.config.energy.action_effort(
         sim.config.predation.steal_cost_rate * requested_amount,
         sim.creatures[attacker_id].cached_complexity,
         sim.creatures[attacker_id].age,
@@ -300,14 +302,14 @@ mod tests {
         // Attacker at (5,5), victim at (5,4) = N of attacker
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
-        sim.config.predation.steal_cost_rate = 0.0; // no cost for clarity
+        sim.config.predation.steal_cost_rate = 0.0; // only the NoOp floor (T16.F02)
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
         assert_eq!(result, PredationActionResult::Transferred);
         assert!(
-            (sim.creatures[attacker_id].energy - 60.0).abs() < 1e-6,
-            "attacker should gain 10"
+            (sim.creatures[attacker_id].energy - (60.0 - 0.05)).abs() < 1e-5,
+            "attacker should gain 10 less the 0.05 effort floor"
         );
         assert!(
             (sim.creatures[victim_id].energy - 20.0).abs() < 1e-6,
@@ -485,8 +487,8 @@ mod tests {
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
         assert_eq!(result, PredationActionResult::TransferredAndKilled);
-        // attacker: 50 + 5 (actual steal) + complexity bonus
-        let expected = 50.0 + 5.0 + victim_complexity as f32 * 1.0;
+        // attacker: 50 − 0.05 (effort floor) + 5 (actual steal) + complexity bonus
+        let expected = 50.0 - 0.05 + 5.0 + victim_complexity as f32 * 1.0;
         assert!(
             (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
             "attacker energy {} should be {} (with complexity bonus)",
@@ -534,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn steal_zero_amount_only_costs_zero() {
+    fn steal_zero_amount_pays_the_noop_floor() {
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.predation.steal_cost_rate = 0.2;
@@ -542,10 +544,10 @@ mod tests {
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 0.0);
 
         assert_eq!(result, PredationActionResult::Transferred);
-        // cost = 0.2 * 0 = 0, transfer = 0
+        // cost = max(0.2 * 0, noop_cost) = 0.05 (T16.F02), transfer = 0
         assert!(
-            (sim.creatures[attacker_id].energy - 50.0).abs() < 1e-6,
-            "no energy change for zero steal"
+            (sim.creatures[attacker_id].energy - (50.0 - 0.05)).abs() < 1e-6,
+            "a zero steal pays the NoOp floor"
         );
         assert!(
             (sim.creatures[victim_id].energy - 30.0).abs() < 1e-6,

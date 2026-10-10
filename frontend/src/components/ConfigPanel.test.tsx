@@ -224,27 +224,24 @@ describe("ConfigPanel", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("locks runtime failed action penalty while startup ramp is active", () => {
-		useConfigStore.getState().setServerConfig(
-			{
-				...MOCK_CONFIG,
-				startup: {
-					ramps: {
-						failed_action_penalty: {
-							enabled: true,
-							start: 5,
-							end: 30,
-							target_tick: 1000,
-						},
-					},
-				},
-			},
-			"paused",
-		);
-		useSimulationStore.getState().setTick(10);
-
+	it("shows effort-priced costs with no penalty field or startup ramp section", () => {
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
 		render(<ConfigPanel />);
-		expect(screen.getByTestId("config-field-energy-costs-failed-action-penalty")).toBeDisabled();
+
+		expect(
+			screen.queryByTestId("config-field-energy-costs-failed-action-penalty"),
+		).not.toBeInTheDocument();
+		expect(
+			screen.queryByTestId("startup-field-ramp-failed-action-penalty-enabled"),
+		).not.toBeInTheDocument();
+		expect(screen.queryByText("Startup Ramps")).not.toBeInTheDocument();
+
+		const attempt = screen.getByTestId("config-field-energy-costs-reproduce-attempt-cost");
+		expect(attempt).toHaveValue(0.05);
+		expect(attempt).toBeEnabled();
+		expect(
+			Number(screen.getByTestId("config-field-energy-costs-noop-cost").getAttribute("min")),
+		).toBeGreaterThan(0);
 	});
 
 	it("supports fertility startup controls and persists values in startup preset", () => {

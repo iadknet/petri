@@ -1017,44 +1017,41 @@ async fn startup_accepts_founder_profile_and_get_config_roundtrips() {
     );
 }
 
-// ── 11f. startup_failed_action_penalty_ramp_pins_runtime_penalty_to_end ───
+// ── 11f. startup_rejects_retired_penalty_and_ramp_keys ────────────────────
 
+/// T16.F02 retired `energy.costs.failed_action_penalty` and the whole
+/// `startup` section: a startup request naming either fails to resolve and
+/// names the key, with no alias or migration.
 #[tokio::test]
-async fn startup_failed_action_penalty_ramp_pins_runtime_penalty_to_end() {
-    let a = app();
-    let startup_body = r#"{
-        "seed": 123,
-        "startup": {
-            "ramps": {
-                "failed_action_penalty": {
-                    "enabled": true,
-                    "start": 5.0,
-                    "end": 30.0,
-                    "target_tick": 1000
-                }
-            }
-        }
-    }"#;
-
-    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
-    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
-
-    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
-    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
-    assert_eq!(
-        get_body["config"]["energy"]["costs"]["failed_action_penalty"].as_f64(),
-        Some(30.0)
-    );
-    assert_eq!(
-        get_body["config"]["startup"]["ramps"]["failed_action_penalty"]["enabled"].as_bool(),
-        Some(true)
-    );
+async fn startup_rejects_retired_penalty_and_ramp_keys() {
+    for (body, key) in [
+        (
+            r#"{"seed":1,"energy":{"costs":{"failed_action_penalty":1.0}}}"#,
+            "failed_action_penalty",
+        ),
+        (
+            r#"{"seed":1,"startup":{"ramps":{"failed_action_penalty":{"enabled":true,"start":5.0,"end":30.0,"target_tick":1000}}}}"#,
+            "startup",
+        ),
+    ] {
+        let (status, resp) = do_request(app(), startup_req(body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {resp}");
+        assert_eq!(
+            resp["error"]["code"].as_str(),
+            Some("validation_rejected"),
+            "body: {resp}"
+        );
+        assert!(
+            resp.to_string().contains(&format!("unknown field `{key}`")),
+            "body: {resp}"
+        );
+    }
 }
 
-// ── 11g. patch_config_rejects_startup_fields ───────────────────────────────
+// ── 11g. patch_config_rejects_retired_startup_section ─────────────────────
 
 #[tokio::test]
-async fn patch_config_rejects_startup_fields() {
+async fn patch_config_rejects_retired_startup_section() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -1079,6 +1076,10 @@ async fn patch_config_rejects_startup_fields() {
     assert_eq!(
         body["error"]["code"].as_str(),
         Some("validation_rejected"),
+        "body: {body}"
+    );
+    assert!(
+        body.to_string().contains("unknown field `startup`"),
         "body: {body}"
     );
 }
@@ -1364,26 +1365,15 @@ async fn patch_config_rejects_non_object_food_shared_patch() {
     );
 }
 
-// ── 11h. patch_config_blocks_failed_penalty_while_ramp_active ─────────────
+// ── 11h. patch_config_rejects_retired_failed_action_penalty ──────────────
 
 #[tokio::test]
-async fn patch_config_blocks_failed_penalty_while_ramp_active() {
+async fn patch_config_rejects_retired_failed_action_penalty() {
     let a = app();
-    let startup_body = r#"{
-        "seed": 321,
-        "startup": {
-            "ramps": {
-                "failed_action_penalty": {
-                    "enabled": true,
-                    "start": 5.0,
-                    "end": 30.0,
-                    "target_tick": 10
-                }
-            }
-        }
-    }"#;
-    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
-    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":321}"#))
+        .await
+        .unwrap();
 
     let patch = r#"{"energy":{"costs":{"failed_action_penalty":7.0}}}"#;
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
@@ -1393,46 +1383,29 @@ async fn patch_config_blocks_failed_penalty_while_ramp_active() {
         Some("validation_rejected"),
         "body: {body}"
     );
+    assert!(
+        body.to_string()
+            .contains("unknown field `failed_action_penalty`"),
+        "body: {body}"
+    );
 }
 
-// ── 11i. patch_config_allows_failed_penalty_after_ramp_target_tick ─────────
+// ── 11i. patch_config_applies_reproduce_attempt_cost ──────────────────────
 
 #[tokio::test]
-async fn patch_config_allows_failed_penalty_after_ramp_target_tick() {
+async fn patch_config_applies_reproduce_attempt_cost() {
     let a = app();
-    let startup_body = r#"{
-        "seed": 777,
-        "startup": {
-            "ramps": {
-                "failed_action_penalty": {
-                    "enabled": true,
-                    "start": 5.0,
-                    "end": 30.0,
-                    "target_tick": 1
-                }
-            }
-        }
-    }"#;
-    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
-    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":777}"#))
+        .await
+        .unwrap();
 
-    let (start_status, start_body) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
-    assert_eq!(start_status, StatusCode::OK, "body: {start_body}");
-    let (pause_status, pause_body) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
-    assert_eq!(pause_status, StatusCode::OK, "body: {pause_body}");
-    let (step_status, step_body) = do_request(
-        a.clone(),
-        post_json("/v3/simulation/step", r#"{"steps":1}"#),
-    )
-    .await;
-    assert_eq!(step_status, StatusCode::OK, "body: {step_body}");
-
-    let patch = r#"{"energy":{"costs":{"failed_action_penalty":9.0}}}"#;
+    let patch = r#"{"energy":{"costs":{"reproduce_attempt_cost":0.25}}}"#;
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert_eq!(
-        body["config"]["energy"]["costs"]["failed_action_penalty"].as_f64(),
-        Some(9.0),
+        body["config"]["energy"]["costs"]["reproduce_attempt_cost"].as_f64(),
+        Some(f64::from(0.25_f32)),
         "body: {body}"
     );
 }
@@ -3425,7 +3398,15 @@ async fn energy_only_shared_reward_can_be_changed_live() {
                 type_idx,
                 &mut sim.stats.energy_flows
             ));
-            assert!((sim.creatures[id].energy - 13.75).abs() < 1e-6);
+            // 0.5 food × 7.5 credited, then the eat effort paid (T16.F02).
+            let creature = &sim.creatures[id];
+            let effort = sim.config.energy.action_effort(
+                sim.config.energy.costs.eat_cost,
+                creature.cached_complexity,
+                creature.age,
+            );
+            assert!(effort > 0.0);
+            assert_eq!(creature.energy, 13.75 - effort);
         }
     }
     let (_, snapshot) = do_request(a, get_req("/v3/simulation/snapshot?zoom_tier=detail")).await;

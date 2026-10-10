@@ -1,5 +1,9 @@
 import type { FieldDef } from "../shared/types.ts";
 
+/** T16.F02: the shared pricing rule of every action's effort. */
+export const EFFORT_RULE =
+	"Charged on every attempt, whatever the outcome, and never below Noop Cost";
+
 export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 	{
 		path: "energy.costs.eat_reward_per_food",
@@ -19,7 +23,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-energy-costs-move-cost",
 		defaultValue: 0.2,
-		tooltip: "Energy subtracted each time a creature moves to an adjacent cell",
+		tooltip: `Energy a move costs. ${EFFORT_RULE}; a blocked move pays it and nothing more`,
 	},
 	{
 		path: "energy.costs.eat_cost",
@@ -27,17 +31,19 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 10,
 		step: 0.01,
-		defaultValue: 0.0,
-		tooltip: "Energy subtracted when a creature eats food from its cell",
+		defaultValue: 0.05,
+		testId: "config-field-energy-costs-eat-cost",
+		tooltip: `Energy an eat costs, paid after the food is credited. ${EFFORT_RULE}; an eat on an empty cell pays it and nothing more`,
 	},
 	{
 		path: "energy.costs.noop_cost",
 		label: "Noop Cost",
-		min: 0,
+		min: 0.01,
 		max: 10,
 		step: 0.01,
 		defaultValue: 0.05,
-		tooltip: "Energy subtracted when a creature takes no action",
+		testId: "config-field-energy-costs-noop-cost",
+		tooltip: `Energy a no-op costs, the floor of every action's effort; must be above 0. ${EFFORT_RULE}`,
 	},
 	{
 		path: "energy.costs.reproduce_cost",
@@ -46,16 +52,17 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 50,
 		step: 0.1,
 		defaultValue: 0.1,
-		tooltip: "Energy subtracted from parent when reproduction occurs",
+		tooltip:
+			"The replication cost, paid by the parent only on a conception, after every reproduction gate passes",
 	},
 	{
-		path: "energy.costs.failed_action_penalty",
-		label: "Failed Action Penalty",
+		path: "energy.costs.reproduce_attempt_cost",
+		label: "Reproduce Attempt Cost",
 		min: 0,
-		max: 20,
-		step: 0.1,
-		defaultValue: 1.0,
-		testId: "config-field-energy-costs-failed-action-penalty",
-		tooltip: "Additional energy penalty when an action fails (move blocked, eat empty cell, etc.)",
+		max: 10,
+		step: 0.01,
+		defaultValue: 0.05,
+		testId: "config-field-energy-costs-reproduce-attempt-cost",
+		tooltip: `Energy a reproduce attempt costs, paid before any gate. ${EFFORT_RULE}; a rejected attempt pays it and nothing more`,
 	},
 ];

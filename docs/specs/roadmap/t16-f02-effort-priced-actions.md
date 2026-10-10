@@ -124,12 +124,12 @@ reported under the blocker rule, never rounded to a pass.
       goal `action_attempts` block through `v3-core`, the bench tracking, the
       summary keep-list and telemetry, with every trajectory pin unchanged.
       Its build is the control (Verification).
-- [ ] TDD: failing tests for the cases below, then the engine change (the
+- [x] TDD: failing tests for the cases below, then the engine change (the
       floor helper on every action charge, the `eat_cost` default, Step 0,
       the steal floor, the four failure debits removed).
-- [ ] Retire every surface in invariant 8; strip the seven tracked recipes.
-- [ ] Panel and frontend tests; reference documents.
-- [ ] Re-pin moved trajectory values with the reason in the test and old and
+- [x] Retire every surface in invariant 8; strip the seven tracked recipes.
+- [x] Panel and frontend tests; reference documents.
+- [x] Re-pin moved trajectory values with the reason in the test and old and
       new values in the readings.
 
 | Property | Cases |
@@ -143,9 +143,9 @@ reported under the blocker rule, never rounded to a pass.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` exits 0 before and after the
+- [x] `cargo test -p v3-core --test viability` exits 0 before and after the
       engine change.
-- [ ] Focused tests (`v3-core` actions, tick and config, `v3-server`,
+- [x] Focused tests (`v3-core` actions, tick and config, `v3-server`,
       `v3-cli` bench, `v3-telemetry`, `v3-lab`, frontend): commands and
       counts in the readings.
 - [ ] `make check` exits 0; tested commit in the readings. Before the

@@ -77,32 +77,6 @@ pub fn resolve_config(
             field: "config",
             reason: error.to_string(),
         })?;
-    let ramp = &config.startup.ramps.failed_action_penalty;
-    for (field, invalid, reason) in [
-        (
-            "startup.ramps.failed_action_penalty.target_tick",
-            ramp.target_tick < 1,
-            "must be >= 1",
-        ),
-        (
-            "startup.ramps.failed_action_penalty.start",
-            !ramp.start.is_finite() || ramp.start < 0.0,
-            "must be finite and >= 0.0",
-        ),
-        (
-            "startup.ramps.failed_action_penalty.end",
-            !ramp.end.is_finite() || ramp.end < 0.0,
-            "must be finite and >= 0.0",
-        ),
-    ] {
-        if invalid {
-            return Err(ConfigError {
-                field,
-                reason: reason.into(),
-            });
-        }
-    }
     config.normalize();
-    config.apply_startup_overrides();
     Ok(config)
 }

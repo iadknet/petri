@@ -1,0 +1,464 @@
+//! T16.F02: every committed action pays its effort, at least `NoOp`'s, on
+//! every attempt, and a failure pays that effort and nothing more.
+
+use super::support::*;
+use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldAction};
+use crate::runtime::trace::domain::TerminationReason;
+use crate::runtime::types::{ComputeCostReport, MeshOutput};
+use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
+use crate::simulation::outcomes::OutcomeAccumulator;
+use crate::simulation::Simulation;
+use rand::{rngs::SmallRng, SeedableRng};
+
+fn run(sim: &mut Simulation, id: CreatureId, actions: Vec<WorldAction>) {
+    let decision = MeshOutput {
+        actions,
+        cost_report: ComputeCostReport::default(),
+        priority_bid: 0.0,
+        work_counters: Default::default(),
+        energy_observation: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
+        commit_counts: Default::default(),
+    };
+    super::super::run_phase_2(
+        sim,
+        vec![(id, decision)],
+        &mut OutcomeAccumulator::default(),
+        &mut SmallRng::seed_from_u64(11),
+    );
+}
+
+fn execute(sim: &mut Simulation, id: CreatureId, action: WorldAction) {
+    run(sim, id, vec![action]);
+}
+
+const REPRODUCE: WorldAction = WorldAction::Reproduce {
+    direction: Direction::N,
+    energy_transfer_fraction: 0.5,
+};
+
+/// Which action bucket of [`EnergyFlows`] an attempt is charged to.
+#[derive(Clone, Copy, Debug)]
+enum Bucket {
+    Move,
+    Eat,
+    Reproduce,
+    Steal,
+}
+
+impl Bucket {
+    /// The effort base for this attempt, with `requested` the steal amount.
+    fn base(self, sim: &Simulation, requested: f32) -> f32 {
+        let costs = &sim.config.energy.costs;
+        match self {
+            Self::Move => costs.move_cost,
+            Self::Eat => costs.eat_cost,
+            Self::Reproduce => costs.reproduce_attempt_cost,
+            Self::Steal => sim.config.predation.steal_cost_rate * requested,
+        }
+    }
+
+    fn add_failed(self, flows: &mut EnergyFlows, debit: f64) {
+        let (charge, failed) = match self {
+            Self::Move => (
+                &mut flows.action_charges.r#move,
+                &mut flows.failed_action_effort.r#move,
+            ),
+            Self::Eat => (
+                &mut flows.action_charges.eat,
+                &mut flows.failed_action_effort.eat,
+            ),
+            Self::Reproduce => (
+                &mut flows.action_charges.reproduce,
+                &mut flows.failed_action_effort.reproduce,
+            ),
+            Self::Steal => (
+                &mut flows.action_charges.steal_energy,
+                &mut flows.failed_action_effort.steal_energy,
+            ),
+        };
+        *charge += debit;
+        *failed += debit;
+    }
+}
+
+fn effort(sim: &Simulation, id: CreatureId, base: f32) -> f32 {
+    let creature = &sim.creatures[id];
+    sim.config
+        .energy
+        .action_effort(base, creature.cached_complexity, creature.age)
+}
+
+fn barrier_north(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = make_sim_with_one_creature(energy);
+    sim.world.set_barrier(Position::new(5, 4), true);
+    sim.config.energy.lifecycle.min_reproduce_age = 0;
+    (sim, id)
+}
+
+fn ready_parent(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = make_sim_with_one_creature(energy);
+    sim.config.energy.lifecycle.min_reproduce_age = 0;
+    (sim, id)
+}
+
+fn occupied_north(energy: f32) -> (Simulation, CreatureId) {
+    let (sim, id, _) = make_sim_two_creatures(energy, 50.0);
+    (sim, id)
+}
+
+/// A creature on the corner of a bounded world, so a move north leaves it.
+fn bounded_corner(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = make_sim_with_one_creature(energy);
+    let mut world = crate::kernel::WorldState::new(
+        sim.config.world.width,
+        sim.config.world.height,
+        crate::config::WorldEdgeMode::Bounded,
+    );
+    world.reconfigure_food(sim.config.world.food.clone());
+    let corner = Position::new(0, 0);
+    world.place_creature(corner, id);
+    sim.world = world;
+    sim.creatures[id].position = corner;
+    (sim, id)
+}
+
+fn capped_parent(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = ready_parent(energy);
+    sim.config.population.max_creatures = 1;
+    (sim, id)
+}
+
+fn young_parent(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = ready_parent(energy);
+    sim.config.energy.lifecycle.min_reproduce_age = 100;
+    (sim, id)
+}
+
+fn poor_parent(energy: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = ready_parent(energy);
+    sim.config.energy.lifecycle.min_reproduce_energy = 1_000.0;
+    (sim, id)
+}
+
+/// Invariant 2: a failed attempt stores `before − effort` in `f32`, both
+/// `action_charges` and `failed_action_effort` rise by the applied debit,
+/// and no other flow moves. Only Step 7 counts a litter rejection.
+#[test]
+fn a_failed_attempt_pays_its_effort_and_nothing_else() {
+    let steal = WorldAction::StealEnergy {
+        direction: Direction::N,
+        amount: 1.0,
+    };
+    let litter_reproduce = WorldAction::Reproduce {
+        direction: Direction::N,
+        energy_transfer_fraction: 0.0,
+    };
+    type Setup = fn(f32) -> (Simulation, CreatureId);
+    // (label, setup, action, bucket, litter rejections)
+    let cases: [(&str, Setup, WorldAction, Bucket, u64); 11] = [
+        (
+            "move barrier",
+            barrier_north,
+            WorldAction::Move(Direction::N),
+            Bucket::Move,
+            0,
+        ),
+        (
+            "move occupied",
+            occupied_north,
+            WorldAction::Move(Direction::N),
+            Bucket::Move,
+            0,
+        ),
+        (
+            "move out of bounds",
+            bounded_corner,
+            WorldAction::Move(Direction::N),
+            Bucket::Move,
+            0,
+        ),
+        (
+            "eat configured type",
+            make_sim_with_one_creature,
+            WorldAction::eat(OrdinaryFoodTypeId::default()),
+            Bucket::Eat,
+            0,
+        ),
+        (
+            "eat unconfigured type",
+            make_sim_with_one_creature,
+            WorldAction::eat(OrdinaryFoodTypeId::new(7)),
+            Bucket::Eat,
+            0,
+        ),
+        (
+            "reproduce invalid target",
+            barrier_north,
+            REPRODUCE,
+            Bucket::Reproduce,
+            0,
+        ),
+        (
+            "reproduce population cap",
+            capped_parent,
+            REPRODUCE,
+            Bucket::Reproduce,
+            0,
+        ),
+        (
+            "reproduce age",
+            young_parent,
+            REPRODUCE,
+            Bucket::Reproduce,
+            0,
+        ),
+        (
+            "reproduce parent energy",
+            poor_parent,
+            REPRODUCE,
+            Bucket::Reproduce,
+            0,
+        ),
+        (
+            "reproduce litter",
+            ready_parent,
+            litter_reproduce,
+            Bucket::Reproduce,
+            1,
+        ),
+        (
+            "steal no victim",
+            make_sim_with_one_creature,
+            steal,
+            Bucket::Steal,
+            0,
+        ),
+    ];
+    for (label, setup, action, bucket, litter) in cases {
+        // Arrange
+        let (mut sim, id) = setup(100.0);
+        let before = sim.creatures[id].energy;
+        let effort = effort(&sim, id, bucket.base(&sim, 1.0));
+        let mut expected = sim.stats.energy_flows.clone();
+        if matches!(bucket, Bucket::Eat) {
+            // An eat sizes the per-type intake slots before it reads food.
+            expected
+                .food_intake_by_type
+                .resize(sim.config.world.food.types.len(), 0.0);
+        }
+
+        // Act
+        execute(&mut sim, id, action);
+
+        // Assert
+        let after = sim.creatures[id].energy;
+        assert!(effort >= 0.05, "{label}: effort {effort}");
+        assert_eq!(after.to_bits(), (before - effort).to_bits(), "{label}");
+        bucket.add_failed(&mut expected, applied_debit(before, after));
+        assert_eq!(sim.stats.energy_flows, expected, "{label}");
+        assert_eq!(
+            sim.stats.reproduction_actions_rejected_litter_total, litter,
+            "{label}"
+        );
+    }
+}
+
+/// Invariant 3: a rejection never reaches the replication cost; the attempt
+/// effort is the only debit even when the parent cannot afford the cost.
+#[test]
+fn reproduce_below_cost_pays_only_the_attempt_effort() {
+    let (mut sim, id) = ready_parent(1.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    sim.config.energy.costs.reproduce_cost = 2.0;
+    execute(&mut sim, id, REPRODUCE);
+    assert_eq!(sim.creatures[id].energy, 1.0 - 0.05);
+    let flows = &sim.stats.energy_flows;
+    assert!(flows.action_charges.reproduce > 0.0);
+    assert_eq!(
+        flows.action_charges.reproduce,
+        flows.failed_action_effort.reproduce
+    );
+    assert_eq!(flows.parental_transfer_debit, 0.0);
+    assert_eq!(sim.stats.mortality.deaths_total, 0);
+}
+
+/// Lifecycle: an effort that exhausts the creature floors it to zero with a
+/// `zero_floor_credit`, removes it with the action's sink as the cause, and
+/// charges nothing queued after it.
+#[test]
+fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() {
+    for (action, cause) in [
+        (WorldAction::Move(Direction::N), DeathCause::ActionMove),
+        (
+            WorldAction::eat(OrdinaryFoodTypeId::default()),
+            DeathCause::ActionEat,
+        ),
+        (REPRODUCE, DeathCause::ActionReproduce),
+        (
+            WorldAction::StealEnergy {
+                direction: Direction::N,
+                amount: 0.0,
+            },
+            DeathCause::ActionStealEnergy,
+        ),
+    ] {
+        let (mut sim, id) = barrier_north(0.03);
+        run(&mut sim, id, vec![action, WorldAction::NoOp]);
+        assert!(!sim.creatures.contains_key(id), "{cause:?}");
+        assert_eq!(sim.stats.mortality.count(cause), 1, "{cause:?}");
+        assert_eq!(sim.stats.mortality.deaths_total, 1, "{cause:?}");
+        let floor = sim.stats.energy_flows.zero_floor_credit;
+        assert!(floor > 0.0, "{cause:?}: zero floor credit {floor}");
+        assert_eq!(sim.stats.energy_flows.action_charges.noop, 0.0, "{cause:?}");
+        assert_eq!(sim.stats.last_tick_noop, 0, "{cause:?}");
+    }
+}
+
+/// Lifecycle: an attacker whose steal effort exhausts it still takes the
+/// transfer, as before the feature.
+#[test]
+fn a_steal_whose_effort_exhausts_the_attacker_still_transfers() {
+    let (mut sim, attacker, victim) = make_sim_two_creatures(0.03, 50.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    execute(
+        &mut sim,
+        attacker,
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 1.0,
+        },
+    );
+    assert_eq!(sim.creatures[victim].energy, 49.0);
+    assert_eq!(sim.creatures[attacker].energy, (0.03f32 - 0.05) + 1.0);
+    assert_eq!(sim.stats.mortality.deaths_total, 0);
+}
+
+/// Lifecycle: actions discarded after a conception and a gestating parent's
+/// tick charge nothing.
+#[test]
+fn a_gestating_parent_and_its_discarded_actions_are_never_charged() {
+    let (mut sim, id) = ready_parent(100.0);
+    sim.config
+        .energy
+        .lifecycle
+        .gestation_ticks_per_founder_genome = 1.0;
+    let eat = WorldAction::eat(OrdinaryFoodTypeId::default());
+    run(
+        &mut sim,
+        id,
+        vec![REPRODUCE, eat, WorldAction::Move(Direction::S)],
+    );
+    assert!(sim.creatures[id].pending_birth.is_some());
+    let charged = sim.stats.energy_flows.action_charges;
+    assert_eq!((charged.eat, charged.r#move), (0.0, 0.0));
+    let held = sim.creatures[id].energy;
+
+    execute(&mut sim, id, eat);
+    assert_eq!(sim.creatures[id].energy, held);
+    assert_eq!(sim.stats.energy_flows.action_charges, charged);
+}
+
+/// Success: `NoOp` and `Move` are charged bit for bit what they were before
+/// the floor, at the defaults.
+#[test]
+fn noop_and_move_charges_are_unchanged_at_the_defaults() {
+    for action in [WorldAction::NoOp, WorldAction::Move(Direction::S)] {
+        let (mut sim, id) = make_sim_with_one_creature(100.0);
+        sim.creatures[id].age = 250;
+        let costs = &sim.config.energy.costs;
+        let base = if action == WorldAction::NoOp {
+            costs.noop_cost
+        } else {
+            costs.move_cost
+        };
+        let creature = &sim.creatures[id];
+        let legacy =
+            sim.config
+                .energy
+                .adjusted_action_cost(base, creature.cached_complexity, creature.age);
+        execute(&mut sim, id, action);
+        assert_eq!(
+            sim.creatures[id].energy.to_bits(),
+            (100.0f32 - legacy).to_bits(),
+            "{action:?}"
+        );
+    }
+}
+
+/// Success: an eat credits the food and the clamp, then pays its effort.
+#[test]
+fn a_successful_eat_credits_then_pays_its_effort() {
+    let (mut sim, id) = make_sim_with_one_creature(198.0);
+    let eat = WorldAction::eat(OrdinaryFoodTypeId::default());
+    sim.world
+        .set_food_type(Position::new(5, 5), OrdinaryFoodTypeId::default(), 1.0);
+    let effort = effort(&sim, id, sim.config.energy.costs.eat_cost);
+    execute(&mut sim, id, eat);
+    let max = sim.config.energy.lifecycle.max_energy;
+    assert_eq!(sim.creatures[id].energy.to_bits(), (max - effort).to_bits());
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.action_charges.eat, applied_debit(max, max - effort));
+    assert_eq!(flows.failed_action_effort.eat, 0.0);
+}
+
+/// Success: a conception pays the attempt effort, then the replication cost,
+/// then the litter, as three successive `f32` subtractions; the litter is
+/// the fraction of the post-effort, post-cost energy.
+#[test]
+fn a_conception_pays_effort_then_cost_then_litter() {
+    let (mut sim, id) = ready_parent(100.0);
+    let energy = &sim.config.energy;
+    let effort = effort(&sim, id, energy.costs.reproduce_attempt_cost);
+    let creature = &sim.creatures[id];
+    let cost = energy.adjusted_action_cost(
+        energy.costs.reproduce_cost,
+        creature.cached_complexity,
+        creature.age,
+    );
+    let after_effort = 100.0f32 - effort;
+    let after_cost = after_effort - cost;
+    let litter = (0.5 * after_cost).min(energy.lifecycle.default_offspring_energy);
+    execute(&mut sim, id, REPRODUCE);
+    assert_eq!(
+        sim.creatures[id].energy.to_bits(),
+        (after_cost - litter).to_bits()
+    );
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(
+        flows.action_charges.reproduce,
+        applied_debit(100.0, after_effort) + applied_debit(after_effort, after_cost)
+    );
+    assert_eq!(flows.failed_action_effort.reproduce, 0.0);
+    assert_eq!(flows.offspring_energy_credit, f64::from(litter));
+}
+
+/// Invariant 4: a steal requesting nothing, or priced at rate 0, pays the
+/// `NoOp` floor.
+#[test]
+fn a_steal_requesting_nothing_pays_the_noop_floor() {
+    for (rate, amount) in [(0.05, 0.0), (0.05, f32::NAN), (0.0, 10.0)] {
+        let (mut sim, attacker, _victim) = make_sim_two_creatures(100.0, 50.0);
+        sim.config.predation.steal_cost_rate = rate;
+        let creature = &sim.creatures[attacker];
+        let floor = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.noop_cost,
+            creature.cached_complexity,
+            creature.age,
+        );
+        execute(
+            &mut sim,
+            attacker,
+            WorldAction::StealEnergy {
+                direction: Direction::N,
+                amount,
+            },
+        );
+        let stolen = if amount.is_finite() { amount } else { 0.0 };
+        assert_eq!(
+            sim.creatures[attacker].energy.to_bits(),
+            ((100.0f32 - floor) + stolen).to_bits(),
+            "rate {rate} amount {amount}"
+        );
+    }
+}

@@ -156,16 +156,16 @@ config still carrying the field fails to load until it is removed.
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
 | `energy.lifecycle.age_reference_ticks` | `u64` | `500` | Span over which the brain's `AgeTicks` read rises from `0.0` to `1.0` (`min(age / age_reference_ticks, 1)`, T17.F02). A missing field defaults to `500`; `0` normalizes to `500`. The founder's age gate is derived from it at seeding and is exact only while `min_reproduce_age <= age_reference_ticks`; above that the threshold exceeds the saturated `1.0` read and the founder never attempts a birth. |
-| `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (free, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
+| `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (each attempt paying only its effort, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 97. |
 | `energy.lifecycle.gestation_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and delivers every birth at conception (the pre-feature engine). Gestation span per founder genome (T03.F12); see Gestation below. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
-| `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
+| `energy.costs.eat_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. Effort base of every `Eat` attempt; see Action effort below. |
 | `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for ordinary food types whose `energy_per_unit` is absent/null. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
-| `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
-| `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
-| `energy.costs.failed_action_penalty` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `> 0.0`; invalid values fall back to `0.05`. The floor of every action's effort. |
+| `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. The replication cost, paid only on a conception (Genome replication cost below). |
+| `energy.costs.reproduce_attempt_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. A missing field defaults to `0.05`. Effort base of every `Reproduce` attempt, paid before any gate (T16.F02). |
 | `energy.complexity_cost.enabled` | `bool` | `false` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
@@ -207,7 +207,8 @@ Genome replication cost:
   (`energy.complexity_cost`, `energy.age_cost`), which are untouched.
 - Computed at step 5 but charged only after the `min_reproduce_energy` and
   transfer gates (steps 6 and 7) pass, both of which read the parent's energy
-  minus the charge; an attempt those gates reject burns nothing. On a birth
+  minus the attempt effort and the charge; an attempt those gates reject pays
+  only its effort. On a birth
   the whole charge lands in `energy_flows.action_charges.reproduce` and none
   of it reaches the offspring, whose transfer is unchanged.
 - At the default rate a 386-unit genome (289 above the founder) pays 29.9x the
@@ -236,8 +237,8 @@ Gestation:
   life (a configuration pathology; the UI caps the rate at 10).
 
 Complexity energy cost:
-- When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
-  failed_action_penalty) are multiplied by
+- When enabled, all action energy costs (noop, eat, move, the reproduce
+  attempt effort and replication cost, and steal) are multiplied by
   `1.0 + max(0, functional_complexity - threshold) * scaling_factor`.
 - Uses functional complexity (reachability-aware), not total genome size. This
   means creatures are not penalized for junk DNA (unreachable mesh nodes, dead
@@ -265,14 +266,23 @@ Action cost multiplier composition:
   `complexity_multiplier * age_multiplier`.
 - Both multipliers compose multiplicatively — independent pressures combine
   naturally.
-- Applied to: noop, eat, move, reproduce, steal, and failed_action_penalty costs.
+- Applied to: noop, eat, move, the reproduce attempt effort and replication
+  cost, and steal costs.
 - Centralized via `EnergyConfig::action_cost_multiplier(complexity, age)`.
 
-Startup ramp note:
-- Implementations may support startup-only ramps (for example
-  `startup.ramps.failed_action_penalty`) that transiently override the effective
-  failed-action penalty during early ticks while preserving
-  `energy.costs.failed_action_penalty` as the steady-state runtime value.
+Action effort (T16.F02):
+- Every committed action charges its effort on every attempt, whatever the
+  outcome: `EnergyConfig::action_effort(base, complexity, age)` =
+  `adjusted_action_cost(max(base, noop_cost), complexity, age)`, with base
+  `move_cost`, `eat_cost`, `noop_cost`, `reproduce_attempt_cost`, or
+  `predation.steal_cost_rate` times the sanitized requested amount.
+- The actions share the multiplier, so no effort is below `NoOp`'s, and
+  `NoOp`'s is above zero. A base at or above `noop_cost` is charged exactly
+  `adjusted_action_cost(base, …)`.
+- A failure (a blocked move, an eat finding no food, a rejected reproduce, a
+  steal with no victim) pays its effort and nothing more; there is no
+  failed-action penalty and no startup ramp. A config naming the retired
+  `energy.costs.failed_action_penalty` or `startup` section fails to resolve.
 
 Energy posture:
 - Energy lifecycle and action-cost config values are continuous scalar units
@@ -281,8 +291,11 @@ Energy posture:
   through fixed test-mode controls.
 
 Reproduction transfer sequencing:
-This sequencing is evaluated only after spawn target validity succeeds, as
-defined in `v3-reproduction-spec.md`.
+Every attempt first pays its effort (`action_effort(reproduce_attempt_cost, …)`,
+Step 0 of `v3-reproduction-spec.md` Section 6), before target validity and
+every other gate. The steps below then run on the post-effort energy, once
+spawn target validity and the population cap succeed, as defined in
+`v3-reproduction-spec.md`.
 1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
 2. Compute `cost = energy.costs.reproduce_cost`, scaled by the complexity and
    age multipliers and by the genome replication cost factor
@@ -294,8 +307,8 @@ defined in `v3-reproduction-spec.md`.
    where `energy_transfer_fraction` is the action's `meta[1]` sanitized to
    [0, 1] at decode (so `after_cost >= transfer`).
 5. Reject reproduction when `transfer <= 0.0` or
-   `transfer < energy.lifecycle.initial_energy`. A rejection at step 3 or
-   step 5 charges nothing.
+   `transfer < energy.lifecycle.initial_energy`. A rejection at any step,
+   or at target validity or the population cap, pays only the attempt effort.
 6. Pay `cost`, then `transfer`, from the parent.
 
 Outcome mapping:

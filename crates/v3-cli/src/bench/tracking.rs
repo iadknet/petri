@@ -223,7 +223,6 @@ pub struct EnergyFlowTracking {
     /// `applied-energy-flows-v2`); absent from reports stored before it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failed_action_effort: Option<FailedActionEffortTracking>,
-    pub failed_action_penalty: String,
     pub vm_compute: String,
     pub priority_bid: String,
     pub graph_compute: String,
@@ -267,7 +266,6 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
                 reproduce: six(flows.failed_action_effort.reproduce),
                 steal_energy: six(flows.failed_action_effort.steal_energy),
             }),
-            failed_action_penalty: six(flows.failed_action_penalty),
             vm_compute: six(flows.vm_compute),
             priority_bid: six(flows.priority_bid),
             graph_compute: six(flows.graph_compute),
@@ -638,7 +636,7 @@ impl WorldTracking {
                 shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
             }),
             mortality: Some(MortalityTracking {
-                definition: "applied-mortality-v1".into(),
+                definition: "applied-mortality-v2".into(),
                 deaths_total: stats.mortality.deaths_total,
                 by_cause: v3_core::simulation::energy_accounting::DeathCause::ALL
                     .into_iter()

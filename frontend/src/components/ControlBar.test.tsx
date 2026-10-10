@@ -84,11 +84,11 @@ const MOCK_CONFIG: SimulationConfig = {
 		},
 		costs: {
 			move_cost: 0.02,
-			eat_cost: 0,
+			eat_cost: 0.05,
 			eat_reward_per_food: 5,
-			noop_cost: 0,
+			noop_cost: 0.05,
 			reproduce_cost: 0.12,
-			failed_action_penalty: 5,
+			reproduce_attempt_cost: 0.07,
 		},
 		complexity_cost: {
 			enabled: true,
@@ -143,16 +143,6 @@ const MOCK_CONFIG: SimulationConfig = {
 	},
 	shared_memory: {
 		decay_rate: 0.0,
-	},
-	startup: {
-		ramps: {
-			failed_action_penalty: {
-				enabled: false,
-				start: 5,
-				end: 5,
-				target_tick: 1000,
-			},
-		},
 	},
 };
 
@@ -304,16 +294,6 @@ describe("ControlBar", () => {
 				},
 			},
 			energy: { initial_energy: 20 },
-			startup: {
-				ramps: {
-					failed_action_penalty: {
-						enabled: false,
-						start: 5,
-						end: 5,
-						target_tick: 1000,
-					},
-				},
-			},
 		});
 		useStatsHistoryStore.getState().pushStats(3, 10, 25);
 
@@ -388,16 +368,6 @@ describe("ControlBar", () => {
 					energy: {
 						lifecycle: { initial_energy: 20 },
 					},
-					startup: {
-						ramps: {
-							failed_action_penalty: {
-								enabled: false,
-								start: 5,
-								end: 5,
-								target_tick: 1000,
-							},
-						},
-					},
 				}),
 			);
 			expect(useSimulationStore.getState().simState).toBe("idle");
@@ -407,7 +377,7 @@ describe("ControlBar", () => {
 		});
 	});
 
-	it("restart skips runtime failed_action_penalty re-patch when startup ramp is enabled", async () => {
+	it("restart re-patches reproduce_attempt_cost and never the retired penalty", async () => {
 		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
 		useStartupConfigStore.getState().setPreset({
 			seed: 123,
@@ -444,16 +414,6 @@ describe("ControlBar", () => {
 				},
 			},
 			energy: { initial_energy: 20 },
-			startup: {
-				ramps: {
-					failed_action_penalty: {
-						enabled: true,
-						start: 5,
-						end: 30,
-						target_tick: 1000,
-					},
-				},
-			},
 		});
 		vi.mocked(api.startup).mockResolvedValue({
 			protocol_version: "v3alpha1",
@@ -501,7 +461,7 @@ describe("ControlBar", () => {
 					};
 				};
 			};
-			energy?: { costs?: { failed_action_penalty?: number } };
+			energy?: { costs?: Record<string, number> };
 		};
 		expect(patch.world?.food?.shared?.occupancy_depletion).toEqual({
 			enabled: true,
@@ -513,7 +473,9 @@ describe("ControlBar", () => {
 			floor: 0.05,
 			recovery_ticks: 1000,
 		});
-		expect(patch.energy?.costs?.failed_action_penalty).toBeUndefined();
+		expect(patch.energy?.costs?.reproduce_attempt_cost).toBe(0.07);
+		expect(patch.energy?.costs).not.toHaveProperty("failed_action_penalty");
+		expect(patch).not.toHaveProperty("startup");
 	});
 
 	it("displays TPS value when ticksPerSecond is non-zero", () => {

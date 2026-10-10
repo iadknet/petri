@@ -34,7 +34,7 @@ use crate::summary::{ArmSummary, Events, Fidelity, LifetimeLearning, ReplicateRe
 use crate::{GenomeFile, LabError};
 
 /// NDJSON row schema version.
-pub const ROW_VERSION: u32 = 3;
+pub const ROW_VERSION: u32 = 4;
 
 /// How an arm produces its individuals.
 #[derive(Debug, Clone)]

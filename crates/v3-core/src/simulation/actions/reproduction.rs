@@ -135,8 +135,11 @@ impl ReproductionInvalidTargetCause {
 /// the child starts with, in [0, 1] (T17.F01); the litter is capped at
 /// `default_offspring_energy` and refused under `initial_energy`.
 ///
-/// Steps 1 to 8 run at conception. When every gate passes the parent carries
-/// a pending birth delivered after `gestation_ticks` (T03.F12) by
+/// Step 0 (T16.F02) debits the attempt effort,
+/// `action_effort(reproduce_attempt_cost)`, before any gate; a rejected
+/// attempt pays that effort and nothing more. Steps 1 to 8 then run at
+/// conception on the post-effort energy. When every gate passes the parent
+/// carries a pending birth delivered after `gestation_ticks` (T03.F12) by
 /// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) runs Steps 9 to 14
 /// at once, the pre-feature engine.
 ///
@@ -153,6 +156,36 @@ pub fn apply_reproduce(
     sim.stats.reproduction_actions_attempted_total += 1;
     sim.stats.last_tick_reproduce += 1;
 
+    // Step 0 (T16.F02): the attempt effort, paid whatever the outcome.
+    let parent = &mut sim.creatures[parent_id];
+    let before = parent.energy;
+    parent.energy -= sim.config.energy.action_effort(
+        sim.config.energy.costs.reproduce_attempt_cost,
+        parent.cached_complexity,
+        parent.age,
+    );
+    let effort = parent.observe_energy(
+        before,
+        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
+    );
+    sim.stats.energy_flows.action_charges.reproduce += effort;
+
+    let result = conceive(parent_id, sim, dir, energy_transfer_fraction, rng);
+    if result != ReproductionActionResult::Conceived {
+        sim.stats.energy_flows.failed_action_effort.reproduce += effort;
+    }
+    result
+}
+
+/// Steps 1 to 8 of the unified sequence on the post-effort energy (T16.F01
+/// order): gates first, then the replication cost and the litter.
+fn conceive(
+    parent_id: CreatureId,
+    sim: &mut Simulation,
+    dir: Direction,
+    energy_transfer_fraction: f32,
+    rng: &mut impl Rng,
+) -> ReproductionActionResult {
     let parent_pos = sim.creatures[parent_id].position;
 
     // Step 1: Resolve target cell.
@@ -200,8 +233,8 @@ pub fn apply_reproduce(
 
     // Step 5: Compute reproduce_cost (scaled by genome complexity, age, and
     // the genome replication cost on units above the founder's size) and the
-    // parent's energy after it. Nothing is deducted until both gates pass
-    // (T16.F01): a rejected attempt leaves the parent untouched.
+    // parent's post-effort energy after it. Nothing more is deducted until
+    // both gates pass (T16.F01): a rejected attempt pays only Step 0.
     let cost = sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
@@ -227,7 +260,7 @@ pub fn apply_reproduce(
     // energy, capped at `default_offspring_energy`. Decode already sanitizes
     // the fraction to [0, 1]; the clamp here keeps `after_cost >= transfer`
     // true for every caller. A litter under `initial_energy` is not
-    // conceived, and the refusal is free.
+    // conceived, and the refusal pays only Step 0.
     let fraction = clamp_unit_interval(energy_transfer_fraction);
     let transfer =
         (fraction * after_cost).min(sim.config.energy.lifecycle.default_offspring_energy);
@@ -719,11 +752,12 @@ mod tests {
         assert_every_creature_caches_its_own_genome_size(0.0);
     }
 
-    /// T16.F01 invariant 4: `action_charges.reproduce` accumulates only over
-    /// births. With the energy gate above `max_energy`, every attempt is an
-    /// energy rejection and the flow stays at zero across the tick loop.
+    /// T16.F01 invariant 4 as T16.F02 amends it: the replication charge
+    /// accumulates only over births. With the energy gate above
+    /// `max_energy`, every attempt is an energy rejection, so the whole
+    /// reproduce flow is attempt effort, all of it failed.
     #[test]
-    fn energy_rejected_attempts_leave_the_reproduce_flow_at_zero() {
+    fn energy_rejected_attempts_pay_only_their_attempt_effort() {
         use crate::config::SimulationConfig;
         use crate::simulation::{run_tick, seed_simulation};
 
@@ -748,10 +782,12 @@ mod tests {
             "the fixture must actually reject attempts on energy"
         );
         assert_eq!(sim.stats.reproduction_actions_spawned_total, 0);
-        // Exact zero is the claim: no observe_energy crossing was recorded.
+        let flows = &sim.stats.energy_flows;
+        assert!(flows.action_charges.reproduce > 0.0);
+        // Exact equality is the claim: nothing but failed attempt effort.
         assert_eq!(
-            sim.stats.energy_flows.action_charges.reproduce, 0.0,
-            "rejected attempts must not contribute to action_charges.reproduce"
+            flows.action_charges.reproduce, flows.failed_action_effort.reproduce,
+            "rejected attempts contribute only their effort to action_charges.reproduce"
         );
     }
 

@@ -16,7 +16,6 @@ pub enum DeathCause {
     ActionMove,
     ActionReproduce,
     ActionStealEnergy,
-    FailedActionPenalty,
     ParentalTransfer,
     Predation,
     ExternalRemoval,
@@ -24,7 +23,7 @@ pub enum DeathCause {
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 17] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
         Self::VmCompute,
@@ -38,7 +37,6 @@ impl DeathCause {
         Self::ActionMove,
         Self::ActionReproduce,
         Self::ActionStealEnergy,
-        Self::FailedActionPenalty,
         Self::ParentalTransfer,
         Self::Predation,
         Self::ExternalRemoval,
@@ -61,7 +59,6 @@ impl DeathCause {
             Self::ActionMove => "action_move",
             Self::ActionReproduce => "action_reproduce",
             Self::ActionStealEnergy => "action_steal_energy",
-            Self::FailedActionPenalty => "failed_action_penalty",
             Self::ParentalTransfer => "parental_transfer",
             Self::Predation => "predation",
             Self::ExternalRemoval => "external_removal",
@@ -155,7 +152,6 @@ pub struct EnergyFlows {
     pub food_intake_by_type: Vec<f64>,
     pub action_charges: ActionCharges,
     pub failed_action_effort: FailedActionEffort,
-    pub failed_action_penalty: f64,
     pub vm_compute: f64,
     pub priority_bid: f64,
     pub graph_compute: f64,
@@ -201,7 +197,7 @@ mod tests {
                 "lifecycle_decay", "genome_carrying", "vm_compute", "graph_compute",
                 "mesh_ramp", "hebbian_learning", "reward_learning", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
-                "failed_action_penalty", "parental_transfer", "predation",
+                "parental_transfer", "predation",
                 "external_removal", "unattributed",
             ];
             prop_assert_eq!(DeathCause::ALL[index].as_key(), expected[index]);
