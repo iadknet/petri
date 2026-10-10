@@ -57,7 +57,8 @@ in the form of the [deletion-rate plan](deletion-rate-experiment-plan-2026-10-09
     kept on in production until the authored-solution arm and the invasion
     read say the shortcut is not a barrier.
   - One heavy job on the host at a time; this plan runs after the
-    deletion-rate and vote-margin runs.
+    vote-margin run (the deletion-rate run was stopped on 2026-10-09).
+  - No Fable in any role (section "Roles").
 - **Decision criteria.**
   - Over a short horizon with mutation off, does a per-attempt price make
     the founder's reproduce gate pay against a matched lesion, and at what
@@ -233,10 +234,9 @@ and 2022 to 20,000; the assay's default arm set reproduces E1's `(a)` and
   checkpoints at 10,000 and 20,000, the vote-delta reading, and the window
   counters over `[9,000, 10,000)` and `[19,000, 20,000)`; seeds 1022, 2022,
   3022, 4022; 3 h kill per run; one job at a time.
-- **Arms.** `default` (production recipe, both fields off; reused from the
-  deletion-rate run if gate P0 holds against its artifacts on the same
-  seeds and checkpoints and its census carries the window counters,
-  otherwise run); `live` (penalty 0.02, ramp off, `reproduce_cost` 0, both
+- **Arms.** `default` (production recipe, both fields off; run here, since
+  the deletion-rate run's `default` artifacts predate T11.F29's production
+  change and carry no window counters); `live` (penalty 0.02, ramp off, `reproduce_cost` 0, both
   fields off); `price` (`live` plus P1's price); `break` (`live` plus
   `Some(0)`, or `Some(2000)` if P2's guard failed); `both` (`live` plus the
   same price and the same break setting).
@@ -328,8 +328,7 @@ Runs per (arm, seed) labelled `attempts-less` with a living population at
   - P0: two identity runs.
   - P1: 96 competitions, about 2 to 2.3 h.
   - P2: 96 competitions, about 2 to 2.3 h.
-  - P3: 16 new runs at 11 to 15 min (20 if `default` cannot be reused),
-    about 3 to 5 h.
+  - P3: 20 runs at 11 to 15 min, about 4 to 5 h.
   - P4: two processes per (arm, seed) to 25,000 ticks, about 30 min each;
     up to 12 pairs, so up to 12 h in the worst case, typically far fewer.
 - **Session.** One goal session of about 200 turns, likely split at P3.
@@ -350,6 +349,37 @@ Runs per (arm, seed) labelled `attempts-less` with a living population at
 - Nothing here advances the variation question; it settles whether these
   pressures are safe to keep on once variation can supply the circuits.
 
+## Roles (this run's rule 8; no Fable)
+
+Fable credits are exhausted (user, 2026-10-09). No Claude role in this run
+is Fable. Rule 8 of the diagnosis plan says every role is Fable and that a
+run stops rather than substitute Opus; that clause does not apply here, and
+neither do the Fable roles in the output-wiring and born-connected run
+notes. Nothing in them is a reason to stop or to wait for Fable.
+
+- **Session.** Opus 5.5 (`claude-opus-5-5`) at effort `xhigh`. It is the
+  implementer: it writes the instruments, runs the gates and rows, reads the
+  results and writes the note. No subagent is needed; if one is spawned, it
+  runs on Opus (`model: "opus"`), never Fable.
+- **Advisor.** Opus, enabled with `/advisor opus` before the goal is pasted
+  (the project settings default `advisorModel` to `fable`). Consulted through
+  the `advisor` tool at every one of these points, each recorded with its
+  dispositions in the note's Advice table:
+  - before the first gate, on the approach to the whole run;
+  - after each gate's or row's reading is drafted and before it is recorded;
+  - whenever a gate fails, a row is `incomplete`, a result contradicts its
+    prediction, or an approach has not converged after two attempts;
+  - before the plan forward is drafted, and again after;
+  - before closing.
+  The advisor advises; it does not write code, run rows or edit the note. If
+  the advisor tool is unavailable or returns a credit error, the run records
+  it, sends the same brief to Codex as an advice job, and continues.
+- **Reviews.** Codex `gpt-6.1-sol` at `high`, read-only, through
+  `codex exec`: (a) the predeclaration before any heavy row runs; (b) the
+  note's reading before closing. A Codex usage limit marks the review
+  `pending`; the run continues, and the note recommends nothing until review
+  (b) has completed.
+
 ## Review dispositions (Codex adversarial review, 2026-10-09)
 
 | # | Finding | Disposition |
@@ -365,10 +395,12 @@ Runs per (arm, seed) labelled `attempts-less` with a living population at
 
 ## Goal command (parked)
 
-Run after the deletion-rate and vote-margin runs have landed. Open a new
-session in the main checkout on a clean `main`, model Opus 5.5, with the
-advisor enabled on Opus 5.5 and Codex for reviews. Paste:
+Run after the vote-margin run has landed. Open a new session in the main
+checkout on a clean, current `main`, with no other heavy job on the host.
+Set the model to Opus 5.5 at effort `xhigh`, run `/advisor opus` (the
+project default is a Fable advisor, and Fable credits are exhausted), and
+confirm the startup notice shows an Opus advisor. Then paste:
 
 ```
-/goal An effective-action pressure run is complete on main. Read docs/strategy/action-choice-pressure-experiment-plan-2026-10-09.md in full (its prototypes, instruments, gates P0 and P4, rows P1 to P3, labels, dispositions and review dispositions are the contract's form), then docs/strategy/action-choice-pressure-research-2026-10-09.md Sections 2, 5 and 6, then docs/strategy/deletion-rate-run-2026-10.md once it has landed, otherwise docs/strategy/output-wiring-run-2026-10.md (gates, frozen-instrument pattern, Advice table). Confirm Opus 5.5 with the advisor enabled on Opus 5.5 and Codex for reviews, a clean main, no other heavy job on the host, and create the worktree with EnterWorktree named action-pressure. Take the census probe, the cohort dump and the diagnosis probe as file state from branch worktree-deletion-rate (instr and lab commits only, no proto). Build the two proto fields and the instruments exactly as the plan states them, reading both fields through the serialized config so the instrument builds without them. Predeclare and commit P0 to P4 before any of them runs: replicate-wide pressure treatments at E1's assay sizes for P1 and P2; Canyon goal recipe, seeds 1022, 2022, 3022 and 4022, 20,000 ticks, checkpoints 10,000 and 20,000, windows [9,000, 10,000) and [19,000, 20,000), arms default (reused only under the plan's condition), live, price, break and both, 3 h kill per run, one job at a time for P3; P4 per (arm, seed) labelled attempts-less with a living population. Run P0, then P1 and P2, then P3 with P1's disposition and P2's guard applied, then P4. The labels and dispositions are the plan's as written. Consult the advisor at every rule 8 point and record it; send the predeclaration to Codex before any row runs and the note's reading before closing. Write docs/strategy/action-choice-pressure-run-2026-10.md with the gates, the rows, the Advice table and a plan forward that says, per pressure, candidate feature (and which track), lab arm only with the circuit routed to T11/T20, too harsh at this form, or barrier (change of shape). Land docs only; keep proto and instr on the branch. Done means the note is on main, make check-docs exited 0 on main, the worktree removed and its branch kept, main clean. Stop after 200 turns.
+/goal An effective-action pressure run is complete on main. Read docs/strategy/action-choice-pressure-experiment-plan-2026-10-09.md in full (its prototypes, instruments, gates P0 and P4, rows P1 to P3, labels, dispositions and review dispositions are the contract's form), then docs/strategy/action-choice-pressure-research-2026-10-09.md Sections 2, 5 and 6, then docs/strategy/output-wiring-run-2026-10.md (gates, frozen-instrument pattern, Advice table). No Fable in any role: confirm the session is Opus 5.5 at effort xhigh with an Opus advisor and Codex for reviews, as the plan's Roles section states (it replaces rule 8; the Fable roles in the diagnosis plan and the output-wiring and born-connected notes do not apply, and are never a reason to stop). Confirm a clean main and no other heavy job on the host, and create the worktree with EnterWorktree named action-pressure. Take the census probe, the cohort dump and the diagnosis probe as file state from branch worktree-deletion-rate (instr and lab commits only, no proto). Build the two proto fields and the instruments exactly as the plan states them, reading both fields through the serialized config so the instrument builds without them. Predeclare and commit P0 to P4 before any of them runs: replicate-wide pressure treatments at E1's assay sizes for P1 and P2; Canyon goal recipe, seeds 1022, 2022, 3022 and 4022, 20,000 ticks, checkpoints 10,000 and 20,000, windows [9,000, 10,000) and [19,000, 20,000), arms default, live, price, break and both, 3 h kill per run, one job at a time for P3; P4 per (arm, seed) labelled attempts-less with a living population. Run P0, then P1 and P2, then P3 with P1's disposition and P2's guard applied, then P4. The labels and dispositions are the plan's as written. Consult the Opus advisor at every point the Roles section lists and record it in the Advice table; send the predeclaration to Codex before any row runs and the note's reading before closing. Write docs/strategy/action-choice-pressure-run-2026-10.md with the gates, the rows, the Advice table and a plan forward that says, per pressure, candidate feature (and which track), lab arm only with the circuit routed to T11/T20, too harsh at this form, or barrier (change of shape). Land docs only; keep proto and instr on the branch. Done means the note is on main, make check-docs exited 0 on main, the worktree removed and its branch kept, main clean. Stop after 200 turns.
 ```
