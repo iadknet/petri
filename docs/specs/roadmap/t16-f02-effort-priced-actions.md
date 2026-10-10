@@ -35,7 +35,8 @@ end (attempts and rejections by reason).
   environmental pressure, and the goal-world recipes, which set no cost,
   are unchanged.
 - No lab recalibration: `crates/v3-lab` changes only where it read the
-  retired surface.
+  retired surface, plus test-fixture seeds the new prices moved off their
+  path (invariant 8, Lab row); no stored calibration verdict is re-run.
 - Closed specs, strategy notes, stored summaries, readings and sweep configs
   are not edited. A saved config carrying a retired key fails to resolve, with
   no alias or migration, as at T11.F20.
@@ -97,7 +98,7 @@ Invariants; invariant 8, the retirement of every surface, is the second table:
 | Frontend | `StartupRampsSection`, the ramp types and store fields, the `ControlBar` restart skip, the `RuntimeFieldGroup` ramp lock, the penalty field in `EnergyCostsSection` | `EnergyCostsSection` gains `reproduce_attempt_cost`, shows the `eat_cost` default 0.05 and a `Noop Cost` minimum above 0; the tooltips of the five effort fields say they are charged on every attempt and never below `Noop Cost`, and `Reproduce Cost` says it is the replication cost paid only on a conception |
 | Telemetry | flow key `failed_action_penalty` and mortality cause `failed_action_penalty`; `petri.failed_action_penalty` on the actions phase and the window tick; `petri.penalty` on window action events (`AppliedAction.penalty`, `FlowMarks.penalty`, `TickOutcome.failed_action_penalty`) | Telemetry table below |
 | Bench (`v3-cli`) | `EnergyFlowTracking.failed_action_penalty` | `failed_action_effort` and `action_attempts` (invariants 5–6); the progress page still renders stored summaries with and without the retired keys |
-| Lab (`v3-lab`) | `Setup::new` reading the ramp's target tick; the `penalty` tally and the `penalty_charged` score field; the exploration probe's penalty overrides | The scene start tick stays 62,680 as a lab constant, so no other tick-dependent input moves |
+| Lab (`v3-lab`) | `Setup::new` reading the ramp's target tick; the `penalty` tally and the `penalty_charged` score field; the exploration probe's penalty overrides | The scene start tick stays 62,680 as a lab constant, so no other tick-dependent input moves; campaign `ROW_VERSION` 3 → 4 (the scene score lost `penalty_charged`), `SUMMARY_VERSION` unchanged; the ignored probe's refund rules refund `failed_action_effort.reproduce`, so its pre-feature readings are not comparable; mechanism-test fixtures that no longer calibrate under the new prices take new seeds (old and new in the readings) |
 | Reference docs | the penalty, ramp and patch-lock text in `v3-runtime-config-spec.md` and `v3-server-api-protocol-spec.md` | Those two, `v3-tick-orchestration-spec.md` (per-action effort and floor) and `v3-reproduction-spec.md` Sections 5 and 6 (Step 0; the text that says a rejected parent pays nothing and that age precedes any charge) state invariants 1–4 |
 
 ## Telemetry
@@ -130,7 +131,9 @@ reported under the blocker rule, never rounded to a pass.
 - [x] Retire every surface in invariant 8; strip the seven tracked recipes.
 - [x] Panel and frontend tests; reference documents.
 - [x] Re-pin moved trajectory values with the reason in the test and old and
-      new values in the readings.
+      new values in the readings; a fixture seed whose run no longer reaches
+      the tested path (extinction, an uncalibrated tiny grid) is replaced the
+      same way.
 
 | Property | Cases |
 | --- | --- |
