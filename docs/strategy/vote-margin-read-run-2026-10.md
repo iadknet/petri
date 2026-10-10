@@ -9,8 +9,9 @@ frozen-instrument pattern and Advice table as the precedent, extending the
 [diagnosis follow-up run](evolvability-diagnosis-run-2026-10-followup.md)'s
 row N3 instrument, inside the
 [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
-Status: **predeclared, amendment A1 after Codex review (a)** (no gate or
-row has run).
+Status: **gates V0.2 and V0 passed; row V1 running** since 04:34Z
+2026-10-10 under an awake kill of 21,638 s (amendment A1 after Codex review
+(a) applied before any gate ran).
 
 ## Question
 
@@ -212,6 +213,76 @@ exposure-context consumer that does not execute (`coverage-unresolved`).
 | V0.2 | Fixtures and smoke (first) | (i) The six fixtures and the module's unit tests pass, and `make check` exits 0 on the branch before any binary is hashed. (ii) **Smoke:** `census-v2` with `PETRI_E2_VOTE_DELTAS=1` on the follow-up's 200 × 200 Canyon recipe (`smoke/small.json`, sha256 `485152f6…`, 400 founders), seed 33, checkpoints 300, 2,500 and 5,000: exit 0; every reached checkpoint carries a `vote_deltas` block whose parents each carry `exposure_contexts`, and every channel carries its v2 record (class, `consumer_exposure`, per-pass records when `delta_passes` > 0, parameter fields when `scenes_actions_differ` > 0); the block's serialized size and wall time recorded. A smoke with no executed target channel passes on the structural checks and says so (the fixtures carry the classification) |
 | V0 | Identity between builds (second) | `census-v1` and `census-v2`, one after the other, eight threads (`RAYON_NUM_THREADS=8`), the Confluence goal world (`experiments/worlds/confluence.json`, seed 33), `PETRI_E2_VOTE_DELTAS=1`, horizon 10,000, checkpoint 10,000. **Extension rule:** if the v1 run's 10,000 block has no parent with `executed_target_channels` > 0, both builds rerun to 20,000 with checkpoints 10,000 and 20,000, and the rerun is the gate. **Pass** when: every sample row equal; the extinction record and footer (`ticks`, `extinct`) equal; at every scheduled checkpoint the `input_use` and `e6` blocks, each serialized once with sorted keys and compact separators, hash-equal; and the **whitelist projection** of v2's `vote_deltas` (per parent `parent_index`, `generation`, `genome_size`, `nodes`, `reachable_nodes`, `executed_target_channels`; per channel `family`, `channel`, `consumers_graph`, `consumers_graph_abs_weight`, `consumers_vm`, `stats`; per family every v1 key) hash-equals v1's block under the same serialization. The header must be equal on every nested value except `vote_delta_version` (v1 against v2), any key v2 adds, and the recipe path and label; timing fields excluded and listed. The other checkpoint blocks (`births`, `sink_use`, `memory_loop`, `memory_sensitivity`, `temporal_memory_sensitivity`, the cohort and decile fields) are hashed and reported, not blocking. **A1 (finding 3):** every legacy key must be present at every level of both blocks, v1's raw block must equal its own projection, v2's projection is compared against v1's raw block, and `vote_delta_version` must be exactly `vote-delta-v1` against `vote-delta-v2`. A blocking mismatch stops the plan. **V1's budget (A1 finding 4: the plan's "wall time of the v2 run"):** W = v2's wall time to tick 10,000 including that checkpoint's census (the footer's `elapsed_secs` at horizon 10,000; under the extension rule, the run log's `elapsed` at the tick-10,000 sample plus that checkpoint's `census_secs`); projection = W × 15.26 (N3's elapsed 15,560.9 s to 50,000 over its 1,019.7 s to 10,000); V1's awake kill = min(2 × projection, 28,800 s), computed by `v0check.py` |
 
+**Gate results.** **Binaries.** `census-v1` `149ad949…` built at
+`09f91f13` in the nested tree; `census-v2` `61587da3…` built at `ca4796c8`
+(the A1 instrument commit `813c1ea0` plus a one-line census header fix for
+clippy's `too_many_lines`, 169 against 167, which stopped the first
+`make check`); each lists `diagnosis_census_run`. **V0.2 (i) passed:** the
+module's 10 tests (the six class fixtures, the incumbent-tie test, the
+exposure-context construction, the two v1 unit tests) pass, and **`make
+check` exited 0** on the branch at `ca4796c8` (log
+`make-check-branch.log`; `npm ci` in `frontend/` first). **V0.2 (ii)
+passed** ([`smoke.json`](vote-margin-read-run-2026-10/smoke.json), checker
+[`smokecheck.py`](vote-margin-read-run-2026-10/smokecheck.py)): `census-v2`
+on the 200 × 200 recipe completed 5,000 ticks in 9.2 s (exit 0, 8 threads,
+on AC), every checkpoint (300, 2,500, 5,000) carries a `vote_deltas` block
+of 20 parents each with `exposure_contexts`; **no sampled parent carries an
+executed target channel at any smoke checkpoint** (the small world's cohort
+reads no area summary or barrier ring), so the smoke passes on the
+structural checks alone, as predeclared, and the fixtures carry the
+classification; the block is 4.8 KB and 0.01 to 0.03 s per checkpoint.
+**V0 passed** (17 of 17 checks, [`v0.json`](vote-margin-read-run-2026-10/v0.json),
+checker [`v0check.py`](vote-margin-read-run-2026-10/v0check.py)): `census-v1`
+then `census-v2` on Confluence seed 33 to 10,000, footers' `elapsed_secs`
+701.8 s and 709.0 s, 8 threads, on AC, no other Petri job; the v1 block at 10,000 has 3 executed target
+channels on 2 of 20 parents, so **the extension rule did not trigger**.
+Every sample row (20 ticks) equal, both footers at 10,000 and not extinct,
+the `input_use` and `e6` blocks hash-equal, every legacy key present, v1's
+raw `vote_deltas` equal to its own projection and to v2's projection, the
+version pair exactly `vote-delta-v1` / `vote-delta-v2`, the header equal
+but for that pair and v2's one added key
+(`vote_delta_v2_exposure_seed_base`). Reported, not blocking: `births`,
+`sink_use`, `memory_loop`, both memory sensitivities, the cohort and decile
+fields all hash-equal. The v2 block is 2.4 MB at 10,000 (per-pass records
+for 2,240 delta passes, about 1 KB each) against v1's 9.6 KB, and costs
+0.07 s. **V1's budget:** W = 709.0 s (the footer's `elapsed_secs`),
+projection 709.0 × 15.26 = 10,819 s, **awake kill 21,638 s** (6.0 h, under
+the 8 h cap). Today's Confluence carries about twice N3's population (7,197
+living at 10,000 against N3's 3,582) at a lower simulation cost per tick
+(699 s to 10,000 against N3's 1,019 s): the comparison is across engines
+(T24's food repairs, T03.F12's gestation and T11.F29's feedback routes
+since N3), and the 15.26 ratio is N3's growth profile, which today's denser
+world need not follow; a budget kill is covered by the stopping rule
+(`incomplete`, the checkpoints reached kept) and is not a host failure.
+**Consistency check on real data:** `smokecheck.py` on V0's v2 output
+passes (exit 0; per-pass record counts equal `delta_passes` and parameter
+executions equal `scenes_actions_differ` on all six channel readings,
+original and C), which the smoke could not exercise.
+
+**V0's v2 run at 10,000 (a by-product, not a row checkpoint; no prediction
+is read here).** Three executed target channels on two parents
+([`v0-v2read.json`](vote-margin-read-run-2026-10/v0-v2read.json)): one
+`vote-causal` (`AreaFoodSummary:1` channel 2, one Graph sink consumer with
+a vote endpoint; 1,180 delta passes, one action-changing execution with 10
+committed-differing passes and no differing parameter field) and two
+`moving-residual` (`AreaFoodSummary:0` channels 1 and 6 on two parents, one
+Graph consumer each, every one of 530 delta passes moving only the kindless
+`Terminate` sink: a target read reaching a pass-control sink, no kind's
+effective vote moving). Two "moved" statistics differ by design: v1's
+`most_moved_sink` (largest |Δ| summed over passes) is `Move(6)` on the
+`vote-causal` channel, carried by the 9 passes where `Eat` moves most, while
+the per-pass moved sink of v2's records is `StealEnergy(3)` on 1,171 of
+1,180 passes (|Δ| about 0.0075 against a within-kind margin of 0.2). The
+pooled per-pass median is 0.037 over the 1,171 margined passes of that one
+channel, so N3's "dilution" label there rests on a single channel that is
+nevertheless `vote-causal`; the label is reported with its contributing
+channels and passes, never alone. No battery execution exposes any of the
+three consumers (N3's coverage finding reproduced on this engine); option C
+discovers the same three channels with the same classes (the causal one
+changes 7 of 48 executions there) and all three consumers exposed. The
+consistency counts are 0 (unexposed with effect) and 0 (passes whose
+reconstructed selection disagrees with the trace).
+
 ## Ledger
 
 | ID | Question | Method, instrument, sizes | Prediction / decision rule | Status | Result |
@@ -225,6 +296,7 @@ each point raised.
 
 | # | Point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 2 | After the V0.2 and V0 readings were drafted, before they were recorded (one batched consultation, as Advice 1 suggested); whether to report V0's v2 reading at 10,000; what to watch in V1 | Gate paragraph right. (1) Quote both V0 run times from the footers; say the population and cost comparison is across engines and that 15.26 is N3's profile, so a budget kill reads as predeclared; run `smokecheck.py` on V0's v2 output, the only check of record counts against `delta_passes`. (2) Report the 10,000 reading as a V0 by-product with no prediction read; the "dilution" label rests on one channel that is `vote-causal`, so carry contributing channels beside every label (`channels_with_margined_passes` in the reader); define v1's `most_moved_sink` against v2's per-pass moved sink after a spot check; include C's agreement, the battery's zero exposure and the consistency counts. (3) V1: do not poll; pre-write the Codex (b) brief, the row cell, the cost table and the plan-forward skeleton; at 20,000 compare elapsed with N3's 2,320 s; a `vote-causal` channel failing prediction 3 is a result; name `Terminate`-only movers when they recur; split the reader's rows into a channels file before 1 MiB; update the Status line | All adopted: (1) and (2) in Gate results above and `v1read.py`; (3) the Status line, the waits and the summaries split |
 | 1 | Before the first gate: the approach to the whole run, after the contract, the taken code and the executor were read | Approach sound; ten points. (0) The advisor cannot state its model; record the settings and the missing `/advisor opus` as a setup deviation, tell the user once, continue (no credit error, so no Codex fallback). (1) Dispose Codex (a) before the hashed v2 binary and V0, not after V0. (2) Masked and suppressing on per-kind effective-vote read effects (any kind), not through the moved sink's kind; moved sink beside. (3) Walk the genome for consumer identity, sinks by kind; predeclare `none` endpoints, `ClearSlot` as intermediate, an order-safe compute walk. (4) V0's header may differ in `vote_delta_version` and v2's new keys only; hash the other blocks and report. (5) Run copied, hashed binaries, never `cargo test` mid-chain; fresh scripts; `pgrep` and power at every launch; define "host free" for D now. (6) Load `rust-skills`; fixtures first; create the summaries folder before the first `make check-docs`. (7) Predeclare V1's kill formula and automate the extension rule. (8) Per-pass records for delta passes only; read the block size at the smoke and at V0. (9) Turn economy: one note write, one driver, batched consultations. (10) Predeclare the close checklist | All adopted in this predeclaration: (0) Run setup; (1) the Order; (2) instrument item 4; (3) items 1 and 2; (4) gate V0; (5) Run setup and the driver; (6) done before code; (7) gate V0; (8) item 3 and gate V0.2; (9) the Order; (10) the Order |
 
 ## Codex reviews
