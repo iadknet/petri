@@ -199,8 +199,8 @@ field or switch); a run shows existing signals moved by the changed draws.
       source reading above 1.0) make the same fixture `revisiting` on both
       backends, with the number of events each path needed recorded in the
       readings.
-- [ ] Update `docs/reference/v3-mutation-spec.md` (invariant 8) and the
-      `mod.rs` weight comment; then the Verification items in order.
+- [x] Update `docs/reference/v3-mutation-spec.md` (invariant 8) and the
+      `mod.rs` weight comment.
 
 ## Verification
 
@@ -213,9 +213,17 @@ field or switch); a run shows existing signals moved by the changed draws.
       passed. Workspace: exit 0, 2,720 passed, 0 failed (series test passes
       after the re-pin); eleven seeded pins re-pinned (readings).
 - [ ] `make check` -> exit 0, tested commit in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
+
+| Mutation gate | Record |
+| --- | --- |
+| Summary | `71 mutants tested in 66m: 1 missed, 55 caught, 13 unviable, 2 timeouts` |
+| Output | `~/.local/share/petri-tools/mutants/t11-f29/mutants.out.old` (readings) |
+| 242:49 `>` to `>=` in `feedback_slot` (missed) | Killed (`a_zero_register_vm_node_is_never_the_selected_source`) |
+| 217:30 `-` to `+` in `losing_bias` (timeout) | Deferred (user, 2026-10-09): the step-down starts at or above the incumbent, ~10^9 steps per call hang the lib binary to the 475 s cap; `the_margin_starts_one_unit_below_where_f32_spacing_reaches_two` fails fast under it |
+| 217:30 `-` to `/` in `losing_bias` (timeout) | Deferred (user, 2026-10-09): same hang and same fast-failing test |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t11-f29-feedback-route-formation.json` and
       `-goal.json`, local raw hash and byte count and verification time in the
@@ -287,8 +295,8 @@ both walks, and budgets except `recruitment_paths` 236.1 s over its 120 s cap, a
 overrun (T20.F16 246.7 s) under [T03.F12](t03-f12-genome-length-dependent-reproductive-time.md)'s
 accepted exception. **Fail**, each accepted by the user (Notes): Canyon `mesh_ramp` deaths,
 pooled dead per birth, cycle-carrying dead per applied birth (Orchards, Confluence, drift Canyon
-depth 250), Canyon final population. Summaries are listed under Verification; full readings in
-[`docs/progress/readings/t11-f29.md`](../../progress/readings/t11-f29.md).
+depth 250), Canyon final population. Readings:
+[`t11-f29.md`](../../progress/readings/t11-f29.md).
 
 ## Success Criteria
 
@@ -321,3 +329,4 @@ depth 250), Canyon final population. Summaries are listed under Verification; fu
   vs 0.007295; Canyon final 3,098 (40.9%) under the half floor.
 - Deferred: the T11 track criterion (loop-carrying offspring inside T19.F02's
   dead-per-birth ceiling) stays unchecked on Orchards 4/287 and Confluence 11/119.
+- Deferred: (user) two `losing_bias` timeout mutants; Verification table.

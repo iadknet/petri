@@ -193,6 +193,29 @@ fn the_margin_steps_below_a_rounded_difference() {
 }
 
 #[test]
+fn the_margin_starts_one_unit_below_where_f32_spacing_reaches_two() {
+    // At 2^24 the spacing above is 2 and below is 1: `incumbent - 1.0` is
+    // exact, while a start at or above the incumbent rounds back onto it.
+    let incumbent = 16_777_216.0f32;
+    assert_eq!(losing_bias(incumbent), 16_777_215.0);
+    assert_eq!(losing_bias(-incumbent), -16_777_218.0);
+}
+
+#[test]
+fn a_zero_register_vm_node_is_never_the_selected_source() {
+    let mut base = genome(vec![node(0, &[1]), node(1, &[2]), node(2, &[])]);
+    if let BackendDef::Vm(vm) = &mut base.nodes[0].backend_def {
+        vm.register_count = 0;
+    }
+    for seed in 0..32 {
+        let mut g = base.clone();
+        assert!(feedback_seeded(&mut g, &[], seed).is_ok(), "seed {seed}");
+        assert_eq!(g.nodes[0], base.nodes[0], "seed {seed}");
+        assert_eq!(g.nodes[1].targets.len(), 2, "seed {seed}");
+    }
+}
+
+#[test]
 fn the_event_appends_a_losing_branch_with_its_own_gate_write_on_both_backends() {
     for graph in [false, true] {
         let base = conditional_fixture(graph);
