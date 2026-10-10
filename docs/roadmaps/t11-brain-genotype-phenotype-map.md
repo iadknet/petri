@@ -96,7 +96,7 @@ a representation only where the neighborhood reading still shows a gap.
   - Goal: Like a motor neuron that can only synapse on muscle that contracts, a brain's action-parameter outputs exist only for the three parameters the body reads (Eat food type, Reproduce transfer fraction, StealEnergy amount), so no inherited wiring or VM write addresses the five undecoded fields.
 - [x] **T11.F26 — Mutation-Effect Attribution and Observation Coverage** — Depends on: T11.F16, T11.F20, T11.F24, T11.F25, T11.F27, T14.F12, T19.F06
   - Goal: Show in the Petri progress report whether applied mutations change a creature's computation, state or actions, separating observed barriers to behavioral change from changes missed by the observation battery; observation only.
-- [ ] **T11.F29 — Feedback Route Formation** — Depends on: T11.F15, T19.F04
+- [x] **T11.F29 — Feedback Route Formation** — Depends on: T11.F15, T19.F04
   - Goal: Feedback projections, a later stage of a nervous system wiring back to an earlier one. A mesh can grow a route branch back to a node on its own working path, itself included, born silent like any new branch, so a loop that repeats a step or keeps state is one ordinary mutation away instead of a rare by-product of a slice copy.
 
 ## Notes for AI Agents
