@@ -24,6 +24,15 @@ could support, and the dose order failed on the three complete seeds. The rule
 could not have validated. The `del-1.0` control differed from `default` by up
 to 36 in P at 20,000 (seed 3022: 13 against 49).
 
+**Landing:** the five `docs:` commits went to `main` as docs only, on top of
+`e8ccb0fd`. The `proto:`, `instr:` and `lab:` commits stay on the kept branch
+`worktree-deletion-rate`, and the evidence is in the main checkout's
+`.bench-artifacts/lab/delrate/`. While the run went on, `main` advanced from
+the launch revision `7582325d` by T11.F29, whose `AddFeedbackRoute` topology
+operator raises the topology weight total from 211 to 221, plus three docs
+notes. Every number here is for `7582325d`, and S0's hazards on today's `main`
+would differ slightly through that table.
+
 ## Question
 
 T11.F28's premise, restated for `main` after T20.F16: deletion operators remove
