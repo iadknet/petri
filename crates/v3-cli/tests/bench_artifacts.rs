@@ -185,6 +185,13 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
     v3_cli::inspect::resolve_baseline_world(recipe, path.to_str().unwrap()).unwrap()
 }
 
+/// The `sha256:` digest of a config value in canonical (sorted-key) form.
+fn value_digest(value: &serde_json::Value) -> String {
+    let canonical =
+        serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
+    format!("sha256:{}", artifacts::sha256(&canonical))
+}
+
 /// These digests pin the fully resolved checked-in recipes. Intentional changes
 /// to inherited production defaults must update them after repeated resolution.
 /// T11.F20 re-pinned all three after two agreeing runs: the resolved
@@ -202,6 +209,9 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// `energy.costs.failed_action_penalty` and `startup`, adds
 /// `energy.costs.reproduce_attempt_cost: 0.05`, and `eat_cost` defaults to
 /// 0.05; undoing exactly those recovers the T03.F12 digests.
+/// The effort-cost defaults (2026-10-10) re-pinned all three after two
+/// agreeing runs: `noop_cost` 0.4, `reproduce_attempt_cost` 1.0 and
+/// `move_cost` 1.6; restoring 0.05, 0.05 and 0.2 recovers the T16.F02 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -217,6 +227,33 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:ff17c388774137ca48df2e21e7e0949f648c1aa6e04799f439cdae7772022a4b",
+            "sha256:ece666508c5c6886b80afb723d4651e8092dad5bfcb40650d6873da798193210",
+            "sha256:f1752c872a0e45ae9cd74787940be0b29bd38ae7f8c870a0c14c17d563f8c420",
+        ]
+    );
+
+    // Undoing the effort-cost defaults recovers the T16.F02 digests.
+    let t16_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        let costs = value["energy"]["costs"].as_object_mut().unwrap();
+        for (key, now, before) in [
+            ("noop_cost", 0.4_f32, 0.05_f32),
+            ("reproduce_attempt_cost", 1.0, 0.05),
+            ("move_cost", 1.6, 0.2),
+        ] {
+            assert_eq!(
+                costs.insert(key.into(), json!(f64::from(before))),
+                Some(json!(f64::from(now))),
+                "{key}"
+            );
+        }
+        value
+    });
+    let t16 = t16_values.each_ref().map(value_digest);
+    assert_eq!(
+        t16,
+        [
             "sha256:12ea63f7191ad3286011e06a2f068e6c15e208af0f875a4ea6eac71f274edf08",
             "sha256:6112372c8e990697cebbee72ec054d31b1f2c8c0485bc87159f9c28bf87e9db7",
             "sha256:39d3a045c89ff08b35ef87177a378c116f53b8394d60933f54fb5c1f6a14a843",
@@ -226,8 +263,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     // Undoing T16.F02's config shape recovers the T03.F12 digests: restore
     // the retired penalty and its startup ramp at their old defaults, drop
     // `reproduce_attempt_cost`, and return `eat_cost` to 0.
-    let f12_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let f12_values = t16_values.map(|mut value| {
         let costs = value["energy"]["costs"].as_object_mut().unwrap();
         assert_eq!(
             costs.remove("reproduce_attempt_cost"),
@@ -252,11 +288,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
         );
         value
     });
-    let f12 = f12_values.each_ref().map(|value| {
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
-    });
+    let f12 = f12_values.each_ref().map(value_digest);
     assert_eq!(
         f12,
         [
@@ -276,11 +308,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
         );
         value
     });
-    let f05 = f05_values.each_ref().map(|value| {
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
-    });
+    let f05 = f05_values.each_ref().map(value_digest);
     assert_eq!(
         f05,
         [
@@ -300,11 +328,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
         );
         value
     });
-    let f04 = f04_values.each_ref().map(|value| {
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
-    });
+    let f04 = f04_values.each_ref().map(value_digest);
     assert_eq!(
         f04,
         [
@@ -322,9 +346,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
                 .remove("neutral_input_recruitment"),
             Some(json!("Off"))
         );
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value)).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
+        value_digest(&value)
     });
     assert_eq!(
         historical,

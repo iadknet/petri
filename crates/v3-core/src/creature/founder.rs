@@ -40,9 +40,10 @@ pub struct FounderReproducePolicy {
 /// At the default `max_energy` (200) each unit threshold is the T17.F01 raw
 /// gate (32/32/60/40/50) divided by 200, which sits at least 2.0 above
 /// `min_reproduce_energy` (30), and each fraction clears the `initial_energy`
-/// (20) litter floor at its own threshold after the age-1.0 reproduce cost,
-/// so a founder attempt at or above its gate is never refused on energy
-/// (T17.F01 invariant 5). A lifecycle where `energy_threshold * max_energy -
+/// (20) litter floor at its own threshold after the age-1.0 attempt effort
+/// and reproduce cost, so before senescence (through age 130 at default
+/// economics) a founder attempt above its gate is never refused on energy
+/// (T17.F01 invariant 5); older founders may waste attempts. A lifecycle where `energy_threshold * max_energy -
 /// 1.0 < min_reproduce_energy` pins the founder at its gate.
 #[must_use]
 pub const fn founder_reproduce_policy(profile: FounderProfile) -> FounderReproducePolicy {

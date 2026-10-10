@@ -433,7 +433,10 @@ fn founder_eats_primary_type_and_preserves_other_food() {
 
     assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.0);
     assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.5);
-    assert!(sim.creatures[id].energy > 20.0);
+    // Effort-cost defaults, 2026-10-10: floor 0.4, attempt 1.0, move 1.6. The
+    // tick's eat + move (2.0) and decay now outweigh the 0.5-unit meal (2.5),
+    // so the credited intake replaces the former `energy > 20.0` proxy.
+    assert_eq!(sim.stats.energy_flows.food_intake_by_type, vec![2.5, 0.0]);
 }
 
 /// With no food and sufficient energy, the founder should emit Reproduce and
@@ -1108,24 +1111,23 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
-    // Re-pinned by T16.F02 at both rates: founders pay the 0.05 eat effort
-    // from their first Eat and the ramped failed-action penalty is gone
-    // (default 229 -> 195 births, rate 0.0 199 -> 297; old digests in
-    // docs/progress/readings/t16-f02.md). Measured on macOS aarch64.
+    // Effort-cost defaults, 2026-10-10: floor 0.4, attempt 1.0, move 1.6
+    // (default 195 -> 99 births, rate 0.0 297 -> 94; old digests in
+    // docs/progress/readings/effort-cost-defaults.md). Measured on macOS aarch64.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            195,
+            99,
             0,
-            "89d60dc0f467a597a6dc32229cf7cb0c02c378c0931f705c511f9adeb1a4c477".to_owned()
+            "0948b6d22e1ff9e8186c9e8622c4c6fbc5aa8d1ad6a7bbb735eb678b4d424c85".to_owned()
         )
     );
     assert_eq!(
         founder_only_trajectory(Some(0.0)),
         (
-            297,
+            94,
             0,
-            "4a5941e899a878853adf125db91a0430fbbbce2139aad6ebab9cf43de646d61c".to_owned()
+            "50f761554d2f14dacd30a58b74fe5e33aa8c07f7b034ef1008a25d47bec5dd2b".to_owned()
         )
     );
 }

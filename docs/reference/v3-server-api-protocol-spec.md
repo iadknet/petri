@@ -168,12 +168,12 @@ Request (conceptual v3alpha4 shape):
       "default_offspring_energy": 100.0
     },
     "costs": {
-      "move_cost": 0.2,
+      "move_cost": 1.6,
       "eat_cost": 0.05,
       "eat_reward_per_food": 5.0,
-      "noop_cost": 0.05,
+      "noop_cost": 0.4,
       "reproduce_cost": 0.1,
-      "reproduce_attempt_cost": 0.05
+      "reproduce_attempt_cost": 1.0
     }
   },
   "runtime": {
@@ -482,12 +482,12 @@ Response:
         "default_offspring_energy": 100.0
       },
       "costs": {
-        "move_cost": 0.2,
+        "move_cost": 1.6,
         "eat_cost": 0.05,
         "eat_reward_per_food": 5.0,
-        "noop_cost": 0.05,
+        "noop_cost": 0.4,
         "reproduce_cost": 0.1,
-        "reproduce_attempt_cost": 0.05
+        "reproduce_attempt_cost": 1.0
       }
     },
     "runtime": {

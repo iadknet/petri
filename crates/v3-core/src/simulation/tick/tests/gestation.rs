@@ -246,6 +246,12 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // to crowded deliveries.
     cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 8.0;
     cfg.energy.lifecycle.energy_decay_per_tick = 2.0;
+    // Effort-cost defaults, 2026-10-10: the fixture keeps the earlier effort
+    // costs; at floor 0.4, attempt 1.0, move 1.6 the population dies before
+    // any delivery, and the identities are independent of action prices.
+    cfg.energy.costs.noop_cost = 0.05;
+    cfg.energy.costs.reproduce_attempt_cost = 0.05;
+    cfg.energy.costs.move_cost = 0.2;
     let mut sim = seed_simulation(cfg, 165);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;

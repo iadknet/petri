@@ -242,11 +242,12 @@ fn a_failed_attempt_pays_its_effort_and_nothing_else() {
 /// effort is the only debit even when the parent cannot afford the cost.
 #[test]
 fn reproduce_below_cost_pays_only_the_attempt_effort() {
-    let (mut sim, id) = ready_parent(1.0);
+    // Effort-cost defaults, 2026-10-10: 1.5 so the parent survives the 1.0 attempt effort.
+    let (mut sim, id) = ready_parent(1.5);
     sim.config.energy.complexity_cost.enabled = false;
     sim.config.energy.costs.reproduce_cost = 2.0;
     execute(&mut sim, id, REPRODUCE);
-    assert_eq!(sim.creatures[id].energy, 1.0 - 0.05);
+    assert_eq!(sim.creatures[id].energy, 1.5 - 1.0);
     let flows = &sim.stats.energy_flows;
     assert!(flows.action_charges.reproduce > 0.0);
     assert_eq!(
@@ -304,7 +305,8 @@ fn a_steal_whose_effort_exhausts_the_attacker_still_transfers() {
         },
     );
     assert_eq!(sim.creatures[victim].energy, 49.0);
-    assert_eq!(sim.creatures[attacker].energy, (0.03f32 - 0.05) + 1.0);
+    // Effort-cost defaults, 2026-10-10: the 0.4 effort floor.
+    assert_eq!(sim.creatures[attacker].energy, (0.03f32 - 0.4) + 1.0);
     assert_eq!(sim.stats.mortality.deaths_total, 0);
 }
 

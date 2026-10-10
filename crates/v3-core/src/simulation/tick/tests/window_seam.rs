@@ -195,9 +195,12 @@ fn traced_and_untraced_runs_are_identical_for_graph_founders() {
 
 #[test]
 fn traced_and_untraced_runs_are_identical_for_vm_founders() {
+    // Effort-cost defaults, 2026-10-10: seed 9 to 14. At seeds 9, 10, 12 and
+    // 13 a traced target dies of a move inside its window, and a dead
+    // creature's action log, the oracle, is removed with it.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 9));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 9));
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 14));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 14));
         assert_equivalent(traced, plain, budget);
     }
 }

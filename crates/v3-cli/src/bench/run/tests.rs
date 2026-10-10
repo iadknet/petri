@@ -48,7 +48,9 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
     params.width = 32;
     params.height = 32;
     params.founders = 32;
-    params.ticks = 60;
+    // Effort-cost defaults, 2026-10-10: 40, not 60, so every goal case still
+    // holds more than `SAMPLE_SIZE` creatures (Orchards fell to 9 at 60).
+    params.ticks = 40;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
     params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
@@ -565,6 +567,9 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     params.width = 24;
     params.height = 24;
     params.founders = 16;
+    // Effort-cost defaults, 2026-10-10: seed 1 goes extinct at tick 91; seed
+    // 15 is the lowest of 0..=40 that survives the run (15 and 33 do).
+    params.seeds = vec![15];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

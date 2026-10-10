@@ -32,6 +32,8 @@
 //! Re-pinned by T16.F02 after two agreeing runs: every Eat pays the 0.05
 //! effort, a reproduce attempt pays its effort before the gates, and the
 //! failed-action penalty is gone, which moves all four digests.
+//! Re-pinned after two agreeing runs for the effort-cost defaults, 2026-10-10:
+//! floor 0.4, attempt 1.0, move 1.6, which moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -43,11 +45,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "98e6517eec9def7283343fd0a914713379a3638c5c9a2bd1b4e73cb21ecc3d2f"
+        "33f3a73ba7900f92f76da8e2699e6536cdb0b355cfa3fb328580151a91d92776"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "0a6131485f7f14b565d8e3daf2f7d0712610ce90da9c1d63023278f9818413a8"
+        "7a674e6747390ed9d6afcec21482d74f8acd02b17b90e0f3faa6f21df2b3c760"
     );
 }
 
@@ -120,11 +122,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "8e839ff92e03d52141afcc563197321c81ea56650062e129d32c67c3a20306d0"
+        "60861ddd3d70c0a4b0be08d1e40a1e4601f46065390bf3cd6c40a72b8ae1d7f4"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "54fab293c4d516a3a99d680899bfd5c97da2ac3d008d1a87cd7319b9f19ccc9a"
+        "c08aab7d93216e455424b63cc9cb03754cb1562ceb2a8b385eb503df378efe8c"
     );
 }
 

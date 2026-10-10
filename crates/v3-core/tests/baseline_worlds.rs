@@ -116,10 +116,13 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// failed-action penalty is gone (default 860634653294650084 ->
 /// 11682689850618140524, rate 0.0 7790766295895291063 ->
 /// 17199981815595828116).
+/// Re-pinned after two agreeing runs for the effort-cost defaults, 2026-10-10:
+/// floor 0.4, attempt 1.0, move 1.6 (default 11682689850618140524 ->
+/// 7229388965272740622, rate 0.0 17199981815595828116 -> 7526238675349254538).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 11682689850618140524);
-    assert_eq!(short_run_identity(Some(0.0)), 17199981815595828116);
+    assert_eq!(short_run_identity(None), 7229388965272740622);
+    assert_eq!(short_run_identity(Some(0.0)), 7526238675349254538);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

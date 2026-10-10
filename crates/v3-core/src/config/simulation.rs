@@ -447,7 +447,7 @@ pub struct EnergyCostsConfig {
     pub eat_cost: f32,
     pub eat_reward_per_food: f32,
     /// The effort floor (T16.F02): every action's effort is at least this,
-    /// so it must be finite and above 0 (normalization falls back to 0.05).
+    /// so it must be finite and above 0 (normalization falls back to 0.4).
     pub noop_cost: f32,
     /// Replication cost, paid only on a conception (T16.F01).
     pub reproduce_cost: f32,
@@ -457,16 +457,16 @@ pub struct EnergyCostsConfig {
 }
 
 fn default_reproduce_attempt_cost() -> f32 {
-    0.05
+    1.0
 }
 
 impl Default for EnergyCostsConfig {
     fn default() -> Self {
         Self {
-            move_cost: 0.2,
+            move_cost: 1.6,
             eat_cost: 0.05,
             eat_reward_per_food: 5.0,
-            noop_cost: 0.05,
+            noop_cost: 0.4,
             reproduce_cost: 0.1,
             reproduce_attempt_cost: default_reproduce_attempt_cost(),
         }
@@ -981,13 +981,13 @@ impl SimulationConfig {
         );
 
         let ec = &mut self.energy.costs;
-        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
+        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 1.6);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.05);
         ec.noop_cost = if ec.noop_cost.is_finite() && ec.noop_cost > 0.0 {
             ec.noop_cost
         } else {
-            0.05
+            0.4
         };
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
         ec.reproduce_attempt_cost = normalize_f32_finite_nonneg(
@@ -1371,11 +1371,11 @@ mod tests {
         assert_eq!(cfg.energy.age_cost.age_cap, 200);
         assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
         // Energy costs
-        assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
+        assert!((cfg.energy.costs.move_cost - 1.6).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.05).abs() < 1e-6);
-        assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
+        assert!((cfg.energy.costs.noop_cost - 0.4).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
-        assert!((cfg.energy.costs.reproduce_attempt_cost - 0.05).abs() < 1e-6);
+        assert!((cfg.energy.costs.reproduce_attempt_cost - 1.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 64);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
@@ -2321,7 +2321,7 @@ mod tests {
     fn action_effort_floors_a_zero_or_invalid_base_to_noop() {
         let ec = EnergyConfig::default();
         let noop = ec.action_effort(ec.costs.noop_cost, 0, 0);
-        assert_eq!(noop, 0.05);
+        assert_eq!(noop, 0.4);
         for base in [0.0, 0.01, f32::NAN] {
             assert_eq!(ec.action_effort(base, 0, 0).to_bits(), noop.to_bits());
         }
@@ -2331,9 +2331,9 @@ mod tests {
     fn effort_cost_defaults_are_pinned() {
         let costs = EnergyCostsConfig::default();
         assert_eq!(costs.eat_cost, 0.05);
-        assert_eq!(costs.noop_cost, 0.05);
-        assert_eq!(costs.move_cost, 0.2);
-        assert_eq!(costs.reproduce_attempt_cost, 0.05);
+        assert_eq!(costs.noop_cost, 0.4);
+        assert_eq!(costs.move_cost, 1.6);
+        assert_eq!(costs.reproduce_attempt_cost, 1.0);
         assert_eq!(costs.reproduce_cost, 0.1);
     }
 
@@ -2344,20 +2344,19 @@ mod tests {
             cfg.energy.costs.noop_cost = invalid;
             cfg.energy.costs.eat_cost = invalid;
             cfg.energy.costs.reproduce_attempt_cost = invalid;
+            cfg.energy.costs.move_cost = invalid;
             cfg.normalize();
-            assert_eq!(cfg.energy.costs.noop_cost, 0.05, "{invalid}");
+            assert_eq!(cfg.energy.costs.move_cost, 1.6, "{invalid}");
+            assert_eq!(cfg.energy.costs.noop_cost, 0.4, "{invalid}");
             assert_eq!(cfg.energy.costs.eat_cost, 0.05, "{invalid}");
-            assert_eq!(cfg.energy.costs.reproduce_attempt_cost, 0.05, "{invalid}");
+            assert_eq!(cfg.energy.costs.reproduce_attempt_cost, 1.0, "{invalid}");
         }
         let mut cfg = SimulationConfig::default();
         cfg.energy.costs.noop_cost = 0.0;
         cfg.energy.costs.eat_cost = 0.0;
         cfg.energy.costs.reproduce_attempt_cost = 0.0;
         cfg.normalize();
-        assert_eq!(
-            cfg.energy.costs.noop_cost, 0.05,
-            "noop_cost must be above 0"
-        );
+        assert_eq!(cfg.energy.costs.noop_cost, 0.4, "noop_cost must be above 0");
         assert_eq!(cfg.energy.costs.eat_cost, 0.0);
         assert_eq!(cfg.energy.costs.reproduce_attempt_cost, 0.0);
     }
@@ -2368,7 +2367,7 @@ mod tests {
             r#"{"move_cost":0.2,"eat_cost":0.0,"eat_reward_per_food":5.0,"noop_cost":0.05,"reproduce_cost":0.1}"#,
         )
         .unwrap();
-        assert_eq!(costs.reproduce_attempt_cost, 0.05);
+        assert_eq!(costs.reproduce_attempt_cost, 1.0);
     }
 
     // ── ReachableBiasConfig tests ─────────────────────────────────────────
