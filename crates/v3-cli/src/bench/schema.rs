@@ -4,6 +4,7 @@ use super::comparison::{Comparison, MeasuredIdentity};
 use super::input_use::{undefined_input_use, InputUse};
 use super::mutation_effects::{undefined_mutation_effects, MutationEffects};
 use super::profiles::GoalCase;
+use super::ring_rules::{undefined_ring_rules, RingRules};
 use super::run::millis;
 use super::tracking::{PersistenceSample, WorldTracking};
 use crate::{fraction_or_undefined, six, UNDEFINED};
@@ -174,6 +175,10 @@ pub struct GoalCaseObservation {
     /// The input-use funnel (T20.F01); unmeasured in reports stored before it.
     #[serde(default = "undefined_input_use")]
     pub input_use: Indicator<InputUse>,
+    /// The ring-rule census of the terminal population (T11.F31);
+    /// unmeasured in reports stored before it.
+    #[serde(default = "undefined_ring_rules")]
+    pub ring_rules: Indicator<RingRules>,
 }
 
 /// The rates [`WorldTracking`] implies, derived once so a total and its

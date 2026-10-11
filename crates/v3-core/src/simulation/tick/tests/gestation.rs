@@ -252,7 +252,11 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     cfg.energy.costs.noop_cost = 0.05;
     cfg.energy.costs.reproduce_attempt_cost = 0.05;
     cfg.energy.costs.move_cost = 0.2;
-    let mut sim = seed_simulation(cfg, 165);
+    // Re-seeded by T11.F31 (165 -> 328): the five ring projection operators
+    // change every Graph-domain draw, and at seed 165 no creature holds
+    // energy above the lowered cap at tick 50, the precondition of the
+    // lowered-cap case.
+    let mut sim = seed_simulation(cfg, 328);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {

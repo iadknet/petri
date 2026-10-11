@@ -694,13 +694,19 @@ pub(crate) fn alter_edge_weight_in_def(
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     reset_inherited_edge(def, surface, edge_idx);
-    let w = &mut edge_at_mut(def, surface, edge_idx).weight;
+    perturb_weight(&mut edge_at_mut(def, surface, edge_idx).weight, rng);
+    Ok(())
+}
+
+/// `AlterGraphEdgeWeight`'s weight law, shared with
+/// `AlterRingProjectionWeight` (T11.F31): `|w| > 0.01` scales by
+/// `1 + U[−0.2, 0.2]`, otherwise adds `U[−0.1, 0.1]`. One draw.
+pub(crate) fn perturb_weight(w: &mut f32, rng: &mut impl Rng) {
     if w.abs() > 0.01 {
         *w *= 1.0 + rng.gen_range(-0.2f32..=0.2);
     } else {
         *w += rng.gen_range(-0.1f32..=0.1);
     }
-    Ok(())
 }
 
 /// The compute nodes `copy_edge_bundle` can copy a bundle from: those that
@@ -1040,6 +1046,7 @@ mod tests {
 
     fn minimal_def() -> CgpGraphBackendDef {
         CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
@@ -1151,6 +1158,7 @@ mod tests {
     #[test]
     fn split_existing_edge_no_edges_is_skip() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
@@ -1169,6 +1177,7 @@ mod tests {
     #[test]
     fn split_existing_edge_dangling_compute_source_is_skip() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
@@ -1198,6 +1207,7 @@ mod tests {
     #[test]
     fn split_existing_edge_compute_consumer_inserts_and_remaps() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
@@ -1257,6 +1267,7 @@ mod tests {
     #[test]
     fn split_existing_edge_self_loop_shifts_consistently() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::DecayIntegrator(0.5),
@@ -1290,6 +1301,7 @@ mod tests {
     #[test]
     fn split_existing_edge_sink_consumer_appends() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(0.5),
@@ -1333,6 +1345,7 @@ mod tests {
     #[test]
     fn remove_compute_node_empty_is_skip() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
@@ -1381,6 +1394,7 @@ mod tests {
     #[test]
     fn copy_cgp_subgraph_too_small_is_skip() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1418,6 +1432,7 @@ mod tests {
     fn retarget_edge_changes_source() {
         // Single edge for targeted testing
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1447,6 +1462,7 @@ mod tests {
     fn alter_edge_weight_modifies_weight() {
         // Use a single compute node with one edge for targeted testing
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1511,6 +1527,7 @@ mod tests {
     #[test]
     fn mutate_compute_param_no_parameterized_is_skip() {
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1626,6 +1643,7 @@ mod tests {
         // only eligible target is the Add node's one edge — every trial
         // mutates that edge's ComputeNode index.
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
@@ -1663,6 +1681,7 @@ mod tests {
     #[test]
     fn raw_field_mutation_shared_memory_slot_wraps_modulo_16() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1704,6 +1723,7 @@ mod tests {
             InputReference::World(WorldInputKey::NeighborBarrierRing),
         ];
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
@@ -1768,6 +1788,7 @@ mod tests {
         // A single compute node's self-referencing edge has no valid
         // ComputeNode index move (0 is the only valid index).
         let mut def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -1856,6 +1877,7 @@ mod tests {
     fn add_compute_node_reaches_all_three_forms_with_distinct_signatures() {
         fn fixture() -> CgpGraphBackendDef {
             CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Negate,
@@ -2193,6 +2215,7 @@ mod tests {
 
         // Arm 1 only: a parameterized compute node, and no edge anywhere.
         let mut params_only = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(0.5),
@@ -2211,6 +2234,7 @@ mod tests {
 
         // Arm 2 only: no parameterized compute node, but a movable edge.
         let mut edges_only = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
@@ -2279,6 +2303,7 @@ mod tests {
         }
         assert_eq!(drawn.len(), compute + 94, "every candidate stays drawable");
         let empty = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
@@ -2329,7 +2354,7 @@ mod tests {
             seed in proptest::prelude::any::<u64>(),
         ) {
             use proptest::prelude::*;
-            let def = CgpGraphBackendDef {
+            let def = CgpGraphBackendDef { projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: (0..compute)
                     .map(|_| ComputeNode {

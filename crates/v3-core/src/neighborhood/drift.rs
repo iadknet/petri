@@ -868,19 +868,22 @@ mod tests {
         // internal change median 1 -> 9). Re-pinned by T11.F29: the
         // `AddFeedbackRoute` entry remaps every topology draw (created 9 -> 7,
         // dispatched 4 -> 5, dispatch censored present 4 -> 2, internal
-        // change reached 3 -> 1).
-        assert_eq!(reading.cohort.created, 7);
-        assert_eq!(reading.cohort.dispatched(), 5);
-        // Five cohort modules reached dispatch, the median six generations
+        // change reached 3 -> 1). Re-pinned by T11.F31: five ring projection
+        // operators change every Graph-domain draw (created 7 -> 6,
+        // dispatched 5 -> 3, dispatch censored present 2 -> 3, internal
+        // change censored present 6 -> 5).
+        assert_eq!(reading.cohort.created, 6);
+        assert_eq!(reading.cohort.dispatched(), 3);
+        // Three cohort modules reached dispatch, the median six generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 5,
+                reached: 3,
                 median_generations: Some(6),
                 censored_deleted: 0,
-                censored_present: 2,
+                censored_present: 3,
             },
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
@@ -891,14 +894,15 @@ mod tests {
         // after birth; on the T19.F04 vote founder six do, at the same
         // median. On the T11.F20 walk three do, a median one generation
         // after birth; on the T20.F16 walk three do, a median nine; on the
-        // T11.F29 walk one does, nine generations after birth.
+        // T11.F29 walk one does, nine generations after birth, as on the
+        // T11.F31 walk.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
                 reached: 1,
                 median_generations: Some(9),
                 censored_deleted: 0,
-                censored_present: 6,
+                censored_present: 5,
             },
         );
     }

@@ -83,6 +83,7 @@ fn voting_graph_node(
         node_id: NodeId::new(id),
         input_refs: vec![],
         backend_def: BackendDef::Graph(CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(value),

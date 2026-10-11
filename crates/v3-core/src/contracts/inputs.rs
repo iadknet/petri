@@ -63,6 +63,16 @@ impl WorldInputKey {
         }
     }
 
+    /// Whether this is one of the three neighbor rings: width 8, sub-value `c`
+    /// the neighbor in `Direction::ALL[c]` (T11.F31 ring projections).
+    #[must_use]
+    pub const fn is_neighbor_ring(self) -> bool {
+        matches!(
+            self,
+            Self::NeighborFoodRing { .. } | Self::NeighborBarrierRing | Self::NeighborOccupiedRing
+        )
+    }
+
     /// Returns the typed food index for food-specific world keys, or `None` otherwise.
     #[must_use]
     pub const fn food_type_idx(self) -> Option<OrdinaryFoodTypeId> {
@@ -143,6 +153,15 @@ pub enum InputReference {
     /// Compound (T19.F05): the previous tick's outcome channels, one per
     /// `OutcomeChannel` discriminant, frozen at tick start.
     PreviousOutcome,
+}
+
+impl InputReference {
+    /// Whether this reference is a neighbor ring a ring projection reads
+    /// (T11.F31): `World` of one of [`WorldInputKey::is_neighbor_ring`].
+    #[must_use]
+    pub const fn is_ring(&self) -> bool {
+        matches!(self, Self::World(key) if key.is_neighbor_ring())
+    }
 }
 
 #[cfg(test)]

@@ -635,3 +635,60 @@ proptest! {
         prop_assert_eq!(after, expected);
     }
 }
+
+/// A ring projection (T11.F31) consumes all eight channels of its ring, live
+/// and read whenever its node's effects pass runs.
+#[test]
+fn a_ring_projection_consumes_all_eight_channels_of_its_ring() {
+    use crate::creature::genome::cgp::RingProjection;
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
+    let BackendDef::Graph(def) = &mut node.backend_def else {
+        unreachable!()
+    };
+    def.projections
+        .push(RingProjection::new(0, DirectedVoteKind::Move, 1, -2.0));
+    let parent = Fixture::new().read(&genome(vec![node]));
+    for c in 0..8 {
+        let ring = channel(&barriers(), c);
+        assert!(parent.connected.contains(&ring), "{c}");
+        assert!(parent.executed_live.contains(&ring), "{c}");
+    }
+    assert!(parent.consistency_ok());
+}
+
+/// Ablating one channel zeroes that channel's term in every projection that
+/// reads it and changes nothing a genome reader sees.
+#[test]
+fn ablating_a_ring_channel_masks_only_that_projection_term() {
+    use crate::creature::genome::cgp::RingProjection;
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let refs = vec![barriers(), food_here(), barriers()];
+    let mut node = graph_node(0, refs, Vec::new(), EAT, vec![leaf(1, 0)]);
+    let BackendDef::Graph(def) = &mut node.backend_def else {
+        unreachable!()
+    };
+    def.projections = vec![
+        RingProjection::new(0, DirectedVoteKind::Move, 1, -2.0),
+        RingProjection::new(2, DirectedVoteKind::Reproduce, 0, 1.0),
+        RingProjection::new(1, DirectedVoteKind::Move, 0, 1.0),
+    ];
+    let genome = genome(vec![node]);
+    let target = channel(&barriers(), 3);
+    let ablated = super::consumers::ablated(&genome, |c| c == target);
+    assert_eq!(ablated, genome);
+    assert_eq!(ablated.genome_size(), genome.genome_size());
+    assert_eq!(
+        serde_json::to_string(&ablated).unwrap(),
+        serde_json::to_string(&genome).unwrap()
+    );
+    assert_eq!(format!("{ablated:?}"), format!("{genome:?}"));
+    let BackendDef::Graph(def) = &ablated.nodes[0].backend_def else {
+        unreachable!()
+    };
+    let masks: Vec<u8> = def.projections.iter().map(|p| p.ablated_channels).collect();
+    // Both barrier projections lose channel 3; the off-ring one is untouched.
+    assert_eq!(masks, vec![1 << 3, 1 << 3, 0]);
+    // The ordinary food consumer is untouched.
+    assert_eq!(def.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
+}

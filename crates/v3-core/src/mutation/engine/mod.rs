@@ -762,6 +762,17 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
         GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
         GraphOperator::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
+        GraphOperator::AddRingProjection => MutationOperator::GraphAddRingProjection,
+        GraphOperator::AlterRingProjectionWeight => {
+            MutationOperator::GraphAlterRingProjectionWeight
+        }
+        GraphOperator::ShiftRingProjectionOffset => {
+            MutationOperator::GraphShiftRingProjectionOffset
+        }
+        GraphOperator::RetargetRingProjectionKind => {
+            MutationOperator::GraphRetargetRingProjectionKind
+        }
+        GraphOperator::RemoveRingProjection => MutationOperator::GraphRemoveRingProjection,
     }
 }
 

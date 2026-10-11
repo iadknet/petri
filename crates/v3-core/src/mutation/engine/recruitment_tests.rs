@@ -32,8 +32,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // appends a vote edge (3980442848510747838 -> 13774101911075560278).
     // Re-pinned by T11.F29: the `AddFeedbackRoute` entry remaps every
     // topology draw (13774101911075560278 -> 3281291995176387451).
+    // Re-pinned by T11.F31: five ring projection operators join the Graph
+    // default arm (total weight 44 -> 56), remapping every Graph draw
+    // (3281291995176387451 -> 16135082583858842888).
     assert_eq!(
-        hash, 3281291995176387451,
+        hash, 16135082583858842888,
         "pin of the recruitment-Off production path"
     );
 }

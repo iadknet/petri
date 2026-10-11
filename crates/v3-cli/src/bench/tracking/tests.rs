@@ -274,6 +274,7 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
         }
     }
     let inert = CgpGraphBackendDef {
+        projections: Vec::new(),
         birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Constant(0.0),

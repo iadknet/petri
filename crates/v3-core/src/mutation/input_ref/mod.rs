@@ -98,8 +98,8 @@ fn swappable_indices(node: &NodeGenome, food_type_count: usize) -> Vec<usize> {
 }
 
 /// The `input_refs` indices some consumer on the node's backend addresses:
-/// a `GraphSource::InputLeaf` on any edge container, or a VM `ReadInput`
-/// anywhere in the program, live or not.
+/// a `GraphSource::InputLeaf` on any edge container, a ring projection
+/// (T11.F31), or a VM `ReadInput` anywhere in the program, live or not.
 fn referenced_indices(node: &NodeGenome) -> BTreeSet<u16> {
     match &node.backend_def {
         BackendDef::Graph(def) => def
@@ -108,6 +108,7 @@ fn referenced_indices(node: &NodeGenome) -> BTreeSet<u16> {
                 GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
                 GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
             })
+            .chain(def.projections.iter().map(|projection| projection.ref_idx))
             .collect(),
         BackendDef::Vm(vm) => vm
             .program

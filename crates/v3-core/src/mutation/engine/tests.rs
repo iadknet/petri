@@ -90,6 +90,7 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
             node_id: NodeId::new(0),
             input_refs,
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: Vec::new(),
                 output_sinks: vec![OutputSink {
@@ -221,6 +222,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
                     birth_weights: None,
                     compute_nodes: Vec::new(),
                     output_sinks: vec![OutputSink {
@@ -238,6 +240,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 node_id: NodeId::new(1),
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
                     birth_weights: None,
                     compute_nodes: Vec::new(),
                     output_sinks: vec![OutputSink {

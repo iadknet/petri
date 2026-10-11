@@ -16,6 +16,7 @@ use super::profiles::{
     build_config, goal_case, goal_recipes_for, profile_block, GoalCase, GoalRecipe,
     NeighborhoodSizes, ProfileParams, GOAL_WORLD_SET, SCHEMA_VERSION,
 };
+use super::ring_rules::{undefined_ring_rules, RingRules};
 use super::schema::{
     ratio, timed_recruitment_paths, undefined_neighborhood_read, Deterministic, DriftDepth,
     Environment, GoalCaseObservation, Host, Indicator, LineageDiversitySeed, MemorySensitivitySeed,
@@ -89,6 +90,8 @@ struct GoalObservation {
     /// `Some` only on the goal world set (T20.F01), timed on its own.
     input_use: Option<InputUse>,
     input_use_wall_clock_ms: f64,
+    /// `Some` only on the goal world set (T11.F31): pure structure, untimed.
+    ring_rules: Option<RingRules>,
 }
 
 /// `Duration` as fractional milliseconds, the unit every wall-clock field in
@@ -273,6 +276,7 @@ pub(super) fn run_one_seed(
         let input_use = world_observation
             .map(|observation| super::input_use::observe_world(seed, &sim, observation));
         let input_use_wall_clock_ms = millis(input_use_started.elapsed());
+        let ring_rules = world_observation.map(|_| super::ring_rules::observe_world(&sim));
         let neighborhood_read = read_with_exposure.map(|(read, _)| read);
 
         GoalObservation {
@@ -289,6 +293,7 @@ pub(super) fn run_one_seed(
             mutation_effects_wall_clock_ms,
             input_use,
             input_use_wall_clock_ms,
+            ring_rules,
         }
     });
 
@@ -526,6 +531,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         let mut case_read = undefined_neighborhood_read();
         let mut case_effects = undefined_mutation_effects();
         let mut case_input_use = undefined_input_use();
+        let mut case_ring_rules = undefined_ring_rules();
         if let Some(observation) = run.goal_observation {
             lineage_diversity_per_seed.push(observation.lineage_diversity);
             memory_sensitivity_per_seed.push(observation.memory_sensitivity);
@@ -558,6 +564,9 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                 observation.input_use_wall_clock_ms,
                 &mut input_use_wall_clock_ms_per_seed,
             );
+            if let Some(ring_rules) = observation.ring_rules {
+                case_ring_rules = Indicator::Defined(ring_rules);
+            }
             case_read = timed_case_reading(
                 observation.neighborhood_read,
                 seed,
@@ -583,6 +592,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                 neighborhood_read: case_read,
                 mutation_effects: case_effects,
                 input_use: case_input_use,
+                ring_rules: case_ring_rules,
             });
         }
         per_seed.push(run.per_seed);

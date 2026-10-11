@@ -34,6 +34,7 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
         ],
     }));
     let stateful_plastic = make(BackendDef::Graph(CgpGraphBackendDef {
+        projections: Vec::new(),
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::DecayIntegrator(0.5),
             inputs: vec![GraphEdge {
@@ -456,6 +457,7 @@ fn temporal_report_keeps_substrate_counts_separate() {
             input_refs: vec![],
             targets: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(0.0),

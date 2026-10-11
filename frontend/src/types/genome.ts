@@ -95,9 +95,25 @@ export interface OutputSink {
 	inputs: GraphEdge[];
 }
 
+/** A directed vote kind a ring projection votes for (T11.F31). */
+export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy";
+
+/**
+ * One ring projection (T11.F31): adds `weight * ring[(d - offset) mod 8]` to
+ * `kind`'s direction-`d` vote for all eight directions.
+ */
+export interface RingProjection {
+	ref_idx: number;
+	kind: DirectedVoteKind;
+	offset: number;
+	weight: number;
+}
+
 export interface GraphBackendDef {
 	compute_nodes: ComputeNode[];
 	output_sinks: OutputSink[];
+	/** Omitted by the server when the node carries none. */
+	projections?: RingProjection[];
 }
 
 export type VmInstruction =

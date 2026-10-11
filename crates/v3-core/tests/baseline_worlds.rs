@@ -119,10 +119,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// Re-pinned after two agreeing runs for the effort-cost defaults, 2026-10-10:
 /// floor 0.4, attempt 1.0, move 1.6 (default 11682689850618140524 ->
 /// 7229388965272740622, rate 0.0 17199981815595828116 -> 7526238675349254538).
+/// Re-pinned by T11.F31 after two agreeing runs: five ring projection
+/// operators join the Graph catalog and change every Graph-domain draw
+/// (default 7229388965272740622 -> 16142175903090917201, rate 0.0
+/// 7526238675349254538 -> 14486103714587518529).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 7229388965272740622);
-    assert_eq!(short_run_identity(Some(0.0)), 7526238675349254538);
+    assert_eq!(short_run_identity(None), 16142175903090917201);
+    assert_eq!(short_run_identity(Some(0.0)), 14486103714587518529);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

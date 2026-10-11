@@ -28,6 +28,7 @@ use proptest::prelude::*;
 
 mod boundaries;
 mod lifecycle;
+mod projection;
 mod recruitment;
 mod refinement;
 

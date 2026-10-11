@@ -1,7 +1,9 @@
 //! F04 access through the actual preflight/append path and native evaluator.
 use super::*;
 use crate::config::{MutationConfig, NeutralInputRecruitment as Arm};
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
+use crate::mutation::graph::projection;
 use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;
@@ -41,6 +43,31 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                 );
                 assert_eq!(silent.result, before.result);
                 assert_eq!(silent.memory, before.memory);
+                let ring = matches!(&family, SourceFamily::Input(reference) if reference.is_ring());
+                if let (true, Some((kind, _))) = (ring, DirectedVoteKind::of_sink(vote)) {
+                    // A ring landing on a directed sink is one silent
+                    // projection (T11.F31), refined as a unit: one weight
+                    // step moves the kind's vote in every direction.
+                    assert_eq!(graph(&node).edges().count(), 0);
+                    assert_eq!(graph(&node).projections.len(), 1);
+                    assert_eq!(graph(&node).projections[0].weight, 0.0);
+                    let mut refined = node.clone();
+                    projection::alter_weight(
+                        graph_mut(&mut refined),
+                        &mut SmallRng::seed_from_u64(11),
+                    )
+                    .unwrap();
+                    let votes = effects(graph(&refined), &refined.input_refs, 0.5)
+                        .side
+                        .dispatch_effects()
+                        .0;
+                    for d in 0..8 {
+                        assert_ne!(votes[kind.sink(d).index()], 0.0, "{arm:?} {vote:?} {d}");
+                    }
+                    assert_eq!(votes.iter().filter(|&&vote| vote != 0.0).count(), 8);
+                    continue;
+                }
+                assert!(graph(&node).projections.is_empty());
                 let mut refined = node.clone();
                 alter_edge_weight_in_def(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                     .unwrap();

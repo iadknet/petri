@@ -182,7 +182,8 @@ Genome carrying cost:
   existing `energy <= 0.0` rule in the same tick.
 - The unit is total genome size (`genome_size()`), which counts every node,
   input reference, target, VM instruction, VM constant, compute node and its
-  edges, and wired output sink and its edges with equal weight. It is not reachability-aware, so unreachable and dead structure is
+  edges, wired output sink and its edges, and ring projection (one unit each,
+  T11.F31) with equal weight. It is not reachability-aware, so unreachable and dead structure is
   charged exactly like the executed core.
 - Is NOT scaled by the complexity or age action multipliers, exactly as
   `energy_decay_per_tick` is not; it is a world-level Phase 0 cost, not an

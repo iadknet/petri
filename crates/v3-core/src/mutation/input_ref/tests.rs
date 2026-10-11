@@ -351,6 +351,7 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
         weight: 1.0,
     };
     let def = CgpGraphBackendDef {
+        projections: Vec::new(),
         birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Add,

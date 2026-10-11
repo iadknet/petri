@@ -34,6 +34,9 @@
 //! failed-action penalty is gone, which moves all four digests.
 //! Re-pinned after two agreeing runs for the effort-cost defaults, 2026-10-10:
 //! floor 0.4, attempt 1.0, move 1.6, which moves all four digests.
+//! Re-pinned by T11.F31 after two agreeing runs: five ring projection
+//! operators join the Graph catalog, which changes every Graph-domain draw
+//! and moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -45,11 +48,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "33f3a73ba7900f92f76da8e2699e6536cdb0b355cfa3fb328580151a91d92776"
+        "c32110f7116c05395f60f522b51191a2008f6404dba0c1c07246c3203d03cd59"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "7a674e6747390ed9d6afcec21482d74f8acd02b17b90e0f3faa6f21df2b3c760"
+        "bfc7f5518ebb1e707fabf1bc57ee097e5cbe8cc7f19de2e7c2af305ef03b8888"
     );
 }
 
@@ -122,11 +125,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "60861ddd3d70c0a4b0be08d1e40a1e4601f46065390bf3cd6c40a72b8ae1d7f4"
+        "00698b2825cd9811175991ee3e9251719bcdb629a1d6933dc7ecc27f951773e7"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "c08aab7d93216e455424b63cc9cb03754cb1562ceb2a8b385eb503df378efe8c"
+        "4564cbb9a5d38636767b1e229b31a745295dc11c8cf191d342cff8b1d1487550"
     );
 }
 

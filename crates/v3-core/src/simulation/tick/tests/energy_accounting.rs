@@ -382,6 +382,7 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
             input_refs: vec![],
             targets: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(1.0),

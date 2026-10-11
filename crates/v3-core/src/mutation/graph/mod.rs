@@ -1,5 +1,6 @@
 pub mod hebbian;
 pub(crate) mod operators;
+pub(crate) mod projection;
 pub(crate) mod recruitment;
 pub(crate) mod refinement;
 
@@ -38,10 +39,15 @@ pub enum GraphOperator {
     MutateTraceDecay,
     RecruitNeutralInput,
     RefineHeritableStructure,
+    AddRingProjection,
+    AlterRingProjectionWeight,
+    ShiftRingProjectionOffset,
+    RetargetRingProjectionKind,
+    RemoveRingProjection,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 28] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -65,6 +71,11 @@ impl GraphOperator {
         Self::MutateTraceDecay,
         Self::RecruitNeutralInput,
         Self::RefineHeritableStructure,
+        Self::AddRingProjection,
+        Self::AlterRingProjectionWeight,
+        Self::ShiftRingProjectionOffset,
+        Self::RetargetRingProjectionKind,
+        Self::RemoveRingProjection,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -95,12 +106,19 @@ impl GraphOperator {
             Self::MutateTraceDecay => 4,
             Self::RecruitNeutralInput => 1,
             Self::RefineHeritableStructure => 4,
+            // Ring projections (T11.F31): each the tier of the edge operator
+            // it parallels.
+            Self::AddRingProjection => 2,
+            Self::AlterRingProjectionWeight => 4,
+            Self::ShiftRingProjectionOffset => 2,
+            Self::RetargetRingProjectionKind => 2,
+            Self::RemoveRingProjection => 2,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 23,
+            Self::ALL.len() == 28,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -129,9 +147,11 @@ impl GraphOperator {
             | Self::CopyEdgeBundle
             | Self::EnableHebbian
             | Self::EnableRewardModulation
-            | Self::RecruitNeutralInput => ComplexityEffect::Increasing,
+            | Self::RecruitNeutralInput
+            | Self::AddRingProjection => ComplexityEffect::Increasing,
             Self::RemoveInternalGraphNode
             | Self::RemoveGraphEdge
+            | Self::RemoveRingProjection
             | Self::DisableHebbian
             | Self::DisableRewardModulation => ComplexityEffect::Decreasing,
             Self::AlterGraphEdgeWeight
@@ -144,7 +164,10 @@ impl GraphOperator {
             | Self::MutateHebbianRate
             | Self::ToggleHebbianLamarckian
             | Self::MutateRewardSource
-            | Self::MutateTraceDecay => ComplexityEffect::Neutral,
+            | Self::MutateTraceDecay
+            | Self::AlterRingProjectionWeight
+            | Self::ShiftRingProjectionOffset
+            | Self::RetargetRingProjectionKind => ComplexityEffect::Neutral,
         }
     }
 
@@ -209,6 +232,11 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_node(def, hebbian::is_reward_modulated)
             }
+            Self::AddRingProjection => projection::can_add(input_refs),
+            Self::AlterRingProjectionWeight
+            | Self::ShiftRingProjectionOffset
+            | Self::RetargetRingProjectionKind
+            | Self::RemoveRingProjection => projection::has_projection(def),
         }
     }
 }
@@ -343,6 +371,30 @@ impl GraphMutator {
                 hebbian::mutate_reward_source(genome, node_idx, rng)
             }
             GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
+            GraphOperator::AddRingProjection => {
+                let node = genome
+                    .nodes
+                    .get_mut(node_idx)
+                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
+                projection::add(node, rng)
+            }
+            GraphOperator::AlterRingProjectionWeight
+            | GraphOperator::ShiftRingProjectionOffset
+            | GraphOperator::RetargetRingProjectionKind
+            | GraphOperator::RemoveRingProjection => {
+                let def = match genome.nodes.get_mut(node_idx).map(|n| &mut n.backend_def) {
+                    Some(BackendDef::Graph(def)) => def,
+                    _ => return Err(MutationSkipReason::NoApplicableTarget),
+                };
+                match op {
+                    GraphOperator::AlterRingProjectionWeight => projection::alter_weight(def, rng),
+                    GraphOperator::ShiftRingProjectionOffset => projection::shift_offset(def, rng),
+                    GraphOperator::RetargetRingProjectionKind => {
+                        projection::retarget_kind(def, rng)
+                    }
+                    _ => projection::remove(def, rng),
+                }
+            }
         }
     }
 }

@@ -215,9 +215,18 @@ proptest! {
             added += new.inputs.len() - old.inputs.len();
             prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.weight == 0.0));
         }
-        prop_assert_eq!(changed, 1);
-        prop_assert!((1..=27).contains(&added));
-        if !whole { prop_assert_eq!(added, 1); }
+        // A ring family landing on a directed vote sink becomes one silent
+        // projection in place of its edges (T11.F31).
+        let projected = after_graph.projections.len() - before_graph.projections.len();
+        prop_assert_eq!(&after_graph.projections[..before_graph.projections.len()], &before_graph.projections[..]);
+        prop_assert!(after_graph.projections.iter().all(|projection| projection.weight == 0.0));
+        prop_assert_eq!(changed + projected, 1);
+        if projected == 0 {
+            prop_assert!((1..=27).contains(&added));
+            if !whole { prop_assert_eq!(added, 1); }
+        } else {
+            prop_assert_eq!(added, 0);
+        }
         prop_assert_eq!(&after_graph.compute_nodes, &before_graph.compute_nodes);
         prop_assert_eq!(&fixture.targets, &before.targets);
         prop_assert_eq!(fixture.node_id, before.node_id);
@@ -361,4 +370,79 @@ proptest! {
         prop_assert_eq!(GraphOperator::random(&mut rng), expected);
         prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>());
     }
+}
+
+#[test]
+fn a_ring_on_a_directed_sink_becomes_one_silent_projection() {
+    use crate::creature::genome::cgp::RingProjection;
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
+    let family = SourceFamily::Input(ring.clone());
+    // SingleChannel: channel 5 into Move(3) is offset (3 - 5) mod 8 = 6.
+    let mut fixture = node();
+    recruit_source(
+        &mut fixture,
+        &family,
+        Arm::SingleChannel,
+        5,
+        VoteSink::Move(3),
+    )
+    .unwrap();
+    assert_eq!(fixture.input_refs, vec![ring.clone()]);
+    assert_eq!(graph(&fixture).edges().count(), 0);
+    assert_eq!(
+        graph(&fixture).projections,
+        vec![RingProjection::new(0, DirectedVoteKind::Move, 6, 0.0)]
+    );
+    // WholeFamily reads channel 0, and an existing declaration is reused.
+    recruit_source(
+        &mut fixture,
+        &family,
+        Arm::WholeFamily,
+        0,
+        VoteSink::StealEnergy(7),
+    )
+    .unwrap();
+    assert_eq!(fixture.input_refs, vec![ring.clone()]);
+    assert_eq!(
+        graph(&fixture).projections[1],
+        RingProjection::new(0, DirectedVoteKind::StealEnergy, 7, 0.0)
+    );
+    // An undirected destination keeps today's edges.
+    recruit_source(&mut fixture, &family, Arm::SingleChannel, 2, VoteSink::Eat).unwrap();
+    assert_eq!(graph(&fixture).projections.len(), 2);
+    assert_eq!(graph(&fixture).edges().count(), 1);
+    // A non-ring family on a directed sink keeps today's edge.
+    let mut other = node();
+    recruit_source(
+        &mut other,
+        &SourceFamily::Input(InputReference::ActionVotes),
+        Arm::SingleChannel,
+        1,
+        VoteSink::Move(0),
+    )
+    .unwrap();
+    assert!(graph(&other).projections.is_empty());
+    assert_eq!(graph(&other).edges().count(), 1);
+}
+
+#[test]
+fn a_dangling_projection_reference_bounds_admission_like_a_dangling_leaf() {
+    use crate::creature::genome::cgp::RingProjection;
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let mut fixture = node();
+    graph_mut(&mut fixture)
+        .projections
+        .push(RingProjection::new(0, DirectedVoteKind::Move, 0, 1.0));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    assert!(admission
+        .plan(
+            &SourceFamily::Input(InputReference::ActionVotes),
+            Arm::SingleChannel,
+            0
+        )
+        .is_none());
+    assert!(admission
+        .plan(&SourceFamily::Memory(false), Arm::SingleChannel, 0)
+        .is_some());
 }

@@ -6,9 +6,11 @@
 
 use std::collections::BTreeSet;
 
+use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
 use crate::creature::genome::cgp_analysis::cgp_live_compute_indices;
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
+use crate::creature::genome::vote::VOTE_DIRECTION_COUNT;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 
 use super::catalog::{addressed, shared_memory, Addressed, Channel, Declaration};
@@ -97,6 +99,13 @@ fn instruction_target(node: &NodeGenome, instruction: &VmInstruction) -> Option<
     }
 }
 
+/// The ring a projection reads, when `ref_idx` resolves to one.
+fn projection_ring(node: &NodeGenome, ref_idx: u16) -> Option<&InputReference> {
+    node.input_refs
+        .get(usize::from(ref_idx))
+        .filter(|reference| reference.is_ring())
+}
+
 fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsumers {
     let live: BTreeSet<usize> = cgp_live_compute_indices(graph).into_iter().collect();
     let consumers = |edges: &[GraphEdge], live: bool| {
@@ -116,10 +125,22 @@ fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsume
             .map(|(index, compute)| consumers(&compute.inputs, live.contains(&index)))
             .collect(),
         // Every sink edge is on the wired surface: an unwired sink has none.
+        // A ring projection reads all eight channels of its ring in the same
+        // effects pass (T11.F31).
         sinks: graph
             .output_sinks
             .iter()
             .flat_map(|sink| consumers(&sink.inputs, true))
+            .chain(graph.projections.iter().flat_map(|projection| {
+                projection_ring(node, projection.ref_idx)
+                    .into_iter()
+                    .flat_map(|reference| {
+                        (0..u16::from(VOTE_DIRECTION_COUNT)).map(|channel| Consumer {
+                            target: Target::Input(addressed(reference, channel)),
+                            live: true,
+                        })
+                    })
+            }))
             .collect(),
     }
 }
@@ -214,9 +235,11 @@ pub(super) fn declarations(genome: &CreatureGenome, reachable: &[usize]) -> BTre
 /// `genome` with every read of a channel `ablate` selects returning 0.0:
 /// each such Graph input leaf and VM `ReadInput` has its `ref_idx` moved out
 /// of range, which both backends already resolve to 0.0
-/// (`runtime/cgp/sources.rs`, `runtime/vm.rs`). Nothing else changes: the
-/// same edges, weights, instructions and `genome_size()`, so execution keeps
-/// its native semantics and charges.
+/// (`runtime/cgp/sources.rs`, `runtime/vm.rs`), and each ring projection
+/// reading such a channel has that channel's bit set in its ablation-only
+/// mask (T11.F31). Nothing else changes: the same edges, weights,
+/// projections, instructions and `genome_size()`, so execution keeps its
+/// native semantics and charges.
 pub(in crate::neighborhood) fn ablated(
     genome: &CreatureGenome,
     ablate: impl Fn(Channel) -> bool,
@@ -235,6 +258,16 @@ pub(in crate::neighborhood) fn ablated(
         };
         match &mut node.backend_def {
             BackendDef::Graph(graph) => {
+                for projection in &mut graph.projections {
+                    let ring = refs.get(usize::from(projection.ref_idx));
+                    if ring.is_some_and(InputReference::is_ring) {
+                        for channel in 0..VOTE_DIRECTION_COUNT {
+                            if hit(projection.ref_idx, u16::from(channel)) {
+                                projection.ablated_channels |= 1 << channel;
+                            }
+                        }
+                    }
+                }
                 let edges = graph
                     .compute_nodes
                     .iter_mut()

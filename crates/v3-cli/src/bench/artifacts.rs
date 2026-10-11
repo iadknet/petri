@@ -427,6 +427,7 @@ fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
                     "neighborhood_read",
                     "mutation_effects",
                     "input_use",
+                    "ring_rules",
                 ] {
                     if let Some(value) = case.get(key) {
                         projected[key] = value.clone();
@@ -597,10 +598,10 @@ const KEPT_SAMPLE_FIELDS: [&str; 12] = [
     "occupancy_grid",
     "sensor_census",
 ];
-/// Case blocks the page reads, each kept whole, and `input_use` (T20.F01)
-/// and `action_attempts` (T16.F02), which the page does not read but the
-/// readings do.
-const KEPT_CASE_BLOCKS: [&str; 22] = [
+/// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
+/// `action_attempts` (T16.F02) and `ring_rules` (T11.F31), which the page
+/// does not read but the readings do.
+const KEPT_CASE_BLOCKS: [&str; 23] = [
     "case",
     "cognition",
     "energy_flows",
@@ -623,6 +624,7 @@ const KEPT_CASE_BLOCKS: [&str; 22] = [
     "reachable_structure_size_distribution",
     "input_use",
     "action_attempts",
+    "ring_rules",
 ];
 
 /// Apply `project` to an object, passing anything else through unchanged.

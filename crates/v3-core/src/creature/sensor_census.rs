@@ -157,6 +157,14 @@ fn census_graph(
             GraphSource::ComputeNode(_) => {}
         }
     }
+    // A ring projection consumes its ring on the live walk (T11.F31).
+    for projection in &graph.projections {
+        census.insert_input(
+            input_refs
+                .get(usize::from(projection.ref_idx))
+                .filter(|reference| reference.is_ring()),
+        );
+    }
 }
 
 impl CreatureSensorCensus {
@@ -256,6 +264,7 @@ mod tests {
 
     fn empty_graph() -> CgpGraphBackendDef {
         CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
@@ -667,6 +676,25 @@ mod tests {
                 "HopsThisTick",
                 "PreviousOutcome",
             ]
+        );
+    }
+
+    #[test]
+    fn a_ring_projection_is_a_live_consumer_of_its_ring() {
+        use crate::creature::genome::cgp::RingProjection;
+        use crate::creature::genome::vote::DirectedVoteKind;
+        let mut graph = empty_graph();
+        graph
+            .projections
+            .push(RingProjection::new(1, DirectedVoteKind::Move, 0, 0.0));
+        let refs = vec![
+            InputReference::World(WorldInputKey::food_here(FOOD_0)),
+            InputReference::World(WorldInputKey::NeighborOccupiedRing),
+        ];
+        let census = census_of(&graph_node(graph, refs));
+        assert_eq!(
+            census.world_inputs,
+            BTreeSet::from([WorldInputKey::NeighborOccupiedRing])
         );
     }
 

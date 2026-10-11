@@ -6,7 +6,8 @@
 
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::vote::{
-    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
+    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_DIRECTION_COUNT,
+    VOTE_SINK_COUNT,
 };
 
 // ── Edge addressing ─────────────────────────────────────────────────────────
@@ -136,6 +137,69 @@ pub struct OutputSink {
     pub inputs: Vec<GraphEdge>,
 }
 
+// ── Ring projections ────────────────────────────────────────────────────────
+
+/// One ring projection (T11.F31): a single gene that adds
+/// `weight · ring[(d − offset) mod 8]` to `kind`'s direction-`d` vote for all
+/// eight directions, `ring` the neighbor ring at `input_refs[ref_idx]`. It is
+/// not an edge of any sink; its weight, offset, kind and existence change only
+/// as a unit.
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct RingProjection {
+    pub ref_idx: u16,
+    pub kind: DirectedVoteKind,
+    /// Rotation offset; read mod 8.
+    pub offset: u8,
+    pub weight: f32,
+    /// Ring channels whose term reads 0.0, bit `c` for channel `c`: input-use
+    /// ablation state only (`neighborhood::input_use`). Outside genome
+    /// identity, serialization, equality and size.
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub ablated_channels: u8,
+}
+
+impl RingProjection {
+    #[must_use]
+    pub const fn new(ref_idx: u16, kind: DirectedVoteKind, offset: u8, weight: f32) -> Self {
+        Self {
+            ref_idx,
+            kind,
+            offset,
+            weight,
+            ablated_channels: 0,
+        }
+    }
+
+    /// The ring channel this projection reads for direction `d`:
+    /// `(d − offset) mod 8`.
+    #[must_use]
+    pub const fn channel_for(&self, d: u8) -> u8 {
+        let n = VOTE_DIRECTION_COUNT;
+        (d % n + n - self.offset % n) % n
+    }
+}
+
+impl PartialEq for RingProjection {
+    fn eq(&self, other: &Self) -> bool {
+        self.ref_idx == other.ref_idx
+            && self.kind == other.kind
+            && self.offset == other.offset
+            && self.weight == other.weight
+    }
+}
+
+impl std::fmt::Debug for RingProjection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RingProjection")
+            .field("ref_idx", &self.ref_idx)
+            .field("kind", &self.kind)
+            .field("offset", &self.offset)
+            .field("weight", &self.weight)
+            .finish()
+    }
+}
+
 // ── Top-level graph backend ─────────────────────────────────────────────────
 
 /// CGP-style graph backend definition.
@@ -149,22 +213,33 @@ pub struct CgpGraphBackendDef {
     pub compute_nodes: Vec<ComputeNode>,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     pub output_sinks: Vec<OutputSink>,
+    /// Ring projections (T11.F31), in genome order; omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projections: Vec<RingProjection>,
 }
 
 // Keep temporary birth state out of diagnostic genome identity as well as
 // serialization and equality. Existing state fingerprints use this format.
 impl std::fmt::Debug for CgpGraphBackendDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CgpGraphBackendDef")
+        let mut debug = f.debug_struct("CgpGraphBackendDef");
+        debug
             .field("compute_nodes", &self.compute_nodes)
-            .field("output_sinks", &self.output_sinks)
-            .finish()
+            .field("output_sinks", &self.output_sinks);
+        // Omitted when empty, so a genome without projections keeps the
+        // fingerprint it had before T11.F31.
+        if !self.projections.is_empty() {
+            debug.field("projections", &self.projections);
+        }
+        debug.finish()
     }
 }
 
 impl PartialEq for CgpGraphBackendDef {
     fn eq(&self, other: &Self) -> bool {
-        self.compute_nodes == other.compute_nodes && self.output_sinks == other.output_sinks
+        self.compute_nodes == other.compute_nodes
+            && self.output_sinks == other.output_sinks
+            && self.projections == other.projections
     }
 }
 
@@ -256,19 +331,27 @@ impl CgpGraphBackendDef {
             compute_nodes: Vec::new(),
             output_sinks,
             birth_weights: None,
+            projections: Vec::new(),
         }
     }
 
     /// Whether a visit to this graph enters evaluation and the effects pass.
     ///
     /// True with at least one compute node, and true for a zero-compute graph
-    /// with a wired output sink. A graph with neither computes nothing and
-    /// applies nothing, so its visit is free.
-    /// Derived from the genome on every visit and stored nowhere.
+    /// with a wired output sink or a ring projection (T11.F31). A graph with
+    /// none of these computes nothing and applies nothing, so its visit is
+    /// free. Derived from the genome on every visit and stored nowhere.
     #[must_use]
     pub fn enters_visit(&self) -> bool {
         !self.compute_nodes.is_empty()
+            || !self.projections.is_empty()
             || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
+    }
+
+    /// Whether any projection votes for `kind`.
+    #[must_use]
+    pub fn projects_kind(&self, kind: DirectedVoteKind) -> bool {
+        self.projections.iter().any(|p| p.kind == kind)
     }
 
     /// Remove a compute node at `idx`. Remaps `GraphSource::ComputeNode`
@@ -395,7 +478,17 @@ impl CgpGraphBackendDef {
     /// After an input_ref is removed at `removed_ref_idx`, update all
     /// `GraphSource::InputLeaf { ref_idx }` across all edge containers.
     /// Matching ref_idx edges are removed. Higher ref_idx values are decremented.
+    /// Projections are treated the same way (T11.F31).
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
+        self.projections.retain_mut(|projection| {
+            if projection.ref_idx == removed_ref_idx {
+                return false;
+            }
+            if projection.ref_idx > removed_ref_idx {
+                projection.ref_idx -= 1;
+            }
+            true
+        });
         self.retain_edges(|edge| {
             if let GraphSource::InputLeaf { ref_idx, .. } = &mut edge.source {
                 if *ref_idx == removed_ref_idx {

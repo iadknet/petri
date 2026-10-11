@@ -5,8 +5,10 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::VoteSink;
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, RingProjection,
+};
+use crate::creature::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, NodeGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::input_ref::input_reference_universe;
@@ -23,14 +25,36 @@ pub(crate) enum SourceFamily {
 struct Plan {
     declarations: Vec<InputReference>,
     sources: Vec<GraphSource>,
+    /// The ring declared or found, and the drawn channel, when the family is
+    /// a neighbor ring (T11.F31).
+    ring: Option<(u16, u16)>,
 }
 
 impl Plan {
+    /// Append the plan at `destination`. A ring family landing on a directed
+    /// vote sink `K(d)` becomes one zero-weight projection
+    /// `{ref_idx, K, (d − channel) mod 8, 0.0}` in place of its edges
+    /// (T11.F31); every other plan appends its edges at weight 0.
     fn append(self, node: &mut NodeGenome, destination: usize) {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("admission requires a Graph backend")
         };
         node.input_refs.extend(self.declarations);
+        let directed = match def.output_sinks[destination].kind {
+            OutputSinkKind::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
+            _ => None,
+        };
+        if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
+            let n = u16::from(VOTE_DIRECTION_COUNT);
+            let offset = (u16::from(d) % n + n - channel % n) % n;
+            def.projections.push(RingProjection::new(
+                ref_idx,
+                kind,
+                u8::try_from(offset).expect("offset below 8"),
+                0.0,
+            ));
+            return;
+        }
         def.output_sinks[destination]
             .inputs
             .extend(self.sources.into_iter().map(|source| GraphEdge {
@@ -56,16 +80,16 @@ impl<'a> Admission<'a> {
                 .entry(reference)
                 .or_insert(u16::try_from(index).expect("representable prefix"));
         }
+        // A dangling projection reference is a dangling leaf (T11.F31).
         let append_end = def
             .edges()
             .filter_map(|edge| match edge.source {
-                GraphSource::InputLeaf { ref_idx, .. }
-                    if usize::from(ref_idx) >= references.len() =>
-                {
-                    Some(usize::from(ref_idx))
-                }
+                GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
                 _ => None,
             })
+            .chain(def.projections.iter().map(|projection| projection.ref_idx))
+            .map(usize::from)
+            .filter(|&ref_idx| ref_idx >= references.len())
             .min()
             .unwrap_or(65536);
         Self {
@@ -82,7 +106,9 @@ impl<'a> Admission<'a> {
         let mut plan = Plan {
             declarations: vec![],
             sources: vec![],
+            ring: None,
         };
+        let mut ring = None;
         let mut declare = |reference: &InputReference| {
             if let Some(&index) = self.existing.get(reference) {
                 return Some(index);
@@ -106,6 +132,9 @@ impl<'a> Admission<'a> {
                     return None;
                 }
                 let ref_idx = declare(reference)?;
+                if reference.is_ring() {
+                    ring = Some((ref_idx, channel));
+                }
                 if arm == Arm::SingleChannel {
                     plan.sources.push(GraphSource::InputLeaf {
                         ref_idx,
@@ -145,6 +174,7 @@ impl<'a> Admission<'a> {
                     }));
             }
         }
+        plan.ring = ring;
         Some(plan)
     }
 

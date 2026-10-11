@@ -116,6 +116,7 @@ fn resolver_boundaries_preserve_wrap_scalar_raw_queue_and_soft_zero_semantics() 
         "a next index cannot be represented; no truncating admission"
     );
     let empty = CgpGraphBackendDef {
+        projections: Vec::new(),
         compute_nodes: vec![],
         output_sinks: vec![],
         birth_weights: None,

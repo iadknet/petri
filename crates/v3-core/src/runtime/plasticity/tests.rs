@@ -70,6 +70,7 @@ fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
 
 fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
     CgpGraphBackendDef {
+        projections: Vec::new(),
         birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),

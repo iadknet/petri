@@ -4,6 +4,7 @@ mod copy;
 mod extensions;
 mod f08;
 mod operators;
+mod projection;
 
 #[test]
 fn complexity_effect_consistent_with_types() {
