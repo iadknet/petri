@@ -173,6 +173,24 @@
   .tile .b .d { color: var(--muted); }
   .tile .pass { color: var(--good); font-weight: 600; font-size: 11px; }
   .tile .fail { color: var(--critical); font-weight: 600; font-size: 11px; }
+  .tile .wr { cursor: default; }
+  .tile .dc { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .tile .dc.big { color: var(--ink); font-weight: 600; }
+  .tile .note { margin: 6px 0 0; font-size: 11px; color: var(--ink-2); line-height: 1.35; }
+  .chg { margin-top: 14px; }
+  .chg .lead { margin: 4px 0 0; color: var(--ink-2); font-size: 12px; }
+  .chg table { width: auto; min-width: min(100%, 760px); }
+  .chg td .cv { font-weight: 600; margin-right: 6px; }
+  .chg td .dl { color: var(--muted); font-size: 11px; display: inline-block; min-width: 64px; text-align: right; }
+  .chg td .dl.big { color: var(--ink); font-weight: 600; }
+  .chg td.na { color: var(--muted); }
+  .chg tr.grp td { text-align: left; color: var(--muted); font-weight: 600; padding-top: 10px; border-bottom: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+  .chip.flag { border-color: var(--warning); color: var(--ink); font-weight: 600; }
+  .chip.severe { border-color: var(--critical); color: var(--critical); font-weight: 600; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 16px; font-size: 12px; }
+  nav.toc span { color: var(--muted); }
   .empty { color: var(--muted); padding: 24px 0; text-align: center; }
   .notice { margin-top: 12px; }
   .notice .box {
@@ -205,7 +223,7 @@
 <body>
 <header>
   <h1>Petri progress</h1>
-  <p>Five questions about the simulation, answered from every closure's stored report (a closure is one finished feature's benchmark run). One chart row per indicator, three worlds per row. Hover for the exact reading; press Table for the numbers.</p>
+  <p>Five questions about the simulation, answered from every closure's stored report (a closure is one finished benchmark run). The tiles answer them for the latest closure. The table under them shows what changed against the closure the latest report compares itself with. One section of charts per question follows. Hover for exact readings; press Table for the numbers.</p>
 </header>
 <div class="bar" id="status">Loading the stored reports…</div>
 <div class="notice" id="notice" hidden></div>
@@ -936,33 +954,42 @@
     return c.card;
   }
 
-  function tile(question, title, worlds) {
+  // A percent change counts as large from this size on; large changes are drawn in ink.
+  const BIG_DELTA = 20;
+  // A short change label: "+12.3%", or "×205" once the change passes 1,000%.
+  const deltaShort = (d, cur, ref) => {
+    if (!Number.isFinite(d)) return '';
+    if (Math.abs(d) >= 1000 && Number.isFinite(cur) && Number.isFinite(ref) && ref > 0) return `×${fmt(cur / ref, 1)}`;
+    return `${signed(d)}%`;
+  };
+
+  // One headline tile: a value and a change per world; the detail sits in the
+  // row's hover title, and an optional note states the cross-world answer.
+  // world: { world, value, unit?, verdict?, delta (number), beside?, ref? }
+  function tile(question, title, worlds, refName, note) {
     const t = el('div', 'tile');
     t.appendChild(el('p', 'q', question));
     t.appendChild(el('h3', null, title));
     const w = el('div', 'w');
     worlds.forEach((x) => {
-      const d = el('div');
       const wr = el('div', 'wr');
       wr.appendChild(el('span', 'wn', x.world));
       const v = el('span', 'v' + (x.value === NOT_MEASURED ? ' na' : ''), x.value);
       if (x.unit) v.appendChild(el('small', null, ' ' + x.unit));
       wr.appendChild(v);
       if (x.verdict) wr.appendChild(el('span', x.verdict, x.verdict));
-      d.appendChild(wr);
-      const b = el('div', 'b');
-      if (x.beside) b.append(x.beside + ' · ');
-      b.appendChild(el('span', 'd', x.delta));
-      if (x.ref) b.append(' · ' + x.ref);
-      d.appendChild(b);
-      w.appendChild(d);
+      if (Number.isFinite(x.delta)) wr.appendChild(el('span', 'dc' + (Math.abs(x.delta) >= BIG_DELTA ? ' big' : ''), deltaShort(x.delta)));
+      wr.title = [x.beside, Number.isFinite(x.delta) ? `${signed(x.delta)}% vs ${refName}, single run` : 'no change stored', x.ref].filter(Boolean).join('\n');
+      w.appendChild(wr);
     });
     t.appendChild(w);
+    if (note) t.appendChild(el('p', 'note', note));
     return t;
   }
 
-  function question(title, lede) {
+  function question(title, lede, id) {
     const s = el('section', 'q');
+    if (id) s.id = id;
     s.appendChild(el('h2', null, title));
     if (lede) s.appendChild(el('p', 'lede', lede));
     const cards = el('div', 'cards');
@@ -1050,35 +1077,65 @@
   const pop = (rep, seed) => gi(rep, 'population_persistence', seed) || {};
   const samplesOf = (rep, seed) => { const s = pop(rep, seed).samples; return Array.isArray(s) ? s : []; };
   const lastSample = (rep, seed) => { const s = samplesOf(rep, seed); return s.length ? s[s.length - 1] : {}; };
-  const checkpointTicks = (M) => {
+  const checkpointTicks = (M, pts = M.worldPoints) => {
     const ticks = new Set();
-    M.worldPoints.forEach((pt) => M.worlds.forEach((w) => samplesOf(pt.rep, w.seed).forEach((s) => ticks.add(num(s.tick)))));
+    pts.forEach((pt) => M.worlds.forEach((w) => samplesOf(pt.rep, w.seed).forEach((s) => ticks.add(num(s.tick)))));
     return [...ticks].filter(Number.isFinite).sort((a, b) => a - b);
   };
 
-  // Checkpoint rows: x is the tick, one line per goal-worlds closure, latest emphasized.
+  // Checkpoint rows: x is the tick; two lines per panel, the previous
+  // goal-worlds closure and the latest, which is emphasized.
   function checkpointRow(M, title, sub, field, opts = {}) {
-    const worldPts = M.worldPoints;
-    const xs = checkpointTicks(M);
+    const all = M.worldPoints;
+    const shown = [];
+    [all[all.length - 2], all[all.length - 1]].forEach((pt) => { if (pt && !shown.includes(pt)) shown.push(pt); });
+    const style = (pt) => (pt === M.latest
+      ? { name: `${pt.label} (latest)`, color: SERIES[0], emph: true, dots: true }
+      : { name: `${pt.label} (previous)`, color: 'var(--muted)', dots: false });
+    const xs = checkpointTicks(M, shown);
     const axis = { labels: xs.map(String), title: 'tick', meta: (i, panel) => panel.meta ? panel.meta[i] : undefined };
     const panels = worldPanels(M, (w) => ({
       hasHistory: true, markFrom: 0,
-      series: worldPts.map((pt, k) => {
+      series: shown.map((pt) => {
         const mp = new Map();
         samplesOf(pt.rep, w.seed).forEach((s) => mp.set(num(s.tick), num(field(s, pt.rep, w))));
-        const last = k === worldPts.length - 1;
-        return { name: pt.label, color: ramp(k, worldPts.length), emph: last, dots: last, values: xs.map((t) => (mp.has(t) ? mp.get(t) : NaN)) };
+        return Object.assign(style(pt), { values: xs.map((t) => (mp.has(t) ? mp.get(t) : NaN)) });
       }),
     }));
-    panels.forEach((p) => { p.meta = xs.map(() => `${worldPts.length} closures, ${worldPts[0].label} to ${worldPts[worldPts.length - 1].label}; darker is later`); });
-    const span = `one line per goal-worlds-v1 closure, ${worldPts[0] ? worldPts[0].label : ''} → ${M.latest ? M.latest.label : ''}, darker is later, the latest is emphasized`;
-    return row(Object.assign({ title, sub: `${sub}; ${span}`, axis, panels, hideLegend: true, height: 170 }, opts));
+    panels.forEach((p) => { p.meta = xs.map(() => `${M.envMeta(M.latest.rep)} · previous and latest goal-worlds closures`); });
+    return row(Object.assign({ title, sub: `${sub}; the previous and latest goal-worlds-v1 closures`, axis, panels, height: 170 }, opts));
+  }
+
+  // Stacked categories that never reach `minShare` of a column, beyond the
+  // `keep` largest, are drawn last and in one grey, and the legend names them
+  // together; the hover and the Table still list every category.
+  function foldMinor(panels, keep = 7, minShare = 0.02) {
+    const cats = panels[0].categories;
+    const top = cats.map(() => 0);
+    panels.forEach((p) => p.data.forEach((r) => {
+      const t = r ? sum(r) : 0;
+      if (t > 0) r.forEach((v, k) => { if (Number.isFinite(v) && v / t > top[k]) top[k] = v / t; });
+    }));
+    const byTop = cats.map((_, k) => k).sort((a, b) => top[b] - top[a]);
+    const kept = byTop.filter((k, i) => i < keep && top[k] >= minShare).sort((a, b) => a - b);
+    const minor = cats.map((_, k) => k).filter((k) => !kept.includes(k));
+    const order = kept.concat(minor);
+    const newCats = order.map((k, i) => ({ name: cats[k].name, color: i < kept.length ? CAT_COLORS[i % CAT_COLORS.length] : 'var(--axis)' }));
+    panels.forEach((p) => {
+      p.categories = newCats;
+      p.data = p.data.map((r) => (r ? order.map((k) => r[k]) : r));
+    });
+    const items = newCats.slice(0, kept.length).map((x) => ({ ...x, cls: 'rect' }));
+    if (minor.length) items.push({ name: `other: ${minor.length} smaller kinds, each under ${pct(minShare)} or outside the top ${keep} (Table lists them)`, color: 'var(--axis)', cls: 'rect' });
+    if (panels[0].overlay) items.push({ name: panels[0].overlay.name, color: panels[0].overlay.color });
+    return items;
   }
 
   // ── Rendering ────────────────────────────────────────────────────────────
   function renderHeadline(M, app) {
     const ref = M.latestRef;
     const latest = M.latest;
+    const refName = refId(ref) || 'no stored closure';
     const per = (fn) => M.worlds.map((w) => {
       const obs = worldCase(latest.rep, w.name);
       return fn(w, obs || {}, latest.rep);
@@ -1089,13 +1146,19 @@
     // Alive
     {
       const finals = M.worlds.map((w) => seriesFor(M, w, (rep, obs, seed) => pop(rep, seed).final_population));
-      tiles.appendChild(tile('Is the world alive?', 'Creatures alive at the last tick', per((w, obs, rep) => ({
+      const rows = per((w, obs, rep) => ({
         world: w.short,
         value: Number.isFinite(num(pop(rep, w.seed).final_population)) ? fmt(num(pop(rep, w.seed).final_population), 0) : NOT_MEASURED,
         beside: `lowest ${fmt(num(pop(rep, w.seed).minimum_population), 0)} across ${samplesOf(rep, w.seed).length} checkpoints`,
-        delta: deltaText(ref, readingDelta(ref, w.name, 'final_population')),
+        delta: readingDelta(ref, w.name, 'final_population'),
         ref: refText(finals[M.worlds.indexOf(w)], (v) => fmt(v, 0)),
-      }))));
+        extinct: get(seedRow(rep, 'deterministic.per_seed', w.seed), 'extinction_tick'),
+      }));
+      const dead = rows.filter((r) => r.extinct !== undefined && r.extinct !== null).map((r) => r.world);
+      const unknown = rows.filter((r) => r.extinct === undefined).map((r) => r.world);
+      tiles.appendChild(tile('Is the world alive?', 'Creatures alive at the last tick', rows, refName,
+        (dead.length ? `Extinct: ${dead.join(', ')}.` : `${rows.length - unknown.length} of ${rows.length} worlds survived the full run.`)
+          + (unknown.length ? ` Not recorded: ${unknown.join(', ')}.` : '')));
     }
     // Ways of living
     {
@@ -1106,46 +1169,57 @@
           world: w.short,
           value: Number.isFinite(num(ld.surviving_founder_clade_count)) ? fmt(num(ld.surviving_founder_clade_count), 0) : NOT_MEASURED,
           beside: `lineage entropy ${fmt(num(ld.shannon_entropy_nats), 3)} nats`,
-          delta: deltaText(ref, readingDelta(ref, w.name, 'surviving_founder_clade_count')),
+          delta: readingDelta(ref, w.name, 'surviving_founder_clade_count'),
           ref: refText(clades[M.worlds.indexOf(w)], (v) => fmt(v, 0)),
         };
-      })));
+      }), refName));
     }
     // Cognition present
     {
       const mem = M.worlds.map((w) => seriesFor(M, w, (rep, obs, seed) => get(gi(rep, 'memory_sensitivity', seed), 'different_from_either_fraction')));
-      tiles.appendChild(tile('Is cognition present?', 'Creatures acting on memory', per((w, obs, rep) => {
+      const rows = per((w, obs, rep) => {
         const ms = gi(rep, 'memory_sensitivity', w.seed) || {};
         const v = num(ms.different_from_either_fraction);
         return {
-          world: w.short,
+          world: w.short, raw: v,
           value: Number.isFinite(v) ? pct(v) : NOT_MEASURED,
           beside: `${fmt(num(ms.different_from_either_count), 0)} of ${fmt(num(ms.final_creature_count), 0)} creatures at the end`,
-          delta: deltaText(ref, readingDelta(ref, w.name, 'memory_different_from_either_fraction')),
+          delta: readingDelta(ref, w.name, 'memory_different_from_either_fraction'),
           ref: refText(mem[M.worlds.indexOf(w)], pct),
         };
-      })));
+      });
+      const measured = rows.filter((r) => Number.isFinite(r.raw));
+      const acting = measured.filter((r) => r.raw > 0).length;
+      const unmeasured = rows.length - measured.length;
+      tiles.appendChild(tile('Is cognition present?', 'Creatures acting on memory', rows, refName,
+        !measured.length ? 'Not measured in this closure.'
+          : (acting ? `Creatures act on memory in ${acting} of ${measured.length} measured worlds.` : `No creature acts on memory in the ${measured.length} measured worlds.`)
+            + (unmeasured ? ` ${unmeasured} not measured.` : '')));
     }
     // Cognition paying
     {
-      tiles.appendChild(tile('Is cognition paying?', 'Offspring per creature, state vs none', per((w, obs) => {
+      const rows = per((w, obs) => {
         const st = get(obs, 'reproductive_success_by_cognitive_class.by_class.stateful') || {};
         const no = get(obs, 'reproductive_success_by_cognitive_class.by_class.none') || {};
         const a = ratio(num(st.offspring_spawned_sum), num(st.creatures_observed_total));
         const b = ratio(num(no.offspring_spawned_sum), num(no.creatures_observed_total));
         return {
-          world: w.short,
+          world: w.short, a, b,
           value: Number.isFinite(a) ? fmt(a, 3) : NOT_MEASURED,
           unit: Number.isFinite(b) ? `vs ${fmt(b, 3)} with none` : '',
-          beside: Number.isFinite(a) ? `${fmt(num(st.creatures_observed_total), 0)} with state, ${fmt(num(no.creatures_observed_total), 0)} without` : '',
-          delta: 'no delta stored',
+          beside: Number.isFinite(a) ? `${fmt(num(st.creatures_observed_total), 0)} creatures with state, ${fmt(num(no.creatures_observed_total), 0)} without` : '',
+          delta: NaN,
           ref: 'no first reading',
         };
-      })));
+      });
+      const both = rows.filter((r) => Number.isFinite(r.a) && Number.isFinite(r.b));
+      const more = both.filter((r) => r.a > r.b).length;
+      tiles.appendChild(tile('Is cognition paying?', 'Offspring per creature, with state vs none', rows, refName,
+        both.length ? `Creatures with state have more offspring in ${more} of ${both.length} worlds.` : 'Not measured in this closure.'));
     }
     // Evolvable
     {
-      tiles.appendChild(tile('Is the substrate still evolvable?', 'Mutated births that changed behavior', per((w, obs) => {
+      const rows = per((w, obs) => {
         const nr = get(obs, 'neighborhood_read') || {};
         const v = num(nr.changed_per_all_births);
         const floor = F12_FLOORS[w.short];
@@ -1157,20 +1231,123 @@
           world: w.short,
           value: Number.isFinite(v) ? pct(v) : NOT_MEASURED,
           beside: Number.isFinite(births) ? `${fmt(births, 0)} births from ${fmt(genomes, 0)} genomes` : '',
-          delta: deltaText(ref, readingDelta(ref, w.name, 'neighborhood_read_changed_per_all_births')),
+          delta: readingDelta(ref, w.name, 'neighborhood_read_changed_per_all_births'),
           ref: Number.isFinite(floor) ? `floor ${pct(floor)}, set at T14.F12` : 'no floor set',
           verdict: Number.isFinite(floor) && Number.isFinite(v) ? (v >= floor ? 'pass' : 'fail') : '',
         };
-      })));
+      });
+      const judged = rows.filter((r) => r.verdict);
+      const failing = judged.filter((r) => r.verdict === 'fail').map((r) => r.world);
+      tiles.appendChild(tile('Is the substrate still evolvable?', 'Mutated births that changed behavior', rows, refName,
+        !judged.length ? 'No floor reading in this closure.'
+          : (failing.length ? `Below the T14.F12 floor: ${failing.join(', ')}.` : `${judged.length} of ${judged.length} measured worlds at or above the T14.F12 floor.`)
+            + (judged.length < rows.length ? ` Not measured: ${rows.filter((r) => !r.verdict).map((r) => r.world).join(', ')}.` : '')));
     }
     app.appendChild(tiles);
     const p = el('p', 'art');
-    p.textContent = `Tiles show ${latest.label}, the latest closure, run ${(get(latest.rep, 'environment.generated_at') || '').slice(0, 10)} on ${get(latest.rep, 'environment.host.cpu_model') || 'an unrecorded host'}. Each world is a different environment, not a repeat with another seed. Each delta compares one run with one stored run (${refId(ref) || 'none stored'}). A first reading is the first three-world closure that measured the indicator.`;
+    p.textContent = `Latest closure ${latest.label}, run ${(get(latest.rep, 'environment.generated_at') || '').slice(0, 10)}. Small grey numbers are the change vs ${refName}: one stored run against one, never a trend. Hover a world for its detail. Each world is a different environment, not a repeat.`;
     app.appendChild(p);
   }
 
+  // What changed against the closure the latest report compares itself with
+  // (referenceFor: the nearest earlier closed summary it names): its stored
+  // comparison, a fixed set of key readings per question, then the counters.
+  // Nothing is recomputed; a reading the block lacks is "not measured".
+  const FRACTION_READING = /fraction|share|per_all_births|per_mutated_births/;
+  const readingFmt = (name, v) => (!Number.isFinite(v) ? '—' : FRACTION_READING.test(name) ? pct(v) : fmt(v));
+  const KEY_READINGS = [
+    ['Is the world alive?', [['final_population', 'Creatures at the end'], ['minimum_population', 'Lowest population'], ['births', 'Births'], ['mean_energy', 'Mean energy at the end']]],
+    ['How many ways of living?', [['surviving_founder_clade_count', 'Founder clades alive'], ['lineage_shannon_entropy_nats', 'Lineage entropy (nats)']]],
+    ['Is cognition present?', [['memory_different_from_either_fraction', 'Acting on memory'], ['temporal_memory_persisted_outputs_different_from_either_fraction', 'Acting on persisted outputs'], ['temporal_memory_operator_state_different_from_either_fraction', 'Acting on operator state']]],
+    ['Is the substrate still evolvable?', [['neighborhood_read_changed_per_all_births', 'Mutated births that changed behavior'], ['drift_changed_per_all_births_at_2000', 'Changed after 2,000 mutations of drift'], ['evolved_changed_per_mutated_births', 'Evolved genomes: mutated births changed'], ['reachable_structure_size_median', 'Reachable structure, median size']]],
+  ];
+  function changeCell(c, name) {
+    const td = el('td');
+    if (!c) { td.className = 'na'; td.textContent = NOT_MEASURED; return td; }
+    if (c.absent_in_reference) { td.className = 'na'; td.textContent = 'not in the compared closure'; return td; }
+    const r = (c.readings || []).find((x) => x.name === name);
+    const cur = r ? num(r.current) : NaN, was = r ? num(r.reference) : NaN, d = r ? num(r.percent_delta) : NaN;
+    if (!r || (!Number.isFinite(cur) && !Number.isFinite(was))) { td.className = 'na'; td.textContent = NOT_MEASURED; return td; }
+    td.appendChild(el('span', 'cv', readingFmt(name, cur)));
+    let text = '—';
+    if (Number.isFinite(d)) text = d === 0 ? 'no change' : deltaShort(d, cur, was);
+    else if (cur === was) text = 'no change';
+    else if (Number.isFinite(was)) text = `was ${readingFmt(name, was)}`;
+    td.appendChild(el('span', 'dl' + (Number.isFinite(d) && Math.abs(d) >= BIG_DELTA ? ' big' : ''), text));
+    td.title = `${readingFmt(name, cur)} now, ${readingFmt(name, was)} at the compared closure`;
+    return td;
+  }
+  function renderChanges(M, app) {
+    const ref = M.latestRef;
+    const c = card(ref ? `What changed since ${refId(ref)}` : 'What changed', ref ? `comparison.references[] of ${M.latest.label} against ${refId(ref)}` : 'no stored comparison');
+    if (!ref) { c.card.appendChild(el('p', 'sub', `${M.latest.label} stores no comparison with an earlier closure.`)); app.appendChild(c.card); return; }
+    c.card.classList.add('chg');
+    const cases = M.worlds.map((w) => (ref.cases || []).find((x) => x.case === w.name));
+    const changed = cases.filter((x) => x && x.inputs_changed).length;
+    c.card.appendChild(el('p', 'lead', `${M.latest.label} vs ${refId(ref)}, one run each. ${ref.severe ? 'Marked severe.' : 'Not marked severe.'} World inputs changed in ${changed} of ${cases.length} worlds. Bold changes are ${BIG_DELTA}% or more.`));
+    const t = el('table');
+    const hr = el('tr');
+    ['Reading', ...M.worlds.map((w) => w.short)].forEach((h) => hr.appendChild(el('th', null, h)));
+    const thead = el('thead'); thead.appendChild(hr); t.appendChild(thead);
+    const tb = el('tbody');
+    KEY_READINGS.forEach(([group, items]) => {
+      const g = el('tr', 'grp'); const gd = el('td', null, group); gd.colSpan = M.worlds.length + 1; g.appendChild(gd); tb.appendChild(g);
+      items.forEach(([name, label]) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', null, label));
+        cases.forEach((cs) => tr.appendChild(changeCell(cs, name)));
+        tb.appendChild(tr);
+      });
+    });
+    t.appendChild(tb);
+    const wrap = el('div', 'tbl'); wrap.appendChild(t); c.card.appendChild(wrap);
+
+    // The cost line: each work counter's stored change and level, then wall clock.
+    c.card.appendChild(el('p', 'lead', 'What did it cost? Work per creature-tick, the change and its stored level:'));
+    const chips = el('div', 'chips');
+    (ref.counters || []).forEach((x) => {
+      const lv = x.level || 'ok';
+      chips.appendChild(el('span', 'chip' + (lv === 'ok' ? '' : ` ${lv}`), `${x.name.replace(/_/g, ' ')} ${deltaShort(num(x.percent_delta), num(x.current), num(x.reference)) || '—'}${lv === 'ok' ? '' : ` · ${lv}`}`));
+    });
+    const wc = ref.wall_clock;
+    if (wc) chips.appendChild(el('span', 'chip' + (wc.level && wc.level !== 'ok' ? ` ${wc.level}` : ''), `wall clock ${signed(num(wc.percent_delta))}%${wc.level && wc.level !== 'ok' ? ` · ${wc.level}` : ''} (host-dependent)`));
+    c.card.appendChild(chips);
+
+    // Every stored reading, largest change first, for the reader who wants the rest.
+    const names = [];
+    cases.forEach((cs) => (cs && cs.readings || []).forEach((r) => { if (!names.includes(r.name)) names.push(r.name); }));
+    const size = (name) => Math.max(0, ...cases.map((cs) => { const r = cs && (cs.readings || []).find((x) => x.name === name); return r && Number.isFinite(num(r.percent_delta)) ? Math.abs(num(r.percent_delta)) : 0; }));
+    names.sort((a, b) => size(b) - size(a));
+    const d = el('details');
+    d.appendChild(el('summary', null, `All ${names.length} stored readings, largest change first`));
+    const t2 = el('table');
+    const h2 = el('tr');
+    ['Reading', ...M.worlds.map((w) => w.short)].forEach((h) => h2.appendChild(el('th', null, h)));
+    const th2 = el('thead'); th2.appendChild(h2); t2.appendChild(th2);
+    const tb2 = el('tbody');
+    names.forEach((name) => {
+      const tr = el('tr');
+      tr.appendChild(el('td', null, name.replace(/_/g, ' ')));
+      cases.forEach((cs) => tr.appendChild(changeCell(cs, name)));
+      tb2.appendChild(tr);
+    });
+    t2.appendChild(tb2);
+    const w2 = el('div', 'tbl'); w2.appendChild(t2); d.appendChild(w2);
+    c.card.appendChild(d);
+    app.appendChild(c.card);
+  }
+
+  // Section links under the overview.
+  const SECTIONS = [['q-alive', 'Alive'], ['q-ways', 'Ways of living'], ['q-cognition', 'Cognition'], ['q-evolvable', 'Evolvable'], ['q-cost', 'Cost'], ['q-detail', 'World detail']];
+  function renderToc(app) {
+    const n = el('nav', 'toc');
+    n.appendChild(el('span', null, 'Jump to:'));
+    SECTIONS.forEach(([id, label]) => { const a = el('a', null, label); a.href = `#${id}`; n.appendChild(a); });
+    app.appendChild(n);
+  }
+
   function renderAlive(M, app) {
-    const q = question('1. Is the world alive?', 'How many creatures each world holds, and the births, deaths, energy and food behind that number. One panel per world, one point per closure. Every indicator this question needs is measured.');
+    const q = question('1. Is the world alive?', 'How many creatures each world holds, and the births, deaths, energy and food behind that number. One panel per world, one point per closure. Every indicator this question needs is measured.', 'q-alive');
     q.cards.appendChild(checkpointRow(M, 'Population at each of the 20 checkpoints', 'population_persistence.per_seed[<s>].samples[].population', (s) => s.population, { height: 120 }));
     q.cards.appendChild(row({
       title: 'Population at the end, at its lowest, and at plateau, per closure', sub: 'population_persistence.per_seed[<s>].{final_population,minimum_population,plateau_population}', axis: M.axis,
@@ -1203,9 +1380,7 @@
       const causes = [];
       M.worldPoints.forEach((pt) => M.worlds.forEach((w) => Object.keys(get(worldCase(pt.rep, w.name), 'mortality.by_cause') || {}).forEach((k) => { if (!causes.includes(k)) causes.push(k); })));
       const cats = causes.map((k, i) => ({ name: k.replace(/_/g, ' '), color: CAT_COLORS[i % CAT_COLORS.length] }));
-      q.cards.appendChild(row({
-        title: 'Deaths by cause, as a share of all deaths', sub: 'cases[<w>].mortality.by_cause / deaths_total (T14.F03)', axis: M.axis, kind: 'stack', yFmt: pctTick, tipFmt: pct,
-        panels: worldPanels(M, (w) => ({
+      const deathPanels = worldPanels(M, (w) => ({
           series: [], markFrom: M.breakAt,
           data: M.points.map((pt) => {
             if (pt.kind !== 'world') return null;
@@ -1214,7 +1389,11 @@
             return mort ? causes.map((k) => ratio(num(get(mort, `by_cause.${k}`)), total)) : null;
           }),
           denom: M.points.map((pt) => pt.kind === 'world' ? `${fmt(num(get(worldCase(pt.rep, w.name), 'mortality.deaths_total')), 0)} deaths` : ''),
-        })).map((p) => Object.assign(p, { categories: cats })),
+        })).map((p) => Object.assign(p, { categories: cats }));
+      const deathLegend = foldMinor(deathPanels);
+      q.cards.appendChild(row({
+        title: 'Deaths by cause, as a share of all deaths', sub: 'cases[<w>].mortality.by_cause / deaths_total (T14.F03)', axis: M.axis, kind: 'stack', yFmt: pctTick, tipFmt: pct,
+        panels: deathPanels, legendItems: deathLegend,
       }));
     }
     {
@@ -1222,9 +1401,7 @@
         'hebbian_learning', 'reward_learning', 'parental_transfer_debit', 'predation_victim_debit', 'external_removal_loss', 'maximum_energy_clamp_loss'];
       const cats = CHARGES.map((k, i) => ({ name: k.replace(/_/g, ' '), color: CAT_COLORS[i % CAT_COLORS.length] }));
       const charge = (ef, k) => k === 'action_charges' ? sum(Object.values(get(ef, 'action_charges') || {}).map(num)) : num(get(ef, k));
-      q.cards.appendChild(row({
-        title: 'Energy spent, by kind, with food eaten drawn as the line', sub: 'cases[<w>].energy_flows: thirteen charge keys stacked; the line is food_intake_by_type summed (T14.F03)', axis: M.axis, kind: 'stack',
-        panels: worldPanels(M, (w) => ({
+      const energyPanels = worldPanels(M, (w) => ({
           series: [], markFrom: M.breakAt, categories: cats,
           data: M.points.map((pt) => {
             if (pt.kind !== 'world') return null;
@@ -1236,41 +1413,44 @@
             const ft = get(worldCase(pt.rep, w.name), 'energy_flows.food_intake_by_type');
             return Array.isArray(ft) ? sum(ft.map(num)) : NaN;
           }) },
-        })),
+        }));
+      const energyLegend = foldMinor(energyPanels);
+      q.cards.appendChild(row({
+        title: 'Energy spent, by kind, with food eaten drawn as the line', sub: 'cases[<w>].energy_flows: thirteen charge keys stacked; the line is food_intake_by_type summed (T14.F03)', axis: M.axis, kind: 'stack',
+        panels: energyPanels, legendItems: energyLegend,
       }));
     }
     {
       const typeCount = Math.max(1, ...M.worlds.map((w) => (get(worldCase(M.latest.rep, w.name), 'food_density_total') || []).length));
       q.cards.appendChild(checkpointRow(M, 'Food on the ground at each checkpoint, all types summed', 'population_persistence.per_seed[<s>].samples[].food_density_total[] summed over types', (s) => Array.isArray(s.food_density_total) ? sum(s.food_density_total.map(num)) : NaN));
       const worldPts = M.worldPoints;
-      const xs = checkpointTicks(M);
+      const xs = checkpointTicks(M, [M.latest]);
       const grazers = worldPts.filter((pt) => M.worlds.some((w) => samplesOf(pt.rep, w.seed).some((s) => Array.isArray(s.grazed_cell_share))));
-      const shown = grazers.length ? worldPts.slice(worldPts.indexOf(grazers[0])) : worldPts.slice(-1);
-      const unmeasured = shown.filter((pt) => !grazers.includes(pt));
+      const shown = [M.latest];
       q.cards.appendChild(row({
-        title: 'Grazed cells and the grazing modifier at each checkpoint, by food type', sub: 'samples[].{grazed_cell_share[],grazing_modifier_mean[]} (T02.F04); a closure stored before the fields is not measured', yFmt: pctTick, tipFmt: pct, yMax: 1, height: 190,
+        title: `Grazed cells and the grazing modifier at each checkpoint, by food type, at ${M.latest.label}`, sub: 'samples[].{grazed_cell_share[],grazing_modifier_mean[]} (T02.F04), latest closure only', yFmt: pctTick, tipFmt: pct, yMax: 1, height: 190,
         axis: { labels: xs.map(String), title: 'tick', meta: (i, panel) => panel.meta },
         panels: worldPanels(M, (w) => ({
           hasHistory: true, markFrom: 0,
-          meta: `closures ${shown.map((pt) => pt.label).join(', ')}; ${M.latest.label} is drawn bold`,
+          meta: M.envMeta(M.latest.rep),
           series: shown.flatMap((pt, k) => Array.from({ length: typeCount }, (_, t) => {
             const mp = new Map(), mm = new Map();
             samplesOf(pt.rep, w.seed).forEach((s) => { mp.set(num(s.tick), num(get(s, `grazed_cell_share.${t}`))); mm.set(num(s.tick), num(get(s, `grazing_modifier_mean.${t}`))); });
             const last = pt === M.latest;
             return [
-              { name: `grazed share, type ${t} (${pt.label})`, color: SERIES[t % SERIES.length], emph: last, values: xs.map((x) => mp.has(x) ? mp.get(x) : NaN) },
-              { name: `modifier mean, type ${t} (${pt.label})`, color: SERIES[(t + 4) % SERIES.length], muted: true, emph: last, values: xs.map((x) => mm.has(x) ? mm.get(x) : NaN) },
+              { name: `grazed share, type ${t}`, color: SERIES[t % SERIES.length], emph: last, values: xs.map((x) => mp.has(x) ? mp.get(x) : NaN) },
+              { name: `modifier mean, type ${t}`, color: SERIES[(t + 4) % SERIES.length], muted: true, values: xs.map((x) => mm.has(x) ? mm.get(x) : NaN) },
             ];
           }).flat()),
         })),
-        note: `${unmeasured.length ? unmeasured.map((pt) => pt.label).join(', ') + ' not measured: stored before grazing was recorded. ' : ''}${grazers.length ? 'Grazing is recorded for ' + grazers.map((pt) => pt.label).join(', ') : 'No stored closure records grazing yet'}.`,
+        note: grazers.includes(M.latest) ? '' : `${M.latest.label} stores no grazing reading.`,
       }));
     }
     app.appendChild(q.section);
   }
 
   function renderWays(M, app) {
-    const q = question('2. How many ways of living, for how long?', 'How many founder clades survive (a clade is one founder’s descendants), how evenly creatures spread across them, what the survivors do, and where they live. Not measured yet: strategy count, strategy distinctness, evolutionary activity, adaptive novelty, the T14.F09 loss curve.');
+    const q = question('2. How many ways of living, for how long?', 'How many founder clades survive (a clade is one founder’s descendants), how evenly creatures spread across them, what the survivors do, and where they live. Not measured yet: strategy count, strategy distinctness, evolutionary activity, adaptive novelty, the T14.F09 loss curve.', 'q-ways');
     q.cards.appendChild(row({
       title: 'Founder clades still alive at the end, per closure', sub: 'lineage_diversity.per_seed[<s>].surviving_founder_clade_count', axis: M.axis,
       panels: worldPanels(M, (w) => {
@@ -1359,7 +1539,7 @@
   }
 
   function renderCognition(M, app) {
-    const q = question('3. Is cognition present and paying?', 'Whether creatures carry internal state, read it, and act on it. Whether the creatures that do leave more offspring. Not measured yet: learning dependence, memory dependence, prediction dependence, information integration, reciprocal interaction.');
+    const q = question('3. Is cognition present and paying?', 'Whether creatures carry internal state, read it, and act on it. Whether the creatures that do leave more offspring. Not measured yet: learning dependence, memory dependence, prediction dependence, information integration, reciprocal interaction.', 'q-cognition');
     const CLASSES = ['none', 'plasticity', 'shared_memory', 'stateful'];
     const classItems = (w, fn, unit) => CLASSES.map((cls, i) => {
       const b = get(worldCase(M.latest.rep, w.name), `reproductive_success_by_cognitive_class.by_class.${cls}`) || {};
@@ -1567,7 +1747,7 @@
   }
 
   function renderEvolvable(M, app) {
-    const q = question('4. Is the substrate still evolvable?', 'Whether one mutation of a living genome still changes behavior, at birth and after 2,000 mutations of drift. Where mutations land in the genome. Not measured yet: evolutionary activity, adaptive novelty.');
+    const q = question('4. Is the substrate still evolvable?', 'Whether one mutation of a living genome still changes behavior, at birth and after 2,000 mutations of drift. Where mutations land in the genome. Not measured yet: evolutionary activity, adaptive novelty.', 'q-evolvable');
     q.cards.appendChild(row({
       title: 'Mutated births that changed behavior, against the T14.F12 floor', sub: 'cases[<w>].neighborhood_read.{changed,silent,dead}_per_all_births over 5,000 births from 50 selected genomes (T14.F12); the floor is the F12 first reading, strict not-below', axis: M.axis, yFmt: pctTick, tipFmt: pct,
       panels: worldPanels(M, (w) => ({
@@ -1658,16 +1838,21 @@
           if (m) rows.push(meshRow(pt.label, w.short, m));
         });
       });
+      const raw = el('details');
+      raw.appendChild(el('summary', null, 'Raw tables: mesh execution per closure, and mutation-effect attribution (T11.F26)'));
+      const rawCards = el('div', 'cards');
+      raw.appendChild(rawCards);
       const c = card('Mesh execution in sampled evolved genomes', 'Sums over the sampled evolved genomes, per closure and world (mesh-execution-v1, T11.F14). Route varies: genomes whose chosen targets differ across the 48 snapshots.');
       c.card.appendChild(table(['Closure', 'World', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Capped passes', 'Executions'], rows, (i) => (rows[i][1] === 'default world, seeds pooled' ? 'hist' : null)));
-      q.cards.appendChild(c.card);
+      rawCards.appendChild(c.card);
+      renderMutationEffects(M, rawCards);
+      q.cards.appendChild(raw);
     }
-    renderMutationEffects(M, q.cards);
     app.appendChild(q.section);
   }
 
   function renderCost(M, app) {
-    const q = question('5. What did this closure cost?', 'Work per creature-tick (one creature simulated for one tick), as a percent of the series’ epoch baseline (the closure every later one is measured against). Wall clock on the recorded host. The gate profile is the shorter benchmark run every closure records. Each percent delta is the stored comparison’s, single run; the hover names its level.');
+    const q = question('5. What did this closure cost?', 'Work per creature-tick (one creature simulated for one tick), as a percent of the series’ epoch baseline (the closure every later one is measured against). Wall clock on the recorded host. The gate profile is the shorter benchmark run every closure records. Each percent delta is the stored comparison’s, single run; the hover names its level.', 'q-cost');
     const ctr = (rep, seed, key) => { const r = seedRow(rep, 'deterministic.per_seed', seed); return r ? ratio(num(r[key]), num(r.creature_ticks)) : NaN; };
     const baseOf = (pt) => (pt.kind === 'goal' ? M.goalEpoch : M.worldEpoch);
     const baseId = (rep) => (rep ? featureId(rep.feature || '') : '');
@@ -1727,6 +1912,7 @@
 
   function renderDetail(M, app) {
     const wrap = el('section', 'q');
+    wrap.id = 'q-detail';
     wrap.appendChild(el('h2', null, 'World detail'));
     wrap.appendChild(el('p', 'lede', 'Per world: the map at tick zero and the config the latest closure ran, plus movement and energy readings. These describe the environment; they answer none of the five questions.'));
     M.worlds.forEach((w) => {
@@ -1799,6 +1985,8 @@
       return;
     }
     renderHeadline(M, app);
+    renderChanges(M, app);
+    renderToc(app);
     renderAlive(M, app);
     renderWays(M, app);
     renderCognition(M, app);
