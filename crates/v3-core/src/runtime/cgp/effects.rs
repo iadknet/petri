@@ -52,7 +52,8 @@ type DirectionTerms = [f32; VOTE_DIRECTION_COUNT as usize];
 
 /// `P_K[d] = Σ w_p · r_p((d − k_p) mod 8)` over each kind's projections in
 /// genome order, accumulated from 0.0. A projection whose `ref_idx` is out of
-/// range or not a ring, and an ablated channel, contributes 0.0.
+/// range or not a ring contributes nothing, whatever its weight; an ablated
+/// channel reads 0.0, as it does for an edge.
 fn projection_terms(
     def: &CgpGraphBackendDef,
     compute_count: usize,
@@ -65,28 +66,29 @@ fn projection_terms(
     let mut terms: ProjectionTerms = [None; DirectedVoteKind::ALL.len()];
     for projection in &def.projections {
         let entry = terms[projection.kind.index()].get_or_insert([0.0; _]);
-        let is_ring = input_refs
+        if !input_refs
             .get(usize::from(projection.ref_idx))
-            .is_some_and(InputReference::is_ring);
+            .is_some_and(InputReference::is_ring)
+        {
+            continue;
+        }
         let mut ring: DirectionTerms = [0.0; _];
-        if is_ring {
-            for (channel, value) in ring.iter_mut().enumerate() {
-                if projection.ablated_channels & (1 << channel) != 0 {
-                    continue;
-                }
-                *value = resolve_source_post_convergence(
-                    &GraphSource::InputLeaf {
-                        ref_idx: projection.ref_idx,
-                        sub_idx: channel as u16,
-                    },
-                    compute_count,
-                    curr_outputs,
-                    input_refs,
-                    resolve_ctx,
-                    shared_memory,
-                    prev_shared_memory,
-                );
+        for (channel, value) in ring.iter_mut().enumerate() {
+            if projection.ablated_channels & (1 << channel) != 0 {
+                continue;
             }
+            *value = resolve_source_post_convergence(
+                &GraphSource::InputLeaf {
+                    ref_idx: projection.ref_idx,
+                    sub_idx: channel as u16,
+                },
+                compute_count,
+                curr_outputs,
+                input_refs,
+                resolve_ctx,
+                shared_memory,
+                prev_shared_memory,
+            );
         }
         for (d, term) in entry.iter_mut().enumerate() {
             let channel = projection.channel_for(d as u8);

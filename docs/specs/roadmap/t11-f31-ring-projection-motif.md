@@ -173,10 +173,13 @@ keys and the goal summary gains one block.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> exit 0 (28 passed), before
-      any edit and after the last production edit (the self-review pass).
+      any edit and after the last production edit (the projection NaN-weight fix).
 - [x] Focused tests -> names and counts in the
-      [readings](../../progress/readings/t11-f31.md). On the current tree:
-      `cargo test -p v3-core` (2,069 passed), `cargo test -p v3-cli
+      [readings](../../progress/readings/t11-f31.md);
+      `a_nonfinite_weight_off_range_or_off_ring_leaves_incumbent_votes_unchanged`
+      pins that a NaN or infinite weight on an off-range or off-ring
+      projection leaves its kind's edge votes unchanged. On the current tree:
+      `cargo test -p v3-core` (2,070 passed), `cargo test -p v3-cli
       ring_rules` -> exit 0; `cargo check --workspace --all-targets`, `make
       rust-clippy` and `cargo fmt --all --check` clean. On the build commit
       `cf7fa109`: `cargo test -p v3-cli`, `cargo test -p

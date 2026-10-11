@@ -387,7 +387,8 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
     edges.
   - `ActionParam(field)`: `action_params[field.index()] = sanitize_f32(wsum)`.
 
-Sinks with empty `inputs` are inert — no write occurs. A visit that reaches
+Sinks with empty `inputs` are inert — no write occurs — except a directed
+vote sink whose kind has a ring projection. A visit that reaches
 its effects stages its vote contribution; an exhausted visit stages nothing.
 
 ### Effect-phase trace visibility (Execution Sampler)
@@ -613,10 +614,10 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | `SharedMemory { slot }` where `slot >= 16` | Bound at mutation time to 0-15; defensive fallback: 0.0 |
 | `CustomOutput(s)` where `s >= 12` | Constructor invariant; defensive fallback: 0.0 |
 | Unwired `ActionParam` sink | The parameter keeps its last write this tick (zero at tick start) |
-| Graph with no wired vote sink | Votes nothing; the pass commits only what other nodes vote |
+| Graph with no wired vote sink and no ring projection | Votes nothing; the pass commits only what other nodes vote |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write, unless it is a directed vote sink whose kind has a ring projection |
-| Ring projection whose `ref_idx` is out of range or not a ring | Contributes 0.0; its kind's sinks are still applied |
+| Ring projection whose `ref_idx` is out of range or not a ring | Contributes 0.0 whatever its weight (NaN/Inf included); its kind's sinks are still applied |
 | Ring projection `offset >= 8` | Read mod 8 |
 | Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
