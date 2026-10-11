@@ -264,6 +264,14 @@ and T21.F01's destructive `scripts/telemetry-verify` (with `telemetry/verify/`)
 were deleted at the user's direction the same day; its record stays in
 `docs/progress/readings/t21-f01.md`.
 
+On 2026-10-10 the user ruled that `make check` is too expensive to repeat:
+T16.F02's run executed it about seven times (every implementer pass at the
+orchestrator's request, the closure run, and once more on `main` after a
+fast-forward that had left the tree identical to the tested commit). It now
+runs once per feature at Close; passes use `cargo check`, `cargo fmt --check`,
+crate tests and clippy, docs-only follow-ups use `make check-docs`, and a
+rebase reruns it only when `main` gained code.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
