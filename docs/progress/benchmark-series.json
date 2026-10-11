@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t16-f02-effort-priced-actions.json",
+    "epoch_baseline": "docs/progress/features/effort-cost-defaults.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -69,7 +69,8 @@
       "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json",
       "docs/progress/features/t20-f16-born-connected-input-declaration.json",
       "docs/progress/features/t11-f29-feedback-route-formation.json",
-      "docs/progress/features/t16-f02-effort-priced-actions.json"
+      "docs/progress/features/t16-f02-effort-priced-actions.json",
+      "docs/progress/features/effort-cost-defaults.json"
     ]
   },
   "goal": {
@@ -114,7 +115,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t16-f02-effort-priced-actions-goal.json",
+    "epoch_baseline": "docs/progress/features/effort-cost-defaults-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -158,7 +159,8 @@
       "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json",
       "docs/progress/features/t20-f16-born-connected-input-declaration-goal.json",
       "docs/progress/features/t11-f29-feedback-route-formation-goal.json",
-      "docs/progress/features/t16-f02-effort-priced-actions-goal.json"
+      "docs/progress/features/t16-f02-effort-priced-actions-goal.json",
+      "docs/progress/features/effort-cost-defaults-goal.json"
     ]
   }
 }
