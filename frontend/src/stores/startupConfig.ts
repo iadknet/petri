@@ -560,7 +560,9 @@ export function buildStartupRequest(preset: StartupPreset): StartupRequest {
 				? layer.algorithm.Fbm.seed
 				: "PoissonBlobs" in layer.algorithm
 					? layer.algorithm.PoissonBlobs.seed
-					: null,
+					: "Channels" in layer.algorithm
+						? layer.algorithm.Channels.seed
+						: null,
 		),
 	];
 	if (seeds.some((seed) => seed != null && (!Number.isSafeInteger(seed) || seed < 0))) {

@@ -240,6 +240,28 @@ describe("StartupConfigStore", () => {
 		});
 	});
 
+	it("rejects unsafe channels layer seeds", () => {
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
+			{
+				weight: 1.0,
+				algorithm: {
+					Channels: {
+						octaves: 4,
+						frequency: 0.01,
+						lacunarity: 2.0,
+						persistence: 0.5,
+						width: 3,
+						value: 0.25,
+						seed: Number.MAX_SAFE_INTEGER + 1,
+					},
+				},
+			},
+		]);
+		expect(() => buildStartupRequest(useStartupConfigStore.getState().preset)).toThrow(
+			/requires safe integer seeds/,
+		);
+	});
+
 	it("carries channels layers and max blend through startup requests", () => {
 		const channels = {
 			Channels: {

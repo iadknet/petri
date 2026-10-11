@@ -20,8 +20,8 @@ pub struct ChannelParams {
 /// cells across whatever the field's frequency or amplitude. Channel cells take
 /// `value`; every other cell is -1. The gradient comes from central
 /// differences of neighbouring cells (one-sided on the grid edge). A cell with
-/// a vanishing gradient counts as off-channel unless it sits exactly on the
-/// contour. Deterministic for a given seed.
+/// a vanishing gradient has no measurable distance and is off-channel, even on
+/// the contour itself. Deterministic for a given seed.
 pub fn generate_channels(width: u16, height: u16, params: &ChannelParams, seed: u64) -> Grid<f32> {
     let noise = generate_fbm(
         width,
@@ -42,7 +42,7 @@ pub fn generate_channels(width: u16, height: u16, params: &ChannelParams, seed: 
             let gy = central_difference(height, y, |j| *noise.get(x, j));
             let gradient = gx.hypot(gy);
             // |f| <= half_width * |grad f| is the distance test without a division.
-            if f.abs() <= half_width * gradient {
+            if gradient > 0.0 && f.abs() <= half_width * gradient {
                 grid.set(x, y, params.value);
             }
         }
@@ -108,6 +108,18 @@ mod tests {
             (1.5..=2.5).contains(&factor),
             "width 2 -> 4 factor {factor} (fractions {fractions:?})"
         );
+    }
+
+    #[test]
+    fn zero_gradient_cells_are_off_channel_even_on_the_contour() {
+        // Frequency 0 samples every cell at a Perlin lattice point: f = 0 and
+        // gradient = 0 everywhere, so no cell has a measurable distance.
+        let flat = ChannelParams {
+            frequency: 0.0,
+            ..params(3.0)
+        };
+        let grid = generate_channels(64, 64, &flat, 42);
+        assert!(grid.as_slice().iter().all(|v| *v == -1.0));
     }
 
     #[test]
