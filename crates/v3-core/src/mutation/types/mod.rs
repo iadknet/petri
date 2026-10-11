@@ -191,6 +191,11 @@ pub enum MutationOperator {
     GraphMutateTraceDecay,
     GraphRecruitNeutralInput,
     GraphRefineHeritableStructure,
+    GraphAddRingProjection,
+    GraphAlterRingProjectionWeight,
+    GraphShiftRingProjectionOffset,
+    GraphRetargetRingProjectionKind,
+    GraphRemoveRingProjection,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -254,6 +259,11 @@ impl MutationOperator {
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
             Self::GraphRefineHeritableStructure => "Graph.RefineHeritableStructure",
+            Self::GraphAddRingProjection => "Graph.AddRingProjection",
+            Self::GraphAlterRingProjectionWeight => "Graph.AlterRingProjectionWeight",
+            Self::GraphShiftRingProjectionOffset => "Graph.ShiftRingProjectionOffset",
+            Self::GraphRetargetRingProjectionKind => "Graph.RetargetRingProjectionKind",
+            Self::GraphRemoveRingProjection => "Graph.RemoveRingProjection",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -315,7 +325,12 @@ impl MutationOperator {
             | Self::GraphDisableRewardModulation
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
-            | Self::GraphRecruitNeutralInput => MutationDomain::Graph,
+            | Self::GraphRecruitNeutralInput
+            | Self::GraphAddRingProjection
+            | Self::GraphAlterRingProjectionWeight
+            | Self::GraphShiftRingProjectionOffset
+            | Self::GraphRetargetRingProjectionKind
+            | Self::GraphRemoveRingProjection => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -369,12 +384,14 @@ impl MutationOperator {
             | Self::GraphCopyEdgeBundle
             | Self::GraphEnableHebbian
             | Self::GraphEnableRewardModulation
-            | Self::GraphRecruitNeutralInput => ComplexityEffect::Increasing,
+            | Self::GraphRecruitNeutralInput
+            | Self::GraphAddRingProjection => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
             | Self::GraphDisableHebbian
-            | Self::GraphDisableRewardModulation => ComplexityEffect::Decreasing,
+            | Self::GraphDisableRewardModulation
+            | Self::GraphRemoveRingProjection => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphRefineHeritableStructure
@@ -386,7 +403,10 @@ impl MutationOperator {
             | Self::GraphMutateHebbianRate
             | Self::GraphToggleHebbianLamarckian
             | Self::GraphMutateRewardSource
-            | Self::GraphMutateTraceDecay => ComplexityEffect::Neutral,
+            | Self::GraphMutateTraceDecay
+            | Self::GraphAlterRingProjectionWeight
+            | Self::GraphShiftRingProjectionOffset
+            | Self::GraphRetargetRingProjectionKind => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -395,7 +415,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 56] {
+    pub const fn all() -> [Self; 61] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -449,6 +469,11 @@ impl MutationOperator {
             Self::GraphMutateTraceDecay,
             Self::GraphRecruitNeutralInput,
             Self::GraphRefineHeritableStructure,
+            Self::GraphAddRingProjection,
+            Self::GraphAlterRingProjectionWeight,
+            Self::GraphShiftRingProjectionOffset,
+            Self::GraphRetargetRingProjectionKind,
+            Self::GraphRemoveRingProjection,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,

@@ -478,6 +478,7 @@ mod tests {
             node_id: id_graph,
             input_refs: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(0.0),
@@ -570,6 +571,7 @@ mod tests {
             node_id: id_graph,
             input_refs: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(9.0),
@@ -658,6 +660,7 @@ mod tests {
                 node_id: id0,
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
                     birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::Constant(1.0),
@@ -798,6 +801,7 @@ mod tests {
                 node_id: id0,
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
                     birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::Constant(1.0),
@@ -847,6 +851,7 @@ mod tests {
                 node_id: id0,
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
                     birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::Constant(1.0),

@@ -65,6 +65,17 @@ pub(crate) fn derive_cgp_annotations(
         }
     }
 
+    // A ring projection reads its ring and writes the action channel (T11.F31).
+    for projection in &def.projections {
+        if let Some(input_ref) = input_refs
+            .get(usize::from(projection.ref_idx))
+            .filter(|reference| reference.is_ring())
+        {
+            read_classes.insert(classify_input_ref(input_ref));
+        }
+        write_classes.insert(MeshWriteClass::Action);
+    }
+
     // Write classes from wired output sinks
     for sink in &def.output_sinks {
         if sink.inputs.is_empty() {
@@ -109,6 +120,7 @@ mod tests {
     #[test]
     fn empty_graph_no_annotations() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
@@ -123,6 +135,7 @@ mod tests {
     #[test]
     fn wired_sink_produces_write_class() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -163,6 +176,7 @@ mod tests {
     #[test]
     fn stateful_node_detected() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::DecayIntegrator(0.5),
@@ -188,6 +202,7 @@ mod tests {
             OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
         ] {
             let def = CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(1.0),
@@ -210,6 +225,7 @@ mod tests {
     #[test]
     fn memory_sink_is_stateful() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
@@ -232,6 +248,7 @@ mod tests {
     #[test]
     fn shared_memory_source_is_stateful() {
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -266,6 +283,7 @@ mod tests {
             weight: 1.0,
         };
         let def = CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: vec![

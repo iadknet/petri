@@ -269,6 +269,7 @@ mod tests {
             input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
             targets: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![
                     ComputeNode {

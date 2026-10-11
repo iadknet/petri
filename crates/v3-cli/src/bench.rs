@@ -11,6 +11,7 @@ mod indicators;
 pub mod input_use;
 pub mod mutation_effects;
 mod profiles;
+pub mod ring_rules;
 mod run;
 mod schema;
 #[cfg(test)]

@@ -283,6 +283,8 @@ impl CreatureGenome {
                             score += 1 + sink.inputs.len() as u32;
                         }
                     }
+                    // One unit per ring projection (T11.F31): it wires no sink.
+                    score += graph.projections.len() as u32;
                 }
             }
         }
@@ -299,6 +301,10 @@ impl CreatureGenome {
         analysis::functional_complexity(self)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/projection_tests.rs"]
+mod projection_tests;
 
 #[cfg(test)]
 mod tests {

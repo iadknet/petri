@@ -700,6 +700,7 @@ fn functional_complexity_excludes_dead_graph_nodes() {
                 type_idx: crate::config::OrdinaryFoodTypeId::default(),
             })],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
                 birth_weights: None,
                 compute_nodes: vec![
                     ComputeNode {

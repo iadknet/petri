@@ -24,7 +24,7 @@ use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
 use crate::creature::genome::cgp::OutputSinkKind;
-use crate::creature::genome::vote::VoteSink;
+use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -98,7 +98,8 @@ impl SteeringPooled {
 
 /// Whether a node in `executed` structurally contributes to a `Move` sink
 /// (T19.F04): a VM program with an `AddVote` naming a `Move` sink, or a graph
-/// with a wired `ActionVote(Move(_))` sink.
+/// with a wired `ActionVote(Move(_))` sink or a `Move` ring projection
+/// (T11.F31).
 #[must_use]
 pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
     let is_move = |sink: Option<VoteSink>| matches!(sink, Some(VoteSink::Move(_)));
@@ -111,10 +112,13 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
                 matches!(instruction, VmInstruction::AddVote { sink, .. }
                     if is_move(VoteSink::from_index(usize::from(*sink))))
             }),
-            BackendDef::Graph(graph) => graph.output_sinks.iter().any(|sink| {
-                !sink.inputs.is_empty()
-                    && matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
-            }),
+            BackendDef::Graph(graph) => {
+                graph.projects_kind(DirectedVoteKind::Move)
+                    || graph.output_sinks.iter().any(|sink| {
+                        !sink.inputs.is_empty()
+                            && matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
+                    })
+            }
         })
 }
 
@@ -227,6 +231,35 @@ mod tests {
             &config.runtime,
             config.shared_memory.decay_rate,
         )
+    }
+
+    #[test]
+    fn a_move_projection_votes_move_and_another_kind_does_not() {
+        use crate::creature::genome::cgp::RingProjection;
+        let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
+        let genome_with = |kind| {
+            let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+            def.projections.push(RingProjection::new(0, kind, 0, 0.0));
+            CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![ring.clone()],
+                    backend_def: BackendDef::Graph(def),
+                    targets: vec![],
+                }],
+            }
+        };
+        let executed = BTreeSet::from([NodeId::new(0)]);
+        assert!(votes_move(&genome_with(DirectedVoteKind::Move), &executed));
+        assert!(!votes_move(
+            &genome_with(DirectedVoteKind::Reproduce),
+            &executed
+        ));
+        assert!(!votes_move(
+            &genome_with(DirectedVoteKind::Move),
+            &BTreeSet::new()
+        ));
     }
 
     #[test]

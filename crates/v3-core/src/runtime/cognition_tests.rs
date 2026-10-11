@@ -145,6 +145,7 @@ fn graph_writes(values: &[f32], clear: bool) -> CreatureGenome {
         });
     }
     genome(BackendDef::Graph(CgpGraphBackendDef {
+        projections: Vec::new(),
         birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),

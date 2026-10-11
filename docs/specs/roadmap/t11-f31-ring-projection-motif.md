@@ -139,9 +139,9 @@ keys and the goal summary gains one block.
 
 ## Implementation Tasks
 
-- [ ] `cargo test -p v3-core --test viability` passes before any edit and after
+- [x] `cargo test -p v3-core --test viability` passes before any edit and after
       every production edit.
-- [ ] Failing tests first for the Boundary and Reader tables, with proptest
+- [x] Failing tests first for the Boundary and Reader tables, with proptest
       properties in v3-core for zero-weight equality, eight-edge equivalence,
       one-step rotation by `Shift`, one size unit per projection, `Prune` and
       reindex keeping each projection on the same `InputReference`, and serde
@@ -152,19 +152,19 @@ keys and the goal summary gains one block.
       term would be; duplicate projections and incumbent edges sum in the
       stated order; refinement groups identical with and without projections;
       `InputRef.Add` and VM paths draw for draw unchanged.
-- [ ] Genome type, serde, identity and size; evaluation, `enters_visit` and
+- [x] Genome type, serde, identity and size; evaluation, `enters_visit` and
       traces.
-- [ ] The five operators, catalog and keys; the `RecruitNeutralInput` ring
+- [x] The five operators, catalog and keys; the `RecruitNeutralInput` ring
       case; reference coverage (`Prune`, reindex, admission).
-- [ ] Every reader in the Reader table.
-- [ ] `ring_rules` in the goal profile and the summary projection, with a
+- [x] Every reader in the Reader table.
+- [x] `ring_rules` in the goal profile and the summary projection, with a
       founder fixture (one rule, `NeighborFoodRing:0 Move 0 +`, coverage 4)
       and fixtures for each path kind and for a projection.
-- [ ] Frontend type and Graph node detail.
-- [ ] Reference documents: graph backend spec (data model, §6, effects,
+- [x] Frontend type and Graph node detail.
+- [x] Reference documents: graph backend spec (data model, §6, effects,
       liveness, soft defaults), mutation spec (catalog, `Add` unchanged),
       runtime config spec (`genome_size()` units).
-- [ ] Re-pins of the Determinism paragraph, each with its reason, in the
+- [x] Re-pins of the Determinism paragraph, each with its reason, in the
       readings.
 - [ ] `make check` exits 0 in the worktree.
 - [ ] Gate and goal profiles by the benchmark specialist, then the mutation gate
@@ -172,9 +172,15 @@ keys and the goal summary gains one block.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> exit 0, before and after.
-- [ ] Focused tests -> names and counts in the
-      [readings](../../progress/readings/t11-f31.md).
+- [x] `cargo test -p v3-core --test viability` -> exit 0 (28 passed), before
+      any edit and after the last production edit.
+- [x] Focused tests -> names and counts in the
+      [readings](../../progress/readings/t11-f31.md); `cargo test -p v3-core`
+      (2,069 passed), `cargo test -p v3-cli`, `cargo test -p v3-server -p
+      v3-lab -p v3-telemetry` -> exit 0; `cargo check --workspace
+      --all-targets`, `cargo clippy --workspace --all-targets` and `cargo fmt
+      --all --check` clean; `npm run lint`, `npm run test` (380 passed) and
+      `npm run build` in `frontend/` -> exit 0.
 - [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.

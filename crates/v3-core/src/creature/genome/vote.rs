@@ -171,9 +171,83 @@ impl VoteSink {
     }
 }
 
+/// A directed world-action kind: the kinds with eight direction sinks, which a
+/// ring projection (T11.F31) votes for.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+pub enum DirectedVoteKind {
+    Move,
+    Reproduce,
+    StealEnergy,
+}
+
+impl DirectedVoteKind {
+    /// Catalog order, the order `AddRingProjection` and
+    /// `RetargetRingProjectionKind` draw over.
+    pub const ALL: [Self; 3] = [Self::Move, Self::Reproduce, Self::StealEnergy];
+
+    /// Position in [`Self::ALL`].
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Move => 0,
+            Self::Reproduce => 1,
+            Self::StealEnergy => 2,
+        }
+    }
+
+    /// The direction-`d` sink of this kind; `d` is a `Direction::ALL` index.
+    #[must_use]
+    pub const fn sink(self, d: u8) -> VoteSink {
+        match self {
+            Self::Move => VoteSink::Move(d),
+            Self::Reproduce => VoteSink::Reproduce(d),
+            Self::StealEnergy => VoteSink::StealEnergy(d),
+        }
+    }
+
+    /// The kind and direction of a directed sink; `None` for any other sink.
+    #[must_use]
+    pub const fn of_sink(sink: VoteSink) -> Option<(Self, u8)> {
+        match sink {
+            VoteSink::Move(d) => Some((Self::Move, d)),
+            VoteSink::Reproduce(d) => Some((Self::Reproduce, d)),
+            VoteSink::StealEnergy(d) => Some((Self::StealEnergy, d)),
+            VoteSink::Eat | VoteSink::Terminate | VoteSink::Decide => None,
+        }
+    }
+
+    /// The world-action kind.
+    #[must_use]
+    pub const fn vote_kind(self) -> VoteKind {
+        match self {
+            Self::Move => VoteKind::Move,
+            Self::Reproduce => VoteKind::Reproduce,
+            Self::StealEnergy => VoteKind::StealEnergy,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn directed_kinds_map_onto_their_sinks() {
+        for (index, kind) in DirectedVoteKind::ALL.into_iter().enumerate() {
+            assert_eq!(kind.index(), index);
+            for d in 0..VOTE_DIRECTION_COUNT {
+                let sink = kind.sink(d);
+                assert_eq!(sink.index(), 1 + index * 8 + usize::from(d));
+                assert_eq!(DirectedVoteKind::of_sink(sink), Some((kind, d)));
+                assert_eq!(sink.kind(), Some(kind.vote_kind()));
+            }
+        }
+        for sink in [VoteSink::Eat, VoteSink::Terminate, VoteSink::Decide] {
+            assert_eq!(DirectedVoteKind::of_sink(sink), None);
+        }
+    }
 
     #[test]
     fn action_param_fields_are_the_decoded_catalog_in_kind_major_order() {

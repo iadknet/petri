@@ -361,6 +361,7 @@ mod tests {
 
     fn def_with_nodes(nodes: Vec<ComputeNode>) -> CgpGraphBackendDef {
         CgpGraphBackendDef {
+            projections: Vec::new(),
             birth_weights: None,
             compute_nodes: nodes,
             output_sinks: Vec::new(),

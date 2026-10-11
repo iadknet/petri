@@ -56,6 +56,15 @@ produces a structurally valid genome.
 pub struct GraphBackendDef {
     pub compute_nodes: Vec<ComputeNode>,
     pub output_sinks: Vec<OutputSink>,
+    /// Ring projections (T11.F31); serde default empty, omitted when empty.
+    pub projections: Vec<RingProjection>,
+}
+
+pub struct RingProjection {
+    pub ref_idx: u16,                // a neighbor ring in `input_refs`
+    pub kind: DirectedVoteKind,      // Move | Reproduce | StealEnergy
+    pub offset: u8,                  // read mod 8
+    pub weight: f32,
 }
 
 pub struct ComputeNode {
@@ -77,7 +86,11 @@ pub struct GraphEdge {
 
 Design choice: edges are co-located with each node/sink for linear,
 cache-friendly evaluation. Fixed structural outputs are stored in separate
-Vecs to prevent topology mutations from affecting them.
+Vecs to prevent topology mutations from affecting them. A ring projection is
+not an edge of any sink (Section 6). Equality and the `Debug` genome identity
+include `projections`; `Debug` omits an empty list, so a genome without
+projections keeps its pre-T11.F31 fingerprint. Each projection also carries an
+input-use ablation mask that is outside equality, `Debug`, serde and size.
 
 ---
 
@@ -274,6 +287,39 @@ neither free storage/work/reproduction nor unchanged fitness.
 The runtime and property fixtures, commands and cost observations are indexed
 in [T20.F02 readings](../progress/readings/t20-f02.md).
 
+### Ring projections (T11.F31)
+
+A projection `{ref_idx, kind K, offset k, weight w}` adds
+`w · ring[(d − k) mod 8]` to `K(d)`'s vote for all eight directions, the ring
+being the neighbor ring (`NeighborFoodRing`, `NeighborBarrierRing`,
+`NeighborOccupiedRing`) at `input_refs[ref_idx]`, whose channel `c` is
+`Direction::ALL[c]`, the vote's own direction index.
+
+- In the effects pass of an entered visit, for each directed kind and
+  direction, `P_K[d] = Σ w_p · r_p((d + 8 − k_p) mod 8)` over `K`'s projections
+  in genome order, accumulated from 0.0; `r_p(c)` is what
+  `InputLeaf { ref_idx, sub_idx: c }` resolves to. A projection whose
+  `ref_idx` is out of range or not a ring contributes 0.
+- Sink `K(d)`'s contribution is `sanitize_f32(S + P_K[d])`, `S` its edge sum
+  (0.0 without edges). A sink with neither edges nor a projection of its kind
+  stays inert. One implementation serves production, observed and traced
+  visits; a traced sink record carries the applied value including the
+  projection term. An exhausted visit stages nothing. The pass is RNG-free.
+- A weight-0 projection over finite ring values leaves the visit's vote
+  contribution, output slots, parameters, shared memory, route scores and
+  carried state exactly equal (signed zero allowed). On a kind without edges a
+  projection is exactly its eight edges `InputLeaf { ref_idx, (d − k) mod 8 }`
+  → `K(d)` at weight `w`.
+- No per-projection energy charge: the graph charge stays per compute node, and
+  a projection makes the visit entered (Section 8), so a projection on a
+  dormant graph pays one minimum visit, as the first zero vote edge does. Host
+  work is eight reads and multiply-adds per projection per entered visit.
+- A projection is one `genome_size()` unit and one live component; its ring is
+  a consumed reference that `Prune` never deletes. Structured refinement
+  groups `ActionVote` sink edges only, so a projection is never a group member.
+- The VM has no projection (T11.F18 parity exemption): a VM node reaches one
+  by `SwapNodeBackend` to Graph.
+
 ---
 
 ## 7. Pass Ends
@@ -293,8 +339,8 @@ eligibility once; it snapshots nothing (T19.F02). Internal time is counted in
 visits and world time in ticks: a module's state advances once per visit,
 however many visits a tick's pass makes, and the per-pass hop cap and the
 per-tick hop ramp bound and price those visits. A visit is entered when the
-graph has at least one compute node or a wired effect surface (an output
-sink carrying at least one edge). An entered visit evaluates all compute nodes once in index order,
+graph has at least one compute node, a wired effect surface (an output
+sink carrying at least one edge), or a ring projection (T11.F31). An entered visit evaluates all compute nodes once in index order,
 including disconnected nodes; with zero compute nodes that evaluation is
 empty and the effects pass still runs.
 
@@ -335,7 +381,10 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
   - `WriteSlot(slot)`: `shared_memory[slot % 16] = sanitize_f32(wsum)`.
   - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
     the act of having edges and firing is what clears).
-  - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`.
+  - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`, with a
+    directed sink's ring projection term added to `wsum` first (Section 6);
+    a directed sink whose kind has a projection is applied even without
+    edges.
   - `ActionParam(field)`: `action_params[field.index()] = sanitize_f32(wsum)`.
 
 Sinks with empty `inputs` are inert — no write occurs. A visit that reaches
@@ -515,7 +564,9 @@ contribution:
   votes. Only wired items count toward `genome_size()` and
   `functional_complexity()`.
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
-  any wired sink, vote and parameter sinks included.
+  any wired sink, vote and parameter sinks included. A ring projection is a
+  live component wiring no sink: one `genome_size()` unit, one
+  `functional_complexity()` unit, its ring a consumed reference (T11.F31).
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.
 
@@ -564,7 +615,9 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | Unwired `ActionParam` sink | The parameter keeps its last write this tick (zero at tick start) |
 | Graph with no wired vote sink | Votes nothing; the pass commits only what other nodes vote |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
-| Sink with empty `inputs` | Inert — does not write |
+| Sink with empty `inputs` | Inert — does not write, unless it is a directed vote sink whose kind has a ring projection |
+| Ring projection whose `ref_idx` is out of range or not a ring | Contributes 0.0; its kind's sinks are still applied |
+| Ring projection `offset >= 8` | Read mod 8 |
 | Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
 

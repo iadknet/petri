@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import type { GraphBackendDef, InputReference, RouteTarget } from "../../types/genome.ts";
 import type { GraphTrace } from "../../types/trace.ts";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
+import { RingProjectionList } from "./RingProjectionList.tsx";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import { BackwardWeightEdge, WeightEdge } from "./graphInternalsEdges.tsx";
@@ -170,6 +171,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 					/>
 				</ReactFlowProvider>
 			</div>
+			<RingProjectionList projections={graphDef.projections} inputRefs={inputRefs} />
 		</div>
 	);
 });

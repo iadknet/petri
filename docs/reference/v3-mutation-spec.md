@@ -552,6 +552,33 @@ added/removed/retyped — only their edges are evolvable.
   a dormant graph's first edge adds its minimum charged visit. Silent signaling
   does not imply physiological neutrality or discovered usefulness.
 
+  Ring case (T11.F31): a ring family (`NeighborFoodRing`, `NeighborBarrierRing`,
+  `NeighborOccupiedRing`) landing on a directed sink `K(d)` is declared as
+  above, then appends one ring projection `{ref_idx, K, (d − channel) mod 8,
+  0.0}` instead of the edge or column (`channel` 0 under WholeFamily), with no
+  new draw. Other families and destinations are unchanged. Admission treats a
+  dangling projection `ref_idx` as a dangling leaf.
+
+- Ring projections (T11.F31), appended to `GraphOperator::ALL` after
+  `RefineHeritableStructure`; the default-arm total weight is 56 (44 before).
+  A projection is one gene (graph backend spec, "Ring projections"): its
+  weight, offset, kind and existence change only as a unit, and no operator
+  changes part of one or its `ref_idx`.
+
+  | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
+  | --- | ---: | --- | --- | --- |
+  | `AddRingProjection` | 2 | a Graph node with a ring at an index ≤ 65,535 | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; pushes `{ref_idx, kind, offset, 0.0}` (duplicates allowed) | Increasing |
+  | `AlterRingProjectionWeight` | 4 | a Graph node with a projection | the projection uniformly; `AlterGraphEdgeWeight`'s law (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
+  | `ShiftRingProjectionOffset` | 2 | same | the projection; `gen_bool(0.5)` true +1, false −1, mod 8 | Neutral |
+  | `RetargetRingProjectionKind` | 2 | same | the projection; `gen_range(0..2)` over the other two kinds in catalog order | Neutral |
+  | `RemoveRingProjection` | 2 | same | the projection; `Vec::remove`, order kept | Decreasing |
+
+  Restricted size pressure admits only `RemoveRingProjection` of the five. A
+  born-connected `InputRef.Add` ring landing on a direction sink stays one
+  ordinary edge (T20.F16 unchanged, draw for draw). Existing operators' code
+  paths and the founder battery's per-family seeds are unchanged; the new
+  operators remap every Graph-domain draw.
+
 ### InputRef domain
 
 - `Add` — pushes one reference to `input_refs`. On a VM node it is a growth
@@ -567,7 +594,9 @@ added/removed/retyped — only their edges are evolvable.
   The draws are always taken; when the index does not fit `u16` or the node
   lacks the drawn sink, no edge is pushed and the event stays a plain
   declaration. The born edge is an ordinary edge with no provenance; the
-  connected reference is not prunable while the edge consumes it.
+  connected reference is not prunable while the edge consumes it. A ring
+  landing on a direction sink stays this one ordinary edge, never a ring
+  projection (T11.F31).
 
   The new reference is one `gen_range(0..27)` key draw (T19.F05):
 
@@ -583,9 +612,10 @@ added/removed/retyped — only their edges are evolvable.
   | 14 to 18 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
   | 19 to 26 | `UpstreamSlot` | the slot |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
-  `GraphSource::InputLeaf { ref_idx }` on any edge container and no VM
-  `ReadInput { ref_idx }` anywhere in the program, live or not. Higher
-  `ref_idx` values are decremented on both backends, so every consumer
+  `GraphSource::InputLeaf { ref_idx }` on any edge container, no ring
+  projection `ref_idx` (T11.F31), and no VM `ReadInput { ref_idx }` anywhere
+  in the program, live or not. Higher `ref_idx` values are decremented on both
+  backends, projections included, so every consumer
   resolves to the same reference afterwards and none is removed or rewritten;
   the event is neutral at birth. A node with no unreferenced entry is not a
   target.
