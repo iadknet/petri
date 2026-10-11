@@ -4,18 +4,20 @@
 //! mapped to an effective fertility multiplier controlling food growth rate.
 
 mod annealing;
+mod channels;
 mod fbm;
 mod mixing;
 mod poisson_blobs;
 mod uniform;
 
 pub use annealing::{effective_fertility_range, map_fertility};
+pub use channels::{generate_channels, ChannelParams};
 pub use fbm::{generate_fbm, FbmField};
-pub use mixing::mix_layers;
+pub use mixing::{blend_layers, mix_layers};
 pub use poisson_blobs::generate_poisson_blobs;
 pub use uniform::generate_uniform;
 
-use crate::config::{FertilityAlgorithm, FertilityConfig};
+use crate::config::{FertilityAlgorithm, FertilityBlend, FertilityConfig};
 use crate::kernel::Grid;
 
 /// Generate a raw fertility grid from the configured layers.
@@ -36,11 +38,7 @@ pub fn generate_fertility(
         return Grid::new(width, height, 0.0);
     }
 
-    let default_layer = crate::config::FertilityLayer {
-        algorithm: FertilityAlgorithm::default(),
-        weight: 1.0,
-        target: crate::config::FertilityLayerTarget::default(),
-    };
+    let default_layer = crate::config::FertilityLayer::default();
     let layers: &[crate::config::FertilityLayer] = if config.layers.is_empty() {
         // Use the default PoissonBlobs algorithm when no layers are configured.
         std::slice::from_ref(&default_layer)
@@ -48,16 +46,16 @@ pub fn generate_fertility(
         &config.layers
     };
 
-    let generated: Vec<(Grid<f32>, f32)> = layers
+    let generated: Vec<(Grid<f32>, f32, FertilityBlend)> = layers
         .iter()
         .enumerate()
         .map(|(i, layer)| {
             let grid = generate_layer(width, height, &layer.algorithm, world_seed, i as u64);
-            (grid, layer.weight)
+            (grid, layer.weight, layer.blend)
         })
         .collect();
 
-    mix_layers(&generated)
+    blend_layers(generated)
 }
 
 /// Generate a single layer grid from a `FertilityAlgorithm` variant.
@@ -108,6 +106,26 @@ fn generate_layer(
                 *falloff,
                 &mut blob_rng,
             )
+        }
+        FertilityAlgorithm::Channels {
+            octaves,
+            frequency,
+            lacunarity,
+            persistence,
+            width: channel_width,
+            value,
+            seed,
+        } => {
+            let params = ChannelParams {
+                octaves: *octaves,
+                frequency: *frequency,
+                lacunarity: *lacunarity,
+                persistence: *persistence,
+                width: *channel_width,
+                value: *value,
+            };
+            let effective_seed = seed.unwrap_or(world_seed.wrapping_add(layer_index));
+            generate_channels(width, height, &params, effective_seed)
         }
     }
 }
@@ -176,6 +194,40 @@ mod tests {
     }
 
     #[test]
+    fn channels_layer_without_seed_follows_shared_seed_rule() {
+        let channels = |seed| crate::config::FertilityLayer {
+            algorithm: FertilityAlgorithm::Channels {
+                octaves: 4,
+                frequency: 0.02,
+                lacunarity: 2.0,
+                persistence: 0.5,
+                width: 3.0,
+                value: 0.5,
+                seed,
+            },
+            blend: FertilityBlend::Max,
+            ..crate::config::FertilityLayer::default()
+        };
+        let config = |seed| FertilityConfig {
+            enabled: true,
+            layers: vec![
+                crate::config::FertilityLayer {
+                    algorithm: FertilityAlgorithm::Uniform { value: -1.0 },
+                    ..crate::config::FertilityLayer::default()
+                },
+                channels(seed),
+            ],
+            ..FertilityConfig::default()
+        };
+        let bits = |g: &Grid<f32>| g.as_slice().iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+        let implicit = generate_fertility(64, 64, &config(None), 500);
+        let explicit = generate_fertility(64, 64, &config(Some(501)), 500);
+        let other = generate_fertility(64, 64, &config(Some(502)), 500);
+        assert_eq!(bits(&implicit), bits(&explicit));
+        assert_ne!(bits(&implicit), bits(&other));
+    }
+
+    #[test]
     fn poisson_layer_covers_target_fraction() {
         // Scaled-down config: 36 blobs on a 320x320 grid gives a comparable
         // blob-density ratio to the production default (900 blobs on 1600x1600).
@@ -191,8 +243,7 @@ mod tests {
                     falloff: 0.5,
                     seed: None,
                 },
-                weight: 1.0,
-                target: crate::config::FertilityLayerTarget::default(),
+                ..crate::config::FertilityLayer::default()
             }],
             ..FertilityConfig::default()
         };

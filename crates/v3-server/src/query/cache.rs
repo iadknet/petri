@@ -255,8 +255,7 @@ mod tests {
                     algorithm: v3_core::config::FertilityAlgorithm::Uniform {
                         value: uniform_value,
                     },
-                    weight: 1.0,
-                    target: v3_core::config::FertilityLayerTarget::default(),
+                    ..FertilityLayer::default()
                 }],
             },
             ..FoodConfig::default()

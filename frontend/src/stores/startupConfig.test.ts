@@ -240,6 +240,34 @@ describe("StartupConfigStore", () => {
 		});
 	});
 
+	it("carries channels layers and max blend through startup requests", () => {
+		const channels = {
+			Channels: {
+				octaves: 4,
+				frequency: 0.01,
+				lacunarity: 2.0,
+				persistence: 0.5,
+				width: 3,
+				value: 0.25,
+				seed: 11,
+			},
+		};
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
+			{ weight: 1.0, algorithm: { Uniform: { value: 0.5 } } },
+			{ weight: 1.0, algorithm: channels, blend: "Max" },
+		]);
+
+		const layers = buildStartupRequest(useStartupConfigStore.getState().preset).world?.food
+			?.fertility?.layers;
+		expect(layers?.[0]).not.toHaveProperty("blend");
+		expect(layers?.[1]).toEqual({
+			algorithm: channels,
+			weight: 1.0,
+			target: "AllFoods",
+			blend: "Max",
+		});
+	});
+
 	it("retargets invalid single-type fertility targets to all_foods", () => {
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
 			{

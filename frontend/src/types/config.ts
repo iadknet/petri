@@ -19,12 +19,27 @@ export type FertilityAlgorithm =
 				falloff: number;
 				seed?: number | null;
 			};
+	  }
+	| {
+			Channels: {
+				octaves: number;
+				frequency: number;
+				lacunarity: number;
+				persistence: number;
+				width: number;
+				value: number;
+				seed?: number | null;
+			};
 	  };
+
+/** Omitted means `WeightedAverage`, matching the server's serialization. */
+export type FertilityBlend = "WeightedAverage" | "Max";
 
 export interface FertilityLayer {
 	algorithm: FertilityAlgorithm;
 	weight: number;
 	target?: FoodFertilityLayerTarget;
+	blend?: FertilityBlend;
 }
 
 export interface FertilityConfig {
@@ -63,6 +78,7 @@ export interface StartupFoodRequestLayer {
 	algorithm: FertilityAlgorithm;
 	weight: number;
 	target: FoodFertilityLayerTarget;
+	blend?: FertilityBlend;
 }
 
 export interface StartupFoodRequestFertilityConfig {

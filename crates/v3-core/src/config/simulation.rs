@@ -160,6 +160,40 @@ pub enum FertilityAlgorithm {
         falloff: f32,
         seed: Option<u64>,
     },
+    /// Narrow strips of `value` along the zero contour of an fBm field (the
+    /// ridges of ridged fBm), roughly `width` cells across; -1 elsewhere.
+    Channels {
+        octaves: u32,
+        frequency: f32,
+        lacunarity: f32,
+        persistence: f32,
+        width: f32,
+        value: f32,
+        seed: Option<u64>,
+    },
+}
+
+/// Fallback channel width in cells for a non-finite `width`.
+pub(crate) const DEFAULT_CHANNEL_WIDTH: f32 = 3.0;
+/// Fallback in-channel raw fertility for a non-finite `value`.
+pub(crate) const DEFAULT_CHANNEL_VALUE: f32 = 1.0;
+/// Octave cap of the noise crate's `Fbm` builder.
+pub(crate) const MAX_FBM_OCTAVES: u32 = noise::Fbm::<noise::Perlin>::MAX_OCTAVES as u32;
+
+/// How a fertility layer combines with the others targeting the same food.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum FertilityBlend {
+    /// Contributes `weight` to the weighted average of all such layers.
+    #[default]
+    WeightedAverage,
+    /// Raises each cell of the weighted average to at least this layer's value.
+    Max,
+}
+
+impl FertilityBlend {
+    fn is_weighted_average(&self) -> bool {
+        *self == Self::WeightedAverage
+    }
 }
 
 impl Default for FertilityAlgorithm {
@@ -183,6 +217,10 @@ pub struct FertilityLayer {
     pub weight: f32,
     #[serde(default)]
     pub target: FertilityLayerTarget,
+    /// Omitted from serialization at its default so configs without a `Max`
+    /// layer serialize (and digest) exactly as before the field existed.
+    #[serde(default, skip_serializing_if = "FertilityBlend::is_weighted_average")]
+    pub blend: FertilityBlend,
 }
 
 impl Default for FertilityLayer {
@@ -191,6 +229,7 @@ impl Default for FertilityLayer {
             algorithm: FertilityAlgorithm::default(),
             weight: 1.0,
             target: FertilityLayerTarget::default(),
+            blend: FertilityBlend::default(),
         }
     }
 }
@@ -1107,6 +1146,27 @@ fn normalize_food_config(food: &mut FoodConfig) {
     normalize_food_shared(&mut food.shared);
     normalize_food_types(food);
     normalize_food_layer_targets(food);
+    normalize_channel_layers(food);
+}
+
+fn normalize_channel_layers(food: &mut FoodConfig) {
+    for layer in &mut food.fertility.layers {
+        if let FertilityAlgorithm::Channels {
+            octaves,
+            width,
+            value,
+            ..
+        } = &mut layer.algorithm
+        {
+            *octaves = (*octaves).clamp(1, MAX_FBM_OCTAVES);
+            *width = if width.is_finite() {
+                width.max(1.0)
+            } else {
+                DEFAULT_CHANNEL_WIDTH
+            };
+            *value = normalize_f32_clamp(*value, -1.0, 1.0, DEFAULT_CHANNEL_VALUE);
+        }
+    }
 }
 
 fn normalize_food_shared(shared: &mut FoodResourceConfig) {
@@ -2743,6 +2803,115 @@ mod tests {
             "initial_coverage": 0.6
         }));
         assert_eq!(result.unwrap().growth_inhibitor, 0.2);
+    }
+
+    fn channels_layer(width: f32, value: f32, octaves: u32) -> FertilityLayer {
+        FertilityLayer {
+            algorithm: FertilityAlgorithm::Channels {
+                octaves,
+                frequency: 0.01,
+                lacunarity: 2.0,
+                persistence: 0.5,
+                width,
+                value,
+                seed: Some(7),
+            },
+            blend: FertilityBlend::Max,
+            ..FertilityLayer::default()
+        }
+    }
+
+    fn channels_params(layer: &FertilityLayer) -> (f32, f32, u32) {
+        match layer.algorithm {
+            FertilityAlgorithm::Channels {
+                width,
+                value,
+                octaves,
+                ..
+            } => (width, value, octaves),
+            ref other => panic!("expected Channels, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn default_and_existing_recipes_serialize_without_blend_key() {
+        let baseline = SimulationConfig::default();
+        let json = serde_json::to_string(&baseline).unwrap();
+        assert!(!json.contains("blend"), "default config serializes blend");
+        for recipe in [
+            include_str!("../../../../experiments/worlds/plains.json"),
+            include_str!("../../../../experiments/worlds/orchards-in-grassland.json"),
+            include_str!("../../../../experiments/worlds/canyon-country.json"),
+            include_str!("../../../../experiments/worlds/confluence.json"),
+        ] {
+            let patch: serde_json::Value = serde_json::from_str(recipe).unwrap();
+            let config = crate::config::resolve_config(&baseline, patch).unwrap();
+            let json = serde_json::to_string(&config).unwrap();
+            assert!(!json.contains("blend"), "recipe config serializes blend");
+        }
+    }
+
+    #[test]
+    fn channels_max_layer_round_trips_through_resolve_config() {
+        let baseline = SimulationConfig::default();
+        let patch = serde_json::json!({"world": {"food": {"fertility": {"layers": [
+            {"algorithm": {"PoissonBlobs": {"blob_count": 10, "min_radius": 5.0,
+                "max_radius": 15.0, "falloff": 0.5, "seed": null}}, "weight": 1.0},
+            {"algorithm": {"Channels": {"octaves": 4, "frequency": 0.01,
+                "lacunarity": 2.0, "persistence": 0.5, "width": 3.0, "value": 0.25,
+                "seed": 11}}, "weight": 1.0, "blend": "Max"}
+        ]}}}});
+        let config = crate::config::resolve_config(&baseline, patch).unwrap();
+        let layers = &config.world.food.fertility.layers;
+        assert_eq!(layers[0].blend, FertilityBlend::WeightedAverage);
+        assert_eq!(layers[1].blend, FertilityBlend::Max);
+        assert_eq!(channels_params(&layers[1]), (3.0, 0.25, 4));
+
+        let serialized = serde_json::to_value(&config).unwrap();
+        let layer_json = &serialized["world"]["food"]["fertility"]["layers"];
+        assert!(layer_json[0].get("blend").is_none());
+        assert_eq!(layer_json[1]["blend"], "Max");
+        let reparsed: SimulationConfig = serde_json::from_value(serialized.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&reparsed).unwrap(), serialized);
+    }
+
+    #[test]
+    fn unknown_fertility_blend_is_rejected() {
+        let json = r#"{"algorithm":{"Uniform":{"value":0.0}},"weight":1.0,"blend":"Min"}"#;
+        assert!(serde_json::from_str::<FertilityLayer>(json).is_err());
+    }
+
+    #[test]
+    fn normalize_repairs_invalid_channels_parameters() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.fertility.layers = vec![
+            channels_layer(0.0, 0.5, 4),
+            channels_layer(-3.0, 0.5, 0),
+            channels_layer(f32::NAN, f32::NAN, 99),
+            channels_layer(f32::INFINITY, 4.0, 4),
+            channels_layer(2.5, -0.5, 4),
+        ];
+        cfg.normalize();
+        let params: Vec<_> = cfg
+            .world
+            .food
+            .fertility
+            .layers
+            .iter()
+            .map(channels_params)
+            .collect();
+        assert_eq!(params[0], (1.0, 0.5, 4));
+        assert_eq!(params[1], (1.0, 0.5, 1));
+        assert_eq!(
+            params[2],
+            (
+                DEFAULT_CHANNEL_WIDTH,
+                DEFAULT_CHANNEL_VALUE,
+                MAX_FBM_OCTAVES
+            )
+        );
+        assert_eq!(params[3], (DEFAULT_CHANNEL_WIDTH, 1.0, 4));
+        assert_eq!(params[4], (2.5, -0.5, 4));
     }
 
     #[test]

@@ -94,15 +94,21 @@ edit and govern no traced phase.
 
 ## Verification
 
-- [ ] `cargo check --workspace --all-targets` -> pass.
-- [ ] `cargo fmt --all --check` -> pass.
-- [ ] New and existing fertility and config tests in v3-core
-      (`cargo test -p v3-core fertility`, `cargo test -p v3-core config`) -> pass.
-- [ ] Tests of every other crate the diff touches (for example
-      `cargo test -p v3-server`, `cargo test -p v3-cli`) -> pass.
-- [ ] `make rust-clippy` -> pass.
-- [ ] Frontend type check and tests, only if the frontend changes -> pass.
-- [ ] `make check-docs` -> pass.
+- [x] `cargo check --workspace --all-targets` -> pass.
+- [x] `cargo fmt --all --check` -> pass.
+- [x] New and existing fertility and config tests in v3-core
+      (`cargo test -p v3-core fertility`, `cargo test -p v3-core config`) -> pass
+      (43 and 167 lib tests). Channel fraction on 256x256, seed 42, frequency
+      0.01, 4 octaves: 0.045 at width 2, 0.068 at width 3, 0.091 at width 4
+      (factor 2.00), strictly rising over widths 1-8.
+- [x] Tests of every other crate the diff touches: `cargo test -p v3-server`
+      -> pass; v3-cli is untouched, and `cargo test -p v3-cli --test
+      bench_artifacts` (pinned config digests) -> pass.
+- [x] `make rust-clippy` -> pass.
+- [x] Frontend type check and tests: `npx tsc -b --noEmit` and
+      `npx vitest run` in `frontend/` -> pass (349 tests); `npx biome check src/`
+      -> no errors.
+- [x] `make check-docs` -> pass.
 - [ ] Mutation gate: `Not applicable: user decision 2026-10-10, minimal-overhead run`.
 - [ ] Benchmark summary: `Not applicable: no default or existing recipe changes, user decision 2026-10-10`.
 
