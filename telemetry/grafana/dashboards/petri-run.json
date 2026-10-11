@@ -1376,12 +1376,235 @@
       }
     },
     {
+      "id": 34,
+      "type": "timeseries",
+      "title": "Parent age at birth (1m window)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 90,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.1, sum by (le) (rate(petri_run_birth_parent_age_bucket{petri_run_id=\"$run_id\"}[1m])))",
+          "legendFormat": "p10, all births",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(petri_run_birth_parent_age_bucket{petri_run_id=\"$run_id\"}[1m])))",
+          "legendFormat": "median, all births",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.9, sum by (le) (rate(petri_run_birth_parent_age_bucket{petri_run_id=\"$run_id\"}[1m])))",
+          "legendFormat": "p90, all births",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(petri_run_birth_parent_age_bucket{petri_run_id=\"$run_id\", petri_birth_order=\"first\"}[1m])))",
+          "legendFormat": "median, first births",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "description": "Age of the parent, in ticks, when each child was delivered (after any gestation), over births in the last minute. Quantiles are interpolated within histogram buckets (bounds 20, 22, 25, 30, 40, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, 5000 ticks); a quantile above 5000 reads as 5000. \"First birth\" is the parent's first delivered child: age at first reproduction."
+    },
+    {
+      "id": 35,
+      "type": "bargauge",
+      "title": "Parent age at birth, run so far",
+      "description": "Births over the whole time range by the parent's age at delivery, in ticks; each bar is one bucket, labelled by its inclusive upper bound (+Inf holds ages above 5000).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 98,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (le) (last_over_time(petri_run_birth_parent_age_bucket{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{le}}",
+          "range": false,
+          "instant": true,
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 36,
+      "type": "bargauge",
+      "title": "Mean parent age at birth, run so far, by birth order",
+      "description": "Mean age of the parent, in ticks, at delivery, over every birth in the time range: \"first\" is each parent's first delivered child (age at first reproduction), \"later\" every subsequent one.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 98,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_birth_order) (last_over_time(petri_run_birth_parent_age_sum{petri_run_id=\"$run_id\"}[$__range])) / sum by (petri_birth_order) (last_over_time(petri_run_birth_parent_age_count{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{petri_birth_order}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
       "id": 15,
       "type": "row",
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 90,
+        "y": 106,
         "w": 24,
         "h": 1
       },
@@ -1398,7 +1621,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 91,
+        "y": 107,
         "w": 12,
         "h": 8
       },
@@ -1475,7 +1698,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 91,
+        "y": 107,
         "w": 12,
         "h": 8
       },
@@ -1552,7 +1775,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 99,
+        "y": 115,
         "w": 12,
         "h": 8
       },
@@ -1629,7 +1852,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 99,
+        "y": 115,
         "w": 12,
         "h": 8
       },
@@ -1706,7 +1929,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 107,
+        "y": 123,
         "w": 12,
         "h": 8
       },
@@ -1779,7 +2002,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 115,
+        "y": 131,
         "w": 24,
         "h": 1
       },
@@ -1797,7 +2020,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 116,
+        "y": 132,
         "w": 24,
         "h": 10
       },
@@ -1824,7 +2047,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 126,
+        "y": 142,
         "w": 24,
         "h": 1
       },
@@ -1842,7 +2065,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 127,
+        "y": 143,
         "w": 24,
         "h": 10
       },

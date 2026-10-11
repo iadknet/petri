@@ -124,6 +124,7 @@ T21.F04's material).
 | `petri.run.deaths` | `petri_run_deaths_total` | `mortality.deaths_total` | — | monotonic sum |
 | `petri.run.deaths_by_cause` | `petri_run_deaths_by_cause_total` | `mortality.by_cause` | `petri.cause` (18) | monotonic sum |
 | `petri.run.reproductive_success.<creatures_observed\|offspring_spawned\|survival_ticks>` | `petri_run_reproductive_success_<x>_total` | `reproductive_success_by_cognitive_class.by_class` | `petri.cognitive_class` (4) | monotonic sum |
+| `petri.run.birth_parent_age` (added 2026-10-10) | `petri_run_birth_parent_age_<bucket\|sum\|count>` | `birth_parent_age`: parent age in ticks at each delivered birth, buckets `BIRTH_PARENT_AGE_BOUNDS` | `petri.birth_order` (`first`, `later`) | cumulative histogram |
 | `petri.run.energy_flow` | `petri_run_energy_flow` | `energy_flows` `f64` fields; `action_charges.<action>` as `action_charge.<action>`; `food_intake_by_type[i]` as `food_intake.<i>` | `petri.flow` (≤ 27) | non-monotonic sum |
 | `petri.run.genome_size_creature_ticks` | `petri_run_genome_size_creature_ticks_total` | `energy_flows.genome_size_creature_ticks` | — | monotonic sum |
 | `petri.run.phase_wall_clock` (unit `s`) | `petri_run_phase_wall_clock_seconds_total` | `phase_wall_clock` | `petri.phase` (5) | monotonic sum |

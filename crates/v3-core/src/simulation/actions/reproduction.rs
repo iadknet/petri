@@ -11,6 +11,7 @@ use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
+use crate::simulation::birth_age::BirthOrder;
 use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::simulation::Simulation;
 
@@ -559,6 +560,9 @@ fn spawn_child(
         .insert(child_id, ActionLog::new(sim.config.action_log.capacity));
     sim.world.place_creature(target, child_id);
     if let Some(parent) = sim.creatures.get_mut(parent_id) {
+        sim.stats
+            .birth_parent_age
+            .record(BirthOrder::of(parent.offspring_spawned_count), parent.age);
         parent.offspring_spawned_count += 1;
     }
 
