@@ -29,3 +29,7 @@ tmp/
 
 # cargo-mutants output when run directly instead of through make rust-mutants
 /mutants.out*
+
+# Root-level tool caches (a Vite test cache, Impeccable design-tool state)
+/node_modules/
+/.impeccable/

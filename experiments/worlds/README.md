@@ -12,6 +12,10 @@ world-set report; a recipe edit is labeled `inputs_changed` in that
 comparison rather than treated as the same world. `plains.json` is `{}`, the
 production default, kept as a loadable control.
 
+`blobs-and-fruit-substrate.json` is not part of the goal set. It is a full
+config parked from the 2026-10-10 live tuning of a blob-island world with an
+Fbm fertility substrate layer: boom-and-bust populations, weak evolution.
+
 Inspect a world (readings as JSON, preview as PNG):
 
 ```sh
