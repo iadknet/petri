@@ -262,3 +262,96 @@ fn add_and_refinement_are_unchanged_by_projections() {
         assert_eq!(q.projections, three());
     }
 }
+
+/// Each unit operator reaches its own edit through the mutator's dispatch.
+#[test]
+fn the_mutator_dispatches_each_unit_operator_to_its_projection_edit() {
+    type Edit = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<(), MutationSkipReason>;
+    let cases: [(GraphOperator, Edit); 4] = [
+        (
+            GraphOperator::AlterRingProjectionWeight,
+            projection::alter_weight,
+        ),
+        (
+            GraphOperator::ShiftRingProjectionOffset,
+            projection::shift_offset,
+        ),
+        (
+            GraphOperator::RetargetRingProjectionKind,
+            projection::retarget_kind,
+        ),
+        (GraphOperator::RemoveRingProjection, projection::remove),
+    ];
+    let config = MutationConfig::default();
+    for (op, edit) in cases {
+        for seed in 0..16 {
+            // Arrange
+            let refs = vec![barrier(), food(0)];
+            let mut genome = CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![graph_node(refs.clone(), three())],
+            };
+            let mut direct = graph_node(refs, three());
+
+            // Act
+            GraphMutator::apply_to_node(
+                &mut genome,
+                op,
+                0,
+                &mut SmallRng::seed_from_u64(seed),
+                &config,
+                1,
+            )
+            .unwrap();
+            edit(graph_mut(&mut direct), &mut SmallRng::seed_from_u64(seed)).unwrap();
+
+            // Assert
+            assert_eq!(
+                graph(&genome.nodes[0]).projections,
+                graph(&direct).projections,
+                "{op:?} seed {seed}"
+            );
+        }
+    }
+}
+
+/// A ring at index 65,535 is a projection site; one at 65,536 is not.
+#[test]
+fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
+    // Arrange
+    let mut refs = vec![InputReference::ActionVotes; usize::from(u16::MAX)];
+    refs.push(barrier());
+    let mut last = graph_node(refs.clone(), vec![]);
+    refs.insert(0, InputReference::ActionVotes);
+    let mut past = graph_node(refs, vec![]);
+
+    // Act
+    let added = projection::add(&mut last, &mut SmallRng::seed_from_u64(0));
+    let skipped = projection::add(&mut past, &mut SmallRng::seed_from_u64(0));
+
+    // Assert
+    assert_eq!(added, Ok(()));
+    assert_eq!(graph(&last).projections.len(), 1);
+    assert_eq!(graph(&last).projections[0].ref_idx, u16::MAX);
+    assert_eq!(skipped, Err(MutationSkipReason::NoApplicableTarget));
+    assert!(graph(&past).projections.is_empty());
+}
+
+/// A stored offset is read mod 8, so the largest `u8` shifts like 7.
+#[test]
+fn shift_reads_any_stored_offset_mod_eight() {
+    for seed in 0..16 {
+        // Arrange
+        let mut node = graph_node(
+            vec![barrier()],
+            vec![RingProjection::new(0, DirectedVoteKind::Move, u8::MAX, 0.5)],
+        );
+
+        // Act
+        projection::shift_offset(graph_mut(&mut node), &mut SmallRng::seed_from_u64(seed)).unwrap();
+
+        // Assert: 7 + 1 and 7 − 1, mod 8.
+        let offset = graph(&node).projections[0].offset;
+        assert!(offset == 0 || offset == 6, "seed {seed}: {offset}");
+    }
+}

@@ -186,13 +186,33 @@ keys and the goal summary gains one block.
       v3-server -p v3-lab -p v3-telemetry` -> exit 0; `npm run lint`, `npm
       run test` (380 passed) and `npm run build` in `frontend/` -> exit 0.
 - [ ] `make check` -> exit 0, tested commit in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `93c3fa33` -> exit 0,
+      `293 mutants tested in 3h: 25 missed, 214 caught, 54 unviable`, no
+      timeouts; output copied to
+      `~/.local/share/petri-tools/mutants/t11-f31/mutants.out.fresh` (the
+      `mutants.out` beside it now holds the feedback pass). One fresh run:
+      triage only added tests. `MUTANTS_ITERATE=1` feedback (not closure
+      evidence): `25 mutants tested in 21m: 9 missed, 16 caught`, the nine
+      equivalents below.
 - [x] Benchmark summaries stored at the paths below, series entries added
       (`gate.closed`, `goal_worlds.closed`), raw hashes and byte counts in the
       readings, goal run once, no full report staged. Exit statuses, `severe`
       false on both, and the two missed predeclared targets are in the
       measured verdict above.
+
+| Survivor (`v3-core/src/`) | Resolution |
+| --- | --- |
+| `creature/ring_rules.rs:84:45` guard `is_neighbor_ring()` -> `true` in `ring_of`; `90:18` `>` -> `>=` in `carries` | Killed: `only_ring_references_above_the_weight_floor_carry_a_path` (`creature/ring_rules_tests.rs`) |
+| `creature/ring_rules.rs:139:36` `<` -> `<=` in `bus` | Killed: `a_bus_hop_from_a_sub_index_past_the_ring_carries_no_rule` |
+| `creature/ring_rules.rs:226:54` `&&` -> `\|\|`; `227:33` `+=` -> `-=`, `+=` -> `*=`; `227:75` `<` -> `==` in `observe_one` | Killed: `projection_rows_count_each_sign_only_above_the_weight_floor` |
+| `mutation/graph/mod.rs:387:21`, `388:21`, `389:21` delete `AlterRingProjectionWeight`, `ShiftRingProjectionOffset`, `RetargetRingProjectionKind` arms in `apply_to_node` | Killed: `the_mutator_dispatches_each_unit_operator_to_its_projection_edit` (`mutation/graph/tests/projection.rs`) |
+| `mutation/graph/projection.rs:19:37` `+` -> `-`, `+` -> `*` in `ring_indices` | Killed: `add_reaches_a_ring_at_the_last_u16_index_and_none_past_it` |
+| `mutation/graph/projection.rs:89:44` `%` -> `+` in `shift_offset` | Killed: `shift_reads_any_stored_offset_mod_eight` |
+| `creature/genome/cgp.rs:179:12` `%` -> `+` in `channel_for`; `187:12`, `187:30` `%` -> `+` in `offset_for` | Killed: `channel_and_offset_rotations_are_mod_eight_for_every_u8_pair` (`creature/genome/tests/projection_tests.rs`) |
+| `creature/ring_rules.rs:142:69` (`bus`), `191:55`, `205:68`, `226:75`, `233:53` `>` -> `>=`, `227:75` `<` -> `<=` (`observe_one`) | Equivalent: each sign test runs only on a weight that passed `carries` (`\|w\| > 1e-3`), which excludes 0 and NaN, so the strict and non-strict comparisons against 0.0 agree |
+| `creature/ring_rules.rs:258:18` `>` -> `>=` in `observe_one` | Equivalent: every coverage entry comes from `Coverage::add`, which sets a direction bit, so `n` is never 0 |
+| `creature/genome/cgp.rs:495:35` `>` -> `>=` in `reindex_input_refs_after_removal` | Equivalent: an equal `ref_idx` already returned `false` on the line before |
+| `mutation/graph/recruitment.rs:49:38` `%` -> `+` in `Plan::append` | Equivalent: `plan` rejects a ring channel at or above the ring width 8 and the whole-family arm passes 0, so `channel + 8` fits `u8` and `offset_for` reduces it to the same offset |
 
 ## Performance and Goal Impact
 

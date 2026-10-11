@@ -194,3 +194,26 @@ fn a_projection_is_a_live_component_reading_its_ring_and_writing_action() {
     assert_eq!(writes, vec![MeshWriteClass::Action]);
     assert!(!stateful);
 }
+
+/// Both rotations are `(a − b) mod 8` for every `u8` pair, not only for the
+/// eight directions and offsets the census and mutation draw.
+#[test]
+fn channel_and_offset_rotations_are_mod_eight_for_every_u8_pair() {
+    let rotation =
+        |a: u8, b: u8| u8::try_from((i16::from(a) - i16::from(b)).rem_euclid(8)).expect("below 8");
+    for a in 0..=u8::MAX {
+        for b in 0..=u8::MAX {
+            let projection = RingProjection::new(0, DirectedVoteKind::Move, b, 0.0);
+            assert_eq!(
+                projection.channel_for(a),
+                rotation(a, b),
+                "d {a}, offset {b}"
+            );
+            assert_eq!(
+                RingProjection::offset_for(a, b),
+                rotation(a, b),
+                "d {a}, channel {b}"
+            );
+        }
+    }
+}
