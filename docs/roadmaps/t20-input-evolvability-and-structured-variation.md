@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
 **Status**: In Progress
-**Last updated**: 2026-10-09
+**Last updated**: 2026-10-11
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -180,6 +180,15 @@ Compare ordinary two-step sparse growth, one-event neutral recruitment, and
 structured inherited changes with independent exceptions. Keep these as separate
 arms. Universal dense wiring, a global sensor-addressing rewrite, permanent
 weight tying and a replacement brain framework are not justified by this evidence.
+One exception, by user ruling on 2026-10-11: [T11.F31](t11-brain-genotype-phenotype-map.md)
+adds a persistent ring-to-direction projection, with a drawn offset and
+independent per-direction exceptions. Its evidence is in the
+[factored motor output note](../strategy/factored-motor-output-research-2026-10-11.md).
+Under T11.F31:
+- F04's ring recruitment into a direction group arrives as a zero-weight
+  projection;
+- F05 refines a projection through its own weight;
+- T11.F30's kind drives join the destination sets of F04, F05 and F16.
 
 **General access and semantic structure.** F01 covers the audited 19 named
 non-upstream families plus `UpstreamSlot`; shared-memory sources are inventoried
@@ -197,7 +206,9 @@ different quantities, and a scalar has no repeated layout. Do not force cyclic
 sharing onto either. F05 must qualify two distinct repeated layouts before
 claiming general coordination; otherwise report its supported subset while F04's
 general access is assessed independently. No task answer selects a source, sink,
-correspondence or mutation target in production.
+correspondence or mutation target in production. Pairing neighbor-ring cell d with
+direction d is body geometry, not a task answer, when the offset and sign are drawn
+(user ruling, 2026-10-11).
 
 Zero weight is not universally neutral: wiring `ClearSlot` clears memory, and
 other write sinks can overwrite a carried value with zero. F02 must distinguish

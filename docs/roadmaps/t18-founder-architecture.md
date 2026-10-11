@@ -1,7 +1,7 @@
 # T18 — Founder Architecture
 
 **Status**: Planned
-**Last updated**: 2026-09-23
+**Last updated**: 2026-10-11
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -33,6 +33,7 @@ bounded comparisons against the current canonical founder.
 
 ## Notes for AI Agents
 
+- Factored motor output, 2026-10-11 (user decision): [T11.F30](t11-brain-genotype-phenotype-map.md) replaces the lowest-index direction tie with a heading tie (last committed Move, at birth away from the parent). That answers the north-default question the [diagnosis run](../strategy/evolvability-diagnosis-run-2026-10.md) (`:506-516`) left for F01: after F30, the founder's "first-argmax cardinal-food steering" criterion is read with heading ties, not North. The [factored motor output note](../strategy/factored-motor-output-research-2026-10-11.md) (§4) records a 13-edge drive-plus-direction port of the founder's votes, with identical queues to the current 32 edges and 4 multiplies on V3Alpha1. It is an input for F01's layout, not a decision.
 - Scope revision, 2026-09-23: the user-approved roadmap cleanup replaces the
   pre-T19 layout. F01 and F02 remain unscheduled; T19's completion does not
   add them to the master priority order. The earlier decision to introduce a
