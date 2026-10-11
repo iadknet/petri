@@ -98,7 +98,7 @@ edit and govern no traced phase.
 - [x] `cargo fmt --all --check` -> pass.
 - [x] New and existing fertility and config tests in v3-core
       (`cargo test -p v3-core fertility`, `cargo test -p v3-core config`) -> pass
-      (43 and 167 lib tests). Channel fraction on 256x256, seed 42, frequency
+      (44 and 167 lib tests). Channel fraction on 256x256, seed 42, frequency
       0.01, 4 octaves: 0.045 at width 2, 0.068 at width 3, 0.091 at width 4
       (factor 2.00), strictly rising over widths 1-8.
 - [x] Tests of every other crate the diff touches: `cargo test -p v3-server`
@@ -106,7 +106,7 @@ edit and govern no traced phase.
       bench_artifacts` (pinned config digests) -> pass.
 - [x] `make rust-clippy` -> pass.
 - [x] Frontend type check and tests: `npx tsc -b --noEmit` and
-      `npx vitest run` in `frontend/` -> pass (349 tests); `npx biome check src/`
+      `npx vitest run` in `frontend/` -> pass (350 tests); `npx biome check src/`
       -> no errors.
 - [x] `make check-docs` -> pass.
 - [ ] Mutation gate: `Not applicable: user decision 2026-10-10, minimal-overhead run`.
