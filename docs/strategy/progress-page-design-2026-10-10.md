@@ -138,3 +138,99 @@ Three gaps in the research:
   stored comparisons, labelled with the closure each one names.
 - **Not done:** a test with a reader who did not build the page, which the
   Analysis Function, Grafana and NN/g all recommend.
+
+## Second redesign: field record on Observable Plot (2026-10-10)
+
+The owner found the hand-drawn SVG charts squished and ugly, even after two
+passes. They asked for a different visualization system and a full redesign.
+The redesign ran through the Impeccable flow:
+
+1. A product interview, recorded in `PRODUCT.md`.
+2. Two dealt direction rounds. The owner chose the **ecology field record**
+   (a long-term ecological research record in the Park Grass tradition).
+3. A direction contract, kept in `.impeccable/surfaces/docs-progress-index-html.md`.
+
+### Chart library
+
+The library was chosen on 2026-10-10 against the constraints in
+`PRODUCT.md`:
+
+- a static page with no build step;
+- a vendored, pinned file under 1 MiB;
+- the dark mode;
+- small multiples, step and band marks, log scales, dumbbells and pointer
+  interaction.
+
+| Option | Version and size checked | Verdict |
+| --- | --- | --- |
+| Observable Plot 0.6.17 on d3 7.9.0 | 209 KB + 280 KB minified; ISC | **Chosen.** Publication-figure grammar with facets, `areaY` bands, `link` dumbbells, `symlog`, `pointer` and `scale()` for hover sync, in little code. |
+| Apache ECharts 6.1.0 | about 1 MB full build; Apache-2.0 | Polished interactivity, but over the size limit unless custom-built, and dashboard-shaped. |
+| Vega-Lite 6.x | about 1 MB with Vega; BSD-3 | Declarative and capable; 6.5.0 was two days old and too new for the age policy; heavier runtime. |
+| Chart.js 4.5.1 | about 200 KB; MIT | No facets; dumbbells need plugins. |
+| lightweight-charts (already in `frontend/`) | — | Built for financial time series; no facets, bands or categorical dumbbells. |
+
+Remaining risk: Plot's last release was Feb 2025. The vendored copy keeps
+working whatever happens upstream. Versions, licences and checksums are in
+`docs/progress/vendor/README.md`, and the script tags carry SRI `integrity`
+hashes.
+
+### Visual decisions
+
+- **Plot colours:**
+  - 11 Orchards `#199e70`, 22 Canyon `#d95926`, 33 Confluence `#3987e5`.
+  - These are the dataviz reference palette's first three dark steps. They
+    passed the validator on the `#14181c` sheet across all pairs (worst CVD
+    ΔE 9.4).
+  - Green-against-orange variants failed the deuteranopia check.
+- **Type:** Geist Sans and JetBrains Mono, vendored from the same packages
+  the live web UI uses, so Petri's two surfaces match.
+- **Structure:** the owner chose it from three built prototypes. The other
+  two were a now/history split and per-plot sheets.
+  1. A survey-sheet header with a ruled plot strip that brings one plot
+     forward.
+  2. A census matrix:
+     - rows are the readings and the guardrails; columns are the plots;
+     - each cell has a tabular value, a paired delta row in signed numerals
+       and a census curve on a square-root scale;
+     - the first census is a dashed line, and the read closure is amber;
+     - notched flags on a two-tier lane name the movers.
+  3. Compute cost.
+  4. A closure register with runs of no-change closures folded.
+  5. Supplementary charts in Plot, by topic: faceted lines, checkpoint
+     columns, dumbbells and the occupancy grid.
+- **Review:** an independent finish review took three passes. It found eight
+  material issues, then six regressions across later batches. All are fixed,
+  including squished curves, unnamed mover lines and register fit at the
+  owner's 578px pane.
+
+## Distilled around cognition and evolvability (2026-10-10)
+
+The owner said cognition and evolvability are the two things they care about
+most. The page was cut to lead with them:
+
+- **Census matrix:** two labelled bands.
+  - Cognition: memory use. It reads "Not yet" while every plot is under 1%,
+    and notes that learning and prediction are not measured.
+  - Evolvability: mutations that change behaviour (its first reading, at
+    T14.F12, is the floor) and new behaviour after 2,000 generations of drift.
+  - One "Also watched" row keeps founder families and creatures alive as values
+    with a delta. Even spread and families by closure moved to the Ways of
+    living topic.
+- **Charts:** census curves are linear from zero. The square-root scale existed
+  for the late spike in founder families, which no longer has a curve here.
+  Linear keeps memory's near-zero readings flat instead of magnifying noise.
+- **Mover flags:** they hang over the evolvability headline. Memory has barely
+  moved, so flags scored on it would mark noise.
+- **First census:** a reading added after the series began uses its own first
+  measured closure.
+- **Closure register:** columns are memory use, changes behaviour, floor, after
+  long drift and cost.
+- **Compute cost:** shows flagged counters only. The counters within limits, the
+  limits and cost over time fold into one disclosure.
+- **Supplementary census:** topics start with Cognition and Evolvability.
+- **Data limits:**
+  - Memory use is at or near 0% at almost every closure. The one exception is
+    Canyon at T11.F22, at 9.3%.
+  - Mutations that change behaviour exists only from T14.F12 onward.
+- **Not used:** the stored helpful, neutral and detrimental mutation totals. They
+  are viability-score heuristics, not a measured outcome.

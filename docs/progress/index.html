@@ -3,289 +3,298 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Petri progress</title>
+<title>Petri long-term record</title>
 <style>
+  @font-face { font-family: "Geist Sans"; src: url("vendor/geist-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Geist Sans"; src: url("vendor/geist-sans-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Geist Sans"; src: url("vendor/geist-sans-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "JetBrains Mono"; src: url("vendor/jetbrains-mono-latin-wght-normal.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+  /* A field record on a dark slate sheet. One hairline weight; one tonal ramp;
+     one amber accent reserved for the closure being read. */
   :root {
-    color-scheme: light;
-    --page: #f9f9f7;
-    --surface: #fcfcfb;
-    --raised: #f3f3ef;
-    --ink: #0b0b0b;
-    --ink-2: #52514e;
-    --muted: #898781;
-    --grid: #e1e0d9;
-    --axis: #c3c2b7;
-    --border: rgba(11, 11, 11, 0.10);
-    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
-    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-    --seq-100: #cde2fb; --seq-200: #9ec5f4; --seq-300: #6da7ec; --seq-400: #3987e5;
-    --seq-500: #256abf; --seq-600: #184f95; --seq-700: #0d366b;
-    --good: #0b8a0b; --bad: #d03b3b; --warn: #b77a00;
-    --focus: #2a78d6;
-    --selection: rgba(42, 120, 214, 0.14);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --page: #0d0d0d;
-      --surface: #1a1a19;
-      --raised: #232322;
-      --ink: #ffffff;
-      --ink-2: #c3c2b7;
-      --muted: #898781;
-      --grid: #2c2c2a;
-      --axis: #383835;
-      --border: rgba(255, 255, 255, 0.10);
-      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-      --good: #3dbb4f; --bad: #ef6b6b; --warn: #e3a72f;
-      --selection: rgba(57, 135, 229, 0.22);
-    }
+    color-scheme: dark;
+    --sheet: #14181c;
+    --sheet-2: #191e23;
+    --sheet-3: #20262c;
+    --rule: #2a3138;
+    --rule-2: #3a434c;
+    --ink: #ebe7dd;
+    --ink-2: #b9b5aa;
+    --muted: #8a877d;
+    --plot-11: #199e70;
+    --plot-22: #d95926;
+    --plot-33: #3987e5;
+    --accent: #e8b44c;
+    --good: #4cc46a;
+    --bad: #ef6b6b;
+    --sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  html { scroll-behavior: smooth; }
   body {
-    background: var(--page);
+    background: var(--sheet);
     color: var(--ink);
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-variant-numeric: tabular-nums;
+    font: 14px/1.55 var(--sans);
+    font-feature-settings: "tnum" 1;
+    -webkit-font-smoothing: antialiased;
   }
-  a { color: var(--s1); text-underline-offset: 2px; }
-  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .wrap { max-width: 1240px; margin: 0 auto; padding-left: 28px; padding-right: 28px; }
+  ::selection { background: rgba(232, 180, 76, 0.28); color: var(--ink); }
+  a { color: var(--ink); text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  html { scrollbar-color: var(--rule-2) var(--sheet); }
+  .sheet { max-width: 1360px; margin: 0 auto; padding: 0 40px 56px; }
 
-  header.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px 24px; flex-wrap: wrap; padding-top: 22px; }
-  header.top h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
-  header.top p { margin: 4px 0 0; color: var(--ink-2); max-width: 70ch; }
-  .picker { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12px; }
+  /* Survey-sheet header: a ruled form strip. */
+  header.form { padding-top: 24px; }
+  .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; }
+  .title-row h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+  .title-row p { margin: 4px 0 0; color: var(--ink-2); }
+  .picker { display: flex; align-items: center; gap: 10px; }
+  .picker label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .picker select {
-    font: inherit; font-size: 13px; color: var(--ink); background: var(--surface);
-    border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; max-width: 360px;
+    font: inherit; font-size: 13px; color: var(--ink); background: var(--sheet-2);
+    border: 1px solid var(--rule-2); border-radius: 6px; padding: 6px 10px; min-width: 300px; max-width: 420px;
   }
-  .bar { padding-top: 8px; color: var(--muted); font-size: 12px; }
-  nav.toc { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 13px; }
-  main { padding-bottom: 40px; }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 18px 12px;
-    min-width: 0;
+  .fields { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)) minmax(380px, 2.6fr); margin-top: 18px; border: 1px solid var(--rule); border-radius: 8px; }
+  .field { padding: 8px 14px 9px; border-left: 1px solid var(--rule); min-width: 0; }
+  .field:first-child { border-left: none; }
+  .field .fl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .field .fv { font-size: 16px; font-weight: 500; margin-top: 2px; }
+  .field .fv small { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .plotmap { display: inline-flex; margin-top: 4px; border: 1px solid var(--rule-2); border-radius: 6px; overflow: hidden; }
+  .plotbtn {
+    appearance: none; font: inherit; font-size: 13px; color: var(--ink); background: transparent; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; padding: 4px 14px 4px 0; border: none; border-left: 1px solid var(--rule-2); border-radius: 0;
+    transition: border-color 160ms ease-out, background 160ms ease-out, opacity 160ms ease-out;
   }
-  section.band { margin-top: 34px; scroll-margin-top: 12px; }
-  section.band > h2 { font-size: 19px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
-  section.band > p.lede { margin: 4px 0 14px; color: var(--ink-2); max-width: 82ch; }
-  .stack { display: grid; gap: 14px; }
+  .plotbtn:first-child { border-left: none; }
+  .plotbtn { background: color-mix(in srgb, var(--c) 20%, transparent); padding-left: 12px; }
+  .plotbtn i { display: none; }
+  .plotbtn b { font-family: var(--mono); font-weight: 500; font-size: 12px; color: var(--ink-2); }
+  .plotbtn:hover { background: color-mix(in srgb, var(--c) 32%, transparent); }
+  .plotbtn[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 48%, transparent); }
+  .plotmap.focused .plotbtn[aria-pressed="false"] { opacity: 0.45; }
+  .note { margin: 14px 0 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; color: var(--ink-2); }
+  .note .badge { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; padding: 1px 7px; border-radius: 4px; }
+  .badge.ok { color: var(--good); background: rgba(76, 196, 106, 0.12); }
+  .badge.check { color: var(--bad); background: rgba(239, 107, 107, 0.12); }
+  .badge.same { color: var(--ink-2); background: var(--sheet-3); }
+  .note b { color: var(--ink); font-weight: 600; }
 
-  /* The verdict: what the selected closure did, first thing on the page. */
-  .verdict { margin-top: 16px; padding: 18px 22px 16px; }
-  .verdict .eyebrow { margin: 0; color: var(--muted); font-size: 12px; }
-  .verdict h2 { margin: 2px 0 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
-  .verdict .action { margin: 10px 0 0; font-size: 17px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
-  .verdict .action .badge { flex: none; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 6px; letter-spacing: 0.02em; }
-  .badge.ok { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
-  .badge.check { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
-  .badge.same { background: var(--raised); color: var(--ink-2); }
-  .verdict .also { margin: 4px 0 0 0; padding-left: 18px; color: var(--ink-2); }
-  .verdict .lines { list-style: none; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); display: grid; gap: 8px; }
-  .verdict .lines li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: baseline; }
-  .verdict .lines .k { color: var(--ink-2); font-weight: 600; font-size: 13px; }
-  .verdict .lines .v { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; }
-  .verdict .lines .v .say { color: var(--ink-2); }
-  .verdict .foot { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+  /* Sections */
+  section.part { margin-top: 44px; }
+  section.part > h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em; }
+  section.part > p.lede { margin: 4px 0 0; color: var(--ink-2); max-width: 80ch; }
+  .rule-top { border-top: 1px solid var(--rule); padding-top: 22px; }
+
+  .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; color: var(--ink-2); font-size: 13px; }
+  .tag { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink-2); border: 1px solid var(--rule-2); border-radius: 4px; padding: 0 6px; white-space: nowrap; }
+  .fig { position: relative; margin-top: 6px; }
+  .fig svg { display: block; overflow: visible; }
+  .fig .hover-line { position: absolute; width: 1px; background: var(--ink-2); opacity: 0.5; pointer-events: none; display: none; }
+  .fl { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+  /* The census matrix: readings as rows, plots as columns, every cell ruled. */
+  .matrix { display: grid; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .matrix > * { padding: 10px 16px 10px; border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); min-width: 0; }
+  .matrix > .mx-corner, .matrix > .mx-plot { border-top: none; background: var(--sheet-2); }
+  .matrix > .mx-corner, .matrix > .mx-label { border-left: none; }
+  .mx-since { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .mx-plot { appearance: none; border-right: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; border-bottom: 2px solid var(--c); transition: opacity 160ms ease-out, background 160ms ease-out; }
+  .mx-plot:hover { background: var(--sheet-3); }
+  .mx-plot i { width: 14px; height: 14px; border-radius: 3px; background: var(--c); }
+  .mx-plot b { font-family: var(--mono); font-weight: 500; font-size: 12px; color: var(--ink-2); }
+  .mx-plot.dim, .mx-cell.dim { opacity: 0.4; }
+  .mx-lh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .mx-label h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .mx-verdict { margin: 4px 0 0; color: var(--ink); font-size: 13px; }
+  .mx-label .small { margin: 6px 0 0; }
+  .matrix > .mx-band { grid-column: 1 / -1; border-left: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; padding: 20px 16px 10px; }
+  .mx-band h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em; }
+  .mx-band p { margin: 0; color: var(--ink-2); }
+  .mx-band p.small { color: var(--muted); }
+  .mx-val .chip { margin-left: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0; vertical-align: 3px; }
+  .wv { display: inline-flex; gap: 12px; }
+  .mx-cell { transition: opacity 160ms ease-out; }
+  .mx-cellplot { display: none; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .mx-cellplot i { width: 9px; height: 9px; border-radius: 2px; background: var(--c); }
+  .mx-val { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; font-feature-settings: "tnum" 0; }
+  .mx-val small { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-left: 5px; }
+  .dline { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 2px 0; border-top: 1px solid var(--rule); font-size: 12px; margin-top: 3px; }
+  .dline .dk { color: var(--muted); }
+  .dpair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .dline .dv { color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+  .dv.good { color: var(--good); }
+  .dv.bad, .dv.severe { color: var(--bad); }
+  .dv.severe { font-weight: 600; }
+  .dv.flag { color: var(--ink); font-weight: 600; }
+  .dv.small, .dv.flat, .dv.na, .dv.neutral { color: var(--muted); font-weight: 400; }
+  .lane { position: relative; height: 40px; margin-top: 8px; }
+  .mflag {
+    position: absolute; top: 0; appearance: none; white-space: nowrap; font-family: var(--mono); font-size: 10.5px; line-height: 18px; height: 18px;
+    padding: 0 10px 0 5px; color: var(--ink-2); background: var(--sheet-3); border: none; border-left: 1.5px solid var(--ink-2); cursor: pointer;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 50%, 100% 100%, 0 100%); transition: color 140ms ease-out, background 140ms ease-out;
+  }
+  .mflag:hover { color: var(--ink); background: var(--rule-2); }
+  .lane .staff { position: absolute; top: 18px; width: 1px; background: var(--ink-2); opacity: 0.35; pointer-events: none; }
+  .lane .staff.sel { background: var(--accent); opacity: 0.5; }
+  .lane { z-index: 1; }
+  .mflag.flip { padding: 0 5px 0 10px; border-left: none; border-right: 1.5px solid var(--ink-2); clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 6px 50%); }
+  .mflag.sel { color: var(--accent); background: rgba(232, 180, 76, 0.16); border-color: var(--accent); cursor: default; }
+  .costbox { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; margin-top: 14px; }
+  .costbox .costlines { margin-top: 6px; }
 
   /* Change chips: arrow for direction, colour for better or worse, grey for small. */
-  .chip {
-    display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap;
-    font-size: 12px; line-height: 1.5; padding: 0 8px; border-radius: 999px;
-    border: 1px solid var(--border); color: var(--ink-2); cursor: default;
-  }
+  .chip { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; font-size: 12px; line-height: 1.5; padding: 0 7px; border-radius: 4px; color: var(--ink-2); background: var(--sheet-3); cursor: default; }
   .chip .w { color: var(--muted); }
-  .chip.good { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, transparent); }
-  .chip.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 50%, transparent); }
-  .chip.flag { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
-  .chip.severe { color: var(--bad); border-color: var(--bad); font-weight: 600; }
-  .chip.small, .chip.flat, .chip.na, .chip.neutral { color: var(--muted); }
-  .chip.small .w, .chip.flat .w { color: var(--muted); }
+  .chip.good { color: var(--good); background: rgba(76, 196, 106, 0.1); }
+  .chip.bad { color: var(--bad); background: rgba(239, 107, 107, 0.1); }
+  .chip.flag { color: var(--ink); background: var(--sheet-3); font-weight: 600; }
+  .chip.severe { color: var(--bad); background: rgba(239, 107, 107, 0.14); font-weight: 600; }
+  .chip.small, .chip.flat, .chip.na, .chip.neutral { color: var(--muted); background: transparent; }
 
-  /* Goal cards: one reading, three worlds, history underneath. */
-  .goal h3 { margin: 0; font-size: 16px; font-weight: 650; }
-  .goal .metric { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
-  .def { margin: 6px 0 0; color: var(--ink-2); max-width: 90ch; }
-  .worlds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 12px; }
-  .wcell { min-width: 0; }
-  .wcell .wname { font-size: 12px; font-weight: 600; color: var(--ink-2); }
-  .wcell .big { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.15; margin-top: 2px; }
-  .wcell .big small { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
-  .wcell .rowc { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin-top: 4px; font-size: 12px; color: var(--muted); }
-  .spark { margin-top: 6px; position: relative; }
-  .spark svg { display: block; width: 100%; height: 52px; overflow: visible; cursor: pointer; }
-  .spark .cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  /* Closure register: a ruled ledger. */
+  .ledger { margin-top: 16px; border: 1px solid var(--rule); border-radius: 8px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--sheet-2); position: sticky; top: 0; }
+  td.num, th.num { text-align: right; }
+  .ledger tbody tr { cursor: pointer; transition: background 120ms ease-out; }
+  .ledger tbody tr:hover td, .ledger tbody tr.hot td { background: var(--sheet-3); }
+  .ledger tr.sel td { background: rgba(232, 180, 76, 0.1); border-bottom-color: rgba(232, 180, 76, 0.45); }
+  .ledger tr.sel td.no { color: var(--accent); }
+  .ledger td.name { white-space: normal; min-width: 180px; }
+  .ledger td.cost { white-space: normal; min-width: 130px; max-width: 190px; }
+  .ledger td.cost .mc { text-align: left; min-width: 0; }
+  .ledger td.name b { font-weight: 500; }
+  .ledger td.name code { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: 6px; }
+  .ledger td.no { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .ledger tr.fold td { color: var(--muted); font-size: 12px; cursor: pointer; white-space: normal; }
+  .ledger tr.fold:hover td { color: var(--ink-2); }
+  .trio { display: inline-flex; gap: 8px; }
+  .mc { font-size: 12px; min-width: 44px; display: inline-block; text-align: right; color: var(--muted); }
+  .mc.good { color: var(--good); }
+  .mc.bad { color: var(--bad); }
+  .mc.flag { color: var(--ink); font-weight: 600; }
+  .mc.severe { color: var(--bad); font-weight: 600; }
+  th .sw { display: flex; gap: 8px; margin-top: 5px; }
+  th .sw i { display: inline-block; width: 44px; height: 4px; border-radius: 2px; }
 
-  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 5px; background: var(--raised); color: var(--ink-2); white-space: nowrap; }
-  .tag.up, .tag.down { color: var(--ink); }
+  /* Supplementary census */
+  details.topic { border-top: 1px solid var(--rule); }
+  details.topic:last-of-type { border-bottom: 1px solid var(--rule); }
+  details.topic > summary { list-style: none; cursor: pointer; padding: 14px 4px; display: flex; gap: 14px; align-items: baseline; }
+  details.topic > summary::-webkit-details-marker { display: none; }
+  details.topic > summary::before { content: ""; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform 160ms ease-out; align-self: center; }
+  details.topic[open] > summary::before { transform: rotate(45deg); }
+  details.topic > summary b { font-size: 16px; font-weight: 600; }
+  details.topic > summary span { color: var(--muted); font-size: 13px; }
+  .cards { display: grid; gap: 28px; padding: 6px 0 30px 21px; }
+  .card { min-width: 0; }
+  .card .chead { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+  .card .tools { display: flex; gap: 8px; align-items: center; }
+  .card .def { margin: 3px 0 0; color: var(--ink-2); font-size: 13px; max-width: 90ch; }
+  .tbtn { appearance: none; font: inherit; font-size: 12px; color: var(--ink-2); background: transparent; border: 1px solid var(--rule-2); border-radius: 4px; padding: 0 8px; cursor: pointer; }
+  .tbtn:hover, .tbtn[aria-pressed="true"] { color: var(--ink); background: var(--sheet-3); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; color: var(--ink-2); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; }
+  .legend i.box { width: 10px; height: 10px; border: none; border-radius: 2px; opacity: 0.35; }
+  .legend i.dot { width: 9px; height: 9px; border: none; border-radius: 50%; }
+  .legend i.dash { border-top-style: dashed; }
+  .legend i.dots { border-top-style: dotted; }
+  .tbl { overflow-x: auto; margin-top: 10px; border: 1px solid var(--rule); border-radius: 8px; }
+  .scale { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .scale i { display: inline-block; width: 120px; height: 8px; border-radius: 2px; background: linear-gradient(90deg, #1c2a3a, #9ec5f4); }
+  .pn { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-top: 12px; }
+  .small { color: var(--muted); font-size: 12px; }
 
-  details.about { margin-top: 10px; }
-  details.about > summary { display: inline-block; cursor: pointer; font-size: 12px; color: var(--s1); list-style: none; }
+  details.about { margin-top: 8px; }
+  details.about > summary { display: inline-block; cursor: pointer; font-size: 12px; color: var(--muted); list-style: none; }
   details.about > summary::-webkit-details-marker { display: none; }
-  details.about > summary::before { content: "ⓘ "; }
-  details.about dl { display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; margin: 8px 0 2px; font-size: 13px; }
+  details.about > summary:hover { color: var(--ink-2); }
+  details.about > summary::before { content: "+ "; }
+  details.about[open] > summary::before { content: "− "; }
+  details.about dl { display: grid; grid-template-columns: 90px 1fr; gap: 4px 14px; margin: 8px 0 2px; font-size: 13px; max-width: 90ch; }
   details.about dt { color: var(--muted); }
   details.about dd { margin: 0; color: var(--ink-2); }
-  details.about dd.path { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; color: var(--muted); }
+  details.about dd.path { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 
-  /* Guardrails */
-  .guards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-  .guard h3 { margin: 0; font-size: 15px; font-weight: 650; }
-  .guard .state { margin: 4px 0 0; font-weight: 600; }
-  .guard .state.ok { color: var(--good); }
-  .guard .state.check { color: var(--warn); }
-  .guard .state.na { color: var(--muted); }
-  .grow { display: grid; grid-template-columns: 82px 1fr; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; }
-  .grow .wn { color: var(--ink-2); font-size: 12px; }
-  .grow .gv { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-  .grow .gv b { font-size: 15px; }
-  .bullet { display: block; width: 100%; height: 14px; margin-top: 2px; }
-  .cost h4 { margin: 12px 0 0; font-size: 12px; color: var(--ink-2); font-weight: 600; }
-  .cost h4 small { font-weight: 400; color: var(--muted); }
-  .cost .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-  .cost .rest { margin: 5px 0 0; font-size: 12px; color: var(--muted); }
-
-  /* Closure history */
-  .tl-controls { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; color: var(--ink-2); font-size: 13px; }
-  .tbl { overflow-x: auto; }
-  table { border-collapse: collapse; font-size: 13px; width: 100%; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: baseline; }
-  th { color: var(--ink-2); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
-  td.num, th.num { text-align: right; }
-  table.timeline tbody tr { cursor: pointer; }
-  table.timeline tbody tr:hover td { background: var(--raised); }
-  table.timeline tr.sel td { background: var(--selection); }
-  table.timeline tr.same td { color: var(--muted); }
-  table.timeline td.name { white-space: normal; min-width: 200px; max-width: 300px; }
-  table.timeline td { vertical-align: middle; }
-  table.timeline td.name b { font-weight: 600; }
-  table.timeline td.name small { color: var(--muted); margin-left: 4px; }
-  table.timeline .mini { display: inline-flex; gap: 4px; }
-  .mchip { font-size: 12px; padding: 0 4px; border-radius: 4px; color: var(--ink-2); }
-  .mchip.good { color: var(--good); }
-  .mchip.bad { color: var(--bad); }
-  .mchip.small, .mchip.flat, .mchip.na { color: var(--muted); }
-  .mchip.flag { color: var(--warn); }
-  .mchip.severe { color: var(--bad); font-weight: 600; }
-
-  /* Explore */
-  details.topic { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-  details.topic + details.topic { margin-top: 10px; }
-  details.topic > summary { cursor: pointer; padding: 12px 18px; list-style: none; display: flex; gap: 12px; align-items: baseline; }
-  details.topic > summary::-webkit-details-marker { display: none; }
-  details.topic > summary::before { content: "▸"; color: var(--muted); width: 10px; }
-  details.topic[open] > summary::before { content: "▾"; }
-  details.topic > summary b { font-size: 15px; font-weight: 650; }
-  details.topic > summary span { color: var(--muted); font-size: 13px; }
-  details.topic > .stack { padding: 0 14px 14px; }
-  details.topic .card { background: var(--page); }
-  .chead { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
-  .chead h3 { margin: 0; font-size: 14px; font-weight: 650; }
-  .panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; margin-top: 8px; }
-  .panels.n1 { grid-template-columns: 1fr; }
-  .panel { min-width: 0; }
-  .panel .pn { font-size: 12px; font-weight: 600; color: var(--ink-2); }
-  .plot { position: relative; }
-  .plot svg { display: block; width: 100%; height: auto; overflow: visible; }
-  svg text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); }
-  svg text.xsel { fill: var(--s1); font-weight: 600; }
-  svg .grid line { stroke: var(--grid); }
-  svg .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-  svg .line.emph { stroke-width: 2.6; }
-  svg .line.muted { opacity: 0.6; stroke-width: 1.5; }
-  svg .line.riser { stroke-width: 1; opacity: 0.4; }
-  svg text.ptitle { fill: var(--ink-2); font-weight: 600; font-size: 12px; }
-  /* A surface-coloured halo keeps labels legible where they cross a line. */
-  svg text.ref-label, svg text.vlab, svg text.sellab, svg text.ptitle, svg text.unit { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
-  details.topic .card svg text.ref-label, details.topic .card svg text.vlab, details.topic .card svg text.sellab, details.topic .card svg text.ptitle, details.topic .card svg text.unit { stroke: var(--page); }
-  .rows { display: grid; gap: 2px; margin-top: 6px; }
-  .wrows { display: grid; gap: 4px; margin-top: 12px; }
-  .wrow { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; align-items: center; padding: 6px 0; border-top: 1px solid var(--grid); }
-  .wrow:first-child { border-top: none; }
-  svg .ref { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 4 4; }
-  svg .ref.floor { stroke: var(--bad); }
-  svg .ref-label { fill: var(--ink-2); }
-  svg .selband { fill: var(--selection); }
-  svg .ann { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
-  svg text.sellab { fill: var(--ink-2); font-weight: 600; }
-  svg text.unit { fill: var(--muted); }
-  svg text.vlab { fill: var(--ink); font-weight: 600; }
-  svg text.rowlab { fill: var(--ink-2); }
-  svg .xhair { stroke: var(--ink-2); stroke-width: 1; pointer-events: none; }
-  svg .nm { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
-  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--ink-2); font-size: 12px; }
-  .legend span { display: inline-flex; align-items: center; gap: 6px; }
-  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
-  .legend i.box { width: 10px; height: 10px; border-radius: 2px; opacity: 0.35; }
-  .legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
-  .chead .tools { display: flex; gap: 8px; align-items: center; }
-  .tbtn {
-    appearance: none; font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
-    border: 1px solid var(--border); border-radius: 6px; padding: 1px 9px; cursor: pointer;
-  }
-  .tbtn:hover, .tbtn[aria-pressed="true"] { background: var(--raised); color: var(--ink); }
-  .note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-  .scale { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; }
-  .scale i { display: inline-block; width: 120px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--seq-100), var(--seq-700)); }
-
-  /* Glossary and hover terms */
-  .term { border-bottom: 1px dotted var(--muted); cursor: help; }
-  dl.gloss { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; margin: 0; }
-  dl.gloss dt { font-weight: 600; }
-  dl.gloss dd { margin: 0; color: var(--ink-2); }
+  dl.key { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 40px; margin: 16px 0 0; }
+  dl.key div { border-top: 1px solid var(--rule); padding-top: 8px; }
+  dl.key dt { font-weight: 600; }
+  dl.key dd { margin: 2px 0 0; color: var(--ink-2); }
 
   .tip {
     position: fixed; z-index: 50; pointer-events: none; display: none;
-    background: var(--surface); color: var(--ink); border: 1px solid var(--border);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); border-radius: 8px;
-    padding: 8px 10px; font-size: 12px; max-width: 360px;
+    background: var(--sheet-2); color: var(--ink); border: 1px solid var(--rule-2);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); border-radius: 6px; padding: 8px 10px; font-size: 12px; max-width: 360px;
   }
   .tip .t { font-weight: 600; margin-bottom: 2px; }
   .tip .m { color: var(--muted); margin-bottom: 4px; }
-  .tip .r { display: flex; gap: 6px; align-items: center; }
+  .tip .r { display: flex; gap: 7px; align-items: center; }
   .tip .r i { width: 10px; height: 3px; border-radius: 2px; flex: none; }
   .tip .r b { white-space: nowrap; }
   .tip .r span { color: var(--ink-2); }
 
-  .notice .box { margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
-  pre, code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
-  pre { background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
-  footer { padding-bottom: 40px; color: var(--muted); font-size: 12px; }
+  .bar-status { margin-top: 10px; color: var(--muted); font-size: 12px; }
+  .bar-status:empty { display: none; }
+  .notice .box { margin-top: 18px; border: 1px solid var(--rule-2); border-radius: 8px; padding: 14px 16px; }
+  pre, code { font-family: var(--mono); font-size: 12px; }
+  pre { background: var(--sheet-2); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; overflow-x: auto; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 12px; }
   footer p { margin: 4px 0; max-width: 110ch; }
 
-  @media (max-width: 960px) {
-    .guards { grid-template-columns: 1fr; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 1100px) {
+    .fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .fields .field.plots { grid-column: 1 / -1; border-left: none; border-top: 1px solid var(--rule); }
+    .matrix { grid-template-columns: 1fr !important; }
+    .matrix > * { border-left: none; }
+    .matrix > .mx-corner { display: none; }
+    .matrix > .mx-plot { display: none; }
+    .mx-cellplot { display: flex; }
+    .costbox { grid-template-columns: 1fr; }
   }
-  @media (max-width: 760px) {
-    .wrap { padding-left: 16px; padding-right: 16px; }
-    .worlds, .panels { grid-template-columns: 1fr; gap: 14px; }
-    .wrow { grid-template-columns: 1fr; gap: 4px; }
-    .verdict .lines li { grid-template-columns: 1fr; gap: 2px; }
-    details.about dl, dl.gloss { grid-template-columns: 1fr; gap: 2px; }
-    details.about dd, dl.gloss dd { margin-bottom: 6px; }
+  @media (max-width: 820px) {
+    .sheet { padding: 0 18px 40px; }
+    dl.key { grid-template-columns: 1fr; }
+    .picker select { min-width: 0; width: 100%; }
+    .ledger th:nth-child(1), .ledger td.no, .ledger th:nth-child(2), .ledger tr[data-i] td:nth-child(2) { display: none; }
+    .trio { flex-direction: column; gap: 0; }
+    .trio .mc::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: middle; }
+    .mc { min-width: 0; text-align: left; }
+    th .sw { display: none; }
+    .ledger td.name { min-width: 120px; }
+    .ledger td.cost { min-width: 84px; }
+    .ledger th { white-space: normal; letter-spacing: 0.04em; }
+    .ledger th, .ledger td { padding: 6px 6px; }
   }
 </style>
 </head>
 <body>
-<header class="wrap top">
-  <div>
-    <h1>Petri progress</h1>
-    <p>Petri's goal: many ways of making a living side by side, and creatures whose behaviour depends on memory. Every finished feature (a <span class="term" data-term="Closure">closure</span>) stores one benchmark run; this page reads them all.</p>
+<div class="sheet">
+<header class="form">
+  <div class="title-row">
+    <div>
+      <h1>Petri long-term record</h1>
+      <p>Cognition and evolvability, counted in three plots after every closure.</p>
+    </div>
+    <div class="picker"><label for="pick">Reading closure</label><select id="pick"></select></div>
   </div>
-  <label class="picker">Showing closure <select id="pick" aria-label="Closure to show"></select></label>
+  <div class="fields" id="fields"></div>
+  <div class="bar-status" id="status">Loading the stored reports…</div>
 </header>
-<div class="wrap bar" id="status">Loading the stored reports…</div>
-<div class="wrap notice" id="notice" hidden></div>
-<main class="wrap" id="app"></main>
-<footer class="wrap" id="foot"></footer>
+<div class="notice" id="notice" hidden></div>
+<main id="app"></main>
+<footer id="foot"></footer>
+</div>
+<script src="vendor/d3-7.9.0.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"></script>
+<script src="vendor/plot-0.6.17.umd.min.js" integrity="sha384-JUpn2GgRr0gxU0xOBd8D8P634jhRCwobtG8G2MMEkX1RnGJ7/FJNnuukpfT+H2w1"></script>
 <script>
 (function () {
   'use strict';
@@ -584,53 +593,63 @@
   // kind: how values and changes print. better: 'up', 'down' or null (context only).
   const READINGS = {
     clades: {
-      label: 'Founder families still alive', kind: 'count', unit: 'families', better: 'up',
+      label: 'Founder families alive', watch: 'founder families alive', kind: 'count', unit: 'families', better: 'up',
       read: (pt, w) => get(gi(pt.rep, 'lineage_diversity', w.seed), 'surviving_founder_clade_count'),
-      def: 'How many of the 10,000 founders still have living descendants when the 2,000-tick run ends.',
-      why: 'Diversity, part one. More founder families alive at once means more ways of making a living can last side by side. It is the first diversity indicator in the success definition.',
-      how: 'Every creature alive at tick zero starts its own family. At the last tick, count the families with at least one living member.',
-      caveat: 'It counts families, not strategies: two families can live the same way. Each world is one seeded run.',
+      def: 'Founders (of 10,000) with living descendants at the end of the run.',
+      why: 'Diversity. More families alive means more ways of living side by side.',
+      how: 'Each creature at tick zero starts a family. At tick 2,000, count families with a living member.',
+      caveat: 'Counts families, not strategies. One run per world.',
       path: 'deterministic.goal_indicators.lineage_diversity.per_seed[].surviving_founder_clade_count',
     },
     even: {
-      label: 'Evenly spread families', kind: 'number', unit: 'families', better: 'up',
+      label: 'Even spread of families', kind: 'number', unit: 'families', better: 'up',
       read: (pt, w) => { const e = num(get(gi(pt.rep, 'lineage_diversity', w.seed), 'shannon_entropy_nats')); return fin(e) ? Math.exp(e) : NaN; },
       extra: (pt, w) => { const e = num(get(gi(pt.rep, 'lineage_diversity', w.seed), 'shannon_entropy_nats')); return fin(e) ? `lineage entropy ${fmt(e, 3)} nats` : ''; },
-      def: 'How many equal-sized families would spread creatures this evenly. 1 means one family holds everyone.',
-      why: 'Diversity, part two. Survival alone can hide a monoculture: one giant family plus many tiny ones. This reading rises only when creatures are spread across many families.',
-      how: 'e raised to the lineage entropy, the Shannon entropy of creature counts by family in nats. Ecologists call this the effective number of types (the Hill number of order 1).',
-      caveat: 'The stored indicator is the entropy; the page shows e^entropy because it reads in families. Hover a value for the stored entropy.',
+      def: 'The number of equal-sized families that would give this spread. 1 means one family holds everyone.',
+      why: 'Diversity. Catches one giant family hiding among many tiny ones.',
+      how: 'e to the power of the lineage entropy. Ecologists call it the effective number of types.',
+      caveat: 'The stored indicator is the entropy. Hover a value to see it.',
       path: 'deterministic.goal_indicators.lineage_diversity.per_seed[].shannon_entropy_nats',
     },
     memory: {
-      label: 'Creatures whose action depends on memory', kind: 'share', unit: 'of living creatures', better: 'up',
+      label: 'Memory use', short: 'Memory use', kind: 'share', unit: 'of living creatures', better: 'up',
+      low: 0.01, lowText: 'Not yet. Under 1% of creatures in every plot.',
       read: (pt, w) => get(gi(pt.rep, 'memory_sensitivity', w.seed), 'different_from_either_fraction'),
       extra: (pt, w) => { const r = gi(pt.rep, 'memory_sensitivity', w.seed); return r ? `${fmtInt(num(r.different_from_either_count))} of ${fmtInt(num(r.final_creature_count))} creatures` : ''; },
-      def: 'Share of the creatures alive at the end whose next action changes when their memory is wiped or scrambled.',
-      why: 'Cognition, part one. Behaviour that depends on remembering, not only on what a creature senses right now. It is the first cognition indicator in the success definition.',
-      how: 'For every creature alive at the last tick, compute its chosen action three times: memory intact, memory zeroed, memory scrambled. Count the creatures whose action differs in either test.',
-      caveat: 'It shows dependence, not benefit: a creature can depend on memory without gaining from it. Founders read near zero. Learning and prediction are not measured yet.',
+      def: 'Creatures at the end whose next action changes when their memory is wiped or scrambled.',
+      why: 'Cognition. Behaviour that depends on remembering, not just on sensing.',
+      how: 'Each final creature decides three times: memory intact, zeroed, scrambled. Count those whose action differs.',
+      caveat: 'Shows dependence, not benefit. Learning and prediction are not measured yet.',
       path: 'deterministic.goal_indicators.memory_sensitivity.per_seed[].different_from_either_fraction',
     },
     population: {
-      label: 'Creatures alive at the end', kind: 'count', unit: 'creatures', better: 'up',
+      label: 'Creatures alive at the end', watch: 'creatures alive at the end', kind: 'count', unit: 'creatures', better: 'up',
       read: (pt, w) => pop(pt.rep, w.seed).final_population,
       extra: (pt, w) => `lowest ${fmtInt(num(pop(pt.rep, w.seed).minimum_population))} during the run`,
-      def: 'Living creatures at the last of 2,000 ticks.',
-      why: 'Diversity and cognition mean nothing in a dead world. 0 means the world went extinct.',
-      how: 'Population at the last tick; the lowest point is the fewest alive at any of the 20 checkpoints (every 100 ticks).',
-      caveat: 'Every world booms to the 100,000 cap early and crashes as the first food runs out, so the end population is a plateau, not growth.',
+      def: 'Living creatures at tick 2,000.',
+      why: '0 means the world went extinct.',
+      how: 'The lowest point is the fewest alive at any of 20 checkpoints.',
+      caveat: 'Every world booms to 100,000, then crashes. The end is a plateau.',
       path: 'deterministic.goal_indicators.population_persistence.per_seed[].final_population',
     },
     floor: {
-      label: 'Mutated offspring that behave differently', kind: 'share', unit: 'of 5,000 offspring', better: 'up',
+      label: 'Mutations that change behaviour', short: 'Changes behaviour', movedAs: 'mutation outcomes', kind: 'share', unit: 'of 5,000 offspring', better: 'up',
       read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.changed_per_all_births'),
       extra: (pt, w) => { const nr = get(worldCase(pt.rep, w.name), 'neighborhood_read'); return nr ? `${fmtInt(num(get(nr, 'births.any_events.changed')))} of ${fmtInt(num(get(nr, 'births.births_total')))} offspring` : ''; },
-      def: 'Breed 100 offspring from each of 50 living genomes at the end of the run: the share that behave differently from their parent.',
-      why: 'Evolution needs variation. If mutations stop changing behaviour, selection has nothing new to choose from. The floor is each world\'s first reading at T14.F12; a closure should not fall below it.',
-      how: 'Each offspring is mutated by the production mutation engine and run through a fixed test battery beside its parent: same behaviour (silent), different (changed), or never acting (dead).',
-      caveat: 'About 60% of offspring receive no mutation at all; they count as unchanged. Read on the evolved population, not the founder.',
+      def: 'Offspring that act differently from their parent. The first reading, at T14.F12, is the floor.',
+      why: 'No variation, no evolution. It must stay at or above the floor.',
+      how: '5,000 offspring of 50 living genomes. Each is mutated, then tested beside its parent: same (silent), different (changed) or never acts (dead).',
+      caveat: 'About 60% of offspring get no mutation. They count as unchanged.',
       path: 'deterministic.goal_indicators.cases[].neighborhood_read.changed_per_all_births',
+    },
+    drift: {
+      label: 'New behaviour after long drift', short: 'After long drift', kind: 'share', unit: 'of offspring', better: 'up',
+      read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 2000),
+      def: 'The founder, mutated for 2,000 generations with no selection. The share of offspring that then act differently.',
+      why: 'Evolvability at depth. If variation fades over the generations, evolution stalls.',
+      how: '2,000 generations of mutation only from the founder. At that depth, 2,000 offspring are tested beside their parent.',
+      caveat: 'Mutation only: no ecology and no survival.',
+      path: 'deterministic.goal_indicators.cases[].drift_depth.readings[depth 2000].changed_per_all_births',
     },
     births: { label: 'Births', kind: 'count', better: null, read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'births') },
     hops: { label: 'Mesh hops', kind: 'count', better: null, read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'mesh_hops') },
@@ -638,7 +657,13 @@
   // Readings that, all identical to the previous closure in every world, mean
   // the closure did not change the simulation (runs are deterministic).
   const FINGERPRINT = ['population', 'births', 'hops', 'clades', 'even', 'memory'];
-  const GOAL_KEYS = ['clades', 'even', 'memory'];
+  // The two goals read first (owner, 2026-10-10), then context.
+  const BANDS = [
+    { title: 'Cognition', ask: 'Does behaviour depend on memory?', note: 'Learning and prediction are not measured yet.', keys: ['memory'] },
+    { title: 'Evolvability', ask: 'Do mutations keep making new behaviour?', keys: ['floor', 'drift'] },
+  ];
+  const GOAL_KEYS = BANDS.flatMap((b) => b.keys);
+  const WATCH_KEYS = ['clades', 'population'];
   const valueText = (spec, v) => (!fin(v) ? 'not measured' : spec.kind === 'share' ? pct(v) : spec.kind === 'count' ? fmtInt(v) : fmt(v, 1));
   const fmtNum = (a) => fmt(a, Math.abs(a) >= 10 ? 1 : 2);
   const deltaText = (spec, d) => (spec.kind === 'share' ? signedWith(d, (a) => pts(a)) : spec.kind === 'count' ? signedWith(d, (a) => fmtInt(a)) : signedWith(d, fmtNum));
@@ -653,19 +678,13 @@
     const small = fin(typical) && Math.abs(d) < typical;
     const better = spec.better === 'up' ? d > 0 : spec.better === 'down' ? d < 0 : null;
     const tone = small ? 'small' : better === null ? 'neutral' : better ? 'good' : 'bad';
-    const word = small ? 'a small move' : better === null ? '' : better ? 'better' : 'worse';
+    const word = small ? 'small' : better === null ? '' : better ? 'better' : 'worse';
     return {
       tone, d, better,
       text: `${d > 0 ? '▲' : '▼'} ${sizeText(spec, Math.abs(d))}`,
-      say: `${d > 0 ? 'Up' : 'Down'} ${sizeText(spec, Math.abs(d))}${word ? ': ' + word : ''}.` + (fin(typical) ? ` A typical move between closures is ${sizeText(spec, typical)}.` : ''),
+      signed: deltaText(spec, d),
+      say: `${d > 0 ? 'Up' : 'Down'} ${sizeText(spec, Math.abs(d))}${word ? ': ' + word : ''}.` + (fin(typical) ? ` Typical move: ${sizeText(spec, typical)}.` : ''),
     };
-  }
-  function chip(j, prefix, suffix) {
-    const c = el('span', `chip ${j.tone}`);
-    if (prefix) c.appendChild(el('span', 'w', prefix));
-    c.appendChild(document.createTextNode(j.text + (suffix ? ' ' + suffix : '')));
-    c.title = j.say;
-    return c;
   }
 
   // ── Model ────────────────────────────────────────────────────────────────
@@ -712,6 +731,9 @@
     Object.entries(READINGS).forEach(([key, spec]) => {
       M.vals[key] = worlds.map((w) => points.map((pt) => (pt.kind === 'world' ? num(spec.read(pt, w)) : NaN)));
     });
+    // A reading added after the series began has its own first census: its
+    // first measured closure in that plot.
+    M.firstOf = (key, wi) => (M.firstIndex < 0 ? -1 : M.vals[key][wi].findIndex(fin));
     points.forEach((pt, i) => {
       if (pt.kind !== 'world') return;
       const j = M.prevOf(i);
@@ -765,8 +787,8 @@
         wall: ref.wall_clock ? { d: num(ref.wall_clock.percent_delta), level: ref.wall_clock.level || 'ok' } : null,
       });
     };
-    add('Long run', 'the three worlds, 2,000 ticks each', pt.rep, M.closedWorlds, pt.path);
-    add('Short run', 'the quick gate run inside make check', pt.f && pt.f.gate, M.closedGate, pt.f && pt.f.paths.gate);
+    add('Long run', 'three worlds, 2,000 ticks', pt.rep, M.closedWorlds, pt.path);
+    add('Short run', 'quick run in make check', pt.f && pt.f.gate, M.closedGate, pt.f && pt.f.paths.gate);
     return runs;
   }
   const worstLevel = (runs) => {
@@ -797,116 +819,80 @@
       const ext = get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'extinction_tick');
       if (p === 0 || (ext !== undefined && ext !== null)) checks.push({ rank: 4, sim: true, text: `${w.short} went extinct.` });
       const fv = M.vals.floor[wi][i], fl = F12_FLOORS[w.short];
-      if (fin(fv) && fin(fl) && fv < fl) checks.push({ rank: 2, sim: true, text: `${w.short} is below the evolvability floor (${pct(fv)}, floor ${pct(fl)}).` });
+      if (fin(fv) && fin(fl) && fv < fl) checks.push({ rank: 2, sim: true, text: `${w.short}: mutations below the floor (${pct(fv)} vs ${pct(fl)}).` });
     });
     const runs = costOf(M, pt);
     runs.forEach((r) => (r.counters || []).forEach((c) => {
-      if (c.level === 'severe') checks.push({ rank: 3, text: `${r.label}: ${c.name} per creature-tick ${pctChange(c.d)}, past the ${r.work.severe}% severe limit.` });
-      else if (c.level === 'flag') checks.push({ rank: 1, text: `${r.label}: ${c.name} per creature-tick ${pctChange(c.d)}, past the ${r.work.flag}% flag.` });
+      if (c.level === 'severe') checks.push({ rank: 3, group: `${r.label}, severe`, item: `${c.name} ${pctChange(c.d)}`, text: `${r.label}: ${c.name} ${pctChange(c.d)} (severe; limit +${r.work.severe}%).` });
+      else if (c.level === 'flag') checks.push({ rank: 1, group: `${r.label}, flag`, item: `${c.name} ${pctChange(c.d)}`, text: `${r.label}: ${c.name} ${pctChange(c.d)} (flag; limit +${r.work.flag}%).` });
     }));
     runs.forEach((r) => {
       if (!r.wall || r.wall.level === 'ok') return;
-      checks.push({ rank: 0.5, text: `${r.label}: wall clock per creature-tick ${pctChange(r.wall.d)}, past the ${r.wall.level === 'severe' ? r.wallLimits.severe : r.wallLimits.flag}% ${r.wall.level} limit (depends on the host).` });
+      checks.push({ rank: 0.5, group: `${r.label}, ${r.wall.level}`, item: `wall clock ${pctChange(r.wall.d)}`, text: `${r.label}: wall clock ${pctChange(r.wall.d)} (${r.wall.level}; limit +${r.wall.level === 'severe' ? r.wallLimits.severe : r.wallLimits.flag}%; depends on the machine).` });
     });
     checks.sort((x, y) => y.rank - x.rank);
     return { checks, runs };
   }
-  // The three guardrail chips; a guardrail with no reading says so, never "passed".
-  function guardChips(M, i, runs) {
-    const out = [];
-    const measured = M.worlds.filter((w, wi) => fin(M.vals.population[wi][i]));
-    const extinct = M.worlds.filter((w, wi) => M.vals.population[wi][i] === 0).length;
-    const gap = M.worlds.length - measured.length;
-    out.push(el('span', 'chip ' + (!measured.length ? 'na' : extinct ? 'bad' : 'good'),
-      !measured.length ? 'alive: not measured' : extinct ? `${extinct} extinct` : gap ? `${measured.length} alive, ${gap} not measured` : 'all alive'));
-    const judged = M.worlds.filter((w, wi) => fin(M.vals.floor[wi][i]) && fin(F12_FLOORS[w.short]));
-    const below = judged.filter((w) => M.vals.floor[M.worlds.indexOf(w)][i] < F12_FLOORS[w.short]).length;
-    const fgap = M.worlds.length - judged.length;
-    out.push(el('span', 'chip ' + (!judged.length ? 'na' : below ? 'bad' : 'good'),
-      !judged.length ? 'floor not measured' : below ? `${below} below floor` : fgap ? `floor held in ${judged.length}, ${fgap} not measured` : 'floor held'));
-    const compared = runs.filter((r) => r.counters);
-    const worst = worstLevel(runs), wall = wallWorst(runs);
-    out.push(el('span', 'chip ' + (!compared.length ? 'na' : worst ? (worst.rank === 2 ? 'severe' : 'flag') : 'good'),
-      !compared.length ? 'cost not compared' : worst ? `cost ${worst.rank === 2 ? 'severe' : 'flag'}: ${worst.c.name} ${pctChange(worst.c.d)}` : 'work within limits'));
-    if (wall) out.push(el('span', 'chip ' + (wall.rank === 2 ? 'severe' : 'flag'), `wall clock ${pctChange(wall.run.wall.d)} · ${wall.run.wall.level}`));
-    return out;
-  }
   const guardsComplete = (M, i, runs) => M.worlds.every((w, wi) => fin(M.vals.population[wi][i]) && fin(M.vals.floor[wi][i])) && runs.every((r) => r.counters);
+
+  // Simulation checks stay one per line; cost checks merge into one line per run.
+  // Lines keep the rank order of their first check.
+  function groupChecks(checks) {
+    const lines = [], groups = new Map();
+    checks.forEach((c) => {
+      if (!c.group) { lines.push({ text: c.text }); return; }
+      if (!groups.has(c.group)) { const g = { group: c.group, items: [] }; groups.set(c.group, g); lines.push(g); }
+      groups.get(c.group).items.push(c.item);
+    });
+    return lines.map((l) => (l.group ? `${l.group}: ${l.items.join(', ')}.` : l.text));
+  }
 
   function verdictOf(M) {
     const i = M.sel, pt = M.points[i], j = M.prevOf(i);
-    const out = { badge: 'ok', action: '', also: [], lines: [] };
+    const out = { badge: 'ok', action: '', also: [] };
     const { checks, runs } = guardChecks(M, i);
-    const guardLine = ['Guardrails', guardChips(M, i, runs)];
     if (j < 0) {
       out.badge = checks.length ? 'check' : 'same';
-      out.action = 'First closure of this series: there is nothing earlier to compare with.';
-      out.also = checks.map((c) => c.text);
-      out.lines.push(guardLine);
+      out.action = 'First closure in the series. Nothing to compare yet.';
+      out.also = groupChecks(checks);
       return out;
     }
     if (!pt.changed) {
       out.badge = 'same';
-      out.action = 'No change: this closure left the simulation exactly as it was.';
-      out.also = checks.map((c) => (c.sim ? `Carried over unchanged: ${c.text}` : c.text));
-      out.lines.push(['Why', [el('span', 'say', `Every tracked reading in all three worlds is identical to ${M.points[j].title}. Runs are deterministic, so a feature that does not change behaviour repeats the same run.`)]]);
-      out.lines.push(guardLine);
+      out.action = 'No change: this closure did not change the simulation.';
+      out.also = groupChecks(checks.map((c) => (c.sim ? { ...c, text: `Still true: ${c.text}` } : c)));
       return out;
     }
-    GOAL_KEYS.forEach((key) => {
+    // Population raises a check only on extinction (above), never on an ordinary drop.
+    GOAL_KEYS.concat(['clades']).forEach((key) => {
       const worse = M.worlds.filter((w, wi) => M.judgeAt(key, wi, i).tone === 'bad').map((w) => w.short);
-      if (worse.length) checks.push({ rank: 1.5, text: `${READINGS[key].label} fell in ${listText(worse)}, more than a typical move.` });
+      if (worse.length) checks.push({ rank: 1.5, text: `${READINGS[key].label} fell in ${listText(worse)}.` });
     });
     checks.sort((x, y) => y.rank - x.rank);
-    if (checks.length) { out.badge = 'check'; out.action = checks[0].text; out.also = checks.slice(1).map((c) => c.text); }
+    if (checks.length) { out.badge = 'check'; out.action = checks[0].text; out.also = groupChecks(checks.slice(1)); }
     else out.action = guardsComplete(M, i, runs)
-      ? 'Nothing needs attention: no guardrail broke and no goal reading fell by more than a typical move.'
-      : 'Nothing needs attention in the readings that were measured; some guardrails were not measured (see below).';
-    const goalLine = (key) => {
-      const nodes = M.worlds.map((w, wi) => chip(M.judgeAt(key, wi, i), w.short));
-      nodes.push(el('span', 'say', summaryText(M, key, i)));
-      return nodes;
-    };
-    out.lines.push(['Founder families', goalLine('clades')]);
-    out.lines.push(['Even spread', goalLine('even')]);
-    out.lines.push(['Memory use', goalLine('memory')]);
-    out.lines.push(guardLine);
+      ? 'Nothing needs attention.'
+      : 'Nothing needs attention in what was measured. Some guardrails were not measured.';
     return out;
   }
   const listText = (xs) => (xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
   const worldsText = (k) => `${k} ${k === 1 ? 'world' : 'worlds'}`;
-  // One sentence for a goal reading at closure i, from fixed rules.
-  function summaryText(M, key, i) {
-    const tones = M.worlds.map((w, wi) => M.judgeAt(key, wi, i));
-    const cur = M.worlds.map((w, wi) => M.vals[key][wi][i]);
-    const na = tones.filter((t) => t.tone === 'na').length;
-    const n = M.worlds.length - na;
-    if (!n) return 'Not measured.';
-    const tail = na ? ` Not measured in ${worldsText(na)}.` : '';
-    if (cur.every((v) => v === 0) && tones.every((t) => t.tone === 'flat')) return 'Still 0 in every world.';
-    const up = tones.filter((t) => t.tone === 'good').length, down = tones.filter((t) => t.tone === 'bad').length;
-    const small = tones.filter((t) => t.tone === 'small' || t.tone === 'flat').length;
-    const parts = [];
-    if (up) parts.push(`up in ${up}`);
-    if (down) parts.push(`down in ${down}`);
-    if (small) parts.push(`little or no change in ${small}`);
-    return parts.join(', ') + ` of ${na ? `${n} measured` : n} worlds.` + tail;
-  }
-  // Against the first reading of the series: the success definition's test.
+  // Against each plot's first census of the reading: the success definition's test.
   function progressText(M, key) {
-    const i = M.sel, f = M.firstIndex;
-    if (f < 0) return 'First reading not loaded.';
-    if (i === f) return 'This closure is the first reading; later closures are compared with it.';
-    const res = M.worlds.map((w, wi) => ({ w, cur: M.vals[key][wi][i], first: M.vals[key][wi][f] })).filter((r) => fin(r.cur) && fin(r.first));
+    const i = M.sel;
+    if (M.firstIndex < 0) return 'First reading not loaded.';
+    const res = M.worlds.map((w, wi) => { const f = M.firstOf(key, wi); return { w, f, cur: M.vals[key][wi][i], first: f >= 0 ? M.vals[key][wi][f] : NaN }; })
+      .filter((r) => fin(r.cur) && fin(r.first));
     if (!res.length) return 'Not measured yet.';
+    if (res.every((r) => r.f === i)) return 'This is the first reading.';
     const missing = M.worlds.length - res.length;
     const tail = missing ? ` ${worldsText(missing)} not measured.` : '';
     const scope = missing ? 'measured worlds' : 'worlds';
-    if (res.every((r) => r.cur === 0 && r.first === 0)) return `Zero in every ${missing ? 'measured world' : 'world'}, as it was at the first reading.` + tail;
+    if (res.every((r) => r.cur === 0 && r.first === 0)) return `Still 0 in every ${missing ? 'measured world' : 'world'}.` + tail;
     const above = res.filter((r) => r.cur > r.first).map((r) => r.w.short);
     const n = res.length;
     if (above.length === n) return `Above the first reading in all ${n} ${scope}.` + tail;
-    if (!above.length) return `Not above the first reading in any of the ${n} ${scope}.` + tail;
+    if (!above.length) return `Not above the first reading in any ${missing ? 'measured world' : 'world'}.` + tail;
     return `Above the first reading in ${above.length} of ${n} ${scope} (${listText(above)}).` + tail;
   }
 
@@ -943,7 +929,7 @@
     ro.observe(plot);
     OBSERVERS.push(ro);
   };
-  const directionTag = (b) => el('span', 'tag' + (b ? ' ' + b : ''), b === 'up' ? 'Higher is better' : b === 'down' ? 'Lower is better' : 'Context: no better direction');
+  const directionTag = (b) => el('span', 'tag' + (b ? ' ' + b : ''), b === 'up' ? 'Higher is better' : b === 'down' ? 'Lower is better' : 'Context only');
   const OPEN_ABOUT = new Set();
   function about(spec) {
     const d = el('details', 'about');
@@ -952,7 +938,7 @@
     d.addEventListener('toggle', () => { if (!key) return; if (d.open) OPEN_ABOUT.add(key); else OPEN_ABOUT.delete(key); });
     d.appendChild(el('summary', null, 'What is this?'));
     const dl = el('dl');
-    [['Why it matters', spec.why], ['How it is measured', spec.how], ['Caveats', spec.caveat], ['Stored as', spec.path]].forEach(([k, v]) => {
+    [['Why', spec.why], ['How', spec.how], ['Caveat', spec.caveat], ['Stored as', spec.path]].forEach(([k, v]) => {
       if (!v) return;
       dl.appendChild(el('dt', null, k));
       dl.appendChild(el('dd', k === 'Stored as' ? 'path' : null, v));
@@ -964,7 +950,8 @@
     const l = el('div', 'legend');
     items.forEach((it) => {
       const s = el('span');
-      const i = el('i', it.box ? 'box' : it.dot ? 'dot' : null); i.style.background = it.color;
+      const i = el('i', it.box ? 'box' : it.dot ? 'dot' : it.cls || null);
+      if (it.box || it.dot) i.style.background = it.color; else i.style.color = it.color;
       s.appendChild(i); s.appendChild(document.createTextNode(it.name));
       l.appendChild(s);
     });
@@ -982,10 +969,13 @@
     return wrap;
   }
 
-  // ── Charts ───────────────────────────────────────────────────────────────
-  // Shared rules: 2px lines, 1px solid gridlines, dashed lines only for a
-  // reference (first reading, floor, baseline), a neutral band for the shown
-  // closure, text in ink tokens, and a Table button on every chart.
+  // ── Charts (Observable Plot) ─────────────────────────────────────────────
+  // Plot colours are literal hex: Plot reads them as identity colours. They
+  // mirror --plot-11/22/33 and passed the dataviz validator on this sheet.
+  const PLOT_HEX = { Orchards: '#199e70', Canyon: '#d95926', Confluence: '#3987e5' };
+  const HEX = { sheet: '#14181c', sheet2: '#191e23', sheet3: '#20262c', rule: '#2a3138', rule2: '#3a434c', ink: '#ebe7dd', ink2: '#b9b5aa', muted: '#8a877d', accent: '#e8b44c', bad: '#ef6b6b' };
+  const PLOT_STYLE = { background: 'transparent', color: HEX.ink2, fontFamily: '"Geist Sans", system-ui, sans-serif', fontSize: '12px', overflow: 'visible' };
+  const DASHES = [null, '5,4', '1.5,3.5', '8,3,2,3'];
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const shortDate = (d) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d || ''); return m ? `${MONTHS[+m[2] - 1]} ${+m[3]}` : ''; };
   const dayNumber = (d) => { const t = Date.parse((d || '').slice(0, 10)); return fin(t) ? t / 86400000 : NaN; };
@@ -997,212 +987,57 @@
     dates.forEach((d, i) => { const t = dayNumber(d); if (fin(t) && t - last >= gap) { out.push(i); last = t; } });
     return out;
   }
-  // A log10 domain spanning whole decades, with 1-2-5 ticks when it spans few.
-  function logDomain(arrays) {
-    let lo = Infinity, hi = -Infinity;
-    arrays.forEach((a) => a.forEach((v) => { if (fin(v) && v > 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
-    if (!fin(lo)) { lo = 1; hi = 10; }
-    const a = Math.floor(Math.log10(lo)), b = Math.max(a + 1, Math.ceil(Math.log10(hi)));
-    const ticks = [];
-    for (let e = a; e <= b; e++) [1, 2, 5].forEach((k) => { const v = k * Math.pow(10, e); if ((b - a <= 2 || k === 1) && v >= Math.pow(10, a) && v <= Math.pow(10, b)) ticks.push(v); });
-    return { lo: Math.pow(10, a), hi: Math.pow(10, b), ticks, log: true };
-  }
+  const plotHex = (short) => PLOT_HEX[short] || HEX.ink2;
+  const plotLabel = (w) => `Plot ${w.seed} · ${w.short}`;
+  const isDim = (M, short) => !!M.focus && M.focus !== short;
+  const closureX = (M) => ({
+    type: 'linear', domain: [0, Math.max(1, M.points.length - 1)], label: null, tickSize: 0,
+    ticks: dateTicks(M.points.map((p) => p.date), 6), tickFormat: (k) => shortDate(M.points[k] && M.points[k].date),
+  });
 
-  // Step pieces: value i holds from x0(i) to x1(i). Flats carry the reading;
-  // risers only join them, so they are drawn lighter. NaN lifts the pen.
-  function stepParts(values, x0, x1, yAt) {
-    let flats = '', risers = '', prev = null;
-    values.forEach((v, i) => {
-      const y = fin(v) ? yAt(v) : NaN;
-      if (!fin(y)) { prev = null; return; }
-      if (prev !== null && prev !== y) risers += `M${x0(i).toFixed(1)},${prev.toFixed(1)}V${y.toFixed(1)}`;
-      flats += `M${x0(i).toFixed(1)},${y.toFixed(1)}H${x1(i).toFixed(1)}`;
-      prev = y;
+  // Draw a Plot figure into a host at its real width, redrawn when the width changes.
+  function figure(host, build) {
+    observeWidth(host, () => {
+      const w = Math.round(host.clientWidth);
+      if (!w) return;
+      const fig = build(w);
+      host.replaceChildren(fig);
     });
-    return { flats, risers };
   }
-  // The wash under a stepped series, down to the baseline, one shape per unbroken run.
-  function stepArea(values, x0, x1, yAt, base) {
-    let d = '', open = false;
-    values.forEach((v, i) => {
-      const y = fin(v) ? yAt(v) : NaN;
-      if (!fin(y)) { if (open) { d += `V${base.toFixed(1)}Z`; open = false; } return; }
-      d += open ? `V${y.toFixed(1)}` : `M${x0(i).toFixed(1)},${base.toFixed(1)}V${y.toFixed(1)}`;
-      d += `H${x1(i).toFixed(1)}`;
-      open = true;
+  // Pointer wiring: `rowsAt(datum)` lists the tooltip rows for the pointed datum.
+  function wire(M, fig, title, rowsAt, { pick = true, sync = false } = {}) {
+    let last = null;
+    fig.addEventListener('pointermove', (ev) => { last = ev; });
+    fig.addEventListener('pointerleave', () => { hideTip(); if (sync) M.hover(null); });
+    fig.addEventListener('input', () => {
+      const d = fig.value;
+      if (!d || !last) { hideTip(); if (sync) M.hover(null); return; }
+      const t = title(d);
+      showTip(last, t[0], t[1], rowsAt(d));
+      if (sync) M.hover(d.i);
     });
-    if (open) d += `V${base.toFixed(1)}Z`;
-    return d;
+    if (pick) { fig.style.cursor = 'pointer'; fig.addEventListener('click', () => { const d = fig.value; if (d && Number.isInteger(d.i)) M.pick(d.i); }); }
+  }
+  const closureMeta = (M, i) => (M.points[i].kind === 'gap' ? 'report not stored' : `${shortDate(M.points[i].date)}${M.points[i].changed ? '' : ' · changed nothing'} · click to read this closure`);
+
+  // Move the shared hover line across every census figure.
+  function placeHover(M, i) {
+    M.syncTargets = M.syncTargets.filter((t) => t.fig.isConnected);
+    M.syncTargets.forEach(({ fig, line }) => {
+      if (i === null || i === undefined) { line.style.display = 'none'; return; }
+      const x = fig.scale('x').apply(i), yr = fig.scale('y').range;
+      const host = fig.parentElement;
+      if (!host) return;
+      if (line.parentElement !== host) host.appendChild(line);
+      line.style.left = `${x}px`;
+      line.style.top = `${Math.min(...yr)}px`;
+      line.style.height = `${Math.abs(yr[0] - yr[1])}px`;
+      line.style.display = 'block';
+    });
+    document.querySelectorAll('.ledger tr[data-i]').forEach((tr) => tr.classList.toggle('hot', i !== null && +tr.dataset.i === i));
   }
 
-  // A line plot, one world wide. cfg: { n, series: [{ name, color, values, muted,
-  // emph, details }], dom, band?: { lo[], hi[], color, name }, step, area, title,
-  // unit, showX, sel, selLabel, refLines, marks, yFmt, tipFmt, xTicks, xLabel(i),
-  // tipTitle(i), tipMeta(i), onPick(i), height }
-  function linePlot(plot, cfg) {
-    const n = cfg.n;
-    const draw = () => {
-      const W = Math.max(240, Math.round(plot.clientWidth) || 600);
-      const showX = cfg.showX !== false;
-      const H = (cfg.height || 120) + (showX ? 24 : 6);
-      plot.replaceChildren();
-      const m = { t: 22, r: 14, b: showX ? 26 : 6, l: 54 };
-      const iw = W - m.l - m.r, ih = H - m.t - m.b;
-      const { lo, hi, ticks } = cfg.dom;
-      const tf = cfg.dom.log ? (v) => Math.log10(v) : (v) => v;
-      const LO = tf(lo), HI = tf(hi);
-      const s = cfg.step ? iw / Math.max(1, n) : (n <= 1 ? iw : iw / (n - 1));
-      const xAt = (i) => (cfg.step ? m.l + s * (i + 0.5) : m.l + (n <= 1 ? iw / 2 : i * s));
-      const x0 = (i) => m.l + s * i, x1 = (i) => m.l + s * (i + 1);
-      const yAt = (v) => {
-        if (!fin(v)) return NaN;
-        if (cfg.dom.log && v <= 0) return m.t + ih;
-        return m.t + ih - ((tf(Math.min(Math.max(v, lo), hi)) - LO) / (HI - LO || 1)) * ih;
-      };
-      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': cfg.label || 'chart' });
-      const hasSel = Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n;
-      // cfg.bridge[i] marks a closure with no stored report: drawing carries the
-      // previous reading across it (hover and tables still say "not stored").
-      const bridged = (vals) => (cfg.bridge ? vals.map((v, i) => (cfg.bridge[i] && !fin(v) && i > 0 ? vals[i - 1] : v)) : vals);
-      if (hasSel) {
-        const bw = cfg.step ? s : Math.max(2, Math.min(s, 12));
-        const bx = cfg.step ? x0(cfg.sel) : Math.min(Math.max(xAt(cfg.sel) - bw / 2, m.l), m.l + iw - bw);
-        svg.appendChild(svgEl('rect', { class: 'selband', x: bx, y: m.t, width: bw, height: ih }));
-      }
-      // Top line: the panel's name, the unit, and the shown closure's label.
-      let titleEnd = m.l;
-      if (cfg.title) { const tx = svgEl('text', { class: 'ptitle', x: m.l, y: 14 }); tx.textContent = cfg.title; svg.appendChild(tx); titleEnd = m.l + cfg.title.length * 7.2 + 14; }
-      if (cfg.unit) { const tx = svgEl('text', { class: 'unit', x: m.l - 8, y: 14, 'text-anchor': 'end' }); tx.textContent = cfg.unit; svg.appendChild(tx); }
-      if (hasSel && cfg.selLabel) {
-        // Shortened with an ellipsis to the room right of the title; the full name stays on hover.
-        const room = m.l + iw - titleEnd, cw = 6.6;
-        const maxChars = Math.max(4, Math.floor(room / cw));
-        const text = cfg.selLabel.length > maxChars ? cfg.selLabel.slice(0, maxChars - 1) + '…' : cfg.selLabel;
-        const x = xAt(cfg.sel), tw = text.length * cw;
-        let anchor = 'middle', tx0 = x;
-        if (x + tw / 2 > m.l + iw) { anchor = 'end'; tx0 = m.l + iw; }
-        if ((anchor === 'middle' ? x - tw / 2 : tx0 - tw) < titleEnd) { anchor = 'start'; tx0 = Math.max(titleEnd, Math.min(x, m.l + iw - tw)); }
-        const tx = svgEl('text', { class: 'sellab', x: tx0, y: 14, 'text-anchor': anchor });
-        tx.textContent = text;
-        if (text !== cfg.selLabel) { const t = svgEl('title', {}); t.textContent = cfg.selLabel; tx.appendChild(t); }
-        svg.appendChild(tx);
-      }
-      const g = svgEl('g', { class: 'grid' });
-      ticks.forEach((t) => {
-        const y = yAt(t);
-        if (!fin(y)) return;
-        g.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y }));
-        const tx = svgEl('text', { x: m.l - 8, y: y + 4, 'text-anchor': 'end' }); tx.textContent = (cfg.yFmt || fmtTick)(t); g.appendChild(tx);
-      });
-      svg.appendChild(g);
-      if (showX) {
-        const placed = [];
-        (cfg.xTicks || []).forEach((i) => {
-          if (!(i >= 0 && i < n)) return;
-          const x = xAt(i);
-          if (placed.some((p) => Math.abs(p - x) < 64)) return;
-          const text = cfg.xLabel(i);
-          if (!text) return;
-          placed.push(x);
-          const anchor = x < m.l + 24 ? 'start' : x > m.l + iw - 24 ? 'end' : 'middle';
-          const tx = svgEl('text', { x, y: H - 7, 'text-anchor': anchor });
-          tx.textContent = text;
-          svg.appendChild(tx);
-        });
-      }
-      (cfg.marks || []).forEach((mk) => {
-        if (!(mk.i >= 0 && mk.i < n)) return;
-        const x = cfg.step ? x0(mk.i) : xAt(mk.i);
-        svg.appendChild(svgEl('line', { class: 'ann', x1: x, x2: x, y1: m.t, y2: m.t + ih }));
-        const right = x > m.l + iw / 2;
-        const tx = svgEl('text', { class: 'ref-label', x: right ? x - 4 : x + 4, y: m.t + ih - 6, 'text-anchor': right ? 'end' : 'start' });
-        tx.textContent = mk.label;
-        svg.appendChild(tx);
-      });
-      if (cfg.band) {
-        const b = cfg.band;
-        let run = [];
-        const flush = () => {
-          if (!run.length) return;
-          const top = run.map((i) => (cfg.step ? `${x0(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)} ${x1(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}` : `${xAt(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`));
-          const bot = run.slice().reverse().map((i) => (cfg.step ? `${x1(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)} ${x0(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}` : `${xAt(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`));
-          svg.appendChild(svgEl('polygon', { points: top.concat(bot).join(' '), fill: b.color, opacity: 0.16 }));
-          run = [];
-        };
-        for (let i = 0; i < n; i++) { if (fin(yAt(b.lo[i])) && fin(yAt(b.hi[i]))) run.push(i); else flush(); }
-        flush();
-      }
-      // The wash under the series the chart is about, when the scale starts at zero.
-      const lead = cfg.series.find((sr) => sr.emph) || (cfg.series.length === 1 ? cfg.series[0] : null);
-      if (cfg.area && lead && !cfg.dom.log && lo === 0 && cfg.step) svg.appendChild(svgEl('path', { d: stepArea(bridged(lead.values), x0, x1, yAt, m.t + ih), fill: lead.color, opacity: 0.1 }));
-      (cfg.refLines || []).forEach((r) => {
-        const y = yAt(r.y);
-        if (!fin(y)) return;
-        svg.appendChild(svgEl('line', { class: 'ref' + (r.floor ? ' floor' : ''), x1: m.l, x2: m.l + iw, y1: y, y2: y }));
-        const tx = svgEl('text', { class: 'ref-label', x: m.l + 4, y: y - 5, 'text-anchor': 'start' }); tx.textContent = r.label; svg.appendChild(tx);
-      });
-      cfg.series.forEach((sr) => {
-        const cls = 'line' + (sr.emph ? ' emph' : '') + (sr.muted ? ' muted' : '');
-        if (cfg.step) {
-          const { flats, risers } = stepParts(bridged(sr.values), x0, x1, yAt);
-          if (risers) svg.appendChild(svgEl('path', { d: risers, class: cls + ' riser', stroke: sr.color }));
-          if (flats) svg.appendChild(svgEl('path', { d: flats, class: cls, stroke: sr.color }));
-        } else {
-          let p = '', pen = false;
-          sr.values.forEach((v, i) => { const y = yAt(v); if (!fin(y)) { pen = false; return; } p += (pen ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + y.toFixed(1); pen = true; });
-          if (p) svg.appendChild(svgEl('path', { d: p, class: cls, stroke: sr.color }));
-          sr.values.forEach((v, i) => {
-            const y = yAt(v);
-            if (fin(y) && !fin(yAt(sr.values[i - 1])) && !fin(yAt(sr.values[i + 1]))) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: y, r: 3, fill: sr.color }));
-          });
-        }
-        if (cfg.dom.log) sr.values.forEach((v, i) => { if (v === 0) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: m.t + ih, r: 3.5, fill: 'var(--surface)', stroke: sr.color, 'stroke-width': 1.5 })); });
-      });
-      if (hasSel) {
-        cfg.series.forEach((sr) => {
-          const y = yAt(sr.values[cfg.sel]);
-          if (fin(y)) svg.appendChild(svgEl('circle', { cx: xAt(cfg.sel), cy: y, r: 4, fill: sr.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
-        });
-        if (lead) {
-          const v = lead.values[cfg.sel], y = yAt(v);
-          if (fin(y)) {
-            const x = xAt(cfg.sel), right = x > m.l + iw * 0.75;
-            const tx = svgEl('text', { class: 'vlab', x: right ? x - 9 : x + 9, y: y < m.t + 14 ? y + 15 : y - 8, 'text-anchor': right ? 'end' : 'start' });
-            tx.textContent = (cfg.tipFmt || fmt)(v);
-            svg.appendChild(tx);
-          }
-        }
-      }
-      if (!cfg.series.some((sr) => sr.values.some((v) => fin(yAt(v))))) { const tx = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2 + 4, 'text-anchor': 'middle' }); tx.textContent = 'not measured'; svg.appendChild(tx); }
-      const hair = svgEl('line', { class: 'xhair', y1: m.t, y2: m.t + ih, visibility: 'hidden' });
-      svg.appendChild(hair);
-      const hit = svgEl('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' });
-      if (cfg.onPick) hit.style.cursor = 'pointer';
-      svg.appendChild(hit);
-      const nearest = (ev) => {
-        const r = svg.getBoundingClientRect();
-        const sx = ((ev.clientX - r.left) * W) / r.width;
-        if (cfg.step) return Math.max(0, Math.min(n - 1, Math.floor((sx - m.l) / s)));
-        let best = 0, bd = Infinity;
-        for (let i = 0; i < n; i++) { const dd = Math.abs(xAt(i) - sx); if (dd < bd) { bd = dd; best = i; } }
-        return best;
-      };
-      hit.addEventListener('pointermove', (ev) => {
-        const i = nearest(ev);
-        hair.setAttribute('x1', xAt(i)); hair.setAttribute('x2', xAt(i)); hair.setAttribute('visibility', 'visible');
-        const rows = cfg.series.map((sr) => ({ color: sr.color, name: sr.name + (sr.details && sr.details[i] ? ` · ${sr.details[i]}` : ''), value: fin(sr.values[i]) ? (cfg.tipFmt || fmt)(sr.values[i]) : 'not measured' }));
-        if (cfg.band) rows.push({ color: cfg.band.color, name: cfg.band.name || 'range', value: fin(cfg.band.lo[i]) ? `${(cfg.tipFmt || fmt)(cfg.band.lo[i])} – ${(cfg.tipFmt || fmt)(cfg.band.hi[i])}` : 'not measured' });
-        showTip(ev, cfg.tipTitle(i), cfg.tipMeta ? cfg.tipMeta(i) : '', rows);
-      });
-      hit.addEventListener('pointerleave', () => { hair.setAttribute('visibility', 'hidden'); hideTip(); });
-      if (cfg.onPick) hit.addEventListener('click', (ev) => cfg.onPick(nearest(ev)));
-      plot.appendChild(svg);
-    };
-    observeWidth(plot, draw);
-  }
-
-  // An explore card: plain title, one-line definition, direction tag, a Table
-  // button (the chart's text twin, built on first press), "What is this?".
+  // A plain-titled card with a direction tag, a Table button and "What is this?".
   function chartCard(spec) {
     const c = el('div', 'card');
     const head = el('div', 'chead');
@@ -1235,533 +1070,376 @@
     return { card: c, body, setTable };
   }
 
-  // Three worlds stacked as full-width rows on one shared scale, the date axis
-  // under the last. Each closure's reading holds until the next one.
-  // spec.series: [{ name, color, read(pt, w), detail?(pt, w), muted?, emph? }];
-  // spec.band?: { name, color, lo(pt, w), hi(pt, w) }; spec.unit; spec.ref?(w); spec.log.
-  function closuresChart(M, spec) {
+  // Readings over every closure. One series: one chart, three plot curves.
+  // Several series (or a band): one row per plot, the lead series in the plot's
+  // colour, the rest grey and told apart by dash.
+  // spec.series: [{ name, read(pt, w), detail?(pt, w) }]; spec.band?: { name, lo, hi };
+  // spec.ref?(w) → { y, label }; spec.log; spec.unit; spec.yFmt; spec.tipFmt.
+  function closureLines(M, spec) {
     const c = chartCard(spec);
-    const at = (fn, w) => M.points.map((pt) => (pt.kind === 'world' ? num(fn(pt, w)) : NaN));
-    const panels = M.worlds.map((w) => ({
-      w,
-      series: spec.series.map((s) => ({
-        ...s,
-        values: at(s.read, w),
-        details: s.detail ? M.points.map((pt) => (pt.kind === 'world' ? s.detail(pt, w) : '')) : null,
-      })),
-      band: spec.band ? { name: spec.band.name, color: spec.band.color, lo: at(spec.band.lo, w), hi: at(spec.band.hi, w) } : null,
-      refs: spec.ref ? [spec.ref(w)].filter(Boolean) : [],
+    const multi = spec.series.length > 1 || !!spec.band;
+    const rows = [];
+    M.worlds.forEach((w) => M.points.forEach((pt, i) => {
+      if (pt.kind !== 'world') return;
+      spec.series.forEach((s, si) => { const v = num(s.read(pt, w)); if (fin(v)) rows.push({ i, w: w.short, si, v }); });
     }));
-    const arrays = panels.flatMap((p) => p.series.map((s) => s.values).concat(p.refs.map((r) => [r.y])).concat(p.band ? [p.band.lo, p.band.hi] : []));
-    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero, 3);
-    const ticks = dateTicks(M.points.map((p) => p.date), 6);
-    if (spec.series.length > 1 || spec.band) c.body.appendChild(legend(spec.series.map((s) => ({ name: s.name, color: s.color })).concat(spec.band ? [{ name: spec.band.name, color: spec.band.color, box: true }] : [])));
-    const stack = el('div', 'rows');
-    panels.forEach((p, k) => {
-      const plot = el('div', 'plot');
-      stack.appendChild(plot);
-      const last = k === panels.length - 1;
-      linePlot(plot, {
-        n: M.points.length, series: p.series, band: p.band, dom, step: true, area: true, title: p.w.short, bridge: M.points.map((q) => q.kind === 'gap'), unit: k === 0 ? spec.unit : '',
-        showX: last, height: spec.height || 104, sel: M.sel, refLines: p.refs,
-        selLabel: k === 0 && M.points[M.sel] ? M.points[M.sel].name : '',
-        yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
-        xTicks: ticks, xLabel: (i) => shortDate(M.points[i].date),
-        tipTitle: (i) => `${p.w.short} · ${M.points[i].title}`,
-        tipMeta: (i) => (M.points[i].kind === 'gap' ? 'report not stored' : `${shortDate(M.points[i].date)}${M.points[i].changed ? '' : ' · changed nothing'} · click to show this closure`),
-        onPick: (i) => { if (M.points[i].kind === 'world') M.pick(i); },
+    const bands = [];
+    if (spec.band) M.worlds.forEach((w) => M.points.forEach((pt, i) => { if (pt.kind !== 'world') return; const lo = num(spec.band.lo(pt, w)), hi = num(spec.band.hi(pt, w)); if (fin(lo) && fin(hi)) bands.push({ i, w: w.short, lo, hi }); }));
+    const refs = spec.ref ? M.worlds.map((w) => { const r = spec.ref(w); return r && fin(r.y) ? { w: w.short, y: r.y, label: r.label } : null; }).filter(Boolean) : [];
+    const fmtV = spec.tipFmt || fmt;
+    const yFmt = spec.yFmt || fmtTick;
+    const fy = multi ? 'w' : undefined;
+    const host = el('div', 'fig');
+    c.body.appendChild(host);
+    figure(host, (width) => {
+      const marks = [
+        Plot.ruleX([M.sel], { x: (d) => d, stroke: HEX.accent, strokeOpacity: 0.6 }),
+        spec.band ? Plot.areaY(bands, { x: 'i', y1: 'lo', y2: 'hi', fy, fill: (d) => plotHex(d.w), fillOpacity: 0.16, curve: 'step' }) : null,
+        refs.length ? Plot.ruleY(refs, { y: 'y', fy: multi ? 'w' : undefined, stroke: HEX.bad, strokeOpacity: 0.7, strokeDasharray: '4,4' }) : null,
+        refs.length ? Plot.text(refs, { y: 'y', fy: multi ? 'w' : undefined, text: 'label', frameAnchor: 'left', dx: 4, dy: -7, textAnchor: 'start', fill: HEX.ink2, stroke: HEX.sheet, strokeWidth: 3, paintOrder: 'stroke' }) : null,
+      ];
+      spec.series.forEach((s, si) => {
+        const data = rows.filter((r) => r.si === si);
+        marks.push(Plot.line(data, { x: 'i', y: 'v', z: 'w', fy, stroke: (d) => (multi && si > 0 ? HEX.ink2 : plotHex(d.w)), strokeOpacity: (d) => (isDim(M, d.w) ? 0.18 : multi && si > 0 ? 0.6 : 1), strokeWidth: si === 0 ? 2 : 1.4, strokeDasharray: multi ? DASHES[si] : null }));
       });
+      marks.push(Plot.dot(rows.filter((r) => r.i === M.sel && (r.si === 0 || !multi)), { x: 'i', y: 'v', fy, r: 4, fill: (d) => plotHex(d.w), stroke: HEX.sheet, strokeWidth: 2 }));
+      marks.push(Plot.ruleX(rows.filter((r) => r.si === 0), Plot.pointerX({ x: 'i', fy, stroke: HEX.ink2, strokeOpacity: 0.45, maxRadius: 60 })));
+      const fig = Plot.plot({
+        width, height: multi ? M.worlds.length * 118 + 40 : (spec.height || 230), style: PLOT_STYLE,
+        marginLeft: 52, marginRight: multi ? 96 : 16, marginTop: 16, marginBottom: 28,
+        x: closureX(M),
+        y: { grid: true, nice: true, type: spec.log ? 'symlog' : 'linear', zero: !spec.log && spec.zero !== false, label: null, ticks: multi ? 3 : 4, tickFormat: yFmt },
+        fy: multi ? { domain: M.worlds.map((w) => w.short), label: null, padding: 0.22, tickFormat: (s) => `Plot ${(M.worlds.find((w) => w.short === s) || {}).seed} · ${s}` } : undefined,
+        color: { type: 'identity' },
+        marks: marks.filter(Boolean),
+      });
+      wire(M, fig, (d) => [`${M.points[d.i].title}`, closureMeta(M, d.i)], (d) => {
+        const ws = multi ? M.worlds.filter((w) => w.short === d.w) : M.worlds;
+        return ws.flatMap((w) => spec.series.map((s, si) => {
+          const pt = M.points[d.i];
+          const v = pt.kind === 'world' ? num(s.read(pt, w)) : NaN;
+          const det = s.detail && pt.kind === 'world' ? s.detail(pt, w) : '';
+          return { color: multi && si > 0 ? HEX.ink2 : plotHex(w.short), name: `${multi ? s.name : plotLabel(w)}${det ? ' · ' + det : ''}`, value: fin(v) ? fmtV(v) : 'not measured' };
+        }));
+      });
+      return fig;
     });
-    c.body.appendChild(stack);
-    c.body.appendChild(el('p', 'note', 'Each closure\'s reading holds until the next closure, so a step is where a closure moved it. The shaded column is the closure shown; click to show another.'));
+    if (multi) c.body.appendChild(legend(spec.series.map((s, si) => ({ name: s.name, color: si === 0 ? HEX.ink : HEX.ink2, cls: si === 1 ? 'dash' : si === 2 ? 'dots' : si === 3 ? 'dash' : null })).concat(spec.band ? [{ name: spec.band.name, color: HEX.ink2, box: true }] : []), si0Note(spec)));
     c.setTable(() => {
       const headers = ['Closure'];
       M.worlds.forEach((w) => { spec.series.forEach((s) => headers.push(`${w.short} · ${s.name}`)); if (spec.band) headers.push(`${w.short} · ${spec.band.name}`); });
-      const rows = [];
+      const out = [];
       for (let i = M.points.length - 1; i >= 0; i--) {
         const pt = M.points[i];
         const row = [pt.title];
-        panels.forEach((p) => {
-          p.series.forEach((s) => row.push(pt.kind === 'world' ? (fin(s.values[i]) ? (spec.tipFmt || fmt)(s.values[i]) : 'not measured') : 'not stored'));
-          if (p.band) row.push(fin(p.band.lo[i]) ? `${(spec.tipFmt || fmt)(p.band.lo[i])} – ${(spec.tipFmt || fmt)(p.band.hi[i])}` : 'not measured');
+        M.worlds.forEach((w) => {
+          spec.series.forEach((s) => { const v = pt.kind === 'world' ? num(s.read(pt, w)) : NaN; row.push(pt.kind !== 'world' ? 'not stored' : fin(v) ? fmtV(v) : 'not measured'); });
+          if (spec.band) { const lo = pt.kind === 'world' ? num(spec.band.lo(pt, w)) : NaN, hi = pt.kind === 'world' ? num(spec.band.hi(pt, w)) : NaN; row.push(fin(lo) ? `${fmtV(lo)} – ${fmtV(hi)}` : 'not measured'); }
         });
-        rows.push(row);
+        out.push(row);
       }
-      return [headers, rows];
+      return [headers, out];
     });
     return c.card;
   }
+  const si0Note = (spec) => (spec.series.length > 1 ? `${spec.series[0].name} in the plot's colour` : '');
 
-  // Through one run: the shown closure (blue) against the one before (grey) at
-  // each checkpoint, worlds stacked. spec.log draws a log scale for readings
-  // that boom and crash.
-  function checkpointChart(M, spec) {
+  // Through one run: the read closure (plot colour) against the one before
+  // (grey) at every checkpoint, one column per plot.
+  function checkpointLines(M, spec) {
     const c = chartCard(spec);
     const sel = M.points[M.sel], j = M.prevOf(M.sel), prev = j >= 0 ? M.points[j] : null;
     const runs = [prev, sel].filter(Boolean);
-    const ticks = new Set();
-    runs.forEach((pt) => M.worlds.forEach((w) => samplesOf(pt.rep, w.seed).forEach((s) => ticks.add(num(s.tick)))));
-    const xs = [...ticks].filter(fin).sort((a, b) => a - b);
-    const panels = M.worlds.map((w) => ({
-      w,
-      series: runs.map((pt) => {
-        const mp = new Map();
-        samplesOf(pt.rep, w.seed).forEach((s) => mp.set(num(s.tick), num(spec.read(s, pt, w))));
-        const isSel = pt === sel;
-        return { name: isSel ? `${pt.name} (shown)` : `${pt.name} (before)`, color: isSel ? 'var(--s1)' : 'var(--muted)', emph: isSel, muted: !isSel, values: xs.map((t) => (mp.has(t) ? mp.get(t) : NaN)) };
-      }),
-    }));
-    const arrays = panels.flatMap((p) => p.series.map((s) => s.values));
-    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero, 3);
-    const every = Math.max(1, Math.ceil(xs.length / 8));
-    c.body.appendChild(legend(panels[0] ? panels[0].series : []));
-    const stack = el('div', 'rows');
-    panels.forEach((p, k) => {
-      const plot = el('div', 'plot');
-      stack.appendChild(plot);
-      linePlot(plot, {
-        n: xs.length, series: p.series, dom, title: p.w.short, unit: k === 0 ? spec.unit : '', showX: k === panels.length - 1, height: spec.height || 100,
-        yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
-        xLabel: (i) => (i === 0 ? `tick ${xs[i]}` : String(xs[i])), xTicks: xs.map((_, i) => i).filter((i) => i % every === 0 || i === xs.length - 1),
-        tipTitle: (i) => `${p.w.short} · tick ${xs[i]}`,
+    const rows = [];
+    runs.forEach((pt) => M.worlds.forEach((w) => samplesOf(pt.rep, w.seed).forEach((s) => {
+      const v = num(spec.read(s, pt, w)), t = num(s.tick);
+      if (fin(v) && fin(t)) rows.push({ t, w: w.short, v, shown: pt === sel });
+    })));
+    const fmtV = spec.tipFmt || fmt;
+    const host = el('div', 'fig');
+    c.body.appendChild(host);
+    figure(host, (width) => {
+      const fig = Plot.plot({
+        width, height: spec.height || 230, style: PLOT_STYLE, marginLeft: 52, marginRight: 16, marginTop: 24, marginBottom: 30,
+        fx: { domain: M.worlds.map((w) => w.short), label: null, padding: 0.12, tickFormat: (s) => `Plot ${(M.worlds.find((w) => w.short === s) || {}).seed} · ${s}` },
+        x: { label: null, ticks: 4, tickFormat: (t) => (t === 100 ? 'tick 100' : String(t)) },
+        y: { grid: true, nice: true, type: spec.log ? 'symlog' : 'linear', zero: !spec.log && spec.zero !== false, label: null, ticks: 4, tickFormat: spec.yFmt || fmtTick },
+        color: { type: 'identity' },
+        marks: [
+          Plot.line(rows.filter((r) => !r.shown), { x: 't', y: 'v', fx: 'w', stroke: HEX.muted, strokeWidth: 1.4 }),
+          Plot.line(rows.filter((r) => r.shown), { x: 't', y: 'v', fx: 'w', stroke: (d) => plotHex(d.w), strokeOpacity: (d) => (isDim(M, d.w) ? 0.25 : 1), strokeWidth: 2 }),
+          Plot.ruleX(rows.filter((r) => r.shown), Plot.pointerX({ x: 't', fx: 'w', stroke: HEX.ink2, strokeOpacity: 0.45 })),
+        ],
       });
+      wire(M, fig, (d) => [`Plot ${(M.worlds.find((w) => w.short === d.w) || {}).seed} · ${d.w} · tick ${d.t}`, ''], (d) => rows.filter((r) => r.w === d.w && r.t === d.t).sort((a, b) => b.shown - a.shown).map((r) => ({ color: r.shown ? plotHex(r.w) : HEX.muted, name: r.shown ? `${sel.name} (read)` : `${prev ? prev.name : ''} (before)`, value: fmtV(r.v) })), { pick: false });
+      return fig;
     });
-    c.body.appendChild(stack);
-    if (spec.log) c.body.appendChild(el('p', 'note', 'Log scale: equal distances are equal ratios, so the early boom and the late plateau both fit. A zero sits on the bottom edge as a hollow dot.'));
+    c.body.appendChild(legend([{ name: `${sel.name} (read)`, color: HEX.ink }].concat(prev ? [{ name: `${prev.name} (before)`, color: HEX.muted }] : [])));
+    if (spec.log) c.body.appendChild(el('p', 'small', 'Log scale, so the early boom and the late plateau both fit.'));
     c.setTable(() => {
+      const ticks = [...new Set(rows.map((r) => r.t))].sort((a, b) => a - b);
       const headers = ['Tick'];
-      panels.forEach((p) => p.series.forEach((s) => headers.push(`${p.w.short} · ${s.name}`)));
-      return [headers, xs.map((t, i) => [String(t), ...panels.flatMap((p) => p.series.map((s) => (fin(s.values[i]) ? (spec.tipFmt || fmt)(s.values[i]) : 'not measured')))])];
+      M.worlds.forEach((w) => { headers.push(`${w.short} · read`); if (prev) headers.push(`${w.short} · before`); });
+      return [headers, ticks.map((t) => [String(t), ...M.worlds.flatMap((w) => { const a = rows.find((r) => r.w === w.short && r.t === t && r.shown), b = rows.find((r) => r.w === w.short && r.t === t && !r.shown); return prev ? [a ? fmtV(a.v) : '—', b ? fmtV(b.v) : '—'] : [a ? fmtV(a.v) : '—']; })])];
     });
     return c.card;
   }
 
-  // Before and after per item, as dumbbells: grey dot for the closure before,
-  // blue dot for the closure shown, joined by a line; the shown value labelled.
-  // One label column serves all three worlds; narrow screens stack the worlds.
+  // Before and after per item as dumbbells: grey for the closure before, the
+  // plot's colour for the closure read, one column per plot, one label column.
   // spec.items(pt, w) → [{ key, name, value }]; spec.top folds the rest into "other".
-  function pairBars(M, spec) {
+  function dumbbells(M, spec) {
     const c = chartCard(spec);
     const sel = M.points[M.sel], j = M.prevOf(M.sel), prev = j >= 0 ? M.points[j] : null;
     const fmtV = spec.fmt || fmt;
-    const per = M.worlds.map((w) => ({ now: spec.items(sel, w) || [], was: prev ? spec.items(prev, w) || [] : [] }));
+    const per = M.worlds.map((w) => ({ w, now: spec.items(sel, w) || [], was: prev ? spec.items(prev, w) || [] : [] }));
     const keys = [], names = {};
     per.forEach((p) => p.now.concat(p.was).forEach((it) => { if (!keys.includes(it.key)) { keys.push(it.key); names[it.key] = it.name; } }));
     const val = (arr, k) => { const it = arr.find((x) => x.key === k); return it ? num(it.value) : NaN; };
-    let rows = keys.map((k) => ({ key: k, name: names[k], cells: per.map((p) => ({ a: val(p.now, k), b: val(p.was, k) })) }));
-    if (spec.sort !== false) rows.sort((x, y) => Math.max(0, ...y.cells.map((q) => num(q.a) || 0)) - Math.max(0, ...x.cells.map((q) => num(q.a) || 0)));
-    if (spec.top && rows.length > spec.top + 1) {
-      const rest = rows.slice(spec.top);
+    let cats = keys.map((k) => ({ key: k, name: names[k], cells: per.map((p) => ({ a: val(p.now, k), b: val(p.was, k) })) }));
+    if (spec.sort !== false) cats.sort((x, y) => Math.max(0, ...y.cells.map((q) => num(q.a) || 0)) - Math.max(0, ...x.cells.map((q) => num(q.a) || 0)));
+    if (spec.top && cats.length > spec.top + 1) {
+      const rest = cats.slice(spec.top);
       const part = (xs) => (xs.some(fin) ? sum(xs) : NaN);
-      rows = rows.slice(0, spec.top).concat([{ key: 'other', name: `other (${rest.length} kinds)`, cells: M.worlds.map((w, wi) => ({ a: part(rest.map((r) => r.cells[wi].a)), b: part(rest.map((r) => r.cells[wi].b)) })) }]);
+      cats = cats.slice(0, spec.top).concat([{ key: 'other', name: `other (${rest.length} kinds)`, cells: M.worlds.map((w, wi) => ({ a: part(rest.map((r) => r.cells[wi].a)), b: part(rest.map((r) => r.cells[wi].b)) })) }]);
     }
-    let hi = 0;
-    rows.forEach((r) => r.cells.forEach((q) => [q.a, q.b].forEach((v) => { if (fin(v) && v > hi) hi = v; })));
-    if (!(hi > 0)) hi = 1;
-    const ticks = niceTicks(0, hi, 2);
-    hi = Math.max(hi, ticks[ticks.length - 1]);
-    const plot = el('div', 'plot');
-    c.body.appendChild(plot);
-    const draw = () => {
-      const W = Math.max(260, Math.round(plot.clientWidth) || 600);
-      plot.replaceChildren();
-      const longest = Math.max(...rows.map((r) => r.name.length), 6);
-      const labW = Math.min(190, Math.max(80, longest * 6.4 + 14));
-      const rowH = 22, headH = 20, axisH = 18;
-      const stacked = W < 640;
-      const tracks = stacked ? 1 : M.worlds.length;
-      const gap = 22;
-      const tw = (W - labW - gap * (tracks - 1)) / tracks;
-      const blockH = headH + rows.length * rowH + axisH;
-      const H = stacked ? blockH * M.worlds.length : blockH;
-      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': spec.title });
-      M.worlds.forEach((w, wi) => {
-        const ox = stacked ? labW : labW + wi * (tw + gap), oy = stacked ? wi * blockH : 0;
-        const x0 = ox + 4, iw = tw - 56;
-        const xAt = (v) => x0 + (Math.max(0, v) / hi) * iw;
-        const head = svgEl('text', { x: x0, y: oy + 13, class: 'rowlab' }); head.textContent = w.short; head.setAttribute('font-weight', '600'); svg.appendChild(head);
-        const g = svgEl('g', { class: 'grid' });
-        ticks.forEach((t) => {
-          g.appendChild(svgEl('line', { x1: xAt(t), x2: xAt(t), y1: oy + headH, y2: oy + headH + rows.length * rowH }));
-          const tx = svgEl('text', { x: xAt(t), y: oy + blockH - 5, 'text-anchor': 'middle' }); tx.textContent = (spec.tickFmt || fmtV)(t); g.appendChild(tx);
-        });
-        svg.appendChild(g);
-        rows.forEach((r, k) => {
-          const y = oy + headH + k * rowH + rowH / 2;
-          if (wi === 0 || stacked) { const lab = svgEl('text', { x: labW - 10, y: y + 4, 'text-anchor': 'end', class: 'rowlab' }); lab.textContent = r.name; svg.appendChild(lab); }
-          const q = r.cells[wi];
-          if (fin(q.a) && fin(q.b)) svg.appendChild(svgEl('line', { x1: xAt(q.b), x2: xAt(q.a), y1: y, y2: y, stroke: 'var(--axis)', 'stroke-width': 2, 'stroke-linecap': 'round' }));
-          if (fin(q.b)) svg.appendChild(svgEl('circle', { cx: xAt(q.b), cy: y, r: 4, fill: 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2 }));
-          if (fin(q.a)) svg.appendChild(svgEl('circle', { cx: xAt(q.a), cy: y, r: 5, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2 }));
-          const right = Math.max(fin(q.a) ? xAt(q.a) : x0, fin(q.b) ? xAt(q.b) : x0);
-          const tv = svgEl('text', { x: right + 9, y: y + 4, class: fin(q.a) ? 'vlab' : 'rowlab' }); tv.textContent = fin(q.a) ? fmtV(q.a) : 'not measured'; svg.appendChild(tv);
-          const hit = svgEl('rect', { x: stacked ? 0 : ox, y: y - rowH / 2, width: stacked ? W : tw, height: rowH, fill: 'transparent' });
-          hit.addEventListener('pointermove', (ev) => showTip(ev, `${w.short} · ${r.name}`, spec.tipMeta || '', [
-            { color: 'var(--s1)', name: sel.title, value: fin(q.a) ? fmtV(q.a) : 'not measured' },
-            ...(prev ? [{ color: 'var(--muted)', name: prev.title, value: fin(q.b) ? fmtV(q.b) : 'not measured' }] : []),
-          ]));
-          hit.addEventListener('pointerleave', hideTip);
-          svg.appendChild(hit);
-        });
+    const rows = [];
+    cats.forEach((cat) => M.worlds.forEach((w, wi) => rows.push({ w: w.short, cat: cat.name, a: cat.cells[wi].a, b: cat.cells[wi].b })));
+    const longest = Math.max(6, ...cats.map((cat) => cat.name.length));
+    const host = el('div', 'fig');
+    c.body.appendChild(host);
+    figure(host, (width) => {
+      const fig = Plot.plot({
+        width, height: cats.length * 26 + 52, style: PLOT_STYLE, marginLeft: Math.min(200, longest * 6.6 + 14), marginRight: 58, marginTop: 24, marginBottom: 28,
+        fx: { domain: M.worlds.map((w) => w.short), label: null, padding: 0.18, tickFormat: (s) => `Plot ${(M.worlds.find((w) => w.short === s) || {}).seed} · ${s}` },
+        y: { domain: cats.map((cat) => cat.name), label: null, tickSize: 0 },
+        x: { grid: true, nice: true, zero: true, label: null, ticks: 3, tickFormat: spec.tickFmt || fmtV },
+        color: { type: 'identity' },
+        marks: [
+          Plot.link(rows.filter((r) => fin(r.a) && fin(r.b)), { fx: 'w', y1: 'cat', y2: 'cat', x1: 'b', x2: 'a', stroke: HEX.rule2, strokeWidth: 2 }),
+          Plot.dot(rows.filter((r) => fin(r.b)), { fx: 'w', y: 'cat', x: 'b', r: 3.6, fill: HEX.muted, stroke: HEX.sheet, strokeWidth: 1.5 }),
+          Plot.dot(rows.filter((r) => fin(r.a)), { fx: 'w', y: 'cat', x: 'a', r: 4.8, fill: (d) => plotHex(d.w), fillOpacity: (d) => (isDim(M, d.w) ? 0.3 : 1), stroke: HEX.sheet, strokeWidth: 1.5 }),
+          Plot.text(rows.filter((r) => fin(r.a)), { fx: 'w', y: 'cat', x: (d) => Math.max(d.a, fin(d.b) ? d.b : 0), text: (d) => fmtV(d.a), dx: 9, textAnchor: 'start', fill: HEX.ink, fontWeight: 600 }),
+          Plot.ruleY(rows, Plot.pointerY({ fx: 'w', y: 'cat', stroke: HEX.ink2, strokeOpacity: 0.2, strokeWidth: 18, maxRadius: 14 })),
+        ],
       });
-      plot.appendChild(svg);
-    };
-    observeWidth(plot, draw);
-    c.body.appendChild(legend([{ name: `${sel.name} (shown)`, color: 'var(--s1)', dot: true }].concat(prev ? [{ name: `${prev.name} (before)`, color: 'var(--muted)', dot: true }] : [])));
+      wire(M, fig, (d) => [`Plot ${(M.worlds.find((w) => w.short === d.w) || {}).seed} · ${d.w} · ${d.cat}`, ''], (d) => [{ color: plotHex(d.w), name: `${sel.name} (read)`, value: fin(d.a) ? fmtV(d.a) : 'not measured' }].concat(prev ? [{ color: HEX.muted, name: `${prev.name} (before)`, value: fin(d.b) ? fmtV(d.b) : 'not measured' }] : []), { pick: false });
+      return fig;
+    });
+    c.body.appendChild(legend([{ name: `${sel.name} (read)`, color: HEX.ink, dot: true }].concat(prev ? [{ name: `${prev.name} (before)`, color: HEX.muted, dot: true }] : [])));
     c.setTable(() => {
       const headers = ['Item'];
-      M.worlds.forEach((w) => { headers.push(`${w.short} · shown`); if (prev) headers.push(`${w.short} · before`); });
+      M.worlds.forEach((w) => { headers.push(`${w.short} · read`); if (prev) headers.push(`${w.short} · before`); });
       const f = (v) => (fin(v) ? fmtV(v) : 'not measured');
-      return [headers, rows.map((r) => [r.name, ...r.cells.flatMap((q) => (prev ? [f(q.a), f(q.b)] : [f(q.a)]))])];
+      return [headers, cats.map((cat) => [cat.name, ...cat.cells.flatMap((q) => (prev ? [f(q.a), f(q.b)] : [f(q.a)]))])];
     });
     return c.card;
   }
 
   // ── Sections ─────────────────────────────────────────────────────────────
-  function band(id, title, lede) {
-    const s = el('section', 'band');
+  function part(id, title, lede) {
+    const s = el('section', 'part');
     s.id = id;
     s.appendChild(el('h2', null, title));
     if (lede) s.appendChild(el('p', 'lede', lede));
     return s;
   }
 
-  function renderVerdict(M, app) {
+  // Survey-sheet header fields: span, closures, changed, and the plot strip map.
+  function renderFields(M) {
+    const box = document.getElementById('fields');
+    box.replaceChildren();
+    const worldPts = M.points.filter((p) => p.kind === 'world');
+    const changed = worldPts.filter((p) => p.changed).length;
+    const first = M.points[M.firstIndex] || worldPts[0], last = worldPts[worldPts.length - 1];
+    const field = (label, value, small, cls) => {
+      const f = el('div', 'field' + (cls ? ' ' + cls : ''));
+      f.appendChild(el('div', 'fl', label));
+      const v = el('div', 'fv', value);
+      if (small) v.appendChild(el('small', null, ' ' + small));
+      f.appendChild(v);
+      return f;
+    };
+    box.appendChild(field('Record span', `${shortDate(first && first.date)} – ${shortDate(last && last.date)}`, ''));
+    box.appendChild(field('Closures', String(worldPts.length), `since ${first ? first.id || first.name : '—'}`));
+    box.appendChild(field('Changed the run', String(changed), `${worldPts.length - changed} changed nothing`));
+    const plots = el('div', 'field plots');
+    plots.appendChild(el('div', 'fl', 'Plots: click one to bring it forward'));
+    const map = el('div', 'plotmap' + (M.focus ? ' focused' : ''));
+    M.worlds.forEach((w) => {
+      const b = el('button', 'plotbtn');
+      b.type = 'button';
+      b.style.setProperty('--c', plotHex(w.short));
+      b.setAttribute('aria-pressed', M.focus === w.short ? 'true' : 'false');
+      b.title = WORLD_INFO[w.short] || '';
+      b.appendChild(el('i'));
+      b.appendChild(el('b', null, String(w.seed)));
+      b.appendChild(document.createTextNode(w.short));
+      b.addEventListener('click', () => { M.focus = M.focus === w.short ? null : w.short; M.render(); });
+      map.appendChild(b);
+    });
+    plots.appendChild(map);
+    box.appendChild(plots);
+  }
+
+  // One line under the header: what the read closure did, answer first.
+  function renderNote(M, app) {
     const v = verdictOf(M);
     const pt = M.points[M.sel], j = M.prevOf(M.sel);
-    const worldIdx = M.points.filter((p) => p.kind === 'world');
-    const c = el('section', 'card verdict');
-    c.appendChild(el('p', 'eyebrow', `Closure ${worldIdx.indexOf(pt) + 1} of ${worldIdx.length} · run ${pt.date || 'undated'} · compared with ${j >= 0 ? M.points[j].title : 'nothing earlier'}`));
-    c.appendChild(el('h2', null, pt.title));
-    const a = el('p', 'action');
-    a.appendChild(el('span', 'badge ' + v.badge, v.badge === 'ok' ? 'OK' : v.badge === 'check' ? 'CHECK' : 'SAME'));
-    a.appendChild(el('span', null, v.action));
-    c.appendChild(a);
+    const p = el('p', 'note');
+    p.appendChild(el('span', 'badge ' + v.badge, v.badge === 'ok' ? 'OK' : v.badge === 'check' ? 'CHECK' : 'SAME'));
+    const t = el('span');
+    t.appendChild(el('b', null, pt.name));
+    t.appendChild(document.createTextNode(` (${shortDate(pt.date)}${j >= 0 ? `, vs ${M.points[j].name}` : ''}): ${v.action}`));
+    p.appendChild(t);
     if (v.also.length) {
-      const ul = el('ul', 'also');
-      v.also.slice(0, 4).forEach((t) => ul.appendChild(el('li', null, t)));
-      if (v.also.length > 4) ul.appendChild(el('li', null, `and ${v.also.length - 4} more in Guardrails below.`));
-      c.appendChild(ul);
+      const more = el('a', null, `${v.also.length} more below`);
+      more.href = '#cost';
+      more.addEventListener('click', (ev) => { ev.preventDefault(); document.getElementById('cost').scrollIntoView({ behavior: 'smooth' }); });
+      p.appendChild(more);
     }
-    if (v.lines.length) {
-      const ul = el('ul', 'lines');
-      v.lines.forEach(([k, nodes]) => {
-        const li = el('li');
-        li.appendChild(el('span', 'k', k));
-        const vv = el('span', 'v');
-        nodes.forEach((n) => vv.appendChild(n));
-        li.appendChild(vv);
-        ul.appendChild(li);
-      });
-      c.appendChild(ul);
-    }
-    c.appendChild(el('p', 'foot', 'Green is better, red is worse, grey is a small move: smaller than the typical change between closures for that reading and world. Each world is one seeded run, so small moves can be chance. Hover any chip for the sentence.'));
-    app.appendChild(c);
+    app.appendChild(p);
   }
 
-  // A goal reading: one row per world, the numbers on the left and a wide trend
-  // over every closure on the right, the first reading drawn as a dashed line.
-  function goalCard(M, key) {
-    const spec = READINGS[key];
-    const i = M.sel, j = M.prevOf(i), f = M.firstIndex;
-    const c = el('div', 'card goal');
-    c.appendChild(el('h3', null, `${spec.label}: ${progressText(M, key).replace(/^./, (s) => s.toLowerCase())}`));
-    const metric = el('p', 'metric');
-    metric.appendChild(directionTag(spec.better));
-    metric.appendChild(document.createTextNode(`  ${spec.unit} · the first reading is ${M.points[f] ? M.points[f].title : 'not stored'}`));
-    c.appendChild(metric);
-    c.appendChild(el('p', 'def', spec.def));
-    const ticks = dateTicks(M.points.map((p) => p.date), 6);
-    const rows = el('div', 'wrows');
-    M.worlds.forEach((w, wi) => {
-      const row = el('div', 'wrow');
-      const cell = el('div', 'wcell');
-      const wn = el('div', 'wname', w.name);
-      wn.title = WORLD_INFO[w.short] || '';
-      cell.appendChild(wn);
-      const cur = M.vals[key][wi][i];
-      const big = el('div', 'big', valueText(spec, cur));
-      if (spec.extra) big.title = spec.extra(M.points[i], w);
-      if (spec.extra && spec.kind === 'share') big.appendChild(el('small', null, spec.extra(M.points[i], w)));
-      cell.appendChild(big);
-      const r1 = el('div', 'rowc');
-      r1.appendChild(chip(M.judgeAt(key, wi, i)));
-      r1.appendChild(el('span', null, j >= 0 ? `vs ${M.points[j].name}` : 'first closure'));
-      cell.appendChild(r1);
-      const first = M.vals[key][wi][f];
-      const r2 = el('div', 'rowc');
-      if (fin(first) && fin(cur) && i !== f) {
-        r2.appendChild(chip(judge(spec, cur, first, M.typical[key][wi])));
-        r2.appendChild(el('span', null, `since the first reading, ${valueText(spec, first)}`));
-      } else r2.appendChild(el('span', null, i === f ? 'this is the first reading' : 'no first reading'));
-      cell.appendChild(r2);
-      row.appendChild(cell);
-      const plot = el('div', 'plot');
-      row.appendChild(plot);
-      const values = M.vals[key][wi];
-      const fmtV = (v) => valueText(spec, v);
-      linePlot(plot, {
-        n: M.points.length, series: [{ name: spec.label, color: 'var(--s1)', emph: true, values, details: spec.extra ? M.points.map((pt) => (pt.kind === 'world' ? spec.extra(pt, w) : '')) : null }],
-        dom: domainOf([values, [first]], true, 3), step: true, area: true, sel: i, bridge: M.points.map((q) => q.kind === 'gap'), showX: wi === M.worlds.length - 1, height: 92,
-        refLines: fin(first) ? [{ y: first, label: `first reading ${fmtV(first)}` }] : [],
-        yFmt: spec.kind === 'share' ? pctTick : fmtTick, tipFmt: fmtV, label: `${spec.label}, ${w.short}, over every closure`,
-        xTicks: ticks, xLabel: (k) => shortDate(M.points[k].date),
-        tipTitle: (k) => `${w.short} · ${M.points[k].title}`,
-        tipMeta: (k) => (M.points[k].kind === 'gap' ? 'report not stored' : `${shortDate(M.points[k].date)}${M.points[k].changed ? '' : ' · changed nothing'} · click to show this closure`),
-        onPick: (k) => { if (M.points[k].kind === 'world') M.pick(k); },
-      });
-      rows.appendChild(row);
-    });
-    c.appendChild(rows);
-    c.appendChild(el('p', 'note', 'Each closure\'s reading holds until the next closure. The shaded column is the closure shown; click a chart to show another.'));
-    c.appendChild(about(spec));
-    return c;
-  }
-
-  function renderGoals(M, app) {
-    const s1 = band('diversity', '1. Diversity: are many ways of living lasting side by side?', 'Both readings should rise above their first reading and stay there; that is the diversity half of the success definition. Higher is better.');
-    const st1 = el('div', 'stack');
-    st1.appendChild(goalCard(M, 'clades'));
-    st1.appendChild(goalCard(M, 'even'));
-    s1.appendChild(st1);
-    app.appendChild(s1);
-    const s2 = band('cognition', '2. Cognition: does behaviour depend on memory?', 'Memory use should rise above its first reading and stay there; that is the cognition half of the success definition. Learning and prediction are not measured yet, so memory use is the only cognition reading.');
-    const st2 = el('div', 'stack');
-    st2.appendChild(goalCard(M, 'memory'));
-    s2.appendChild(st2);
-    app.appendChild(s2);
-  }
-
-  function renderGuards(M, app) {
-    const s = band('guardrails', '3. Guardrails: did anything break?', 'Three things every closure must keep: the worlds stay alive, mutations keep producing new behaviour, and compute cost does not jump.');
-    const g = el('div', 'guards');
-    const i = M.sel, pt = M.points[i];
-    // Alive
-    {
-      const spec = READINGS.population;
-      const c = el('div', 'card guard');
-      c.appendChild(el('h3', null, 'Worlds alive'));
-      const dead = M.worlds.filter((w, wi) => M.vals.population[wi][i] === 0);
-      const measured = M.worlds.filter((w, wi) => fin(M.vals.population[wi][i]));
-      c.appendChild(el('p', 'state ' + (!measured.length ? 'na' : dead.length ? 'check' : 'ok'), !measured.length ? 'Not measured.' : dead.length ? `Extinct: ${listText(dead.map((w) => w.short))}.` : `All ${measured.length} worlds survived the full run.`));
-      c.appendChild(el('p', 'def', spec.def));
-      M.worlds.forEach((w, wi) => {
-        const r = el('div', 'grow');
-        r.appendChild(el('span', 'wn', w.short));
-        const gv = el('span', 'gv');
-        gv.appendChild(el('b', null, valueText(spec, M.vals.population[wi][i])));
-        gv.appendChild(chip(M.judgeAt('population', wi, i)));
-        gv.appendChild(el('span', 'note', spec.extra(pt, w)));
-        r.appendChild(gv);
-        c.appendChild(r);
-      });
-      c.appendChild(about(spec));
-      g.appendChild(c);
-    }
-    // Evolvability floor, as a bullet graph per world.
-    {
-      const spec = READINGS.floor;
-      const c = el('div', 'card guard');
-      c.appendChild(el('h3', null, 'Mutations still change behaviour'));
-      const judged = M.worlds.filter((w, wi) => fin(M.vals.floor[wi][i]) && fin(F12_FLOORS[w.short]));
-      const below = judged.filter((w) => M.vals.floor[M.worlds.indexOf(w)][i] < F12_FLOORS[w.short]);
-      const missing = M.worlds.length - judged.length;
-      c.appendChild(el('p', 'state ' + (!judged.length ? 'na' : below.length ? 'check' : 'ok'),
-        (!judged.length ? 'Not measured in this closure.' : below.length ? `Below the floor: ${listText(below.map((w) => w.short))}.` : `At or above the floor in ${judged.length} of ${judged.length} measured worlds.`) + (missing && judged.length ? ` ${missing} not measured.` : '')));
-      c.appendChild(el('p', 'def', spec.def));
-      let hi = 0;
-      M.worlds.forEach((w, wi) => { [M.vals.floor[wi][i], F12_FLOORS[w.short]].forEach((v) => { if (fin(v)) hi = Math.max(hi, v); }); });
-      hi = Math.max(0.05, hi * 1.25);
-      M.worlds.forEach((w, wi) => {
-        const v = M.vals.floor[wi][i], fl = F12_FLOORS[w.short];
-        const r = el('div', 'grow');
-        r.appendChild(el('span', 'wn', w.short));
-        const gv = el('div');
-        const top = el('span', 'gv');
-        top.appendChild(el('b', null, valueText(spec, v)));
-        top.appendChild(chip(M.judgeAt('floor', wi, i)));
-        top.appendChild(el('span', 'note', fin(fl) ? `floor ${pct(fl)}` : 'no floor'));
-        gv.appendChild(top);
-        const svg = svgEl('svg', { class: 'bullet', viewBox: '0 0 300 14', preserveAspectRatio: 'none', role: 'img', 'aria-label': `${w.short}: ${valueText(spec, v)} against floor ${pct(fl)}` });
-        svg.appendChild(svgEl('rect', { x: 0, y: 3, width: 300, height: 8, rx: 2, fill: 'var(--raised)' }));
-        if (fin(fl)) svg.appendChild(svgEl('rect', { x: 0, y: 3, width: (fl / hi) * 300, height: 8, rx: 2, fill: 'var(--grid)' }));
-        if (fin(v)) svg.appendChild(svgEl('rect', { x: 0, y: 5, width: (v / hi) * 300, height: 4, rx: 1, fill: fin(fl) && v < fl ? 'var(--bad)' : 'var(--ink-2)' }));
-        if (fin(fl)) svg.appendChild(svgEl('rect', { x: (fl / hi) * 300 - 1, y: 0, width: 2, height: 14, fill: 'var(--ink)' }));
-        gv.appendChild(svg);
-        r.appendChild(gv);
-        c.appendChild(r);
-      });
-      c.appendChild(el('p', 'note', 'Bar: this closure. Tick: the floor.'));
-      c.appendChild(about(spec));
-      g.appendChild(c);
-    }
-    // Compute cost
-    {
-      const c = el('div', 'card guard cost');
-      c.appendChild(el('h3', null, 'Compute cost'));
-      const runs = costOf(M, pt);
-      const worst = worstLevel(runs), wall = wallWorst(runs);
-      const wallText = wall ? ` Wall clock ${pctChange(wall.run.wall.d)} in the ${wall.run.label.toLowerCase()} (${wall.run.wall.level}, host-dependent).` : '';
-      c.appendChild(el('p', 'state ' + (worst || wall ? 'check' : runs.some((r) => r.counters) ? 'ok' : 'na'), (worst ? `${worst.run.label}: ${worst.c.name} ${pctChange(worst.c.d)} (${worst.rank === 2 ? 'severe' : 'flag'}).` : runs.some((r) => r.counters) ? 'Every work counter is within its limit.' : 'No stored comparison.') + wallText));
-      c.appendChild(el('p', 'def', 'Work per creature-tick (one creature simulated for one tick), against the earlier closure each report compares itself with. Lower is cheaper.'));
-      runs.forEach((r) => {
-        const h = el('h4', null, `${r.label} `);
-        h.appendChild(el('small', null, r.missing ? `(${r.what}): ${r.missing}` : `(${r.what}) vs ${r.refTitle}`));
-        c.appendChild(h);
-        if (r.missing) return;
-        const chips = el('div', 'chips');
-        const loud = r.counters.filter((x) => x.level !== 'ok').sort((a, b) => b.d - a.d);
-        loud.forEach((x) => {
-          const ch = el('span', `chip ${x.level}`, `${x.name} ${pctChange(x.d)} · ${x.level}`);
-          ch.title = `${x.name} per creature-tick changed ${pctChange(x.d)}; flag at +${r.work.flag}%, severe at +${r.work.severe}%; ${fmt(x.d / r.work.flag, 1)}× the flag.`;
-          chips.appendChild(ch);
-        });
-        if (r.wall) {
-          const ch = el('span', `chip ${r.wall.level === 'ok' ? 'small' : r.wall.level}`, `wall clock ${pctChange(r.wall.d)}${r.wall.level === 'ok' ? '' : ' · ' + r.wall.level}`);
-          ch.title = `Elapsed time per creature-tick: flag at +${r.wallLimits.flag}%, severe at +${r.wallLimits.severe}%. Depends on the host, so it never decides a closure on its own.`;
-          chips.appendChild(ch);
-        }
-        c.appendChild(chips);
-        const quiet = r.counters.filter((x) => x.level === 'ok');
-        if (quiet.length) c.appendChild(el('p', 'rest', `Within limits: ${quiet.map((x) => `${x.name} ${pctChange(x.d)}`).join(', ')}.`));
-      });
-      c.appendChild(about({
-        why: 'A feature should not make the simulation much more expensive without a reason. A severe rise needs a written justification at closure.',
-        how: 'Each work counter (mesh hops, VM steps and so on) is divided by creature-ticks and compared with the stored earlier closure. Up to +10% is ok, +10% is a flag, +50% is severe; wall clock uses +25% and +100%.',
-        caveat: 'Wall clock depends on the machine and what else was running; the work counters do not.',
-        path: 'comparison.references[].counters[] and .wall_clock',
-      }));
-      g.appendChild(c);
-    }
-    s.appendChild(g);
-    app.appendChild(s);
-  }
-
-  function renderTimeline(M, app) {
-    const s = band('history', '4. Closure history: which feature moved what?', `Newest first. Each row compares a closure with the one before it; each cell shows ${M.worlds.map((w) => w.short).join(', then ')}. Click a row to show that closure everywhere on this page.`);
-    const sameCount = M.points.filter((p) => p.kind === 'world' && !p.changed).length;
-    const ctl = el('div', 'tl-controls');
-    const lab = el('label');
-    const box = el('input'); box.type = 'checkbox'; box.checked = !!M.showSame;
-    lab.appendChild(box);
-    lab.appendChild(document.createTextNode(` Show the ${sameCount} closures that changed nothing`));
-    ctl.appendChild(lab);
-    s.appendChild(ctl);
-    const card = el('div', 'card');
-    const wrap = el('div', 'tbl');
-    const t = el('table', 'timeline');
+  // The closure register: a ruled ledger, newest first. Runs of closures that
+  // changed nothing fold into one row.
+  function renderRegister(M, app) {
+    const s = part('register', 'Closure register', 'Newest first.');
+    s.classList.add('rule-top');
+    const wrap = el('div', 'ledger');
+    const t = el('table');
     const hr = el('tr');
-    ['Closure', 'Run', 'Founder families', 'Even spread', 'Memory use', 'Floor', 'Cost'].forEach((h) => hr.appendChild(el('th', null, h)));
+    const sw = () => { const sp = el('span', 'sw'); M.worlds.forEach((w) => { const i = el('i'); i.style.background = plotHex(w.short); sp.appendChild(i); }); return sp; };
+    ['No.', 'Run', 'Closure'].forEach((h) => hr.appendChild(el('th', null, h)));
+    GOAL_KEYS.forEach((key) => {
+      const th = el('th', null, READINGS[key].short);
+      th.appendChild(sw());
+      hr.appendChild(th);
+      if (key === 'floor') hr.appendChild(el('th', null, 'Floor'));
+    });
+    hr.appendChild(el('th', null, 'Cost'));
     const thead = el('thead'); thead.appendChild(hr); t.appendChild(thead);
     const tb = el('tbody');
+    const ordinal = new Map();
+    M.points.filter((p) => p.kind === 'world').forEach((p, k) => ordinal.set(p, k + 1));
+    let fold = [];
+    const flushFold = () => {
+      if (!fold.length) return;
+      const items = fold;
+      fold = [];
+      const tr = el('tr', 'fold');
+      const td = el('td', null, `${items.length} ${items.length === 1 ? 'closure' : 'closures'} changed nothing or stored no report: ${items.map((p) => p.id || p.name).join(', ')}`);
+      td.colSpan = 8;
+      tr.appendChild(td);
+      tr.addEventListener('click', () => { M.unfold = true; M.render(); });
+      tb.appendChild(tr);
+    };
     for (let i = M.points.length - 1; i >= 0; i--) {
       const pt = M.points[i];
+      const quiet = pt.kind === 'gap' || (!pt.changed && M.prevOf(i) >= 0);
+      if (quiet && !M.unfold && i !== M.sel) { fold.push(pt); continue; }
+      flushFold();
       const tr = el('tr');
       if (pt.kind === 'gap') {
-        tr.className = 'same';
-        const td = el('td', 'name'); td.appendChild(el('b', null, pt.id)); td.appendChild(el('small', null, pt.loadFailed ? 'report could not be loaded' : 'report not stored'));
+        tr.appendChild(el('td', 'no', '—'));
+        tr.appendChild(el('td', null, ''));
+        const td = el('td', 'name'); td.appendChild(el('b', null, pt.id)); td.appendChild(el('code', null, pt.loadFailed ? 'could not be loaded' : 'not stored'));
         tr.appendChild(td);
-        const why = el('td', null, pt.reason || ''); why.colSpan = 6; why.style.whiteSpace = 'normal';
+        const why = el('td', 'small', pt.reason || ''); why.colSpan = 5; why.style.whiteSpace = 'normal';
         tr.appendChild(why);
-        tr.style.cursor = 'default';
-        if (!M.showSame && !pt.loadFailed) tr.hidden = true;
         tb.appendChild(tr);
         continue;
       }
+      tr.dataset.i = String(i);
       if (i === M.sel) tr.classList.add('sel');
-      if (!pt.changed) { tr.classList.add('same'); if (!M.showSame && i !== M.sel) tr.hidden = true; }
-      const nameTd = el('td', 'name');
-      nameTd.appendChild(el('b', null, pt.name));
-      if (pt.id && pt.id !== pt.name) nameTd.appendChild(el('small', null, pt.id));
-      if (!pt.changed && M.prevOf(i) >= 0) nameTd.appendChild(el('small', null, '· changed nothing'));
-      tr.appendChild(nameTd);
-      tr.appendChild(el('td', null, pt.date));
+      tr.appendChild(el('td', 'no', String(ordinal.get(pt)).padStart(2, '0')));
+      tr.appendChild(el('td', null, shortDate(pt.date)));
+      const nm = el('td', 'name');
+      nm.appendChild(el('b', null, pt.name));
+      if (pt.id && pt.id !== pt.name) nm.appendChild(el('code', null, pt.id));
+      if (!pt.changed && M.prevOf(i) >= 0) nm.appendChild(el('code', null, 'changed nothing'));
+      tr.appendChild(nm);
       GOAL_KEYS.forEach((key) => {
         const td = el('td');
-        const mini = el('span', 'mini');
+        const trio = el('span', 'trio');
         M.worlds.forEach((w, wi) => {
           const jd = M.judgeAt(key, wi, i);
-          const m = el('span', `mchip ${jd.tone}`, jd.tone === 'flat' ? '·' : jd.tone === 'na' ? '—' : jd.text.replace(' ', '').replace(' pts', ''));
+          const m = el('span', `mc ${jd.tone}`, jd.tone === 'flat' ? '·' : jd.tone === 'na' ? '—' : jd.signed.replace(' pts', ''));
           m.title = `${w.short}: ${valueText(READINGS[key], M.vals[key][wi][i])}. ${jd.say}`;
-          mini.appendChild(m);
+          m.style.setProperty('--c', plotHex(w.short));
+          trio.appendChild(m);
         });
-        td.appendChild(mini);
+        td.appendChild(trio);
         tr.appendChild(td);
-      });
-      {
+        if (key !== 'floor') return;
         const judged = M.worlds.filter((w, wi) => fin(M.vals.floor[wi][i]) && fin(F12_FLOORS[w.short]));
         const below = judged.filter((w) => M.vals.floor[M.worlds.indexOf(w)][i] < F12_FLOORS[w.short]);
-        const td = el('td');
-        td.appendChild(el('span', 'mchip ' + (!judged.length ? 'na' : below.length ? 'bad' : 'good'), !judged.length ? '—' : below.length ? `${below.length} below` : 'held'));
-        tr.appendChild(td);
-      }
+        tr.appendChild(el('td', null)).appendChild(el('span', 'mc ' + (!judged.length ? 'na' : below.length ? 'bad' : 'good'), !judged.length ? '—' : below.length ? `${below.length} below` : 'held'));
+      });
       {
         const runs = costOf(M, pt);
         const worst = worstLevel(runs), wall = wallWorst(runs);
-        const td = el('td');
         const m = worst
-          ? el('span', 'mchip ' + (worst.rank === 2 ? 'severe' : 'flag'), `${worst.rank === 2 ? 'severe' : 'flag'}: ${worst.c.name} ${pctChange(worst.c.d)}`)
-          : wall ? el('span', 'mchip flag', `wall clock ${pctChange(wall.run.wall.d)}`)
-            : el('span', 'mchip ' + (runs.some((r) => r.counters) ? 'flat' : 'na'), runs.some((r) => r.counters) ? 'ok' : '—');
-        if (worst) m.title = `${worst.run.label} vs ${worst.run.refTitle}`;
-        else if (wall) m.title = `${wall.run.label} vs ${wall.run.refTitle}; wall clock depends on the host`;
-        td.appendChild(m);
-        tr.appendChild(td);
+          ? el('span', 'mc ' + (worst.rank === 2 ? 'severe' : 'flag'), `${worst.c.name} ${pctChange(worst.c.d)}`)
+          : wall ? el('span', 'mc flag', `wall clock ${pctChange(wall.run.wall.d)}`)
+            : el('span', 'mc', runs.some((r) => r.counters) ? 'ok' : '—');
+        if (worst) m.title = `${worst.run.label} vs ${worst.run.refTitle} (${worst.rank === 2 ? 'severe' : 'flag'})`;
+        tr.appendChild(el('td', 'cost')).appendChild(m);
       }
-      tr.addEventListener('click', () => { M.pick(i); document.getElementById('top').scrollIntoView(); });
+      tr.addEventListener('mouseenter', () => placeHover(M, i));
+      tr.addEventListener('mouseleave', () => placeHover(M, null));
+      tr.addEventListener('click', () => { M.pick(i); window.scrollTo({ top: 0, behavior: 'smooth' }); });
       tb.appendChild(tr);
     }
+    flushFold();
     t.appendChild(tb);
     wrap.appendChild(t);
-    card.appendChild(wrap);
-    card.appendChild(el('p', 'note', 'Arrows show the change from the previous closure in each world: green better, red worse, grey a small move, a dot no change. Memory use moves in percentage points. Hover for the numbers.'));
-    s.appendChild(card);
-    box.addEventListener('change', () => { M.showSame = box.checked; M.render(); });
+    s.appendChild(wrap);
+    if (M.unfold) { const a = el('a', 'small', 'Fold the closures that changed nothing'); a.href = '#register'; a.style.display = 'inline-block'; a.style.marginTop = '8px'; a.addEventListener('click', (ev) => { ev.preventDefault(); M.unfold = false; M.render(); }); s.appendChild(a); }
     app.appendChild(s);
   }
 
-  // ── Explore: everything else, folded by topic and drawn on first open ────
+  // ── Supplementary census: everything else, folded by topic ───────────────
   const CAUSE_NAMES = (k) => k.replace(/_/g, ' ');
   function topics(M) {
     const share = { yFmt: pctTick, tipFmt: pct };
     const sel = () => M.points[M.sel];
     return [
       {
-        key: 'pop', title: 'Population and energy', hint: 'how many live, how they die, where energy goes',
+        key: 'pop', title: 'Population and energy', hint: 'population, deaths, energy, food',
         cards: () => [
-          closuresChart(M, {
-            title: 'Population at the end and at its lowest', better: 'up', unit: 'creatures',
-            def: 'Creatures alive at the last tick (blue) and the fewest alive at any checkpoint (orange). A low point near zero means the world nearly died out.',
+          closureLines(M, {
+            title: 'Population at the end and at its lowest', better: 'up',
+            def: 'Alive at tick 2,000 (the plot colour) and the fewest alive at any checkpoint (dashed).',
             series: [
-              { name: 'at the end', color: SERIES[0], emph: true, read: (pt, w) => pop(pt.rep, w.seed).final_population },
-              { name: 'lowest point', color: SERIES[1], read: (pt, w) => pop(pt.rep, w.seed).minimum_population },
+              { name: 'at the end', read: (pt, w) => pop(pt.rep, w.seed).final_population },
+              { name: 'lowest point', read: (pt, w) => pop(pt.rep, w.seed).minimum_population },
             ],
-            why: 'A world that nearly empties can lose most of its families at once.', how: 'population_persistence at the last tick and its minimum over 20 checkpoints.', path: 'goal_indicators.population_persistence.per_seed[].{final_population,minimum_population}',
+            why: 'A near-empty plot loses families fast.', how: 'Population at tick 2,000, and its minimum over 20 checkpoints.', path: 'goal_indicators.population_persistence.per_seed[].{final_population,minimum_population}',
           }),
-          closuresChart(M, {
-            title: 'Births over the whole run', better: null, unit: 'births',
-            def: 'All births in the 2,000 ticks. More turnover means more generations for evolution to act on. Deaths track births closely; the gap between them is the population change.',
-            series: [{ name: 'births', color: SERIES[0], emph: true, read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'births'), detail: (pt, w) => `${fmtInt(num(get(worldCase(pt.rep, w.name), 'mortality.deaths_total')))} deaths` }],
+          closureLines(M, {
+            title: 'Births per run', better: null,
+            def: 'All births in 2,000 ticks. More births, more generations to evolve. Hover for deaths.',
+            series: [{ name: 'births', read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'births'), detail: (pt, w) => `${fmtInt(num(get(worldCase(pt.rep, w.name), 'mortality.deaths_total')))} deaths` }],
             path: 'deterministic.per_seed[].births; cases[].mortality.deaths_total',
           }),
-          checkpointChart(M, {
-            title: 'Population through the run', better: null, log: true, unit: 'creatures',
-            def: 'Creatures alive at each checkpoint (every 100 ticks), for the shown closure and the one before. Every world booms toward the 100,000 cap, then crashes as the first food runs out.',
+          checkpointLines(M, {
+            title: 'Population through the run', better: null, log: true,
+            def: 'Alive every 100 ticks: this closure against the one before.',
             read: (s) => s.population, path: 'population_persistence.per_seed[].samples[].population',
           }),
-          pairBars(M, {
+          dumbbells(M, {
             title: 'What creatures died of', better: null, fmt: pct, top: 6,
-            def: 'What took each creature\'s last energy, as a share of all deaths in the run: the cost of a move, lifecycle decay, an eat, and so on. A jump in one cause usually explains a population change.',
+            def: 'What used up each creature\'s last energy. Share of all deaths.',
             items: (pt, w) => { const m = get(worldCase(pt.rep, w.name), 'mortality'); const t = num(get(m, 'deaths_total')); return m ? Object.entries(m.by_cause || {}).map(([k, v]) => ({ key: k, name: CAUSE_NAMES(k), value: ratio(num(v), t) })) : []; },
             path: 'cases[].mortality.by_cause / deaths_total',
           }),
-          pairBars(M, {
+          dumbbells(M, {
             title: 'Where the energy went', better: null, fmt: pct, top: 6,
-            def: 'Each kind of energy spending as a share of all spending in the run: living, acting, thinking, carrying a genome, raising offspring.',
+            def: 'Where energy was spent. Share of all spending.',
             items: (pt, w) => {
               const ef = get(worldCase(pt.rep, w.name), 'energy_flows');
               if (!ef) return [];
-              // Spending is every flow except credits, food intake and the exposure and definition fields.
               const keys = Object.keys(ef).filter((k) => !/_credit$/.test(k) && !['definition', 'food_intake_by_type', 'genome_size_creature_ticks'].includes(k));
               const val = (k) => (k === 'action_charges' ? sum(Object.values(ef.action_charges || {}).map(num)) : num(ef[k]));
               const total = sum(keys.map(val));
@@ -1769,127 +1447,131 @@
             },
             path: 'cases[].energy_flows.*',
           }),
-          checkpointChart(M, {
-            title: 'Food on the ground through the run', better: null, unit: 'food',
-            def: 'All food summed over the map at each checkpoint. Food that never recovers after the early boom limits how many creatures the world can hold.',
+          checkpointLines(M, {
+            title: 'Food on the ground through the run', better: null,
+            def: 'All food on the map, every 100 ticks.',
             read: (s) => (Array.isArray(s.food_density_total) ? sum(s.food_density_total.map(num)) : NaN), path: 'samples[].food_density_total[]',
           }),
-          checkpointChart(M, {
-            title: 'Grazed ground through the run', better: null, yFmt: pctTick, tipFmt: pct, unit: 'of cells',
-            def: 'Share of the founders\' food cells (type 0) that are grazed down at each checkpoint. Not measured before T02.F04.',
+          checkpointLines(M, {
+            title: 'Grazed ground through the run', better: null, yFmt: pctTick, tipFmt: pct,
+            def: 'Share of grass cells grazed down, every 100 ticks. Not measured before T02.F04.',
             read: (s) => get(s, 'grazed_cell_share.0'), path: 'samples[].grazed_cell_share[0]',
           }),
         ],
       },
       {
-        key: 'ways', title: 'Ways of living', hint: 'families through the run, what they do, where they live, what they eat',
+        key: 'ways', title: 'Ways of living', hint: 'families, what they do, where they live, what they eat',
         cards: () => {
           const out = [
-            checkpointChart(M, {
-              title: 'Founder families alive through the run', better: 'up', log: true, unit: 'families',
-              def: 'Families with a living member at each checkpoint. Thousands survive the boom; the count at the end is the headline reading.',
+            closureLines(M, {
+              title: 'Founder families alive, by closure', better: 'up', log: true, tipFmt: fmtInt,
+              def: READINGS.clades.def,
+              series: [{ name: 'families alive', read: READINGS.clades.read }],
+              path: READINGS.clades.path,
+            }),
+            closureLines(M, {
+              title: 'Even spread of families, by closure', better: 'up', tipFmt: (v) => fmt(v, 1),
+              def: READINGS.even.def,
+              series: [{ name: 'effective families', read: READINGS.even.read }],
+              path: READINGS.even.path,
+            }),
+            checkpointLines(M, {
+              title: 'Founder families alive through the run', better: 'up', log: true,
+              def: 'Families with a living member, every 100 ticks.',
               read: (s) => s.surviving_founder_clade_count, path: 'samples[].surviving_founder_clade_count',
             }),
           ];
           {
-            const c = chartCard({ title: `What the largest families do, at ${sel().name}`, better: null, def: 'The ten largest surviving families per world: size, energy, age, generation, genome size, and what share of their actions are eating, moving, resting (NoOp), reproducing and stealing.', path: 'cases[].surviving_clade_profiles.rows[]' });
-            const grid = el('div', 'stack');
+            const c = chartCard({ title: `What the largest families do, at ${sel().name}`, better: null, def: 'Top 10 families per plot, and what they spend their actions on.', path: 'cases[].surviving_clade_profiles.rows[]' });
             M.worlds.forEach((w) => {
               const rows = (get(worldCase(sel().rep, w.name), 'surviving_clade_profiles.rows') || []).slice().sort((a, b) => num(b.size) - num(a.size));
-              grid.appendChild(el('div', 'pn', `${w.short}: ${rows.length ? rows.length + ' families alive' : 'not measured'}`));
+              c.body.appendChild(el('div', 'pn', `${plotLabel(w)}: ${rows.length ? rows.length + ' families alive' : 'not measured'}`));
               if (!rows.length) return;
               const ACTS = ['Eat', 'Move', 'NoOp', 'Reproduce', 'StealEnergy'];
-              grid.appendChild(table(['Family', 'Size', 'Energy', 'Age', 'Generation', 'Genome', 'Eat', 'Move', 'Rest', 'Reproduce', 'Steal'],
+              c.body.appendChild(table(['Family', 'Size', 'Energy', 'Age', 'Generation', 'Genome', 'Eat', 'Move', 'Rest', 'Reproduce', 'Steal'],
                 rows.slice(0, 10).map((r) => { const acts = sum(Object.values(r.actions_by_type || {}).map(num)); return [String(r.lineage_id), fmtInt(num(r.size)), fmt(num(r.mean_energy), 1), fmtInt(num(r.mean_age)), fmt(num(r.mean_generation), 1), fmtInt(num(r.mean_genome_size)), ...ACTS.map((a) => pct(ratio(num(get(r, `actions_by_type.${a}`)), acts)))]; }),
                 (k) => k > 0));
             });
-            c.body.appendChild(grid);
             out.push(c.card);
           }
           {
-            const c = chartCard({ title: `How many families share each patch of the map, at ${sel().name}`, better: 'up', def: 'The map cut into a 16 × 16 grid at the last checkpoint; darker cells hold more distinct families. Many dark cells means families live side by side, not in separate corners.', path: 'samples[last].occupancy_grid.distinct_clades' });
-            const grid = el('div', 'panels');
+            const c = chartCard({ title: `Families sharing each map patch, at ${sel().name}`, better: 'up', def: 'Distinct families per cell of a 16 × 16 grid. Lighter: more families side by side.', path: 'samples[last].occupancy_grid.distinct_clades' });
+            const cells = [];
             let hi = 1;
-            const gs = M.worlds.map((w) => { const g = get(lastSample(sel().rep, w.seed), 'occupancy_grid'); if (g && Array.isArray(g.distinct_clades)) g.distinct_clades.forEach((v) => { if (num(v) > hi) hi = num(v); }); return g; });
-            M.worlds.forEach((w, wi) => {
-              const pane = el('div', 'panel');
-              pane.appendChild(el('div', 'pn', w.short));
-              const g = gs[wi];
+            M.worlds.forEach((w) => {
+              const g = get(lastSample(sel().rep, w.seed), 'occupancy_grid');
               const cx = num(get(g, 'cells_x')), cy = num(get(g, 'cells_y'));
-              if (!(cx > 0 && cy > 0 && Array.isArray(get(g, 'distinct_clades')))) { pane.appendChild(el('p', 'note', 'not measured')); grid.appendChild(pane); return; }
-              const cell = 12;
-              const svg = svgEl('svg', { viewBox: `0 0 ${cx * cell} ${cy * cell}`, width: cx * cell, height: cy * cell, role: 'img', 'aria-label': `Distinct families per map cell, ${w.short}` });
-              svg.style.maxWidth = '220px';
+              if (!(cx > 0 && cy > 0 && Array.isArray(get(g, 'distinct_clades')))) return;
               for (let y = 0; y < cy; y++) for (let x = 0; x < cx; x++) {
                 const v = num(g.distinct_clades[y * cx + x]), p = num((g.population || [])[y * cx + x]);
-                const r = svgEl('rect', { x: x * cell + 0.5, y: y * cell + 0.5, width: cell - 1, height: cell - 1, rx: 1.5, fill: !fin(v) ? 'var(--page)' : v === 0 ? 'var(--grid)' : SEQ[Math.min(SEQ.length - 1, Math.floor((v / hi) * (SEQ.length - 1)))] });
-                r.addEventListener('pointermove', (ev) => showTip(ev, `${w.short} · cell ${x}, ${y}`, '', [{ color: 'var(--s1)', name: 'distinct families', value: fmtInt(v) }, { color: 'transparent', name: 'creatures', value: fmtInt(p) }]));
-                r.addEventListener('pointerleave', hideTip);
-                svg.appendChild(r);
+                if (fin(v)) { cells.push({ w: w.short, x, y, v, p }); hi = Math.max(hi, v); }
               }
-              pane.appendChild(svg);
-              grid.appendChild(pane);
             });
-            c.body.appendChild(grid);
+            const host = el('div', 'fig');
+            c.body.appendChild(host);
+            if (!cells.length) c.body.appendChild(el('p', 'small', 'Not measured in this closure.'));
+            else figure(host, (width) => {
+              const fig = Plot.plot({
+                width: Math.min(width, 1000), height: Math.min(width, 1000) / 3 + 30, style: PLOT_STYLE, marginLeft: 8, marginRight: 8, marginTop: 24, marginBottom: 6,
+                fx: { domain: M.worlds.map((w) => w.short), label: null, padding: 0.08, tickFormat: (s) => `Plot ${(M.worlds.find((w) => w.short === s) || {}).seed} · ${s}` },
+                x: { axis: null, domain: d3.range(16) }, y: { axis: null, domain: d3.range(16) },
+                color: { type: 'linear', domain: [0, hi], range: ['#1c2a3a', '#9ec5f4'] },
+                marks: [
+                  Plot.cell(cells, { fx: 'w', x: 'x', y: 'y', fill: (d) => (d.v === 0 ? HEX.sheet2 : d.v), inset: 0.6, rx: 1.5 }),
+                  Plot.cell(cells, Plot.pointer({ fx: 'w', x: 'x', y: 'y', fill: 'none', stroke: HEX.ink, strokeWidth: 1.5 })),
+                ],
+              });
+              wire(M, fig, (d) => [`Plot ${(M.worlds.find((w) => w.short === d.w) || {}).seed} · ${d.w} · cell ${d.x}, ${d.y}`, ''], (d) => [{ color: '#9ec5f4', name: 'distinct families', value: fmtInt(d.v) }, { color: 'transparent', name: 'creatures', value: fmtInt(d.p) }], { pick: false });
+              return fig;
+            });
             const sc = el('div', 'scale'); sc.appendChild(el('span', null, '0 families')); sc.appendChild(el('i')); sc.appendChild(el('span', null, `${fmtInt(hi)} families`));
             c.body.appendChild(sc);
             out.push(c.card);
           }
-          out.push(closuresChart(M, {
-            title: 'Which foods get eaten', better: null, ...share, unit: 'of bites',
-            def: 'Share of all bites taken from each food type. Founders eat only type 0 (grass); any bite of type 1 (fruit) means a family found a new food, a new way of living.',
-            series: [0, 1].map((t) => ({ name: `type ${t}${t === 0 ? ' (grass)' : ' (fruit)'}`, color: SERIES[t], read: (pt, w) => get(worldCase(pt.rep, w.name), `typed_eat_share.${t}`) })),
+          out.push(closureLines(M, {
+            title: 'Which foods get eaten', better: null, ...share,
+            def: 'Share of bites by food. Founders eat only grass; fruit bites mean a new way of living.',
+            series: [{ name: 'grass (type 0)', read: (pt, w) => get(worldCase(pt.rep, w.name), 'typed_eat_share.0') }, { name: 'fruit (type 1)', read: (pt, w) => get(worldCase(pt.rep, w.name), 'typed_eat_share.1') }],
             path: 'cases[].typed_eat_share[]',
           }));
-          out.push(closuresChart(M, {
-            title: 'Predation', better: null, unit: 'per run',
-            def: 'Attempts to steal energy from another creature, and the attempts that killed the victim. Predation is a second way of making a living.',
-            series: [
-              { name: 'attempts', color: SERIES[0], read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.actions_attempted_total') },
-              { name: 'kills', color: SERIES[1], read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.kills_total') },
-            ],
+          out.push(closureLines(M, {
+            title: 'Predation', better: null,
+            def: 'Attempts to steal energy, and kills. A second way of living.',
+            series: [{ name: 'attempts', read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.actions_attempted_total') }, { name: 'kills', read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.kills_total') }],
             path: 'cases[].predation.{actions_attempted_total,kills_total}',
           }));
           return out;
         },
       },
       {
-        key: 'cog', title: 'Cognition', hint: 'whether memory pays, which memory is used, what creatures sense',
+        key: 'cog', title: 'Cognition', hint: 'does memory pay, which memory, what they sense',
         cards: () => {
           const CLASSES = [['none', 'no memory or learning'], ['plasticity', 'learning weights'], ['shared_memory', 'shared memory'], ['stateful', 'stateful nodes']];
           const byClass = (field) => (pt, w) => CLASSES.map(([k, name]) => { const b = get(worldCase(pt.rep, w.name), `reproductive_success_by_cognitive_class.by_class.${k}`) || {}; return { key: k, name, value: ratio(num(b[field]), num(b.creatures_observed_total)) }; });
           return [
-            pairBars(M, {
-              title: 'Offspring per creature, by kind of brain', better: null, fmt: (v) => fmt(v, 3), sort: false, labelWidth: 150,
-              def: 'Average offspring of creatures that died during the run, grouped by what their brain carries. If memory pays, its bars are longer than "no memory or learning".',
-              items: byClass('offspring_spawned_sum'), path: 'cases[].reproductive_success_by_cognitive_class.by_class.<class>',
-            }),
-            pairBars(M, {
-              title: 'Lifespan, by kind of brain', better: null, fmt: (v) => fmt(v, 0), sort: false, labelWidth: 150,
-              def: 'Average ticks survived, same groups. Longer lives with memory would suggest memory helps creatures survive.',
-              items: byClass('survival_ticks_sum'), path: 'by_class.<class>.survival_ticks_sum / creatures_observed_total',
-            }),
-            closuresChart(M, {
-              title: 'Memory use, by kind of memory', better: 'up', ...share, unit: 'of creatures',
-              def: 'Share of final creatures whose action changes when one kind of remembered state is perturbed: outputs kept from last tick, state inside compute nodes, or earlier memory slots.',
-              series: [['persisted_outputs', 'kept outputs'], ['operator_state', 'node state'], ['previous_slots', 'earlier slots']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => get(gi(pt.rep, 'temporal_memory_sensitivity', w.seed), `${k}.different_from_either_fraction`) })),
+            dumbbells(M, { title: 'Offspring per creature, by kind of brain', better: null, fmt: (v) => fmt(v, 3), sort: false, def: 'Average offspring by brain type. If memory pays, its dot sits right of "no memory or learning".', items: byClass('offspring_spawned_sum'), path: 'cases[].reproductive_success_by_cognitive_class.by_class.<class>' }),
+            dumbbells(M, { title: 'Lifespan, by kind of brain', better: null, fmt: (v) => fmt(v, 0), sort: false, def: 'Average ticks lived, by brain type.', items: byClass('survival_ticks_sum'), path: 'by_class.<class>.survival_ticks_sum / creatures_observed_total' }),
+            closureLines(M, {
+              title: 'Memory use, by kind of memory', better: 'up', ...share,
+              def: 'Creatures whose action changes when one kind of memory is disturbed.',
+              series: [['persisted_outputs', 'kept outputs'], ['operator_state', 'node state'], ['previous_slots', 'earlier slots']].map(([k, name]) => ({ name, read: (pt, w) => get(gi(pt.rep, 'temporal_memory_sensitivity', w.seed), `${k}.different_from_either_fraction`) })),
               path: 'temporal_memory_sensitivity.per_seed[].<kind>.different_from_either_fraction',
             }),
-            closuresChart(M, {
-              title: 'Creatures carrying memory or learning parts', better: null, ...share, unit: 'of creatures',
-              def: 'Share of final creatures whose brain contains each part. Carrying a part is not using it; compare with memory use above.',
-              series: [['has_plasticity', 'learning weights'], ['has_stateful_compute_node', 'stateful node'], ['reads_shared_memory', 'reads shared memory'], ['writes_shared_memory', 'writes shared memory']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => { const r = gi(pt.rep, 'structural_companions', w.seed); return r ? ratio(num(r[k]), num(r.final_creature_count)) : NaN; } })),
+            closureLines(M, {
+              title: 'Creatures carrying memory or learning parts', better: null, ...share,
+              def: 'Creatures whose brain has each part. Having a part is not using it.',
+              series: [['has_plasticity', 'learning weights'], ['has_stateful_compute_node', 'stateful node'], ['reads_shared_memory', 'reads shared memory'], ['writes_shared_memory', 'writes shared memory']].map(([k, name]) => ({ name, read: (pt, w) => { const r = gi(pt.rep, 'structural_companions', w.seed); return r ? ratio(num(r[k]), num(r.final_creature_count)) : NaN; } })),
               path: 'structural_companions.per_seed[]',
             }),
-            closuresChart(M, {
-              title: 'Learning updates that changed a weight', better: null, ...share, unit: 'of updates',
-              def: 'Of all learning updates in the run, the share that actually changed a connection weight. Near zero means the learning machinery runs but does nothing.',
-              series: [['plasticity', 'plasticity'], ['hebbian', 'Hebbian'], ['reward_modulated', 'reward-modulated']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), `cognition.${k}_changes_total`)), num(get(worldCase(pt.rep, w.name), `cognition.${k}_updates_total`))) })),
+            closureLines(M, {
+              title: 'Learning updates that changed a weight', better: null, ...share,
+              def: 'Learning updates that changed a weight. Near 0: learning does nothing.',
+              series: [['plasticity', 'plasticity'], ['hebbian', 'Hebbian'], ['reward_modulated', 'reward-modulated']].map(([k, name]) => ({ name, read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), `cognition.${k}_changes_total`)), num(get(worldCase(pt.rep, w.name), `cognition.${k}_updates_total`))) })),
               path: 'cases[].cognition.<kind>_changes_total / <kind>_updates_total',
             }),
-            pairBars(M, {
-              title: 'What creatures can sense', better: null, fmt: pct, top: 12, labelWidth: 170,
-              def: 'Share of living creatures at the last checkpoint whose brain reads each world input. An input nobody reads cannot shape behaviour.',
+            dumbbells(M, {
+              title: 'What creatures can sense', better: null, fmt: pct, top: 12,
+              def: 'Creatures whose brain reads each input. An unread input cannot shape behaviour.',
               items: (pt, w) => { const s = lastSample(pt.rep, w.seed); const p = num(s.population); return (get(s, 'sensor_census.world_inputs') || []).map((r) => ({ key: r.key, name: r.key, value: ratio(num(r.creatures), p) })); },
               path: 'samples[last].sensor_census.world_inputs[]',
             }),
@@ -1897,102 +1579,109 @@
         },
       },
       {
-        key: 'evo', title: 'Evolvability', hint: 'what mutations do, at birth and after long drift; brain and genome size',
+        key: 'evo', title: 'Evolvability', hint: 'what mutations do, brain and genome size',
         cards: () => [
-          closuresChart(M, {
-            title: 'What a mutation does to offspring', better: 'up', ...share, unit: 'of offspring',
-            def: 'Of 5,000 offspring bred from 50 living genomes: behaves differently (changed), behaves the same (silent), or never acts (dead). The red dashed line is the changed floor.',
+          closureLines(M, {
+            title: 'What a mutation does to offspring', better: 'up', ...share,
+            def: 'Of 5,000 offspring: acts differently (changed), the same (silent), or never acts (dead). Red line: the floor.',
             series: [
-              { name: 'changed', color: SERIES[0], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.changed_per_all_births') },
-              { name: 'silent', color: SERIES[1], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.silent_per_all_births') },
-              { name: 'dead', color: SERIES[2], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.dead_per_all_births') },
+              { name: 'changed', read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.changed_per_all_births') },
+              { name: 'silent', read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.silent_per_all_births') },
+              { name: 'dead', read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.dead_per_all_births') },
             ],
-            ref: (w) => (fin(F12_FLOORS[w.short]) ? { y: F12_FLOORS[w.short], label: `floor ${pct(F12_FLOORS[w.short])}`, floor: true, always: true } : null),
+            ref: (w) => (fin(F12_FLOORS[w.short]) ? { y: F12_FLOORS[w.short], label: `floor ${pct(F12_FLOORS[w.short])}` } : null),
             path: 'cases[].neighborhood_read.{changed,silent,dead}_per_all_births',
           }),
-          closuresChart(M, {
-            title: 'Do mutations still matter after long drift?', better: 'up', ...share, unit: 'of offspring',
-            def: 'Start from the founder, apply 2,000 rounds of mutation with no selection, then breed: the share of offspring that behave differently. It tests whether junk build-up drowns out mutations.',
-            series: [
-              { name: 'after 2,000 rounds', color: SERIES[0], emph: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 2000) },
-              { name: 'after 1,000 rounds', color: SERIES[1], muted: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 1000) },
-            ],
+          closureLines(M, {
+            title: 'Do mutations still matter after long drift?', better: 'up', ...share,
+            def: 'After 2,000 random mutations with no selection: offspring that act differently.',
+            series: [{ name: 'after 2,000 rounds', read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 2000) }, { name: 'after 1,000 rounds', read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 1000) }],
             path: 'cases[].drift_depth.readings[depth].changed_per_all_births',
           }),
-          closuresChart(M, {
-            title: 'Mutations that hit the working part of the brain', better: 'up', ...share, unit: 'of mutations',
-            def: 'Share of mutations that land on brain parts the creature actually runs. Mutations on unused parts change nothing.',
-            series: [{ name: 'on parts in use', color: SERIES[0], emph: true, read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), 'mutation_supply.executed_target_total')), num(get(worldCase(pt.rep, w.name), 'mutation_supply.events_applied_total'))) }],
+          closureLines(M, {
+            title: 'Mutations that hit used brain parts', better: 'up', ...share,
+            def: 'Mutations landing on brain parts the creature actually runs.',
+            series: [{ name: 'on parts in use', read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), 'mutation_supply.executed_target_total')), num(get(worldCase(pt.rep, w.name), 'mutation_supply.events_applied_total'))) }],
             path: 'cases[].mutation_supply.executed_target_total / events_applied_total',
           }),
-          closuresChart(M, {
-            title: 'Brain size that can affect behaviour', better: null, unit: 'parts',
-            def: 'Median number of brain parts reachable from the senses to an action; the shaded range holds the middle half of creatures. Bigger can mean more capable, or just more junk.',
-            series: [{ name: 'median', color: SERIES[0], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.median') }],
-            band: { name: 'middle half of creatures', color: SERIES[0], lo: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p25'), hi: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p75') },
+          closureLines(M, {
+            title: 'Brain size in use', better: null,
+            def: 'Brain parts that can affect actions. Line: median. Shaded: middle half of creatures.',
+            series: [{ name: 'median', read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.median') }],
+            band: { name: 'middle half of creatures', lo: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p25'), hi: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p75') },
             path: 'cases[].reachable_structure_size_distribution',
           }),
-          checkpointChart(M, {
-            title: 'Genome size through the run', better: null, unit: 'units', zero: false,
-            def: 'Average genome size of living creatures at each checkpoint. Steady growth with no change in behaviour usually means junk is piling up.',
+          checkpointLines(M, {
+            title: 'Genome size through the run', better: null, zero: false,
+            def: 'Average genome size, every 100 ticks. Growth without new behaviour means junk.',
             read: (s) => s.mean_genome_size, tipFmt: (v) => fmt(v, 1), path: 'samples[].mean_genome_size',
           }),
         ],
       },
       {
-        key: 'cost', title: 'Compute cost over time', hint: 'work per creature-tick across closures, wall clock, the quick gate run',
+        key: 'cost', title: 'Compute cost over time', hint: 'cost per creature-tick, by closure',
         cards: () => {
           const ctr = (rep, seed, key) => { const r = seedRow(rep, 'deterministic.per_seed', seed); return r ? ratio(num(r[key]), num(r.creature_ticks)) : NaN; };
           const first = M.points[M.firstIndex];
           const cards = [
-            !first ? (() => { const c = chartCard({ title: 'Work per creature-tick, relative to the first closure', better: 'down', def: 'Not drawn: the series\' first report could not be loaded, and no other closure stands in for it.' }); return c.card; })() : closuresChart(M, {
-              title: 'Work per creature-tick, relative to the first closure', better: 'down', yFmt: pctTick, tipFmt: pct, unit: 'of first',
-              def: `Each counter divided by creature-ticks, as a share of its value at ${first ? first.title : 'the first closure'} (100%). Lower is cheaper.`,
-              series: [['mesh_hops', 'mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'graph relaxation'], ['actions_applied', 'actions applied']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => ratio(ctr(pt.rep, w.seed, k), ctr(first.rep, w.seed, k)) })),
-              ref: () => ({ y: 1, label: '100%: the first closure' }),
-              why: 'Shows long-run cost drift that closure-to-closure checks can miss.', caveat: 'Some counters were redefined along the way; see counter_definition_changes in benchmark-series.json.', path: 'deterministic.per_seed[].<counter> / creature_ticks',
+            !first ? chartCard({ title: 'Work per creature-tick vs the first closure', better: 'down', def: 'Not drawn: the first report could not be loaded.' }).card : closureLines(M, {
+              title: 'Work per creature-tick vs the first closure', better: 'down', yFmt: pctTick, tipFmt: pct,
+              def: `Each counter vs ${first.title} (100%).`,
+              series: [['mesh_hops', 'mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'graph relaxation'], ['actions_applied', 'actions applied']].map(([k, name]) => ({ name, read: (pt, w) => ratio(ctr(pt.rep, w.seed, k), ctr(first.rep, w.seed, k)) })),
+              why: 'Shows slow cost drift that closure-by-closure checks miss.', caveat: 'Some counters were redefined; see counter_definition_changes in benchmark-series.json.', path: 'deterministic.per_seed[].<counter> / creature_ticks',
             }),
-            closuresChart(M, {
-              title: 'Wall clock per creature-tick', better: 'down', unit: 'time', yFmt: (v) => fmt(v * 1000, 1) + ' µs', tipFmt: (v) => fmt(v * 1000, 2) + ' µs',
-              def: 'Elapsed time per creature simulated for one tick. It depends on the machine, so compare only runs from the same host (hover names it).',
-              series: [{ name: 'per creature-tick', color: SERIES[0], emph: true, read: (pt, w) => { const wc = seedRow(pt.rep, 'environment.wall_clock_ms_per_seed', w.seed); const r = seedRow(pt.rep, 'deterministic.per_seed', w.seed); return wc && r ? ratio(num(wc.wall_clock_ms), num(r.creature_ticks)) : NaN; }, detail: (pt) => pt.host }],
+            closureLines(M, {
+              title: 'Wall clock per creature-tick', better: 'down', yFmt: (v) => fmt(v * 1000, 1) + ' µs', tipFmt: (v) => fmt(v * 1000, 2) + ' µs',
+              def: 'Time per creature-tick. Compare only runs on the same machine (hover names it).',
+              series: [{ name: 'per creature-tick', read: (pt, w) => { const wc = seedRow(pt.rep, 'environment.wall_clock_ms_per_seed', w.seed); const r = seedRow(pt.rep, 'deterministic.per_seed', w.seed); return wc && r ? ratio(num(wc.wall_clock_ms), num(r.creature_ticks)) : NaN; }, detail: (pt) => pt.host }],
               path: 'environment.wall_clock_ms_per_seed[] / per_seed[].creature_ticks',
             }),
           ];
-          // The quick gate run has its own closure list and one panel.
           const gatePts = M.closedGate.map((p) => M.data.features.find((f) => f.paths.gate === p)).filter((f) => f && f.gate);
           if (gatePts.length) {
             const base = gatePts[0].gate;
-            const selSlug = sel().slug;
-            const selIdx = gatePts.findIndex((f) => f.slug === selSlug);
-            const c = chartCard({ title: 'Quick gate run: work per creature-tick, relative to its first closure', better: 'down', def: 'The short run inside make check, recorded at every closure. Lower is cheaper.', path: 'gate reports: deterministic.per_creature_tick.<counter>' });
-            const series = [['mesh_hops', 'mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'graph relaxation'], ['actions_applied', 'actions applied']].map(([k, name], n) => ({ name, color: SERIES[n], values: gatePts.map((f) => ratio(num(get(f.gate, `deterministic.per_creature_tick.${k}`)), num(get(base, `deterministic.per_creature_tick.${k}`)))) }));
-            const plot = el('div', 'plot');
-            const pane = el('div', 'panels n1'); pane.appendChild(plot);
-            c.body.appendChild(pane);
-            const gateDates = gatePts.map((f) => (get(f.gate, 'environment.generated_at') || '').slice(0, 10));
-            linePlot(plot, {
-              n: gatePts.length, series, dom: domainOf(series.map((s) => s.values).concat([[1]]), true, 3), step: true, unit: 'of first', height: 180,
-              sel: selIdx >= 0 ? selIdx : undefined, selLabel: selIdx >= 0 ? featureId(gatePts[selIdx].slug) || featureName(gatePts[selIdx].slug) : '',
-              refLines: [{ y: 1, label: '100%: the first gate closure' }],
-              marks: (get(M.data.index, 'counter_definition_changes') || []).map((ch) => ({ i: gatePts.findIndex((f) => featureId(f.slug) === ch.feature), label: `${COUNTER_NAMES[ch.counter] || ch.counter} redefined at ${ch.feature}` })),
-              yFmt: pctTick, tipFmt: pct, xTicks: dateTicks(gateDates, 6), xLabel: (i) => shortDate(gateDates[i]), tipTitle: (i) => titleOfPath(gatePts[i].slug), tipMeta: (i) => shortDate(gateDates[i]),
+            const selIdx = gatePts.findIndex((f) => f.slug === sel().slug);
+            const KEYS = [['mesh_hops', 'mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'graph relaxation'], ['actions_applied', 'actions applied']];
+            const rows = [];
+            gatePts.forEach((f, i) => KEYS.forEach(([k, name], si) => { const v = ratio(num(get(f.gate, `deterministic.per_creature_tick.${k}`)), num(get(base, `deterministic.per_creature_tick.${k}`))); if (fin(v)) rows.push({ i, si, name, v }); }));
+            const dates = gatePts.map((f) => (get(f.gate, 'environment.generated_at') || '').slice(0, 10));
+            const marksAt = (get(M.data.index, 'counter_definition_changes') || []).map((ch) => ({ i: gatePts.findIndex((f) => featureId(f.slug) === ch.feature), label: `${COUNTER_NAMES[ch.counter] || ch.counter} redefined at ${ch.feature}` })).filter((m) => m.i >= 0);
+            const c = chartCard({ title: 'Quick run (make check): work per creature-tick', better: 'down', def: 'Each counter vs the first quick run (100%).', path: 'gate reports: deterministic.per_creature_tick.<counter>' });
+            const host = el('div', 'fig');
+            c.body.appendChild(host);
+            const GREYS = [HEX.ink, HEX.ink2, HEX.ink2, HEX.muted];
+            figure(host, (width) => {
+              const lastIdx = gatePts.length - 1;
+              const fig = Plot.plot({
+                width, height: 260, style: PLOT_STYLE, marginLeft: 52, marginRight: 120, marginTop: 16, marginBottom: 28,
+                x: { type: 'linear', domain: [0, lastIdx], label: null, tickSize: 0, ticks: dateTicks(dates, 6), tickFormat: (k) => shortDate(dates[k]) },
+                y: { grid: true, nice: true, zero: true, label: null, ticks: 4, tickFormat: pctTick },
+                marks: [
+                  Plot.ruleY([1], { stroke: HEX.ink2, strokeOpacity: 0.5, strokeDasharray: '4,4' }),
+                  selIdx >= 0 ? Plot.ruleX([selIdx], { x: (d) => d, stroke: HEX.accent, strokeOpacity: 0.6 }) : null,
+                  Plot.ruleX(marksAt, { x: 'i', stroke: HEX.ink2, strokeOpacity: 0.5, strokeDasharray: '2,3' }),
+                  Plot.text(marksAt, { x: 'i', frameAnchor: 'bottom', dy: -6, dx: 4, textAnchor: 'start', text: 'label', fill: HEX.ink2, stroke: HEX.sheet, strokeWidth: 3, paintOrder: 'stroke' }),
+                  ...KEYS.map((_, si) => Plot.line(rows.filter((r) => r.si === si), { x: 'i', y: 'v', stroke: GREYS[si], strokeWidth: si === 0 ? 2 : 1.5, strokeDasharray: DASHES[si], curve: 'step' })),
+                  Plot.text(KEYS.map((_, si) => rows.filter((r) => r.si === si).slice(-1)[0]).filter(Boolean), { x: 'i', y: 'v', text: 'name', dx: 8, textAnchor: 'start', fill: HEX.ink2 }),
+                  Plot.ruleX(rows.filter((r) => r.si === 0), Plot.pointerX({ x: 'i', stroke: HEX.ink2, strokeOpacity: 0.45 })),
+                ].filter(Boolean),
+              });
+              wire(M, fig, (d) => [titleOfPath(gatePts[d.i].slug), shortDate(dates[d.i])], (d) => KEYS.map(([k, name], si) => { const r = rows.find((x) => x.i === d.i && x.si === si); return { color: GREYS[si], name, value: r ? pct(r.v) : 'not measured' }; }), { pick: false });
+              return fig;
             });
-            c.body.appendChild(legend(series));
-            c.setTable(() => [['Closure', ...series.map((s) => s.name)], gatePts.map((f, i) => [titleOfPath(f.slug), ...series.map((s) => pct(s.values[i]))]).reverse()]);
+            c.setTable(() => [['Closure', ...KEYS.map((k) => k[1])], gatePts.map((f, i) => [titleOfPath(f.slug), ...KEYS.map((_, si) => { const r = rows.find((x) => x.i === i && x.si === si); return r ? pct(r.v) : 'not measured'; })]).reverse()]);
             cards.push(c.card);
           }
           return cards;
         },
       },
       {
-        key: 'worlds', title: 'The three worlds', hint: 'what each world is, its map and the settings the shown closure ran',
+        key: 'worlds', title: 'The three plots', hint: 'maps and settings',
         cards: () => M.worlds.map((w) => {
           const cs = worldCase(sel().rep, w.name) || {};
           const run = seedRow(sel().rep, 'deterministic.per_seed', w.seed) || {};
           const con = run.tick_zero_connectivity || {};
-          const c = chartCard({ title: w.name, better: null, def: WORLD_INFO[w.short] || '' });
-          c.card.querySelector('.tag').remove();
+          const c = chartCard({ title: `${plotLabel(w)}: ${w.name}`, better: 'none', def: WORLD_INFO[w.short] || '' });
           c.body.appendChild(table(['Reading', 'Value'], [
             ['Passable cells, share of the map', pct(num(con.passable_fraction))],
             ['Largest connected region, share of passable cells', pct(num(con.largest_component_fraction_of_passable))],
@@ -2002,19 +1691,20 @@
             ['Moves attempted', fmtInt(num(cs.moves_attempted_total))],
             ['Recipe', get(cs, 'case.recipe_path') || '—'],
           ]));
-          const a = el('a', 'note', 'Open the stored report for this closure');
+          const a = el('a', 'small', 'Open the stored report');
           a.href = rel(sel().path);
+          a.style.display = 'inline-block';
+          a.style.marginTop = '8px';
           c.body.appendChild(a);
           return c.card;
         }),
       },
       {
-        key: 'raw', title: 'Raw tables', hint: 'mesh execution and mutation-effect attribution (T11.F26), for debugging',
+        key: 'raw', title: 'Raw tables', hint: 'debug tables (mesh execution, T11.F26)',
         cards: () => {
           const out = [];
           {
-            const c = chartCard({ title: 'Mesh execution in sampled evolved genomes', better: null, def: 'Sums over the sampled evolved genomes, per closure and world, newest first (mesh-execution-v1, T11.F14). Route varies: genomes whose chosen targets differ across the 48 snapshots.' });
-            c.card.querySelector('.tag').remove();
+            const c = chartCard({ title: 'Mesh execution in sampled evolved genomes', better: 'none', def: 'Sums over sampled evolved genomes, newest first (T11.F14). Route varies: targets differ across 48 snapshots.' });
             const rows = [];
             for (let i = M.points.length - 1; i >= 0; i--) {
               const pt = M.points[i];
@@ -2025,7 +1715,7 @@
                 if (m) rows.push([pt.id || pt.name, w.short, fmt(m.genomes), fmt(m.total), fmt(m.reachable), fmt(m.executed), fmt(m.knockout), `${m.routeVaries} / ${m.genomes}`, `${fmt(m.capHits)} / ${fmt(m.execs)}`, fmt(m.execs)]);
               });
             }
-            c.body.appendChild(table(['Closure', 'World', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Capped passes', 'Executions'], rows, (k) => k > 1));
+            c.body.appendChild(table(['Closure', 'Plot', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Capped passes', 'Executions'], rows, (k) => k > 1));
             out.push(c.card);
           }
           renderMutationEffects(M, out);
@@ -2044,71 +1734,357 @@
         if (v.status !== 'measured') { rows.push([w.short, v.status].concat(headers.slice(2).map(() => ''))); return; }
         rowsOf(v).forEach((r) => rows.push([w.short].concat(r)));
       });
-      const c = chartCard({ title: `${title}, at ${pt.name}`, better: null, def: sub });
-      c.card.querySelector('.tag').remove();
+      const c = chartCard({ title: `${title}, at ${pt.name}`, better: 'none', def: sub });
       c.body.appendChild(table(headers, rows));
       out.push(c.card);
     };
     const cohortRows = (v, cells) => v.cohorts.map((c) => (c.status ? [c.name, c.status] : [c.name].concat(cells(c))));
     add('Mutation exposure per birth', 'Events per birth over births_total; zero-applied over births_total; genome-identical over event-bearing births.',
-      ['World', 'Panel', 'Supply', 'Requested / birth', 'Applied / birth', 'Zero-applied births', 'Genome-identical births'],
+      ['Plot', 'Panel', 'Supply', 'Requested / birth', 'Applied / birth', 'Zero-applied births', 'Genome-identical births'],
       (v) => v.exposure.map((r) => [r.panel, r.supply, r.requestedPerBirth, r.appliedPerBirth, r.zeroApplied, r.identical]));
     add('Parent capability', 'All-NoOp and one-queue parents over parents; births from acting parents over births_total.',
-      ['World', 'Panel', 'All-NoOp parents', 'One-queue parents', 'Births from acting parents'],
+      ['Plot', 'Panel', 'All-NoOp parents', 'One-queue parents', 'Births from acting parents'],
       (v) => v.exposure.map((r) => [r.panel, r.allNoop, r.oneQueue, r.fromActing]));
     add('Single-event attribution by category', 'Each category over applied proposals; cohort identity by mean depth or generation and genome size.',
-      ['World', 'Cohort', 'Identity', 'Parents', 'Mean depth / generation', 'Mean genome size', 'Applied of proposals', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved'],
+      ['Plot', 'Cohort', 'Identity', 'Parents', 'Mean depth / generation', 'Mean genome size', 'Applied of proposals', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved'],
       (v) => cohortRows(v, (c) => [c.identity, c.parents, c.meanDepthOrGeneration, c.meanGenomeSize, `${c.applied} of ${c.proposals}`].concat(c.categories.map((x) => x[1]))));
     add('Battery-silent pairs on the extended contexts', 'Pairs differing in actions over pairs sampled, per group (neighborhood-coverage-v1).',
-      ['World', 'Cohort', 'Original battery', 'Pairs', 'Recorded', 'Authored', 'Ticks 1–4', 'Ticks 5–32', 'Any group', 'State or cost only', 'All-NoOp parents acting'],
+      ['Plot', 'Cohort', 'Original battery', 'Pairs', 'Recorded', 'Authored', 'Ticks 1–4', 'Ticks 5–32', 'Any group', 'State or cost only', 'All-NoOp parents acting'],
       (v) => cohortRows(v, (c) => [v.batteryVersion, c.coverage.pairs, c.coverage.recorded, c.coverage.authored, c.coverage.early, c.coverage.late, c.coverage.any, c.coverage.stateOnly, c.coverage.noopActing]));
     add('Per-cohort detail by operator and first-target class', 'Proposals, skipped, applied and category counts; a target class is a stratum label, never a cause.',
-      ['World', 'Cohort', 'Row', 'Proposals', 'Skipped', 'Applied', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved', 'silent_with_state_or_cost', 'consistency_violations'],
+      ['Plot', 'Cohort', 'Row', 'Proposals', 'Skipped', 'Applied', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved', 'silent_with_state_or_cost', 'consistency_violations'],
       (v) => v.cohorts.flatMap((c) => (c.status ? [[c.name, c.status]] : c.operators.concat(c.targets).map((r) => [c.name].concat(r)))));
   }
 
+  const TOPIC_ORDER = ['cog', 'evo', 'ways', 'pop', 'worlds', 'raw'];
   function renderExplore(M, app) {
-    const s = band('explore', '5. Explore the detail', 'Everything else the reports store, folded by topic. Each chart says what it shows and which way is better; open "What is this?" for how it is measured.');
-    topics(M).forEach((tp) => {
+    const s = part('explore', 'Supplementary census', 'Everything else the reports store, by topic. Charts read the closure picked above against the one before it.');
+    s.classList.add('rule-top');
+    const list = el('div');
+    list.style.marginTop = '14px';
+    const all = topics(M);
+    TOPIC_ORDER.map((k) => all.find((t) => t.key === k)).filter(Boolean).forEach((tp) => {
       const d = el('details', 'topic');
       d.dataset.key = tp.key;
       const sm = el('summary');
       sm.appendChild(el('b', null, tp.title));
       sm.appendChild(el('span', null, tp.hint));
       d.appendChild(sm);
-      const st = el('div', 'stack');
+      const st = el('div', 'cards');
       d.appendChild(st);
       let built = false;
       const build = () => { if (built) return; built = true; tp.cards().forEach((c) => st.appendChild(c)); };
       d.addEventListener('toggle', () => { if (d.open) { M.open.add(tp.key); build(); } else M.open.delete(tp.key); });
       if (M.open.has(tp.key)) { d.open = true; build(); }
-      s.appendChild(d);
+      list.appendChild(d);
     });
+    s.appendChild(list);
     app.appendChild(s);
   }
 
   const GLOSSARY = [
-    ['Closure', 'One finished roadmap feature. When a feature closes, its benchmark run is stored and this page reads it. Closures are the x-axis of every history chart.'],
-    ['World', 'One of three saved maps, each run once per closure for 2,000 ticks from 10,000 founders: Orchards in grassland, Canyon country and Confluence. They are different environments, not repeats of one.'],
-    ['Tick', 'One step of the simulation. Every creature senses, decides and acts once per tick.'],
-    ['Founder family', 'Every descendant of one of the 10,000 creatures alive at tick zero. Also called a clade or lineage.'],
-    ['Memory', 'State a creature carries from one tick to the next: memory slots and brain nodes that keep a value.'],
-    ['Mutation outcomes', 'An offspring is changed when it behaves differently from its parent, silent when it behaves the same, and dead when it never acts.'],
-    ['Drift', 'Mutation with no selection: many rounds of random change, to see whether junk build-up stops mutations from mattering.'],
-    ['Floor', 'A line a reading should not fall below. The evolvability floor is each world\'s first reading at T14.F12.'],
-    ['Creature-tick', 'One creature simulated for one tick. Cost is counted per creature-tick so a bigger population does not look more expensive.'],
-    ['Flag, severe', 'Cost limits against the stored earlier closure: work per creature-tick flags at +10% and is severe at +50%; wall clock at +25% and +100%.'],
-    ['Long run, short run', 'The long run (goal profile) is the three-world, 2,000-tick run behind most of this page. The short run (gate profile) is the quick run inside make check, used for cost only.'],
-    ['Typical move', 'For each reading and world: the middle size of past changes between closures that changed the simulation. Smaller changes are drawn grey, because one seeded run per world means small moves can be chance.'],
-    ['Changed nothing', 'A closure whose readings are all identical to the previous closure in every world. Runs are deterministic, so this means the feature did not change behaviour (for example, a measurement or storage feature).'],
+    ['Closure', 'A finished feature and its stored benchmark run.'],
+    ['Plot', 'One of three saved worlds, numbered by its seed. Each closure runs each once: 2,000 ticks, 10,000 founders.'],
+    ['Census', 'The readings taken at the end of a closure\'s run. The first census is the first three-plot closure.'],
+    ['Founder family', 'All descendants of one creature from tick zero. Also called a clade or lineage.'],
+    ['Memory', 'State a creature keeps from one tick to the next.'],
+    ['Mutation outcomes', 'Changed: acts differently from its parent. Silent: acts the same. Dead: never acts.'],
+    ['Drift', 'Mutation with no selection.'],
+    ['Floor', 'A line a reading must not drop below.'],
+    ['Creature-tick', 'One creature for one tick. The unit of cost.'],
+    ['Flag, severe', 'Cost limits: +10% and +50% per creature-tick. Wall clock: +25% and +100%.'],
+    ['Long run, short run', 'Long: the three-plot run behind this page. Short: the quick run in make check.'],
+    ['Typical move', 'The usual size of a change between closures. Smaller changes show grey.'],
+    ['Changed nothing', 'Every reading matches the previous closure. The feature did not change behaviour.'],
   ];
-  function renderGlossary(M, app) {
-    const s = band('glossary', 'Words on this page');
-    const c = el('div', 'card');
-    const dl = el('dl', 'gloss');
-    GLOSSARY.forEach(([k, v]) => { dl.appendChild(el('dt', null, k)); dl.appendChild(el('dd', null, v)); });
-    c.appendChild(dl);
-    s.appendChild(c);
+  function renderKey(M, app) {
+    const s = part('key', 'Field key');
+    s.classList.add('rule-top');
+    const dl = el('dl', 'key');
+    GOAL_KEYS.concat(WATCH_KEYS).forEach((key) => {
+      const r = READINGS[key];
+      const d = el('div');
+      d.appendChild(el('dt', null, r.label));
+      d.appendChild(el('dd', null, `${r.def} ${r.how} ${r.caveat}`));
+      dl.appendChild(d);
+    });
+    GLOSSARY.forEach(([k, v]) => { const d = el('div'); d.appendChild(el('dt', null, k)); d.appendChild(el('dd', null, v)); dl.appendChild(d); });
+    s.appendChild(dl);
+    app.appendChild(s);
+  }
+
+  // ── The census matrix: readings as rows, plots as columns ────────────────
+  // The largest value a reading reaches in any plot, so a row shares one scale.
+  const sharedMax = (M, key) => Math.max(0, ...M.worlds.flatMap((w, wi) => M.vals[key][wi].filter(fin)));
+  // Closures that moved the headline reading, biggest first, scored against its typical move.
+  function moverCandidates(M, key) {
+    const out = [];
+    M.points.forEach((pt, i) => {
+      if (pt.kind !== 'world' || !pt.changed || i === M.sel) return;
+      const j = M.prevOf(i);
+      if (j < 0) return;
+      let s = 0;
+      M.worlds.forEach((w, wi) => { const d = Math.abs(M.vals[key][wi][i] - M.vals[key][wi][j]); const t = M.typical[key][wi]; if (fin(d) && fin(t) && t > 0) s += d / t; });
+      if (s > 0) out.push({ i, s });
+    });
+    return out.sort((a, b) => b.s - a.s);
+  }
+  // Notched flags hanging over a chart, placed in pixels so no two labels
+  // touch; a flag near the right edge hangs leftward from its staff.
+  function placeFlags(M, lane, fig, candidates, max, staffH, what) {
+    lane.replaceChildren();
+    const x = fig.scale('x');
+    const laneW = lane.clientWidth || fig.clientWidth || 300;
+    const cw = 6.4;
+    const box = (px, label) => { const w = label.length * cw + 16; const flip = px + w > laneW; return { l: flip ? px - w : px, w, flip }; };
+    const clear = (a, b) => a.l + a.w + 6 < b.l || b.l + b.w + 6 < a.l;
+    // Two tiers: the read closure on top, movers below it, so neither crowds the other.
+    const put = (i, label, cls, title) => {
+      const px = x.apply(i), b = box(px, label);
+      const tier = cls === 'sel' ? 0 : 20;
+      const f = el(cls === 'sel' ? 'span' : 'button', 'mflag' + (cls ? ' ' + cls : '') + (b.flip ? ' flip' : ''), label);
+      if (f.tagName === 'BUTTON') f.type = 'button';
+      f.style.left = `${b.l}px`;
+      f.style.top = `${tier}px`;
+      const staff = el('span', 'staff' + (cls === 'sel' ? ' sel' : ''));
+      staff.style.left = `${px}px`;
+      staff.style.top = `${tier + 18}px`;
+      staff.style.height = `${(staffH || 80) + 32 - tier}px`;
+      lane.appendChild(staff);
+      f.title = title;
+      lane.appendChild(f);
+      return { f, b };
+    };
+    const pt = M.points[M.sel];
+    const selLabel = pt.id || pt.name;
+    put(M.sel, selLabel, 'sel', `${pt.title}: the closure being read.`);
+    const taken = [];
+    let n = 0;
+    candidates.forEach((c) => {
+      if (n >= max) return;
+      const id = M.points[c.i].id || M.points[c.i].name;
+      const b = box(x.apply(c.i), id);
+      if (taken.some((t) => !clear(b, t))) return;
+      const { f } = put(c.i, id, '', `${M.points[c.i].title}: one of the closures that moved ${what} most. Click to read it.`);
+      taken.push(b);
+      n += 1;
+      f.addEventListener('mouseenter', () => placeHover(M, c.i));
+      f.addEventListener('mouseleave', () => placeHover(M, null));
+      f.addEventListener('click', () => M.pick(c.i));
+    });
+  }
+  // One plot's census curve in a matrix cell: a linear scale from zero shared
+  // by the row, the first census dashed in the plot's colour, the read closure amber.
+  function cellCensus(M, key, w, height, showX, flags) {
+    const spec = READINGS[key];
+    const wi = M.worlds.indexOf(w);
+    const rows = [];
+    M.points.forEach((pt, i) => { if (pt.kind !== 'world') return; const v = M.vals[key][wi][i]; if (fin(v)) rows.push({ i, w: w.short, v, changed: pt.changed }); });
+    const fi = M.firstOf(key, wi);
+    const first = fi >= 0 ? M.vals[key][wi][fi] : NaN;
+    const hi = sharedMax(M, key) || 1;
+    const yFmt = spec.kind === 'share' ? pctTick : fmtTick;
+    const host = el('div', 'fig');
+    const line = el('div', 'hover-line');
+    const c = plotHex(w.short);
+    figure(host, (width) => {
+      const fig = Plot.plot({
+        width, height: height + (showX ? 24 : 6), style: PLOT_STYLE, marginLeft: 40, marginRight: 10, marginTop: 8, marginBottom: showX ? 24 : 6,
+        x: { ...closureX(M), axis: showX ? 'bottom' : null },
+        y: { domain: [0, hi], nice: true, grid: true, label: null, ticks: 3, tickFormat: yFmt },
+        color: { type: 'identity' },
+        marks: [
+          Plot.ruleX([M.sel], { x: (d) => d, stroke: HEX.accent, strokeOpacity: 0.8 }),
+          fin(first) ? Plot.ruleY([first], { y: (d) => d, stroke: c, strokeOpacity: 0.55, strokeDasharray: '3,3' }) : null,
+          Plot.areaY(rows, { x: 'i', y: 'v', fill: c, fillOpacity: 0.08 }),
+          Plot.line(rows, { x: 'i', y: 'v', stroke: c, strokeWidth: 1.8 }),
+          Plot.dot(rows.filter((r) => r.i === fi), { x: 'i', y: 'v', r: 3.5, symbol: 'diamond2', fill: HEX.sheet, stroke: c, strokeWidth: 1.4 }),
+          Plot.dot(rows.filter((r) => r.i === M.sel), { x: 'i', y: 'v', r: 4, fill: c, stroke: HEX.sheet, strokeWidth: 2 }),
+          Plot.ruleX(rows, Plot.pointerX({ x: 'i', strokeOpacity: 0, maxRadius: 60 })),
+        ].filter(Boolean),
+      });
+      wire(M, fig, (d) => [M.points[d.i].title, closureMeta(M, d.i)], (d) => [{ color: c, name: `${plotLabel(w)}${spec.extra && M.points[d.i].kind === 'world' ? ' · ' + spec.extra(M.points[d.i], w) : ''}`, value: valueText(spec, M.vals[key][wi][d.i]) }], { sync: true });
+      M.syncTargets.push({ fig, line });
+      if (flags && flags.lane) placeFlags(M, flags.lane, fig, flags.candidates, 3, height, flags.what);
+      return fig;
+    });
+    return host;
+  }
+  // A ruled delta line: label left, signed tabular numeral right, coloured by tone.
+  function deltaLine(label, j) {
+    const r = el('div', 'dline');
+    r.appendChild(el('span', 'dk', label));
+    const v = el('span', `dv ${j.tone}`, j.tone === 'flat' ? 'no change' : j.tone === 'na' ? '—' : j.signed);
+    v.title = j.say;
+    r.appendChild(v);
+    return r;
+  }
+  // A reading that has stayed near zero says so plainly before any comparison.
+  const verdictLine = (M, key) => {
+    const spec = READINGS[key];
+    const cur = M.worlds.map((w, wi) => M.vals[key][wi][M.sel]);
+    if (spec.low && cur.every((v) => fin(v) && v < spec.low)) return spec.lowText;
+    return progressText(M, key).replace(/first reading/g, 'first census').replace(/\bworlds\b/g, 'plots').replace(/\bworld\b/g, 'plot');
+  };
+
+  function renderMatrix(M, app) {
+    const s = el('section', 'part');
+    s.id = 'census';
+    s.style.marginTop = '18px';
+    const m = el('div', 'matrix');
+    m.style.gridTemplateColumns = `236px repeat(${M.worlds.length}, minmax(0, 1fr))`;
+    const corner = el('div', 'mx-corner');
+    corner.appendChild(el('span', 'fl', 'Census since'));
+    const fp = M.points[M.firstIndex];
+    corner.appendChild(el('div', 'mx-since', fp ? `${fp.name} · ${shortDate(fp.date)}` : 'first report not loaded'));
+    m.appendChild(corner);
+    M.worlds.forEach((w) => {
+      const h = el('button', 'mx-plot' + (M.focus === w.short ? ' focus' : isDim(M, w.short) ? ' dim' : ''));
+      h.type = 'button';
+      h.style.setProperty('--c', plotHex(w.short));
+      h.setAttribute('aria-pressed', M.focus === w.short ? 'true' : 'false');
+      h.title = `${WORLD_INFO[w.short] || ''} Click to bring this plot forward.`;
+      h.appendChild(el('i'));
+      h.appendChild(el('b', null, String(w.seed)));
+      h.appendChild(document.createTextNode(w.short));
+      h.addEventListener('click', () => { M.focus = M.focus === w.short ? null : w.short; M.render(); });
+      m.appendChild(h);
+    });
+    const cellOf = (w) => {
+      const cell = el('div', 'mx-cell' + (isDim(M, w.short) ? ' dim' : ''));
+      const cp = el('div', 'mx-cellplot'); cp.style.setProperty('--c', plotHex(w.short)); cp.appendChild(el('i')); cp.appendChild(document.createTextNode(plotLabel(w)));
+      cell.appendChild(cp);
+      return cell;
+    };
+    // Mover flags hang over the evolvability headline: memory has barely moved.
+    const FLAG_KEY = 'floor';
+    const candidates = moverCandidates(M, FLAG_KEY).slice(0, 10);
+    const lastKey = GOAL_KEYS[GOAL_KEYS.length - 1];
+    BANDS.forEach((band) => {
+      const b = el('div', 'mx-band');
+      b.appendChild(el('h2', null, band.title));
+      b.appendChild(el('p', null, band.ask));
+      if (band.note) b.appendChild(el('p', 'small', band.note));
+      m.appendChild(b);
+      band.keys.forEach((key) => {
+        const spec = READINGS[key];
+        const lab = el('div', 'mx-label');
+        const lh = el('div', 'mx-lh');
+        lh.appendChild(el('h3', null, spec.label));
+        lh.appendChild(directionTag(spec.better));
+        lab.appendChild(lh);
+        lab.appendChild(el('p', 'mx-verdict', verdictLine(M, key)));
+        lab.appendChild(el('p', 'small', spec.def));
+        m.appendChild(lab);
+        M.worlds.forEach((w, wi) => {
+          const cell = cellOf(w);
+          const i = M.sel, f = M.firstOf(key, wi), cur = M.vals[key][wi][i], first = f >= 0 ? M.vals[key][wi][f] : NaN;
+          const val = el('div', 'mx-val', valueText(spec, cur));
+          val.appendChild(el('small', null, spec.unit));
+          if (spec.extra) val.title = spec.extra(M.points[i], w);
+          const fl = F12_FLOORS[w.short];
+          if (key === 'floor' && fin(cur) && fin(fl) && cur < fl) val.appendChild(el('span', 'chip bad', `below floor ${pct(fl)}`));
+          cell.appendChild(val);
+          const pair = el('div', 'dpair');
+          pair.appendChild(deltaLine('since first', fin(first) && fin(cur) && i !== f ? judge(spec, cur, first, M.typical[key][wi]) : { tone: 'na', say: i === f ? 'This is the first census.' : 'No first census.' }));
+          const pl = deltaLine('vs previous', M.judgeAt(key, wi, i));
+          pl.title = M.prevOf(i) >= 0 ? `vs ${M.points[M.prevOf(i)].title}` : 'first closure';
+          pair.appendChild(pl);
+          cell.appendChild(pair);
+          let lane = null;
+          if (key === FLAG_KEY) { lane = el('div', 'lane'); cell.appendChild(lane); }
+          cell.appendChild(cellCensus(M, key, w, 88, key === lastKey, { lane, candidates, what: spec.movedAs || spec.label.toLowerCase() }));
+          m.appendChild(cell);
+        });
+      });
+    });
+    const gl = el('div', 'mx-label');
+    gl.appendChild(el('h3', null, 'Also watched'));
+    gl.appendChild(el('p', 'small', 'Diversity and survival: context for the two goals.'));
+    m.appendChild(gl);
+    M.worlds.forEach((w, wi) => {
+      const cell = cellOf(w);
+      const i = M.sel;
+      WATCH_KEYS.forEach((key) => {
+        const spec = READINGS[key];
+        const r = el('div', 'dline');
+        r.appendChild(el('span', 'dk', spec.watch));
+        const wv = el('span', 'wv');
+        const v = el('span', 'dv', valueText(spec, M.vals[key][wi][i]));
+        if (spec.extra) v.title = spec.extra(M.points[i], w);
+        const jd = M.judgeAt(key, wi, i);
+        const d = el('span', `dv ${jd.tone}`, jd.tone === 'flat' ? 'no change' : jd.tone === 'na' ? '—' : jd.signed);
+        d.title = `vs previous. ${jd.say}`;
+        wv.append(v, d);
+        r.appendChild(wv);
+        cell.appendChild(r);
+      });
+      m.appendChild(cell);
+    });
+    s.appendChild(m);
+    app.appendChild(s);
+  }
+
+  // Compute cost: each run's flagged counters against its stored comparison.
+  function renderCost(M, app) {
+    const s = part('cost', 'Compute cost', 'Work per creature-tick against the stored earlier closure. Only flagged counters show.');
+    s.classList.add('rule-top');
+    const i = M.sel, pt = M.points[i];
+    const { checks, runs } = guardChecks(M, i);
+    const box = el('div', 'costbox');
+    runs.forEach((r) => {
+      const col = el('div');
+      col.appendChild(el('div', 'fl', r.missing ? `${r.label}: ${r.missing}` : `${r.label} · ${r.what} · vs ${r.refTitle}`));
+      if (!r.missing) {
+        const loud = r.counters.filter((x) => x.level !== 'ok').sort((a, b) => b.d - a.d);
+        const lines = el('div', 'costlines');
+        loud.forEach((x) => {
+          const d = el('div', 'dline');
+          d.appendChild(el('span', 'dk', x.name));
+          const v = el('span', `dv ${x.level}`, `${pctChange(x.d)} · ${x.level}`);
+          v.title = `Flag +${r.work.flag}%, severe +${r.work.severe}%.`;
+          d.appendChild(v);
+          lines.appendChild(d);
+        });
+        if (r.wall && r.wall.level !== 'ok') {
+          const d = el('div', 'dline');
+          d.appendChild(el('span', 'dk', 'wall clock (depends on the machine)'));
+          d.appendChild(el('span', `dv ${r.wall.level}`, `${pctChange(r.wall.d)} · ${r.wall.level}`));
+          lines.appendChild(d);
+        }
+        if (!lines.firstChild) lines.appendChild(el('div', 'small', 'Every counter within its limit.'));
+        col.appendChild(lines);
+      }
+      box.appendChild(col);
+    });
+    s.appendChild(box);
+    const sim = checks.filter((c) => c.sim);
+    if (!pt.changed && sim.length) s.appendChild(el('p', 'small', `This closure changed nothing, so these carry over from the closure before: ${sim.map((c) => c.text).join(' ')}`));
+    // Everything else about cost, folded: the counters within limits, the
+    // limits themselves, and cost by closure over the whole record.
+    const d = el('details', 'topic');
+    d.style.marginTop = '14px';
+    const sm = el('summary');
+    sm.appendChild(el('b', null, 'All counters and cost over time'));
+    sm.appendChild(el('span', null, 'counters within limits, the limits, cost by closure'));
+    d.appendChild(sm);
+    const st = el('div', 'cards');
+    d.appendChild(st);
+    let built = false;
+    const build = () => {
+      if (built) return;
+      built = true;
+      runs.filter((r) => !r.missing).forEach((r) => {
+        const quiet = r.counters.filter((x) => x.level === 'ok');
+        st.appendChild(el('p', 'small', `${r.label}, within limits: ${quiet.length ? quiet.map((x) => `${x.name} ${pctChange(x.d)}`).join(', ') : 'none'}.`));
+      });
+      st.appendChild(el('p', 'small', 'Flag at +10%, severe at +50% per creature-tick; wall clock at +25% and +100%.'));
+      const tp = topics(M).find((t) => t.key === 'cost');
+      if (tp) tp.cards().forEach((c) => st.appendChild(c));
+    };
+    d.addEventListener('toggle', () => { if (d.open) { M.open.add('cost'); build(); } else M.open.delete('cost'); });
+    if (M.open.has('cost')) { d.open = true; build(); }
+    s.appendChild(d);
     app.appendChild(s);
   }
 
@@ -2116,14 +2092,15 @@
   function start(data) {
     const M = buildModel(data);
     M.open = new Set();
-    M.showSame = false;
+    M.focus = null;
+    M.unfold = false;
+    M.syncTargets = [];
     const app = document.getElementById('app');
     const status = document.getElementById('status');
     const worldN = M.points.filter((p) => p.kind === 'world').length;
-    const sameN = M.points.filter((p) => p.kind === 'world' && !p.changed).length;
     const missing = (data.missing || []).length ? ` · ${data.missing.length} listed but could not be loaded` : '';
-    status.textContent = `${worldN} closures on the three worlds since ${M.points[M.firstIndex] ? M.points[M.firstIndex].title : '—'} · ${worldN - sameN} changed the simulation, ${sameN} changed nothing${missing}`;
-    if (!M.latest) { app.replaceChildren(el('p', 'note', 'No three-world report is stored yet. The series starts at T12.F04.')); return; }
+    if (!M.latest) { app.replaceChildren(el('p', 'small', 'No three-plot report is stored yet. The series starts at T12.F04.')); status.textContent = ''; return; }
+    status.textContent = missing ? `${worldN} closures loaded${missing}.` : '';
     const pick = document.getElementById('pick');
     for (let i = M.points.length - 1; i >= 0; i--) {
       const pt = M.points[i];
@@ -2139,21 +2116,20 @@
       const k = slug ? M.points.findIndex((p) => p.kind === 'world' && p.slug === slug) : -1;
       return k >= 0 ? k : M.points.indexOf(M.latest);
     };
+    M.hover = (i) => placeHover(M, i);
     M.render = () => {
       hideTip();
       OBSERVERS.splice(0).forEach((ro) => ro.disconnect());
+      M.syncTargets = [];
       pick.value = M.points[M.sel].slug;
+      renderFields(M);
       app.replaceChildren();
-      const anchor = el('div'); anchor.id = 'top'; app.appendChild(anchor);
-      renderVerdict(M, app);
-      const toc = el('nav', 'toc');
-      [['diversity', 'Diversity'], ['cognition', 'Cognition'], ['guardrails', 'Guardrails'], ['history', 'Closure history'], ['explore', 'Explore'], ['glossary', 'Words']].forEach(([id, t]) => { const a = el('a', null, t); a.href = `#${id}`; a.addEventListener('click', (ev) => { ev.preventDefault(); document.getElementById(id).scrollIntoView(); }); toc.appendChild(a); });
-      app.appendChild(toc);
-      renderGoals(M, app);
-      renderGuards(M, app);
-      renderTimeline(M, app);
+      renderNote(M, app);
+      renderMatrix(M, app);
+      renderCost(M, app);
+      renderRegister(M, app);
       renderExplore(M, app);
-      renderGlossary(M, app);
+      renderKey(M, app);
     };
     M.pick = (i) => {
       if (!M.points[i] || M.points[i].kind !== 'world' || i === M.sel) return;
@@ -2165,11 +2141,9 @@
     window.addEventListener('hashchange', () => { const k = fromHash(); if (k !== M.sel) { M.sel = k; M.render(); } });
     M.sel = fromHash();
     M.render();
-    // Hover definitions for terms in static copy.
-    document.querySelectorAll('.term[data-term]').forEach((t) => { const g = GLOSSARY.find(([k]) => k === t.dataset.term); if (g) t.title = g[1]; });
     document.getElementById('foot').replaceChildren(
-      el('p', null, `Reports are found through benchmark-series.json (${get(data.index, 'goal_worlds.series') || 'goal-worlds-v1'} for most of the page, ${get(data.index, 'gate.series') || 'gate-v1'} for the quick run). The older single-world series (goal-v1, before T12.F04) is not drawn; its readings are in docs/progress.md.`),
-      el('p', null, 'No score is composed from these readings. Each world is a distinct environment, so worlds are compared side by side, never averaged.'),
+      el('p', null, `Source: benchmark-series.json (${get(data.index, 'goal_worlds.series') || 'goal-worlds-v1'}; ${get(data.index, 'gate.series') || 'gate-v1'} for the quick run). Single-world readings before T12.F04 are in docs/progress.md.`),
+      el('p', null, 'No combined score. Plots are compared side by side, never averaged. Charts: Observable Plot 0.6.17 and d3 7.9.0, vendored in vendor/.'),
       el('p', null, M.latest.rep.kind === 'petri-benchmark-summary' ? `Latest closure: ${artifactNotice(M.latest.rep)}` : ''),
     );
   }
@@ -2180,9 +2154,11 @@
     const box = el('div', 'box');
     box.appendChild(el('strong', null, 'Reports not loaded.'));
     const p = el('p');
+    const noPlot = typeof Plot === 'undefined' || typeof d3 === 'undefined';
     p.textContent = location.protocol === 'file:'
       ? 'Cause: the page was opened as a file, and browsers block fetch() from file:// pages. Fix: serve it over HTTP. From the repository root, run:'
-      : `Cause: ${err && err.message ? err.message : err}. Fix: make that file readable under docs/progress, then serve from the repository root:`;
+      : noPlot ? 'Cause: the chart library in vendor/ did not load (missing file or checksum mismatch). Fix: restore docs/progress/vendor/ and serve from the repository root:'
+        : `Cause: ${err && err.message ? err.message : err}. Fix: make that file readable under docs/progress, then serve from the repository root:`;
     box.appendChild(p);
     box.appendChild(el('pre', null, 'python3 -m http.server 8000 --directory docs/progress'));
     const p2 = el('p');
