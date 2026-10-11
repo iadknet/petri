@@ -3,7 +3,7 @@ name: roadmap-spec-owner
 description: >-
   Owns the flat feature spec for exactly one roadmap feature (TNN.FNN): writes
   it in the feature worktree, runs a readiness review and an adversarial Codex
-  Astra challenge loop on it, and stays available
+  Sol challenge loop on it, and stays available
   through SendMessage to resolve contradictions, requirement questions, and
   escalations during implementation. Delegate the Plan step to this agent. Does
   not write feature code, run gates, review the final diff, or expand scope.
@@ -46,8 +46,8 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   perform one readiness review. Your self-review is not independent
   validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
-  defines it: up to three rounds, each a fresh read-only Codex Astra `high`
-  job started in the background and awaited with `status --wait`, with the
+  defines it: up to three rounds, each a fresh read-only Codex Sol `high`
+  `codex exec` job started in the background, with the
   brief written outside the worktree. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the
   requirement, or the code — not in your own authorship. Record every round's
@@ -59,8 +59,8 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Set the spec to `In Progress`, promote a `Planned` track and a `Planning`
   master, and run `make roadmap-check`. The orchestrator verifies the result
   and commits; you do not commit.
-- Report the spec path, what your readiness review changed, the Codex job ID,
-  `logFile` path, and verdict of each round, the blocking findings you fixed or rebutted, any
+- Report the spec path, what your readiness review changed, the Codex
+  output file path, and verdict of each round, the blocking findings you fixed or rebutted, any
   blocking finding Codex still upholds, the `make roadmap-check` result, and
   any requirement you could not resolve from the roadmap and code. Then stop.
 
