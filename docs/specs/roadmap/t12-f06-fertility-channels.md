@@ -1,6 +1,6 @@
 # T12.F06 — Fertility Channels
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-10
 **Feature**: T12.F06
 **Track**: [T12 — World Composition and Baseline Worlds](../../roadmaps/t12-world-composition-and-baseline-worlds.md)
@@ -82,15 +82,15 @@ edit and govern no traced phase.
 
 ## Implementation Tasks
 
-- [ ] Add `FertilityAlgorithm::Channels`, the `FertilityBlend` enum and the
+- [x] Add `FertilityAlgorithm::Channels`, the `FertilityBlend` enum and the
       `blend` layer field, with normalization of the `Channels` parameters.
-- [ ] Generate the channel layer (new module beside `fbm.rs`) and wire it into
+- [x] Generate the channel layer (new module beside `fbm.rs`) and wire it into
       `generate_layer` with the shared seeding rule.
-- [ ] Apply `Max` layers after the weighted average in fertility mixing.
-- [ ] Carry the new algorithm and `blend` through the frontend types, the
+- [x] Apply `Max` layers after the weighted average in fertility mixing.
+- [x] Carry the new algorithm and `blend` through the frontend types, the
       startup request and `FertilitySection.tsx` (algorithm option, width and
       value fields, blend choice).
-- [ ] Tests for each Success Criterion; a proptest for the blend invariants.
+- [x] Tests for each Success Criterion; a proptest for the blend invariants.
 
 ## Verification
 
@@ -108,9 +108,9 @@ edit and govern no traced phase.
 - [x] Frontend type check and tests: `npx tsc -b --noEmit` and
       `npx vitest run` in `frontend/` -> pass (350 tests); `npx biome check src/`
       -> no errors.
-- [x] `make check-docs` -> pass.
-- [ ] Mutation gate: `Not applicable: user decision 2026-10-10, minimal-overhead run`.
-- [ ] Benchmark summary: `Not applicable: no default or existing recipe changes, user decision 2026-10-10`.
+- [x] `make check-docs` -> pass. Final run of every item above on tested commit 27a92d95 by the orchestrator: all exit 0.
+- [x] Mutation gate: `Not applicable: user decision 2026-10-10, minimal-overhead run`.
+- [x] Benchmark summary: `Not applicable: no default or existing recipe changes, user decision 2026-10-10`.
 
 ## Performance and Goal Impact
 
@@ -118,24 +118,25 @@ Not applicable: no default or existing recipe changes, user decision 2026-10-10
 
 ## Success Criteria
 
-- [ ] Default blend reproduces today's mixing exactly: for layers without
+- [x] Default blend reproduces today's mixing exactly: for layers without
       `blend`, the mixed grid is bit-identical to today's weighted average, and
       a config with no `Max` layer serializes with no `blend` key.
-- [ ] A `Max` layer never lowers a cell: every cell, a blob centre included,
+- [x] A `Max` layer never lowers a cell: every cell, a blob centre included,
       is at least its value without that layer (proptest over layer values and
       weights), and the result does not depend on layer order.
-- [ ] The channel layer is narrow and its width follows the parameter: on a
+- [x] The channel layer is narrow and its width follows the parameter: on a
       fixed seed and frequency, channel cells are a minority of the grid at
       width 3, and the channel-cell fraction rises strictly with width and
       roughly doubles from width 2 to width 4 (factor in [1.5, 2.5]).
-- [ ] The same config and seed give a bit-identical channel grid; a different
+- [x] The same config and seed give a bit-identical channel grid; a different
       seed gives a different one; an omitted seed follows the shared rule.
-- [ ] A recipe with a `Channels` layer and `"blend": "Max"` round-trips
+- [x] A recipe with a `Channels` layer and `"blend": "Max"` round-trips
       through `resolve_config` and serialization unchanged, and through the
       frontend startup request with both fields intact.
-- [ ] A `width` of 0, a negative or non-finite `width`, and a non-finite
+- [x] A `width` of 0, a negative or non-finite `width`, and a non-finite
       `value` normalize to valid values; an unknown blend name is rejected.
 
 ## Notes for AI Agents
 
 - Decision: Minimal-overhead run (user, 2026-10-10): no Codex rounds, no gate or goal profile, no mutation gate, targeted test subset only.
+- Cost: `/usage` not collected (minimal-overhead run); 2 implementer passes (build 3 advisor consults, remediation 2); 0 spec-owner resumes; 0 Codex rounds; final Opus review 0 P1, 1 P2, 3 P3 (the P2 and the zero-gradient P3 fixed in 27a92d95).

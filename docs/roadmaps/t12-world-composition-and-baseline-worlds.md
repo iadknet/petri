@@ -33,7 +33,7 @@ is what later environmental features are read against.
 
 - [ ] **T12.F05 — Procedural Worlds with Saved Manual Overlays** — Depends on: T12.F02
   - Goal: Shaped land. A world template retains its procedural settings and seeds together with hand-painted terrain additions and erasures, so generated land and manual edits remain editable and reload together.
-- [ ] **T12.F06 — Fertility Channels** — Depends on: T12.F04
+- [x] **T12.F06 — Fertility Channels** — Depends on: T12.F04
   - Goal: Streams through dry country. A fertility layer can draw narrow, wavy channels of fertile ground from ridged fBm noise, a few cells wide and set by the recipe, and a layer can blend by maximum instead of the weighted average, so a channel adds fertility where it runs without diluting the patches beneath it. Kept at low fertility, a grazed channel refills slowly because regrowth scales with fertility and a thin strip is fed from two neighbours, not four.
 
 ## Notes for AI Agents
