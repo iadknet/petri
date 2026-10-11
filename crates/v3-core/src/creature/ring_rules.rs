@@ -19,7 +19,9 @@
 use std::collections::BTreeMap;
 
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, OutputSinkKind};
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, GraphSource, OutputSinkKind, RingProjection,
+};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::sensor_census::world_input_key_label;
@@ -82,10 +84,6 @@ fn ring_of(reference: Option<&InputReference>) -> Option<WorldInputKey> {
         Some(InputReference::World(key)) if key.is_neighbor_ring() => Some(*key),
         _ => None,
     }
-}
-
-fn offset(d: u8, channel: u8) -> u8 {
-    (d % DIRECTIONS + DIRECTIONS - channel % DIRECTIONS) % DIRECTIONS
 }
 
 fn carries(weight: f32) -> bool {
@@ -189,7 +187,7 @@ impl RingRuleCensus {
                             let rule = Rule {
                                 family,
                                 kind,
-                                offset: offset(d, channel),
+                                offset: RingProjection::offset_for(d, channel),
                                 positive: edge.weight > 0.0,
                             };
                             coverage.add(rule, d, true);
@@ -203,7 +201,7 @@ impl RingRuleCensus {
                             let rule = Rule {
                                 family,
                                 kind,
-                                offset: offset(d, channel),
+                                offset: RingProjection::offset_for(d, channel),
                                 positive: positive == (edge.weight > 0.0),
                             };
                             coverage.add(rule, d, true);

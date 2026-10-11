@@ -47,12 +47,12 @@ fn edges_wsum(
 
 /// Per directed kind, the projection term of each direction's vote, or `None`
 /// when the kind has no projection (T11.F31).
-type ProjectionTerms = [Option<[f32; VOTE_DIRECTION_COUNT as usize]>; 3];
+type ProjectionTerms = [Option<DirectionTerms>; DirectedVoteKind::ALL.len()];
+type DirectionTerms = [f32; VOTE_DIRECTION_COUNT as usize];
 
 /// `P_K[d] = Σ w_p · r_p((d − k_p) mod 8)` over each kind's projections in
 /// genome order, accumulated from 0.0. A projection whose `ref_idx` is out of
 /// range or not a ring, and an ablated channel, contributes 0.0.
-#[allow(clippy::too_many_arguments)]
 fn projection_terms(
     def: &CgpGraphBackendDef,
     compute_count: usize,
@@ -62,13 +62,13 @@ fn projection_terms(
     shared_memory: &[f32; 16],
     prev_shared_memory: &[f32; 16],
 ) -> ProjectionTerms {
-    let mut terms: ProjectionTerms = [None; 3];
+    let mut terms: ProjectionTerms = [None; DirectedVoteKind::ALL.len()];
     for projection in &def.projections {
-        let entry = terms[projection.kind.index()].get_or_insert([0.0; 8]);
+        let entry = terms[projection.kind.index()].get_or_insert([0.0; _]);
         let is_ring = input_refs
             .get(usize::from(projection.ref_idx))
             .is_some_and(InputReference::is_ring);
-        let mut ring = [0.0f32; 8];
+        let mut ring: DirectionTerms = [0.0; _];
         if is_ring {
             for (channel, value) in ring.iter_mut().enumerate() {
                 if projection.ablated_channels & (1 << channel) != 0 {
@@ -118,19 +118,15 @@ pub(crate) fn apply_cgp_graph_effects(
     // each wired `ActionVote` sink, 0 for an unwired one. Staged at the end of
     // the effects, which only run when the visit commits.
     let mut contribution: VoteVector = [0.0; VOTE_SINK_COUNT];
-    let projections = if def.projections.is_empty() {
-        [None; 3]
-    } else {
-        projection_terms(
-            def,
-            compute_count,
-            curr_outputs,
-            input_refs,
-            resolve_ctx,
-            shared_memory,
-            prev_shared_memory,
-        )
-    };
+    let projections = projection_terms(
+        def,
+        compute_count,
+        curr_outputs,
+        input_refs,
+        resolve_ctx,
+        shared_memory,
+        prev_shared_memory,
+    );
 
     for sink in &def.output_sinks {
         // A directed vote sink's projection term (T11.F31), added to its edge

@@ -13,22 +13,18 @@ use super::operators::perturb_weight;
 
 /// The node's ring indices a projection can name, ascending: neighbor rings
 /// at an index representable as `u16`.
-fn ring_indices(input_refs: &[InputReference]) -> Vec<u16> {
+fn ring_indices(input_refs: &[InputReference]) -> impl Iterator<Item = u16> + '_ {
     input_refs
         .iter()
         .take(usize::from(u16::MAX) + 1)
         .enumerate()
         .filter(|(_, reference)| reference.is_ring())
         .map(|(idx, _)| u16::try_from(idx).expect("index within u16"))
-        .collect()
 }
 
 /// Whether `AddRingProjection` has a site: a ring at an index ≤ 65,535.
 pub(super) fn can_add(input_refs: &[InputReference]) -> bool {
-    input_refs
-        .iter()
-        .take(usize::from(u16::MAX) + 1)
-        .any(InputReference::is_ring)
+    ring_indices(input_refs).next().is_some()
 }
 
 /// Whether the unit operators have a site: at least one projection.
@@ -50,7 +46,7 @@ fn graph_node(
 /// in `0..8` — then push `{ring, kind, offset, 0.0}`. Duplicates are allowed.
 pub(crate) fn add(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
-    let rings = ring_indices(input_refs);
+    let rings: Vec<u16> = ring_indices(input_refs).collect();
     if rings.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -102,11 +98,13 @@ pub(crate) fn retarget_kind(
 ) -> Result<(), MutationSkipReason> {
     let idx = pick(def, rng)?;
     let projection = &mut def.projections[idx];
-    let others: Vec<DirectedVoteKind> = DirectedVoteKind::ALL
+    let current = projection.kind;
+    let pick = rng.gen_range(0..DirectedVoteKind::ALL.len() - 1);
+    projection.kind = DirectedVoteKind::ALL
         .into_iter()
-        .filter(|&kind| kind != projection.kind)
-        .collect();
-    projection.kind = others[rng.gen_range(0..others.len())];
+        .filter(|&kind| kind != current)
+        .nth(pick)
+        .expect("two other kinds");
     Ok(())
 }
 

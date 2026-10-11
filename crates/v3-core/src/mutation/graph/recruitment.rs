@@ -45,12 +45,12 @@ impl Plan {
             _ => None,
         };
         if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
-            let n = u16::from(VOTE_DIRECTION_COUNT);
-            let offset = (u16::from(d) % n + n - channel % n) % n;
+            let channel =
+                u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
             def.projections.push(RingProjection::new(
                 ref_idx,
                 kind,
-                u8::try_from(offset).expect("offset below 8"),
+                RingProjection::offset_for(d, channel),
                 0.0,
             ));
             return;

@@ -178,6 +178,14 @@ impl RingProjection {
         let n = VOTE_DIRECTION_COUNT;
         (d % n + n - self.offset % n) % n
     }
+
+    /// The offset whose direction-`d` vote reads ring channel `channel`:
+    /// `(d − channel) mod 8`, the inverse of [`Self::channel_for`].
+    #[must_use]
+    pub const fn offset_for(d: u8, channel: u8) -> u8 {
+        let n = VOTE_DIRECTION_COUNT;
+        (d % n + n - channel % n) % n
+    }
 }
 
 impl PartialEq for RingProjection {

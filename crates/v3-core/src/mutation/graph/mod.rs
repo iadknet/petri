@@ -382,10 +382,7 @@ impl GraphMutator {
             | GraphOperator::ShiftRingProjectionOffset
             | GraphOperator::RetargetRingProjectionKind
             | GraphOperator::RemoveRingProjection => {
-                let def = match genome.nodes.get_mut(node_idx).map(|n| &mut n.backend_def) {
-                    Some(BackendDef::Graph(def)) => def,
-                    _ => return Err(MutationSkipReason::NoApplicableTarget),
-                };
+                let def = operators::graph_def_mut(genome, node_idx)?;
                 match op {
                     GraphOperator::AlterRingProjectionWeight => projection::alter_weight(def, rng),
                     GraphOperator::ShiftRingProjectionOffset => projection::shift_offset(def, rng),
