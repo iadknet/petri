@@ -7,19 +7,19 @@ sweep reports stay in the main checkout's ignored `.bench-artifacts/`; the
 calling checkout stores concise summaries with exact raw hashes and recorded
 local verification times. Existing historical reports remain unchanged.
 
-[progress/index.html](progress/index.html) answers the five questions the
-success definition asks, one section each in order — is the world alive; how
-many ways of living, for how long; is cognition present and paying; is the
-substrate still evolvable; what did this closure cost — from the same reports
-listed below (T14.F11, 2026-09-15). A headline row of five tiles answers the
-first four for Orchards, Canyon and Confluence side by side; every indicator
-below it is one row of three world panels over closure order, with the
-`goal-v1` history drawn left of a labelled break inside the same chart, the
-gate profile folded into the cost section, and barrier and blocked-move rates
-in a collapsed per-world detail block. Only the T14.F12 neighborhood-read
-floors are drawn as floors; other references are first readings; every delta
-is a stored single-run comparison and is labelled so. A reading a report did
-not measure is drawn as "not measured", never as zero.
+[progress/index.html](progress/index.html) reads the `goal-worlds-v1`
+reports listed below and answers the success definition first (redesigned
+2026-10-10; the rationale and sources are in the
+[progress page design note](strategy/progress-page-design-2026-10-10.md)). A
+verdict card states what the shown closure did and what needs checking; then
+diversity (founder families, and their evenness as e^entropy) and cognition
+(memory use) per world against the series' first reading; then three
+guardrails (worlds alive, the T14.F12 floor, compute cost from the stored
+comparisons); then one row per closure, flagging closures whose readings are
+identical to the previous one; then every other reading, folded by topic. Any
+closure can be shown with the picker, a timeline row or a chart point. A change
+smaller than the reading's typical move between closures is drawn grey. A
+reading a report did not measure is drawn as "not measured", never as zero.
 Browsers block `fetch()` under `file://`, so serve the directory first:
 `python3 -m http.server 8000 --directory docs/progress`, then open
 `http://localhost:8000/`. New closures appear automatically once
