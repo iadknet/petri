@@ -1,6 +1,7 @@
 import { randomSeed } from "../../../stores/startupConfig.ts";
 import type {
 	FertilityAlgorithm,
+	FertilityBlend,
 	FertilityLayer,
 	FoodFertilityLayerTarget,
 } from "../../../types/config.ts";
@@ -85,7 +86,7 @@ const ANNEALING_FIELDS: FieldDef[] = [
 	},
 ];
 
-type FertilityAlgorithmType = "Uniform" | "Fbm" | "PoissonBlobs";
+type FertilityAlgorithmType = "Uniform" | "Fbm" | "PoissonBlobs" | "Channels";
 
 const FBM_TOOLTIPS = {
 	octaves:
@@ -116,6 +117,20 @@ const POISSON_TOOLTIPS = {
 	seed: "A number that picks island placement. Same seed gives the same island layout.",
 } as const;
 
+const CHANNELS_TOOLTIPS = {
+	frequency:
+		"How closely the channels are spaced. Higher packs more, shorter channels; lower spreads fewer, longer ones.",
+	octaves: "How wavy the channels run. More octaves add finer bends.",
+	width: "How many cells across each channel is.",
+	value: "Fertility on a channel, from -1 (barren) to 1. Cells off the channels are barren.",
+	useSeed:
+		"Turn this on to lock the channel layout so it repeats exactly when you use the same seed.",
+	seed: "A number that picks the channel layout. Same seed gives the same channels.",
+} as const;
+
+const BLEND_TOOLTIP =
+	"Weighted Average mixes this layer into the others by weight. Max raises each cell to at least this layer's value without diluting the others; its weight is ignored.";
+
 function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 	switch (type) {
 		case "Uniform":
@@ -136,6 +151,17 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 					min_radius: 5.0,
 					max_radius: 15.0,
 					falloff: 0.5,
+				},
+			};
+		case "Channels":
+			return {
+				Channels: {
+					octaves: 4,
+					frequency: 0.01,
+					lacunarity: 2.0,
+					persistence: 0.5,
+					width: 3.0,
+					value: 1.0,
 				},
 			};
 		default:
@@ -169,7 +195,20 @@ function parseTarget(value: string): FoodFertilityLayerTarget {
 function algorithmType(algorithm: FertilityAlgorithm): FertilityAlgorithmType {
 	if ("Uniform" in algorithm) return "Uniform";
 	if ("Fbm" in algorithm) return "Fbm";
+	if ("Channels" in algorithm) return "Channels";
 	return "PoissonBlobs";
+}
+
+/** Set `seed`, or drop the key when `seed` is undefined (the server derives one). */
+function withSeed<T extends { seed?: number | null }>(params: T, seed: number | undefined): T {
+	const { seed: _previous, ...rest } = params;
+	return (seed === undefined ? rest : { ...rest, seed }) as T;
+}
+
+/** A layer with `blend` set, or with the key dropped for the default. */
+function withBlend(layer: FertilityLayer, blend: FertilityBlend): FertilityLayer {
+	const { blend: _previous, ...rest } = layer;
+	return blend === "Max" ? { ...rest, blend } : rest;
 }
 
 interface LayerFieldProps {
@@ -225,6 +264,118 @@ function LayerField({
 				)}
 			</div>
 		</div>
+	);
+}
+
+interface FbmShape {
+	octaves: number;
+	frequency: number;
+	lacunarity: number;
+	persistence: number;
+}
+
+interface FbmShapeFieldsProps<T extends FbmShape> {
+	shape: T;
+	testIdPrefix: string;
+	tooltips: Record<keyof FbmShape, string>;
+	onChange: (shape: T) => void;
+}
+
+function FbmShapeFields<T extends FbmShape>({
+	shape,
+	testIdPrefix,
+	tooltips,
+	onChange,
+}: FbmShapeFieldsProps<T>) {
+	return (
+		<>
+			<LayerField
+				label="Octaves"
+				testId={`${testIdPrefix}-octaves`}
+				value={shape.octaves}
+				tooltip={tooltips.octaves}
+				min={1}
+				max={12}
+				step={1}
+				onChange={(value) => onChange({ ...shape, octaves: Math.round(value) })}
+			/>
+			<LayerField
+				label="Frequency"
+				testId={`${testIdPrefix}-frequency`}
+				value={shape.frequency}
+				tooltip={tooltips.frequency}
+				min={0.001}
+				max={1}
+				step={0.001}
+				onChange={(value) => onChange({ ...shape, frequency: value })}
+			/>
+			<LayerField
+				label="Lacunarity"
+				testId={`${testIdPrefix}-lacunarity`}
+				value={shape.lacunarity}
+				tooltip={tooltips.lacunarity}
+				min={0.5}
+				max={4}
+				step={0.05}
+				onChange={(value) => onChange({ ...shape, lacunarity: value })}
+			/>
+			<LayerField
+				label="Persistence"
+				testId={`${testIdPrefix}-persistence`}
+				value={shape.persistence}
+				tooltip={tooltips.persistence}
+				min={0}
+				max={1}
+				step={0.01}
+				onChange={(value) => onChange({ ...shape, persistence: value })}
+			/>
+		</>
+	);
+}
+
+interface SeedFieldsProps {
+	seed: number | null | undefined;
+	testIdPrefix: string;
+	tooltips: { useSeed: string; seed: string };
+	/** `undefined` clears the seed so the server derives one from the world seed. */
+	onChange: (seed: number | undefined) => void;
+}
+
+function SeedFields({ seed, testIdPrefix, tooltips, onChange }: SeedFieldsProps) {
+	return (
+		<>
+			<div className="flex items-center justify-between gap-2 py-0.5 pl-2">
+				<label
+					htmlFor={`${testIdPrefix}-seed-enabled-input`}
+					className="flex items-center gap-1 text-[11px] text-slate-400"
+				>
+					Use Seed
+					<Tooltip text={tooltips.useSeed}>
+						<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
+					</Tooltip>
+				</label>
+				<input
+					id={`${testIdPrefix}-seed-enabled-input`}
+					data-testid={`${testIdPrefix}-seed-enabled`}
+					type="checkbox"
+					checked={seed != null}
+					onChange={(e) => onChange(e.target.checked ? (seed ?? 0) : undefined)}
+					className="accent-emerald-500"
+				/>
+			</div>
+			{seed != null && (
+				<LayerField
+					label="Seed"
+					testId={`${testIdPrefix}-seed`}
+					value={seed}
+					tooltip={tooltips.seed}
+					min={0}
+					step={1}
+					onChange={(value) => onChange(Math.max(0, Math.round(value)))}
+					onRandomize={() => onChange(randomSeed())}
+				/>
+			)}
+		</>
 	);
 }
 
@@ -316,11 +467,10 @@ export function FertilitySection({
 							</p>
 						)}
 						{fertilityLayers.map((layer, index) => {
-							const layerAlgorithmType = algorithmType(layer.algorithm);
+							const algorithm = layer.algorithm;
 							const baseTestId = `startup-field-fertility-layer-${index}`;
-							const fbm = "Fbm" in layer.algorithm ? layer.algorithm.Fbm : null;
-							const poisson =
-								"PoissonBlobs" in layer.algorithm ? layer.algorithm.PoissonBlobs : null;
+							const setAlgorithm = (next: FertilityAlgorithm) =>
+								updateLayer(index, (currentLayer) => ({ ...currentLayer, algorithm: next }));
 							return (
 								<div
 									key={`fertility-layer-${index}`}
@@ -378,18 +528,42 @@ export function FertilitySection({
 										<select
 											id={`${baseTestId}-algorithm-input`}
 											data-testid={`${baseTestId}-algorithm`}
-											value={layerAlgorithmType}
-											onChange={(e) => {
-												updateLayer(index, (currentLayer) => ({
-													...currentLayer,
-													algorithm: defaultAlgorithm(e.target.value as FertilityAlgorithmType),
-												}));
-											}}
+											value={algorithmType(algorithm)}
+											onChange={(e) =>
+												setAlgorithm(defaultAlgorithm(e.target.value as FertilityAlgorithmType))
+											}
 											className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
 										>
 											<option value="Uniform">Uniform</option>
 											<option value="Fbm">FBM</option>
 											<option value="PoissonBlobs">Poisson Blobs</option>
+											<option value="Channels">Channels</option>
+										</select>
+									</div>
+
+									<div className="mt-2 flex items-center justify-between gap-2">
+										<label
+											htmlFor={`${baseTestId}-blend-input`}
+											className="flex items-center gap-1 text-[11px] text-slate-400"
+										>
+											Blend
+											<Tooltip text={BLEND_TOOLTIP}>
+												<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
+											</Tooltip>
+										</label>
+										<select
+											id={`${baseTestId}-blend-input`}
+											data-testid={`${baseTestId}-blend`}
+											value={layer.blend ?? "WeightedAverage"}
+											onChange={(e) =>
+												updateLayer(index, (currentLayer) =>
+													withBlend(currentLayer, e.target.value as FertilityBlend),
+												)
+											}
+											className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
+										>
+											<option value="WeightedAverage">Weighted Average</option>
+											<option value="Max">Max</option>
 										</select>
 									</div>
 
@@ -405,306 +579,148 @@ export function FertilitySection({
 										}
 									/>
 
-									{layerAlgorithmType === "Uniform" && "Uniform" in layer.algorithm && (
+									{"Uniform" in algorithm && (
 										<LayerField
 											label="Value"
 											testId={`${baseTestId}-uniform-value`}
-											value={layer.algorithm.Uniform.value}
+											value={algorithm.Uniform.value}
 											tooltip={UNIFORM_TOOLTIPS.value}
 											min={-1}
 											max={1}
 											step={0.05}
-											onChange={(value) =>
-												updateLayer(index, (currentLayer) => ({
-													...currentLayer,
-													algorithm: { Uniform: { value } },
-												}))
-											}
+											onChange={(value) => setAlgorithm({ Uniform: { value } })}
 										/>
 									)}
 
-									{layerAlgorithmType === "Fbm" && fbm && (
+									{"Fbm" in algorithm && (
 										<>
-											<LayerField
-												label="Octaves"
-												testId={`${baseTestId}-fbm-octaves`}
-												value={fbm.octaves}
-												tooltip={FBM_TOOLTIPS.octaves}
-												min={1}
-												max={12}
-												step={1}
-												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															Fbm: {
-																...fbm,
-																octaves: Math.round(value),
-															},
-														},
-													}))
-												}
+											<FbmShapeFields
+												shape={algorithm.Fbm}
+												testIdPrefix={`${baseTestId}-fbm`}
+												tooltips={FBM_TOOLTIPS}
+												onChange={(Fbm) => setAlgorithm({ Fbm })}
 											/>
-											<LayerField
-												label="Frequency"
-												testId={`${baseTestId}-fbm-frequency`}
-												value={fbm.frequency}
-												tooltip={FBM_TOOLTIPS.frequency}
-												min={0.001}
-												max={1}
-												step={0.001}
-												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: { Fbm: { ...fbm, frequency: value } },
-													}))
-												}
+											<SeedFields
+												seed={algorithm.Fbm.seed}
+												testIdPrefix={`${baseTestId}-fbm`}
+												tooltips={FBM_TOOLTIPS}
+												onChange={(seed) => setAlgorithm({ Fbm: withSeed(algorithm.Fbm, seed) })}
 											/>
-											<LayerField
-												label="Lacunarity"
-												testId={`${baseTestId}-fbm-lacunarity`}
-												value={fbm.lacunarity}
-												tooltip={FBM_TOOLTIPS.lacunarity}
-												min={0.5}
-												max={4}
-												step={0.05}
-												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															Fbm: { ...fbm, lacunarity: value },
-														},
-													}))
-												}
-											/>
-											<LayerField
-												label="Persistence"
-												testId={`${baseTestId}-fbm-persistence`}
-												value={fbm.persistence}
-												tooltip={FBM_TOOLTIPS.persistence}
-												min={0}
-												max={1}
-												step={0.01}
-												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															Fbm: { ...fbm, persistence: value },
-														},
-													}))
-												}
-											/>
-											<div className="flex items-center justify-between gap-2 py-0.5 pl-2">
-												<label
-													htmlFor={`${baseTestId}-fbm-seed-enabled-input`}
-													className="flex items-center gap-1 text-[11px] text-slate-400"
-												>
-													Use Seed
-													<Tooltip text={FBM_TOOLTIPS.useSeed}>
-														<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-													</Tooltip>
-												</label>
-												<input
-													id={`${baseTestId}-fbm-seed-enabled-input`}
-													data-testid={`${baseTestId}-fbm-seed-enabled`}
-													type="checkbox"
-													checked={fbm.seed != null}
-													onChange={(e) => {
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: {
-																Fbm: e.target.checked
-																	? {
-																			...fbm,
-																			seed: fbm.seed ?? 0,
-																		}
-																	: {
-																			octaves: fbm.octaves,
-																			frequency: fbm.frequency,
-																			lacunarity: fbm.lacunarity,
-																			persistence: fbm.persistence,
-																		},
-															},
-														}));
-													}}
-													className="accent-emerald-500"
-												/>
-											</div>
-											{fbm.seed != null && (
-												<LayerField
-													label="Seed"
-													testId={`${baseTestId}-fbm-seed`}
-													value={fbm.seed ?? 0}
-													tooltip={FBM_TOOLTIPS.seed}
-													min={0}
-													step={1}
-													onChange={(value) =>
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: {
-																Fbm: {
-																	...fbm,
-																	seed: Math.max(0, Math.round(value)),
-																},
-															},
-														}))
-													}
-													onRandomize={() =>
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: { Fbm: { ...fbm, seed: randomSeed() } },
-														}))
-													}
-												/>
-											)}
 										</>
 									)}
 
-									{layerAlgorithmType === "PoissonBlobs" && poisson && (
+									{"Channels" in algorithm && (
+										<>
+											<LayerField
+												label="Width"
+												testId={`${baseTestId}-channels-width`}
+												value={algorithm.Channels.width}
+												tooltip={CHANNELS_TOOLTIPS.width}
+												min={1}
+												max={20}
+												step={0.5}
+												onChange={(value) =>
+													setAlgorithm({ Channels: { ...algorithm.Channels, width: value } })
+												}
+											/>
+											<LayerField
+												label="Value"
+												testId={`${baseTestId}-channels-value`}
+												value={algorithm.Channels.value}
+												tooltip={CHANNELS_TOOLTIPS.value}
+												min={-1}
+												max={1}
+												step={0.05}
+												onChange={(value) =>
+													setAlgorithm({ Channels: { ...algorithm.Channels, value } })
+												}
+											/>
+											<FbmShapeFields
+												shape={algorithm.Channels}
+												testIdPrefix={`${baseTestId}-channels`}
+												tooltips={{ ...FBM_TOOLTIPS, ...CHANNELS_TOOLTIPS }}
+												onChange={(Channels) => setAlgorithm({ Channels })}
+											/>
+											<SeedFields
+												seed={algorithm.Channels.seed}
+												testIdPrefix={`${baseTestId}-channels`}
+												tooltips={CHANNELS_TOOLTIPS}
+												onChange={(seed) =>
+													setAlgorithm({ Channels: withSeed(algorithm.Channels, seed) })
+												}
+											/>
+										</>
+									)}
+
+									{"PoissonBlobs" in algorithm && (
 										<>
 											<LayerField
 												label="Blob Count"
 												testId={`${baseTestId}-poisson-blob-count`}
-												value={poisson.blob_count}
+												value={algorithm.PoissonBlobs.blob_count}
 												tooltip={POISSON_TOOLTIPS.blobCount}
 												min={1}
 												max={5000}
 												step={1}
 												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															PoissonBlobs: {
-																...poisson,
-																blob_count: Math.max(1, Math.round(value)),
-															},
+													setAlgorithm({
+														PoissonBlobs: {
+															...algorithm.PoissonBlobs,
+															blob_count: Math.max(1, Math.round(value)),
 														},
-													}))
+													})
 												}
 											/>
 											<LayerField
 												label="Min Radius"
 												testId={`${baseTestId}-poisson-min-radius`}
-												value={poisson.min_radius}
+												value={algorithm.PoissonBlobs.min_radius}
 												tooltip={POISSON_TOOLTIPS.minRadius}
 												min={0.1}
 												max={100}
 												step={0.1}
 												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															PoissonBlobs: {
-																...poisson,
-																min_radius: value,
-															},
-														},
-													}))
+													setAlgorithm({
+														PoissonBlobs: { ...algorithm.PoissonBlobs, min_radius: value },
+													})
 												}
 											/>
 											<LayerField
 												label="Max Radius"
 												testId={`${baseTestId}-poisson-max-radius`}
-												value={poisson.max_radius}
+												value={algorithm.PoissonBlobs.max_radius}
 												tooltip={POISSON_TOOLTIPS.maxRadius}
 												min={0.1}
 												max={100}
 												step={0.1}
 												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															PoissonBlobs: {
-																...poisson,
-																max_radius: value,
-															},
-														},
-													}))
+													setAlgorithm({
+														PoissonBlobs: { ...algorithm.PoissonBlobs, max_radius: value },
+													})
 												}
 											/>
 											<LayerField
 												label="Falloff"
 												testId={`${baseTestId}-poisson-falloff`}
-												value={poisson.falloff}
+												value={algorithm.PoissonBlobs.falloff}
 												tooltip={POISSON_TOOLTIPS.falloff}
 												min={0.01}
 												max={10}
 												step={0.01}
 												onChange={(value) =>
-													updateLayer(index, () => ({
-														...layer,
-														algorithm: {
-															PoissonBlobs: {
-																...poisson,
-																falloff: value,
-															},
-														},
-													}))
+													setAlgorithm({
+														PoissonBlobs: { ...algorithm.PoissonBlobs, falloff: value },
+													})
 												}
 											/>
-											<div className="flex items-center justify-between gap-2 py-0.5 pl-2">
-												<label
-													htmlFor={`${baseTestId}-poisson-seed-enabled-input`}
-													className="flex items-center gap-1 text-[11px] text-slate-400"
-												>
-													Use Seed
-													<Tooltip text={POISSON_TOOLTIPS.useSeed}>
-														<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-													</Tooltip>
-												</label>
-												<input
-													id={`${baseTestId}-poisson-seed-enabled-input`}
-													data-testid={`${baseTestId}-poisson-seed-enabled`}
-													type="checkbox"
-													checked={poisson.seed != null}
-													onChange={(e) => {
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: {
-																PoissonBlobs: e.target.checked
-																	? {
-																			...poisson,
-																			seed: poisson.seed ?? 0,
-																		}
-																	: {
-																			blob_count: poisson.blob_count,
-																			min_radius: poisson.min_radius,
-																			max_radius: poisson.max_radius,
-																			falloff: poisson.falloff,
-																		},
-															},
-														}));
-													}}
-													className="accent-emerald-500"
-												/>
-											</div>
-											{poisson.seed != null && (
-												<LayerField
-													label="Seed"
-													testId={`${baseTestId}-poisson-seed`}
-													value={poisson.seed ?? 0}
-													tooltip={POISSON_TOOLTIPS.seed}
-													min={0}
-													step={1}
-													onChange={(value) =>
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: {
-																PoissonBlobs: {
-																	...poisson,
-																	seed: Math.max(0, Math.round(value)),
-																},
-															},
-														}))
-													}
-													onRandomize={() =>
-														updateLayer(index, () => ({
-															...layer,
-															algorithm: { PoissonBlobs: { ...poisson, seed: randomSeed() } },
-														}))
-													}
-												/>
-											)}
+											<SeedFields
+												seed={algorithm.PoissonBlobs.seed}
+												testIdPrefix={`${baseTestId}-poisson`}
+												tooltips={POISSON_TOOLTIPS}
+												onChange={(seed) =>
+													setAlgorithm({ PoissonBlobs: withSeed(algorithm.PoissonBlobs, seed) })
+												}
+											/>
 										</>
 									)}
 								</div>

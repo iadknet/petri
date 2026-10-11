@@ -382,6 +382,7 @@ function buildStartupFoodRequest(food: StartupFoodConfig): StartupFoodRequest {
 				algorithm: layer.algorithm,
 				weight: layer.weight,
 				target: layer.target ?? "AllFoods",
+				...(layer.blend === "Max" ? { blend: layer.blend } : {}),
 			})),
 		},
 		annealing: {
