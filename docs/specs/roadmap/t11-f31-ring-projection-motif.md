@@ -248,8 +248,8 @@ only. Raw (ignored, main checkout `.bench-artifacts/t11-f31-ring-projection-moti
 gate 105,028 bytes (`08204beb...`), goal 681,246,074 bytes (`00be755a...`).
 Summaries: gate 19,839 bytes (`d79ba8c1...`), goal 392,679 bytes (`0a847496...`).
 Full hashes, counters, wall readings and every predeclared reading are in the
-readings. Predeclared targets **missed** (reported, not reinterpreted, for the
-user): (1) Orchards `neighborhood_read.changed_per_all_births` 0.1432, below its
+readings. Predeclared targets **missed**, both accepted by the user below:
+(1) Orchards `neighborhood_read.changed_per_all_births` 0.1432, below its
 standing floor 0.1464 (Canyon 0.1348 and Confluence 0.1594 are above their
 floors); (2) steering avoidance 0 on all three worlds (exact-hit 0.4407 /
 0.4395 / 0.4205 met). The founder per-operator battery (raw gate
@@ -261,6 +261,13 @@ move with the draw remap; that row predeclared only the new keys. Met:
 persistence floor, ring_rules fingerprint on every world, `dead_per_all_births`
 0.0052 / 0.0072 / 0.0018 against bounds 0.0058 / 0.0140 / 0.0084, drift-walk
 bounds, `AddRingProjection` silent (0 changed, 0 dead) in every cohort.
+
+**User-accepted breaches (user, 2026-10-11, answer "Accept" to each).**
+
+| Breach | Measured | Attribution |
+| --- | --- | --- |
+| Orchards `neighborhood_read.changed_per_all_births` below its standing floor | 0.1432 against floor 0.1464 (reference 0.1568). Drops against the reference: −8.7% Orchards, −16.2% Canyon (0.1348, floor 0.1300), −4.4% Confluence (0.1594, floor 0.1434) | Silent supply, not harm. The predeclared "slightly down" counted only `AddRingProjection`, at about 6% of the applicable Graph weight. `ShiftRingProjectionOffset`, `RetargetRingProjectionKind` and `RemoveRingProjection` are also silent on the zero-weight projections most carriers hold, so a larger share of births changes nothing. `dead_per_all_births` and the drift walk met their bounds. The floor and its value are unchanged. |
+| Steering avoidance 0 on all three worlds against the note §8 target (above 0) | Avoidance 0 of 472 / 537 / 459 moves; exact-hit 0.4407 / 0.4395 / 0.4205 met the 0.37 target | Predeclared as likely: projections are born at zero weight, few carry a weight step by tick 2,000, and few vote nodes declare a barrier ring. The target is unchanged. |
 
 - Summaries: [gate](../../progress/features/t11-f31-ring-projection-motif.json),
   [goal](../../progress/features/t11-f31-ring-projection-motif-goal.json).
