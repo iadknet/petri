@@ -93,6 +93,9 @@ of the worked cases in its Section 2.3.
   included, carries its effort. Its analog is stated in its goal line, and
   the multi-action tick is required (GP-01), so no spec may shorten or cap
   plans to satisfy it.
+- T19.F07 is on hold (user decision, 2026-10-10): after the effort-cost
+  sweeps the user doubts it is still needed and is tuning energy costs
+  instead. The next-feature rule skips it until the user lifts the hold.
 - T19.F01 to T19.F06 are closed. The track also remains In Progress
   because T11.F10's comparative discovery/retention protocol is still pending;
   the closed F02/F04/F06 specs explicitly leave that measurement to F10.

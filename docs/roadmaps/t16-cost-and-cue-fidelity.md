@@ -82,3 +82,12 @@ cannot yet avoid or a record they cannot see.
   is superseded and its readings moved into the rows. A stale spec draft from
   2026-09-19 is on branch `codex/t16-f02`; it predates T19 and this amendment.
   T16.F03 remains unplaced.
+- Effort-cost defaults, 2026-10-10 (user decision, not a roadmap feature):
+  after goal-profile sweeps on T16.F02's closed code, the defaults became
+  `noop_cost` 0.4 (the floor), `reproduce_attempt_cost` 1.0 and `move_cost`
+  1.6; `eat_cost` and `reproduce_cost` are unchanged (the floor lifts eat to
+  0.4). The founder reproduce margin is now guaranteed only before
+  senescence (through age 130 at these economics); older founders may waste
+  attempts. This supersedes the max-age claim of T16.F02 invariant 3a.
+  Sweep readings and re-pins:
+  [effort-cost-defaults readings](../progress/readings/effort-cost-defaults.md).

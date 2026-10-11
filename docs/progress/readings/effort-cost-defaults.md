@@ -11,6 +11,61 @@ The seven root `world-recipe-*.json` files set `move_cost` 0.1 and
 `reproduce_attempt_cost`. The `experiments/worlds/` recipes set none of the
 three, so the goal worlds inherit the new defaults.
 
+## Sweeps that chose the values
+
+Goal profile (`goal-worlds-v1`, one seed per world, 2,000 ticks), each arm a
+scratch build with the default edited, run with `make bench PROFILE=goal`.
+Summaries are local only, under the main checkout's ignored
+`.bench-artifacts/noop-floor-exp/`. The first sweep's baseline is T16.F02's
+committed goal summary. Readings are Orchards / Canyon / Confluence.
+
+| Local summary | sha256 | Bytes |
+| --- | --- | ---: |
+| `summary-0p1.json` | 3e1bfbfd8607e903… | 335651 |
+| `summary-0p2.json` | 53eeeba3eff268aa… | 331057 |
+| `summary-0p4.json` | 4ee3393fba3dbc6f… | 333301 |
+| `summary-0p8.json` | 0fb04cd0867e01dd… | 351593 |
+| `summary-floor0p4-attempt-1p0.json` | 82136e8c34ba9795… | 329631 |
+| `summary-floor0p4-attempt-4p0.json` | 83866c2df21b7f38… | 302077 |
+| `summary-floor0p4-attempt-16p0.json` | 29824b600ff5b20a… | 329571 |
+| `summary-floor0p4-att1-move-0p6.json` | 63d22764281fb1a7… | 283969 |
+| `summary-floor0p4-att1-move-1p0.json` | 68fe52b1b7579d01… | 343564 |
+| `summary-floor0p4-att1-move-1p6.json` | e61b858bd0574a7b… | 370561 |
+
+Sweep 1, `noop_cost` (the floor); other costs at T16.F02 defaults:
+
+| Reading | 0.05 | 0.1 | 0.2 | 0.4 | 0.8 |
+| --- | --- | --- | --- | --- | --- |
+| Failed eat fraction | 0.61 / 0.19 / 0.52 | 0.33 / 0.42 / 0.57 | 0.53 / 0.30 / 0.43 | 0.27 / 0.13 / 0.18 | 0.01 / 0.01 / 0.03 |
+| Food intake per creature-tick | 1.07 / 0.75 / 0.88 | 0.95 / 0.86 / 0.99 | 1.21 / 0.89 / 1.00 | 1.61 / 1.17 / 1.16 | 1.94 / 1.77 / 1.84 |
+| Births per reproduce attempt | 0.20 / 0.08 / 0.08 | 0.14 / 0.09 / 0.10 | 0.24 / 0.15 / 0.09 | 0.30 / 0.19 / 0.29 | 0.40 / 0.28 / 0.33 |
+| Plateau population | 4263 / 4233 / 5142 | 5513 / 4020 / 5008 | 4032 / 5296 / 4888 | 4050 / 5324 / 3377 | 5344 / 869 / 2934 |
+| Surviving founder clades | 1 / 7 / 8 | 3 / 13 / 5 | 2 / 8 / 2 | 5 / 11 / 3 | 59 / 11 / 7 |
+
+Sweep 2, `reproduce_attempt_cost` at floor 0.4:
+
+| Reading | 0.05 (floored to 0.4) | 1 | 4 | 16 |
+| --- | --- | --- | --- | --- |
+| Births per reproduce attempt | 0.30 / 0.19 / 0.29 | 0.37 / 0.26 / 0.41 | 0.29 / 0.34 / 0.43 | 0.34 / 0.22 / 0.26 |
+| Attempts rejected on parent energy | 0.21 / 0.18 / 0.14 | 0.17 / 0.14 / 0.14 | 0.51 / 0.27 / 0.34 | 0.53 / 0.66 / 0.62 |
+| Plateau population | 4050 / 5324 / 3377 | 3825 / 4358 / 1737 | 3320 / 3891 / extinct (tick 846) | 3418 / 377 / 2798 |
+
+Sweep 3, `move_cost` at floor 0.4 and attempt 1.0:
+
+| Reading | 0.2 (floored to 0.4) | 0.6 | 1.0 | 1.6 |
+| --- | --- | --- | --- | --- |
+| Plateau population | 3825 / 4358 / 1737 | 2035 / 2771 / extinct (tick 573) | 6214 / 338 / 3155 | 4536 / 2500 / 3884 |
+| Trough population | 17 / 618 / 30 | 12 / 405 / 0 | 566 / 95 / 80 | 3702 / 342 / 586 |
+| Food intake per creature-tick | 1.36 / 1.24 / 1.11 | 1.52 / 1.37 / 1.28 | 1.84 / 1.68 / 1.99 | 2.44 / 2.32 / 2.43 |
+| Blocked move fraction | 0.12 / 0.31 / 0.23 | 0.11 / 0.26 / 0.20 | 0.10 / 0.20 / 0.17 | 0.08 / 0.14 / 0.13 |
+| Surviving founder clades | 5 / 10 / 2 | 3 / 10 / 0 | 49 / 5 / 4 | 81 / 21 / 28 |
+
+One seed per world: behavior trends (failed eats, blocked moves, intake,
+births per attempt) are consistent across worlds; population outcomes are
+non-monotonic (an extinction at an intermediate value in sweeps 2 and 3) and
+read as early-bottleneck noise. The user chose 0.4 / 1.0 / 1.6 on these
+readings.
+
 ## Decision: founder margin before senescence
 
 User ruling (2026-10-10): the founder reproduce margin (T17.F01 invariant 5)
@@ -88,3 +143,28 @@ sweep config only seeds 22 and 50 of 0..=60 reach tick 250, and in the 24²,
   current=0.095108 reference=Some("0.027946") delta%=Some("240.327775")".
 - `cargo test -p v3-cli --no-fail-fast --test bench_artifacts --test cli --test telemetry`:
   37, 13 and 13 passed.
+
+## Benchmarks and epoch re-pin
+
+| Profile | Command | Exit | Against | Severe |
+| --- | --- | --- | --- | --- |
+| gate | `make bench PROFILE=gate FEATURE=effort-cost-defaults` at `345aefd6` | make 2 (CLI 3, severe) | T16.F02 gate | `vm_steps` +240.3%, `pass_cap_hits` +71.0% |
+| goal | `make bench PROFILE=goal FEATURE=effort-cost-defaults` at `4c8c0d0a` | 0 | T16.F02 goal | none (`vm_steps` −56.9%, `actions_applied` −27.0%, `births` +22.3% flag) |
+
+| File | sha256 | Bytes |
+| --- | --- | ---: |
+| raw gate (main `.bench-artifacts/effort-cost-defaults/gate.json`) | 0391537e769668ff… | 102059 |
+| raw goal (main `.bench-artifacts/effort-cost-defaults/goal.json`) | 60edc5f0adc1e60f… | 666982191 |
+| `docs/progress/features/effort-cost-defaults.json` | 737272ce681a14f7… | 19984 |
+| `docs/progress/features/effort-cost-defaults-goal.json` | 40f4bb1979d881de… | 370069 |
+
+- Gate populations end at 563 / 546 / 593 (seeds 11 / 22 / 33) against T16.F02's
+  2,399 / 2,272 / 2,357; none extinct. Goal final populations 4,283 / 2,354 /
+  4,213 (Orchards / Canyon / Confluence); none extinct.
+- Identity: the goal summary's `deterministic` block equals the sweep arm
+  `summary-floor0p4-att1-move-1p6.json` exactly, so the landed change is the
+  configuration the user chose from.
+- Both severes are the user's 2026-10-10 decision to adopt these defaults.
+  `gate.epoch_baseline` and `goal_worlds.epoch_baseline` in
+  `docs/progress/benchmark-series.json` now point at the two summaries above,
+  and both are appended to their `closed` lists; thresholds are unchanged.
