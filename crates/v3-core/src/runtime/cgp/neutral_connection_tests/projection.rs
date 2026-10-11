@@ -257,6 +257,36 @@ fn a_projection_off_range_or_off_ring_contributes_zero() {
     }
 }
 
+/// A nonfinite weight on an off-range or off-ring projection leaves the
+/// kind's incumbent edge votes unchanged: the projection contributes 0, not
+/// `weight · 0.0`.
+#[test]
+fn a_nonfinite_weight_off_range_or_off_ring_leaves_incumbent_votes_unchanged() {
+    let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
+    let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
+    for d in 0..8u8 {
+        wire(
+            &mut base,
+            OutputSinkKind::ActionVote(DirectedVoteKind::Move.sink(d)),
+            edge(leaf(0, u16::from(d)), 1.5),
+        );
+    }
+    let incumbent = votes(&base, &sensors);
+    assert!((0..8u8).all(|d| incumbent[DirectedVoteKind::Move.sink(d).index()] != 0.0));
+    for ref_idx in [3, 4, u16::MAX] {
+        for weight in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut def = base.clone();
+            def.projections.push(RingProjection::new(
+                ref_idx,
+                DirectedVoteKind::Move,
+                1,
+                weight,
+            ));
+            assert_eq!(votes(&def, &sensors), incumbent, "{ref_idx} {weight}");
+        }
+    }
+}
+
 #[test]
 fn one_weight_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
     let mut food = [0.0; 8];
