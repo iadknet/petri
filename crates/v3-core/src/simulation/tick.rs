@@ -1180,6 +1180,10 @@ fn run_phase_2(
             #[cfg(feature = "telemetry-seams")]
             let marks = (sim.stats.observed_creature == Some(id))
                 .then(|| FlowMarks::of(&sim.stats.energy_flows));
+            let charged_before = (
+                sim.stats.energy_flows.action_charges,
+                sim.stats.energy_flows.failed_action_effort,
+            );
             #[cfg_attr(not(feature = "telemetry-seams"), allow(unused_variables))]
             let entry = match *action {
                 WorldAction::NoOp => execute_noop(sim, &ctx, outcome_acc),
@@ -1201,18 +1205,21 @@ fn run_phase_2(
                     execute_steal_energy(sim, &ctx, direction, amount, outcome_acc)
                 }
             };
+            // Floor energy at 0.0 — creatures cannot spend more than they have.
+            // The action's own overdraft nets out of its charge; only a
+            // deficit it inherited is a floor credit.
+            if let Some(creature) = sim.creatures.get_mut(id) {
+                let before = creature.energy;
+                creature.energy = creature.energy.max(0.0);
+                let overshoot = super::energy_accounting::applied_debit(creature.energy, before);
+                let flows = &mut sim.stats.energy_flows;
+                flows.zero_floor_credit += flows.net_action_overdraft(charged_before, overshoot);
+            }
+
             #[cfg(feature = "telemetry-seams")]
             if let Some(marks) = marks {
                 let applied = marks.applied(entry, &sim.stats.energy_flows);
                 sim.stats.observed_actions.push(applied);
-            }
-
-            // Floor energy at 0.0 — creatures cannot spend more than they have.
-            if let Some(creature) = sim.creatures.get_mut(id) {
-                let before = creature.energy;
-                creature.energy = creature.energy.max(0.0);
-                sim.stats.energy_flows.zero_floor_credit +=
-                    super::energy_accounting::applied_debit(creature.energy, before);
             }
 
             if remove_creature_if_dead(sim, id) {
