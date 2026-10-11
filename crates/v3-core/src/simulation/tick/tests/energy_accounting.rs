@@ -65,7 +65,8 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         sim.config.predation.steal_cost_rate = 2.0;
         execute(&mut sim, id, action);
         assert_eq!(sim.stats.mortality.count(cause), 1, "{cause:?}");
-        assert_eq!(sim.stats.energy_flows.zero_floor_credit, 1.0);
+        // The 1.0 overdraft nets out of the charge, not into the floor.
+        assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
         let charges = sim.stats.energy_flows.action_charges;
         let charged_bucket = match cause {
             DeathCause::ActionNoop => charges.noop,
@@ -75,10 +76,10 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             DeathCause::ActionStealEnergy => charges.steal_energy,
             _ => unreachable!(),
         };
-        assert_eq!(charged_bucket, 2.0);
+        assert_eq!(charged_bucket, 1.0);
         assert_eq!(
             charges.noop + charges.eat + charges.r#move + charges.reproduce + charges.steal_energy,
-            2.0
+            1.0
         );
     }
 }

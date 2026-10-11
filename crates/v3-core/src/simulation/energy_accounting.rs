@@ -175,7 +175,67 @@ pub struct EnergyFlows {
     pub gestation_lost: f64,
 }
 
+/// The share of a dispatch-floor `overshoot` that an action's own `charged`
+/// effort put below zero: at most the overshoot, at most the charge, never
+/// negative. The rest of the overshoot is a deficit the action inherited.
+#[must_use]
+pub(crate) fn overdrawn_share(overshoot: f64, charged: f64) -> f64 {
+    overshoot.min(charged).max(0.0)
+}
+
 impl EnergyFlows {
+    /// Net the action's overdraft out of its charge, given the charge and
+    /// failed-effort totals from before the action and the dispatch floor's
+    /// `overshoot`, so a charge records only energy the creature had or
+    /// gained. Returns the inherited remainder, a floor credit.
+    pub(crate) fn net_action_overdraft(
+        &mut self,
+        before: (ActionCharges, FailedActionEffort),
+        overshoot: f64,
+    ) -> f64 {
+        let (charges, failed) = before;
+        let rows = [
+            (&mut self.action_charges.noop, charges.noop, None),
+            (
+                &mut self.action_charges.eat,
+                charges.eat,
+                Some((&mut self.failed_action_effort.eat, failed.eat)),
+            ),
+            (
+                &mut self.action_charges.r#move,
+                charges.r#move,
+                Some((&mut self.failed_action_effort.r#move, failed.r#move)),
+            ),
+            (
+                &mut self.action_charges.reproduce,
+                charges.reproduce,
+                Some((&mut self.failed_action_effort.reproduce, failed.reproduce)),
+            ),
+            (
+                &mut self.action_charges.steal_energy,
+                charges.steal_energy,
+                Some((
+                    &mut self.failed_action_effort.steal_energy,
+                    failed.steal_energy,
+                )),
+            ),
+        ];
+        let mut remainder = overshoot;
+        for (charge, charge_before, failed_row) in rows {
+            let share = overdrawn_share(remainder, *charge - charge_before);
+            *charge -= share;
+            // A failed attempt's effort is also its failed effort; keep the
+            // subset `failed_action_effort.k <= action_charges.k`.
+            if let Some((failed, failed_before)) = failed_row {
+                if *failed > failed_before {
+                    *failed -= share;
+                }
+            }
+            remainder -= share;
+        }
+        remainder
+    }
+
     pub(crate) fn record_cognition(&mut self, observation: CognitionEnergyObservation) {
         self.vm_compute += observation.vm_compute;
         self.priority_bid += observation.priority_bid;
@@ -228,6 +288,50 @@ mod tests {
             for (index, &count) in totals.by_cause.iter().enumerate() {
                 prop_assert_eq!(count, causes.iter().filter(|&&c| c == index).count() as u64);
             }
+        }
+
+        #[test]
+        fn overdrawn_share_is_bounded_by_overshoot_and_charge(
+            overshoot in -1.0e9f64..1.0e9,
+            charged in -1.0e9f64..1.0e9,
+        ) {
+            let share = overdrawn_share(overshoot, charged);
+            prop_assert!(share >= 0.0);
+            prop_assert!(share <= overshoot.max(0.0));
+            prop_assert!(share <= charged.max(0.0));
+        }
+
+        #[test]
+        fn netting_an_overdraft_conserves_it_and_keeps_failed_within_charge(
+            row in 0usize..5,
+            failed_attempt in any::<bool>(),
+            charged in 0.0f64..1.0e8,
+            overshoot in 0.0f64..1.0e8,
+        ) {
+            let mut flows = EnergyFlows::default();
+            let before = (flows.action_charges, flows.failed_action_effort);
+            let charges = &mut flows.action_charges;
+            let failed = &mut flows.failed_action_effort;
+            let (charge, failed_row) = match row {
+                0 => (&mut charges.noop, None),
+                1 => (&mut charges.eat, Some(&mut failed.eat)),
+                2 => (&mut charges.r#move, Some(&mut failed.r#move)),
+                3 => (&mut charges.reproduce, Some(&mut failed.reproduce)),
+                _ => (&mut charges.steal_energy, Some(&mut failed.steal_energy)),
+            };
+            *charge += charged;
+            if let (true, Some(failed_row)) = (failed_attempt, failed_row) {
+                *failed_row += charged;
+            }
+            let remainder = flows.net_action_overdraft(before, overshoot);
+            let c = flows.action_charges;
+            let f = flows.failed_action_effort;
+            let total = c.noop + c.eat + c.r#move + c.reproduce + c.steal_energy;
+            prop_assert!(total >= 0.0);
+            prop_assert!(remainder >= 0.0);
+            prop_assert!(((charged - total) + remainder - overshoot).abs() <= 1e-6 * overshoot.max(1.0));
+            prop_assert!(f.eat <= c.eat && f.r#move <= c.r#move);
+            prop_assert!(f.reproduce <= c.reproduce && f.steal_energy <= c.steal_energy);
         }
 
         #[test]

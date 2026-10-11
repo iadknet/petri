@@ -258,9 +258,9 @@ fn reproduce_below_cost_pays_only_the_attempt_effort() {
     assert_eq!(sim.stats.mortality.deaths_total, 0);
 }
 
-/// Lifecycle: an effort that exhausts the creature floors it to zero with a
-/// `zero_floor_credit`, removes it with the action's sink as the cause, and
-/// charges nothing queued after it.
+/// Lifecycle: an effort that exhausts the creature floors it to zero,
+/// charges only the energy it had, removes it with the action's sink as the
+/// cause, and charges nothing queued after it.
 #[test]
 fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() {
     for (action, cause) in [
@@ -283,8 +283,14 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
         assert!(!sim.creatures.contains_key(id), "{cause:?}");
         assert_eq!(sim.stats.mortality.count(cause), 1, "{cause:?}");
         assert_eq!(sim.stats.mortality.deaths_total, 1, "{cause:?}");
-        let floor = sim.stats.energy_flows.zero_floor_credit;
-        assert!(floor > 0.0, "{cause:?}: zero floor credit {floor}");
+        let flows = &sim.stats.energy_flows;
+        assert_eq!(flows.zero_floor_credit, 0.0, "{cause:?}");
+        let charges = flows.action_charges;
+        assert_eq!(
+            charges.eat + charges.r#move + charges.reproduce + charges.steal_energy,
+            applied_debit(0.03, 0.0),
+            "{cause:?}"
+        );
         assert_eq!(sim.stats.energy_flows.action_charges.noop, 0.0, "{cause:?}");
         assert_eq!(sim.stats.last_tick_noop, 0, "{cause:?}");
     }
@@ -308,6 +314,77 @@ fn a_steal_whose_effort_exhausts_the_attacker_still_transfers() {
     // Effort-cost defaults, 2026-10-10: the 0.4 effort floor.
     assert_eq!(sim.creatures[attacker].energy, (0.03f32 - 0.4) + 1.0);
     assert_eq!(sim.stats.mortality.deaths_total, 0);
+}
+
+/// Telemetry: a steal request far beyond the attacker's energy, into an
+/// empty cell, charges only the energy the attacker had; the overdraft is
+/// neither a charge nor a floor credit.
+#[test]
+fn an_overdrawn_steal_into_an_empty_cell_charges_only_the_energy_it_had() {
+    let (mut sim, id) = make_sim_with_one_creature(46.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    execute(
+        &mut sim,
+        id,
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 1.0e9,
+        },
+    );
+    assert!(!sim.creatures.contains_key(id));
+    assert_eq!(sim.stats.mortality.count(DeathCause::ActionStealEnergy), 1);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.action_charges.steal_energy, 46.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 46.0);
+    assert_eq!(flows.zero_floor_credit, 0.0);
+}
+
+/// Telemetry: an overdrawn steal that finds a victim charges the attacker's
+/// own energy plus the loot that paid toward the effort.
+#[test]
+fn an_overdrawn_steal_with_a_victim_charges_its_energy_plus_the_loot() {
+    let (mut sim, attacker, victim) = make_sim_two_creatures(46.0, 300.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    execute(
+        &mut sim,
+        attacker,
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 1.0e9,
+        },
+    );
+    assert!(!sim.creatures.contains_key(attacker));
+    assert!(!sim.creatures.contains_key(victim));
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.predation_attacker_credit, 300.0);
+    assert_eq!(flows.action_charges.steal_energy, 346.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
+    assert_eq!(flows.zero_floor_credit, 0.0);
+}
+
+/// Telemetry: a deficit a creature carries into Phase 2 stays a floor
+/// credit; an effort it could not pay charges nothing.
+#[test]
+fn an_inherited_deficit_stays_a_floor_credit_and_the_unpaid_effort_charges_nothing() {
+    let (mut sim, id) = make_sim_with_one_creature(-10.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    execute(
+        &mut sim,
+        id,
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 0.0,
+        },
+    );
+    assert!(!sim.creatures.contains_key(id));
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.action_charges.steal_energy, 0.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
+    assert!(
+        (flows.zero_floor_credit - 10.0).abs() < 1e-6,
+        "floor credit {}",
+        flows.zero_floor_credit
+    );
 }
 
 /// Lifecycle: actions discarded after a conception and a gestating parent's

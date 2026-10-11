@@ -120,7 +120,7 @@ operations. This is a flow reading, not a claim of exact closed-system balance.
 | `predation_victim_debit`, `predation_attacker_credit` | Predation Step 6's two actual energy changes before the attacker's cap; preserve signed values if the existing path selects an already-negative victim; no repair to transfer mechanics |
 | `predation_kill_bonus_credit` | The actual bonus addition before its cap, separately from stolen energy |
 | `maximum_energy_clamp_loss` | Energy discarded by the existing food/predation maximum caps; also observe any lower-bound part of food's existing clamp in `zero_floor_credit` |
-| `zero_floor_credit` | The existing food/action/reward-learning lower floors, including recovery of an overshoot; no new floor is introduced |
+| `zero_floor_credit` | The existing food/action/reward-learning lower floors, including recovery of an overshoot; no new floor is introduced. Amended 2026-10-11: at the action floor, the overshoot the action's own charge caused nets out of that charge; only a deficit carried into the action is credited here |
 | `external_removal_loss` | Positive energy discarded by a live creature's external removal at the common funnel |
 
 For Phase 0's one subtraction let `D` be its actual nonnegative debit and `B`
