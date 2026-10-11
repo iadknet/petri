@@ -1,7 +1,7 @@
 # T12 — World Composition and Baseline Worlds
 
 **Status**: In Progress
-**Last updated**: 2026-09-23
+**Last updated**: 2026-10-10
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -33,6 +33,8 @@ is what later environmental features are read against.
 
 - [ ] **T12.F05 — Procedural Worlds with Saved Manual Overlays** — Depends on: T12.F02
   - Goal: Shaped land. A world template retains its procedural settings and seeds together with hand-painted terrain additions and erasures, so generated land and manual edits remain editable and reload together.
+- [ ] **T12.F06 — Fertility Channels** — Depends on: T12.F04
+  - Goal: Streams through dry country. A fertility layer can draw narrow, wavy channels of fertile ground from ridged fBm noise, a few cells wide and set by the recipe, and a layer can blend by maximum instead of the weighted average, so a channel adds fertility where it runs without diluting the patches beneath it. Kept at low fertility, a grazed channel refills slowly because regrowth scales with fertility and a thin strip is fed from two neighbours, not four.
 
 ## Notes for AI Agents
 
@@ -53,3 +55,4 @@ is what later environmental features are read against.
 - Options considered (2026-09-08): a stored barrier bitmap (rejected as the primary form; kept as an escape hatch), a separate world file format (rejected), reviving `experiments/suites` (retired instead), ChaCha for every seeded draw (rejected: changes every trajectory and re-pins the epoch), keeping terrain generation inside T02.F02 (rejected: couples saved worlds to seasons through an ordering dependency), scattering the features across T02, T10, and T01 (rejected: the split ownership the T11 precedent removed), replacing the goal profile's world (initially rejected for series comparability; superseded by the user's three-environment decision above), and a nutrient budget across food types (rejected: that is the complementary nutrition the user removed on 2026-09-07; the food landscape is per-type value and regrowth with no requirement to eat several types).
 
 - Manual overlays (T12.F05, user direction 2026-09-08). Preserve procedural layer parameters and seeds as editable source settings, plus explicit manual barrier additions and erasures; do not flatten the generated base into a bitmap. Loading regenerates the procedural base, applies manual overrides with precedence over generated terrain, then seeds food and founders against the resulting passable cells. Saving and loading through the app and CLI must retain both parts and reproduce the combined terrain; further manual edits must remain saveable. With no procedural layers, the same representation supports a wholly hand-painted template. Capture authored terrain edits, not simulation-evolved state or a checkpoint. The implementation spec defines deterministic overlap rules and dimension-change validation, and verifies additions, erasures through generated barriers, repeated save/load, and unchanged procedural settings. T12.F05 is dependency-ready after T12.F02 but is not yet assigned a place in the master priority order; existing feature scopes and priorities are unchanged.
+- Fertility channels (T12.F06, user direction 2026-10-10). Motivated by live tuning of `world-recipe-blobs-and-fruit.json`: grazing harsher than factor 0.7 over 2,000 recovery ticks drove the blob-island world extinct, and an fBm substrate under the blobs let it survive. The user wants narrow, wavy, slow-recovering corridors instead of a uniform substrate. Two gaps block it today: the fertility algorithms (`Uniform`, `Fbm`, `PoissonBlobs`) cannot draw lines, and `mix_layers` averages every layer of a type, so a mostly barren channel layer drags blob centres down (weight 1.0 beside two blob layers takes them from about 1.0 to about 0.67). The feature adds a ridged-fBm channel algorithm whose width the recipe sets, and a per-layer blend choice whose default keeps today's weighted average. Slow recovery comes from low channel fertility, with no per-layer recovery mechanism. Natural analog: riparian strips along drainage lines. Production defaults and every existing recipe are unchanged, so no trajectory moves. Run shape (user decision, 2026-10-10): minimal overhead; Opus 5.5 is spec writer, implementer and reviewer, with no Codex rounds; the gate and goal profiles do not run because no default changes; no mutation gate; verification is a minimal targeted test subset.
