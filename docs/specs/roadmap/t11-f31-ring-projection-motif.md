@@ -173,14 +173,15 @@ keys and the goal summary gains one block.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> exit 0 (28 passed), before
-      any edit and after the last production edit.
+      any edit and after the last production edit (the self-review pass).
 - [x] Focused tests -> names and counts in the
-      [readings](../../progress/readings/t11-f31.md); `cargo test -p v3-core`
-      (2,069 passed), `cargo test -p v3-cli`, `cargo test -p v3-server -p
-      v3-lab -p v3-telemetry` -> exit 0; `cargo check --workspace
-      --all-targets`, `cargo clippy --workspace --all-targets` and `cargo fmt
-      --all --check` clean; `npm run lint`, `npm run test` (380 passed) and
-      `npm run build` in `frontend/` -> exit 0.
+      [readings](../../progress/readings/t11-f31.md). On the current tree:
+      `cargo test -p v3-core` (2,069 passed), `cargo test -p v3-cli
+      ring_rules` -> exit 0; `cargo check --workspace --all-targets`, `make
+      rust-clippy` and `cargo fmt --all --check` clean. On the build commit
+      `cf7fa109`: `cargo test -p v3-cli`, `cargo test -p
+      v3-server -p v3-lab -p v3-telemetry` -> exit 0; `npm run lint`, `npm
+      run test` (380 passed) and `npm run build` in `frontend/` -> exit 0.
 - [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.

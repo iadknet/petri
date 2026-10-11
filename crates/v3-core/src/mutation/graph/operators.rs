@@ -15,7 +15,7 @@ use crate::mutation::compound::sub_value_count;
 use crate::mutation::types::MutationSkipReason;
 
 #[inline]
-fn graph_def_mut(
+pub(super) fn graph_def_mut(
     genome: &mut CreatureGenome,
     node_idx: usize,
 ) -> Result<&mut CgpGraphBackendDef, MutationSkipReason> {
