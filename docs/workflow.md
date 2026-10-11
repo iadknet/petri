@@ -130,6 +130,16 @@ only inside subagent results. Run a heavyweight check once, redirect its output
 to a log file, and read the log; never re-invoke `make check`, a benchmark, or
 a mutation run just to filter its output differently.
 
+**`make check` runs once per feature** (user decision, 2026-10-10): at Close,
+on the final feature code, and nowhere else. No implementer, specialist, or
+remediation brief asks for it. A pass verifies with
+`cargo check --workspace --all-targets`, `cargo fmt --all --check`, the tests
+of the crates it touched (the viability gate first where it applies),
+`make rust-clippy` when Rust changed, and the frontend's own tests when it
+touched the frontend. A fast-forward leaves `main`'s tree identical to the
+tested commit, so `make check` is never rerun on `main`. Commits after the
+tested commit that touch only documentation are checked with `make check-docs`.
+
 ## Per-feature contract
 
 Normative. The orchestrator reads this at goal start and follows it, applying
@@ -648,14 +658,16 @@ the full suite was just run on the same code), and commit. Then:
    aimed at the main checkout, so the merge cannot happen before this step.
 2. `git merge --ff-only worktree-<tnn-fnn>`. If it fails because `main` moved,
    rebase `worktree-<tnn-fnn>` onto `main` without asking, resolve the
-   conflicts, rerun `make check` on the rebased content, record the new tested
-   commit, and then fast-forward. Report the rebase and its re-verification.
-   Stop and report only when the conflicts cannot be resolved on the feature's
-   own terms or the rebased content fails `make check`.
+   conflicts, and re-verify: `make check` on the rebased content only when the
+   commits `main` gained touch code, `make check-docs` when they touch only
+   documentation. Record the new tested commit, then fast-forward. Report the
+   rebase and its re-verification. Stop and report only when the conflicts
+   cannot be resolved on the feature's own terms or the re-verification fails.
 3. `git worktree remove .claude/worktrees/<tnn-fnn>` and
    `git branch -d worktree-<tnn-fnn>`.
-4. Show `git status`, `git worktree list`, and the `make check` result in your
-   own message so the goal evaluator can see them.
+4. Show `git status`, `git worktree list`, and the worktree's `make check`
+   result with its tested commit in your own message, so the goal evaluator can
+   see them. Do not rerun `make check` on `main`.
 
 Executing a user-pasted goal authorizes local branch, worktree, and commit
 creation, rebasing the feature branch onto `main`, the fast-forward of `main`,
