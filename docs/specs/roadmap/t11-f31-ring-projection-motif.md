@@ -185,9 +185,11 @@ keys and the goal summary gains one block.
 - [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summaries stored at the paths below, series entries added, raw
-      hashes and byte counts in the readings, goal run once, no full report
-      staged.
+- [x] Benchmark summaries stored at the paths below, series entries added
+      (`gate.closed`, `goal_worlds.closed`), raw hashes and byte counts in the
+      readings, goal run once, no full report staged. Exit statuses, `severe`
+      false on both, and the two missed predeclared targets are in the
+      measured verdict above.
 
 ## Performance and Goal Impact
 
@@ -236,7 +238,29 @@ make bench PROFILE=gate FEATURE=t11-f31-ring-projection-motif
 make bench PROFILE=goal FEATURE=t11-f31-ring-projection-motif
 ```
 
-**Measured verdict.** Not yet measured.
+**Measured verdict (2026-10-11, code `329637b3`).** Both profiles ran once, sequentially.
+`make bench PROFILE=gate` and `PROFILE=goal`: outer exit 0 (observed by the
+benchmark specialist from the shell; summaries' `outer_exit` is `null`), CLI
+exit 0 (summary `measurement_evidence.cli_exit`, source: v3-cli status on
+successful artifact-pair completion). Gate: `severe` false, no counter flag.
+Goal: `severe` false; flags `vm_steps` +13.75% and `decided_passes` +18.03%
+only. Raw (ignored, main checkout `.bench-artifacts/t11-f31-ring-projection-motif/`):
+gate 105,028 bytes (`08204beb...`), goal 681,246,074 bytes (`00be755a...`).
+Summaries: gate 19,839 bytes (`d79ba8c1...`), goal 392,679 bytes (`0a847496...`).
+Full hashes, counters, wall readings and every predeclared reading are in the
+readings. Predeclared targets **missed** (reported, not reinterpreted, for the
+user): (1) Orchards `neighborhood_read.changed_per_all_births` 0.1432, below its
+standing floor 0.1464 (Canyon 0.1348 and Confluence 0.1594 are above their
+floors); (2) steering avoidance 0 on all three worlds (exact-hit 0.4407 /
+0.4395 / 0.4205 met). The founder per-operator battery (raw gate
+`mutational_neighborhood.founder.operator_rows`) is met: all 56 existing rows
+identical to the reference, `AddRingProjection` silent 50 of 50, the four unit
+operators skipped 50 of 50; founder `steering` and `mesh_execution` are
+identical in the raw gate. The summary's `mutation_effects` founder cohort rows
+move with the draw remap; that row predeclared only the new keys. Met:
+persistence floor, ring_rules fingerprint on every world, `dead_per_all_births`
+0.0052 / 0.0072 / 0.0018 against bounds 0.0058 / 0.0140 / 0.0084, drift-walk
+bounds, `AddRingProjection` silent (0 changed, 0 dead) in every cohort.
 
 - Summaries: [gate](../../progress/features/t11-f31-ring-projection-motif.json),
   [goal](../../progress/features/t11-f31-ring-projection-motif-goal.json).
