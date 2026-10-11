@@ -8,18 +8,28 @@ calling checkout stores concise summaries with exact raw hashes and recorded
 local verification times. Existing historical reports remain unchanged.
 
 [progress/index.html](progress/index.html) reads the `goal-worlds-v1`
-reports listed below and answers the success definition first (redesigned
-2026-10-10; the rationale and sources are in the
-[progress page design note](strategy/progress-page-design-2026-10-10.md)). A
-verdict card states what the shown closure did and what needs checking; then
-diversity (founder families, and their evenness as e^entropy) and cognition
-(memory use) per world against the series' first reading; then three
-guardrails (worlds alive, the T14.F12 floor, compute cost from the stored
-comparisons); then one row per closure, flagging closures whose readings are
-identical to the previous one; then every other reading, folded by topic. Any
-closure can be shown with the picker, a timeline row or a chart point. A change
-smaller than the reading's typical move between closures is drawn grey. A
-reading a report did not measure is drawn as "not measured", never as zero.
+reports listed below as a long-term field record (redesigned 2026-10-10; the
+rationale is in the [progress page design note](strategy/progress-page-design-2026-10-10.md)).
+
+- The three worlds are plots numbered by seed: 11 Orchards, 22 Canyon,
+  33 Confluence.
+- The first screen is a census matrix with the plots as columns and two
+  bands of readings: Cognition (memory use) and Evolvability (mutations that
+  change behaviour, against the T14.F12 floor, and new behaviour after long
+  drift). A last row keeps founder families and creatures alive in view.
+- Each cell shows the read closure's value, its change since the first census
+  and since the closure before, and a curve over every closure. Notched flags
+  mark the closures that moved mutation outcomes most.
+- Below that come compute cost, a closure register (closures that changed
+  nothing fold into one row) and supplementary charts by topic. Diversity
+  history, including even spread, is in the Ways of living topic.
+- Any closure can be read through the picker, a register row or a chart
+  point.
+- Charts are drawn with Observable Plot 0.6.17 on d3 7.9.0, vendored with
+  checksums in `progress/vendor/`.
+- A reading a report did not measure is drawn as "not measured", never as
+  zero.
+
 Browsers block `fetch()` under `file://`, so serve the directory first:
 `python3 -m http.server 8000 --directory docs/progress`, then open
 `http://localhost:8000/`. New closures appear automatically once
