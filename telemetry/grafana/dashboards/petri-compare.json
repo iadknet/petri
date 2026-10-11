@@ -1322,6 +1322,83 @@
           "sort": "none"
         }
       }
+    },
+    {
+      "id": 16,
+      "type": "barchart",
+      "title": "Mean parent age at birth, by birth order",
+      "description": "Mean age of the parent, in ticks, at delivery: \"first\" is each parent's first delivered child (age at first reproduction), \"later\" every subsequent one. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (run, petri_birth_order) (label_replace(last_over_time(petri_run_birth_parent_age_sum{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) / sum by (run, petri_birth_order) (label_replace(last_over_time(petri_run_birth_parent_age_count{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_birth_order",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_birth_order": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
     }
   ],
   "refresh": "",

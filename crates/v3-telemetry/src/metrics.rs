@@ -8,7 +8,8 @@
 //! sampled at the snapshot tick. Every data point carries `petri.run_id`;
 //! breakdown maps add the key's `as_key()` string (a food type or vector index
 //! is its decimal index). The tick is the `petri.run.tick` gauge, never an
-//! attribute.
+//! attribute. Parent age at birth is the one cumulative histogram,
+//! `petri.run.birth_parent_age`, keyed by `petri.birth_order`.
 
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -16,10 +17,11 @@ use std::time::{Duration, Instant};
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue};
 use opentelemetry_proto::tonic::metrics::v1::{
-    metric, number_data_point, AggregationTemporality, Gauge, Metric, NumberDataPoint,
-    ResourceMetrics, ScopeMetrics, Sum,
+    metric, number_data_point, AggregationTemporality, Gauge, Histogram, HistogramDataPoint,
+    Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
+use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
 use v3_core::simulation::stats::MutationValueTotals;
@@ -340,6 +342,38 @@ impl Families {
             }),
         );
     }
+}
+
+/// Parent age at every delivered birth: one cumulative histogram point per
+/// birth order, empty ones included.
+fn birth_parent_age(f: &mut Families, s: &SimStats) {
+    let explicit_bounds: Vec<f64> = BIRTH_PARENT_AGE_BOUNDS.map(|bound| bound as f64).to_vec();
+    let data_points = BirthOrder::ALL
+        .map(|order| {
+            let totals = s.birth_parent_age.totals(order);
+            HistogramDataPoint {
+                attributes: vec![
+                    f.run_id.clone(),
+                    string_value("petri.birth_order", order.as_key().to_owned()),
+                ],
+                start_time_unix_nano: f.start_ns,
+                time_unix_nano: f.time_ns,
+                count: totals.count,
+                sum: Some(totals.sum as f64),
+                bucket_counts: totals.bucket_counts.to_vec(),
+                explicit_bounds: explicit_bounds.clone(),
+                ..HistogramDataPoint::default()
+            }
+        })
+        .to_vec();
+    f.metrics.push(Metric {
+        name: "petri.run.birth_parent_age".to_owned(),
+        data: Some(metric::Data::Histogram(Histogram {
+            data_points,
+            aggregation_temporality: AggregationTemporality::Cumulative as i32,
+        })),
+        ..Metric::default()
+    });
 }
 
 /// The twenty fields of a [`MutationValueTotals`], `_total` removed.
@@ -891,6 +925,7 @@ pub(crate) fn encode(
         moment.elapsed.as_secs_f64(),
     );
     counters(&mut f, stats);
+    birth_parent_age(&mut f, stats);
     energy(&mut f, stats);
     mutations(&mut f, stats);
     outcomes(&mut f, stats);

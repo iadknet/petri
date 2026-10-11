@@ -236,6 +236,8 @@ pub struct SimStats {
     pub reproductive_success_by_cognitive_class:
         super::reproductive_success::ReproductiveSuccessByCognitiveClass,
     pub energy_flows: super::energy_accounting::EnergyFlows,
+    /// Parent age at every delivered birth, by birth order.
+    pub birth_parent_age: super::birth_age::BirthParentAge,
     // ── Cumulative (never reset) ─────────────────────────────────────────────
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,

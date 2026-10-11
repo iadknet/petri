@@ -128,6 +128,9 @@ fn populated() -> SimStats {
         s.reproductive_success_by_cognitive_class
             .record(class, 2, 30);
     }
+    s.birth_parent_age.record(BirthOrder::First, 40);
+    s.birth_parent_age.record(BirthOrder::Later, 120);
+    s.birth_parent_age.record(BirthOrder::Later, 20_000);
     s.energy_flows.food_intake_by_type = vec![1.5, 2.5];
     s.energy_flows.action_charges.r#move = -3.25;
     s.phase_wall_clock.cognition = Duration::from_millis(1_500);
@@ -793,4 +796,40 @@ fn an_empty_map_exports_no_family_and_a_default_snapshot_is_bounded() {
         snapshot.family("petri.run.deaths_by_cause").count(),
         DeathCause::ALL.len()
     );
+}
+
+#[test]
+fn parent_age_at_birth_is_one_cumulative_histogram_per_birth_order() {
+    let snapshot = encoded(&populated());
+    let bounds: Vec<f64> = BIRTH_PARENT_AGE_BOUNDS.iter().map(|b| *b as f64).collect();
+    let mut orders = Vec::new();
+    for histogram in &snapshot.histograms {
+        assert_eq!(histogram.name, "petri.run.birth_parent_age");
+        assert_eq!(histogram.unit, "");
+        assert_eq!(
+            histogram.attribute("petri.run_id"),
+            Some("0123456789abcdef0123456789abcdef")
+        );
+        assert_eq!(histogram.attributes.len(), 2);
+        assert_eq!(histogram.explicit_bounds, bounds);
+        assert_eq!(histogram.bucket_counts.len(), bounds.len() + 1);
+        assert_eq!(
+            (histogram.time_unix_nano, histogram.start_time_unix_nano),
+            (2_000, 1_000)
+        );
+        orders.push(histogram.attribute("petri.birth_order").unwrap().to_owned());
+    }
+    assert_eq!(orders, strings(BirthOrder::ALL, |k| k.as_key().to_owned()));
+
+    let first = &snapshot.histograms[0];
+    assert_eq!((first.count, first.sum), (1, Some(40.0)));
+    assert_eq!(first.bucket_counts[4], 1, "40 is in (30, 40]");
+    let later = &snapshot.histograms[1];
+    assert_eq!((later.count, later.sum), (2, Some(20_120.0)));
+    assert_eq!(later.bucket_counts[8], 1, "120 is in (100, 150]");
+    assert_eq!(*later.bucket_counts.last().unwrap(), 1, "20_000 overflows");
+
+    let empty = encoded(&SimStats::default());
+    assert_eq!(empty.histograms.len(), BirthOrder::ALL.len());
+    assert!(empty.histograms.iter().all(|h| h.count == 0));
 }

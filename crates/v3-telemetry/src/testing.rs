@@ -24,7 +24,9 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
 use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, KeyValue};
-use opentelemetry_proto::tonic::metrics::v1::{metric, number_data_point, NumberDataPoint};
+use opentelemetry_proto::tonic::metrics::v1::{
+    metric, number_data_point, AggregationTemporality, HistogramDataPoint, NumberDataPoint,
+};
 use prost::Message;
 
 /// One decoded log record with its resource, values rendered as strings.
@@ -88,11 +90,33 @@ impl ReceivedPoint {
     }
 }
 
+/// One decoded cumulative histogram data point with its family's metadata.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReceivedHistogram {
+    pub name: String,
+    pub unit: String,
+    pub attributes: BTreeMap<String, String>,
+    pub explicit_bounds: Vec<f64>,
+    pub bucket_counts: Vec<u64>,
+    pub count: u64,
+    pub sum: Option<f64>,
+    pub time_unix_nano: u64,
+    pub start_time_unix_nano: u64,
+}
+
+impl ReceivedHistogram {
+    pub fn attribute(&self, key: &str) -> Option<&str> {
+        self.attributes.get(key).map(String::as_str)
+    }
+}
+
 /// One decoded `POST /v1/metrics` request: a run snapshot.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReceivedSnapshot {
     pub resource: BTreeMap<String, String>,
     pub points: Vec<ReceivedPoint>,
+    /// Cumulative histogram points; a delta histogram is not decoded.
+    pub histograms: Vec<ReceivedHistogram>,
 }
 
 impl ReceivedSnapshot {
@@ -331,6 +355,20 @@ fn point(
     }
 }
 
+fn histogram_point(name: &str, unit: &str, data_point: HistogramDataPoint) -> ReceivedHistogram {
+    ReceivedHistogram {
+        name: name.to_owned(),
+        unit: unit.to_owned(),
+        attributes: to_map(&data_point.attributes),
+        explicit_bounds: data_point.explicit_bounds,
+        bucket_counts: data_point.bucket_counts,
+        count: data_point.count,
+        sum: data_point.sum,
+        time_unix_nano: data_point.time_unix_nano,
+        start_time_unix_nano: data_point.start_time_unix_nano,
+    }
+}
+
 /// Decodes an OTLP metrics request body into its snapshots.
 pub fn decode_metrics(body: &[u8]) -> Vec<ReceivedSnapshot> {
     let Ok(request) = ExportMetricsServiceRequest::decode(body) else {
@@ -343,9 +381,19 @@ pub fn decode_metrics(body: &[u8]) -> Vec<ReceivedSnapshot> {
             .map(|resource| to_map(&resource.attributes))
             .unwrap_or_default();
         let mut points = Vec::new();
+        let mut histograms = Vec::new();
         for scope_metrics in resource_metrics.scope_metrics {
             for family in scope_metrics.metrics {
                 let (kind, data_points) = match family.data {
+                    Some(metric::Data::Histogram(histogram))
+                        if histogram.aggregation_temporality
+                            == AggregationTemporality::Cumulative as i32 =>
+                    {
+                        histograms.extend(histogram.data_points.into_iter().map(|data_point| {
+                            histogram_point(&family.name, &family.unit, data_point)
+                        }));
+                        continue;
+                    }
                     Some(metric::Data::Gauge(gauge)) => (MetricKind::Gauge, gauge.data_points),
                     Some(metric::Data::Sum(sum)) if sum.is_monotonic => {
                         (MetricKind::MonotonicSum, sum.data_points)
@@ -364,7 +412,11 @@ pub fn decode_metrics(body: &[u8]) -> Vec<ReceivedSnapshot> {
                 }));
             }
         }
-        snapshots.push(ReceivedSnapshot { resource, points });
+        snapshots.push(ReceivedSnapshot {
+            resource,
+            points,
+            histograms,
+        });
     }
     snapshots
 }

@@ -328,3 +328,30 @@ fn gestation_energy_and_count_identities_hold_every_tick() {
 fn gestation_energy_identity_holds_when_the_cap_is_lowered_mid_run() {
     assert_gestation_identities(Some(50));
 }
+
+#[test]
+fn gestation_records_the_parent_age_at_delivery_by_birth_order() {
+    use crate::simulation::birth_age::BirthOrder;
+    let (mut sim, id) = gestating_sim(1.0);
+    sim.creatures[id].age = 40;
+    conceive(&mut sim, id);
+    // The parent ages while it carries the litter; delivery age is recorded.
+    sim.creatures[id].age = 60;
+    slot(&mut sim, id, 1, vec![WorldAction::NoOp]);
+
+    sim.creatures[id].energy = PARENT_ENERGY;
+    sim.creatures[id].age = 400;
+    let south = WorldAction::Reproduce {
+        direction: Direction::S,
+        energy_transfer_fraction: 0.5,
+    };
+    slot(&mut sim, id, 2, vec![south]);
+    sim.creatures[id].age = 401;
+    slot(&mut sim, id, 3, vec![WorldAction::NoOp]);
+    assert_eq!(sim.stats.gestations_delivered_total, 2);
+
+    let first = sim.stats.birth_parent_age.totals(BirthOrder::First);
+    assert_eq!((first.count, first.sum), (1, 60));
+    let later = sim.stats.birth_parent_age.totals(BirthOrder::Later);
+    assert_eq!((later.count, later.sum), (1, 401));
+}
