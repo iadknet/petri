@@ -97,8 +97,16 @@ Three gaps in the research:
      avoiding stacks and keeping to about four lines per chart.
 8. **Chart forms.** These follow the dataviz skill's mark and anti-pattern
    rules, added the same day.
+   - History charts stack the three worlds as full-width rows on one shared
+     scale, with the date axis under the last row. Side-by-side panels were
+     about 240px wide on the owner's screen.
+   - Goal cards are one row per world: the numbers on the left and a wide
+     trend on the right.
    - History charts are stepped: each closure's reading holds until the next
-     one, so a closure that changed nothing reads as flat.
+     one, with lighter risers and a faint wash under the lead series, so a
+     closure that changed nothing reads as flat.
+   - A closure whose report is not stored is bridged in the drawing, not shown
+     as a hole.
    - The x-axis carries date ticks, and a neutral shaded column marks the shown
      closure, with its value labelled.
    - Readings that boom and crash within a run (population, families) use a
