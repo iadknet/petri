@@ -1,3 +1,5 @@
+import { Icon } from "./Icon.tsx";
+
 interface RandomSeedButtonProps {
 	label: string;
 	testId: string;
@@ -12,9 +14,9 @@ export function RandomSeedButton({ label, testId, onClick }: RandomSeedButtonPro
 			onClick={onClick}
 			title={`Randomize ${label}`}
 			aria-label={`Randomize ${label}`}
-			className="shrink-0 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-200 rounded hover:bg-slate-600 transition-colors"
+			className="flex size-6 shrink-0 items-center justify-center rounded border border-slate-700 text-slate-400 transition-colors hover:border-slate-600 hover:bg-slate-800 hover:text-slate-100"
 		>
-			&#x21bb;
+			<Icon name="shuffle" className="size-3.5" />
 		</button>
 	);
 }

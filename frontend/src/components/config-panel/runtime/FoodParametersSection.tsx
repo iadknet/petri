@@ -33,9 +33,11 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		label: "Recovery Spawn Rate",
 		min: 0,
 		max: 1,
-		step: 0.01,
+		step: 0.0001,
 		defaultValue: 0.01,
-		tooltip: "Probability of spontaneous food spawn on empty cells each tick",
+		sliderMax: 0.05,
+		tooltip:
+			"Recovery attempts per cell per tick: each tick makes cells × rate attempts to seed food on an empty cell",
 	},
 	{
 		path: "world.food.shared.recovery_floor_ratio",
@@ -44,16 +46,18 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		defaultValue: 0.01,
-		tooltip: "Minimum population-to-capacity ratio below which recovery spawning activates",
+		tooltip:
+			"Recovery spawning runs only while a food type's density ratio (food present / capacity) is below this",
 	},
 	{
 		path: "world.food.shared.max_density",
 		label: "Food Max Density",
 		min: 0.1,
-		max: 1,
+		max: 10,
 		step: 0.01,
 		defaultValue: 1.0,
-		tooltip: "Maximum food density per cell (0-1 scale)",
+		sliderMax: 2,
+		tooltip: "Maximum food density per cell; must be at least every food type's initial density",
 	},
 ];
 

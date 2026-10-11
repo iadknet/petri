@@ -5,13 +5,39 @@ import type { FoodFertilityLayerTarget, FoodTypeConfig } from "../../../types/co
 export interface FieldDef {
 	path: string;
 	label: string;
+	/** Hard bounds: what the server accepts. Committed edits are clamped to them. */
 	min: number;
 	max: number;
+	/** Arrow-key increment and slider granularity. */
 	step: number;
 	testId?: string;
 	topologyField?: boolean;
 	defaultValue?: number;
 	tooltip?: string;
+	/** Comfortable slider span when the hard bounds are far wider than useful values. */
+	sliderMin?: number;
+	sliderMax?: number;
+	/** Hide the slider for values that span orders of magnitude (tiny costs, caps). */
+	slider?: false;
+}
+
+export interface EnumFieldDef {
+	path: string;
+	label: string;
+	options: readonly { value: string; label: string }[];
+	testId?: string;
+	defaultValue?: string;
+	tooltip?: string;
+}
+
+export type AnyFieldDef = FieldDef | BooleanFieldDef | EnumFieldDef;
+
+export function isNumberField(field: AnyFieldDef): field is FieldDef {
+	return "min" in field;
+}
+
+export function isEnumField(field: AnyFieldDef): field is EnumFieldDef {
+	return "options" in field;
 }
 
 export interface BooleanFieldDef {

@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { NumberInput } from "../config-panel/shared/NumberInput.tsx";
 
 interface ParamFieldProps {
 	label: string;
@@ -12,26 +13,23 @@ interface ParamFieldProps {
 
 export function ParamField({ label, value, min, max, step, onChange, testId }: ParamFieldProps) {
 	const id = useId();
-	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const v = Number(e.target.value);
-		if (!Number.isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
-	};
+	const clamp = (v: number) => Math.min(max, Math.max(min, v));
 	return (
 		<div className="flex flex-col gap-1">
 			<label htmlFor={id} className="text-[10px] text-slate-400">
 				{label}
 			</label>
 			<div className="flex items-center gap-1.5">
-				<input
+				<NumberInput
 					id={id}
 					data-testid={testId}
-					type="number"
 					value={value}
 					min={min}
 					max={max}
 					step={step}
-					onChange={handleChange}
-					className="w-14 px-1 py-0.5 text-[11px] font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200"
+					integer={Number.isInteger(step) && Number.isInteger(min)}
+					onChange={onChange}
+					className="w-16 px-1 py-0.5 text-[11px] font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200"
 				/>
 				<input
 					aria-label={`${label} slider`}
@@ -40,7 +38,7 @@ export function ParamField({ label, value, min, max, step, onChange, testId }: P
 					min={min}
 					max={max}
 					step={step}
-					onChange={handleChange}
+					onChange={(e) => onChange(clamp(Number(e.target.value)))}
 					className="flex-1 h-1 accent-emerald-500"
 				/>
 			</div>

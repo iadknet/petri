@@ -143,9 +143,18 @@ export interface WorldConfig {
 	food: FoodConfig;
 }
 
+/** Founder genome profile seeded at startup (`FounderProfile`, snake_case on the wire). */
+export type FounderProfile =
+	| "v3_alpha1"
+	| "forage_first_sparse"
+	| "forage_first_sparse_conservative"
+	| "forage_first_sparse_rich_offspring"
+	| "forage_first_sparse_balanced";
+
 export interface PopulationConfig {
 	initial_creatures: number;
 	max_creatures: number;
+	founder_profile: FounderProfile;
 }
 
 export interface LifecycleEnergyConfig {
@@ -153,6 +162,8 @@ export interface LifecycleEnergyConfig {
 	max_energy: number;
 	energy_decay_per_tick: number;
 	min_reproduce_energy: number;
+	min_reproduce_age: number;
+	age_reference_ticks: number;
 	default_offspring_energy: number;
 	genome_carry_cost_per_unit: number;
 	genome_replication_cost_per_unit: number;
@@ -207,7 +218,12 @@ export interface ReachableBiasConfig {
 	input_ref: number;
 }
 
+/** Experimental native Graph input-recruitment arm (T20.F04). */
+export type NeutralInputRecruitment = "Off" | "SingleChannel" | "WholeFamily";
+
 export interface MutationConfig {
+	structured_heritable_refinement: boolean;
+	neutral_input_recruitment: NeutralInputRecruitment;
 	per_unit_rate: number;
 	mesh_layer_probability: number;
 	large_copy_weight_percent: number;

@@ -5,8 +5,9 @@ export const AGE_COST_FIELDS: FieldDef[] = [
 		path: "energy.age_cost.grace_ticks",
 		label: "Grace Ticks",
 		min: 0,
-		max: 5000,
+		max: 1000000,
 		step: 10,
+		sliderMax: 5000,
 		testId: "config-field-age-cost-grace-ticks",
 		defaultValue: 100,
 		tooltip: "Age through which creatures pay normal action energy costs",
@@ -14,13 +15,14 @@ export const AGE_COST_FIELDS: FieldDef[] = [
 	{
 		path: "energy.age_cost.age_cap",
 		label: "Age Cap",
-		min: 1,
-		max: 5000,
+		min: 0,
+		max: 1000000,
 		step: 10,
 		testId: "config-field-age-cost-age-cap",
 		defaultValue: 200,
+		sliderMax: 5000,
 		tooltip:
-			"Age in ticks at which the maximum cost multiplier applies; set above grace ticks for a gradual ramp",
+			"Age in ticks at which the maximum cost multiplier applies; set above grace ticks for a gradual ramp, or 0 to turn the age cost off",
 	},
 	{
 		path: "energy.age_cost.max_multiplier",

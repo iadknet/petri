@@ -30,8 +30,8 @@ describe("resolveRuntimeBounds", () => {
 
 	it.each([
 		["population.max_creatures", { min: 50, max: 10000000 }],
-		["world.food.shared.max_density", { min: 1, max: 1 }],
-		["action_log.capacity", { min: 1, max: 5000 }],
+		["world.food.shared.max_density", { min: 1, max: 10 }],
+		["action_log.capacity", { min: 1, max: 100000 }],
 	])("derives %s bounds from the draft", (path, expected) => {
 		expect(resolveRuntimeBounds(fieldFor(path), MOCK_CONFIG)).toEqual(expected);
 	});

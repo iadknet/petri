@@ -1,4 +1,4 @@
-import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
+import type { AnyFieldDef, BooleanFieldDef, EnumFieldDef, FieldDef } from "../shared/types.ts";
 
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
@@ -36,12 +36,14 @@ export const MUTATION_FIELDS: FieldDef[] = [
 	{
 		path: "mutation.genome_size_cap",
 		label: "Genome Size Cap",
-		min: 1,
-		max: 5000,
+		min: 0,
+		max: 100000,
 		step: 1,
 		testId: "config-field-mutation-genome-size-cap",
 		defaultValue: 1200,
-		tooltip: "Maximum genome size before size pressure suppresses growth mutations",
+		sliderMax: 5000,
+		tooltip:
+			"Maximum genome size before size pressure suppresses growth mutations; 0 removes the cap",
 	},
 	{
 		path: "mutation.phenotype.channel_step",
@@ -51,14 +53,15 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-channel-step",
 		defaultValue: 1,
-		tooltip: "RGB step size applied per tick to the active color channel",
+		tooltip: "RGB step size applied to the active color channel at each reproduction",
 	},
 	{
 		path: "mutation.phenotype.polarity_flip_chance",
 		label: "Polarity Flip",
 		min: 0,
 		max: 1,
-		step: 0.001,
+		step: 0.0001,
+		sliderMax: 0.01,
 		testId: "config-field-mutation-polarity-flip",
 		defaultValue: 0.0002,
 		tooltip: "Probability of reversing the drift direction of the active color channel",
@@ -68,7 +71,8 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		label: "Channel Switch",
 		min: 0,
 		max: 1,
-		step: 0.001,
+		step: 0.0001,
+		sliderMax: 0.05,
 		testId: "config-field-mutation-channel-change",
 		defaultValue: 0.001,
 		tooltip: "Probability of switching to a different active color channel (R/G/B)",
@@ -142,6 +146,13 @@ export const MUTATION_FIELDS: FieldDef[] = [
 
 export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	{
+		path: "mutation.structured_heritable_refinement",
+		label: "Structured Refinement",
+		testId: "config-field-mutation-structured-heritable-refinement",
+		defaultValue: false,
+		tooltip: "Experimental: bounded semantic input-to-vote refinement at birth",
+	},
+	{
 		path: "mutation.genome_size_pressure_enabled",
 		label: "Genome Size Pressure",
 		testId: "config-field-mutation-genome-size-pressure-enabled",
@@ -150,7 +161,25 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	},
 ];
 
-export const MUTATION_ALL_FIELDS: (FieldDef | BooleanFieldDef)[] = [
+/** Experimental arms that pick one mode rather than a number. */
+export const MUTATION_ENUMS: EnumFieldDef[] = [
+	{
+		path: "mutation.neutral_input_recruitment",
+		label: "Neutral Input Recruitment",
+		testId: "config-field-mutation-neutral-input-recruitment",
+		defaultValue: "Off",
+		options: [
+			{ value: "Off", label: "Off" },
+			{ value: "SingleChannel", label: "Single channel" },
+			{ value: "WholeFamily", label: "Whole family" },
+		],
+		tooltip:
+			"Experimental (T20.F04): grows initially silent input-to-vote links, one channel or a whole sensor family at a time",
+	},
+];
+
+export const MUTATION_ALL_FIELDS: AnyFieldDef[] = [
 	...MUTATION_FIELDS,
 	...MUTATION_TOGGLES,
+	...MUTATION_ENUMS,
 ];

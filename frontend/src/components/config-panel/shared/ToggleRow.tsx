@@ -1,4 +1,6 @@
-import { Tooltip } from "./Tooltip.tsx";
+import { RowActions, RowLabel, dirtyTint } from "./FieldRow.tsx";
+import { useAppliedValue } from "./baseline.ts";
+import { useRowFilter } from "./filter.ts";
 import type { BooleanFieldDef } from "./types.ts";
 
 interface ToggleRowProps {
@@ -11,59 +13,59 @@ interface ToggleRowProps {
 	testId?: string;
 }
 
+const onOff = (value: boolean) => (value ? "on" : "off");
+
 export function ToggleRow({
 	field,
 	id,
 	value,
-	serverValue,
+	serverValue: explicitServerValue,
 	disabled,
 	onChange,
 	testId,
 }: ToggleRowProps) {
-	const isDirty = serverValue !== undefined ? value !== serverValue : false;
+	const serverValue = useAppliedValue(field.path, explicitServerValue);
+	const isDirty = serverValue !== undefined && value !== serverValue;
+	const { visible, showHelp } = useRowFilter(field, isDirty);
+	if (!visible) return null;
+
 	const inputId = `${id}-input`;
+	const runtime = id.startsWith("runtime-");
 	const showReset = field.defaultValue !== undefined && value !== field.defaultValue;
 
 	return (
 		<div
-			className={`flex items-center justify-between gap-2 py-1.5 pl-2 border-l-2 ${isDirty ? "border-blue-500" : "border-transparent"}`}
+			data-config-row
+			className={`-mx-2 flex flex-col gap-1 rounded px-2 py-1.5 ${isDirty ? dirtyTint(id.startsWith("runtime-")) : ""}`}
 		>
-			<label htmlFor={inputId} className="flex items-center gap-1 text-xs text-slate-300">
-				{disabled && (
-					<span className="text-slate-500" title="Locked in current state">
-						&#x1f512;
-					</span>
-				)}
-				{field.label}
-				{field.tooltip && (
-					<Tooltip text={field.tooltip}>
-						<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-					</Tooltip>
-				)}
-			</label>
-			<div className="flex items-center gap-1.5">
-				{showReset && (
-					<button
-						type="button"
-						data-testid={`reset-${field.path.replaceAll(".", "-")}`}
-						onClick={() => onChange(field.path, field.defaultValue!)}
+			<div className="flex min-h-5 items-center justify-between gap-2">
+				<RowLabel inputId={inputId} label={field.label} tooltip={field.tooltip} isDirty={isDirty} />
+				<div className="flex shrink-0 items-center gap-1.5">
+					<RowActions
+						path={field.path}
+						isDirty={isDirty}
+						appliedText={serverValue === undefined ? undefined : onOff(serverValue)}
+						onUndo={() => serverValue !== undefined && onChange(field.path, serverValue)}
+						defaultText={showReset ? onOff(field.defaultValue!) : undefined}
+						onReset={() => onChange(field.path, field.defaultValue!)}
 						disabled={disabled}
-						className="text-[10px] text-slate-500 hover:text-slate-300 disabled:opacity-40"
-						title={`Reset to default (${field.defaultValue})`}
-					>
-						&#x21ba;
-					</button>
-				)}
-				<input
-					id={inputId}
-					data-testid={testId}
-					type="checkbox"
-					checked={value}
-					disabled={disabled}
-					onChange={(e) => onChange(field.path, e.target.checked)}
-					className="accent-sky-500 disabled:opacity-40"
-				/>
+					/>
+					<input
+						id={inputId}
+						data-testid={testId}
+						type="checkbox"
+						role="switch"
+						aria-checked={value}
+						checked={value}
+						disabled={disabled}
+						onChange={(e) => onChange(field.path, e.target.checked)}
+						className={`config-switch ${runtime ? "config-switch-live" : "config-switch-startup"}`}
+					/>
+				</div>
 			</div>
+			{showHelp && field.tooltip && (
+				<p className="text-[11px] leading-snug text-slate-500">{field.tooltip}</p>
+			)}
 		</div>
 	);
 }

@@ -1,70 +1,37 @@
-import { Section } from "../shared/Section.tsx";
-import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
-import { ACTION_LOG_FIELDS } from "./ActionLogSection.tsx";
-import { AGE_COST_ALL_FIELDS, AGE_COST_FIELDS, AGE_COST_TOGGLES } from "./AgeEnergyCostSection.tsx";
-import {
-	COMPLEXITY_COST_ALL_FIELDS,
-	COMPLEXITY_COST_FIELDS,
-	COMPLEXITY_COST_TOGGLES,
-} from "./ComplexityEnergyCostSection.tsx";
-import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
-import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
-import {
-	FOOD_GRAZING_FIELDS,
-	FOOD_GRAZING_TOGGLES,
-	FOOD_OCCUPANCY_DEPLETION_FIELDS,
-	FOOD_OCCUPANCY_DEPLETION_TOGGLES,
-	FOOD_PARAMETERS_FIELDS,
-} from "./FoodParametersSection.tsx";
-import { MUTATION_ALL_FIELDS, MUTATION_FIELDS, MUTATION_TOGGLES } from "./MutationSection.tsx";
-import { POPULATION_FIELDS } from "./PopulationSection.tsx";
-import { PREDATION_FIELDS } from "./PredationSection.tsx";
+import type { SimulationConfig } from "../../../types/api.ts";
+import { Category } from "../shared/Category.tsx";
+import { matchField, useConfigFilter } from "../shared/filter.ts";
+import { sameConfigNumber } from "../shared/numberFormat.ts";
+import { getByPath } from "../shared/pathUtils.ts";
+import type { AnyFieldDef, RuntimePanelProps } from "../shared/types.ts";
 import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
-import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
-import { SHARED_MEMORY_FIELDS } from "./SharedMemorySection.tsx";
+import { RUNTIME_CATEGORIES, RUNTIME_PATCH_FIELDS } from "./groups.ts";
 
-export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
-	...FOOD_OCCUPANCY_DEPLETION_TOGGLES,
-	...FOOD_OCCUPANCY_DEPLETION_FIELDS,
-	...FOOD_GRAZING_TOGGLES,
-	...FOOD_GRAZING_FIELDS,
-	...FOOD_PARAMETERS_FIELDS,
-	...POPULATION_FIELDS,
-	...ENERGY_LIFECYCLE_FIELDS,
-	...ENERGY_COSTS_FIELDS,
-	...COMPLEXITY_COST_ALL_FIELDS,
-	...AGE_COST_ALL_FIELDS,
-	...RUNTIME_FIELDS,
-	...MUTATION_ALL_FIELDS,
-	...PREDATION_FIELDS,
-	...ACTION_LOG_FIELDS,
-	...SHARED_MEMORY_FIELDS,
-];
+export { RUNTIME_PATCH_FIELDS };
 
-/** Groups rendered in panel order, each with its numeric fields and toggles. */
-const RUNTIME_GROUPS: { title: string; fields: FieldDef[]; toggles?: BooleanFieldDef[] }[] = [
-	{
-		title: "Food > Occupancy Depletion",
-		fields: FOOD_OCCUPANCY_DEPLETION_FIELDS,
-		toggles: FOOD_OCCUPANCY_DEPLETION_TOGGLES,
-	},
-	{ title: "Food > Grazing", fields: FOOD_GRAZING_FIELDS, toggles: FOOD_GRAZING_TOGGLES },
-	{ title: "Food Parameters", fields: FOOD_PARAMETERS_FIELDS },
-	{ title: "Population", fields: POPULATION_FIELDS },
-	{ title: "Energy > Lifecycle", fields: ENERGY_LIFECYCLE_FIELDS },
-	{ title: "Energy > Costs", fields: ENERGY_COSTS_FIELDS },
-	{
-		title: "Energy > Complexity Cost",
-		fields: COMPLEXITY_COST_FIELDS,
-		toggles: COMPLEXITY_COST_TOGGLES,
-	},
-	{ title: "Energy > Age Cost", fields: AGE_COST_FIELDS, toggles: AGE_COST_TOGGLES },
-	{ title: "Runtime", fields: RUNTIME_FIELDS },
-	{ title: "Mutation", fields: MUTATION_FIELDS, toggles: MUTATION_TOGGLES },
-	{ title: "Predation", fields: PREDATION_FIELDS },
-	{ title: "Action Log", fields: ACTION_LOG_FIELDS },
-	{ title: "Shared Memory", fields: SHARED_MEMORY_FIELDS },
-];
+/** Whether a field's draft differs from what the server applied. */
+export function isFieldDirty(
+	field: AnyFieldDef,
+	draft: SimulationConfig,
+	server: SimulationConfig,
+): boolean {
+	const a = getByPath(draft, field.path);
+	const b = getByPath(server, field.path);
+	return typeof a === "number" && typeof b === "number" ? !sameConfigNumber(a, b) : a !== b;
+}
+
+/** Live fields the current search and filter leave visible. */
+export function visibleRuntimeFields(
+	terms: string[],
+	changedOnly: boolean,
+	draft: SimulationConfig,
+	server: SimulationConfig,
+): AnyFieldDef[] {
+	return RUNTIME_PATCH_FIELDS.filter(
+		(field) =>
+			matchField(field, terms) !== null && (!changedOnly || isFieldDirty(field, draft, server)),
+	);
+}
 
 interface RuntimeConfigPanelProps extends Omit<RuntimePanelProps, "localDraft" | "serverConfig"> {
 	localDraft: RuntimePanelProps["localDraft"] | null;
@@ -72,28 +39,53 @@ interface RuntimeConfigPanelProps extends Omit<RuntimePanelProps, "localDraft" |
 }
 
 export function RuntimeConfigPanel({ localDraft, serverConfig, ...rest }: RuntimeConfigPanelProps) {
+	const filter = useConfigFilter();
+	if (!localDraft || !serverConfig) {
+		return (
+			<p className="px-3 py-6 text-center text-xs text-slate-500">
+				Runtime config unavailable. Restart to initialize the simulation.
+			</p>
+		);
+	}
+
+	const filtering = filter.terms.length > 0 || filter.changedOnly;
+	const visible = new Set(
+		visibleRuntimeFields(filter.terms, filter.changedOnly, localDraft, serverConfig),
+	);
+
 	return (
-		<Section
-			title="Runtime (Live) Config"
-			description="These settings apply to the current simulation when allowed by lifecycle state."
-			collapsible
-			sectionClassName="bg-sky-950/10 border-l-2 border-l-sky-500"
-		>
-			{!localDraft || !serverConfig ? (
-				<div className="p-3 text-sm text-slate-500">
-					Runtime config unavailable. Restart to initialize the simulation.
-				</div>
-			) : (
-				RUNTIME_GROUPS.map((group) => (
-					<RuntimeFieldGroup
-						key={group.title}
-						{...group}
-						{...rest}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-					/>
-				))
-			)}
-		</Section>
+		<>
+			{RUNTIME_CATEGORIES.map((category) => {
+				const fields = category.subgroups.flatMap((subgroup) => subgroup.fields);
+				const shown = fields.filter((field) => visible.has(field));
+				if (shown.length === 0) return null;
+				return (
+					<Category
+						key={category.id}
+						id={`live-${category.id}`}
+						title={category.title}
+						summary={category.summary}
+						settingCount={fields.length}
+						changedCount={
+							fields.filter((field) => isFieldDirty(field, localDraft, serverConfig)).length
+						}
+						forceOpen={filtering}
+					>
+						{category.subgroups
+							.filter((subgroup) => subgroup.fields.some((field) => visible.has(field)))
+							.map((subgroup) => (
+								<RuntimeFieldGroup
+									key={subgroup.title}
+									title={subgroup.title}
+									fields={subgroup.fields}
+									{...rest}
+									localDraft={localDraft}
+									serverConfig={serverConfig}
+								/>
+							))}
+					</Category>
+				);
+			})}
+		</>
 	);
 }

@@ -19,9 +19,25 @@ export interface ConfigState {
 	reset: () => void;
 }
 
-/** Deep equality check */
+/**
+ * Deep equality that treats numbers equal after an f32 round trip: the server
+ * stores f32, so a value typed exactly as displayed (0.3) must not read as a
+ * change from what it sent (0.30000001192092896).
+ */
 function deepEqual(a: unknown, b: unknown): boolean {
-	return JSON.stringify(a) === JSON.stringify(b);
+	if (typeof a === "number" && typeof b === "number") {
+		return a === b || Math.fround(a) === Math.fround(b);
+	}
+	if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
+		return a === b;
+	}
+	if (Array.isArray(a) !== Array.isArray(b)) return false;
+	const aKeys = Object.keys(a);
+	const bKeys = Object.keys(b);
+	if (aKeys.length !== bKeys.length) return false;
+	return aKeys.every((key) =>
+		deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+	);
 }
 
 export const useConfigStore = create<ConfigState>()((set) => ({

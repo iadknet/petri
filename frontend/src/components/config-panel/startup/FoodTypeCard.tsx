@@ -1,6 +1,8 @@
 import { useConfigStore } from "../../../stores/config.ts";
 import type { FoodTypeConfig } from "../../../types/config.ts";
-import { FieldRow } from "../shared/FieldRow.tsx";
+import { FieldRow, NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";
+import { NumberInput } from "../shared/NumberInput.tsx";
+import { formatConfigNumber } from "../shared/numberFormat.ts";
 import type { FieldDef } from "../shared/types.ts";
 
 interface FoodTypeCardProps {
@@ -57,6 +59,10 @@ export function FoodTypeCard({
 	const sharedReward = useConfigStore(
 		(state) => state.serverConfig?.energy.costs.eat_reward_per_food ?? 5,
 	);
+	// The server refuses an initial density above the live shared maximum.
+	const maxDensity = useConfigStore(
+		(state) => state.localDraft?.world.food.shared.max_density ?? 1,
+	);
 	const overrides = [
 		["energy_per_unit", "Energy per density unit", sharedReward, undefined],
 		["growth_rate", "Growth per tick", sharedGrowthRate, 1],
@@ -66,7 +72,7 @@ export function FoodTypeCard({
 		path: `world.food.types.${index}.initial_density`,
 		label: "Initial Density",
 		min: 0,
-		max: 1,
+		max: maxDensity,
 		step: 0.01,
 		defaultValue: 1.0,
 		tooltip: "Starting density for this food type during world generation",
@@ -99,12 +105,10 @@ export function FoodTypeCard({
 			className="rounded border border-slate-800 bg-slate-900/40 p-2 flex flex-col gap-2"
 		>
 			<div className="flex items-start justify-between gap-2">
-				<div className="flex flex-col gap-0.5">
-					<p className="text-[11px] uppercase tracking-wide text-slate-400">
-						Food Type {index + 1}
-					</p>
-					<p className="text-[11px] text-slate-500">type_idx {index}</p>
-				</div>
+				<p className="flex items-baseline gap-2 text-xs font-medium text-slate-200">
+					Food Type {index + 1}
+					<span className="font-mono text-[10px] font-normal text-slate-500">type_idx {index}</span>
+				</p>
 				<button
 					type="button"
 					data-testid={`startup-food-type-remove-${index}`}
@@ -152,6 +156,9 @@ export function FoodTypeCard({
 			<label className="flex items-center gap-2 text-xs text-slate-300">
 				<input
 					type="checkbox"
+					role="switch"
+					aria-checked={foodType.initial_fertility_only ?? false}
+					className="config-switch config-switch-startup config-switch-sm"
 					checked={foodType.initial_fertility_only ?? false}
 					onChange={(event) => onChange({ initial_fertility_only: event.target.checked })}
 					data-testid={`startup-food-type-${index}-fertile-only`}
@@ -173,24 +180,26 @@ export function FoodTypeCard({
 							<label className="flex items-center gap-1 text-xs text-slate-400">
 								<input
 									type="checkbox"
+									role="switch"
+									aria-checked={inherited}
+									className="config-switch config-switch-startup config-switch-sm"
 									checked={inherited}
 									onChange={(event) =>
 										onChange({ [key]: event.target.checked ? null : sharedValue })
 									}
 									aria-label={`Use shared ${label}`}
 								/>
-								Shared ({Number(sharedValue.toPrecision(6))})
+								Shared ({formatConfigNumber(sharedValue)})
 							</label>
-							<input
+							<NumberInput
 								id={id}
-								type="number"
 								min={0}
 								max={max}
 								step={0.01}
-								value={Number((foodType[key] ?? sharedValue).toPrecision(6))}
+								value={foodType[key] ?? sharedValue}
 								disabled={inherited}
-								onChange={(event) => onChange({ [key]: event.target.valueAsNumber })}
-								className="min-w-0 w-24 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 disabled:opacity-50"
+								onChange={(value) => onChange({ [key]: value })}
+								className={NUMBER_INPUT_CLASS}
 							/>
 						</div>
 					</div>

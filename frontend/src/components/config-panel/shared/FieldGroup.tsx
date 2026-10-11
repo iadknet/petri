@@ -5,13 +5,12 @@ interface FieldGroupProps {
 	children: ReactNode;
 }
 
+/** A named run of rows inside a category. Hidden when the filter leaves it empty. */
 export function FieldGroup({ title, children }: FieldGroupProps) {
 	return (
-		<div className="border-b border-petri-border">
-			<div className="w-full px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900/20">
-				{title}
-			</div>
-			<div className="px-3 pb-2 flex flex-col gap-0.5">{children}</div>
+		<div className="config-subgroup pt-2 pb-1 first:pt-1">
+			<h4 className="px-3 pb-0.5 text-[11px] font-medium text-slate-500">{title}</h4>
+			<div className="flex flex-col px-3">{children}</div>
 		</div>
 	);
 }

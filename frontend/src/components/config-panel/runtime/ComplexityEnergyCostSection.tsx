@@ -9,7 +9,7 @@ export const COMPLEXITY_COST_FIELDS: FieldDef[] = [
 		step: 10,
 		testId: "config-field-complexity-cost-threshold",
 		defaultValue: 50,
-		tooltip: "Genome complexity below which there is no energy cost penalty",
+		tooltip: "Genome complexity at or below which there is no energy cost penalty",
 	},
 	{
 		path: "energy.complexity_cost.scaling_factor",

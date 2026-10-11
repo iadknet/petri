@@ -167,7 +167,10 @@ export function ControlBar() {
 			if (prevConfig) {
 				const patch: Record<string, unknown> = {};
 				for (const field of RUNTIME_PATCH_FIELDS) {
-					mergePatch(patch, buildPatch(field.path, getByPath(prevConfig, field.path) as number));
+					mergePatch(
+						patch,
+						buildPatch(field.path, getByPath(prevConfig, field.path) as number | boolean | string),
+					);
 				}
 				try {
 					await api.patchConfig(patch as DeepPartial<SimulationConfig>);

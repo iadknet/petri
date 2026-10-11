@@ -2,7 +2,8 @@ import { randomSeed } from "../../../stores/startupConfig.ts";
 import type { TerrainLayer } from "../../../types/config.ts";
 import { DEFAULT_PATTERN_PARAMS, type PatternType } from "../../../types/pattern.ts";
 import { PatternParamsPanel } from "../../pattern-params/PatternParamsPanel.tsx";
-import { FieldGroup } from "../shared/FieldGroup.tsx";
+import { NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";
+import { NumberInput } from "../shared/NumberInput.tsx";
 import { RandomSeedButton } from "../shared/RandomSeedButton.tsx";
 import type { StartupSectionProps } from "../shared/types.ts";
 
@@ -57,10 +58,8 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 			layers.map((layer, i) => (i === index ? { ...layer, ...patch } : layer)),
 		);
 	return (
-		<FieldGroup title="Terrain">
-			<p className="text-xs text-slate-400 py-1">
-				Barriers are added before food and founders. Layers combine in order.
-			</p>
+		<div className="flex flex-col gap-2 px-3 pt-1">
+			<p className="text-xs text-slate-400 py-1">Layers combine in order.</p>
 			<OptionalSeed
 				label="Map seed"
 				testId="startup-map-seed"
@@ -106,6 +105,9 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 					<label className="text-xs text-slate-300 flex gap-2">
 						<input
 							type="checkbox"
+							role="switch"
+							aria-checked={layer.bounds != null}
+							className="config-switch config-switch-startup config-switch-sm"
 							checked={layer.bounds != null}
 							onChange={(e) =>
 								updateLayer(index, {
@@ -125,18 +127,21 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 					{layer.bounds ? (
 						<div className="grid grid-cols-2 gap-2">
 							{(["x", "y", "width", "height"] as const).map((key) => (
-								<label key={key} className="text-xs text-slate-300">
+								<label
+									key={key}
+									htmlFor={`startup-terrain-layer-${index}-bounds-${key}`}
+									className="text-xs text-slate-300"
+								>
 									{key}
-									<input
+									<NumberInput
+										id={`startup-terrain-layer-${index}-bounds-${key}`}
 										aria-label={`Layer ${index + 1} ${key}`}
-										type="number"
 										min={0}
 										max={65535}
-										step={1}
-										className={inputClass}
-										value={layer.bounds?.[key]}
-										onChange={(e) => {
-											const value = Number(e.target.value);
+										integer
+										className={`${NUMBER_INPUT_CLASS} w-full`}
+										value={layer.bounds?.[key] ?? 0}
+										onChange={(value) => {
 											if (Number.isInteger(value) && value >= 0 && value <= 65535 && layer.bounds)
 												updateLayer(index, { bounds: { ...layer.bounds, [key]: value } });
 										}}
@@ -173,6 +178,6 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 			>
 				Add terrain layer
 			</button>
-		</FieldGroup>
+		</div>
 	);
 }
