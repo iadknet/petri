@@ -121,7 +121,7 @@
   .wcell .big small { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
   .wcell .rowc { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin-top: 4px; font-size: 12px; color: var(--muted); }
   .spark { margin-top: 6px; position: relative; }
-  .spark svg { display: block; width: 100%; height: 46px; overflow: visible; cursor: pointer; }
+  .spark svg { display: block; width: 100%; height: 52px; overflow: visible; cursor: pointer; }
   .spark .cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 2px; }
 
   .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 5px; background: var(--raised); color: var(--ink-2); white-space: nowrap; }
@@ -204,13 +204,25 @@
   svg .ref { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 4 4; }
   svg .ref.floor { stroke: var(--bad); }
   svg .ref-label { fill: var(--ink-2); }
-  svg .selline { stroke: var(--s1); stroke-width: 1; opacity: 0.55; }
+  svg .selband { fill: var(--selection); }
+  svg .ann { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
+  svg text.sellab { fill: var(--ink-2); font-weight: 600; }
+  svg text.unit { fill: var(--muted); }
+  svg text.vlab { fill: var(--ink); font-weight: 600; }
+  svg text.rowlab { fill: var(--ink-2); }
   svg .xhair { stroke: var(--ink-2); stroke-width: 1; pointer-events: none; }
   svg .nm { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--ink-2); font-size: 12px; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
-  .legend i.box { width: 10px; height: 10px; border-radius: 2px; }
+  .legend i.box { width: 10px; height: 10px; border-radius: 2px; opacity: 0.35; }
+  .legend i.dot { width: 9px; height: 9px; border-radius: 50%; }
+  .chead .tools { display: flex; gap: 8px; align-items: center; }
+  .tbtn {
+    appearance: none; font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; padding: 1px 9px; cursor: pointer;
+  }
+  .tbtn:hover, .tbtn[aria-pressed="true"] { background: var(--raised); color: var(--ink); }
   .note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
   .scale { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 6px; }
   .scale i { display: inline-block; width: 120px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--seq-100), var(--seq-700)); }
@@ -318,6 +330,7 @@
     const a = Math.abs(v);
     if (a >= 1e6) return (v / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'M';
     if (a >= 1e4) return (v / 1e3).toLocaleString(undefined, { maximumFractionDigits: 0 }) + 'k';
+    if (a >= 1000) return (v / 1e3).toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'k';
     if (a >= 1) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
     if (a === 0) return '0';
     return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
@@ -937,11 +950,11 @@
     d.appendChild(dl);
     return d;
   }
-  function legend(items, box) {
+  function legend(items) {
     const l = el('div', 'legend');
     items.forEach((it) => {
       const s = el('span');
-      const i = el('i', box ? 'box' : null); i.style.background = it.color;
+      const i = el('i', it.box ? 'box' : it.dot ? 'dot' : null); i.style.background = it.color;
       s.appendChild(i); s.appendChild(document.createTextNode(it.name));
       l.appendChild(s);
     });
@@ -960,8 +973,34 @@
   }
 
   // ── Charts ───────────────────────────────────────────────────────────────
-  // A sparkline over every closure: the first reading dashed, the selected
-  // closure marked; click a point to select that closure.
+  // Shared rules: 2px lines, 1px solid gridlines, dashed lines only for a
+  // reference (first reading, floor, baseline), a neutral band for the shown
+  // closure, text in ink tokens, and a Table button on every chart.
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const shortDate = (d) => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d || ''); return m ? `${MONTHS[+m[2] - 1]} ${+m[3]}` : ''; };
+  const dayNumber = (d) => { const t = Date.parse((d || '').slice(0, 10)); return fin(t) ? t / 86400000 : NaN; };
+  // Date ticks over a closure axis: the first closure, then the first closure at
+  // least `gap` days after the previous tick.
+  function dateTicks(dates, gap) {
+    const out = [];
+    let last = -Infinity;
+    dates.forEach((d, i) => { const t = dayNumber(d); if (fin(t) && t - last >= gap) { out.push(i); last = t; } });
+    return out;
+  }
+  // A log10 domain spanning whole decades, with 1-2-5 ticks when it spans few.
+  function logDomain(arrays) {
+    let lo = Infinity, hi = -Infinity;
+    arrays.forEach((a) => a.forEach((v) => { if (fin(v) && v > 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
+    if (!fin(lo)) { lo = 1; hi = 10; }
+    const a = Math.floor(Math.log10(lo)), b = Math.max(a + 1, Math.ceil(Math.log10(hi)));
+    const ticks = [];
+    for (let e = a; e <= b; e++) [1, 2, 5].forEach((k) => { const v = k * Math.pow(10, e); if ((b - a <= 2 || k === 1) && v >= Math.pow(10, a) && v <= Math.pow(10, b)) ticks.push(v); });
+    return { lo: Math.pow(10, a), hi: Math.pow(10, b), ticks, log: true };
+  }
+
+  // A trend strip for a goal reading over every closure: stepped, scaled to the
+  // reading's own range, the first reading dashed with a hollow dot, the shown
+  // closure filled. Click a closure to show it.
   function sparkline(M, key, wi) {
     const spec = READINGS[key];
     const values = M.vals[key][wi];
@@ -969,29 +1008,33 @@
     const plot = el('div');
     wrap.appendChild(plot);
     const n = values.length;
+    const finite = values.filter(fin);
+    const vmin = finite.length ? Math.min(...finite) : 0, vmax = finite.length ? Math.max(...finite) : 1;
     const draw = () => {
-      const W = Math.max(160, Math.round(plot.clientWidth) || 260), H = 46;
+      const W = Math.max(160, Math.round(plot.clientWidth) || 260), H = 52;
       plot.replaceChildren();
-      const dom = domainOf([values], true);
-      const xAt = (k) => 3 + (n <= 1 ? 0 : (k * (W - 6)) / (n - 1));
-      const yAt = (v) => 4 + (H - 8) - ((v - dom.lo) / (dom.hi - dom.lo || 1)) * (H - 8);
+      const pad = (vmax - vmin) * 0.12 || Math.abs(vmax) * 0.1 || 1;
+      const lo = vmin - pad, hi = vmax + pad;
+      const s = W / Math.max(1, n);
+      const xAt = (k) => s * (k + 0.5);
+      const yAt = (v) => 4 + (H - 8) - ((v - lo) / (hi - lo || 1)) * (H - 8);
       const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `${spec.label}, ${M.worlds[wi].short}, over every closure` });
+      if (M.sel >= 0) svg.appendChild(svgEl('rect', { class: 'selband', x: s * M.sel, y: 0, width: Math.max(4, s), height: H }));
       const first = values[M.firstIndex];
       if (fin(first)) svg.appendChild(svgEl('line', { class: 'ref', x1: 0, x2: W, y1: yAt(first), y2: yAt(first) }));
-      let d = '', pen = false;
-      values.forEach((v, k) => { if (!fin(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + xAt(k).toFixed(1) + ',' + yAt(v).toFixed(1); pen = true; });
-      if (d) svg.appendChild(svgEl('path', { d, class: 'line', stroke: 'var(--ink-2)', 'stroke-width': 1.5, opacity: 0.85 }));
+      svg.appendChild(svgEl('path', { d: stepPath(values, (k) => s * k, (k) => s * (k + 1), yAt), class: 'line', stroke: 'var(--ink-2)', 'stroke-width': 1.5 }));
+      if (fin(first)) svg.appendChild(svgEl('circle', { cx: xAt(M.firstIndex), cy: yAt(first), r: 3, fill: 'var(--surface)', stroke: 'var(--ink-2)', 'stroke-width': 1.5 }));
       if (fin(values[M.sel])) svg.appendChild(svgEl('circle', { cx: xAt(M.sel), cy: yAt(values[M.sel]), r: 4, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2 }));
       const hair = svgEl('line', { class: 'xhair', y1: 0, y2: H, visibility: 'hidden' });
       svg.appendChild(hair);
       const hit = svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: 'transparent' });
       svg.appendChild(hit);
-      const nearest = (ev) => { const r = svg.getBoundingClientRect(); const sx = ((ev.clientX - r.left) * W) / r.width; let best = 0, bd = Infinity; for (let k = 0; k < n; k++) { const dd = Math.abs(xAt(k) - sx); if (dd < bd) { bd = dd; best = k; } } return best; };
+      const nearest = (ev) => { const r = svg.getBoundingClientRect(); const sx = ((ev.clientX - r.left) * W) / r.width; return Math.max(0, Math.min(n - 1, Math.floor(sx / s))); };
       hit.addEventListener('pointermove', (ev) => {
         const k = nearest(ev);
         hair.setAttribute('x1', xAt(k)); hair.setAttribute('x2', xAt(k)); hair.setAttribute('visibility', 'visible');
         const pt = M.points[k];
-        showTip(ev, pt.title, pt.kind === 'gap' ? 'report not stored' : `${pt.date}${pt.changed ? '' : ' · changed nothing'} · click to show this closure`,
+        showTip(ev, pt.title, pt.kind === 'gap' ? 'report not stored' : `${shortDate(pt.date)}${pt.changed ? '' : ' · changed nothing'} · click to show this closure`,
           [{ color: 'var(--ink-2)', name: `${M.worlds[wi].short}${spec.extra && pt.kind === 'world' ? ' · ' + spec.extra(pt, M.worlds[wi]) : ''}`, value: valueText(spec, values[k]) }]);
       });
       hit.addEventListener('pointerleave', () => { hair.setAttribute('visibility', 'hidden'); hideTip(); });
@@ -1000,81 +1043,169 @@
     };
     observeWidth(plot, draw);
     const cap = el('div', 'cap');
-    cap.appendChild(el('span', null, M.points[M.firstIndex] ? M.points[M.firstIndex].id || M.points[M.firstIndex].name : ''));
-    cap.appendChild(el('span', null, 'dashed: first reading'));
-    cap.appendChild(el('span', null, M.points[n - 1] ? M.points[n - 1].id || M.points[n - 1].name : ''));
+    const firstPt = M.points[M.firstIndex], lastPt = M.points[n - 1];
+    cap.appendChild(el('span', null, firstPt ? shortDate(firstPt.date) : ''));
+    cap.appendChild(el('span', null, finite.length ? `low ${valueText(spec, vmin)} · high ${valueText(spec, vmax)}` : ''));
+    cap.appendChild(el('span', null, lastPt ? shortDate(lastPt.date) : ''));
     wrap.appendChild(cap);
     return wrap;
   }
 
+  // A stepped path: value i holds from x0(i) to x1(i); NaN lifts the pen.
+  function stepPath(values, x0, x1, yAt) {
+    let d = '', prevY = null;
+    values.forEach((v, i) => {
+      const y = fin(v) ? yAt(v) : NaN;
+      if (!fin(y)) { prevY = null; return; }
+      d += prevY === null ? `M${x0(i).toFixed(1)},${y.toFixed(1)}` : `V${y.toFixed(1)}`;
+      d += `H${x1(i).toFixed(1)}`;
+      prevY = y;
+    });
+    return d;
+  }
+
   // A line plot. cfg: { n, series: [{ name, color, values, muted, emph }], dom,
-  // first, sel, refLines, yFmt, tipFmt, xLabel(i), xTicks?, tipTitle(i), tipMeta(i),
-  // mark(i): draw a dot at i, onPick(i), height }
+  // band?: { lo[], hi[], color }, step, first, sel, selLabel, refLines, unit,
+  // yFmt, tipFmt, xTicks: [i], xLabel(i), tipTitle(i), tipMeta(i), onPick(i), height }
   function linePlot(plot, cfg) {
     const n = cfg.n;
     const draw = () => {
-      const W = Math.max(220, Math.round(plot.clientWidth) || 360), H = cfg.height || 170;
+      const W = Math.max(220, Math.round(plot.clientWidth) || 360), H = cfg.height || 180;
       plot.replaceChildren();
-      const m = { t: 10, r: 10, b: 22, l: cfg.first ? 46 : 10 };
+      const m = { t: 20, r: 12, b: 22, l: cfg.first ? 48 : 12 };
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
       const { lo, hi, ticks } = cfg.dom;
-      const xAt = (i) => m.l + (n <= 1 ? iw / 2 : (i * iw) / (n - 1));
-      const yAt = (v) => m.t + ih - ((Math.min(Math.max(v, lo), hi) - lo) / (hi - lo || 1)) * ih;
+      const tf = cfg.dom.log ? (v) => Math.log10(v) : (v) => v;
+      const LO = tf(lo), HI = tf(hi);
+      const s = cfg.step ? iw / Math.max(1, n) : (n <= 1 ? iw : iw / (n - 1));
+      const xAt = (i) => (cfg.step ? m.l + s * (i + 0.5) : m.l + (n <= 1 ? iw / 2 : i * s));
+      const yAt = (v) => {
+        if (!fin(v)) return NaN;
+        if (cfg.dom.log && v <= 0) return m.t + ih;
+        return m.t + ih - ((tf(Math.min(Math.max(v, lo), hi)) - LO) / (HI - LO || 1)) * ih;
+      };
       const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': cfg.label || 'chart' });
+      // Selection band first, under everything.
+      if (Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n) {
+        const bw = cfg.step ? s : Math.max(2, Math.min(s, 12));
+        const bx = cfg.step ? m.l + s * cfg.sel : Math.min(Math.max(xAt(cfg.sel) - bw / 2, m.l), m.l + iw - bw);
+        svg.appendChild(svgEl('rect', { class: 'selband', x: bx, y: m.t, width: bw, height: ih }));
+        if (cfg.selLabel) {
+          const x = xAt(cfg.sel);
+          const anchor = x > m.l + iw - 60 ? 'end' : x < m.l + 60 ? 'start' : 'middle';
+          const tx = svgEl('text', { class: 'sellab', x: anchor === 'end' ? Math.min(x + bw / 2, m.l + iw) : anchor === 'start' ? Math.max(x - bw / 2, m.l) : x, y: m.t - 6, 'text-anchor': anchor });
+          tx.textContent = cfg.selLabel;
+          svg.appendChild(tx);
+        }
+      }
       const g = svgEl('g', { class: 'grid' });
       ticks.forEach((t) => {
-        g.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: yAt(t), y2: yAt(t) }));
-        if (cfg.first) { const tx = svgEl('text', { x: m.l - 6, y: yAt(t) + 4, 'text-anchor': 'end' }); tx.textContent = (cfg.yFmt || fmtTick)(t); g.appendChild(tx); }
+        const y = yAt(t);
+        if (!fin(y)) return;
+        g.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y }));
+        if (cfg.first) { const tx = svgEl('text', { x: m.l - 6, y: y + 4, 'text-anchor': 'end' }); tx.textContent = (cfg.yFmt || fmtTick)(t); g.appendChild(tx); }
       });
       svg.appendChild(g);
-      // x labels: the ends and the selected closure, skipping any that would collide.
-      const want = cfg.xTicks || [0, n - 1].concat(Number.isInteger(cfg.sel) ? [cfg.sel] : []);
+      if (cfg.first && cfg.unit) { const tx = svgEl('text', { x: m.l - 6, y: m.t - 6, 'text-anchor': 'end', class: 'unit' }); tx.textContent = cfg.unit; svg.appendChild(tx); }
+      // x labels, skipping any that would collide.
       const placed = [];
-      want.forEach((i) => {
+      (cfg.xTicks || []).forEach((i) => {
         if (!(i >= 0 && i < n)) return;
         const x = xAt(i);
-        const isSel = i === cfg.sel;
-        if (!isSel && placed.some((p) => Math.abs(p - x) < 58)) return;
-        if (isSel) for (let k = placed.length - 1; k >= 0; k--) if (Math.abs(placed[k] - x) < 58) placed.splice(k, 1);
+        if (placed.some((p) => Math.abs(p - x) < 58)) return;
+        const text = cfg.xLabel(i);
+        if (!text) return;
         placed.push(x);
-      });
-      want.forEach((i) => {
-        if (!(i >= 0 && i < n)) return;
-        const x = xAt(i);
-        if (!placed.includes(x)) return;
-        const anchor = x < m.l + 24 ? 'start' : x > m.l + iw - 24 ? 'end' : 'middle';
-        const tx = svgEl('text', { x, y: H - 5, 'text-anchor': anchor, class: i === cfg.sel ? 'xsel' : '' });
-        tx.textContent = cfg.xLabel(i);
+        const anchor = x < m.l + 20 ? 'start' : x > m.l + iw - 20 ? 'end' : 'middle';
+        const tx = svgEl('text', { x, y: H - 6, 'text-anchor': anchor });
+        tx.textContent = text;
         svg.appendChild(tx);
       });
-      if (Number.isInteger(cfg.sel)) svg.appendChild(svgEl('line', { class: 'selline', x1: xAt(cfg.sel), x2: xAt(cfg.sel), y1: m.t, y2: m.t + ih }));
+      // Recorded events (a counter redefined at a closure): a hairline and a label.
+      (cfg.marks || []).forEach((mk) => {
+        if (!(mk.i >= 0 && mk.i < n)) return;
+        const x = cfg.step ? m.l + s * mk.i : xAt(mk.i);
+        svg.appendChild(svgEl('line', { class: 'ann', x1: x, x2: x, y1: m.t, y2: m.t + ih }));
+        const right = x > m.l + iw / 2;
+        const tx = svgEl('text', { class: 'ref-label', x: right ? x - 4 : x + 4, y: m.t + ih - 6, 'text-anchor': right ? 'end' : 'start' });
+        tx.textContent = mk.label;
+        svg.appendChild(tx);
+      });
       (cfg.refLines || []).forEach((r) => {
-        if (!fin(r.y)) return;
-        svg.appendChild(svgEl('line', { class: 'ref' + (r.floor ? ' floor' : ''), x1: m.l, x2: m.l + iw, y1: yAt(r.y), y2: yAt(r.y) }));
-        if (cfg.first || r.always) { const tx = svgEl('text', { class: 'ref-label', x: m.l + 4, y: yAt(r.y) - 4 }); tx.textContent = r.label; svg.appendChild(tx); }
+        const y = yAt(r.y);
+        if (!fin(y)) return;
+        svg.appendChild(svgEl('line', { class: 'ref' + (r.floor ? ' floor' : ''), x1: m.l, x2: m.l + iw, y1: y, y2: y }));
+        if (cfg.first || r.always) { const tx = svgEl('text', { class: 'ref-label', x: m.l + 4, y: y - 4 }); tx.textContent = r.label; svg.appendChild(tx); }
       });
-      cfg.series.forEach((s) => {
-        let d = '', pen = false;
-        s.values.forEach((v, i) => { if (!fin(v)) { pen = false; return; } d += (pen ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + yAt(v).toFixed(1); pen = true; });
-        if (d) svg.appendChild(svgEl('path', { d, class: 'line' + (s.emph ? ' emph' : '') + (s.muted ? ' muted' : ''), stroke: s.color }));
-        s.values.forEach((v, i) => {
-          if (!fin(v)) return;
-          const lone = !fin(s.values[i - 1]) && !fin(s.values[i + 1]);
-          if (i === cfg.sel) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: yAt(v), r: 4, fill: s.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
-          else if (lone || (cfg.mark && cfg.mark(i) && !s.muted)) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: yAt(v), r: 2.2, fill: s.color }));
+      const x0 = (i) => m.l + s * i, x1 = (i) => m.l + s * (i + 1);
+      if (cfg.band) {
+        const b = cfg.band;
+        const idx = [];
+        for (let i = 0; i < n; i++) if (fin(yAt(b.lo[i])) && fin(yAt(b.hi[i]))) idx.push(i);
+        // One polygon per unbroken run of measured closures.
+        let run = [];
+        const flush = () => {
+          if (!run.length) return;
+          const top = cfg.step ? run.map((i) => `${x0(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)} ${x1(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`) : run.map((i) => `${xAt(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`);
+          const bot = cfg.step ? run.slice().reverse().map((i) => `${x1(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)} ${x0(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`) : run.slice().reverse().map((i) => `${xAt(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`);
+          svg.appendChild(svgEl('polygon', { points: top.concat(bot).join(' '), fill: b.color, opacity: 0.14 }));
+          run = [];
+        };
+        idx.forEach((i, k) => { if (k && i !== idx[k - 1] + 1) flush(); run.push(i); });
+        flush();
+      }
+      cfg.series.forEach((sr) => {
+        const d = cfg.step ? stepPath(sr.values, x0, x1, yAt) : (() => {
+          let p = '', pen = false;
+          sr.values.forEach((v, i) => { const y = yAt(v); if (!fin(y)) { pen = false; return; } p += (pen ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + y.toFixed(1); pen = true; });
+          return p;
+        })();
+        if (d) svg.appendChild(svgEl('path', { d, class: 'line' + (sr.emph ? ' emph' : '') + (sr.muted ? ' muted' : ''), stroke: sr.color }));
+        if (!cfg.step) sr.values.forEach((v, i) => {
+          const y = yAt(v);
+          if (fin(y) && !fin(yAt(sr.values[i - 1])) && !fin(yAt(sr.values[i + 1]))) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: y, r: 3, fill: sr.color }));
         });
+        if (cfg.dom.log) sr.values.forEach((v, i) => { if (v === 0) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: m.t + ih, r: 3.5, fill: 'var(--surface)', stroke: sr.color, 'stroke-width': 1.5 })); });
       });
-      if (!cfg.series.some((s) => s.values.some(fin))) { const tx = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2, 'text-anchor': 'middle' }); tx.textContent = 'not measured'; svg.appendChild(tx); }
+      // The shown closure: a ringed dot per series, and its value beside the
+      // series the chart is about.
+      if (Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n) {
+        const labelled = cfg.series.filter((sr) => sr.emph || cfg.series.length === 1);
+        cfg.series.forEach((sr) => {
+          const y = yAt(sr.values[cfg.sel]);
+          if (!fin(y)) return;
+          svg.appendChild(svgEl('circle', { cx: xAt(cfg.sel), cy: y, r: 4, fill: sr.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+        });
+        labelled.slice(0, 1).forEach((sr) => {
+          const v = sr.values[cfg.sel], y = yAt(v);
+          if (!fin(y)) return;
+          const x = xAt(cfg.sel);
+          const right = x > m.l + iw * 0.7;
+          const tx = svgEl('text', { class: 'vlab', x: right ? x - 8 : x + 8, y: Math.max(m.t + 10, y - 7), 'text-anchor': right ? 'end' : 'start' });
+          tx.textContent = (cfg.tipFmt || fmt)(v);
+          svg.appendChild(tx);
+        });
+      }
+      if (!cfg.series.some((sr) => sr.values.some((v) => fin(yAt(v))))) { const tx = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2, 'text-anchor': 'middle' }); tx.textContent = 'not measured'; svg.appendChild(tx); }
       const hair = svgEl('line', { class: 'xhair', y1: m.t, y2: m.t + ih, visibility: 'hidden' });
       svg.appendChild(hair);
       const hit = svgEl('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' });
       if (cfg.onPick) hit.style.cursor = 'pointer';
       svg.appendChild(hit);
-      const nearest = (ev) => { const r = svg.getBoundingClientRect(); const sx = ((ev.clientX - r.left) * W) / r.width; let best = 0, bd = Infinity; for (let i = 0; i < n; i++) { const dd = Math.abs(xAt(i) - sx); if (dd < bd) { bd = dd; best = i; } } return best; };
+      const nearest = (ev) => {
+        const r = svg.getBoundingClientRect();
+        const sx = ((ev.clientX - r.left) * W) / r.width;
+        if (cfg.step) return Math.max(0, Math.min(n - 1, Math.floor((sx - m.l) / s)));
+        let best = 0, bd = Infinity;
+        for (let i = 0; i < n; i++) { const dd = Math.abs(xAt(i) - sx); if (dd < bd) { bd = dd; best = i; } }
+        return best;
+      };
       hit.addEventListener('pointermove', (ev) => {
         const i = nearest(ev);
         hair.setAttribute('x1', xAt(i)); hair.setAttribute('x2', xAt(i)); hair.setAttribute('visibility', 'visible');
-        showTip(ev, cfg.tipTitle(i), cfg.tipMeta ? cfg.tipMeta(i) : '', cfg.series.map((s) => ({ color: s.color, name: s.name + (s.details && s.details[i] ? ` · ${s.details[i]}` : ''), value: fin(s.values[i]) ? (cfg.tipFmt || fmt)(s.values[i]) : 'not measured' })));
+        const rows = cfg.series.map((sr) => ({ color: sr.color, name: sr.name + (sr.details && sr.details[i] ? ` · ${sr.details[i]}` : ''), value: fin(sr.values[i]) ? (cfg.tipFmt || fmt)(sr.values[i]) : 'not measured' }));
+        if (cfg.band) rows.push({ color: cfg.band.color, name: cfg.band.name || 'range', value: fin(cfg.band.lo[i]) ? `${(cfg.tipFmt || fmt)(cfg.band.lo[i])} – ${(cfg.tipFmt || fmt)(cfg.band.hi[i])}` : 'not measured' });
+        showTip(ev, cfg.tipTitle(i), cfg.tipMeta ? cfg.tipMeta(i) : '', rows);
       });
       hit.addEventListener('pointerleave', () => { hair.setAttribute('visibility', 'hidden'); hideTip(); });
       if (cfg.onPick) hit.addEventListener('click', (ev) => cfg.onPick(nearest(ev)));
@@ -1083,34 +1214,60 @@
     observeWidth(plot, draw);
   }
 
-  // An explore card: plain title, one-line definition, direction tag, body, "What is this?".
+  // An explore card: plain title, one-line definition, direction tag, a Table
+  // button (the chart's text twin, built on first press), "What is this?".
   function chartCard(spec) {
     const c = el('div', 'card');
     const head = el('div', 'chead');
     head.appendChild(el('h3', null, spec.title));
-    head.appendChild(directionTag(spec.better));
+    const tools = el('div', 'tools');
+    if (spec.better !== 'none') tools.appendChild(directionTag(spec.better));
+    head.appendChild(tools);
     c.appendChild(head);
     if (spec.def) c.appendChild(el('p', 'def', spec.def));
     const body = el('div');
     c.appendChild(body);
+    const tableBox = el('div');
+    tableBox.hidden = true;
+    c.appendChild(tableBox);
     if (spec.why || spec.how || spec.path) c.appendChild(about(spec));
-    return { card: c, body };
+    const setTable = (build) => {
+      const b = el('button', 'tbtn', 'Table');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        const on = b.getAttribute('aria-pressed') !== 'true';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.textContent = on ? 'Chart' : 'Table';
+        if (on && !tableBox.firstChild) { const [h, r] = build(); tableBox.appendChild(table(h, r, (k) => k > 0)); }
+        body.hidden = on;
+        tableBox.hidden = !on;
+      });
+      tools.appendChild(b);
+    };
+    return { card: c, body, setTable };
   }
 
-  // Three world panels over every closure on one shared scale.
-  // spec.series: [{ name, color, read(pt, w), detail?(pt, w), muted?, emph? }]
+  // Three world panels over every closure, stepped: each closure's reading holds
+  // until the next one, so a closure that changed nothing reads as flat.
+  // spec.series: [{ name, color, read(pt, w), detail?(pt, w), muted?, emph? }];
+  // spec.band?: { name, color, lo(pt, w), hi(pt, w) }; spec.unit; spec.ref?(w).
   function closuresChart(M, spec) {
     const c = chartCard(spec);
+    const at = (fn, w) => M.points.map((pt) => (pt.kind === 'world' ? num(fn(pt, w)) : NaN));
     const panels = M.worlds.map((w) => ({
       w,
       series: spec.series.map((s) => ({
         ...s,
-        values: M.points.map((pt) => (pt.kind === 'world' ? num(s.read(pt, w)) : NaN)),
+        values: at(s.read, w),
         details: s.detail ? M.points.map((pt) => (pt.kind === 'world' ? s.detail(pt, w) : '')) : null,
       })),
+      band: spec.band ? { name: spec.band.name, color: spec.band.color, lo: at(spec.band.lo, w), hi: at(spec.band.hi, w) } : null,
       refs: spec.ref ? [spec.ref(w)].filter(Boolean) : [],
     }));
-    const dom = domainOf(panels.flatMap((p) => p.series.map((s) => s.values).concat(p.refs.map((r) => [r.y]))), spec.zero);
+    const arrays = panels.flatMap((p) => p.series.map((s) => s.values).concat(p.refs.map((r) => [r.y])).concat(p.band ? [p.band.lo, p.band.hi] : []));
+    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero);
+    const ticks = dateTicks(M.points.map((p) => p.date), 6);
     const grid = el('div', 'panels');
     panels.forEach((p, k) => {
       const pane = el('div', 'panel');
@@ -1119,22 +1276,38 @@
       pane.appendChild(plot);
       grid.appendChild(pane);
       linePlot(plot, {
-        n: M.points.length, series: p.series, dom, first: k === 0, sel: M.sel, refLines: p.refs,
-        yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || spec.yFmtTip || fmt, label: `${spec.title}, ${p.w.short}`,
-        xLabel: (i) => M.points[i].id || M.points[i].name,
+        n: M.points.length, series: p.series, band: p.band, dom, step: true, first: k === 0, sel: M.sel, refLines: p.refs, unit: spec.unit,
+        selLabel: M.points[M.sel] ? M.points[M.sel].id || M.points[M.sel].name : '',
+        yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
+        xTicks: ticks, xLabel: (i) => shortDate(M.points[i].date),
         tipTitle: (i) => `${p.w.short} · ${M.points[i].title}`,
-        tipMeta: (i) => (M.points[i].kind === 'gap' ? 'report not stored' : `${M.points[i].date}${M.points[i].changed ? '' : ' · changed nothing'} · click to show this closure`),
-        mark: (i) => M.points[i].kind === 'world' && M.points[i].changed,
+        tipMeta: (i) => (M.points[i].kind === 'gap' ? 'report not stored' : `${shortDate(M.points[i].date)}${M.points[i].changed ? '' : ' · changed nothing'} · click to show this closure`),
         onPick: (i) => { if (M.points[i].kind === 'world') M.pick(i); },
       });
     });
     c.body.appendChild(grid);
-    if (spec.series.length > 1) c.body.appendChild(legend(spec.series));
-    c.body.appendChild(el('p', 'note', 'One point per closure. Dots mark closures that changed the simulation; the blue line marks the closure shown. Click a point to show that closure.'));
+    if (spec.series.length > 1 || spec.band) c.body.appendChild(legend(spec.series.map((s) => ({ name: s.name, color: s.color })).concat(spec.band ? [{ name: spec.band.name, color: spec.band.color, box: true }] : [])));
+    c.body.appendChild(el('p', 'note', 'Each closure\'s reading holds until the next closure, so a step is where a closure moved it. The shaded column is the closure shown; click to show another.'));
+    c.setTable(() => {
+      const headers = ['Closure'];
+      M.worlds.forEach((w) => { spec.series.forEach((s) => headers.push(`${w.short} · ${s.name}`)); if (spec.band) headers.push(`${w.short} · ${spec.band.name}`); });
+      const rows = [];
+      for (let i = M.points.length - 1; i >= 0; i--) {
+        const pt = M.points[i];
+        const row = [pt.title];
+        panels.forEach((p) => {
+          p.series.forEach((s) => row.push(pt.kind === 'world' ? (fin(s.values[i]) ? (spec.tipFmt || fmt)(s.values[i]) : 'not measured') : 'not stored'));
+          if (p.band) row.push(fin(p.band.lo[i]) ? `${(spec.tipFmt || fmt)(p.band.lo[i])} – ${(spec.tipFmt || fmt)(p.band.hi[i])}` : 'not measured');
+        });
+        rows.push(row);
+      }
+      return [headers, rows];
+    });
     return c.card;
   }
 
-  // Through one run: the selected closure against the one before it, at each checkpoint.
+  // Through one run: the shown closure (blue) against the one before (grey) at
+  // each checkpoint. spec.log draws a log scale for readings that boom and crash.
   function checkpointChart(M, spec) {
     const c = chartCard(spec);
     const sel = M.points[M.sel], j = M.prevOf(M.sel), prev = j >= 0 ? M.points[j] : null;
@@ -1151,7 +1324,8 @@
         return { name: isSel ? `${pt.name} (shown)` : `${pt.name} (before)`, color: isSel ? 'var(--s1)' : 'var(--muted)', emph: isSel, muted: !isSel, values: xs.map((t) => (mp.has(t) ? mp.get(t) : NaN)) };
       }),
     }));
-    const dom = domainOf(panels.flatMap((p) => p.series.map((s) => s.values)), spec.zero);
+    const arrays = panels.flatMap((p) => p.series.map((s) => s.values));
+    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero);
     const grid = el('div', 'panels');
     const every = Math.max(1, Math.ceil(xs.length / 5));
     panels.forEach((p, k) => {
@@ -1161,72 +1335,100 @@
       pane.appendChild(plot);
       grid.appendChild(pane);
       linePlot(plot, {
-        n: xs.length, series: p.series, dom, first: k === 0, yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
-        xLabel: (i) => `tick ${xs[i]}`, xTicks: xs.map((_, i) => i).filter((i) => i % every === 0 || i === xs.length - 1),
-        tipTitle: (i) => `${p.w.short} · tick ${xs[i]}`, height: spec.height || 150,
+        n: xs.length, series: p.series, dom, first: k === 0, unit: spec.unit, yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
+        xLabel: (i) => (i === 0 ? `tick ${xs[i]}` : String(xs[i])), xTicks: xs.map((_, i) => i).filter((i) => i % every === 0 || i === xs.length - 1),
+        tipTitle: (i) => `${p.w.short} · tick ${xs[i]}`, height: spec.height || 160,
       });
     });
     c.body.appendChild(grid);
     c.body.appendChild(legend(panels[0] ? panels[0].series : []));
+    if (spec.log) c.body.appendChild(el('p', 'note', 'Log scale: equal distances are equal ratios, so the early boom and the late plateau both fit. A zero sits on the bottom edge as a hollow dot.'));
+    c.setTable(() => {
+      const headers = ['Tick'];
+      panels.forEach((p) => p.series.forEach((s) => headers.push(`${p.w.short} · ${s.name}`)));
+      return [headers, xs.map((t, i) => [String(t), ...panels.flatMap((p) => p.series.map((s) => (fin(s.values[i]) ? (spec.tipFmt || fmt)(s.values[i]) : 'not measured')))])];
+    });
     return c.card;
   }
 
-  // Paired bars per world: the shown closure (blue) over the one before (grey).
+  // Before and after per item, as dumbbells: grey dot for the closure before,
+  // blue dot for the closure shown, joined by a line; the shown value labelled.
+  // One label column serves all three worlds; narrow screens stack the worlds.
   // spec.items(pt, w) → [{ key, name, value }]; spec.top folds the rest into "other".
   function pairBars(M, spec) {
     const c = chartCard(spec);
     const sel = M.points[M.sel], j = M.prevOf(M.sel), prev = j >= 0 ? M.points[j] : null;
     const fmtV = spec.fmt || fmt;
-    const panels = M.worlds.map((w) => {
-      const now = spec.items(sel, w) || [], was = prev ? spec.items(prev, w) || [] : [];
-      const keys = [];
-      now.concat(was).forEach((it) => { if (!keys.includes(it.key)) keys.push(it.key); });
-      const val = (arr, k) => { const it = arr.find((x) => x.key === k); return it ? it.value : NaN; };
-      let rows = keys.map((k) => ({ key: k, name: (now.find((x) => x.key === k) || was.find((x) => x.key === k)).name, a: val(now, k), b: val(was, k) }));
-      if (spec.sort !== false) rows.sort((x, y) => (num(y.a) || 0) - (num(x.a) || 0));
-      if (spec.top && rows.length > spec.top + 1) {
-        const rest = rows.slice(spec.top);
-        const part = (xs) => (xs.some(fin) ? sum(xs) : NaN);
-        rows = rows.slice(0, spec.top).concat([{ key: 'other', name: `other (${rest.length} kinds)`, a: part(rest.map((r) => r.a)), b: part(rest.map((r) => r.b)) }]);
-      }
-      return { w, rows };
-    });
+    const per = M.worlds.map((w) => ({ now: spec.items(sel, w) || [], was: prev ? spec.items(prev, w) || [] : [] }));
+    const keys = [], names = {};
+    per.forEach((p) => p.now.concat(p.was).forEach((it) => { if (!keys.includes(it.key)) { keys.push(it.key); names[it.key] = it.name; } }));
+    const val = (arr, k) => { const it = arr.find((x) => x.key === k); return it ? num(it.value) : NaN; };
+    let rows = keys.map((k) => ({ key: k, name: names[k], cells: per.map((p) => ({ a: val(p.now, k), b: val(p.was, k) })) }));
+    if (spec.sort !== false) rows.sort((x, y) => Math.max(0, ...y.cells.map((q) => num(q.a) || 0)) - Math.max(0, ...x.cells.map((q) => num(q.a) || 0)));
+    if (spec.top && rows.length > spec.top + 1) {
+      const rest = rows.slice(spec.top);
+      const part = (xs) => (xs.some(fin) ? sum(xs) : NaN);
+      rows = rows.slice(0, spec.top).concat([{ key: 'other', name: `other (${rest.length} kinds)`, cells: M.worlds.map((w, wi) => ({ a: part(rest.map((r) => r.cells[wi].a)), b: part(rest.map((r) => r.cells[wi].b)) })) }]);
+    }
     let hi = 0;
-    panels.forEach((p) => p.rows.forEach((r) => { [r.a, r.b].forEach((v) => { if (fin(v) && v > hi) hi = v; }); }));
+    rows.forEach((r) => r.cells.forEach((q) => [q.a, q.b].forEach((v) => { if (fin(v) && v > hi) hi = v; })));
     if (!(hi > 0)) hi = 1;
-    const grid = el('div', 'panels');
-    panels.forEach((p) => {
-      const pane = el('div', 'panel');
-      pane.appendChild(el('div', 'pn', p.w.short));
-      const plot = el('div', 'plot');
-      pane.appendChild(plot);
-      grid.appendChild(pane);
-      const draw = () => {
-        const W = Math.max(220, Math.round(plot.clientWidth) || 320);
-        const labW = spec.labelWidth || 130, rowH = 22, H = p.rows.length * rowH + 4;
-        plot.replaceChildren();
-        const iw = W - labW - 60;
-        const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `${spec.title}, ${p.w.short}` });
-        p.rows.forEach((r, k) => {
-          const y = k * rowH + 2;
-          const lab = svgEl('text', { x: labW - 8, y: y + 14, 'text-anchor': 'end' }); lab.textContent = r.name; svg.appendChild(lab);
-          if (fin(r.a)) svg.appendChild(svgEl('rect', { x: labW, y: y + 3, width: Math.max(0, (r.a / hi) * iw), height: 9, rx: 2, fill: 'var(--s1)' }));
-          if (fin(r.b)) svg.appendChild(svgEl('rect', { x: labW, y: y + 14, width: Math.max(0, (r.b / hi) * iw), height: 4, rx: 1, fill: 'var(--muted)' }));
-          const tv = svgEl('text', { x: labW + Math.max(0, ((fin(r.a) ? r.a : 0) / hi) * iw) + 6, y: y + 12 }); tv.textContent = fin(r.a) ? fmtV(r.a) : 'not measured'; svg.appendChild(tv);
-          const hit = svgEl('rect', { x: 0, y, width: W, height: rowH, fill: 'transparent' });
-          hit.addEventListener('pointermove', (ev) => showTip(ev, `${p.w.short} · ${r.name}`, spec.tipMeta || '', [
-            { color: 'var(--s1)', name: sel.title, value: fin(r.a) ? fmtV(r.a) : 'not measured' },
-            ...(prev ? [{ color: 'var(--muted)', name: prev.title, value: fin(r.b) ? fmtV(r.b) : 'not measured' }] : []),
+    const ticks = niceTicks(0, hi, 2);
+    hi = Math.max(hi, ticks[ticks.length - 1]);
+    const plot = el('div', 'plot');
+    c.body.appendChild(plot);
+    const draw = () => {
+      const W = Math.max(260, Math.round(plot.clientWidth) || 600);
+      plot.replaceChildren();
+      const longest = Math.max(...rows.map((r) => r.name.length), 6);
+      const labW = Math.min(190, Math.max(80, longest * 6.4 + 14));
+      const rowH = 22, headH = 20, axisH = 18;
+      const stacked = W < 640;
+      const tracks = stacked ? 1 : M.worlds.length;
+      const gap = 22;
+      const tw = (W - labW - gap * (tracks - 1)) / tracks;
+      const blockH = headH + rows.length * rowH + axisH;
+      const H = stacked ? blockH * M.worlds.length : blockH;
+      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': spec.title });
+      M.worlds.forEach((w, wi) => {
+        const ox = stacked ? labW : labW + wi * (tw + gap), oy = stacked ? wi * blockH : 0;
+        const x0 = ox + 4, iw = tw - 56;
+        const xAt = (v) => x0 + (Math.max(0, v) / hi) * iw;
+        const head = svgEl('text', { x: x0, y: oy + 13, class: 'rowlab' }); head.textContent = w.short; head.setAttribute('font-weight', '600'); svg.appendChild(head);
+        const g = svgEl('g', { class: 'grid' });
+        ticks.forEach((t) => {
+          g.appendChild(svgEl('line', { x1: xAt(t), x2: xAt(t), y1: oy + headH, y2: oy + headH + rows.length * rowH }));
+          const tx = svgEl('text', { x: xAt(t), y: oy + blockH - 5, 'text-anchor': 'middle' }); tx.textContent = (spec.tickFmt || fmtV)(t); g.appendChild(tx);
+        });
+        svg.appendChild(g);
+        rows.forEach((r, k) => {
+          const y = oy + headH + k * rowH + rowH / 2;
+          if (wi === 0 || stacked) { const lab = svgEl('text', { x: labW - 10, y: y + 4, 'text-anchor': 'end', class: 'rowlab' }); lab.textContent = r.name; svg.appendChild(lab); }
+          const q = r.cells[wi];
+          if (fin(q.a) && fin(q.b)) svg.appendChild(svgEl('line', { x1: xAt(q.b), x2: xAt(q.a), y1: y, y2: y, stroke: 'var(--axis)', 'stroke-width': 2, 'stroke-linecap': 'round' }));
+          if (fin(q.b)) svg.appendChild(svgEl('circle', { cx: xAt(q.b), cy: y, r: 4, fill: 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+          if (fin(q.a)) svg.appendChild(svgEl('circle', { cx: xAt(q.a), cy: y, r: 5, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2 }));
+          const right = Math.max(fin(q.a) ? xAt(q.a) : x0, fin(q.b) ? xAt(q.b) : x0);
+          const tv = svgEl('text', { x: right + 9, y: y + 4, class: fin(q.a) ? 'vlab' : 'rowlab' }); tv.textContent = fin(q.a) ? fmtV(q.a) : 'not measured'; svg.appendChild(tv);
+          const hit = svgEl('rect', { x: stacked ? 0 : ox, y: y - rowH / 2, width: stacked ? W : tw, height: rowH, fill: 'transparent' });
+          hit.addEventListener('pointermove', (ev) => showTip(ev, `${w.short} · ${r.name}`, spec.tipMeta || '', [
+            { color: 'var(--s1)', name: sel.title, value: fin(q.a) ? fmtV(q.a) : 'not measured' },
+            ...(prev ? [{ color: 'var(--muted)', name: prev.title, value: fin(q.b) ? fmtV(q.b) : 'not measured' }] : []),
           ]));
           hit.addEventListener('pointerleave', hideTip);
           svg.appendChild(hit);
         });
-        plot.appendChild(svg);
-      };
-      observeWidth(plot, draw);
+      });
+      plot.appendChild(svg);
+    };
+    observeWidth(plot, draw);
+    c.body.appendChild(legend([{ name: `${sel.name} (shown)`, color: 'var(--s1)', dot: true }].concat(prev ? [{ name: `${prev.name} (before)`, color: 'var(--muted)', dot: true }] : [])));
+    c.setTable(() => {
+      const headers = ['Item'];
+      M.worlds.forEach((w) => { headers.push(`${w.short} · shown`); if (prev) headers.push(`${w.short} · before`); });
+      const f = (v) => (fin(v) ? fmtV(v) : 'not measured');
+      return [headers, rows.map((r) => [r.name, ...r.cells.flatMap((q) => (prev ? [f(q.a), f(q.b)] : [f(q.a)]))])];
     });
-    c.body.appendChild(grid);
-    c.body.appendChild(legend([{ name: `${sel.name} (shown)`, color: 'var(--s1)' }].concat(prev ? [{ name: `${prev.name} (before)`, color: 'var(--muted)' }] : []), true));
     return c.card;
   }
 
@@ -1525,7 +1727,7 @@
         key: 'pop', title: 'Population and energy', hint: 'how many live, how they die, where energy goes',
         cards: () => [
           closuresChart(M, {
-            title: 'Population at the end and at its lowest', better: 'up',
+            title: 'Population at the end and at its lowest', better: 'up', unit: 'creatures',
             def: 'Creatures alive at the last tick (blue) and the fewest alive at any checkpoint (orange). A low point near zero means the world nearly died out.',
             series: [
               { name: 'at the end', color: SERIES[0], emph: true, read: (pt, w) => pop(pt.rep, w.seed).final_population },
@@ -1534,22 +1736,19 @@
             why: 'A world that nearly empties can lose most of its families at once.', how: 'population_persistence at the last tick and its minimum over 20 checkpoints.', path: 'goal_indicators.population_persistence.per_seed[].{final_population,minimum_population}',
           }),
           closuresChart(M, {
-            title: 'Births and deaths over the whole run', better: null,
-            def: 'All births and all deaths in the 2,000 ticks. More turnover means more generations for evolution to act on.',
-            series: [
-              { name: 'births', color: SERIES[0], read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'births') },
-              { name: 'deaths', color: SERIES[1], read: (pt, w) => get(worldCase(pt.rep, w.name), 'mortality.deaths_total') },
-            ],
+            title: 'Births over the whole run', better: null, unit: 'births',
+            def: 'All births in the 2,000 ticks. More turnover means more generations for evolution to act on. Deaths track births closely; the gap between them is the population change.',
+            series: [{ name: 'births', color: SERIES[0], emph: true, read: (pt, w) => get(seedRow(pt.rep, 'deterministic.per_seed', w.seed), 'births'), detail: (pt, w) => `${fmtInt(num(get(worldCase(pt.rep, w.name), 'mortality.deaths_total')))} deaths` }],
             path: 'deterministic.per_seed[].births; cases[].mortality.deaths_total',
           }),
           checkpointChart(M, {
-            title: 'Population through the run', better: null,
-            def: 'Creatures alive at each checkpoint (every 100 ticks), for the shown closure and the one before. Every world booms to the 100,000 cap, then crashes as the first food runs out.',
+            title: 'Population through the run', better: null, log: true, unit: 'creatures',
+            def: 'Creatures alive at each checkpoint (every 100 ticks), for the shown closure and the one before. Every world booms toward the 100,000 cap, then crashes as the first food runs out.',
             read: (s) => s.population, path: 'population_persistence.per_seed[].samples[].population',
           }),
           pairBars(M, {
             title: 'What creatures died of', better: null, fmt: pct, top: 6,
-            def: 'Each cause as a share of all deaths in the run. Old age and starvation are the usual leaders; a jump in one cause usually explains a population change.',
+            def: 'What took each creature\'s last energy, as a share of all deaths in the run: the cost of a move, lifecycle decay, an eat, and so on. A jump in one cause usually explains a population change.',
             items: (pt, w) => { const m = get(worldCase(pt.rep, w.name), 'mortality'); const t = num(get(m, 'deaths_total')); return m ? Object.entries(m.by_cause || {}).map(([k, v]) => ({ key: k, name: CAUSE_NAMES(k), value: ratio(num(v), t) })) : []; },
             path: 'cases[].mortality.by_cause / deaths_total',
           }),
@@ -1568,12 +1767,12 @@
             path: 'cases[].energy_flows.*',
           }),
           checkpointChart(M, {
-            title: 'Food on the ground through the run', better: null,
+            title: 'Food on the ground through the run', better: null, unit: 'food',
             def: 'All food summed over the map at each checkpoint. Food that never recovers after the early boom limits how many creatures the world can hold.',
             read: (s) => (Array.isArray(s.food_density_total) ? sum(s.food_density_total.map(num)) : NaN), path: 'samples[].food_density_total[]',
           }),
           checkpointChart(M, {
-            title: 'Grazed ground through the run', better: null, yFmt: pctTick, tipFmt: pct,
+            title: 'Grazed ground through the run', better: null, yFmt: pctTick, tipFmt: pct, unit: 'of cells',
             def: 'Share of the founders\' food cells (type 0) that are grazed down at each checkpoint. Not measured before T02.F04.',
             read: (s) => get(s, 'grazed_cell_share.0'), path: 'samples[].grazed_cell_share[0]',
           }),
@@ -1584,7 +1783,7 @@
         cards: () => {
           const out = [
             checkpointChart(M, {
-              title: 'Founder families alive through the run', better: 'up',
+              title: 'Founder families alive through the run', better: 'up', log: true, unit: 'families',
               def: 'Families with a living member at each checkpoint. Thousands survive the boom; the count at the end is the headline reading.',
               read: (s) => s.surviving_founder_clade_count, path: 'samples[].surviving_founder_clade_count',
             }),
@@ -1634,17 +1833,17 @@
             out.push(c.card);
           }
           out.push(closuresChart(M, {
-            title: 'Which foods get eaten', better: null, ...share,
+            title: 'Which foods get eaten', better: null, ...share, unit: 'of bites',
             def: 'Share of all bites taken from each food type. Founders eat only type 0 (grass); any bite of type 1 (fruit) means a family found a new food, a new way of living.',
-            series: [0, 1].map((t) => ({ name: `type ${t}${t === 0 ? ' (grass)' : ' (fruit)'}`, color: SERIES[t === 0 ? 2 : 1], read: (pt, w) => get(worldCase(pt.rep, w.name), `typed_eat_share.${t}`) })),
+            series: [0, 1].map((t) => ({ name: `type ${t}${t === 0 ? ' (grass)' : ' (fruit)'}`, color: SERIES[t], read: (pt, w) => get(worldCase(pt.rep, w.name), `typed_eat_share.${t}`) })),
             path: 'cases[].typed_eat_share[]',
           }));
           out.push(closuresChart(M, {
-            title: 'Predation', better: null,
+            title: 'Predation', better: null, unit: 'per run',
             def: 'Attempts to steal energy from another creature, and the attempts that killed the victim. Predation is a second way of making a living.',
             series: [
               { name: 'attempts', color: SERIES[0], read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.actions_attempted_total') },
-              { name: 'kills', color: SERIES[7], read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.kills_total') },
+              { name: 'kills', color: SERIES[1], read: (pt, w) => get(worldCase(pt.rep, w.name), 'predation.kills_total') },
             ],
             path: 'cases[].predation.{actions_attempted_total,kills_total}',
           }));
@@ -1668,19 +1867,19 @@
               items: byClass('survival_ticks_sum'), path: 'by_class.<class>.survival_ticks_sum / creatures_observed_total',
             }),
             closuresChart(M, {
-              title: 'Memory use, by kind of memory', better: 'up', ...share,
+              title: 'Memory use, by kind of memory', better: 'up', ...share, unit: 'of creatures',
               def: 'Share of final creatures whose action changes when one kind of remembered state is perturbed: outputs kept from last tick, state inside compute nodes, or earlier memory slots.',
               series: [['persisted_outputs', 'kept outputs'], ['operator_state', 'node state'], ['previous_slots', 'earlier slots']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => get(gi(pt.rep, 'temporal_memory_sensitivity', w.seed), `${k}.different_from_either_fraction`) })),
               path: 'temporal_memory_sensitivity.per_seed[].<kind>.different_from_either_fraction',
             }),
             closuresChart(M, {
-              title: 'Creatures carrying memory or learning parts', better: null, ...share,
+              title: 'Creatures carrying memory or learning parts', better: null, ...share, unit: 'of creatures',
               def: 'Share of final creatures whose brain contains each part. Carrying a part is not using it; compare with memory use above.',
               series: [['has_plasticity', 'learning weights'], ['has_stateful_compute_node', 'stateful node'], ['reads_shared_memory', 'reads shared memory'], ['writes_shared_memory', 'writes shared memory']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => { const r = gi(pt.rep, 'structural_companions', w.seed); return r ? ratio(num(r[k]), num(r.final_creature_count)) : NaN; } })),
               path: 'structural_companions.per_seed[]',
             }),
             closuresChart(M, {
-              title: 'Learning updates that changed a weight', better: null, ...share,
+              title: 'Learning updates that changed a weight', better: null, ...share, unit: 'of updates',
               def: 'Of all learning updates in the run, the share that actually changed a connection weight. Near zero means the learning machinery runs but does nothing.',
               series: [['plasticity', 'plasticity'], ['hebbian', 'Hebbian'], ['reward_modulated', 'reward-modulated']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), `cognition.${k}_changes_total`)), num(get(worldCase(pt.rep, w.name), `cognition.${k}_updates_total`))) })),
               path: 'cases[].cognition.<kind>_changes_total / <kind>_updates_total',
@@ -1698,43 +1897,40 @@
         key: 'evo', title: 'Evolvability', hint: 'what mutations do, at birth and after long drift; brain and genome size',
         cards: () => [
           closuresChart(M, {
-            title: 'What a mutation does to offspring', better: 'up', ...share,
+            title: 'What a mutation does to offspring', better: 'up', ...share, unit: 'of offspring',
             def: 'Of 5,000 offspring bred from 50 living genomes: behaves differently (changed), behaves the same (silent), or never acts (dead). The red dashed line is the changed floor.',
             series: [
-              { name: 'changed', color: SERIES[1], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.changed_per_all_births') },
-              { name: 'silent', color: SERIES[0], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.silent_per_all_births') },
+              { name: 'changed', color: SERIES[0], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.changed_per_all_births') },
+              { name: 'silent', color: SERIES[1], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.silent_per_all_births') },
               { name: 'dead', color: SERIES[2], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'neighborhood_read.dead_per_all_births') },
             ],
             ref: (w) => (fin(F12_FLOORS[w.short]) ? { y: F12_FLOORS[w.short], label: `floor ${pct(F12_FLOORS[w.short])}`, floor: true, always: true } : null),
             path: 'cases[].neighborhood_read.{changed,silent,dead}_per_all_births',
           }),
           closuresChart(M, {
-            title: 'Do mutations still matter after long drift?', better: 'up', ...share,
+            title: 'Do mutations still matter after long drift?', better: 'up', ...share, unit: 'of offspring',
             def: 'Start from the founder, apply 2,000 rounds of mutation with no selection, then breed: the share of offspring that behave differently. It tests whether junk build-up drowns out mutations.',
             series: [
-              { name: 'after 2,000 rounds', color: SERIES[1], emph: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 2000) },
-              { name: 'after 1,000 rounds', color: SERIES[0], muted: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 1000) },
+              { name: 'after 2,000 rounds', color: SERIES[0], emph: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 2000) },
+              { name: 'after 1,000 rounds', color: SERIES[1], muted: true, read: (pt, w) => driftAt(worldCase(pt.rep, w.name), 1000) },
             ],
             path: 'cases[].drift_depth.readings[depth].changed_per_all_births',
           }),
           closuresChart(M, {
-            title: 'Mutations that hit the working part of the brain', better: 'up', ...share,
+            title: 'Mutations that hit the working part of the brain', better: 'up', ...share, unit: 'of mutations',
             def: 'Share of mutations that land on brain parts the creature actually runs. Mutations on unused parts change nothing.',
             series: [{ name: 'on parts in use', color: SERIES[0], emph: true, read: (pt, w) => ratio(num(get(worldCase(pt.rep, w.name), 'mutation_supply.executed_target_total')), num(get(worldCase(pt.rep, w.name), 'mutation_supply.events_applied_total'))) }],
             path: 'cases[].mutation_supply.executed_target_total / events_applied_total',
           }),
           closuresChart(M, {
-            title: 'Brain size that can affect behaviour', better: null,
-            def: 'Median number of brain parts reachable from the senses to an action, with the middle half of creatures between the faint lines. Bigger can mean more capable, or just more junk.',
-            series: [
-              { name: 'median', color: SERIES[0], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.median') },
-              { name: '25th percentile', color: SERIES[0], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p25') },
-              { name: '75th percentile', color: SERIES[0], muted: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p75') },
-            ],
+            title: 'Brain size that can affect behaviour', better: null, unit: 'parts',
+            def: 'Median number of brain parts reachable from the senses to an action; the shaded range holds the middle half of creatures. Bigger can mean more capable, or just more junk.',
+            series: [{ name: 'median', color: SERIES[0], emph: true, read: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.median') }],
+            band: { name: 'middle half of creatures', color: SERIES[0], lo: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p25'), hi: (pt, w) => get(worldCase(pt.rep, w.name), 'reachable_structure_size_distribution.p75') },
             path: 'cases[].reachable_structure_size_distribution',
           }),
           checkpointChart(M, {
-            title: 'Genome size through the run', better: null,
+            title: 'Genome size through the run', better: null, unit: 'units', zero: false,
             def: 'Average genome size of living creatures at each checkpoint. Steady growth with no change in behaviour usually means junk is piling up.',
             read: (s) => s.mean_genome_size, tipFmt: (v) => fmt(v, 1), path: 'samples[].mean_genome_size',
           }),
@@ -1747,14 +1943,14 @@
           const first = M.points[M.firstIndex];
           const cards = [
             !first ? (() => { const c = chartCard({ title: 'Work per creature-tick, relative to the first closure', better: 'down', def: 'Not drawn: the series\' first report could not be loaded, and no other closure stands in for it.' }); return c.card; })() : closuresChart(M, {
-              title: 'Work per creature-tick, relative to the first closure', better: 'down', yFmt: pctTick, tipFmt: pct,
+              title: 'Work per creature-tick, relative to the first closure', better: 'down', yFmt: pctTick, tipFmt: pct, unit: 'of first',
               def: `Each counter divided by creature-ticks, as a share of its value at ${first ? first.title : 'the first closure'} (100%). Lower is cheaper.`,
               series: [['mesh_hops', 'mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'graph relaxation'], ['actions_applied', 'actions applied']].map(([k, name], n) => ({ name, color: SERIES[n], read: (pt, w) => ratio(ctr(pt.rep, w.seed, k), ctr(first.rep, w.seed, k)) })),
               ref: () => ({ y: 1, label: '100%: the first closure' }),
               why: 'Shows long-run cost drift that closure-to-closure checks can miss.', caveat: 'Some counters were redefined along the way; see counter_definition_changes in benchmark-series.json.', path: 'deterministic.per_seed[].<counter> / creature_ticks',
             }),
             closuresChart(M, {
-              title: 'Wall clock per creature-tick', better: 'down', yFmt: (v) => fmt(v * 1000, 1) + ' µs', tipFmt: (v) => fmt(v * 1000, 2) + ' µs',
+              title: 'Wall clock per creature-tick', better: 'down', unit: 'time', yFmt: (v) => fmt(v * 1000, 1) + ' µs', tipFmt: (v) => fmt(v * 1000, 2) + ' µs',
               def: 'Elapsed time per creature simulated for one tick. It depends on the machine, so compare only runs from the same host (hover names it).',
               series: [{ name: 'per creature-tick', color: SERIES[0], emph: true, read: (pt, w) => { const wc = seedRow(pt.rep, 'environment.wall_clock_ms_per_seed', w.seed); const r = seedRow(pt.rep, 'deterministic.per_seed', w.seed); return wc && r ? ratio(num(wc.wall_clock_ms), num(r.creature_ticks)) : NaN; }, detail: (pt) => pt.host }],
               path: 'environment.wall_clock_ms_per_seed[] / per_seed[].creature_ticks',
@@ -1771,11 +1967,16 @@
             const plot = el('div', 'plot');
             const pane = el('div', 'panels n1'); pane.appendChild(plot);
             c.body.appendChild(pane);
+            const gateDates = gatePts.map((f) => (get(f.gate, 'environment.generated_at') || '').slice(0, 10));
             linePlot(plot, {
-              n: gatePts.length, series, dom: domainOf(series.map((s) => s.values).concat([[1]]), true), first: true, sel: selIdx >= 0 ? selIdx : undefined, refLines: [{ y: 1, label: '100%: the first gate closure' }],
-              yFmt: pctTick, tipFmt: pct, xLabel: (i) => featureId(gatePts[i].slug) || featureName(gatePts[i].slug), tipTitle: (i) => titleOfPath(gatePts[i].slug), tipMeta: (i) => (get(gatePts[i].gate, 'environment.generated_at') || '').slice(0, 10), height: 200,
+              n: gatePts.length, series, dom: domainOf(series.map((s) => s.values).concat([[1]]), true), step: true, first: true, unit: 'of first',
+              sel: selIdx >= 0 ? selIdx : undefined, selLabel: selIdx >= 0 ? featureId(gatePts[selIdx].slug) || featureName(gatePts[selIdx].slug) : '',
+              refLines: [{ y: 1, label: '100%: the first gate closure' }],
+              marks: (get(M.data.index, 'counter_definition_changes') || []).map((ch) => ({ i: gatePts.findIndex((f) => featureId(f.slug) === ch.feature), label: `${COUNTER_NAMES[ch.counter] || ch.counter} redefined at ${ch.feature}` })),
+              yFmt: pctTick, tipFmt: pct, xTicks: dateTicks(gateDates, 6), xLabel: (i) => shortDate(gateDates[i]), tipTitle: (i) => titleOfPath(gatePts[i].slug), tipMeta: (i) => shortDate(gateDates[i]), height: 210,
             });
             c.body.appendChild(legend(series));
+            c.setTable(() => [['Closure', ...series.map((s) => s.name)], gatePts.map((f, i) => [titleOfPath(f.slug), ...series.map((s) => pct(s.values[i]))]).reverse()]);
             cards.push(c.card);
           }
           return cards;
