@@ -91,11 +91,21 @@ Three gaps in the research:
    - Sources: rustc-perf triage ("caused by"); Grafana and Bach annotation
      patterns.
 7. **Every other reading is folded by topic and drawn on first open.** Stacked
-   bars became paired bars (the shown closure against the one before), and
-   checkpoint charts draw two runs, not 44.
+   bars became dumbbells (the shown closure against the one before, one label
+   column across the three worlds), and checkpoint charts draw two runs, not 44.
    - Sources: Few's "only what is needed"; NN/g and the Analysis Function on
      avoiding stacks and keeping to about four lines per chart.
-8. **A glossary of the page's words**, also shown on hover.
+8. **Chart forms.** These follow the dataviz skill's mark and anti-pattern
+   rules, added the same day.
+   - History charts are stepped: each closure's reading holds until the next
+     one, so a closure that changed nothing reads as flat.
+   - The x-axis carries date ticks, and a neutral shaded column marks the shown
+     closure, with its value labelled.
+   - Readings that boom and crash within a run (population, families) use a
+     log scale, with zeros kept on the bottom edge.
+   - A spread (p25–p75 brain size) is a shaded band.
+   - Every chart has a Table view, and series colours follow one fixed order.
+9. **A glossary of the page's words**, also shown on hover.
    - Source: NN/g's point that the page, not the reader's memory, should hold
      definitions.
 
