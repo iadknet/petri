@@ -70,7 +70,8 @@
       "docs/progress/features/t20-f16-born-connected-input-declaration.json",
       "docs/progress/features/t11-f29-feedback-route-formation.json",
       "docs/progress/features/t16-f02-effort-priced-actions.json",
-      "docs/progress/features/effort-cost-defaults.json"
+      "docs/progress/features/effort-cost-defaults.json",
+      "docs/progress/features/t11-f31-ring-projection-motif.json"
     ]
   },
   "goal": {
@@ -160,7 +161,8 @@
       "docs/progress/features/t20-f16-born-connected-input-declaration-goal.json",
       "docs/progress/features/t11-f29-feedback-route-formation-goal.json",
       "docs/progress/features/t16-f02-effort-priced-actions-goal.json",
-      "docs/progress/features/effort-cost-defaults-goal.json"
+      "docs/progress/features/effort-cost-defaults-goal.json",
+      "docs/progress/features/t11-f31-ring-projection-motif-goal.json"
     ]
   }
 }
