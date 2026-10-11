@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creature Windows Over Time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the Snapshot page's lab readout, turned to face time. The change ledger first, then a
+   sticky stretch ruler every chart shares, then one section per Snapshot reading, each drawn
+   stretch by stretch along the run's ticks. Tokens are Snapshot's own. */
+:root {
+  --plane: #f6f6f3;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.10);
+  --food: #1baf7a;
+  --fruit: #eb6834;
+  --other: #2a78d6;
+  --barrier: #6b6a64;
+  --blocked: #d03b3b;
+  --ok: #006300;
+  --chance: #0b0b0b;
+  --wash: rgba(42, 120, 214, 0.08);
+  --wash-strong: rgba(42, 120, 214, 0.16);
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --plane: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+    --food: #199e70; --fruit: #d95926; --other: #3987e5; --barrier: #8f8d86; --blocked: #e05252;
+    --ok: #0ca30c; --chance: #ffffff; --wash: rgba(57, 135, 229, 0.14); --wash-strong: rgba(57, 135, 229, 0.26);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --plane: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+  --food: #199e70; --fruit: #d95926; --other: #3987e5; --barrier: #8f8d86; --blocked: #e05252;
+  --ok: #0ca30c; --chance: #ffffff; --wash: rgba(57, 135, 229, 0.14); --wash-strong: rgba(57, 135, 229, 0.26);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--plane); color: var(--ink); font: 400 16px/1.5 var(--body); }
+::selection { background: var(--wash-strong); color: var(--ink); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 85%; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; line-height: 1.05; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+a { color: inherit; text-underline-offset: 3px; text-decoration-color: var(--axis); }
+a:hover { text-decoration-color: currentColor; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+header { display: grid; gap: 14px; }
+.tabs { display: inline-flex; justify-self: start; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; font: 600 13px/1 var(--body); }
+.tabs a { padding: 7px 14px; text-decoration: none; color: var(--ink-2); }
+.tabs a + a { border-left: 1px solid var(--axis); }
+.tabs a:hover { background: var(--wash); color: var(--ink); }
+.tabs a[aria-current="page"] { background: var(--ink); color: var(--surface); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 13px/1.4 var(--mono); color: var(--ink-2); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; font-size: 14px; }
+.controls select { font: 400 13px var(--mono); background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
+.btn { font: 600 13px var(--body); border: 1px solid var(--axis); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn:hover { background: var(--wash); }
+.status { font: 400 13px var(--mono); color: var(--ink-2); }
+.status.err { color: var(--blocked); }
+.content { display: grid; gap: 40px; }
+.content[hidden] { display: none !important; }
+section { display: grid; gap: 16px; scroll-margin-top: 112px; }
+.section-head { display: grid; gap: 6px; }
+.panel { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 18px; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+.chart text { fill: var(--ink-2); font: 400 12px var(--body); }
+.chart .val { fill: var(--ink); font: 600 12px var(--mono); }
+.chart .lbl { fill: var(--ink); font: 600 12px var(--body); }
+.chart .tick { fill: var(--muted); font: 400 11px var(--mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); align-items: center; }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw-line { width: 14px; height: 2px; display: inline-block; border-radius: 1px; }
+.sw-ring { width: 9px; height: 9px; border-radius: 50%; display: inline-block; border: 2px solid var(--ink-2); }
+.note { font-size: 13px; color: var(--muted); max-width: 72ch; }
+details { font-size: 14px; color: var(--ink-2); }
+summary { cursor: pointer; color: var(--ink-2); }
+summary:focus-visible, button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--other); outline-offset: 2px; }
+.tbl-wrap { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--grid); vertical-align: baseline; }
+th { font-weight: 600; color: var(--ink-2); }
+td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* change ledger */
+.ledger { width: 100%; background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+.ledger th, .ledger td { padding: 12px 16px; border-bottom: 1px solid var(--grid); }
+.ledger tr:last-child td { border-bottom: 0; }
+.ledger thead th { font: 600 13px var(--body); color: var(--ink-2); background: transparent; }
+.ledger td.what { font-weight: 600; color: var(--ink); width: 34%; }
+.ledger td.what span { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+.ledger td.from, .ledger td.to { font: 600 15px var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.ledger td.from { color: var(--ink-2); }
+.ledger td .sub { font: 400 12px var(--body); color: var(--muted); margin-top: 2px; }
+.ledger td.change { font-size: 14px; color: var(--ink); white-space: nowrap; }
+.ledger td.trend { width: 200px; padding-block: 6px; }
+.ledger td.trend svg { width: 180px; height: 36px; display: block; }
+.ledger tbody tr { cursor: pointer; }
+.ledger tbody tr:hover td { background: var(--wash); }
+.ledger tbody tr:focus-visible { outline: 2px solid var(--other); outline-offset: -2px; }
+
+/* the stretch ruler every chart shares */
+.ruler { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--plane) 94%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-bottom: 1px solid var(--grid); margin-inline: -20px; padding: 10px 20px 8px; display: grid; gap: 6px; }
+.ruler-line { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; font-size: 13px; color: var(--ink-2); min-height: 22px; }
+.ruler-line b { color: var(--ink); font-weight: 600; }
+.ruler-line .go { margin-left: auto; font-weight: 600; color: var(--ink); }
+.bins { display: grid; gap: 2px; align-items: end; height: 34px; }
+.bin { height: 100%; border: 0; padding: 0; background: transparent; cursor: pointer; display: flex; align-items: flex-end; border-radius: 3px; }
+.bin i { display: block; width: 100%; border-radius: 2px 2px 0 0; background: var(--axis); min-height: 2px; }
+.bin.thin i { background: transparent; border: 1px solid var(--axis); border-bottom: 0; }
+.bin:hover i, .bin.hover i { background: var(--ink-2); }
+.bin[aria-pressed="true"] { background: var(--wash); }
+.bin[aria-pressed="true"] i { background: var(--other); border-color: var(--other); }
+.bins-axis { display: flex; justify-content: space-between; font: 400 11px var(--mono); color: var(--muted); }
+
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); font: 400 12px/1.45 var(--body); padding: 7px 9px; border-radius: 6px; max-width: 300px; z-index: 10; }
+.tip b { font-weight: 600; }
+.tip .tl { display: flex; gap: 6px; align-items: center; }
+.tip .tl i { width: 10px; height: 2px; border-radius: 1px; flex: none; }
+@media (max-width: 720px) {
+  .ledger td.trend, .ledger th.trend { display: none; }
+  .ledger th, .ledger td { padding: 10px 10px; }
+  .ledger td.what { width: auto; }
+}
+@media (prefers-reduced-motion: no-preference) { .btn, .bin, .tabs a, .ledger td { transition: background-color 120ms ease-out; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <nav class="tabs" aria-label="Creature window views">
+      <a id="tab-snapshot" href="creature-windows.html">Snapshot</a>
+      <a href="creature-windows-over-time.html" aria-current="page">Over time</a>
+    </nav>
+    <h1 id="title">Creature windows over time</h1>
+    <p class="ink2">The Snapshot readings, recomputed for each stretch of the run. They come from the compact record the telemetry stack keeps of every creature window for the run's whole life, so they reach back to its first ticks. Nothing new is measured.</p>
+    <form class="controls" id="controls">
+      <label for="run">Run</label>
+      <select id="run"></select>
+      <label for="bins-n">Stretches</label>
+      <select id="bins-n"><option value="auto" selected>Auto</option><option>8</option><option>12</option><option>16</option><option>24</option></select>
+      <button class="btn" type="submit">Load</button>
+      <a class="btn" id="dash-link" href="#">Run dashboard</a>
+    </form>
+    <div class="meta" id="meta"></div>
+    <p class="status" id="status" role="status">Loading…</p>
+  </header>
+
+  <div class="content" id="content" hidden>
+    <section>
+      <div class="section-head">
+        <h2>What changed from the run’s first windows to its latest</h2>
+        <p class="ink2" id="ledger-sub"></p>
+      </div>
+      <table class="ledger" id="ledger">
+        <thead><tr><th>Reading</th><th class="n">First</th><th class="n">Latest</th><th>Change</th><th class="trend">Every stretch</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="note" id="sample-note"></p>
+    </section>
+
+    <div class="ruler" id="ruler" aria-label="Stretches of the run">
+      <div class="ruler-line" id="ruler-line" aria-live="polite"></div>
+      <div class="bins" id="bins" role="group" aria-label="Pick a stretch to mark it in every chart"></div>
+      <div class="bins-axis" id="bins-axis"></div>
+    </div>
+
+    <section id="s-lineage">
+      <div class="section-head">
+        <h2>Who the windows caught</h2>
+        <p class="ink2">Each window follows one living creature picked at random, so a lineage's share of a stretch's windows estimates its share of the population then.</p>
+      </div>
+      <div class="panel">
+        <h3>Share of windows by lineage</h3>
+        <svg class="chart" id="c-lineage" role="img" aria-label="Share of each stretch's windows held by the largest lineages"></svg>
+        <div class="legend" id="lg-lineage"></div>
+      </div>
+      <div class="two">
+        <div class="panel"><h3>Generation</h3><svg class="chart" id="c-gen" role="img" aria-label="Generation of the sampled creatures, by stretch"></svg><div class="legend" id="lg-gen"></div></div>
+        <div class="panel"><h3>Genome size</h3><svg class="chart" id="c-gsize" role="img" aria-label="Genome size of the sampled creatures, by stretch"></svg><div class="legend" id="lg-gsize"></div></div>
+      </div>
+    </section>
+
+    <section id="s-moves">
+      <div class="section-head">
+        <h2>Where first moves land, against chance</h2>
+        <p class="ink2">The Snapshot reading per stretch: how often a tick's first move steps toward a neighbor holding that thing, divided by the share of its eight neighbors holding it. Above 1× the creatures head for it; below 1× they avoid it.</p>
+      </div>
+      <div class="panel">
+        <svg class="chart" id="c-moves" role="img" aria-label="Moves toward each kind of neighbor as a multiple of chance, by stretch"></svg>
+        <div class="legend" id="lg-moves"></div>
+      </div>
+      <div class="two">
+        <div class="panel"><h3>First moves the world blocked</h3><svg class="chart" id="c-blocked" role="img" aria-label="Share of applied first moves that were blocked, by stretch"></svg><p class="note">Of first moves the world applied. The creature stays where it was.</p></div>
+        <div class="panel"><h3>Eating on the sensed cell</h3><svg class="chart" id="c-eat" role="img" aria-label="Share of ticks with an Eat before any move, with and without food underfoot, by stretch"></svg><div class="legend" id="lg-eat"></div><p class="note">An Eat counts only before the tick's first move. A widening gap means creatures use their food sense more.</p></div>
+      </div>
+    </section>
+
+    <section id="s-behavior">
+      <div class="section-head">
+        <h2>Fixed programs and what creatures chose</h2>
+        <p class="ink2">A window whose action sequence repeats every one to three ticks runs the same program whatever it senses. A window that only moves one way has no steering.</p>
+      </div>
+      <div class="two">
+        <div class="panel"><h3>Windows on a fixed program</h3><svg class="chart" id="c-fixed" role="img" aria-label="Share of windows running a fixed program or moving one way only, by stretch"></svg><div class="legend" id="lg-fixed"></div></div>
+        <div class="panel"><h3>Chosen actions by kind</h3><svg class="chart" id="c-mix" role="img" aria-label="Share of chosen actions by kind, by stretch"></svg><div class="legend" id="lg-mix"></div></div>
+      </div>
+    </section>
+
+    <section id="s-brain">
+      <div class="section-head">
+        <h2>How much of the brain takes part</h2>
+        <p class="ink2">Per creature-tick, the median and the middle half (25th to 75th percentile) of each stretch: mesh hops run, distinct nodes visited, and nodes that cast a non-zero vote.</p>
+      </div>
+      <div class="three">
+        <div class="panel"><h3>Hops per tick</h3><svg class="chart" id="c-hops" role="img" aria-label="Hops per tick, median and middle half, by stretch"></svg></div>
+        <div class="panel"><h3>Distinct nodes visited</h3><svg class="chart" id="c-nodes" role="img" aria-label="Distinct nodes visited per tick, by stretch"></svg></div>
+        <div class="panel"><h3>Nodes that cast a vote</h3><svg class="chart" id="c-voting" role="img" aria-label="Voting nodes per tick, by stretch"></svg></div>
+      </div>
+    </section>
+
+    <section id="s-energy">
+      <div class="section-head">
+        <h2>Energy and death</h2>
+        <p class="ink2">Of each stretch's windows: how many end with less energy than they started, and how many end because the creature died.</p>
+      </div>
+      <div class="panel">
+        <svg class="chart" id="c-energy" role="img" aria-label="Share of windows losing energy and share ending in death, by stretch"></svg>
+        <div class="legend" id="lg-energy"></div>
+      </div>
+      <p class="note">Ticks inside one window are not independent: a creature pressed against a wall bumps it on every tick. Read each point as a description of that stretch's sample, not as a test, and check its counts in the tooltip or the table.</p>
+      <details><summary>Show every reading as a table</summary><div class="tbl-wrap"><table id="table"></table></div></details>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(() => {
+  // ── data access: same-origin Grafana data source proxy (GET only) ──────
+  const PROXY = "/api/datasources/proxy/uid";
+  const SERVICES = `service_name=~"v3-cli|v3-server|v3-lab"`;
+  const BUDGET = 1600; // records read at most, about 4.5 KB each
+  const PAGE = 5000; // Loki's per-query entry limit
+  const MIN_WINDOWS = 5; // a stretch with fewer windows is left as a gap
+  const THIN = 15; // a stretch with fewer windows is drawn hollow
+  const MIN_EVENTS = 20; // a share or ratio on fewer events is left as a gap
+  const params = new URLSearchParams(location.search);
+  const status = document.getElementById("status");
+  const say = (t, err) => { status.textContent = t; status.classList.toggle("err", !!err); };
+  const getJSON = async (url) => { const r = await fetch(url, { credentials: "same-origin" }); if (!r.ok) throw new Error(`${r.status} ${r.statusText} for ${url.split("?")[0]}`); return r.json(); };
+  const nowS = () => Math.floor(Date.now() / 1000);
+  const fmt = (n) => Number(n).toLocaleString("en-US");
+  const pct = (x) => (x * 100).toFixed(0) + "%";
+  const kfmt = (n) => (Math.abs(n) >= 10000 ? (n / 1000).toFixed(0) + "k" : Math.abs(n) >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
+  const utc = (ms) => new Date(ms).toISOString().slice(0, 16).replace("T", " ");
+
+  async function runs() {
+    const to = nowS();
+    const q = `{${SERVICES}} | event_name=~"run.started|run.ended"`;
+    const r = await getJSON(`${PROXY}/loki/loki/api/v1/query_range?` + new URLSearchParams({ query: q, start: String(to - 86400 * 365) + "000000000", end: String(to) + "000000000", limit: "2000", direction: "backward" }));
+    const started = new Map(), ended = new Map();
+    for (const st of r.data.result) for (const [ns] of st.values) {
+      const rec = { ...st.stream, ts: Number(ns) / 1e6 };
+      (rec.event_name === "run.ended" ? ended : started).set(rec.petri_run_id, rec);
+    }
+    return [...started.values()].map((x) => {
+      const e = ended.get(x.petri_run_id);
+      return { ...x, endTs: e ? e.ts : null };
+    }).sort((a, b) => b.ts - a.ts);
+  }
+
+  // The window store (T23.F10) keeps all of a run's newest 300 window records, the even
+  // indexes of the next 300 and every tenth beyond. A stride that is a multiple of ten
+  // reads an even sample of the whole run; smaller strides are used when everything fits.
+  // The filter reads the index from the record body, which always opens {"v":…,"window":<index>,
+  const STRIDES = [[1, null], [2, "[0-9]*[02468]"], [10, "[0-9]*0"], [20, "([0-9]*[02468])?0"], [50, "([0-9]*[05])?0"], [100, "([0-9]*0)?0"], [200, "([0-9]*[02468])?00"], [500, "([0-9]*[05])?00"], [1000, "([0-9]*0)?00"]];
+  async function keepCounts(run, from, to) {
+    const span = Math.max(60, to - from);
+    const q = `sum by (petri_keep) (count_over_time({${SERVICES}} | event_name="creature.window" | petri_run_id="${run}" [${span}s]))`;
+    const r = await getJSON(`${PROXY}/loki/loki/api/v1/query?` + new URLSearchParams({ query: q, time: String(to) }));
+    const c = { 0: 0, 1: 0, 2: 0 };
+    for (const s of r.data.result) c[s.metric.petri_keep] = Number(s.value[1]);
+    return c;
+  }
+  function pickStride(c) {
+    const total = c[0] + c[1] + c[2];
+    for (const [k, re] of STRIDES) {
+      const est = k === 1 ? total : k === 2 ? c[1] + c[2] : c[2] / (k / 10);
+      if (est <= BUDGET) return { k, re, est, total };
+    }
+    const [k, re] = STRIDES[STRIDES.length - 1];
+    return { k, re, est: c[2] / 100, total };
+  }
+
+  async function records(run, from, to, stride) {
+    const filter = stride.re ? ' |~ `^\\{"v":[0-9]+,"window":' + stride.re + ',`' : "";
+    const q = `{${SERVICES}} | event_name="creature.window" | petri_run_id="${run}"${filter}`;
+    const seen = new Map();
+    let end = BigInt(to) * 1000000000n;
+    const start = BigInt(from) * 1000000000n;
+    for (let page = 0; page < 40; page++) {
+      say(`Reading window records… ${fmt(seen.size)} so far`);
+      const r = await getJSON(`${PROXY}/loki/loki/api/v1/query_range?` + new URLSearchParams({ query: q, start: String(start), end: String(end), limit: String(PAGE), direction: "backward" }));
+      let got = 0, oldest = end;
+      for (const st of r.data.result) for (const [ns, line] of st.values) {
+        got++;
+        const t = BigInt(ns);
+        if (t < oldest) oldest = t;
+        let b;
+        try { b = JSON.parse(line); } catch { continue; }
+        if (b && Number.isInteger(b.window) && !seen.has(b.window)) seen.set(b.window, { b, ts: Number(t / 1000000n) });
+      }
+      if (got < PAGE || oldest <= start) break;
+      end = oldest - 1n;
+    }
+    return [...seen.values()];
+  }
+
+  // one stored record → one window, in the shape the Snapshot page reads from a trace
+  function parseRecord({ b, ts }) {
+    if (!Array.isArray(b.ticks) || !b.ticks.length) return null;
+    const ring = (a) => (Array.isArray(a) && a.length === 8 ? a : null);
+    const ticks = b.ticks.map((t) => {
+      const sel = t.sel || [];
+      const res = sel.map((_, i) => (t.res && i < t.res.length ? t.res[i] : null)); // applied results pair with chosen actions by position
+      return { t: t.t, e0: t.e0 || 0, e1: t.e1 ?? t.e0 ?? 0, here: t.here || 0,
+        f0: ring(t.food_by_type && t.food_by_type[0]), f1: ring(t.food_by_type && t.food_by_type[1]),
+        b: ring(t.barrier), o: ring(t.occupied), sel, res, hops: t.hops || [] };
+    }).sort((x, y) => x.t - y.t);
+    const seq = ticks.map((t) => t.sel.join("+") || "-");
+    return { id: b.window, ts, lineage: b.lineage, gen: b.generation, gsize: b.genome_size, end: b.end, policy: b.policy,
+      fixed: seq.length >= 4 && [1, 2, 3].some((p) => seq.every((x, i) => x === seq[i % p])), ticks };
+  }
+
+  // ── the readings of one stretch: the Snapshot definitions (first move only; Eat before the first move)
+  const LABELS = [["f0", "Primary food", "var(--food)"], ["f1", "Fruit", "var(--fruit)"], ["b", "Barrier", "var(--barrier)"], ["o", "Another creature", "var(--other)"]];
+  const KINDS = [["move", "Move"], ["eat", "Eat"], ["reproduce", "Reproduce"], ["steal", "Steal"], ["noop", "Noop"]];
+  const quant = (xs, q) => { if (!xs.length) return null; const s = xs.slice().sort((a, b) => a - b); const i = (s.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
+  const share = (num, den, min = MIN_EVENTS) => ({ v: den >= min ? num / den : null, num, den });
+  function readStretch(W) {
+    const mv = {}, ch = {}, hit = {};
+    for (const [, l] of LABELS) { mv[l] = 0; ch[l] = 0; hit[l] = 0; }
+    let success = 0, blocked = 0;
+    const eat = { here: 0, hereEat: 0, none: 0, noneEat: 0 };
+    const hops = [], nodes = [], voting = [];
+    const kinds = Object.fromEntries(KINDS.map(([k]) => [k, 0]));
+    let acts = 0;
+    for (const w of W) for (const t of w.ticks) {
+      const first = t.sel.findIndex((s) => s.startsWith("move:"));
+      if (first >= 0) {
+        const d = Number(t.sel[first].split(":")[1]);
+        const r = t.res[first];
+        if (r === "Success") success++; else if (r === "Blocked") blocked++;
+        for (const [k, l] of LABELS) {
+          const rg = t[k];
+          if (!rg) continue;
+          const present = rg.map((x) => x > 0), n = present.filter(Boolean).length;
+          if (n === 0 || n === 8) continue;
+          mv[l]++; hit[l] += present[d] ? 1 : 0; ch[l] += n / 8;
+        }
+      }
+      const before = first >= 0 ? t.sel.slice(0, first) : t.sel;
+      const ate = before.some((s) => s.startsWith("eat"));
+      if (t.here > 0) { eat.here++; eat.hereEat += ate; } else { eat.none++; eat.noneEat += ate; }
+      hops.push(t.hops.length);
+      nodes.push(new Set(t.hops.map((h) => h[0])).size);
+      voting.push(new Set(t.hops.filter((h) => h[2] > 0).map((h) => h[0])).size);
+      for (const s of t.sel) { const k = s.split(":")[0]; if (k in kinds) kinds[k]++; acts++; }
+    }
+    const full = W.filter((w) => w.ticks.length >= 4);
+    const lineages = new Map();
+    for (const w of W) lineages.set(w.lineage, (lineages.get(w.lineage) || 0) + 1);
+    const dist = (xs) => ({ p25: quant(xs, 0.25), p50: quant(xs, 0.5), p75: quant(xs, 0.75), n: xs.length });
+    const gens = W.map((w) => w.gen), sizes = W.map((w) => w.gsize);
+    return {
+      n: W.length,
+      ticks: W.reduce((n, w) => n + w.ticks.length, 0),
+      tickLo: Math.min(...W.map((w) => w.ticks[0].t)), tickHi: Math.max(...W.map((w) => w.ticks[w.ticks.length - 1].t)),
+      tsLo: Math.min(...W.map((w) => w.ts)), tsHi: Math.max(...W.map((w) => w.ts)),
+      genLo: Math.min(...gens), genHi: Math.max(...gens),
+      blocked: share(blocked, success + blocked),
+      moves: Object.fromEntries(LABELS.map(([, l]) => [l, { v: mv[l] >= MIN_EVENTS && ch[l] > 0 ? hit[l] / ch[l] : null, n: mv[l], landed: mv[l] ? hit[l] / mv[l] : 0, chance: mv[l] ? ch[l] / mv[l] : 0 }])),
+      eatHere: share(eat.hereEat, eat.here), eatNone: share(eat.noneEat, eat.none),
+      fixed: share(full.filter((w) => w.fixed).length, full.length, MIN_WINDOWS),
+      oneDir: share(full.filter((w) => new Set(w.ticks.flatMap((t) => t.sel.filter((s) => s.startsWith("move:")))).size === 1).length, full.length, MIN_WINDOWS),
+      losing: share(W.filter((w) => w.ticks[w.ticks.length - 1].e1 < w.ticks[0].e0).length, W.length, MIN_WINDOWS),
+      died: share(W.filter((w) => w.end === "died").length, W.length, MIN_WINDOWS),
+      hops: dist(hops), nodes: dist(nodes), voting: dist(voting),
+      kinds: Object.fromEntries(KINDS.map(([k]) => [k, acts ? kinds[k] / acts : 0])), acts,
+      lineages,
+      gen: { ...dist(gens), lo: Math.min(...gens), hi: Math.max(...gens) },
+      gsize: { ...dist(sizes), lo: Math.min(...sizes), hi: Math.max(...sizes) },
+    };
+  }
+
+  async function main() {
+    const runSel = document.getElementById("run"), binSel = document.getElementById("bins-n");
+    let list = [];
+    try { list = await runs(); } catch (e) { say(`Could not list runs from Loki: ${e.message}`, true); }
+    const wanted = params.get("run") || (list[0] && list[0].petri_run_id);
+    runSel.replaceChildren(...list.map((r) => {
+      const o = document.createElement("option");
+      o.value = r.petri_run_id;
+      o.textContent = `${r.petri_run_id.slice(0, 8)} · ${r.service_name} · ${r.petri_world || "?"} · seed ${r.petri_seed} · ${utc(r.ts)}`;
+      return o;
+    }));
+    if (wanted && !list.some((r) => r.petri_run_id === wanted)) { const o = document.createElement("option"); o.value = o.textContent = wanted; runSel.prepend(o); }
+    runSel.value = wanted || "";
+    if (params.get("bins")) binSel.value = params.get("bins");
+    document.getElementById("controls").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const p = new URLSearchParams(location.search);
+      p.set("run", runSel.value); p.set("bins", binSel.value);
+      location.search = p.toString();
+    });
+    if (wanted) document.getElementById("tab-snapshot").href = `creature-windows.html?run=${encodeURIComponent(wanted)}`;
+    if (!wanted) { say("No runs found in the last year.", true); return; }
+    const id = list.find((r) => r.petri_run_id === wanted) || {};
+    const from = id.ts ? Math.floor(id.ts / 1000) - 60 : nowS() - 365 * 86400;
+    const to = id.endTs ? Math.ceil(id.endTs / 1000) + 3600 : nowS();
+    document.getElementById("dash-link").href = `/d/petri-run?var-run_id=${encodeURIComponent(wanted)}&from=${from * 1000}&to=${Math.min(to, nowS()) * 1000}`;
+    say("Counting the run's window records…");
+    let stride;
+    try { stride = pickStride(await keepCounts(wanted, from, to)); }
+    catch (e) { say(`Could not count window records in Loki: ${e.message}`, true); return; }
+    if (!stride.total) {
+      say(id.petri_creature_windows === "on" ? "The telemetry stack holds no window records for this run yet." : "This run stored no window records: windows were off for it, or it ran before the window store (T23.F10).", true);
+      return;
+    }
+    let raw;
+    try { raw = await records(wanted, from, to, stride); }
+    catch (e) { say(`Could not read window records from Loki: ${e.message}`, true); return; }
+    const W = raw.map(parseRecord).filter((w) => w && w.policy !== "manual").sort((a, b) => a.ticks[0].t - b.ticks[0].t);
+    if (W.length < 2 * MIN_WINDOWS) {
+      say(`This run holds ${fmt(W.length)} window record${W.length === 1 ? "" : "s"} with ticks: too few to show change over time. Snapshot shows them one by one.`, true);
+      return;
+    }
+    const auto = Math.max(4, Math.min(16, Math.floor(W.length / 30)));
+    const B = binSel.value === "auto" ? auto : Math.max(2, Number(binSel.value) || auto);
+    say(`Read ${fmt(W.length)} windows of the ${fmt(stride.total)} the store holds for this run${stride.k > 1 ? ` (every ${stride.k === 2 ? "second" : fmt(stride.k) + "th"} window index, evenly across the run)` : ""}.`);
+    document.getElementById("content").hidden = false;
+    render(W, B, { run: wanted, id, stride });
+  }
+
+  function render(W, B, META) {
+    const NS = "http://www.w3.org/2000/svg";
+    const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (parent) parent.appendChild(e); return e; };
+    const html = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+    // ── stretches: equal spans of simulation ticks, each window placed by its first tick
+    const T0 = W[0].ticks[0].t, T1 = Math.max(...W.map((w) => w.ticks[w.ticks.length - 1].t), T0 + B);
+    const span = (T1 - T0 + 1) / B;
+    const groups = Array.from({ length: B }, () => []);
+    for (const w of W) groups[Math.min(B - 1, Math.floor((w.ticks[0].t - T0) / span))].push(w);
+    const S = groups.map((g, i) => {
+      const lo = Math.round(T0 + i * span), hi = Math.round(T0 + (i + 1) * span) - 1;
+      if (g.length < MIN_WINDOWS) return { i, lo, hi, n: g.length, gap: true, W: g };
+      return { i, lo, hi, gap: false, W: g, ...readStretch(g) };
+    });
+    const live = S.filter((s) => !s.gap);
+    const rid = META.run.slice(0, 8);
+    document.title = `Over time · run ${rid}`;
+    document.getElementById("title").textContent = `Creature windows over time · run ${rid}`;
+    const gens = W.map((w) => w.gen);
+    document.getElementById("meta").replaceChildren(...[
+      `run ${rid} · ${META.id.service_name || "?"}`,
+      `world ${META.id.petri_world || "?"} · seed ${META.id.petri_seed || "?"}`,
+      `build ${(META.id.petri_build_revision || "?").slice(0, 10)}`,
+      `ticks ${fmt(T0)}–${fmt(T1)} · generations ${fmt(Math.min(...gens))}–${fmt(Math.max(...gens))}`,
+      `${fmt(W.length)} windows read of ${fmt(META.stride.total)} stored`,
+      `${B} stretches of ${fmt(Math.round(span))} ticks`,
+    ].map((t) => html("span", "", t)));
+    const sparse = S.filter((s) => !s.gap && s.n < THIN).length, gaps = S.filter((s) => s.gap).length;
+    document.getElementById("sample-note").textContent =
+      `Older stretches can hold fewer windows: the store keeps every window among a run's newest 300, every second one of the next 300 and every tenth beyond, and windows start on a wall-clock timer, so a stretch where ticks ran fast holds fewer. A share stays fair inside a stretch; only its count shrinks. Hollow points stand on fewer than ${THIN} windows${sparse ? ` (${sparse} here)` : ""}; a gap means fewer than ${MIN_WINDOWS}${gaps ? ` (${gaps} here)` : ""}.`;
+
+    // ── tooltip and the hover / selection state every chart shares
+    const tip = document.getElementById("tip");
+    const showTip = (ev, node) => { tip.replaceChildren(node); tip.hidden = false; const r = tip.getBoundingClientRect(); const x = Math.min(ev.clientX + 14, innerWidth - r.width - 8); const y = ev.clientY + 16 + r.height > innerHeight ? ev.clientY - r.height - 12 : ev.clientY + 16; tip.style.left = x + "px"; tip.style.top = y + "px"; };
+    const hideTip = () => { tip.hidden = true; };
+    const head = (s) => `Ticks ${fmt(s.lo)}–${fmt(s.hi)} · ${fmt(s.n)} window${s.n === 1 ? "" : "s"}${s.gap ? " (too few to read)" : ""}`;
+    const tipNode = (s, lines) => {
+      const d = html("div");
+      d.append(Object.assign(html("b"), { textContent: head(s) }));
+      if (!s.gap && s.genLo != null) d.append(html("div", "", `generations ${fmt(s.genLo)}–${fmt(s.genHi)}`));
+      for (const [color, text] of lines) { const l = html("div", "tl"); if (color) { const i = html("i"); i.style.background = color; l.append(i); } l.append(document.createTextNode(text)); d.append(l); }
+      return d;
+    };
+    const charts = [];
+    let hoverI = null, selI = null;
+    const sync = () => { for (const c of charts) c.overlay(); drawRuler(); };
+    const setHover = (i) => { if (i !== hoverI) { hoverI = i; sync(); } };
+    const setSel = (i) => { selI = selI === i ? null : i; sync(); };
+
+    // ── one chart frame: shared x (ticks), its own y, an overlay for hover and selection
+    function frame(id, { W0 = 560, H = 200, left = 46, right = 118, top = 14, bottom = 28, tipLines }) {
+      const svg = document.getElementById(id);
+      svg.replaceChildren();
+      svg.setAttribute("viewBox", `0 0 ${W0} ${H}`);
+      const x0 = left, x1 = W0 - right, y0 = H - bottom, y1 = top;
+      const xt = (t) => x0 + ((t - T0) / (T1 - T0 || 1)) * (x1 - x0);
+      const xi = (i) => x0 + ((i + 0.5) / B) * (x1 - x0);
+      const bw = (x1 - x0) / B;
+      const base = el("g", {}, svg), marks = el("g", {}, svg), over = el("g", { "pointer-events": "none" }, svg);
+      // x axis: tick labels at round numbers
+      el("line", { x1: x0, x2: x1, y1: y0, y2: y0, stroke: "var(--axis)" }, base);
+      const step = niceStep((T1 - T0) / 5);
+      for (let t = Math.ceil(T0 / step) * step; t <= T1; t += step) {
+        el("line", { x1: xt(t), x2: xt(t), y1: y0, y2: y0 + 4, stroke: "var(--axis)" }, base);
+        el("text", { x: xt(t), y: y0 + 17, "text-anchor": "middle", class: "tick" }, base).textContent = kfmt(t);
+      }
+      el("text", { x: x1, y: y0 + 17, "text-anchor": "start", class: "tick", dx: 8 }, base).textContent = "tick";
+      const hit = el("rect", { x: x0, y: 0, width: x1 - x0, height: H, fill: "transparent", style: "cursor: crosshair" }, svg);
+      const binAt = (ev) => { const r = svg.getBoundingClientRect(); const vx = ((ev.clientX - r.left) / r.width) * W0; return Math.max(0, Math.min(B - 1, Math.floor(((vx - x0) / (x1 - x0)) * B))); };
+      hit.addEventListener("pointermove", (ev) => { const i = binAt(ev); setHover(i); showTip(ev, tipNode(S[i], S[i].gap ? [] : tipLines(S[i]))); });
+      hit.addEventListener("pointerleave", () => { setHover(null); hideTip(); });
+      hit.addEventListener("click", (ev) => setSel(binAt(ev)));
+      const c = { svg, x0, x1, y0, y1, xt, xi, bw, base, marks, W0, H, right,
+        overlay() {
+          over.replaceChildren();
+          if (selI != null) el("rect", { x: x0 + selI * bw, y: y1 - 6, width: bw, height: y0 - y1 + 6, fill: "var(--wash-strong)" }, over);
+          if (hoverI != null) el("line", { x1: xi(hoverI), x2: xi(hoverI), y1: y1 - 6, y2: y0, stroke: "var(--ink-2)", "stroke-width": 1, "stroke-dasharray": "2 3" }, over);
+        } };
+      charts.push(c);
+      return c;
+    }
+    function niceStep(raw) { const p = 10 ** Math.floor(Math.log10(raw || 1)); const m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
+    function yLinear(c, lo, hi, { ticks = 4, fmt: f = (v) => kfmt(v) } = {}) {
+      const step = niceStep((hi - lo) / ticks) || 1;
+      const top = Math.max(step, Math.ceil(hi / step) * step);
+      const y = (v) => c.y0 - ((v - lo) / (top - lo || 1)) * (c.y0 - c.y1);
+      for (let v = lo; v <= top + 1e-9; v += step) {
+        if (v > lo) el("line", { x1: c.x0, x2: c.x1, y1: y(v), y2: y(v), stroke: "var(--grid)" }, c.base);
+        el("text", { x: c.x0 - 8, y: y(v) + 4, "text-anchor": "end", class: "tick" }, c.base).textContent = f(v);
+      }
+      return y;
+    }
+    const yShare = (c) => yLinear(c, 0, 1, { ticks: 4, fmt: pct });
+    // series: values per stretch (null = gap); optional band [lo, hi]; hollow where thin
+    function line(c, y, vals, color, { band, dash } = {}) {
+      if (band) {
+        let seg = [];
+        const flush = () => {
+          if (seg.length > 1) el("path", { d: seg.map(([i], k) => `${k ? "L" : "M"}${c.xi(i)} ${y(band[i][1])}`).join(" ") + " " + seg.slice().reverse().map(([i]) => `L${c.xi(i)} ${y(band[i][0])}`).join(" ") + " Z", fill: color, "fill-opacity": 0.13 }, c.marks);
+          else if (seg.length === 1) { const [i] = seg[0]; el("rect", { x: c.xi(i) - 3, y: y(band[i][1]), width: 6, height: Math.max(1, y(band[i][0]) - y(band[i][1])), fill: color, "fill-opacity": 0.13 }, c.marks); }
+          seg = [];
+        };
+        S.forEach((s, i) => { if (vals[i] == null || band[i] == null) flush(); else seg.push([i]); });
+        flush();
+      }
+      let d = "", prev = false;
+      vals.forEach((v, i) => { if (v == null) { prev = false; return; } d += `${prev ? "L" : "M"}${c.xi(i)} ${y(v)} `; prev = true; });
+      if (d) el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", ...(dash ? { "stroke-dasharray": dash } : {}) }, c.marks);
+      vals.forEach((v, i) => {
+        if (v == null) return;
+        const thin = S[i].n < THIN;
+        el("circle", { cx: c.xi(i), cy: y(v), r: 3.5, fill: thin ? "var(--surface)" : color, stroke: thin ? color : "var(--surface)", "stroke-width": thin ? 1.6 : 1.5 }, c.marks);
+      });
+    }
+    // direct labels at the right edge, nudged apart; text in ink, the colored mark beside it
+    function endLabels(c, y, items) {
+      const placed = items.map((it) => {
+        let last = -1;
+        it.vals.forEach((v, i) => { if (v != null) last = i; });
+        return last < 0 ? null : { ...it, ty: y(it.vals[last]), last };
+      }).filter(Boolean).sort((a, b) => a.ty - b.ty);
+      for (let k = 1; k < placed.length; k++) if (placed[k].ty - placed[k - 1].ty < 15) placed[k].ty = placed[k - 1].ty + 15;
+      const over = placed.length ? placed[placed.length - 1].ty - (c.y0 + 2) : 0;
+      if (over > 0) for (const p of placed) p.ty -= over;
+      for (const p of placed) {
+        const lx = c.x1 + 10;
+        el("line", { x1: lx, x2: lx + 10, y1: p.ty, y2: p.ty, stroke: p.color, "stroke-width": 2, "stroke-linecap": "round", ...(p.dash ? { "stroke-dasharray": "3 2" } : {}) }, c.marks);
+        el("text", { x: lx + 15, y: p.ty + 4, class: "lbl" }, c.marks).textContent = p.label;
+      }
+    }
+    function legend(id, items) {
+      const box = document.getElementById(id);
+      box.replaceChildren();
+      for (const it of items) {
+        const k = html("span", "key");
+        const s = html("span", it.kind === "sw" || it.kind === "outline" ? "sw" : it.kind === "ring" ? "sw-ring" : "sw-line");
+        if (it.kind === "ring") s.style.borderColor = it.color; else if (it.kind === "outline") s.style.border = "1px dashed var(--axis)"; else s.style.background = it.color;
+        if (it.opacity != null) s.style.opacity = it.opacity;
+        k.append(s, document.createTextNode(it.label));
+        box.append(k);
+      }
+    }
+    const thinKey = { kind: "ring", color: "var(--ink-2)", label: `fewer than ${THIN} windows` };
+
+    // ── who the windows caught: the largest lineages, stacked per stretch
+    (() => {
+      const tot = new Map();
+      for (const s of live) for (const [l, n] of s.lineages) tot.set(l, (tot.get(l) || 0) + n / s.n);
+      const top = [...tot].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l]) => l);
+      const shades = [0.78, 0.56, 0.4, 0.27, 0.16];
+      const c = frame("c-lineage", { W0: 1100, H: 230, right: 150,
+        tipLines: (s) => [...top.map((l, k) => [null, `lineage ${l}: ${pct((s.lineages.get(l) || 0) / s.n)}`]).filter((_, k) => (S[s.i].lineages.get(top[k]) || 0) > 0),
+          [null, `${fmt(s.lineages.size)} lineage${s.lineages.size === 1 ? "" : "s"} in ${fmt(s.n)} windows`]] });
+      const y = yShare(c);
+      for (const s of live) {
+        let acc = 0;
+        const x = c.x0 + s.i * c.bw + 1, w = c.bw - 2;
+        const layers = [...top.map((l, k) => ({ v: (s.lineages.get(l) || 0) / s.n, fill: "var(--ink-2)", op: shades[k] })), { v: 1 - top.reduce((a, l) => a + (s.lineages.get(l) || 0) / s.n, 0), other: true }];
+        for (const L of layers) {
+          if (L.v <= 0) continue;
+          const yt = y(acc + L.v), yb = y(acc);
+          el("rect", { x: x + 0.5, y: yt + 1.5, width: w - 1, height: Math.max(0.5, yb - yt - 3), rx: 2, ...(L.other ? { fill: "none", stroke: "var(--axis)", "stroke-dasharray": "3 2" } : { fill: L.fill, "fill-opacity": L.op }) }, c.marks);
+          acc += L.v;
+        }
+      }
+      // direct labels beside the latest stretch's bands
+      const last = live[live.length - 1];
+      let acc = 0, minY = Infinity;
+      const labs = [];
+      top.forEach((l, k) => { const v = (last.lineages.get(l) || 0) / last.n; if (v > 0) labs.push({ ty: y(acc + v / 2), label: `lineage ${l}`, k, v }); acc += v; });
+      labs.sort((a, b) => b.ty - a.ty);
+      for (const p of labs) { if (p.ty > minY - 14) p.ty = minY - 14; minY = p.ty; }
+      for (const p of labs) if (p.ty > c.y1 - 4) el("text", { x: c.x1 + 10, y: p.ty + 4, class: "lbl" }, c.marks).textContent = `${p.label} · ${pct(p.v)}`;
+      legend("lg-lineage", [...top.map((l, k) => ({ kind: "sw", color: "var(--ink-2)", opacity: shades[k], label: `lineage ${l}` })), { kind: "outline", label: "every other lineage" }]);
+    })();
+
+    // generation and genome size: every window as a faint dot, the stretch median as a line over its middle half
+    function spread(id, key, unit, lgId) {
+      const c = frame(id, { tipLines: (s) => [[null, `median ${fmt(Math.round(s[key].p50))} ${unit}`], [null, `middle half ${fmt(Math.round(s[key].p25))}–${fmt(Math.round(s[key].p75))}`], [null, `range ${fmt(s[key].lo)}–${fmt(s[key].hi)}`]] });
+      const hi = Math.max(...W.map((w) => w[key === "gen" ? "gen" : "gsize"]));
+      const y = yLinear(c, 0, hi);
+      for (const w of W) el("circle", { cx: c.xt(w.ticks[0].t), cy: y(w[key === "gen" ? "gen" : "gsize"]), r: 1.6, fill: "var(--ink-2)", "fill-opacity": 0.28 }, c.marks);
+      const vals = S.map((s) => (s.gap ? null : s[key].p50));
+      line(c, y, vals, "var(--other)", { band: S.map((s) => (s.gap ? null : [s[key].p25, s[key].p75])) });
+      endLabels(c, y, [{ vals, color: "var(--other)", label: `median ${kfmt(vals.filter((v) => v != null).pop())}` }]);
+      legend(lgId, [{ kind: "line", color: "var(--other)", label: "stretch median" }, { kind: "sw", color: "var(--other)", opacity: 0.25, label: "middle half" }, { kind: "sw", color: "var(--ink-2)", opacity: 0.35, label: "one window" }, thinKey]);
+    }
+    spread("c-gen", "gen", "", "lg-gen");
+    spread("c-gsize", "gsize", "units", "lg-gsize");
+
+    // ── moves against chance, on a log scale around 1×
+    (() => {
+      const series = LABELS.map(([, l, color]) => ({ label: l, color, vals: S.map((s) => (s.gap ? null : s.moves[l].v)) }));
+      const all = series.flatMap((s) => s.vals).filter((v) => v != null && v > 0);
+      const c = frame("c-moves", { W0: 1100, H: 250, right: 160,
+        tipLines: (s) => LABELS.map(([, l, color]) => { const m = s.moves[l]; return [color, m.v == null ? `${l}: ${m.n ? `only ${fmt(m.n)} moves` : "no move had this choice"}` : `${l}: ${m.v.toFixed(2)}× chance (${pct(m.landed)} of ${fmt(m.n)} moves, chance ${pct(m.chance)})`]; }) });
+      const lo = Math.min(0.5, ...all) * 0.9, hi = Math.max(2, ...all) * 1.1;
+      const l2 = (v) => Math.log2(v);
+      const y = (v) => c.y0 - ((l2(v) - l2(lo)) / (l2(hi) - l2(lo))) * (c.y0 - c.y1);
+      for (let p = Math.ceil(l2(lo)); p <= Math.floor(l2(hi)); p++) {
+        const v = 2 ** p;
+        el("line", { x1: c.x0, x2: c.x1, y1: y(v), y2: y(v), stroke: v === 1 ? "var(--chance)" : "var(--grid)", "stroke-width": v === 1 ? 1.5 : 1, ...(v === 1 ? { "stroke-dasharray": "5 4" } : {}) }, c.base);
+        el("text", { x: c.x0 - 8, y: y(v) + 4, "text-anchor": "end", class: v === 1 ? "val" : "tick" }, c.base).textContent = (v < 1 ? `1/${1 / v}` : String(v)) + "×";
+      }
+      el("text", { x: c.x0 + 6, y: y(1) - 6, class: "tick" }, c.base).textContent = "chance";
+      for (const s of series) line(c, y, s.vals, s.color);
+      endLabels(c, y, series.map((s) => ({ ...s, label: `${s.label} ${(s.vals.filter((v) => v != null).pop() ?? NaN).toFixed(1)}×` })).filter((s) => s.vals.some((v) => v != null)));
+      legend("lg-moves", [...series.map((s) => ({ kind: "line", color: s.color, label: s.label })), { kind: "line", color: "var(--chance)", label: "chance (1×)" }, thinKey]);
+    })();
+
+    // ── blocked first moves
+    (() => {
+      const vals = S.map((s) => (s.gap ? null : s.blocked.v));
+      const c = frame("c-blocked", { right: 70, tipLines: (s) => [["var(--blocked)", s.blocked.v == null ? `only ${fmt(s.blocked.den)} applied first moves` : `${pct(s.blocked.v)} blocked: ${fmt(s.blocked.num)} of ${fmt(s.blocked.den)} applied first moves`]] });
+      const y = yShare(c);
+      line(c, y, vals, "var(--blocked)");
+      endLabels(c, y, [{ vals, color: "var(--blocked)", label: pct(vals.filter((v) => v != null).pop() ?? 0) }]);
+    })();
+
+    // ── eat on the sensed cell
+    (() => {
+      const here = S.map((s) => (s.gap ? null : s.eatHere.v)), none = S.map((s) => (s.gap ? null : s.eatNone.v));
+      const c = frame("c-eat", { right: 120, tipLines: (s) => [["var(--food)", s.eatHere.v == null ? `food underfoot: only ${fmt(s.eatHere.den)} ticks` : `food underfoot: ate on ${pct(s.eatHere.v)} of ${fmt(s.eatHere.den)} ticks`], ["var(--barrier)", s.eatNone.v == null ? `nothing underfoot: only ${fmt(s.eatNone.den)} ticks` : `nothing underfoot: ate on ${pct(s.eatNone.v)} of ${fmt(s.eatNone.den)} ticks`]] });
+      const y = yShare(c);
+      line(c, y, none, "var(--barrier)", { dash: "4 3" });
+      line(c, y, here, "var(--food)");
+      endLabels(c, y, [{ vals: here, color: "var(--food)", label: "food underfoot" }, { vals: none, color: "var(--barrier)", label: "nothing", dash: true }]);
+      legend("lg-eat", [{ kind: "line", color: "var(--food)", label: "food underfoot" }, { kind: "line", color: "var(--barrier)", label: "nothing underfoot (dashed)" }]);
+    })();
+
+    // ── fixed programs
+    (() => {
+      const fixed = S.map((s) => (s.gap ? null : s.fixed.v)), one = S.map((s) => (s.gap ? null : s.oneDir.v));
+      const c = frame("c-fixed", { right: 120, tipLines: (s) => [["var(--other)", `fixed program: ${s.fixed.v == null ? "—" : pct(s.fixed.v)} (${fmt(s.fixed.num)} of ${fmt(s.fixed.den)} windows)`], ["var(--ink-2)", `one way only: ${s.oneDir.v == null ? "—" : pct(s.oneDir.v)} (${fmt(s.oneDir.num)} of ${fmt(s.oneDir.den)})`]] });
+      const y = yShare(c);
+      line(c, y, one, "var(--ink-2)", { dash: "4 3" });
+      line(c, y, fixed, "var(--other)");
+      endLabels(c, y, [{ vals: fixed, color: "var(--other)", label: "fixed program" }, { vals: one, color: "var(--ink-2)", label: "one way only", dash: true }]);
+      legend("lg-fixed", [{ kind: "line", color: "var(--other)", label: "repeat a 1–3 tick program" }, { kind: "line", color: "var(--ink-2)", label: "move one way only (dashed)" }, thinKey]);
+    })();
+
+    // ── chosen actions by kind, stacked per stretch
+    (() => {
+      const shades = { move: 0.78, eat: 0.56, reproduce: 0.4, steal: 0.26, noop: 0.13 };
+      const c = frame("c-mix", { right: 100, tipLines: (s) => [...KINDS.map(([k, l]) => [null, `${l}: ${pct(s.kinds[k])}`]), [null, `${fmt(s.acts)} chosen actions`]] });
+      const y = yShare(c);
+      for (const s of live) {
+        let acc = 0;
+        for (const [k] of KINDS) {
+          const v = s.kinds[k];
+          if (v <= 0) continue;
+          const yt = y(acc + v), yb = y(acc);
+          el("rect", { x: c.x0 + s.i * c.bw + 1, y: yt + 1, width: c.bw - 2, height: Math.max(0.5, yb - yt - 2), fill: "var(--ink-2)", "fill-opacity": shades[k], rx: 2 }, c.marks);
+          acc += v;
+        }
+      }
+      const last = live[live.length - 1];
+      let acc = 0, minY = Infinity;
+      const labs = [];
+      for (const [k, l] of KINDS) { const v = last.kinds[k]; if (v > 0.03) labs.push({ ty: y(acc + v / 2), label: `${l} ${pct(v)}` }); acc += v; }
+      labs.sort((a, b) => b.ty - a.ty);
+      for (const p of labs) { if (p.ty > minY - 14) p.ty = minY - 14; minY = p.ty; }
+      for (const p of labs) el("text", { x: c.x1 + 10, y: p.ty + 4, class: "lbl" }, c.marks).textContent = p.label;
+      legend("lg-mix", KINDS.map(([k, l]) => ({ kind: "sw", color: "var(--ink-2)", opacity: shades[k], label: l })));
+    })();
+
+    // ── brain: median and middle half per creature-tick
+    function brain(id, key, unit) {
+      const c = frame(id, { W0: 380, H: 190, left: 40, right: 54, tipLines: (s) => [["var(--other)", `median ${fmt(s[key].p50)} ${unit}`], [null, `middle half ${fmt(s[key].p25)}–${fmt(s[key].p75)}`], [null, `${fmt(s[key].n)} creature-ticks`]] });
+      const vals = S.map((s) => (s.gap ? null : s[key].p50));
+      const hi = Math.max(1, ...S.filter((s) => !s.gap).map((s) => s[key].p75));
+      const y = yLinear(c, 0, hi, { ticks: 4 });
+      line(c, y, vals, "var(--other)", { band: S.map((s) => (s.gap ? null : [s[key].p25, s[key].p75])) });
+      endLabels(c, y, [{ vals, color: "var(--other)", label: kfmt(vals.filter((v) => v != null).pop() ?? 0) }]);
+    }
+    brain("c-hops", "hops", "hops");
+    brain("c-nodes", "nodes", "nodes");
+    brain("c-voting", "voting", "voting nodes");
+
+    // ── energy and death
+    (() => {
+      const losing = S.map((s) => (s.gap ? null : s.losing.v)), died = S.map((s) => (s.gap ? null : s.died.v));
+      const c = frame("c-energy", { W0: 1100, H: 220, right: 170, tipLines: (s) => [["var(--fruit)", `ended with less energy: ${pct(s.losing.v)} (${fmt(s.losing.num)} of ${fmt(s.losing.den)})`], ["var(--blocked)", `died in the window: ${pct(s.died.v)} (${fmt(s.died.num)} of ${fmt(s.died.den)})`]] });
+      const y = yShare(c);
+      line(c, y, losing, "var(--fruit)");
+      line(c, y, died, "var(--blocked)", { dash: "4 3" });
+      endLabels(c, y, [{ vals: losing, color: "var(--fruit)", label: "ended with less energy" }, { vals: died, color: "var(--blocked)", label: "died in the window", dash: true }]);
+      legend("lg-energy", [{ kind: "line", color: "var(--fruit)", label: "ended with less energy than it started" }, { kind: "line", color: "var(--blocked)", label: "died in the window (dashed)" }, thinKey]);
+    })();
+
+    // ── the change ledger: first readable stretch against the latest
+    (() => {
+      const lin = (s) => { let best = 0, who = null; for (const [l, n] of s.lineages) if (n > best) { best = n; who = l; } return { v: best / s.n, who }; };
+      const rows = [
+        { what: "Blocked first moves", sub: "of first moves the world applied", get: (s) => s.blocked.v, kind: "share", go: "s-moves" },
+        { what: "Moves into a sensed barrier", sub: "as a multiple of chance", get: (s) => s.moves["Barrier"].v, kind: "ratio", go: "s-moves" },
+        { what: "Windows on a fixed program", sub: "repeating every 1–3 ticks", get: (s) => s.fixed.v, kind: "share", go: "s-behavior" },
+        { what: "Mesh hops per tick", sub: "median per creature-tick", get: (s) => s.hops.p50, kind: "count", go: "s-brain" },
+        { what: "Nodes that cast a vote", sub: "median per creature-tick", get: (s) => s.voting.p50, kind: "count", go: "s-brain" },
+        { what: "Largest lineage", sub: "share of the stretch's windows", get: (s) => lin(s).v, label: (s) => `lineage ${lin(s).who}`, kind: "share", go: "s-lineage" },
+        { what: "Genome size", sub: "median of the sampled creatures", get: (s) => s.gsize.p50, kind: "count", unit: " units", go: "s-lineage" },
+      ];
+      const show = (r, v) => (v == null ? "—" : r.kind === "share" ? pct(v) : r.kind === "ratio" ? v.toFixed(2) + "×" : fmt(Math.round(v)) + (r.unit || ""));
+      const change = (r, a, b) => {
+        if (a == null || b == null) return "—";
+        if (r.kind === "share") { const d = Math.round((b - a) * 100); return d === 0 ? "no change" : `${d > 0 ? "up" : "down"} ${Math.abs(d)} point${Math.abs(d) === 1 ? "" : "s"}`; }
+        if (r.kind === "ratio") { const d = b - a; return Math.abs(d) < 0.05 ? "no change" : `${d > 0 ? "up" : "down"} ${Math.abs(d).toFixed(2)}×`; }
+        if (a === b) return "no change";
+        const times = a > 0 ? b / a : null;
+        return `${b > a ? "up" : "down"} ${fmt(Math.round(Math.abs(b - a)))}${times && (times >= 1.5 || times <= 0.67) ? ` (${times >= 1 ? times.toFixed(1) + " times" : "to " + pct(times)})` : ""}`;
+      };
+      // First and Latest pool the run's earliest (and latest) stretches until they hold POOL windows,
+      // so a thin stretch at either end never stands alone and the stretch count barely moves them
+      const POOL = Math.min(30, Math.floor(W.length / 3));
+      const pool = (order) => { const ws = [], used = []; for (const g of order) { if (ws.length >= POOL) break; ws.push(...g); used.push(g); } return { ws, used }; };
+      const fp = pool(groups), lp = pool(groups.slice().reverse());
+      const FIRST = readStretch(fp.ws), LAST = readStretch(lp.ws);
+      const tb = document.querySelector("#ledger tbody");
+      tb.replaceChildren();
+      for (const r of rows) {
+        const vals = S.map((s) => (s.gap ? null : r.get(s)));
+        const a = r.get(FIRST), b = r.get(LAST);
+        const tr = html("tr");
+        tr.tabIndex = 0;
+        const what = html("td", "what", r.what);
+        what.append(html("span", "", r.sub));
+        const from = html("td", "from", show(r, a)), to = html("td", "to", show(r, b));
+        if (r.label) { from.append(html("div", "sub", r.label(FIRST))); to.append(html("div", "sub", r.label(LAST))); }
+        const ch = html("td", "change", change(r, a, b));
+        const td = html("td", "trend");
+        td.append(mini(vals, r.kind === "share" ? [0, 1] : null));
+        tr.append(what, from, to, ch, td);
+        const go = () => document.getElementById(r.go).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+        tr.addEventListener("click", go);
+        tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+        tb.append(tr);
+      }
+      const span2 = (P, R) => `ticks ${fmt(R.tickLo)}–${fmt(R.tickHi)}, generations ${fmt(R.genLo)}–${fmt(R.genHi)}, ${fmt(R.n)} windows${P.used.length > 1 ? ` from the ${P.used.length} ${P === fp ? "earliest" : "latest"} stretches` : ""}`;
+      document.getElementById("ledger-sub").textContent = `First: ${span2(fp, FIRST)}. Latest: ${span2(lp, LAST)}. Pick a row to jump to its chart.`;
+    })();
+    function mini(vals, dom) {
+      const w = 180, h = 36, p = 4;
+      const svg = el("svg", { viewBox: `0 0 ${w} ${h}`, "aria-hidden": "true" });
+      const got = vals.filter((v) => v != null);
+      if (!got.length) return svg;
+      const lo = dom ? dom[0] : Math.min(0, ...got), hi = dom ? dom[1] : Math.max(...got) || 1;
+      const x = (i) => p + (i / Math.max(1, B - 1)) * (w - 2 * p), y = (v) => h - p - ((v - lo) / (hi - lo || 1)) * (h - 2 * p);
+      el("line", { x1: p, x2: w - p, y1: h - p, y2: h - p, stroke: "var(--grid)" }, svg);
+      let d = "", prev = false;
+      vals.forEach((v, i) => { if (v == null) { prev = false; return; } d += `${prev ? "L" : "M"}${x(i)} ${y(v)} `; prev = true; });
+      el("path", { d, fill: "none", stroke: "var(--ink-2)", "stroke-width": 1.6, "stroke-linejoin": "round" }, svg);
+      const fi = vals.findIndex((v) => v != null);
+      let li = -1; vals.forEach((v, i) => { if (v != null) li = i; });
+      el("circle", { cx: x(fi), cy: y(vals[fi]), r: 2.6, fill: "var(--surface)", stroke: "var(--ink-2)", "stroke-width": 1.4 }, svg);
+      el("circle", { cx: x(li), cy: y(vals[li]), r: 3.2, fill: "var(--ink)" }, svg);
+      return svg;
+    }
+
+    // ── the stretch ruler: sample density per stretch, the shared selection, the way back to Snapshot
+    const binsBox = document.getElementById("bins"), rulerLine = document.getElementById("ruler-line");
+    binsBox.style.gridTemplateColumns = `repeat(${B}, 1fr)`;
+    const maxN = Math.max(...S.map((s) => s.n));
+    const binBtns = S.map((s) => {
+      const b = html("button", "bin" + (s.n < THIN ? " thin" : ""));
+      b.type = "button";
+      b.setAttribute("aria-label", `${head(s)}`);
+      const bar = html("i");
+      bar.style.height = Math.max(6, (s.n / maxN) * 100) + "%";
+      b.append(bar);
+      b.addEventListener("click", () => setSel(s.i));
+      b.addEventListener("pointerenter", () => setHover(s.i));
+      b.addEventListener("pointerleave", () => setHover(null));
+      b.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const j = Math.max(0, Math.min(B - 1, s.i + (e.key === "ArrowRight" ? 1 : -1))); selI = j; sync(); binBtns[j].focus(); }
+        if (e.key === "Escape") { selI = null; sync(); }
+      });
+      binsBox.append(b);
+      return b;
+    });
+    document.getElementById("bins-axis").replaceChildren(html("span", "", `tick ${fmt(T0)}`), html("span", "", "windows read per stretch"), html("span", "", `tick ${fmt(T1)}`));
+    function drawRuler() {
+      binBtns.forEach((b, i) => { b.setAttribute("aria-pressed", String(i === selI)); b.classList.toggle("hover", i === hoverI); });
+      const i = selI ?? hoverI;
+      rulerLine.replaceChildren();
+      if (i == null) { rulerLine.append(html("span", "", `${B} stretches of ${fmt(Math.round(span))} ticks. Pick one, here or on any chart, to mark it everywhere.`)); return; }
+      const s = S[i];
+      const b = html("b", "", `Stretch ${i + 1} of ${B}`);
+      rulerLine.append(b, html("span", "mono", `ticks ${fmt(s.lo)}–${fmt(s.hi)}`));
+      if (!s.gap) rulerLine.append(html("span", "mono", `generations ${fmt(s.genLo)}–${fmt(s.genHi)}`));
+      rulerLine.append(html("span", "mono", `${fmt(s.n)} windows${s.gap ? " (too few to read)" : ""}`));
+      if (s.W.length) {
+        const tsLo = Math.min(...s.W.map((w) => w.ts)), tsHi = Math.max(...s.W.map((w) => w.ts));
+        rulerLine.append(html("span", "mono", `${utc(tsLo)}–${utc(tsHi).slice(11)} UTC`));
+        if (selI != null) {
+          const a = html("a", "go", "Open this stretch in Snapshot");
+          a.href = `creature-windows.html?${new URLSearchParams({ run: META.run, from: String(tsLo - 60000), to: String(tsHi + 60000), limit: "300" })}`;
+          a.title = "Snapshot reads the full traces of the windows in this stretch's wall-clock span, while the run's trace budget lasted.";
+          rulerLine.append(a);
+        }
+      }
+    }
+    drawRuler();
+    for (const c of charts) c.overlay();
+
+    // ── every reading as a table
+    (() => {
+      const cols = [
+        ["Stretch", (s) => s.i + 1], ["Ticks", (s) => `${fmt(s.lo)}–${fmt(s.hi)}`], ["Windows", (s) => fmt(s.n)], ["Generation (median)", (s) => fmt(Math.round(s.gen.p50))],
+        ["Genome (median)", (s) => fmt(Math.round(s.gsize.p50))], ["Blocked", (s) => (s.blocked.v == null ? "—" : pct(s.blocked.v))],
+        ...LABELS.map(([, l]) => [`${l} ×chance`, (s) => (s.moves[l].v == null ? "—" : s.moves[l].v.toFixed(2))]),
+        ["Eat, food underfoot", (s) => (s.eatHere.v == null ? "—" : pct(s.eatHere.v))], ["Eat, nothing underfoot", (s) => (s.eatNone.v == null ? "—" : pct(s.eatNone.v))],
+        ["Fixed program", (s) => (s.fixed.v == null ? "—" : pct(s.fixed.v))], ["Hops (median)", (s) => fmt(s.hops.p50)], ["Nodes (median)", (s) => fmt(s.nodes.p50)], ["Voting (median)", (s) => fmt(s.voting.p50)],
+        ["Losing energy", (s) => (s.losing.v == null ? "—" : pct(s.losing.v))], ["Died", (s) => (s.died.v == null ? "—" : pct(s.died.v))],
+      ];
+      const t = document.getElementById("table");
+      t.replaceChildren();
+      const hr = html("tr");
+      cols.forEach(([h], k) => hr.append(html("th", k > 1 ? "n" : "", h)));
+      t.append(hr);
+      for (const s of S) {
+        const tr = html("tr");
+        cols.forEach(([, f], k) => tr.append(html("td", k > 1 ? "n" : "", s.gap && k > 2 ? "—" : String(f(s)))));
+        t.append(tr);
+      }
+    })();
+  }
+
+  main();
+})();
+</script>
+</body>
+</html>

@@ -60,6 +60,12 @@ p { margin: 0; max-width: 68ch; }
 .muted { color: var(--muted); }
 .ink2 { color: var(--ink-2); }
 header { display: grid; gap: 14px; }
+.tabs { display: inline-flex; justify-self: start; border: 1px solid var(--axis); border-radius: 6px; overflow: hidden; font: 600 13px/1 var(--body); }
+.tabs a { padding: 7px 14px; text-decoration: none; color: var(--ink-2); }
+.tabs a + a { border-left: 1px solid var(--axis); }
+.tabs a:hover { background: var(--wash); color: var(--ink); }
+.tabs a[aria-current="page"] { background: var(--ink); color: var(--surface); }
+.tabs a:focus-visible { outline: 2px solid var(--other); outline-offset: 2px; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 13px/1.4 var(--mono); color: var(--ink-2); }
 .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; font-size: 14px; }
 .controls select { font: 400 13px var(--mono); background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
@@ -137,6 +143,7 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
 <body>
 <div class="wrap">
   <header>
+    <nav class="tabs" aria-label="Creature window views"><a href="creature-windows.html" aria-current="page">Snapshot</a><a id="tab-time" href="creature-windows-over-time.html">Over time</a></nav>
     <div class="eyebrow">Petri · creature window readings</div>
     <h1 id="title">Creature windows</h1>
     <p class="ink2">Every reading below comes from the creature windows the run recorded in the telemetry stack: consecutive ticks of one creature, with what it sensed in its eight neighboring cells, what its brain did, what it chose and what the world applied. Nothing new is measured.</p>
@@ -408,6 +415,7 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     }));
     if (wanted && !list.some((r) => r.petri_run_id === wanted)) { const o = document.createElement("option"); o.value = o.textContent = wanted; runSel.prepend(o); }
     runSel.value = wanted || "";
+    if (wanted) document.getElementById("tab-time").href = `creature-windows-over-time.html?run=${encodeURIComponent(wanted)}`;
     if (params.get("limit")) limSel.value = params.get("limit");
     document.getElementById("controls").addEventListener("submit", (e) => {
       e.preventDefault();
