@@ -1,4 +1,9 @@
 import { FieldGroup } from "../shared/FieldGroup.tsx";
+import { NUMBER_INPUT_CLASS, RowLabel } from "../shared/FieldRow.tsx";
+import { NumberInput } from "../shared/NumberInput.tsx";
+import { RandomSeedButton } from "../shared/RandomSeedButton.tsx";
+import { useRowFilter } from "../shared/filter.ts";
+import type { FieldDef } from "../shared/types.ts";
 
 interface RunSettingsSectionProps {
 	seed: number;
@@ -6,55 +11,49 @@ interface RunSettingsSectionProps {
 	randomizeSeed: () => void;
 }
 
-interface SeedRowProps {
-	value: number;
-	onChange: (value: number) => void;
-	onRandomize: () => void;
-}
-
-function SeedRow({ value, onChange, onRandomize }: SeedRowProps) {
-	const inputId = "startup-seed-input";
-
-	return (
-		<div className="flex flex-col gap-1.5 py-1.5 pl-2 border-l-2 border-transparent">
-			<div className="flex items-center justify-between gap-2">
-				<label htmlFor={inputId} className="text-xs text-slate-300">
-					Run seed
-				</label>
-			</div>
-			<div className="flex items-center gap-2">
-				<input
-					id={inputId}
-					data-testid="startup-field-seed"
-					type="number"
-					min={0}
-					max={Number.MAX_SAFE_INTEGER}
-					step={1}
-					title="Controls food placement, founders, and runtime draws; also the map when map seed is blank."
-					value={value}
-					onChange={(e) => {
-						const seed = Number(e.target.value);
-						if (Number.isSafeInteger(seed) && seed >= 0) onChange(seed);
-					}}
-					className="flex-1 px-2 py-1 text-xs font-mono bg-slate-800 border border-slate-700 rounded text-slate-200"
-				/>
-				<button
-					type="button"
-					data-testid="startup-seed-randomize"
-					onClick={onRandomize}
-					className="px-2 py-1 text-[11px] text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
-				>
-					Randomize
-				</button>
-			</div>
-		</div>
-	);
-}
+const SEED_FIELD: FieldDef = {
+	path: "seed",
+	label: "Run Seed",
+	min: 0,
+	max: Number.MAX_SAFE_INTEGER,
+	step: 1,
+	tooltip:
+		"Controls food placement, founders and runtime draws; also the map when Map Seed is blank. Same seed, same world.",
+};
 
 export function RunSettingsSection({ seed, updateSeed, randomizeSeed }: RunSettingsSectionProps) {
+	const { visible } = useRowFilter(SEED_FIELD, false);
 	return (
-		<FieldGroup title="Run Settings">
-			<SeedRow value={seed} onChange={updateSeed} onRandomize={randomizeSeed} />
+		<FieldGroup title="Run">
+			{visible && (
+				<div data-config-row className="-mx-2 flex flex-col gap-1 rounded px-2 py-1.5">
+					<RowLabel
+						inputId="startup-seed-input"
+						label={SEED_FIELD.label}
+						tooltip={SEED_FIELD.tooltip}
+						isDirty={false}
+					/>
+					<div className="flex items-center gap-1.5">
+						<NumberInput
+							id="startup-seed-input"
+							data-testid="startup-field-seed"
+							value={seed}
+							min={0}
+							max={Number.MAX_SAFE_INTEGER}
+							integer
+							onChange={(value) => {
+								if (Number.isSafeInteger(value) && value >= 0) updateSeed(value);
+							}}
+							className={`${NUMBER_INPUT_CLASS} w-auto min-w-0 flex-1 text-left`}
+						/>
+						<RandomSeedButton
+							label="run seed"
+							testId="startup-seed-randomize"
+							onClick={randomizeSeed}
+						/>
+					</div>
+				</div>
+			)}
 		</FieldGroup>
 	);
 }

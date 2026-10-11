@@ -12,6 +12,7 @@ vi.mock("../api/rest.ts", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../api/rest.ts")>()),
 	api: {
 		patchConfig: vi.fn(),
+		pause: vi.fn(),
 	},
 }));
 
@@ -28,6 +29,7 @@ function rejection(fieldErrors: FieldError[]): ApiRequestError {
 
 describe("ConfigPanel", () => {
 	beforeEach(() => {
+		window.localStorage?.clear();
 		useConfigStore.getState().reset();
 		useSimulationStore.getState().reset();
 		useStartupConfigStore.getState().reset();
@@ -103,10 +105,10 @@ describe("ConfigPanel", () => {
 	it("renders startup and runtime top-level sections with food subgroup", () => {
 		render(<ConfigPanel />);
 
-		expect(screen.getByText("Startup Config")).toBeInTheDocument();
-		expect(screen.getByText("Runtime (Live) Config")).toBeInTheDocument();
+		expect(screen.getByRole("tab", { name: /Live/ })).toHaveAttribute("aria-selected", "true");
+		expect(screen.getByRole("tab", { name: /On Restart/ })).toBeInTheDocument();
 		expect(screen.getByTestId("startup-seed-randomize")).toBeInTheDocument();
-		expect(screen.getByText("Food > Occupancy Depletion")).toBeInTheDocument();
+		expect(screen.getByText("Occupancy depletion")).toBeInTheDocument();
 		expect(screen.getAllByText("Food Types").length).toBeGreaterThan(0);
 		expect(screen.getByTestId("startup-food-type-add")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-type-0-initial-density")).toBeInTheDocument();
@@ -320,6 +322,7 @@ describe("ConfigPanel", () => {
 
 	it("updates fertility targets using the current food type list", () => {
 		render(<ConfigPanel />);
+		fireEvent.click(screen.getByRole("tab", { name: /On Restart/ }));
 		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
 		fireEvent.click(screen.getByTestId("startup-food-type-add"));
 
@@ -559,10 +562,12 @@ describe("ConfigPanel", () => {
 	it("clamps the slider to the draft-derived bound on every change", () => {
 		render(<ConfigPanel />);
 
-		fireEvent.change(screen.getByLabelText("Max Creatures slider"), { target: { value: "10" } });
+		fireEvent.change(screen.getByLabelText("Food Max Density slider"), {
+			target: { value: "0.5" },
+		});
 
-		expect(useConfigStore.getState().localDraft?.population.max_creatures).toBe(
-			MOCK_CONFIG.population.initial_creatures,
+		expect(useConfigStore.getState().localDraft?.world.food.shared.max_density).toBe(
+			MOCK_CONFIG.world.food.types[0]!.initial_density,
 		);
 	});
 
@@ -604,5 +609,171 @@ describe("ConfigPanel", () => {
 				}),
 			),
 		);
+	});
+
+	describe("search and filters", () => {
+		it("narrows the live tab to matching settings and opens their category", () => {
+			render(<ConfigPanel />);
+			fireEvent.change(screen.getByTestId("config-search"), { target: { value: "grazing" } });
+
+			expect(screen.getByTestId("config-field-food-grazing-factor")).toBeInTheDocument();
+			expect(screen.queryByTestId("config-field-energy-costs-move-cost")).not.toBeInTheDocument();
+			expect(screen.getByRole("button", { name: /Food/ })).toHaveAttribute("aria-expanded", "true");
+			expect(screen.queryByRole("button", { name: /^Energy/ })).not.toBeInTheDocument();
+		});
+
+		it("matches config paths and help text, and shows the help that matched", () => {
+			render(<ConfigPanel />);
+			const search = screen.getByTestId("config-search");
+
+			fireEvent.change(search, { target: { value: "vm.step_ramp" } });
+			expect(screen.getByText("Step Ramp Allowance")).toBeInTheDocument();
+			expect(screen.queryByText("Max Mesh Hops")).not.toBeInTheDocument();
+
+			fireEvent.change(search, { target: { value: "litter" } });
+			expect(screen.getByRole("tab", { name: /On Restart/ })).toHaveTextContent("1");
+		});
+
+		it("clears the search with Escape and offers the other tab when this one is empty", () => {
+			render(<ConfigPanel />);
+			const search = screen.getByTestId("config-search");
+			fireEvent.change(search, { target: { value: "lacunarity" } });
+
+			expect(screen.getByText(/No live settings match/)).toBeInTheDocument();
+			fireEvent.click(screen.getByRole("button", { name: /in On Restart/ }));
+			expect(screen.getByRole("tab", { name: /On Restart/ })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+
+			fireEvent.keyDown(search, { key: "Escape" });
+			expect(search).toHaveValue("");
+		});
+
+		it("focuses search with the slash key", () => {
+			render(<ConfigPanel />);
+			fireEvent.keyDown(window, { key: "/" });
+			expect(screen.getByTestId("config-search")).toHaveFocus();
+		});
+
+		it("shows only unapplied changes when Changed only is on", () => {
+			render(<ConfigPanel />);
+			expect(screen.queryByTestId("config-changed-only")).not.toBeInTheDocument();
+
+			fireEvent.change(screen.getByTestId("config-field-energy-costs-move-cost"), {
+				target: { value: "0.5" },
+			});
+			expect(screen.getByRole("tab", { name: /Live/ })).toHaveTextContent("1");
+			expect(screen.getByText("1 unapplied")).toBeInTheDocument();
+			fireEvent.click(screen.getByTestId("config-changed-only"));
+
+			expect(screen.getByTestId("config-field-energy-costs-move-cost")).toBeInTheDocument();
+			expect(screen.queryByTestId("config-field-energy-costs-eat-cost")).not.toBeInTheDocument();
+			expect(screen.getByText("was 0.02")).toBeInTheDocument();
+		});
+	});
+
+	describe("coverage and editing", () => {
+		it("offers the live fields the panel used to miss", () => {
+			render(<ConfigPanel />);
+			for (const testId of [
+				"config-field-energy-lifecycle-min-reproduce-age",
+				"config-field-energy-lifecycle-age-reference-ticks",
+				"config-field-runtime-hop-ramp-allowance",
+				"config-field-runtime-hop-ramp-cost",
+				"config-field-mutation-structured-heritable-refinement",
+				"config-field-mutation-neutral-input-recruitment",
+			]) {
+				expect(screen.getByTestId(testId)).toBeInTheDocument();
+			}
+		});
+
+		it("applies an enum change", async () => {
+			render(<ConfigPanel />);
+			fireEvent.change(screen.getByTestId("config-field-mutation-neutral-input-recruitment"), {
+				target: { value: "WholeFamily" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+			await waitFor(() =>
+				expect(api.patchConfig).toHaveBeenCalledWith({
+					mutation: { neutral_input_recruitment: "WholeFamily" },
+				}),
+			);
+		});
+
+		it("undoes one row back to the applied value", () => {
+			render(<ConfigPanel />);
+			const move = screen.getByTestId("config-field-energy-costs-move-cost");
+			fireEvent.change(move, { target: { value: "0.5" } });
+			fireEvent.click(screen.getByTestId("revert-energy-costs-move_cost"));
+			expect(move).toHaveValue(0.02);
+			expect(useConfigStore.getState().isDirty).toBe(false);
+		});
+
+		it("shows f32 values as typed and keeps a cleared field", () => {
+			const config = structuredClone(MOCK_CONFIG);
+			config.energy.costs.move_cost = 0.699999988079071;
+			useConfigStore.getState().setServerConfig(config, "paused");
+			render(<ConfigPanel />);
+			const move = screen.getByTestId("config-field-energy-costs-move-cost");
+			expect(move).toHaveValue(0.7);
+
+			move.focus();
+			fireEvent.change(move, { target: { value: "" } });
+			fireEvent.blur(move);
+			expect(move).toHaveValue(0.7);
+			expect(useConfigStore.getState().isDirty).toBe(false);
+		});
+
+		it("sets the founder profile on the restart tab", () => {
+			render(<ConfigPanel />);
+			fireEvent.change(screen.getByTestId("startup-field-population-founder-profile"), {
+				target: { value: "forage_first_sparse" },
+			});
+			expect(useStartupConfigStore.getState().preset.population.founder_profile).toBe(
+				"forage_first_sparse",
+			);
+		});
+	});
+
+	describe("while the world runs", () => {
+		it("explains the lock once and offers Pause", async () => {
+			vi.mocked(api.pause).mockResolvedValue({
+				protocol_version: "v3alpha1",
+				state: "paused",
+				tick: 12,
+			} as Awaited<ReturnType<typeof api.pause>>);
+			act(() => useSimulationStore.getState().setSimState("running"));
+			render(<ConfigPanel />);
+
+			expect(screen.getByTestId("config-locked")).toHaveTextContent(/locked while the world runs/);
+			fireEvent.click(screen.getByTestId("config-locked-pause"));
+			await waitFor(() => expect(useSimulationStore.getState().simState).toBe("paused"));
+			expect(screen.queryByTestId("config-locked")).not.toBeInTheDocument();
+			expect(screen.getByTestId("config-field-energy-costs-move-cost")).toBeEnabled();
+		});
+	});
+
+	describe("restart tab", () => {
+		it("marks settings that will change at the next Restart and counts them", () => {
+			render(<ConfigPanel />);
+			fireEvent.click(screen.getByRole("tab", { name: /On Restart/ }));
+			fireEvent.change(screen.getByTestId("startup-field-population-initial-creatures"), {
+				target: { value: "80" },
+			});
+
+			expect(screen.getByRole("tab", { name: /On Restart/ })).toHaveTextContent("1");
+			expect(screen.getByText("was 50")).toBeInTheDocument();
+			fireEvent.click(screen.getByTestId("revert-population-initial_creatures"));
+			expect(useStartupConfigStore.getState().preset.population.initial_creatures).toBe(50);
+		});
+	});
+
+	it("keeps a hovered tooltip open when its icon is clicked", () => {
+		render(<ConfigPanel />);
+		const [help] = screen.getAllByRole("button", { name: "About this setting" });
+		fireEvent.mouseEnter(help!);
+		fireEvent.click(help!);
+		expect(screen.getByTestId("config-tooltip")).toBeInTheDocument();
 	});
 });

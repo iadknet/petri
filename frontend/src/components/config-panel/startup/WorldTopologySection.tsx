@@ -1,16 +1,17 @@
+import { EnumRow } from "../shared/EnumRow.tsx";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
-import { Tooltip } from "../shared/Tooltip.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
-import type { FieldDef, StartupSectionProps } from "../shared/types.ts";
+import type { EnumFieldDef, FieldDef, StartupSectionProps } from "../shared/types.ts";
 
-const FIELDS: FieldDef[] = [
+export const WORLD_TOPOLOGY_FIELDS: FieldDef[] = [
 	{
 		path: "world.width",
 		label: "Width",
 		min: 10,
-		max: 2000,
+		max: 65535,
 		step: 10,
+		sliderMax: 4000,
 		testId: "startup-field-world-width",
 		defaultValue: 1600,
 		tooltip: "World grid width in cells",
@@ -19,44 +20,40 @@ const FIELDS: FieldDef[] = [
 		path: "world.height",
 		label: "Height",
 		min: 10,
-		max: 2000,
+		max: 65535,
 		step: 10,
+		sliderMax: 4000,
 		testId: "startup-field-world-height",
 		defaultValue: 1600,
 		tooltip: "World grid height in cells",
 	},
 ];
 
-const EDGE_MODES = ["Wrap", "Bounded"] as const;
+export const EDGE_MODE_FIELD: EnumFieldDef = {
+	path: "world.edge_mode",
+	label: "Edge Mode",
+	testId: "startup-field-world-edge-mode",
+	defaultValue: "Wrap",
+	options: [
+		{ value: "Wrap", label: "Wrap" },
+		{ value: "Bounded", label: "Bounded" },
+	],
+	tooltip:
+		"How creatures interact with world boundaries. Wrap: opposite edges connect. Bounded: edges are walls.",
+};
 
 export function WorldTopologySection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
 	return (
-		<FieldGroup title="World Topology">
-			<div className="flex flex-col gap-1.5 py-1.5 pl-2 border-l-2 border-transparent">
-				<label
-					htmlFor="startup-world-edge-mode"
-					className="flex items-center gap-1 text-xs text-slate-300"
-				>
-					Edge Mode
-					<Tooltip text="How creatures interact with world boundaries. Wrap: opposite edges connect. Bounded: edges are walls.">
-						<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-					</Tooltip>
-				</label>
-				<select
-					id="startup-world-edge-mode"
-					data-testid="startup-field-world-edge-mode"
-					value={startupPreset.world.edge_mode}
-					onChange={(e) => updateStartupPreset("world.edge_mode", e.target.value)}
-					className="w-32 px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
-				>
-					{EDGE_MODES.map((mode) => (
-						<option key={mode} value={mode}>
-							{mode}
-						</option>
-					))}
-				</select>
-			</div>
-			{FIELDS.map((field) => (
+		<FieldGroup title="Map">
+			<EnumRow
+				field={EDGE_MODE_FIELD}
+				id="startup-world-edge-mode"
+				value={startupPreset.world.edge_mode}
+				disabled={false}
+				onChange={updateStartupPreset}
+				testId={EDGE_MODE_FIELD.testId}
+			/>
+			{WORLD_TOPOLOGY_FIELDS.map((field) => (
 				<FieldRow
 					key={`startup-${field.path}`}
 					field={field}

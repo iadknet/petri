@@ -1,6 +1,5 @@
 import type { StartupPreset } from "../../../stores/startupConfig.ts";
 import type { FoodTypeConfig } from "../../../types/config.ts";
-import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FoodTypeCard } from "./FoodTypeCard.tsx";
 
 interface FoodTypesSectionProps {
@@ -19,10 +18,11 @@ export function FoodTypesSection({
 	const foodTypes = startupPreset.world.food.types;
 
 	return (
-		<FieldGroup title="Food Types">
+		<div className="flex flex-col gap-2 px-3 pt-1">
 			<div className="flex items-center justify-between gap-2 px-1 pb-1">
 				<p className="text-[11px] text-slate-500">
-					List order defines `type_idx` for sensors and fertility targets.
+					List order sets each type's <code className="font-mono text-slate-400">type_idx</code> for
+					sensors and fertility targets.
 				</p>
 				<button
 					type="button"
@@ -45,6 +45,6 @@ export function FoodTypesSection({
 					onChange={(patch) => updateFoodType(index, patch)}
 				/>
 			))}
-		</FieldGroup>
+		</div>
 	);
 }

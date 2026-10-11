@@ -7,13 +7,15 @@ import type {
 } from "../../../types/config.ts";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
+import { NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";
+import { NumberInput } from "../shared/NumberInput.tsx";
 import { RandomSeedButton } from "../shared/RandomSeedButton.tsx";
 import { ToggleRow } from "../shared/ToggleRow.tsx";
 import { Tooltip } from "../shared/Tooltip.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
 import type { BooleanFieldDef, FieldDef, StartupSectionProps } from "../shared/types.ts";
 
-const FERTILITY_TOGGLE: BooleanFieldDef = {
+export const FERTILITY_TOGGLE: BooleanFieldDef = {
 	path: "world.food.fertility.enabled",
 	label: "Enable Fertility Layer",
 	testId: "startup-field-fertility-enabled",
@@ -21,7 +23,7 @@ const FERTILITY_TOGGLE: BooleanFieldDef = {
 	tooltip: "When enabled, spatial fertility multipliers affect food growth rates across the world",
 };
 
-const FERTILITY_FIELDS: FieldDef[] = [
+export const FERTILITY_FIELDS: FieldDef[] = [
 	{
 		path: "world.food.fertility.min_fertility",
 		label: "Min Fertility",
@@ -44,7 +46,7 @@ const FERTILITY_FIELDS: FieldDef[] = [
 	},
 ];
 
-const ANNEALING_TOGGLE: BooleanFieldDef = {
+export const ANNEALING_TOGGLE: BooleanFieldDef = {
 	path: "world.food.annealing.enabled",
 	label: "Enable Warmup Annealing",
 	testId: "startup-field-annealing-enabled",
@@ -53,16 +55,18 @@ const ANNEALING_TOGGLE: BooleanFieldDef = {
 		"When enabled, fertility severity ramps gradually from friendly initial values to target values",
 };
 
-const ANNEALING_FIELDS: FieldDef[] = [
+export const ANNEALING_FIELDS: FieldDef[] = [
 	{
 		path: "world.food.annealing.ramp_ticks",
 		label: "Ramp Ticks",
-		min: 100,
-		max: 50000,
+		min: 0,
+		max: 1000000,
 		step: 100,
 		testId: "startup-field-annealing-ramp-ticks",
 		defaultValue: 5000,
-		tooltip: "Ticks over which fertility severity ramps from initial to target values",
+		sliderMax: 50000,
+		tooltip:
+			"Ticks over which fertility severity ramps from initial to target values; 0 skips the ramp",
 	},
 	{
 		path: "world.food.annealing.initial_min_fertility",
@@ -241,23 +245,19 @@ function LayerField({
 				className="flex items-center gap-1 text-[11px] text-slate-400"
 			>
 				{label}
-				{tooltip && (
-					<Tooltip text={tooltip}>
-						<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-					</Tooltip>
-				)}
+				{tooltip && <Tooltip text={tooltip} />}
 			</label>
 			<div className="flex items-center gap-1">
-				<input
+				<NumberInput
 					id={`${testId}-input`}
 					data-testid={testId}
-					type="number"
 					value={value}
 					min={min}
-					max={max}
+					max={max === undefined ? Number.MAX_SAFE_INTEGER : max}
 					step={step}
-					onChange={(e) => onChange(Number(e.target.value))}
-					className="w-28 px-1.5 py-0.5 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200"
+					integer={step !== undefined && Number.isInteger(step)}
+					onChange={onChange}
+					className={NUMBER_INPUT_CLASS}
 				/>
 				{onRandomize && (
 					<RandomSeedButton label={label} testId={`${testId}-randomize`} onClick={onRandomize} />
@@ -350,17 +350,17 @@ function SeedFields({ seed, testIdPrefix, tooltips, onChange }: SeedFieldsProps)
 					className="flex items-center gap-1 text-[11px] text-slate-400"
 				>
 					Use Seed
-					<Tooltip text={tooltips.useSeed}>
-						<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-					</Tooltip>
+					<Tooltip text={tooltips.useSeed} />
 				</label>
 				<input
 					id={`${testIdPrefix}-seed-enabled-input`}
 					data-testid={`${testIdPrefix}-seed-enabled`}
 					type="checkbox"
+					role="switch"
+					aria-checked={seed != null}
 					checked={seed != null}
 					onChange={(e) => onChange(e.target.checked ? (seed ?? 0) : undefined)}
-					className="accent-emerald-500"
+					className="config-switch config-switch-startup config-switch-sm"
 				/>
 			</div>
 			{seed != null && (
@@ -547,9 +547,7 @@ export function FertilitySection({
 											className="flex items-center gap-1 text-[11px] text-slate-400"
 										>
 											Blend
-											<Tooltip text={BLEND_TOOLTIP}>
-												<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
-											</Tooltip>
+											<Tooltip text={BLEND_TOOLTIP} />
 										</label>
 										<select
 											id={`${baseTestId}-blend-input`}
@@ -617,7 +615,7 @@ export function FertilitySection({
 												value={algorithm.Channels.width}
 												tooltip={CHANNELS_TOOLTIPS.width}
 												min={1}
-												max={20}
+												max={1000}
 												step={0.5}
 												onChange={(value) =>
 													setAlgorithm({ Channels: { ...algorithm.Channels, width: value } })
@@ -660,7 +658,7 @@ export function FertilitySection({
 												value={algorithm.PoissonBlobs.blob_count}
 												tooltip={POISSON_TOOLTIPS.blobCount}
 												min={1}
-												max={5000}
+												max={100000}
 												step={1}
 												onChange={(value) =>
 													setAlgorithm({
@@ -677,7 +675,7 @@ export function FertilitySection({
 												value={algorithm.PoissonBlobs.min_radius}
 												tooltip={POISSON_TOOLTIPS.minRadius}
 												min={0.1}
-												max={100}
+												max={10000}
 												step={0.1}
 												onChange={(value) =>
 													setAlgorithm({
@@ -691,7 +689,7 @@ export function FertilitySection({
 												value={algorithm.PoissonBlobs.max_radius}
 												tooltip={POISSON_TOOLTIPS.maxRadius}
 												min={0.1}
-												max={100}
+												max={10000}
 												step={0.1}
 												onChange={(value) =>
 													setAlgorithm({

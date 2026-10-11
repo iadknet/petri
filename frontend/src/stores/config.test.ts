@@ -79,4 +79,19 @@ describe("ConfigStore", () => {
 		expect(state.serverConfig).toEqual(committedConfig);
 		expect(state.localDraft).toEqual(committedConfig);
 	});
+
+	it("does not count an f32 round trip as a change", () => {
+		const server: SimulationConfig = {
+			...MOCK_CONFIG,
+			energy: {
+				...MOCK_CONFIG.energy,
+				costs: { ...MOCK_CONFIG.energy.costs, move_cost: 0.30000001192092896 },
+			},
+		};
+		useConfigStore.getState().setServerConfig(server, "paused");
+		useConfigStore.getState().updateDraft("energy.costs.move_cost", 0.3);
+		expect(useConfigStore.getState().isDirty).toBe(false);
+		useConfigStore.getState().updateDraft("energy.costs.move_cost", 0.31);
+		expect(useConfigStore.getState().isDirty).toBe(true);
+	});
 });

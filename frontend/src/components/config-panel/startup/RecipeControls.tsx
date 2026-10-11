@@ -5,6 +5,7 @@ import { useSimulationStore } from "../../../stores/simulation.ts";
 import { useStartupConfigStore } from "../../../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../../../stores/stats.ts";
 import { describeApiFailure } from "../../../types/errors.ts";
+import { Tooltip } from "../shared/Tooltip.tsx";
 
 function failure(error: unknown): string {
 	return error instanceof ApiRequestError
@@ -74,25 +75,24 @@ export function RecipeControls() {
 		}
 	}
 
+	const button =
+		"flex h-7 flex-1 items-center justify-center rounded border border-slate-700 px-2 text-xs text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-800 disabled:opacity-50";
+
 	return (
-		<div className="space-y-2 px-3 py-2 mb-3">
-			<div className="flex gap-2" aria-busy={busy}>
-				<button
-					type="button"
-					disabled={busy}
-					onClick={save}
-					className="min-h-9 flex-1 rounded bg-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-600 disabled:opacity-50"
-				>
+		<div className="flex flex-col gap-1.5 border-b border-slate-800/80 px-3 py-2.5">
+			<div className="flex items-center gap-1.5" aria-busy={busy}>
+				<button type="button" disabled={busy} onClick={save} className={button}>
 					Save Recipe
 				</button>
 				<button
 					type="button"
 					disabled={busy}
 					onClick={() => fileInput.current?.click()}
-					className="min-h-9 flex-1 rounded bg-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-600 disabled:opacity-50"
+					className={button}
 				>
 					Load Recipe
 				</button>
+				<Tooltip text="Save writes the applied procedural config. Load restarts at tick zero with the current Run Seed, so the same seed regenerates the same world; painted changes and living state are not saved. Recipe files keep large seeds exactly; the numeric editor handles seeds up to 9007199254740991." />
 				<input
 					ref={fileInput}
 					type="file"
@@ -107,20 +107,14 @@ export function RecipeControls() {
 					}}
 				/>
 			</div>
-			<p className="text-xs text-slate-400">
-				Save the applied procedural config. Load restarts at tick zero. Use the same Run Seed to
-				regenerate the same world; painted changes and living state are not saved.
-			</p>
-			<p className="text-xs text-slate-400">
-				Recipe files preserve large seeds exactly. The numeric editor supports seeds up to
-				9007199254740991.
-			</p>
 			{error ? (
-				<p role="alert" className="text-xs text-red-400">
+				<p role="alert" className="text-[11px] text-red-400">
 					{error}
 				</p>
 			) : null}
-			<output className="block text-xs text-slate-300">{busy ? "Working…" : message}</output>
+			<output className="block text-[11px] text-slate-400 empty:hidden">
+				{busy ? "Working…" : message}
+			</output>
 		</div>
 	);
 }

@@ -507,3 +507,17 @@ it("retains overrides, zero and inheritance through hydration and startup reques
 		buildStartupRequest(useStartupConfigStore.getState().preset).world?.food?.types?.[0],
 	).toMatchObject({ energy_per_unit: null, growth_rate: null, recovery_spawn_rate: 0 });
 });
+
+it("hydrates the founder profile and carries it through startup requests", () => {
+	useStartupConfigStore.getState().reset();
+	expect(useStartupConfigStore.getState().preset.population.founder_profile).toBe("v3_alpha1");
+	const config = structuredClone(MOCK_CONFIG);
+	config.population.founder_profile = "forage_first_sparse_balanced";
+	useStartupConfigStore.getState().hydrateFromServerConfig(config);
+	const preset = useStartupConfigStore.getState().preset;
+	expect(preset.population.founder_profile).toBe("forage_first_sparse_balanced");
+	expect(buildStartupRequest(preset).population).toEqual({
+		initial_creatures: 50,
+		founder_profile: "forage_first_sparse_balanced",
+	});
+});

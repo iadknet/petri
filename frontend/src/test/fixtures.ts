@@ -2,7 +2,7 @@ import type { SimulationConfig } from "../types/api.ts";
 
 /** Shared mock config matching production defaults for most fields. */
 export const MOCK_CONFIG: SimulationConfig = {
-	population: { initial_creatures: 50, max_creatures: 1000 },
+	population: { initial_creatures: 50, max_creatures: 1000, founder_profile: "v3_alpha1" },
 	world: {
 		width: 400,
 		height: 400,
@@ -60,6 +60,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 			genome_replication_cost_per_unit: 0.1,
 			gestation_ticks_per_founder_genome: 1.0,
 			min_reproduce_energy: 1,
+			min_reproduce_age: 20,
+			age_reference_ticks: 500,
 			default_offspring_energy: 8,
 		},
 		costs: {
@@ -95,6 +97,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		perception: { vision_radius: 5 },
 	},
 	mutation: {
+		structured_heritable_refinement: false,
+		neutral_input_recruitment: "Off",
 		per_unit_rate: 0.005,
 		mesh_layer_probability: 0.2,
 		large_copy_weight_percent: 25,

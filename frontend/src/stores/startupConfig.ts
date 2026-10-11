@@ -5,6 +5,7 @@ import type {
 	FoodFertilityLayerTarget,
 	FoodSharedConfig,
 	FoodTypeConfig,
+	FounderProfile,
 	StartupFoodConfig,
 	StartupFoodRequest,
 	TerrainLayer,
@@ -17,6 +18,7 @@ export interface StartupPreset {
 	seed: number;
 	population: {
 		initial_creatures: number;
+		founder_profile: FounderProfile;
 	};
 	world: {
 		width: number;
@@ -317,7 +319,7 @@ function updateFoodTypeTargetsAfterRemoval(
 function buildDefaultPreset(): StartupPreset {
 	return {
 		seed: randomSeed(),
-		population: { initial_creatures: 10000 },
+		population: { initial_creatures: 10000, founder_profile: "v3_alpha1" },
 		world: {
 			width: 1600,
 			height: 1600,
@@ -333,7 +335,10 @@ function buildDefaultPreset(): StartupPreset {
 function fromServerConfig(config: SimulationConfig): StartupPreset {
 	return {
 		seed: randomSeed(),
-		population: { initial_creatures: config.population.initial_creatures },
+		population: {
+			initial_creatures: config.population.initial_creatures,
+			founder_profile: config.population.founder_profile ?? "v3_alpha1",
+		},
 		world: {
 			width: config.world.width,
 			height: config.world.height,
@@ -573,7 +578,10 @@ export function buildStartupRequest(preset: StartupPreset): StartupRequest {
 
 	return {
 		seed: preset.seed,
-		population: { initial_creatures: preset.population.initial_creatures },
+		population: {
+			initial_creatures: preset.population.initial_creatures,
+			founder_profile: preset.population.founder_profile,
+		},
 		world: {
 			width: preset.world.width,
 			height: preset.world.height,

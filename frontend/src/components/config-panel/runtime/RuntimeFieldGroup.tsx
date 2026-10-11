@@ -1,55 +1,77 @@
+import { EnumRow } from "../shared/EnumRow.tsx";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { ToggleRow } from "../shared/ToggleRow.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
-import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import {
+	type AnyFieldDef,
+	type RuntimePanelProps,
+	isEnumField,
+	isNumberField,
+} from "../shared/types.ts";
 import { resolveRuntimeBounds } from "./bounds.ts";
 
 interface RuntimeFieldGroupProps extends RuntimePanelProps {
 	title: string;
-	fields: FieldDef[];
-	toggles?: BooleanFieldDef[];
+	fields: AnyFieldDef[];
 }
 
 export function RuntimeFieldGroup({
 	title,
 	fields,
-	toggles,
 	localDraft,
 	serverConfig,
 	simState,
 	updateDraft,
 	fieldErrors,
 }: RuntimeFieldGroupProps) {
+	const disabled = simState === "running";
 	return (
 		<FieldGroup title={title}>
-			{toggles?.map((field) => (
-				<ToggleRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as boolean}
-					serverValue={getByPath(serverConfig, field.path) as boolean}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
-			{fields.map((field) => (
-				<FieldRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as number}
-					serverValue={getByPath(serverConfig, field.path) as number}
-					bounds={resolveRuntimeBounds(field, localDraft)}
-					error={fieldErrors[field.path]}
-					disabled={simState === "running"}
-					disabledReason="Locked in current state"
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
+			{fields.map((field) => {
+				const id = `runtime-${field.path.replaceAll(".", "-")}`;
+				const common = {
+					id,
+					disabled,
+					onChange: updateDraft,
+					testId: field.testId,
+				};
+				if (isNumberField(field)) {
+					return (
+						<FieldRow
+							key={id}
+							{...common}
+							field={field}
+							value={getByPath(localDraft, field.path) as number}
+							serverValue={getByPath(serverConfig, field.path) as number}
+							bounds={resolveRuntimeBounds(field, localDraft)}
+							error={fieldErrors[field.path]}
+							disabledReason="Pause the world to edit live settings"
+						/>
+					);
+				}
+				if (isEnumField(field)) {
+					return (
+						<EnumRow
+							key={id}
+							{...common}
+							field={field}
+							value={getByPath(localDraft, field.path) as string}
+							serverValue={getByPath(serverConfig, field.path) as string}
+							error={fieldErrors[field.path]}
+						/>
+					);
+				}
+				return (
+					<ToggleRow
+						key={id}
+						{...common}
+						field={field}
+						value={getByPath(localDraft, field.path) as boolean}
+						serverValue={getByPath(serverConfig, field.path) as boolean}
+					/>
+				);
+			})}
 		</FieldGroup>
 	);
 }
