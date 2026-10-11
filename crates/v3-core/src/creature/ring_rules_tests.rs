@@ -87,8 +87,9 @@ fn direct_edges_cover_a_rule_per_direction_and_ignore_tiny_weights() {
     assert_eq!(census.direction_general_edges_only, 1);
 }
 
-#[test]
-fn one_bus_hop_carries_the_ring_channel_with_the_product_sign() {
+/// A food-ring sender writing `sender_channel` into `CustomOutput(4)` at
+/// weight −2, and a receiver voting `StealEnergy(5)` from that slot at 0.5.
+fn bus_hop(sender_channel: u16) -> CreatureGenome {
     let food = InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
         1,
     )));
@@ -96,7 +97,7 @@ fn one_bus_hop_carries_the_ring_channel_with_the_product_sign() {
     wire(
         &mut sender,
         OutputSinkKind::CustomOutput(4),
-        leaf(0, 3, -2.0),
+        leaf(0, sender_channel, -2.0),
     );
     let mut receiver = CgpGraphBackendDef::new_with_fixed_outputs();
     wire(
@@ -110,18 +111,98 @@ fn one_bus_hop_carries_the_ring_channel_with_the_product_sign() {
         slot: 0,
         gate_bias: 1.0,
     });
-    let genome = CreatureGenome {
+    CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
             entry,
             node(1, vec![InputReference::UpstreamSlot(4)], receiver),
         ],
-    };
-    let census = census_of(&[genome]);
+    }
+}
+
+#[test]
+fn one_bus_hop_carries_the_ring_channel_with_the_product_sign() {
+    let census = census_of(&[bus_hop(3)]);
     assert_eq!(
         census.rule_rows(),
         vec!["NeighborFoodRing:1 StealEnergy 2 - 1 0 0 0 0 0 0 0".to_string()]
     );
+}
+
+#[test]
+fn a_bus_hop_from_a_sub_index_past_the_ring_carries_no_rule() {
+    // Arrange: the sender reads sub-index 8, one past the last ring channel.
+    let genome = bus_hop(u16::from(DIRECTIONS));
+
+    // Act
+    let census = census_of(&[genome]);
+
+    // Assert
+    assert!(census.rule_rows().is_empty());
+}
+
+#[test]
+fn only_ring_references_above_the_weight_floor_carry_a_path() {
+    // Arrange: a non-ring world input at full weight, ring edges of either
+    // sign at exactly the floor, and a projection at exactly the floor.
+    let food_here = InputReference::World(WorldInputKey::FoodHere {
+        type_idx: OrdinaryFoodTypeId::new(0),
+    });
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    wire(
+        &mut def,
+        OutputSinkKind::ActionVote(VoteSink::Move(0)),
+        leaf(0, 0, 1.0),
+    );
+    wire(
+        &mut def,
+        OutputSinkKind::ActionVote(VoteSink::Move(1)),
+        leaf(1, 0, PATH_WEIGHT_FLOOR),
+    );
+    wire(
+        &mut def,
+        OutputSinkKind::ActionVote(VoteSink::Move(2)),
+        leaf(1, 0, -PATH_WEIGHT_FLOOR),
+    );
+    def.projections.push(RingProjection::new(
+        1,
+        DirectedVoteKind::Reproduce,
+        0,
+        PATH_WEIGHT_FLOOR,
+    ));
+
+    // Act
+    let census = census_of(&[single(def, vec![food_here, barrier()])]);
+
+    // Assert
+    assert!(census.rule_rows().is_empty());
+    assert_eq!(census.projections, 1);
+    assert_eq!(census.projections_nonzero, 0);
+    assert_eq!(
+        census.projection_rows(),
+        vec!["NeighborBarrierRing Reproduce 0 1 0 0".to_string()]
+    );
+}
+
+#[test]
+fn projection_rows_count_each_sign_only_above_the_weight_floor() {
+    // Arrange: one projection class with one carrying weight of each sign
+    // and one sub-floor weight of each sign.
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    for weight in [-0.5, -1e-4, 1e-4, 0.5] {
+        def.projections
+            .push(RingProjection::new(0, DirectedVoteKind::Move, 2, weight));
+    }
+
+    // Act
+    let census = census_of(&[single(def, vec![barrier()])]);
+
+    // Assert
+    assert_eq!(
+        census.projection_rows(),
+        vec!["NeighborBarrierRing Move 2 4 1 1".to_string()]
+    );
+    assert_eq!(census.projections_nonzero, 2);
 }
 
 #[test]
