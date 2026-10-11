@@ -1,6 +1,6 @@
 # T11.F31 — Ring Projection Motif
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-11
 **Feature**: T11.F31
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -166,8 +166,8 @@ keys and the goal summary gains one block.
       runtime config spec (`genome_size()` units).
 - [x] Re-pins of the Determinism paragraph, each with its reason, in the
       readings.
-- [ ] `make check` exits 0 in the worktree.
-- [ ] Gate and goal profiles by the benchmark specialist, then the mutation gate
+- [x] `make check` exits 0 in the worktree (tested commit `cf507392`).
+- [x] Gate and goal profiles by the benchmark specialist, then the mutation gate
       by the mutation specialist, sequentially and alone.
 
 ## Verification
@@ -185,7 +185,7 @@ keys and the goal summary gains one block.
       `cf7fa109`: `cargo test -p v3-cli`, `cargo test -p
       v3-server -p v3-lab -p v3-telemetry` -> exit 0; `npm run lint`, `npm
       run test` (380 passed) and `npm run build` in `frontend/` -> exit 0.
-- [ ] `make check` -> exit 0, tested commit in the readings.
+- [x] `make check` -> exit 0 on tested commit `cf507392`, recorded in the readings.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `93c3fa33` -> exit 0,
       `293 mutants tested in 3h: 25 missed, 214 caught, 54 unviable`, no
       timeouts; output copied to
@@ -298,16 +298,16 @@ bounds, `AddRingProjection` silent (0 changed, 0 dead) in every cohort.
 
 ## Success Criteria
 
-- [ ] A ring projection is one heritable gene: one size unit, born at weight 0
+- [x] A ring projection is one heritable gene: one size unit, born at weight 0
       by its own operator, and every change to its weight, offset, kind or
       existence acts on all eight directions in one event; per-direction edges
       and `InputRef.Add` are unchanged.
-- [ ] Every reader in the Reader table sees projections, `Prune` never orphans
+- [x] Every reader in the Reader table sees projections, `Prune` never orphans
       one, and production, observed and traced execution agree.
-- [ ] Gate and goal ran once each and every row of the predeclaration is read;
+- [x] Gate and goal ran once each and every row of the predeclaration is read;
       every floor, guard, fingerprint and target is met, or the user has
       explicitly accepted its breach; an unresolved breach stops closure.
-- [ ] `make check` exits 0 and the mutation gate is recorded.
+- [x] `make check` exits 0 and the mutation gate is recorded.
 
 ## Notes for AI Agents
 
