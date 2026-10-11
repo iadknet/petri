@@ -201,6 +201,15 @@
   svg .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
   svg .line.emph { stroke-width: 2.6; }
   svg .line.muted { opacity: 0.6; stroke-width: 1.5; }
+  svg .line.riser { stroke-width: 1; opacity: 0.4; }
+  svg text.ptitle { fill: var(--ink-2); font-weight: 600; font-size: 12px; }
+  /* A surface-coloured halo keeps labels legible where they cross a line. */
+  svg text.ref-label, svg text.vlab, svg text.sellab, svg text.ptitle, svg text.unit { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+  details.topic .card svg text.ref-label, details.topic .card svg text.vlab, details.topic .card svg text.sellab, details.topic .card svg text.ptitle, details.topic .card svg text.unit { stroke: var(--page); }
+  .rows { display: grid; gap: 2px; margin-top: 6px; }
+  .wrows { display: grid; gap: 4px; margin-top: 12px; }
+  .wrow { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 18px; align-items: center; padding: 6px 0; border-top: 1px solid var(--grid); }
+  .wrow:first-child { border-top: none; }
   svg .ref { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 4 4; }
   svg .ref.floor { stroke: var(--bad); }
   svg .ref-label { fill: var(--ink-2); }
@@ -258,6 +267,7 @@
   @media (max-width: 760px) {
     .wrap { padding-left: 16px; padding-right: 16px; }
     .worlds, .panels { grid-template-columns: 1fr; gap: 14px; }
+    .wrow { grid-template-columns: 1fr; gap: 4px; }
     .verdict .lines li { grid-template-columns: 1fr; gap: 2px; }
     details.about dl, dl.gloss { grid-template-columns: 1fr; gap: 2px; }
     details.about dd, dl.gloss dd { margin-bottom: 6px; }
@@ -360,13 +370,13 @@
     for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(+v.toFixed(12));
     return out;
   };
-  const domainOf = (arrays, zero) => {
+  const domainOf = (arrays, zero, count) => {
     let lo = Infinity, hi = -Infinity;
     arrays.forEach((a) => a.forEach((v) => { if (fin(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
     if (!fin(lo)) { lo = 0; hi = 1; }
     if (zero !== false) lo = Math.min(0, lo);
     if (hi === lo) hi = lo + (Math.abs(lo) || 1);
-    const ticks = niceTicks(lo, hi, 4);
+    const ticks = niceTicks(lo, hi, count || 4);
     return { lo: Math.min(lo, ticks[0]), hi: Math.max(hi, ticks[ticks.length - 1]), ticks };
   };
 
@@ -998,195 +1008,172 @@
     return { lo: Math.pow(10, a), hi: Math.pow(10, b), ticks, log: true };
   }
 
-  // A trend strip for a goal reading over every closure: stepped, scaled to the
-  // reading's own range, the first reading dashed with a hollow dot, the shown
-  // closure filled. Click a closure to show it.
-  function sparkline(M, key, wi) {
-    const spec = READINGS[key];
-    const values = M.vals[key][wi];
-    const wrap = el('div', 'spark');
-    const plot = el('div');
-    wrap.appendChild(plot);
-    const n = values.length;
-    const finite = values.filter(fin);
-    const vmin = finite.length ? Math.min(...finite) : 0, vmax = finite.length ? Math.max(...finite) : 1;
-    const draw = () => {
-      const W = Math.max(160, Math.round(plot.clientWidth) || 260), H = 52;
-      plot.replaceChildren();
-      const pad = (vmax - vmin) * 0.12 || Math.abs(vmax) * 0.1 || 1;
-      const lo = vmin - pad, hi = vmax + pad;
-      const s = W / Math.max(1, n);
-      const xAt = (k) => s * (k + 0.5);
-      const yAt = (v) => 4 + (H - 8) - ((v - lo) / (hi - lo || 1)) * (H - 8);
-      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `${spec.label}, ${M.worlds[wi].short}, over every closure` });
-      if (M.sel >= 0) svg.appendChild(svgEl('rect', { class: 'selband', x: s * M.sel, y: 0, width: Math.max(4, s), height: H }));
-      const first = values[M.firstIndex];
-      if (fin(first)) svg.appendChild(svgEl('line', { class: 'ref', x1: 0, x2: W, y1: yAt(first), y2: yAt(first) }));
-      svg.appendChild(svgEl('path', { d: stepPath(values, (k) => s * k, (k) => s * (k + 1), yAt), class: 'line', stroke: 'var(--ink-2)', 'stroke-width': 1.5 }));
-      if (fin(first)) svg.appendChild(svgEl('circle', { cx: xAt(M.firstIndex), cy: yAt(first), r: 3, fill: 'var(--surface)', stroke: 'var(--ink-2)', 'stroke-width': 1.5 }));
-      if (fin(values[M.sel])) svg.appendChild(svgEl('circle', { cx: xAt(M.sel), cy: yAt(values[M.sel]), r: 4, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2 }));
-      const hair = svgEl('line', { class: 'xhair', y1: 0, y2: H, visibility: 'hidden' });
-      svg.appendChild(hair);
-      const hit = svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: 'transparent' });
-      svg.appendChild(hit);
-      const nearest = (ev) => { const r = svg.getBoundingClientRect(); const sx = ((ev.clientX - r.left) * W) / r.width; return Math.max(0, Math.min(n - 1, Math.floor(sx / s))); };
-      hit.addEventListener('pointermove', (ev) => {
-        const k = nearest(ev);
-        hair.setAttribute('x1', xAt(k)); hair.setAttribute('x2', xAt(k)); hair.setAttribute('visibility', 'visible');
-        const pt = M.points[k];
-        showTip(ev, pt.title, pt.kind === 'gap' ? 'report not stored' : `${shortDate(pt.date)}${pt.changed ? '' : ' · changed nothing'} · click to show this closure`,
-          [{ color: 'var(--ink-2)', name: `${M.worlds[wi].short}${spec.extra && pt.kind === 'world' ? ' · ' + spec.extra(pt, M.worlds[wi]) : ''}`, value: valueText(spec, values[k]) }]);
-      });
-      hit.addEventListener('pointerleave', () => { hair.setAttribute('visibility', 'hidden'); hideTip(); });
-      hit.addEventListener('click', (ev) => { const k = nearest(ev); if (M.points[k].kind === 'world') M.pick(k); });
-      plot.appendChild(svg);
-    };
-    observeWidth(plot, draw);
-    const cap = el('div', 'cap');
-    const firstPt = M.points[M.firstIndex], lastPt = M.points[n - 1];
-    cap.appendChild(el('span', null, firstPt ? shortDate(firstPt.date) : ''));
-    cap.appendChild(el('span', null, finite.length ? `low ${valueText(spec, vmin)} · high ${valueText(spec, vmax)}` : ''));
-    cap.appendChild(el('span', null, lastPt ? shortDate(lastPt.date) : ''));
-    wrap.appendChild(cap);
-    return wrap;
-  }
-
-  // A stepped path: value i holds from x0(i) to x1(i); NaN lifts the pen.
-  function stepPath(values, x0, x1, yAt) {
-    let d = '', prevY = null;
+  // Step pieces: value i holds from x0(i) to x1(i). Flats carry the reading;
+  // risers only join them, so they are drawn lighter. NaN lifts the pen.
+  function stepParts(values, x0, x1, yAt) {
+    let flats = '', risers = '', prev = null;
     values.forEach((v, i) => {
       const y = fin(v) ? yAt(v) : NaN;
-      if (!fin(y)) { prevY = null; return; }
-      d += prevY === null ? `M${x0(i).toFixed(1)},${y.toFixed(1)}` : `V${y.toFixed(1)}`;
-      d += `H${x1(i).toFixed(1)}`;
-      prevY = y;
+      if (!fin(y)) { prev = null; return; }
+      if (prev !== null && prev !== y) risers += `M${x0(i).toFixed(1)},${prev.toFixed(1)}V${y.toFixed(1)}`;
+      flats += `M${x0(i).toFixed(1)},${y.toFixed(1)}H${x1(i).toFixed(1)}`;
+      prev = y;
     });
+    return { flats, risers };
+  }
+  // The wash under a stepped series, down to the baseline, one shape per unbroken run.
+  function stepArea(values, x0, x1, yAt, base) {
+    let d = '', open = false;
+    values.forEach((v, i) => {
+      const y = fin(v) ? yAt(v) : NaN;
+      if (!fin(y)) { if (open) { d += `V${base.toFixed(1)}Z`; open = false; } return; }
+      d += open ? `V${y.toFixed(1)}` : `M${x0(i).toFixed(1)},${base.toFixed(1)}V${y.toFixed(1)}`;
+      d += `H${x1(i).toFixed(1)}`;
+      open = true;
+    });
+    if (open) d += `V${base.toFixed(1)}Z`;
     return d;
   }
 
-  // A line plot. cfg: { n, series: [{ name, color, values, muted, emph }], dom,
-  // band?: { lo[], hi[], color }, step, first, sel, selLabel, refLines, unit,
-  // yFmt, tipFmt, xTicks: [i], xLabel(i), tipTitle(i), tipMeta(i), onPick(i), height }
+  // A line plot, one world wide. cfg: { n, series: [{ name, color, values, muted,
+  // emph, details }], dom, band?: { lo[], hi[], color, name }, step, area, title,
+  // unit, showX, sel, selLabel, refLines, marks, yFmt, tipFmt, xTicks, xLabel(i),
+  // tipTitle(i), tipMeta(i), onPick(i), height }
   function linePlot(plot, cfg) {
     const n = cfg.n;
     const draw = () => {
-      const W = Math.max(220, Math.round(plot.clientWidth) || 360), H = cfg.height || 180;
+      const W = Math.max(240, Math.round(plot.clientWidth) || 600);
+      const showX = cfg.showX !== false;
+      const H = (cfg.height || 120) + (showX ? 24 : 6);
       plot.replaceChildren();
-      const m = { t: 20, r: 12, b: 22, l: cfg.first ? 48 : 12 };
+      const m = { t: 22, r: 14, b: showX ? 26 : 6, l: 54 };
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
       const { lo, hi, ticks } = cfg.dom;
       const tf = cfg.dom.log ? (v) => Math.log10(v) : (v) => v;
       const LO = tf(lo), HI = tf(hi);
       const s = cfg.step ? iw / Math.max(1, n) : (n <= 1 ? iw : iw / (n - 1));
       const xAt = (i) => (cfg.step ? m.l + s * (i + 0.5) : m.l + (n <= 1 ? iw / 2 : i * s));
+      const x0 = (i) => m.l + s * i, x1 = (i) => m.l + s * (i + 1);
       const yAt = (v) => {
         if (!fin(v)) return NaN;
         if (cfg.dom.log && v <= 0) return m.t + ih;
         return m.t + ih - ((tf(Math.min(Math.max(v, lo), hi)) - LO) / (HI - LO || 1)) * ih;
       };
       const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': cfg.label || 'chart' });
-      // Selection band first, under everything.
-      if (Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n) {
+      const hasSel = Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n;
+      // cfg.bridge[i] marks a closure with no stored report: drawing carries the
+      // previous reading across it (hover and tables still say "not stored").
+      const bridged = (vals) => (cfg.bridge ? vals.map((v, i) => (cfg.bridge[i] && !fin(v) && i > 0 ? vals[i - 1] : v)) : vals);
+      if (hasSel) {
         const bw = cfg.step ? s : Math.max(2, Math.min(s, 12));
-        const bx = cfg.step ? m.l + s * cfg.sel : Math.min(Math.max(xAt(cfg.sel) - bw / 2, m.l), m.l + iw - bw);
+        const bx = cfg.step ? x0(cfg.sel) : Math.min(Math.max(xAt(cfg.sel) - bw / 2, m.l), m.l + iw - bw);
         svg.appendChild(svgEl('rect', { class: 'selband', x: bx, y: m.t, width: bw, height: ih }));
-        if (cfg.selLabel) {
-          const x = xAt(cfg.sel);
-          const anchor = x > m.l + iw - 60 ? 'end' : x < m.l + 60 ? 'start' : 'middle';
-          const tx = svgEl('text', { class: 'sellab', x: anchor === 'end' ? Math.min(x + bw / 2, m.l + iw) : anchor === 'start' ? Math.max(x - bw / 2, m.l) : x, y: m.t - 6, 'text-anchor': anchor });
-          tx.textContent = cfg.selLabel;
-          svg.appendChild(tx);
-        }
+      }
+      // Top line: the panel's name, the unit, and the shown closure's label.
+      let titleEnd = m.l;
+      if (cfg.title) { const tx = svgEl('text', { class: 'ptitle', x: m.l, y: 14 }); tx.textContent = cfg.title; svg.appendChild(tx); titleEnd = m.l + cfg.title.length * 7.2 + 14; }
+      if (cfg.unit) { const tx = svgEl('text', { class: 'unit', x: m.l - 8, y: 14, 'text-anchor': 'end' }); tx.textContent = cfg.unit; svg.appendChild(tx); }
+      if (hasSel && cfg.selLabel) {
+        // Shortened with an ellipsis to the room right of the title; the full name stays on hover.
+        const room = m.l + iw - titleEnd, cw = 6.6;
+        const maxChars = Math.max(4, Math.floor(room / cw));
+        const text = cfg.selLabel.length > maxChars ? cfg.selLabel.slice(0, maxChars - 1) + '…' : cfg.selLabel;
+        const x = xAt(cfg.sel), tw = text.length * cw;
+        let anchor = 'middle', tx0 = x;
+        if (x + tw / 2 > m.l + iw) { anchor = 'end'; tx0 = m.l + iw; }
+        if ((anchor === 'middle' ? x - tw / 2 : tx0 - tw) < titleEnd) { anchor = 'start'; tx0 = Math.max(titleEnd, Math.min(x, m.l + iw - tw)); }
+        const tx = svgEl('text', { class: 'sellab', x: tx0, y: 14, 'text-anchor': anchor });
+        tx.textContent = text;
+        if (text !== cfg.selLabel) { const t = svgEl('title', {}); t.textContent = cfg.selLabel; tx.appendChild(t); }
+        svg.appendChild(tx);
       }
       const g = svgEl('g', { class: 'grid' });
       ticks.forEach((t) => {
         const y = yAt(t);
         if (!fin(y)) return;
         g.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y }));
-        if (cfg.first) { const tx = svgEl('text', { x: m.l - 6, y: y + 4, 'text-anchor': 'end' }); tx.textContent = (cfg.yFmt || fmtTick)(t); g.appendChild(tx); }
+        const tx = svgEl('text', { x: m.l - 8, y: y + 4, 'text-anchor': 'end' }); tx.textContent = (cfg.yFmt || fmtTick)(t); g.appendChild(tx);
       });
       svg.appendChild(g);
-      if (cfg.first && cfg.unit) { const tx = svgEl('text', { x: m.l - 6, y: m.t - 6, 'text-anchor': 'end', class: 'unit' }); tx.textContent = cfg.unit; svg.appendChild(tx); }
-      // x labels, skipping any that would collide.
-      const placed = [];
-      (cfg.xTicks || []).forEach((i) => {
-        if (!(i >= 0 && i < n)) return;
-        const x = xAt(i);
-        if (placed.some((p) => Math.abs(p - x) < 58)) return;
-        const text = cfg.xLabel(i);
-        if (!text) return;
-        placed.push(x);
-        const anchor = x < m.l + 20 ? 'start' : x > m.l + iw - 20 ? 'end' : 'middle';
-        const tx = svgEl('text', { x, y: H - 6, 'text-anchor': anchor });
-        tx.textContent = text;
-        svg.appendChild(tx);
-      });
-      // Recorded events (a counter redefined at a closure): a hairline and a label.
+      if (showX) {
+        const placed = [];
+        (cfg.xTicks || []).forEach((i) => {
+          if (!(i >= 0 && i < n)) return;
+          const x = xAt(i);
+          if (placed.some((p) => Math.abs(p - x) < 64)) return;
+          const text = cfg.xLabel(i);
+          if (!text) return;
+          placed.push(x);
+          const anchor = x < m.l + 24 ? 'start' : x > m.l + iw - 24 ? 'end' : 'middle';
+          const tx = svgEl('text', { x, y: H - 7, 'text-anchor': anchor });
+          tx.textContent = text;
+          svg.appendChild(tx);
+        });
+      }
       (cfg.marks || []).forEach((mk) => {
         if (!(mk.i >= 0 && mk.i < n)) return;
-        const x = cfg.step ? m.l + s * mk.i : xAt(mk.i);
+        const x = cfg.step ? x0(mk.i) : xAt(mk.i);
         svg.appendChild(svgEl('line', { class: 'ann', x1: x, x2: x, y1: m.t, y2: m.t + ih }));
         const right = x > m.l + iw / 2;
         const tx = svgEl('text', { class: 'ref-label', x: right ? x - 4 : x + 4, y: m.t + ih - 6, 'text-anchor': right ? 'end' : 'start' });
         tx.textContent = mk.label;
         svg.appendChild(tx);
       });
+      if (cfg.band) {
+        const b = cfg.band;
+        let run = [];
+        const flush = () => {
+          if (!run.length) return;
+          const top = run.map((i) => (cfg.step ? `${x0(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)} ${x1(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}` : `${xAt(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`));
+          const bot = run.slice().reverse().map((i) => (cfg.step ? `${x1(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)} ${x0(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}` : `${xAt(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`));
+          svg.appendChild(svgEl('polygon', { points: top.concat(bot).join(' '), fill: b.color, opacity: 0.16 }));
+          run = [];
+        };
+        for (let i = 0; i < n; i++) { if (fin(yAt(b.lo[i])) && fin(yAt(b.hi[i]))) run.push(i); else flush(); }
+        flush();
+      }
+      // The wash under the series the chart is about, when the scale starts at zero.
+      const lead = cfg.series.find((sr) => sr.emph) || (cfg.series.length === 1 ? cfg.series[0] : null);
+      if (cfg.area && lead && !cfg.dom.log && lo === 0 && cfg.step) svg.appendChild(svgEl('path', { d: stepArea(bridged(lead.values), x0, x1, yAt, m.t + ih), fill: lead.color, opacity: 0.1 }));
       (cfg.refLines || []).forEach((r) => {
         const y = yAt(r.y);
         if (!fin(y)) return;
         svg.appendChild(svgEl('line', { class: 'ref' + (r.floor ? ' floor' : ''), x1: m.l, x2: m.l + iw, y1: y, y2: y }));
-        if (cfg.first || r.always) { const tx = svgEl('text', { class: 'ref-label', x: m.l + 4, y: y - 4 }); tx.textContent = r.label; svg.appendChild(tx); }
+        const tx = svgEl('text', { class: 'ref-label', x: m.l + 4, y: y - 5, 'text-anchor': 'start' }); tx.textContent = r.label; svg.appendChild(tx);
       });
-      const x0 = (i) => m.l + s * i, x1 = (i) => m.l + s * (i + 1);
-      if (cfg.band) {
-        const b = cfg.band;
-        const idx = [];
-        for (let i = 0; i < n; i++) if (fin(yAt(b.lo[i])) && fin(yAt(b.hi[i]))) idx.push(i);
-        // One polygon per unbroken run of measured closures.
-        let run = [];
-        const flush = () => {
-          if (!run.length) return;
-          const top = cfg.step ? run.map((i) => `${x0(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)} ${x1(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`) : run.map((i) => `${xAt(i).toFixed(1)},${yAt(b.hi[i]).toFixed(1)}`);
-          const bot = cfg.step ? run.slice().reverse().map((i) => `${x1(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)} ${x0(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`) : run.slice().reverse().map((i) => `${xAt(i).toFixed(1)},${yAt(b.lo[i]).toFixed(1)}`);
-          svg.appendChild(svgEl('polygon', { points: top.concat(bot).join(' '), fill: b.color, opacity: 0.14 }));
-          run = [];
-        };
-        idx.forEach((i, k) => { if (k && i !== idx[k - 1] + 1) flush(); run.push(i); });
-        flush();
-      }
       cfg.series.forEach((sr) => {
-        const d = cfg.step ? stepPath(sr.values, x0, x1, yAt) : (() => {
+        const cls = 'line' + (sr.emph ? ' emph' : '') + (sr.muted ? ' muted' : '');
+        if (cfg.step) {
+          const { flats, risers } = stepParts(bridged(sr.values), x0, x1, yAt);
+          if (risers) svg.appendChild(svgEl('path', { d: risers, class: cls + ' riser', stroke: sr.color }));
+          if (flats) svg.appendChild(svgEl('path', { d: flats, class: cls, stroke: sr.color }));
+        } else {
           let p = '', pen = false;
           sr.values.forEach((v, i) => { const y = yAt(v); if (!fin(y)) { pen = false; return; } p += (pen ? 'L' : 'M') + xAt(i).toFixed(1) + ',' + y.toFixed(1); pen = true; });
-          return p;
-        })();
-        if (d) svg.appendChild(svgEl('path', { d, class: 'line' + (sr.emph ? ' emph' : '') + (sr.muted ? ' muted' : ''), stroke: sr.color }));
-        if (!cfg.step) sr.values.forEach((v, i) => {
-          const y = yAt(v);
-          if (fin(y) && !fin(yAt(sr.values[i - 1])) && !fin(yAt(sr.values[i + 1]))) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: y, r: 3, fill: sr.color }));
-        });
+          if (p) svg.appendChild(svgEl('path', { d: p, class: cls, stroke: sr.color }));
+          sr.values.forEach((v, i) => {
+            const y = yAt(v);
+            if (fin(y) && !fin(yAt(sr.values[i - 1])) && !fin(yAt(sr.values[i + 1]))) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: y, r: 3, fill: sr.color }));
+          });
+        }
         if (cfg.dom.log) sr.values.forEach((v, i) => { if (v === 0) svg.appendChild(svgEl('circle', { cx: xAt(i), cy: m.t + ih, r: 3.5, fill: 'var(--surface)', stroke: sr.color, 'stroke-width': 1.5 })); });
       });
-      // The shown closure: a ringed dot per series, and its value beside the
-      // series the chart is about.
-      if (Number.isInteger(cfg.sel) && cfg.sel >= 0 && cfg.sel < n) {
-        const labelled = cfg.series.filter((sr) => sr.emph || cfg.series.length === 1);
+      if (hasSel) {
         cfg.series.forEach((sr) => {
           const y = yAt(sr.values[cfg.sel]);
-          if (!fin(y)) return;
-          svg.appendChild(svgEl('circle', { cx: xAt(cfg.sel), cy: y, r: 4, fill: sr.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
+          if (fin(y)) svg.appendChild(svgEl('circle', { cx: xAt(cfg.sel), cy: y, r: 4, fill: sr.color, stroke: 'var(--surface)', 'stroke-width': 2 }));
         });
-        labelled.slice(0, 1).forEach((sr) => {
-          const v = sr.values[cfg.sel], y = yAt(v);
-          if (!fin(y)) return;
-          const x = xAt(cfg.sel);
-          const right = x > m.l + iw * 0.7;
-          const tx = svgEl('text', { class: 'vlab', x: right ? x - 8 : x + 8, y: Math.max(m.t + 10, y - 7), 'text-anchor': right ? 'end' : 'start' });
-          tx.textContent = (cfg.tipFmt || fmt)(v);
-          svg.appendChild(tx);
-        });
+        if (lead) {
+          const v = lead.values[cfg.sel], y = yAt(v);
+          if (fin(y)) {
+            const x = xAt(cfg.sel), right = x > m.l + iw * 0.75;
+            const tx = svgEl('text', { class: 'vlab', x: right ? x - 9 : x + 9, y: y < m.t + 14 ? y + 15 : y - 8, 'text-anchor': right ? 'end' : 'start' });
+            tx.textContent = (cfg.tipFmt || fmt)(v);
+            svg.appendChild(tx);
+          }
+        }
       }
-      if (!cfg.series.some((sr) => sr.values.some((v) => fin(yAt(v))))) { const tx = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2, 'text-anchor': 'middle' }); tx.textContent = 'not measured'; svg.appendChild(tx); }
+      if (!cfg.series.some((sr) => sr.values.some((v) => fin(yAt(v))))) { const tx = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2 + 4, 'text-anchor': 'middle' }); tx.textContent = 'not measured'; svg.appendChild(tx); }
       const hair = svgEl('line', { class: 'xhair', y1: m.t, y2: m.t + ih, visibility: 'hidden' });
       svg.appendChild(hair);
       const hit = svgEl('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' });
@@ -1248,10 +1235,10 @@
     return { card: c, body, setTable };
   }
 
-  // Three world panels over every closure, stepped: each closure's reading holds
-  // until the next one, so a closure that changed nothing reads as flat.
+  // Three worlds stacked as full-width rows on one shared scale, the date axis
+  // under the last. Each closure's reading holds until the next one.
   // spec.series: [{ name, color, read(pt, w), detail?(pt, w), muted?, emph? }];
-  // spec.band?: { name, color, lo(pt, w), hi(pt, w) }; spec.unit; spec.ref?(w).
+  // spec.band?: { name, color, lo(pt, w), hi(pt, w) }; spec.unit; spec.ref?(w); spec.log.
   function closuresChart(M, spec) {
     const c = chartCard(spec);
     const at = (fn, w) => M.points.map((pt) => (pt.kind === 'world' ? num(fn(pt, w)) : NaN));
@@ -1266,18 +1253,18 @@
       refs: spec.ref ? [spec.ref(w)].filter(Boolean) : [],
     }));
     const arrays = panels.flatMap((p) => p.series.map((s) => s.values).concat(p.refs.map((r) => [r.y])).concat(p.band ? [p.band.lo, p.band.hi] : []));
-    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero);
+    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero, 3);
     const ticks = dateTicks(M.points.map((p) => p.date), 6);
-    const grid = el('div', 'panels');
+    if (spec.series.length > 1 || spec.band) c.body.appendChild(legend(spec.series.map((s) => ({ name: s.name, color: s.color })).concat(spec.band ? [{ name: spec.band.name, color: spec.band.color, box: true }] : [])));
+    const stack = el('div', 'rows');
     panels.forEach((p, k) => {
-      const pane = el('div', 'panel');
-      pane.appendChild(el('div', 'pn', p.w.short));
       const plot = el('div', 'plot');
-      pane.appendChild(plot);
-      grid.appendChild(pane);
+      stack.appendChild(plot);
+      const last = k === panels.length - 1;
       linePlot(plot, {
-        n: M.points.length, series: p.series, band: p.band, dom, step: true, first: k === 0, sel: M.sel, refLines: p.refs, unit: spec.unit,
-        selLabel: M.points[M.sel] ? M.points[M.sel].id || M.points[M.sel].name : '',
+        n: M.points.length, series: p.series, band: p.band, dom, step: true, area: true, title: p.w.short, bridge: M.points.map((q) => q.kind === 'gap'), unit: k === 0 ? spec.unit : '',
+        showX: last, height: spec.height || 104, sel: M.sel, refLines: p.refs,
+        selLabel: k === 0 && M.points[M.sel] ? M.points[M.sel].name : '',
         yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
         xTicks: ticks, xLabel: (i) => shortDate(M.points[i].date),
         tipTitle: (i) => `${p.w.short} · ${M.points[i].title}`,
@@ -1285,8 +1272,7 @@
         onPick: (i) => { if (M.points[i].kind === 'world') M.pick(i); },
       });
     });
-    c.body.appendChild(grid);
-    if (spec.series.length > 1 || spec.band) c.body.appendChild(legend(spec.series.map((s) => ({ name: s.name, color: s.color })).concat(spec.band ? [{ name: spec.band.name, color: spec.band.color, box: true }] : [])));
+    c.body.appendChild(stack);
     c.body.appendChild(el('p', 'note', 'Each closure\'s reading holds until the next closure, so a step is where a closure moved it. The shaded column is the closure shown; click to show another.'));
     c.setTable(() => {
       const headers = ['Closure'];
@@ -1307,7 +1293,8 @@
   }
 
   // Through one run: the shown closure (blue) against the one before (grey) at
-  // each checkpoint. spec.log draws a log scale for readings that boom and crash.
+  // each checkpoint, worlds stacked. spec.log draws a log scale for readings
+  // that boom and crash.
   function checkpointChart(M, spec) {
     const c = chartCard(spec);
     const sel = M.points[M.sel], j = M.prevOf(M.sel), prev = j >= 0 ? M.points[j] : null;
@@ -1325,23 +1312,21 @@
       }),
     }));
     const arrays = panels.flatMap((p) => p.series.map((s) => s.values));
-    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero);
-    const grid = el('div', 'panels');
-    const every = Math.max(1, Math.ceil(xs.length / 5));
+    const dom = spec.log ? logDomain(arrays) : domainOf(arrays, spec.zero, 3);
+    const every = Math.max(1, Math.ceil(xs.length / 8));
+    c.body.appendChild(legend(panels[0] ? panels[0].series : []));
+    const stack = el('div', 'rows');
     panels.forEach((p, k) => {
-      const pane = el('div', 'panel');
-      pane.appendChild(el('div', 'pn', p.w.short));
       const plot = el('div', 'plot');
-      pane.appendChild(plot);
-      grid.appendChild(pane);
+      stack.appendChild(plot);
       linePlot(plot, {
-        n: xs.length, series: p.series, dom, first: k === 0, unit: spec.unit, yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
+        n: xs.length, series: p.series, dom, title: p.w.short, unit: k === 0 ? spec.unit : '', showX: k === panels.length - 1, height: spec.height || 100,
+        yFmt: spec.yFmt || fmtTick, tipFmt: spec.tipFmt || fmt, label: `${spec.title}, ${p.w.short}`,
         xLabel: (i) => (i === 0 ? `tick ${xs[i]}` : String(xs[i])), xTicks: xs.map((_, i) => i).filter((i) => i % every === 0 || i === xs.length - 1),
-        tipTitle: (i) => `${p.w.short} · tick ${xs[i]}`, height: spec.height || 160,
+        tipTitle: (i) => `${p.w.short} · tick ${xs[i]}`,
       });
     });
-    c.body.appendChild(grid);
-    c.body.appendChild(legend(panels[0] ? panels[0].series : []));
+    c.body.appendChild(stack);
     if (spec.log) c.body.appendChild(el('p', 'note', 'Log scale: equal distances are equal ratios, so the early boom and the late plateau both fit. A zero sits on the bottom edge as a hollow dot.'));
     c.setTable(() => {
       const headers = ['Tick'];
@@ -1474,6 +1459,8 @@
     app.appendChild(c);
   }
 
+  // A goal reading: one row per world, the numbers on the left and a wide trend
+  // over every closure on the right, the first reading drawn as a dashed line.
   function goalCard(M, key) {
     const spec = READINGS[key];
     const i = M.sel, j = M.prevOf(i), f = M.firstIndex;
@@ -1484,8 +1471,10 @@
     metric.appendChild(document.createTextNode(`  ${spec.unit} · the first reading is ${M.points[f] ? M.points[f].title : 'not stored'}`));
     c.appendChild(metric);
     c.appendChild(el('p', 'def', spec.def));
-    const grid = el('div', 'worlds');
+    const ticks = dateTicks(M.points.map((p) => p.date), 6);
+    const rows = el('div', 'wrows');
     M.worlds.forEach((w, wi) => {
+      const row = el('div', 'wrow');
       const cell = el('div', 'wcell');
       const wn = el('div', 'wname', w.name);
       wn.title = WORLD_INFO[w.short] || '';
@@ -1502,15 +1491,29 @@
       const first = M.vals[key][wi][f];
       const r2 = el('div', 'rowc');
       if (fin(first) && fin(cur) && i !== f) {
-        const jf = judge(spec, cur, first, M.typical[key][wi]);
-        r2.appendChild(chip(jf));
+        r2.appendChild(chip(judge(spec, cur, first, M.typical[key][wi])));
         r2.appendChild(el('span', null, `since the first reading, ${valueText(spec, first)}`));
       } else r2.appendChild(el('span', null, i === f ? 'this is the first reading' : 'no first reading'));
       cell.appendChild(r2);
-      cell.appendChild(sparkline(M, key, wi));
-      grid.appendChild(cell);
+      row.appendChild(cell);
+      const plot = el('div', 'plot');
+      row.appendChild(plot);
+      const values = M.vals[key][wi];
+      const fmtV = (v) => valueText(spec, v);
+      linePlot(plot, {
+        n: M.points.length, series: [{ name: spec.label, color: 'var(--s1)', emph: true, values, details: spec.extra ? M.points.map((pt) => (pt.kind === 'world' ? spec.extra(pt, w) : '')) : null }],
+        dom: domainOf([values, [first]], true, 3), step: true, area: true, sel: i, bridge: M.points.map((q) => q.kind === 'gap'), showX: wi === M.worlds.length - 1, height: 92,
+        refLines: fin(first) ? [{ y: first, label: `first reading ${fmtV(first)}` }] : [],
+        yFmt: spec.kind === 'share' ? pctTick : fmtTick, tipFmt: fmtV, label: `${spec.label}, ${w.short}, over every closure`,
+        xTicks: ticks, xLabel: (k) => shortDate(M.points[k].date),
+        tipTitle: (k) => `${w.short} · ${M.points[k].title}`,
+        tipMeta: (k) => (M.points[k].kind === 'gap' ? 'report not stored' : `${shortDate(M.points[k].date)}${M.points[k].changed ? '' : ' · changed nothing'} · click to show this closure`),
+        onPick: (k) => { if (M.points[k].kind === 'world') M.pick(k); },
+      });
+      rows.appendChild(row);
     });
-    c.appendChild(grid);
+    c.appendChild(rows);
+    c.appendChild(el('p', 'note', 'Each closure\'s reading holds until the next closure. The shaded column is the closure shown; click a chart to show another.'));
     c.appendChild(about(spec));
     return c;
   }
@@ -1969,11 +1972,11 @@
             c.body.appendChild(pane);
             const gateDates = gatePts.map((f) => (get(f.gate, 'environment.generated_at') || '').slice(0, 10));
             linePlot(plot, {
-              n: gatePts.length, series, dom: domainOf(series.map((s) => s.values).concat([[1]]), true), step: true, first: true, unit: 'of first',
+              n: gatePts.length, series, dom: domainOf(series.map((s) => s.values).concat([[1]]), true, 3), step: true, unit: 'of first', height: 180,
               sel: selIdx >= 0 ? selIdx : undefined, selLabel: selIdx >= 0 ? featureId(gatePts[selIdx].slug) || featureName(gatePts[selIdx].slug) : '',
               refLines: [{ y: 1, label: '100%: the first gate closure' }],
               marks: (get(M.data.index, 'counter_definition_changes') || []).map((ch) => ({ i: gatePts.findIndex((f) => featureId(f.slug) === ch.feature), label: `${COUNTER_NAMES[ch.counter] || ch.counter} redefined at ${ch.feature}` })),
-              yFmt: pctTick, tipFmt: pct, xTicks: dateTicks(gateDates, 6), xLabel: (i) => shortDate(gateDates[i]), tipTitle: (i) => titleOfPath(gatePts[i].slug), tipMeta: (i) => shortDate(gateDates[i]), height: 210,
+              yFmt: pctTick, tipFmt: pct, xTicks: dateTicks(gateDates, 6), xLabel: (i) => shortDate(gateDates[i]), tipTitle: (i) => titleOfPath(gatePts[i].slug), tipMeta: (i) => shortDate(gateDates[i]),
             });
             c.body.appendChild(legend(series));
             c.setTable(() => [['Closure', ...series.map((s) => s.name)], gatePts.map((f, i) => [titleOfPath(f.slug), ...series.map((s) => pct(s.values[i]))]).reverse()]);
