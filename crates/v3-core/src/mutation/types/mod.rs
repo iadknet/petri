@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::creature::genome::vote::VoteSink;
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -49,6 +50,45 @@ pub enum MutationDomain {
     Vm,
     Graph,
     InputRef,
+}
+
+/// The class of the vote sink a born edge lands on (T11.F30): a kind's
+/// `Drive` or one of its direction sinks. `AddGraphEdge` and `InputRef.Add`
+/// report it at the push; the `drive_births` reading keys carrier outcomes
+/// by it.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum BirthEdgeClass {
+    Drive,
+    Direction,
+}
+
+impl BirthEdgeClass {
+    pub const ALL: [Self; 2] = [Self::Drive, Self::Direction];
+
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Drive => "drive",
+            Self::Direction => "direction",
+        }
+    }
+
+    /// The class of `sink`: `Drive` for a drive, `Direction` for a `Move`,
+    /// `Reproduce` or `StealEnergy` direction sink, `None` for `Eat`,
+    /// `Terminate` and `Decide`.
+    #[must_use]
+    pub const fn of_sink(sink: VoteSink) -> Option<Self> {
+        match sink {
+            VoteSink::Drive(_) => Some(Self::Drive),
+            VoteSink::Move(_) | VoteSink::Reproduce(_) | VoteSink::StealEnergy(_) => {
+                Some(Self::Direction)
+            }
+            VoteSink::Eat | VoteSink::Terminate | VoteSink::Decide => None,
+        }
+    }
 }
 
 /// Input class attached or wired when a mutation adds a new node.
@@ -581,6 +621,9 @@ pub struct MutationSummary {
     /// One record per attempted event, in draw order (T13.F01). Purely
     /// observational: recording consumes no RNG and changes no selection.
     pub events: Vec<MutationEventRecord>,
+    /// The class of each vote-sink edge an applied `AddGraphEdge` or
+    /// `InputRef.Add` pushed, in event order (T11.F30).
+    pub vote_edge_classes: Vec<BirthEdgeClass>,
 }
 
 impl MutationSummary {
@@ -607,6 +650,30 @@ impl MutationSummary {
             executed_target_events: 0,
             not_applicable_events: 0,
             events: Vec::new(),
+            vote_edge_classes: Vec::new(),
+        }
+    }
+
+    /// Record the class of a vote-sink edge an applied event pushed.
+    pub fn record_vote_edge_class(&mut self, class: BirthEdgeClass) {
+        self.vote_edge_classes.push(class);
+    }
+
+    /// The birth's edge class (T11.F30): defined only when the birth applied
+    /// exactly one event, that event was one `AddGraphEdge` or one
+    /// `InputRef.Add`, and it pushed an edge onto a drive or direction sink.
+    #[must_use]
+    pub fn birth_edge_class(&self) -> Option<BirthEdgeClass> {
+        let single = self.applied_events == 1
+            && [
+                MutationOperator::GraphAddGraphEdge,
+                MutationOperator::InputRefAdd,
+            ]
+            .iter()
+            .any(|operator| self.applied_by_operator.get(operator) == Some(&1));
+        match self.vote_edge_classes.as_slice() {
+            [class] if single => Some(*class),
+            _ => None,
         }
     }
 

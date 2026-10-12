@@ -8,11 +8,11 @@ use rand::Rng;
 
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::types::{BirthEdgeClass, MutationSkipReason};
 
 #[inline]
 pub(super) fn graph_def_mut(
@@ -87,7 +87,7 @@ pub(super) fn add_graph_edge(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
     let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
     add_edge(def, &input_refs, rng)
 }
@@ -631,11 +631,14 @@ pub(crate) fn copy_cgp_subgraph(
 // ─── Edge operators (across all 5 surfaces) ─────────────────────────────────
 
 /// Add a random edge to a random edge-bearing surface.
+///
+/// Returns the class of the vote sink the edge lands on (T11.F30), `None`
+/// for a compute input or any other sink.
 pub(crate) fn add_edge(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
     let surface = pick_random_surface(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes.len() as u16;
     let source = random_graph_source(compute_count, input_refs, rng);
@@ -644,7 +647,13 @@ pub(crate) fn add_edge(
     if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
         weights[node].push(None);
     }
-    Ok(())
+    Ok(match surface {
+        EdgeSurface::SinkInput(i) => match def.output_sinks[i].kind {
+            OutputSinkKind::ActionVote(sink) => BirthEdgeClass::of_sink(sink),
+            _ => None,
+        },
+        EdgeSurface::ComputeInput(_) => None,
+    })
 }
 
 /// Remove a random edge from any surface.

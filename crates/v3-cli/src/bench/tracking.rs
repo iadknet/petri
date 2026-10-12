@@ -362,6 +362,11 @@ pub struct WorldTracking {
     /// keyed by `MutationOperator::as_key`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mutation_value_totals_by_operator: Option<BTreeMap<String, MutationOutcomeTotals>>,
+    /// The same lifetime totals for carriers of a single-edge birth, keyed by
+    /// the class of the vote sink the edge landed on, `drive` or `direction`
+    /// (`drive_births`, T11.F30).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mutation_value_totals_by_birth_edge_class: Option<BTreeMap<String, MutationOutcomeTotals>>,
     /// What the population's predation attempts did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
@@ -608,6 +613,7 @@ impl WorldTracking {
             mutation_supply: None,
             mutation_outcome_summary: None,
             mutation_value_totals_by_operator: None,
+            mutation_value_totals_by_birth_edge_class: None,
             predation: None,
             action_attempts: None,
             mortality: None,
@@ -684,6 +690,13 @@ impl WorldTracking {
                     .mutation_value_totals_by_operator
                     .iter()
                     .map(|(operator, totals)| (operator.as_key().to_string(), totals.into()))
+                    .collect(),
+            ),
+            mutation_value_totals_by_birth_edge_class: Some(
+                stats
+                    .mutation_value_totals_by_birth_edge_class
+                    .iter()
+                    .map(|(class, totals)| (class.as_key().to_string(), totals.into()))
                     .collect(),
             ),
             predation: Some(PredationTracking {

@@ -143,6 +143,13 @@ impl Simulation {
                     .or_default()
                     .record_outcome(observation, evaluation);
             }
+            if let Some(class) = creature.birth_edge_class {
+                self.stats
+                    .mutation_value_totals_by_birth_edge_class
+                    .entry(class)
+                    .or_default()
+                    .record_outcome(observation, evaluation);
+            }
             self.world.remove_creature(creature.position);
         }
         self.action_logs.remove(id);

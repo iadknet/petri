@@ -12,8 +12,8 @@ use crate::mutation::pressure;
 use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
-    MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
+    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
@@ -33,7 +33,9 @@ fn requested_event_count(config: &MutationConfig, units: u32, rng: &mut impl Rng
 struct SelectedEvent {
     operator: MutationOperator,
     tracked_before: Option<CreatureGenome>,
-    result: Result<TargetReachability, MutationSkipReason>,
+    /// The reachability and, for `AddGraphEdge` and `InputRef.Add`, the class
+    /// of the vote-sink edge the event pushed (T11.F30).
+    result: Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason>,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
     /// it stood before the event (T13.F01).
@@ -198,7 +200,8 @@ impl MutationEngine {
                         rng,
                         config,
                         food_type_count,
-                    );
+                    )
+                    .map(|reachability| (reachability, None));
                     if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                         discarded.push((
                             operator,
@@ -240,7 +243,8 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.vm);
-                            let result = apply_vm_event(genome, op, &mut targets, rng, config);
+                            let result = apply_vm_event(genome, op, &mut targets, rng, config)
+                                .map(|reachability| (reachability, None));
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 discarded.push((
                                     operator,
@@ -391,15 +395,18 @@ impl MutationEngine {
                 operator: Some(operator),
                 target: first_pick.and_then(|index| node_ids.get(index).copied()),
                 outcome: match result {
-                    Ok(reachability) => MutationEventOutcome::Applied(reachability),
+                    Ok((reachability, _)) => MutationEventOutcome::Applied(reachability),
                     Err(reason) => MutationEventOutcome::Skipped(reason),
                 },
                 discarded,
             });
 
             match result {
-                Ok(reachability) => {
+                Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
+                    if let Some(class) = edge_class {
+                        summary.record_vote_edge_class(class);
+                    }
                     if let Some(before) = tracked_before.as_ref() {
                         #[cfg(test)]
                         if operator == MutationOperator::GraphRecruitNeutralInput {
@@ -636,16 +643,9 @@ fn apply_graph_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
-) -> Result<TargetReachability, MutationSkipReason> {
+) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply_with_food_type_count(
-        genome,
-        op,
-        targets,
-        rng,
-        config,
-        food_type_count,
-    ) {
+    match GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
@@ -669,16 +669,9 @@ fn apply_input_ref_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
-) -> Result<TargetReachability, MutationSkipReason> {
+) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
     let snapshot = genome.clone();
-    match InputRefMutator::apply_with_food_type_count(
-        genome,
-        op,
-        targets,
-        rng,
-        config,
-        food_type_count,
-    ) {
+    match InputRefMutator::apply_classified(genome, op, targets, rng, config, food_type_count) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)

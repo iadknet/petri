@@ -5,8 +5,8 @@ use prost::Message as _;
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::creature::sensor_census::world_input_key_universe;
 use v3_core::mutation::{
-    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationOperatorFunnel,
-    MutationSkipReason,
+    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
+    MutationOperatorFunnel, MutationSkipReason,
 };
 use v3_core::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, PredationActionResult, ReproductionActionResult,
@@ -160,6 +160,10 @@ fn populated() -> SimStats {
             .insert(operator, inputs.iter().map(|input| (*input, 1)).collect());
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
+    }
+    for class in BirthEdgeClass::ALL {
+        s.mutation_value_totals_by_birth_edge_class
+            .insert(class, MutationValueTotals::default());
     }
     for result in [
         ReproductionActionResult::Conceived,
@@ -521,6 +525,14 @@ fn mutation_families(families: &mut Vec<Family>) {
             format!("petri.run.mutation_value.{field}"),
             kind,
             vec![op()],
+        ));
+        families.push((
+            format!("petri.run.mutation_value_by_birth_edge_class.{field}"),
+            kind,
+            vec![(
+                "petri.birth_edge_class",
+                strings(BirthEdgeClass::ALL, |k| k.as_key().to_owned()),
+            )],
         ));
         families.push((
             format!("petri.run.mutation_outcome_summary.{field}"),

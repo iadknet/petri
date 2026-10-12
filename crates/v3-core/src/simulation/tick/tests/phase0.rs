@@ -165,6 +165,40 @@ fn phase_0_records_mutation_value_totals_on_creature_death() {
     );
 }
 
+/// `drive_births` (T11.F30): a carrier's outcome lands under its birth edge
+/// class by the same law as under its operator; a carrier without a class
+/// records nothing there.
+#[test]
+fn phase_0_records_the_carrier_outcome_under_its_birth_edge_class() {
+    use crate::mutation::BirthEdgeClass;
+    let decay = SimulationConfig::default()
+        .energy
+        .lifecycle
+        .energy_decay_per_tick;
+    for class in [Some(BirthEdgeClass::Drive), None] {
+        let (mut sim, id) = make_sim_with_one_creature(decay * 0.5);
+        let creature = sim.creatures.get_mut(id).expect("creature should exist");
+        creature.age = 9;
+        creature.offspring_spawned_count = 3;
+        creature.birth_mutation_operators =
+            vec![MutationOperator::GraphAddGraphEdge].into_boxed_slice();
+        creature.birth_edge_class = class;
+
+        run_phase_0(&mut sim);
+
+        let by_operator =
+            &sim.stats.mutation_value_totals_by_operator[&MutationOperator::GraphAddGraphEdge];
+        let by_class = &sim.stats.mutation_value_totals_by_birth_edge_class;
+        match class {
+            Some(class) => {
+                assert_eq!(by_class.len(), 1);
+                assert_eq!(&by_class[&class], by_operator);
+            }
+            None => assert!(by_class.is_empty()),
+        }
+    }
+}
+
 // ── Genome carrying cost (T03.F08) ──────────────────────────────────────────
 
 #[test]

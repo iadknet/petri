@@ -501,6 +501,7 @@ fn spawn_child(
         summary.applied_by_operator.keys().copied().collect();
     child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
     let child_birth_mutation_operators = child_birth_mutation_operators.into_boxed_slice();
+    let child_birth_edge_class = summary.birth_edge_class();
 
     // Step 11: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
@@ -565,6 +566,7 @@ fn spawn_child(
         };
         child.graph_runtime.plasticity_weights = child_plasticity;
         child.birth_mutation_operators = child_birth_mutation_operators;
+        child.birth_edge_class = child_birth_edge_class;
         child.heading = direction;
         child
     });

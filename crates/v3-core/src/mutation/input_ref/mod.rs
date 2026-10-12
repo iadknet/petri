@@ -15,7 +15,7 @@ use crate::creature::sensor_census::world_input_key_universe;
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
+use crate::mutation::types::{BirthEdgeClass, MutationSkipReason, TargetReachability};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 
 /// The kind of an `input_refs` entry: its mesh read class and compound
@@ -234,12 +234,27 @@ impl InputRefMutator {
         config: &MutationConfig,
         food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_classified(genome, op, targets, rng, config, food_type_count)
+            .map(|(reachability, _)| reachability)
+    }
+
+    /// [`Self::apply_with_food_type_count`] with the class of the vote-sink
+    /// edge an `Add` on a Graph node pushed (T11.F30); the same draws.
+    pub(crate) fn apply_classified(
+        genome: &mut CreatureGenome,
+        op: InputRefOperator,
+        targets: &mut TargetSelector<'_>,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+    ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         if op == InputRefOperator::RawFieldMutation {
-            return apply_raw_field_mutation(genome, rng, config, food_type_count);
+            return apply_raw_field_mutation(genome, rng, config, food_type_count)
+                .map(|reachability| (reachability, None));
         }
         let eligible = Self::applicable_indices(genome, op, food_type_count);
         if eligible.is_empty() {
@@ -248,8 +263,13 @@ impl InputRefMutator {
         let (node_idx, reachability) = targets
             .select(&eligible, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, food_type_count)?;
-        Ok(reachability)
+        let class = if op == InputRefOperator::Add {
+            apply_add(&mut genome.nodes[node_idx], rng, food_type_count)
+        } else {
+            Self::apply_to_node(genome, op, node_idx, rng, food_type_count)?;
+            None
+        };
+        Ok((reachability, class))
     }
 
     /// The nodes `op`'s predicate accepts, in index order.
@@ -304,8 +324,13 @@ impl InputRefMutator {
 /// declaration): the reference is declared already wired into one of the
 /// node's `ActionVote` sinks by [`connect_declared_input`], so it is live and
 /// exposed to selection at birth (`docs/reference/v3-mutation-spec.md`'s
-/// InputRef domain).
-fn apply_add(node: &mut NodeGenome, rng: &mut impl Rng, food_type_count: usize) {
+/// InputRef domain). Returns the class of the vote sink the born edge lands
+/// on (T11.F30).
+fn apply_add(
+    node: &mut NodeGenome,
+    rng: &mut impl Rng,
+    food_type_count: usize,
+) -> Option<BirthEdgeClass> {
     let new_ref = if food_type_count <= 1 {
         sampling::random_input_reference(rng)
     } else {
@@ -314,8 +339,9 @@ fn apply_add(node: &mut NodeGenome, rng: &mut impl Rng, food_type_count: usize) 
     let width = sub_value_count(&new_ref);
     node.input_refs.push(new_ref);
     let ref_idx = u16::try_from(node.input_refs.len() - 1).ok();
-    if let BackendDef::Graph(def) = &mut node.backend_def {
-        connect_declared_input(def, ref_idx, width, rng);
+    match &mut node.backend_def {
+        BackendDef::Graph(def) => connect_declared_input(def, ref_idx, width, rng),
+        BackendDef::Vm(_) => None,
     }
 }
 
@@ -326,13 +352,14 @@ fn apply_add(node: &mut NodeGenome, rng: &mut impl Rng, food_type_count: usize) 
 /// `AddGraphEdge`'s new-edge law (uniform on [-1, 1]). The draws are always
 /// taken; the edge is pushed only when the index fits `u16` (`ref_idx` is
 /// `Some`) and the node carries the drawn sink, otherwise the event stays a
-/// plain declaration with the same draw stream.
+/// plain declaration with the same draw stream. Returns the class of the
+/// sink the edge was pushed onto (T11.F30), `None` when none was pushed.
 pub(crate) fn connect_declared_input(
     def: &mut CgpGraphBackendDef,
     ref_idx: Option<u16>,
     width: u16,
     rng: &mut impl Rng,
-) {
+) -> Option<BirthEdgeClass> {
     debug_assert!(
         width > 0,
         "every input reference has at least one sub-value"
@@ -340,15 +367,15 @@ pub(crate) fn connect_declared_input(
     let sub_idx = rng.gen_range(0..width);
     let sink = VoteSink::from_index(rng.gen_range(0..VOTE_SINK_COUNT));
     let weight = rng.gen_range(-1.0f32..=1.0);
-    let (Some(ref_idx), Some(sink)) = (ref_idx, sink) else {
-        return;
+    let (Some(ref_idx), Some(vote)) = (ref_idx, sink) else {
+        return None;
     };
-    if let Some(sink) = def.sink_mut(OutputSinkKind::ActionVote(sink)) {
-        sink.inputs.push(GraphEdge {
-            source: GraphSource::InputLeaf { ref_idx, sub_idx },
-            weight,
-        });
-    }
+    let sink = def.sink_mut(OutputSinkKind::ActionVote(vote))?;
+    sink.inputs.push(GraphEdge {
+        source: GraphSource::InputLeaf { ref_idx, sub_idx },
+        weight,
+    });
+    BirthEdgeClass::of_sink(vote)
 }
 
 /// Delete one entry drawn uniformly among those no consumer addresses, then

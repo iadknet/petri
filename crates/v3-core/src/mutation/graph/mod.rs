@@ -11,7 +11,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
+use crate::mutation::types::{BirthEdgeClass, MutationSkipReason, TargetReachability};
 
 /// Graph mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -287,6 +287,20 @@ impl GraphMutator {
         config: &MutationConfig,
         food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_classified(genome, op, targets, rng, config, food_type_count)
+            .map(|(reachability, _)| reachability)
+    }
+
+    /// [`Self::apply_with_food_type_count`] with the class of the vote-sink
+    /// edge an `AddGraphEdge` pushed (T11.F30); the same draws.
+    pub(crate) fn apply_classified(
+        genome: &mut CreatureGenome,
+        op: GraphOperator,
+        targets: &mut TargetSelector<'_>,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+    ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
         if !op.enabled(config) {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -298,8 +312,13 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)
-            .map(|()| reachability)
+        let class = if op == GraphOperator::AddGraphEdge {
+            operators::add_graph_edge(genome, node_idx, rng)?
+        } else {
+            Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
+            None
+        };
+        Ok((reachability, class))
     }
 
     /// Dispatch `op` onto one already-selected node.
@@ -339,7 +358,9 @@ impl GraphMutator {
             GraphOperator::RemoveInternalGraphNode => {
                 operators::remove_internal_node(genome, node_idx, rng)
             }
-            GraphOperator::AddGraphEdge => operators::add_graph_edge(genome, node_idx, rng),
+            GraphOperator::AddGraphEdge => {
+                operators::add_graph_edge(genome, node_idx, rng).map(|_| ())
+            }
             GraphOperator::RetargetGraphEdge => {
                 operators::retarget_graph_edge(genome, node_idx, rng)
             }
