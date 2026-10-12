@@ -24,7 +24,7 @@ use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
 use crate::creature::genome::cgp::OutputSinkKind;
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::creature::genome::vote::{DirectedVoteKind, VoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -102,12 +102,7 @@ impl SteeringPooled {
 /// (T11.F31); the `Move` drive counts as a `Move` sink (T11.F30).
 #[must_use]
 pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
-    let is_move = |sink: Option<VoteSink>| {
-        matches!(
-            sink,
-            Some(VoteSink::Move(_) | VoteSink::Drive(DirectedVoteKind::Move))
-        )
-    };
+    let is_move = |sink: Option<VoteSink>| sink.and_then(VoteSink::kind) == Some(VoteKind::Move);
     genome
         .nodes
         .iter()
@@ -121,10 +116,7 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
                 graph.projects_kind(DirectedVoteKind::Move)
                     || graph.output_sinks.iter().any(|sink| {
                         !sink.inputs.is_empty()
-                            && match sink.kind {
-                                OutputSinkKind::ActionVote(vote) => is_move(Some(vote)),
-                                _ => false,
-                            }
+                            && matches!(sink.kind, OutputSinkKind::ActionVote(vote) if is_move(Some(vote)))
                     })
             }
         })

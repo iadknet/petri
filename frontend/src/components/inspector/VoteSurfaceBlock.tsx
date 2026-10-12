@@ -43,16 +43,13 @@ function KindRows({ pass }: { pass: MeshPassTrace }) {
 	const shown = VOTE_KINDS.flatMap((kind, index) => {
 		const best = pass.best[index];
 		if (best === undefined) return [];
-		const entry = {
-			kind,
-			bar: pass.bars[index] ?? 0,
-			best: formatVoteSink(best),
-			bestVote: pass.votes[voteSinkIndex(best)] ?? 0,
-			drive: kind === "Eat" ? null : (pass.votes[driveSinkIndex(kind)] ?? 0),
-			effective: pass.effective_votes[index] ?? 0,
-		};
-		return [entry];
-	}).filter((entry) => entry.bestVote !== 0 || entry.effective !== 0 || (entry.drive ?? 0) !== 0);
+		const bestVote = pass.votes[voteSinkIndex(best)] ?? 0;
+		const drive = kind === "Eat" ? null : (pass.votes[driveSinkIndex(kind)] ?? 0);
+		const effective = pass.effective_votes[index] ?? 0;
+		if (bestVote === 0 && effective === 0 && (drive ?? 0) === 0) return [];
+		const bar = pass.bars[index] ?? 0;
+		return [{ kind, bar, best: formatVoteSink(best), bestVote, drive, effective }];
+	});
 	if (shown.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-1 mt-0.5">

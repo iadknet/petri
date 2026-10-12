@@ -631,7 +631,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
                 ObservedMeshExecution::default(),
             )
         };
@@ -726,7 +726,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
             );
             let (observed, _) = execute_creature_mesh_impl(
                 &genome,
@@ -736,7 +736,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
                 ObservedMeshExecution::default(),
             );
             let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
@@ -747,7 +747,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
             );
             assert_eq!(plain.termination_reason, expected);
             assert_eq!(plain.energy_observation, observed.energy_observation);
@@ -841,7 +841,7 @@ mod tests {
                     &previous,
                     &mut state,
                     &config,
-                    crate::contracts::Direction::N,
+                    Direction::N,
                     UntracedMeshExecution,
                 );
                 let (observed, _) = execute_creature_mesh_impl(
@@ -852,7 +852,7 @@ mod tests {
                     &previous,
                     &mut observed_state,
                     &config,
-                    crate::contracts::Direction::N,
+                    Direction::N,
                     ObservedMeshExecution::default(),
                 );
                 let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
@@ -863,7 +863,7 @@ mod tests {
                     &previous,
                     &mut traced_state,
                     &config,
-                    crate::contracts::Direction::N,
+                    Direction::N,
                 );
                 assert_eq!(plain.actions, traced.actions);
                 assert_eq!(plain.priority_bid, traced.priority_bid);
@@ -1029,7 +1029,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
@@ -1045,7 +1045,7 @@ mod tests {
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             config,
-            crate::contracts::Direction::N,
+            Direction::N,
         )
     }
 
@@ -1127,7 +1127,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
@@ -1167,7 +1167,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
@@ -1197,7 +1197,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(
             output.actions,
@@ -1247,7 +1247,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(
             output.actions,
@@ -1294,7 +1294,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(
             output.actions,
@@ -1330,7 +1330,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.priority_bid, 0.0);
     }
@@ -1382,7 +1382,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.priority_bid, 3.0);
         assert_eq!(
@@ -1609,7 +1609,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(
             output.priority_bid, 2.0,
@@ -1643,7 +1643,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.work_counters.mesh_hops, 2);
         assert_eq!(output.work_counters.vm_steps, 6);
@@ -1715,7 +1715,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.work_counters.mesh_hops, 2);
         assert_eq!(output.work_counters.vm_steps, 6);
@@ -1744,7 +1744,7 @@ mod tests {
             &prev_shared_mem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(
             output.work_counters,
@@ -1785,7 +1785,7 @@ mod tests {
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             config,
-            crate::contracts::Direction::N,
+            Direction::N,
         )
     }
 
@@ -1933,7 +1933,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
             );
             assert_eq!(output.work_counters.mesh_hops, 2);
             // The read is a fraction of `max_energy`, which is 200.0 here.
@@ -1972,7 +1972,7 @@ mod tests {
             &[0.0; 16],
             &mut state,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(matches!(
@@ -2020,7 +2020,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
                 ObservedMeshExecution::default(),
             );
             let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
@@ -2031,7 +2031,7 @@ mod tests {
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
                 &config,
-                crate::contracts::Direction::N,
+                Direction::N,
             );
             for other in [&observed, &traced] {
                 assert_eq!(plain.actions, other.actions);

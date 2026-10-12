@@ -376,7 +376,6 @@ fn birth_parent_age(f: &mut Families, s: &SimStats) {
     });
 }
 
-/// The twenty fields of a [`MutationValueTotals`], `_total` removed.
 /// One `Sum` family per `MutationValueTotals` field under `prefix`, one
 /// point per keyed row with `attribute` naming its key.
 fn value_families<'a>(
@@ -399,6 +398,7 @@ fn value_families<'a>(
     }
 }
 
+/// The twenty fields of a [`MutationValueTotals`], `_total` removed.
 fn value_fields(totals: &MutationValueTotals) -> [(&'static str, Value); 20] {
     [
         ("carriers_observed", totals.carriers_observed_total.into()),

@@ -72,6 +72,8 @@ const VOTE_DIRECTION_COUNT = 8;
 const DIRECTED_VOTE_KINDS: readonly DirectedVoteKind[] = ["Move", "Reproduce", "StealEnergy"];
 /** Catalog index of the first drive sink. */
 const FIRST_DRIVE_SINK = 1 + 3 * VOTE_DIRECTION_COUNT;
+/** Catalog index of `Terminate`; `Decide` follows it. */
+const TERMINATE_SINK = FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length;
 
 /** The vote sink at a catalog index; null at or above the catalog count. */
 export function voteSinkFromIndex(index: number): VoteSink | null {
@@ -85,20 +87,20 @@ export function voteSinkFromIndex(index: number): VoteSink | null {
 	}
 	const drive = DIRECTED_VOTE_KINDS[index - FIRST_DRIVE_SINK];
 	if (drive !== undefined) return { Drive: drive };
-	if (index === FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length) return "Terminate";
-	if (index === FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length + 1) return "Decide";
+	if (index === TERMINATE_SINK) return "Terminate";
+	if (index === TERMINATE_SINK + 1) return "Decide";
 	return null;
 }
 
 /** The catalog index of a vote sink, the inverse of `voteSinkFromIndex`. */
 export function voteSinkIndex(sink: VoteSink): number {
 	if (sink === "Eat") return 0;
-	if (sink === "Terminate") return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length;
-	if (sink === "Decide") return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length + 1;
+	if (sink === "Terminate") return TERMINATE_SINK;
+	if (sink === "Decide") return TERMINATE_SINK + 1;
 	if ("Move" in sink) return 1 + sink.Move;
 	if ("Reproduce" in sink) return 1 + VOTE_DIRECTION_COUNT + sink.Reproduce;
 	if ("StealEnergy" in sink) return 1 + 2 * VOTE_DIRECTION_COUNT + sink.StealEnergy;
-	return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.indexOf(sink.Drive);
+	return driveSinkIndex(sink.Drive);
 }
 
 /** The catalog index of a directed kind's drive. */

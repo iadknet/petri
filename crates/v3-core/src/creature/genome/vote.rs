@@ -121,9 +121,9 @@ pub enum VoteSink {
 impl VoteSink {
     /// Catalog index: `Eat` 0, `Move(d)` `1 + d`, `Reproduce(d)` `9 + d`,
     /// `StealEnergy(d)` `17 + d`, `Drive(K)` `25 + K.index()`, `Terminate` 28,
-    /// `Decide` 29. A directed sink
-    /// built with an out-of-range direction indexes past the catalog and is
-    /// never constructed by the catalog itself.
+    /// `Decide` 29. A directed sink built with an out-of-range direction
+    /// indexes past the catalog and is never constructed by the catalog
+    /// itself.
     #[must_use]
     pub const fn index(self) -> usize {
         let directions = VOTE_DIRECTION_COUNT as usize;
