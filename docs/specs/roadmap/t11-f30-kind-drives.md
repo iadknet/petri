@@ -205,9 +205,27 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
       --noEmit` (exit 0), `vitest run` (383 passed), `biome check src` (no
       errors); `make check` not run. Re-pins, the gate failure and the
       small-world survival reading are in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`, 2026-10-12, on production
+      unchanged since c0d9aec3: `216 mutants tested in 2h: 11 missed, 147
+      caught, 58 unviable`; output
+      `~/.local/share/petri-tools/mutants/t11-f30/mutants.out`. An earlier
+      attempt was unmeasured (baseline failed three `window_seam` tests,
+      fixed at beca3bf6). An iterate pass caught the six kills (5 missed
+      are the equivalents). No timeouts, skips or excludes.
+
+      | Survivor | Resolution |
+      | --- | --- |
+      | `drives.rs:53` `>`→`>=` in `carries` | Killed: `a_weight_exactly_at_the_floor_carries_no_path` |
+      | `drives.rs:71` `>`→`<` in `node_fanouts` | Equivalent: the sign is only a grouping key and carried edges are never zero, so flipping it relabels the same partition |
+      | `drives.rs:71` `>`→`>=` in `node_fanouts` | Equivalent: differs only at `w == 0`, which `carries` already excludes |
+      | `drives.rs:108` `>`→`<` in `observe_one` | Killed: `drive_edges_are_signed_and_floored_and_vm_paths_unsigned` now has an asymmetric 2/1 sign split |
+      | `drives.rs:108` `>`→`>=` in `observe_one` | Equivalent: differs only at `w == 0`, which `carries` already excludes |
+      | `types/mod.rs:73` `as_key` → `""` | Killed: `the_class_of_every_sink_is_drive_direction_or_none` asserts the keys |
+      | `types/mod.rs:73` `as_key` → `"xyzzy"` | Killed: same assertion |
+      | `types/mod.rs:673` `==`→`!=` in `birth_edge_class` | Killed: `a_birth_has_a_class_only_for_one_applied_edge_or_input_add` adds a single other-operator birth with a recorded class |
+      | `traced_mesh.rs:69` `execute_creature_mesh_budgeted` → `Default::default()` | Equivalent: the function is compiled out without `telemetry-seams`, and with it `RecordedMesh` has no `Default`, so no built program changes |
+      | `vote_select.rs:69` `*`→`/` in `select` | Equivalent: `VOTE_UNIT` is `1.0`, and `x * 1.0 == x / 1.0` exactly |
+      | `discovery.rs:287` `work_on_fixtures` → `Default::default()` | Killed: `feasibility_and_vm_concerns_are_recorded` asserts nonzero executions and hops |
 - [x] Benchmark summaries stored at `docs/progress/features/t11-f30-kind-drives.json`
       and `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries (both closed lists and both epochs,

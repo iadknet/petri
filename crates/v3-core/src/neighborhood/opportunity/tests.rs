@@ -253,6 +253,10 @@ fn feasibility_and_vm_concerns_are_recorded() {
             record.founder_work.executions,
             record.authored_work.executions
         );
+        for work in [record.founder_work, record.authored_work] {
+            assert!(work.executions > 0, "{family:?}: the fixtures execute");
+            assert!(work.mesh_hops >= u64::from(work.executions), "{family:?}");
+        }
         let vm = vm_concern(family, &config, FOUNDER_VM_TRANSLATION_STEPS);
         assert!(vm.instructions > 0);
         assert!(vm.charge_after_founder >= vm.charge_standalone);

@@ -111,6 +111,8 @@ fn the_class_of_every_sink_is_drive_direction_or_none() {
         serde_json::to_string(&BirthEdgeClass::ALL).unwrap(),
         "[\"drive\",\"direction\"]"
     );
+    let keys = BirthEdgeClass::ALL.map(BirthEdgeClass::as_key);
+    assert_eq!(keys, ["drive", "direction"], "keys match the serde names");
 }
 
 fn summary(
@@ -142,6 +144,12 @@ fn a_birth_has_a_class_only_for_one_applied_edge_or_input_add() {
     assert_eq!(
         summary(&[(InputRef, InputRefAdd, direction)]).birth_edge_class(),
         direction
+    );
+    // One applied event of any other operator has no class, even with a
+    // recorded vote-sink push.
+    assert_eq!(
+        summary(&[(Graph, GraphRemoveGraphEdge, drive)]).birth_edge_class(),
+        None
     );
     // A compute-input edge, an `Eat` sink or a VM node: no vote-sink push.
     assert_eq!(

@@ -65,6 +65,8 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
     wire(&mut def, drive, memory(0), 0.5);
     wire(&mut def, drive, memory(1), -0.25);
     wire(&mut def, drive, memory(2), 1e-4);
+    // A second positive edge makes the sign split asymmetric.
+    wire(&mut def, drive, memory(3), 0.75);
     let graph = graph_genome(def);
     let vm = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -103,7 +105,7 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
             moves.drive_edges_negative,
             moves.drive_vm_paths
         ),
-        (1, 2, 1, 1, 0)
+        (1, 3, 2, 1, 0)
     );
     let steal = census.kinds[DirectedVoteKind::StealEnergy.index()];
     assert_eq!((steal.drive_carriers, steal.drive_vm_paths), (1, 1));
@@ -144,4 +146,20 @@ fn unreachable_nodes_are_not_read() {
     let census = DriveCensus::observe([(&genome, &[][..])]);
     assert_eq!(census.creatures, 1);
     assert_eq!(census.kinds[0], KindDrives::default());
+}
+
+#[test]
+fn a_weight_exactly_at_the_floor_carries_no_path() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let drive = DirectedVoteKind::Move.drive();
+    wire(&mut def, drive, memory(0), PATH_WEIGHT_FLOOR);
+    wire(&mut def, drive, memory(1), -PATH_WEIGHT_FLOOR);
+    wire(&mut def, VoteSink::Move(0), memory(2), PATH_WEIGHT_FLOOR);
+    wire(&mut def, VoteSink::Move(1), memory(2), PATH_WEIGHT_FLOOR);
+    let census = census_of(&[graph_genome(def)]);
+    assert_eq!(
+        census.kinds[DirectedVoteKind::Move.index()],
+        KindDrives::default(),
+        "the floor is exclusive: |w| must exceed it"
+    );
 }
