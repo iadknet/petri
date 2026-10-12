@@ -5,6 +5,7 @@ pub mod founder;
 pub mod genome;
 pub mod identity;
 pub mod parseability;
+pub mod plasticity_census;
 pub mod ring_rules;
 pub mod sensor_census;
 pub mod state;
