@@ -202,6 +202,10 @@ petri_tick_mean_mesh_nodes
 petri_tick_mean_generation
 petri_tick_drive_carriers
 petri_tick_drive_fanout_creatures
+petri_tick_plasticity_carriers
+petri_tick_plastic_edges
+petri_tick_plastic_edge_drift
+petri_tick_plastic_edges_at_clamp
 '
 
 # Families over maps that hold only the keys a run met: those the workload

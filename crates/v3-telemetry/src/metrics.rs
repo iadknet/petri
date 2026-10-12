@@ -23,6 +23,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::vote::DirectedVoteKind;
+use v3_core::creature::plasticity_census::{PlasticEdges, PlasticityCensus, PlasticityKind};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
@@ -128,6 +129,8 @@ pub struct Census {
     /// Per directed kind: creatures repeating one source across the kind's
     /// direction sinks, the duplication a drive writes once.
     pub drive_fanout_creatures: [u64; DirectedVoteKind::ALL.len()],
+    /// Plastic carriers, edges, drift and clamped edges over reachable nodes.
+    pub plasticity: PlasticityCensus,
 }
 
 impl Census {
@@ -143,7 +146,15 @@ impl Census {
                 .values()
                 .map(|c| (&c.genome, &*c.cached_reachable_nodes)),
         );
+        let plasticity = PlasticityCensus::observe(sim.creatures.values().map(|c| {
+            (
+                &c.genome,
+                &*c.cached_reachable_nodes,
+                c.graph_runtime.plasticity_weights.as_slice(),
+            )
+        }));
         Self {
+            plasticity,
             drive_carriers: drives.kinds.map(|kind| kind.drive_carriers),
             drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
@@ -948,6 +959,41 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
                     (
                         vec![("petri.drive_kind", drive_kind_key(*kind).to_owned())],
                         count.into(),
+                    )
+                }),
+        );
+    }
+    let plasticity = &census.plasticity;
+    f.scalar(
+        "petri.tick.plasticity_carriers".to_owned(),
+        sampled,
+        plasticity.carriers,
+    );
+    type Read = fn(&PlasticEdges) -> Value;
+    let fields: [(&str, Read); 3] = [
+        ("plastic_edges", |row| row.edges.into()),
+        ("plastic_edge_drift", |row| row.drift_sum.into()),
+        ("plastic_edges_at_clamp", |row| row.at_clamp.into()),
+    ];
+    for (name, read) in fields {
+        f.push(
+            format!("petri.tick.{name}"),
+            sampled,
+            "",
+            PlasticityKind::ALL
+                .iter()
+                .zip(&plasticity.kinds)
+                .map(|(kind, row)| {
+                    (
+                        vec![
+                            ("petri.plasticity_rule", kind.rule_key().to_owned()),
+                            ("petri.plasticity_learning", kind.learning_key().to_owned()),
+                            (
+                                "petri.plasticity_inheritance",
+                                kind.inheritance_key().to_owned(),
+                            ),
+                        ],
+                        read(row),
                     )
                 }),
         );

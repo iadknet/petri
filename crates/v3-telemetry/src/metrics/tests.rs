@@ -639,6 +639,7 @@ fn tick_families(families: &mut Vec<Family>) {
         "mean_genome_size",
         "mean_mesh_nodes",
         "mean_generation",
+        "plasticity_carriers",
     ] {
         families.push((format!("petri.tick.{field}"), Gauge, vec![]));
     }
@@ -657,6 +658,30 @@ fn tick_families(families: &mut Vec<Family>) {
                 "petri.drive_kind",
                 strings(["move", "reproduce", "steal_energy"], str::to_owned),
             )],
+        ));
+    }
+    for field in [
+        "plastic_edges",
+        "plastic_edge_drift",
+        "plastic_edges_at_clamp",
+    ] {
+        families.push((
+            format!("petri.tick.{field}"),
+            Gauge,
+            vec![
+                (
+                    "petri.plasticity_rule",
+                    strings(["classic", "oja", "anti_hebb", "covariance"], str::to_owned),
+                ),
+                (
+                    "petri.plasticity_learning",
+                    strings(["hebbian", "reward_modulated"], str::to_owned),
+                ),
+                (
+                    "petri.plasticity_inheritance",
+                    strings(["darwinian", "lamarckian"], str::to_owned),
+                ),
+            ],
         ));
     }
 }
