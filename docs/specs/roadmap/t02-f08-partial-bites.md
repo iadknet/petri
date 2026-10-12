@@ -182,7 +182,7 @@ founder's `genome_size` stays 97. Any other moved pin is a defect.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` first (tick-loop and founder
-      path change; 28 passed), then `make check` -> exit 0 at tested commit 695ab45e (runs once at
+      path change; 28 passed), then `make check` -> exit 0 at tested commit 92a4be60, after rebase onto main 97cc7186 (runs once at
       closure); results in
       [`docs/progress/readings/t02-f08.md`](../../progress/readings/t02-f08.md).
 - [x] Focused tests, one or more per Fixed-design row: names and results in
