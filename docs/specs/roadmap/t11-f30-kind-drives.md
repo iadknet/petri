@@ -266,7 +266,16 @@ make bench PROFILE=gate FEATURE=t11-f30-kind-drives
 make bench PROFILE=goal FEATURE=t11-f30-kind-drives
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-12, HEAD `63e03f03`).** Values in the readings.
+
+- Gate: CLI exit 3, make exit 2, `severe` on `decided_passes` (0.000313 against
+  0; seeds 11 / 22 / 33: 1 / 44 / 0).
+- Goal: CLI exit 3, make exit 2, `severe` on `decided_passes` (0.029780, +221%
+  epoch, +172% F31).
+- Misses: Canyon final 1,249 and plateau 667.696; Confluence
+  `dead_per_all_births` 0.0058; drift depth 250 on every world. No world
+  extinct; other readings pass. Summaries 21,216 and 395,892 bytes. Severes and
+  misses go to the user, not rebased.
 
 - Summaries: [gate](../../progress/features/t11-f30-kind-drives.json),
   [goal](../../progress/features/t11-f30-kind-drives-goal.json).
