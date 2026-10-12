@@ -2070,12 +2070,488 @@
       }
     },
     {
+      "id": 42,
+      "type": "row",
+      "title": "Learning",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 131,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Weight changes per creature-tick, by kind",
+      "description": "Plasticity edge assignments whose stored weight differs from its prior value, per creature-tick over a 1m window: pure Hebbian (applied after every graph visit) and reward-modulated (three-factor, applied once per tick after actions). How much learning actually moves weights. Activity, not effect: every compute node of a visited mesh node learns whether or not it feeds a sink, and a moved weight need not change behaviour.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 132,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_hebbian_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "hebbian",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_reward_modulated_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "reward-modulated",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 44,
+      "type": "timeseries",
+      "title": "Plasticity updates per creature-tick, by kind",
+      "description": "Plasticity edge assignments per creature-tick, changed or not: one per input edge of each plastic compute node per graph visit (Hebbian, so multi-pass ticks count more than once) or per tick (reward-modulated, counted even when the outcome signal is 0). Mixes how many creatures carry plasticity with how active each one is.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 132,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_hebbian_updates_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "hebbian",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_reward_modulated_updates_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "reward-modulated",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 45,
+      "type": "timeseries",
+      "title": "Share of plasticity updates that change a weight, by kind",
+      "description": "Weight changes over updates, per kind, over a 1m window. A low share means most updates write the same value back: zero pre or post activity, a zero outcome signal, or a weight held at its clamp. Exact f32 inequality, so a delta rounded or clamped away is not a change.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 140,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_hebbian_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_hebbian_updates_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "hebbian",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_reward_modulated_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_reward_modulated_updates_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "reward-modulated",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 46,
+      "type": "bargauge",
+      "title": "Plasticity per creature-tick, run so far",
+      "description": "The Hebbian and reward-modulated update and change counters over all creature-ticks of the run so far. Learning energy is not charted: plasticity_update_cost and reward_learning_cost default to 0, so the hebbian_learning and reward_learning energy flows stay at 0.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 140,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(last_over_time(petri_run_hebbian_updates_total{petri_run_id=\"$run_id\"}[$__range])) / sum(last_over_time(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "hebbian updates",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(last_over_time(petri_run_hebbian_changes_total{petri_run_id=\"$run_id\"}[$__range])) / sum(last_over_time(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "hebbian changes",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(last_over_time(petri_run_reward_modulated_updates_total{petri_run_id=\"$run_id\"}[$__range])) / sum(last_over_time(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "reward-modulated updates",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(last_over_time(petri_run_reward_modulated_changes_total{petri_run_id=\"$run_id\"}[$__range])) / sum(last_over_time(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "reward-modulated changes",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 47,
+      "type": "xychart",
+      "pluginVersion": "13.2.2",
+      "title": "Weight changes per creature-tick by tick",
+      "description": "Weight changes per creature-tick plotted against simulation tick, one series per kind, so runs at different speeds compare on the same axis.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 148,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(petri_run_tick{petri_run_id=\"$run_id\"})",
+          "legendFormat": "tick",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_hebbian_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "hebbian",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_reward_modulated_changes_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "reward-modulated",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "show": "points",
+            "pointSize": {
+              "fixed": 4
+            }
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tick"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "min"
+              }
+            ]
+          }
+        ]
+      },
+      "interval": "1s",
+      "options": {
+        "mapping": "manual",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "hebbian"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reward-modulated"
+              }
+            }
+          }
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 15,
       "type": "row",
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 131,
+        "y": 156,
         "w": 24,
         "h": 1
       },
@@ -2092,7 +2568,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 132,
+        "y": 157,
         "w": 12,
         "h": 8
       },
@@ -2169,7 +2645,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 132,
+        "y": 157,
         "w": 12,
         "h": 8
       },
@@ -2246,7 +2722,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 140,
+        "y": 165,
         "w": 12,
         "h": 8
       },
@@ -2323,7 +2799,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 140,
+        "y": 165,
         "w": 12,
         "h": 8
       },
@@ -2400,7 +2876,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 148,
+        "y": 173,
         "w": 12,
         "h": 8
       },
@@ -2473,7 +2949,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 156,
+        "y": 181,
         "w": 24,
         "h": 1
       },
@@ -2491,7 +2967,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 157,
+        "y": 182,
         "w": 24,
         "h": 10
       },
@@ -2518,7 +2994,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 167,
+        "y": 192,
         "w": 24,
         "h": 1
       },
@@ -2536,7 +3012,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 168,
+        "y": 193,
         "w": 24,
         "h": 10
       },
