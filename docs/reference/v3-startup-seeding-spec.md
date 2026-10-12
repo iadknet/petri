@@ -116,7 +116,11 @@ Seeding flow contract:
    - Seeded density uses normalized `f32` food values in canonical `[0.0, 1.0]`
      scale (clamped by `world.food.shared.max_density`).
 5. Seed founders from the founder profile selected per Section 5 (default:
-   the canonical v3alpha1 genome of Section 5.1).
+   the canonical v3alpha1 genome of Section 5.1). Each founder's heading
+   (T11.F30) is one `gen_range(0..8)` draw over `Direction::ALL` from the run
+   RNG, taken in placement order immediately before the founder is built,
+   after the position shuffle, so positions are unchanged and every later
+   draw of the run shifts.
 6. Commit simulation state at tick `0` in `idle` state.
 
 ---
@@ -238,8 +242,9 @@ food, `Move` alone (V3Alpha1; the ForageFirst profiles still commit `Eat`
 first, retaining normal failed-Eat accounting); with the gate open, one
 `Reproduce`, after which `q` suppresses every other vote and the next pass
 ends the tick. Every `Move` and `Reproduce` takes the full primary-food
-cardinal maximum with N/E/S/W tie order (the lowest-index argmax over sinks
-`0, 2, 4, 6`); `Eat` reads type 0 (its parameter is unwired). With
+cardinal maximum; a tie goes to the first tied cardinal clockwise from the
+creature's heading, the heading first (T11.F30; N/E/S/W under heading `N`,
+the order every battery reads); `Eat` reads type 0 (its parameter is unwired). With
 `max_actions_per_turn = 1` the first commit ends the tick, so capacity one
 keeps `Eat`. No second food type is read.
 

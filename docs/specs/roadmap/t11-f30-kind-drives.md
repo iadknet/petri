@@ -1,7 +1,7 @@
 # T11.F30 — Kind Drives
 
 **Status**: In Progress
-**Last updated**: 2026-10-11
+**Last updated**: 2026-10-12
 **Feature**: T11.F30
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
 
@@ -167,30 +167,30 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
 
 ## Implementation Tasks
 
-- [ ] Catalog: `VoteSink::Drive`, index order, counts, `new_with_fixed_outputs`,
+- [x] Catalog: `VoteSink::Drive`, index order, counts, `new_with_fixed_outputs`,
       frontend `VoteSink`, `VOTE_SINK_COUNT` and formatters; re-pin catalog counts.
-- [ ] Commit rule: heading parameter and tie order in `vote_select`, the drive
+- [x] Commit rule: heading parameter and tie order in `vote_select`, the drive
       term in the effective vote, the mesh's heading read and `Move`-commit update,
       heading on `MeshOutput` or by reference; traced and observed modes carry
       the 30-wide vectors.
-- [ ] Heading state: `CreatureState.heading`, the seeding draw, the birth
+- [x] Heading state: `CreatureState.heading`, the seeding draw, the birth
       direction in `spawn_child` for both delivery paths, `N` at every other
       construction and in every battery; `execute_move` unchanged.
-- [ ] Reach: confirm by test that `InputRef.Add`, VM `AddVote`, recruitment and
+- [x] Reach: confirm by test that `InputRef.Add`, VM `AddVote`, recruitment and
       `AddGraphEdge` reach a drive; `move_voted` counts a drive.
-- [ ] Readings: `drives-v1` census; the sink class reported by `add_edge` and
+- [x] Readings: `drives-v1` census; the sink class reported by `add_edge` and
       `connect_declared_input`, carried on the mutation summary and stored as
       `birth_edge_class` for single-operator births;
       `mutation_value_totals_by_birth_edge_class` in `SimStats`, its metric
       family, the raw report and the summary keep-list; the inspector pass
       detail and headings.
-- [ ] Reference docs, protocol version, re-pins with reasons in the readings.
+- [x] Reference docs, protocol version, re-pins with reasons in the readings.
 
 ## Verification
 
 - [ ] `cargo test -p v3-core --test viability` first (founder behavior changes),
       then `make check` -> exit 0; results in the readings.
-- [ ] Focused tests: the tie rule (heading `N` equals lowest index; a flat
+- [x] Focused tests: the tie rule (heading `N` equals lowest index; a flat
       channel with a positive drive commits the heading; the first tied sink
       clockwise from a diagonal heading), the effective vote with and without a
       drive (an unwired-drive selection under `N` equals today's; a `Move`
@@ -200,6 +200,17 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
       mutation reach per operator, traced/observed/production agreement, the
       proptest commit-rule property extended to the drive term and the tie
       order; names and results in the readings.
+- [x] Build pass, 2026-10-12: `cargo test -p v3-core --test viability` first
+      (28 passed after the founder-only digest re-pin), `cargo test -p v3-core`
+      (2,100 passed), `-p v3-telemetry` (73), `-p v3-server` (163),
+      `-p v3-lab` (209), `-p v3-cli` (251 passed, 1 failed:
+      `gate_profile_has_no_severe_regression_against_series_references`,
+      `decided_passes` 0.000313 against the stored 0.000000), `cargo check
+      --workspace --all-targets`, `cargo fmt --all --check`, `make
+      rust-clippy` (exit 0), frontend `tsc -b --noEmit`, `vitest run` (383
+      passed), `biome check src/` (no errors); `make check` not run. Re-pins,
+      the gate failure and the small-world survival reading are in the
+      readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.

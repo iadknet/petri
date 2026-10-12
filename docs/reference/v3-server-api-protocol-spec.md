@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha4 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha5 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha4 protocol-version posture;
+- v3alpha5 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,11 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha4"`.
-- Breaking payload changes require protocol-version bump. `v3alpha4`
+- Canonical value: `"v3alpha5"`.
+- Breaking payload changes require protocol-version bump. `v3alpha5`
+  (T11.F30) widened every vote vector to 30 (the three kind drives), added
+  each pass's `best` and `bars`, the tick's starting `heading` and the
+  creature detail's `heading`. `v3alpha4`
   (T19.F06) removed the graph trace's always-false `converged` and
   always-zero `stable_passes_count` and a retired `mutation` config key
   (a stored config carrying it is rejected), and added each hop's
@@ -94,7 +97,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha4 shape):
+Request (conceptual v3alpha5 shape):
 
 ```json
 {
@@ -229,7 +232,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -250,7 +253,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "running",
   "tick": 123
 }
@@ -265,7 +268,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "paused",
   "tick": 123
 }
@@ -294,7 +297,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -307,7 +310,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -361,7 +364,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -410,7 +413,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "paused",
   "config": {
     "population": {
@@ -553,7 +556,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -584,7 +587,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -597,7 +600,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -608,7 +611,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -650,20 +653,24 @@ Execution-sampler rules:
     `applied_value`
 - each tick carries `passes[]`, one record per pass (T19.F04): `pass_index`,
   `end_reason` (`Decided`, `PassCapReached`, `NoTargets`, `MissingNode`,
-  `EnergyExhausted`), `votes` (27 floats in `VoteSink` catalog order, the
-  pass's final vote vector), `effective_votes` (four floats, kind order
-  `Eat`, `Move`, `Reproduce`, `StealEnergy`, against the bars the pass
-  started with), `committed` (the action the pass committed, or `null`), and
+  `EnergyExhausted`), `votes` (30 floats in `VoteSink` catalog order, the
+  pass's final vote vector), `best` (each kind's chosen sink in kind order
+  `Eat`, `Move`, `Reproduce`, `StealEnergy`, a `VoteSink` such as `"Eat"` or
+  `{"Move":3}`; the heading tie's choice for a directed kind), `bars` (four
+  integers, the bars the pass started with), `effective_votes` (four floats,
+  kind order, `drive + best − bar` for a directed kind), `committed` (the action the pass committed, or `null`), and
   `hops`
+- each tick carries `heading`, the direction string (`"N"` to `"NW"`) the
+  tick started with (T11.F30)
 - each tick carries `termination_reason` (`NoDecision`, `TerminateVoted`,
   `ActionCapReached`, `EnergyExhausted`) and `commit_counts`, the final
   per-kind bars (commits of each kind this tick)
 - each hop carries `pass_index` beside the tick-wide `hop_index`, and
-  `vote_contribution`, the 27 floats that hop committed; zeros when the
+  `vote_contribution`, the 30 floats that hop committed; zeros when the
   dispatch ended exhausted and committed nothing
 - each hop carries `decision_inputs` (T19.F06), the decision-state values
   the dispatch's inputs resolved against, each as the input read returns
-  it: `action_votes` (27, `ActionVotes`), `previous_pass_votes` (27,
+  it: `action_votes` (30, `ActionVotes`), `previous_pass_votes` (30,
   `PreviousPassVotes`), `commit_counts` (4 floats, `CommitCounts`), and
   `hops_this_tick` (`HopsThisTick`); they are what the node could read, not
   proof of a read
@@ -698,13 +705,14 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
   "max_energy": 20.0,
   "age": 84,
   "generation": 3,
+  "heading": "NE",
   "complexity": 12,
   "phenotype": {
     "channels": [128, 0, 64, 0, 0, 0],
@@ -735,13 +743,14 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha4"`. |
+| `protocol_version` | string | Always `"v3alpha5"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
 | `max_energy` | f32 | Maximum energy (from config). |
 | `age` | u64 | Ticks alive. |
 | `generation` | u64 | Reproduction generation (0 = founder). |
+| `heading` | string | Direction of the creature's last committed `Move` (`"N"` to `"NW"`); at birth the step from its parent, at seeding a drawn direction (T11.F30). |
 | `complexity` | u32 | Genome complexity (node count). |
 | `phenotype` | object | Visual phenotype state. |
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
@@ -788,7 +797,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -872,7 +881,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha4
+  performance, but must document the throttle policy. The default v3alpha5
   behavior is per-tick emission.
 
 Ordering rules:
@@ -889,7 +898,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha4",
+  "protocol_version": "v3alpha5",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -915,7 +924,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha4)
+## 7. Out-of-Scope API Surfaces (v3alpha5)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -937,7 +946,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha4 server transport/API semantics.
+This file remains canonical for v3alpha5 server transport/API semantics.
 
 ---
 

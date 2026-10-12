@@ -177,8 +177,8 @@ Topology connection semantics (T11.F15, T11.F18):
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
   the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
-  include `AddVote { sink in 0..27, src }` (the sink drawn uniformly over the
-  vote catalog), `WriteActionParam { field_idx, src }`, whose `field_idx` is
+  include `AddVote { sink in 0..30, src }` (the sink drawn uniformly over the
+  vote catalog, the three kind drives included, T11.F30), `WriteActionParam { field_idx, src }`, whose `field_idx` is
   one uniform draw over `ActionParamField::ALL` (`0..3`, T11.F27), and
   `ReadActionQueueParam`, whose `param_slot` is drawn from `0..2`, the queue
   parameter slots that carry a value (T11.F27); the operand nudge moves an
@@ -357,7 +357,7 @@ and native storage/work costs. Existing weight mutation and edge deletion apply
 to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
-(the 94 output sinks, vote and parameter sinks included) are never
+(the 97 output sinks, vote and parameter sinks included) are never
 added/removed/retyped — only their edges are evolvable.
 
 - `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
@@ -405,8 +405,8 @@ added/removed/retyped — only their edges are evolvable.
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
-  order: all 94 sinks, the 27 vote sinks and the three parameter sinks
-  included (T11.F27);
+  order: all 97 sinks, the 30 vote sinks and the three parameter sinks
+  included (T11.F27, T11.F30);
   source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via
@@ -477,7 +477,7 @@ added/removed/retyped — only their edges are evolvable.
     Every offset and directed kind has support. Canonical directions are 0–7.
   - Slots: one nearby-creature bank and field, across four ranked slots, within
     one sink occurrence. Core has width 4, Vitals 2 and Identity 3 per slot.
-    Every field and all 27 valid vote identities have support. Rank is not a
+    Every field and all 30 valid vote identities have support. Rank is not a
     direction; no cyclic rotation or cross-field/bank correspondence is inferred.
 
   Groups need at least two distinct homologous positions, with at most eight
@@ -525,7 +525,7 @@ added/removed/retyped — only their edges are evolvable.
   samples ActionQueue across all `u16` channels; WholeFamily excludes it because
   it has no small complete fixed-width family. WholeFamily groups upstream into
   24 channels/declarations and each memory bank into 16 channels with no
-  declaration. The event appends at most 27 edges and 24 declarations, to one
+  declaration. The event appends at most 30 edges and 24 declarations, to one
   sink, and counts as one mutation event. Typed families name one food type.
 
   Source admission reuses the first representable matching declaration, or
@@ -556,7 +556,9 @@ added/removed/retyped — only their edges are evolvable.
   `NeighborOccupiedRing`) landing on a directed sink `K(d)` is declared as
   above, then appends one ring projection `{ref_idx, K, (d − channel) mod 8,
   0.0}` instead of the edge or column (`channel` 0 under WholeFamily), with no
-  new draw. Other families and destinations are unchanged. Admission treats a
+  new draw. Other families and destinations are unchanged: a ring family
+  landing on a kind drive (T11.F30) appends its zero-weight edges as on `Eat`,
+  never a projection. Admission treats a
   dangling projection `ref_idx` as a dangling leaf.
 
 - Ring projections (T11.F31), appended to `GraphOperator::ALL` after
@@ -587,13 +589,16 @@ added/removed/retyped — only their edges are evolvable.
   operators that construct `ReadInput`. On a Graph node it is a connection
   operator (T20.F16, born-connected input declaration): after the reference
   draw it draws `sub_idx = gen_range(0..width)` (`width` the reference's
-  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..27))` and a
+  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..30))` and a
   weight `gen_range(-1.0f32..=1.0)` (`AddGraphEdge`'s new-edge law), in that
   order, and appends one `GraphEdge { source: InputLeaf { ref_idx, sub_idx },
   weight }` to that `ActionVote` sink's inputs, `ref_idx` the appended index.
   The draws are always taken; when the index does not fit `u16` or the node
   lacks the drawn sink, no edge is pushed and the event stays a plain
-  declaration. The born edge is an ordinary edge with no provenance; the
+  declaration. `Add` and `AddGraphEdge` report the class of the vote sink
+  they push onto (`drive` or `direction`, T11.F30); a birth whose only
+  applied event is one of them stores that class, and `SimStats` keys its
+  carrier outcome by it (`mutation_value_totals_by_birth_edge_class`). The born edge is an ordinary edge with no provenance; the
   connected reference is not prunable while the edge consumes it. A ring
   landing on a direction sink stays this one ordinary edge, never a ring
   projection (T11.F31).

@@ -53,8 +53,9 @@ Boundary intent:
 ## 2. Pass Loop and Action Selection
 
 A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
-from `entry_node_id`; nodes vote into the 27-sink vote vector `V` (`Eat`, 8
-`Move`, 8 `Reproduce`, 8 `StealEnergy`, `Terminate`, `Decide`) and write the
+from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, 8
+`Move`, 8 `Reproduce`, 8 `StealEnergy`, the drives `Drive(Move)`,
+`Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
 three-field parameter surface `action_params` (indexed by `ActionParamField`:
 `EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`); at the pass
 end at most one
@@ -62,7 +63,10 @@ action commits. A node may be dispatched any number of times within a pass
 (T19.F02): cycles and self-targets are legal, every dispatch runs on the
 creature's live state, and the per-pass hop cap is the only structural bound
 on a pass. `C[K]` is the bar of kind `K` (its commits so far this tick),
-`unit` is 1.0, and `E[K]` is kind `K`'s effective vote.
+`unit` is 1.0, `E[K]` is kind `K`'s effective vote, and `h` is the
+creature's heading (T11.F30): the direction of its last committed `Move`, at
+birth the step from its parent to its cell, at seeding a uniform draw, and
+`N` for a mesh executed outside a simulation tick (batteries, the lab).
 
 ```text
 tick start: V = 0, V_prev = 0, C = 0, queue empty, bus zeroed, parameter
@@ -79,14 +83,17 @@ pass:
   the pass also ends at NoTargets, MissingNode, PassCapReached (hops_this_pass
   reaches max_mesh_hops), or EnergyExhausted; all keep V and the queue
   pass end:
-    for K in {Eat, Move, Reproduce, StealEnergy}:
-      best[K] = lowest-index argmax over K's sinks of V
-      E[K] = V[best[K]] - C[K] * unit
+    best[Eat] = Eat; E[Eat] = V[Eat] - C[Eat] * unit
+    for K in {Move, Reproduce, StealEnergy}:
+      best[K] = first maximum of V over K's eight direction sinks visited in
+                the order (h + k) mod 8, k in 0..8 (never the drive)
+      E[K] = (V[Drive(K)] + V[best[K]]) - C[K] * unit
     K* = argmax E  (ties: the kind committed in the previous pass, then lowest index)
     if EnergyExhausted: end the tick (EnergyExhausted), queue kept
     if E[K*] <= 0: end the tick (NoDecision)
     if queue non-empty and V[Terminate] >= E[K*]: end the tick (TerminateVoted)
     commit best[K*] decoded with the parameter surface of K*; C[K*] += 1
+    if the commit is Move(d): h = d (for later passes and the stored state)
     if queue full: end the tick (ActionCapReached)
     next pass
 exit: settle the bid once; actions = queue, or NoOp when empty
@@ -98,7 +105,7 @@ food type from `EatFoodType` (rounded, non-finite or negative reads type 0),
 `Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
 `[0, 1]`, non-finite reads 0), and `StealEnergy` its amount from
 `StealEnergyAmount` (non-negative finite, else 0). `Move` reads no field, and
-`Terminate` and `Decide`
+the drives, `Terminate` and `Decide`
 never commit and decode to `NoOp`. The parameter surface is zeroed
 at tick start, overwritten per visit, and read at commit.
 
@@ -113,6 +120,12 @@ Guards and ties:
 - A revisited node replaces its own contribution, so a cycle re-judges
   rather than inflates (W11 to W14, W17).
 - Comparisons are on sanitized `f32`; no RNG is drawn.
+- With no drive written, `0.0 + x` is `x`, and under heading `N` the tie
+  order is the lowest index, so one selection reads as before T11.F30; a
+  tick differs only when a `Move` commit precedes a within-kind tie.
+- The heading changes only on a committed `Move`, applied or blocked; no
+  other action, death or gestation changes it, it is never inherited, and no
+  sensor reads it.
 
 What the rule gives (the worked cases in
 `crates/v3-core/src/runtime/pass_loop_tests.rs` are the fixtures):

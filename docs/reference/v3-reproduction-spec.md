@@ -251,6 +251,9 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> population at max_creatures : litter lost
      -> cell = resolve(stored direction) if valid, else the first valid cell
         in Direction::ALL order from the parent's position; none : litter lost
+     -> the child's heading (T11.F30) is the direction of that cell from the
+        parent: the stored direction, or the fallback cell's; a span-0 birth
+        takes the validated Reproduce direction; never the parent's heading
      -> build OffspringDraft with initial_energy = litter energy, reading
         every inherited field from the parent now
   9. call MutationEngine unconditionally on child genome -> MutationSummary
