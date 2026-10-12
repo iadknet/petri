@@ -1751,12 +1751,331 @@
       }
     },
     {
+      "id": 38,
+      "type": "row",
+      "title": "Drives",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 114,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 39,
+      "type": "timeseries",
+      "title": "Drive carriers, share of population, by kind (sampled)",
+      "description": "Share of living creatures with at least one live path into a kind's drive sink (Drive Move, Drive Reproduce, Drive StealEnergy; T11.F30), from the drives-v1 census over reachable nodes at each snapshot. Founders start with no drive edges, so any rise is mutation-borne and kept by selection. Structure, not use: a carried drive may still lose to the bar.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 115,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (petri_drive_kind) (petri_tick_drive_carriers{petri_run_id=\"$run_id\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "{{petri_drive_kind}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Direction fan-outs, share of population, by kind (sampled)",
+      "description": "Share of living creatures that wire one source into two or more of a kind's eight direction sinks: the per-direction duplication a single drive edge replaces. Founders carry Move and Reproduce fan-outs. Drive carriers rising while fan-outs fall is the shift T11.F30 aims at.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 115,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (petri_drive_kind) (petri_tick_drive_fanout_creatures{petri_run_id=\"$run_id\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "{{petri_drive_kind}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 41,
+      "type": "xychart",
+      "pluginVersion": "13.2.2",
+      "title": "Drive carriers by tick (sampled)",
+      "description": "The drive-carrier shares plotted against simulation tick, one series per kind, so runs at different speeds compare on the same axis.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 123,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(petri_run_tick{petri_run_id=\"$run_id\"})",
+          "legendFormat": "tick",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max (petri_tick_drive_carriers{petri_run_id=\"$run_id\",petri_drive_kind=\"move\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "move",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max (petri_tick_drive_carriers{petri_run_id=\"$run_id\",petri_drive_kind=\"reproduce\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "reproduce",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max (petri_tick_drive_carriers{petri_run_id=\"$run_id\",petri_drive_kind=\"steal_energy\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "steal_energy",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "show": "points",
+            "pointSize": {
+              "fixed": 4
+            }
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tick"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "min"
+              },
+              {
+                "id": "max"
+              }
+            ]
+          }
+        ]
+      },
+      "interval": "1s",
+      "options": {
+        "mapping": "manual",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "move"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reproduce"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "steal_energy"
+              }
+            }
+          }
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 15,
       "type": "row",
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 114,
+        "y": 131,
         "w": 24,
         "h": 1
       },
@@ -1773,7 +2092,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 115,
+        "y": 132,
         "w": 12,
         "h": 8
       },
@@ -1850,7 +2169,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 115,
+        "y": 132,
         "w": 12,
         "h": 8
       },
@@ -1927,7 +2246,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 123,
+        "y": 140,
         "w": 12,
         "h": 8
       },
@@ -2004,7 +2323,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 123,
+        "y": 140,
         "w": 12,
         "h": 8
       },
@@ -2081,7 +2400,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 131,
+        "y": 148,
         "w": 12,
         "h": 8
       },
@@ -2154,7 +2473,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 139,
+        "y": 156,
         "w": 24,
         "h": 1
       },
@@ -2172,7 +2491,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 140,
+        "y": 157,
         "w": 24,
         "h": 10
       },
@@ -2199,7 +2518,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 150,
+        "y": 167,
         "w": 24,
         "h": 1
       },
@@ -2217,7 +2536,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 151,
+        "y": 168,
         "w": 24,
         "h": 10
       },

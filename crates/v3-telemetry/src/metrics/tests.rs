@@ -649,6 +649,16 @@ fn tick_families(families: &mut Vec<Family>) {
     ] {
         families.push((format!("petri.tick.{field}"), Gauge, vec![food()]));
     }
+    for field in ["drive_carriers", "drive_fanout_creatures"] {
+        families.push((
+            format!("petri.tick.{field}"),
+            Gauge,
+            vec![(
+                "petri.drive_kind",
+                strings(["move", "reproduce", "steal_energy"], str::to_owned),
+            )],
+        ));
+    }
 }
 
 /// Every combination of the attributes' values.

@@ -200,6 +200,8 @@ petri_tick_mean_energy
 petri_tick_mean_genome_size
 petri_tick_mean_mesh_nodes
 petri_tick_mean_generation
+petri_tick_drive_carriers
+petri_tick_drive_fanout_creatures
 '
 
 # Families over maps that hold only the keys a run met: those the workload
