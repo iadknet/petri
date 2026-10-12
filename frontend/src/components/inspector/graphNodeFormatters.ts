@@ -167,6 +167,8 @@ export function describeVoteSink(sink: VoteSink): string {
 
 const ACTION_PARAM_DESCRIPTIONS: Readonly<Record<ActionParamField, string>> = {
 	EatFoodType: "Which food type Eat targets (rounded). A type that does not exist eats nothing.",
+	EatLeaveShare:
+		"Share of the cell's food Eat leaves behind (0 to 1). 0 eats everything; 1 eats nothing, a failed eat.",
 	ReproduceTransferFraction: "Share of the parent's energy given to the child (0 to 1).",
 	StealEnergyAmount: "Energy to steal; the effort cost grows with the amount asked.",
 };
