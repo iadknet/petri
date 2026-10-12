@@ -66,7 +66,7 @@ describe("VoteSurfaceBlock", () => {
 							end_reason: "Decided",
 							votes,
 							effective_votes: [1.5, 0, 0, 0],
-							committed: { Eat: { type_idx: 0 } },
+							committed: { Eat: { type_idx: 0, leave: 0 } },
 							hops: 2,
 						}),
 						makePass({ pass_index: 1, effective_votes: [-1, 0, 0, 0], bars: [1, 0, 0, 0] }),

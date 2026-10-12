@@ -1171,7 +1171,8 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    field_idx: 2,
+                    field_idx: crate::creature::genome::vote::ActionParamField::StealEnergyAmount
+                        .index() as u8,
                     src: 0,
                 },
                 VmInstruction::LoadConst {

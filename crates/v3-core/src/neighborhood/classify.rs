@@ -457,9 +457,7 @@ mod tests {
         }
     }
 
-    const EAT: WorldAction = WorldAction::Eat {
-        type_idx: crate::config::OrdinaryFoodTypeId::new(0),
-    };
+    const EAT: WorldAction = WorldAction::eat(crate::config::OrdinaryFoodTypeId::new(0));
 
     /// T19.F04 readings inside `Changed`: the same multiset in another order
     /// is `Reordered`; the same action kinds at other counts is `Recount`;

@@ -6,8 +6,12 @@ use crate::contracts::OrdinaryFoodTypeId;
 pub enum WorldAction {
     /// Do nothing this tick.
     NoOp,
-    /// Consume food on the current cell for the configured food type.
-    Eat { type_idx: OrdinaryFoodTypeId },
+    /// Consume food of `type_idx` on the current cell, leaving the share
+    /// `leave` (in [0, 1]) of the cell's density in place (T02.F08).
+    Eat {
+        type_idx: OrdinaryFoodTypeId,
+        leave: f32,
+    },
     /// Move one step in the given direction.
     Move(Direction),
     /// Attempt to spawn an offspring in the given direction. The child starts
@@ -22,10 +26,14 @@ pub enum WorldAction {
 }
 
 impl WorldAction {
-    /// Construct a typed Eat action for the given ordinary food type.
+    /// Construct a typed Eat action for the given ordinary food type that
+    /// eats the whole cell (`leave` 0.0).
     #[must_use]
     pub const fn eat(type_idx: OrdinaryFoodTypeId) -> Self {
-        Self::Eat { type_idx }
+        Self::Eat {
+            type_idx,
+            leave: 0.0,
+        }
     }
 
     pub fn is_noop(&self) -> bool {
@@ -58,13 +66,15 @@ impl WorldAction {
     }
 
     /// Read back a parameter slot for `ReadActionQueueParam`.
-    /// Slot 0 = direction index (as f32), slot 1 = amount (StealEnergy) or
-    /// energy_transfer_fraction (Reproduce). Returns 0.0 for unknown slots or
+    /// Slot 0 = direction index (as f32), or the food type index (Eat);
+    /// slot 1 = amount (StealEnergy), energy_transfer_fraction (Reproduce) or
+    /// the leave share (Eat). Returns 0.0 for unknown slots or
     /// variants without that parameter.
     #[inline]
     pub fn param(&self, slot: usize) -> f32 {
         match (self, slot) {
-            (WorldAction::Eat { type_idx }, 0) => type_idx.get() as f32,
+            (WorldAction::Eat { type_idx, .. }, 0) => type_idx.get() as f32,
+            (WorldAction::Eat { leave, .. }, 1) => *leave,
             (WorldAction::Move(dir), 0) => dir.to_index() as f32,
             (WorldAction::Reproduce { direction, .. }, 0) => direction.to_index() as f32,
             (
@@ -93,10 +103,7 @@ mod tests {
 
     #[test]
     fn other_actions_not_noop() {
-        assert!(!WorldAction::Eat {
-            type_idx: OrdinaryFoodTypeId::default()
-        }
-        .is_noop());
+        assert!(!WorldAction::eat(OrdinaryFoodTypeId::default()).is_noop());
         assert!(!WorldAction::Move(Direction::N).is_noop());
         assert!(!WorldAction::Reproduce {
             direction: Direction::S,
@@ -134,12 +141,29 @@ mod tests {
         );
         assert_eq!(WorldAction::NoOp.direction(), None);
         assert_eq!(
-            WorldAction::Eat {
-                type_idx: OrdinaryFoodTypeId::default()
-            }
-            .direction(),
+            WorldAction::eat(OrdinaryFoodTypeId::default()).direction(),
             None
         );
+    }
+
+    #[test]
+    fn eat_builds_a_whole_cell_eat_and_param_reads_type_then_leave() {
+        let whole = WorldAction::eat(OrdinaryFoodTypeId::new(2));
+        assert_eq!(
+            whole,
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::new(2),
+                leave: 0.0
+            }
+        );
+        let partial = WorldAction::Eat {
+            type_idx: OrdinaryFoodTypeId::new(3),
+            leave: 0.25,
+        };
+        assert_eq!(partial.param(0).to_bits(), 3.0f32.to_bits());
+        assert_eq!(partial.param(1).to_bits(), 0.25f32.to_bits());
+        assert_eq!(whole.param(1).to_bits(), 0.0f32.to_bits());
+        assert_eq!(partial.param(2).to_bits(), 0.0f32.to_bits());
     }
 
     #[test]
@@ -180,6 +204,7 @@ mod tests {
             WorldAction::NoOp,
             WorldAction::Eat {
                 type_idx: OrdinaryFoodTypeId::default(),
+                leave: 0.25,
             },
             WorldAction::Move(Direction::W),
             WorldAction::Reproduce {

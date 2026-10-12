@@ -265,10 +265,10 @@ pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 Cus
     + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
 const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
 /// Total fixed sink count: the sinks before the vote catalog + 30 ActionVote +
-/// 3 ActionParam (T11.F27).
+/// 4 ActionParam (T11.F27, T02.F08).
 pub const FIXED_SINK_COUNT: usize =
     FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + ACTION_PARAM_FIELD_COUNT;
-const _: () = assert!(FIXED_SINK_COUNT == 97);
+const _: () = assert!(FIXED_SINK_COUNT == 98);
 
 impl CgpGraphBackendDef {
     /// The output sink of `kind`, when the graph carries it.
@@ -327,7 +327,7 @@ impl CgpGraphBackendDef {
             });
         }
 
-        // 3 ActionParam sinks in `ActionParamField::ALL` order (T11.F27).
+        // 4 ActionParam sinks in `ActionParamField::ALL` order (T11.F27, T02.F08).
         for field in ActionParamField::ALL {
             output_sinks.push(OutputSink {
                 kind: OutputSinkKind::ActionParam(field),
@@ -629,7 +629,7 @@ mod tests {
                 OutputSinkKind::ActionVote(sink)
             );
         }
-        // The three parameter sinks occupy 94..97 in `ActionParamField::ALL`
+        // The four parameter sinks occupy 94..98 in `ActionParamField::ALL`
         // order (T11.F27).
         let first_param = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
         assert_eq!(first_param, 94);
@@ -641,7 +641,7 @@ mod tests {
             params,
             ActionParamField::ALL.map(OutputSinkKind::ActionParam)
         );
-        assert_eq!(def.output_sinks.len(), 97);
+        assert_eq!(def.output_sinks.len(), 98);
 
         // All sinks start with empty edges
         for sink in &def.output_sinks {

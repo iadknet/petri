@@ -843,6 +843,10 @@ fn outcomes(f: &mut Families, s: &SimStats) {
             "eat_actions_failed_total_by_type",
             &s.eat_actions_failed_total_by_type,
         ),
+        (
+            "eat_actions_partial_total_by_type",
+            &s.eat_actions_partial_total_by_type,
+        ),
     ] {
         f.counts(run_name(field), "petri.food_type", map, |k| {
             k.get().to_string()

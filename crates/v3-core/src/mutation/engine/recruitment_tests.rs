@@ -37,8 +37,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // (3281291995176387451 -> 16135082583858842888).
     // Re-pinned by T11.F30: three drive sinks join every Graph node, remapping
     // every sink and surface draw (16135082583858842888 -> 11747062888261140569).
+    // Re-pinned by T02.F08: every graph genome carries the `EatLeaveShare`
+    // sink and the surface draw covers `c + 98`
+    // (11747062888261140569 -> 13078250158860285847).
     assert_eq!(
-        hash, 11747062888261140569,
+        hash, 13078250158860285847,
         "pin of the recruitment-Off production path"
     );
 }

@@ -76,7 +76,7 @@ fn side() -> MeshSideOutputs {
     side.votes = ramp(0.0);
     side.previous_pass_votes = ramp(0.5);
     side.commit_counts = [1, 2, 3, 4];
-    side.action_params = [0.25, 0.5, 0.75];
+    side.action_params = [0.25, 0.5, 0.75, 1.0];
     side.work_counters.mesh_hops = 6;
     side
 }

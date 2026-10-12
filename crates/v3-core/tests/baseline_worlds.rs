@@ -128,10 +128,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// drive sinks remap every sink and surface draw (default
 /// 16142175903090917201 -> 5792368611610278395, rate 0.0
 /// 14486103714587518529 -> 467545077909000578).
+/// Re-pinned by T02.F08 after two agreeing runs: every genome's `Debug` text
+/// carries the `EatLeaveShare` sink from tick 0, and the surface and
+/// opcode-25 draws widen (default 5792368611610278395 ->
+/// 11106923287936488614, rate 0.0 467545077909000578 ->
+/// 11416820348583511793).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 5792368611610278395);
-    assert_eq!(short_run_identity(Some(0.0)), 467545077909000578);
+    assert_eq!(short_run_identity(None), 11106923287936488614);
+    assert_eq!(short_run_identity(Some(0.0)), 11416820348583511793);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.
@@ -268,37 +273,47 @@ fn typed_rewards_inherit_live_values_and_apply_cap_before_cost() {
         sim.creatures[id].energy = 10.0;
         sim.world
             .set_food_type(pos, OrdinaryFoodTypeId::new(1), 0.5);
-        assert!(apply_typed_eat(
-            &mut sim.creatures[id],
-            &mut sim.world,
-            &sim.config,
-            OrdinaryFoodTypeId::new(1),
-            &mut sim.stats.energy_flows
-        ));
+        assert!(
+            apply_typed_eat(
+                &mut sim.creatures[id],
+                &mut sim.world,
+                &sim.config,
+                OrdinaryFoodTypeId::new(1),
+                0.0,
+                &mut sim.stats.energy_flows
+            ) > 0.0
+        );
         assert_eq!(sim.creatures[id].energy, expected);
     }
     sim.config.world.food.types[1].energy_per_unit = Some(1000.0);
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(1), 1.0);
-    assert!(apply_typed_eat(
-        &mut sim.creatures[id],
-        &mut sim.world,
-        &sim.config,
-        OrdinaryFoodTypeId::new(1),
-        &mut sim.stats.energy_flows
-    ));
+    assert!(
+        apply_typed_eat(
+            &mut sim.creatures[id],
+            &mut sim.world,
+            &sim.config,
+            OrdinaryFoodTypeId::new(1),
+            0.0,
+            &mut sim.stats.energy_flows
+        ) > 0.0
+    );
     assert_eq!(
         sim.creatures[id].energy,
         sim.config.energy.lifecycle.max_energy - 2.0
     );
     let before = sim.creatures[id].energy;
-    assert!(!apply_typed_eat(
-        &mut sim.creatures[id],
-        &mut sim.world,
-        &sim.config,
-        OrdinaryFoodTypeId::new(99),
-        &mut sim.stats.energy_flows
-    ));
+    assert_eq!(
+        apply_typed_eat(
+            &mut sim.creatures[id],
+            &mut sim.world,
+            &sim.config,
+            OrdinaryFoodTypeId::new(99),
+            0.0,
+            &mut sim.stats.energy_flows
+        ),
+        0.0
+    );
     assert_eq!(sim.creatures[id].energy, before - 2.0);
 }
 
@@ -638,14 +653,14 @@ fn food_choice_mutation_diagnostic() {
             .snapshots
             .iter()
             .chain(signature.sequences.iter().flatten());
-        changed_eat+=usize::from(parent_executions.zip(child_executions).any(|(p,c)|p.iter().zip(c).any(|(p,c)|matches!((p,c),(WorldAction::Eat{type_idx:a},WorldAction::Eat{type_idx:b}) if a!=b))));
+        changed_eat+=usize::from(parent_executions.zip(child_executions).any(|(p,c)|p.iter().zip(c).any(|(p,c)|matches!((p,c),(WorldAction::Eat{type_idx:a,..},WorldAction::Eat{type_idx:b,..}) if a!=b))));
         nonprimary += usize::from(
             signature
                 .snapshots
                 .iter()
                 .chain(signature.sequences.iter().flatten())
                 .flatten()
-                .any(|a| matches!(a,WorldAction::Eat{type_idx} if type_idx.get()!=0)),
+                .any(|a| matches!(a,WorldAction::Eat{type_idx,..} if type_idx.get()!=0)),
         );
     }
     println!("food-choice diagnostic: births=1000 seeds=9000..9999 food_types=2 executions_per_genome={} executed_parent_nodes={executed:?} zero_event_births={zero} offspring_with_corresponding_eat_index_change={changed_eat} offspring_selecting_nonprimary_anywhere={nonprimary}",base.execution_count());

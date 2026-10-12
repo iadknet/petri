@@ -1084,9 +1084,7 @@ fn e1_exact_one_edge_update_immediate_reward() {
     let tick = run_one_traced_tick(&mut sim, target);
     assert_eq!(
         tick.final_actions[0],
-        WorldAction::Eat {
-            type_idx: OrdinaryFoodTypeId::default()
-        },
+        WorldAction::eat(OrdinaryFoodTypeId::default()),
         "the wired Eat vote should commit Eat every tick"
     );
 

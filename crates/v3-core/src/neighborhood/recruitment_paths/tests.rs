@@ -1028,6 +1028,8 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// shortens 3 -> 2 events, `graph_detour` 2 -> 1 and `graph_unprepared`
 /// 5 -> 3. T11.F30 moved every Graph seed and the VM `vote_to_east` seed:
 /// the three drive sinks remap the sink, surface and `AddVote` draws.
+/// T02.F08 moved the copy and split `GraphAddGraphEdge` seeds (713 -> 417,
+/// 653 -> 4890): the `EatLeaveShare` sink widens the edge-surface draw.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1049,8 +1051,8 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         record,
         [
             ("graph_blank", vec![(InputRefAdd, 4251), swap], None),
-            ("graph_copy", vec![(GraphAddGraphEdge, 713), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 653), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 417), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 4890), swap], None),
             (
                 "vm_blank",
                 vec![

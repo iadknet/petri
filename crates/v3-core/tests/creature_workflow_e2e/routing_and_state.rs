@@ -114,9 +114,7 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
     assert_eq!(
         tick.final_actions[0],
-        WorldAction::Eat {
-            type_idx: OrdinaryFoodTypeId::default(),
-        }
+        WorldAction::eat(OrdinaryFoodTypeId::default())
     );
     let route = tick.hops[0]
         .route

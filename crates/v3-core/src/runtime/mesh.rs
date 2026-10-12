@@ -1201,9 +1201,9 @@ mod tests {
         );
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }]
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )]
         );
     }
 
@@ -1251,9 +1251,9 @@ mod tests {
         );
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }],
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )],
             "route=3.7 should select targets[0]"
         );
     }
@@ -1298,9 +1298,9 @@ mod tests {
         );
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }],
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )],
             "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
     }
@@ -1387,9 +1387,9 @@ mod tests {
         assert_eq!(output.priority_bid, 3.0);
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }]
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )]
         );
         assert!(
             (energy - 97.0).abs() < 1e-3,
@@ -1457,9 +1457,9 @@ mod tests {
         assert_eq!(energy, 0.0);
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }]
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )]
         );
         assert_eq!(
             output.termination_reason,

@@ -40,6 +40,10 @@
 //! Re-pinned by T11.F30 after two agreeing runs: the founder heading draws
 //! shift the run RNG and the three drive sinks remap every sink and surface
 //! draw, which moves all four digests.
+//! Re-pinned by T02.F08 after two agreeing runs: every graph genome carries
+//! the `EatLeaveShare` sink, the surface and opcode-25 draws widen, and the
+//! ±1 field nudge lands on a field of a different meaning, which moves the
+//! two sampled digests; the applied-behavior guard digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -51,11 +55,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "733ca59ff24c7da3c0ca398424fd46e32dabaac6c175c2643759f42fd76f60d3"
+        "08bcb284eea2b2b86d0fe522a4a78693ee4ab25385cb2a01b2fcea6007e8387b"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "a27c63e6e244728443cfa104bdcb5956f2814e11ed78bdb5900eda46ec2f2fce"
+        "b7d16c677cdc867dd25e0757d5d4d04d57a8c208b2af2e08f7bae51150980221"
     );
 }
 

@@ -1415,12 +1415,15 @@ mod tests {
     /// draw): 23/23 graph (censored 13 -> 9) and 23/23 VM (censored 8 -> 9)
     /// retained discoveries remain useful. Re-pinned by T11.F30 (three drive
     /// sinks remap every sink and surface draw): 22/22 graph (censored
-    /// 9 -> 10) and 23/23 VM retained discoveries remain useful.
+    /// 9 -> 10) and 23/23 VM retained discoveries remain useful. Re-pinned
+    /// by T02.F08 (the `EatLeaveShare` sink widens the surface draw to
+    /// `c + 98`): 21/21 graph (censored 10 -> 11) and 23/23 VM retained
+    /// discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [22, 22, 22, 22], 10),
+            ("graph_prepared", [21, 21, 21, 21], 11),
             ("vm_prepared", [23, 23, 23, 23], 9),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();

@@ -179,11 +179,11 @@ Topology connection semantics (T11.F15, T11.F18):
   the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
   include `AddVote { sink in 0..30, src }` (the sink drawn uniformly over the
   vote catalog, the three kind drives included, T11.F30), `WriteActionParam { field_idx, src }`, whose `field_idx` is
-  one uniform draw over `ActionParamField::ALL` (`0..3`, T11.F27), and
+  one uniform draw over `ActionParamField::ALL` (`0..4`, T11.F27, T02.F08), and
   `ReadActionQueueParam`, whose `param_slot` is drawn from `0..2`, the queue
   parameter slots that carry a value (T11.F27); the operand nudge moves an
   `AddVote`'s `sink` or `src`, and the raw-field move can still step a
-  `field_idx` to `3` or more, a write the VM ignores
+  `field_idx` to `4` or more, a write the VM ignores
 - `VmConstantMutation` — one constant `c` of the pool, drawn uniformly, moves
   by `u × max(|c|, 1)` with `u` uniform in [−0.1, 0.1] (the graph parameter
   step; T11.F23): a unit-scale constant moves as a graph parameter does, a
@@ -357,7 +357,7 @@ and native storage/work costs. Existing weight mutation and edge deletion apply
 to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
-(the 97 output sinks, vote and parameter sinks included) are never
+(the 98 output sinks, vote and parameter sinks included) are never
 added/removed/retyped — only their edges are evolvable.
 
 - `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
@@ -405,8 +405,8 @@ added/removed/retyped — only their edges are evolvable.
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
-  order: all 97 sinks, the 30 vote sinks and the three parameter sinks
-  included (T11.F27, T11.F30);
+  order: all 98 sinks, the 30 vote sinks and the four parameter sinks
+  included (T11.F27, T11.F30, T02.F08);
   source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via

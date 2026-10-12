@@ -555,7 +555,9 @@ fn steal_north_genome() -> CreatureGenome {
                         const_idx: 1,
                     },
                     VmInstruction::WriteActionParam {
-                        field_idx: 2,
+                        field_idx:
+                            crate::creature::genome::vote::ActionParamField::StealEnergyAmount
+                                .index() as u8,
                         src: 1,
                     },
                     VmInstruction::AddVote { sink: 17, src: 0 },

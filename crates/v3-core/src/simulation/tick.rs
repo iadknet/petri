@@ -886,6 +886,7 @@ fn execute_eat(
     sim: &mut Simulation,
     ctx: &ActionContext,
     type_idx: OrdinaryFoodTypeId,
+    leave: f32,
     outcome_acc: &mut OutcomeAccumulator,
 ) -> ActionLogEntry {
     let mut action_result = ActionResult::Success;
@@ -893,22 +894,30 @@ fn execute_eat(
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::Eat);
         let food_before = sim.world.food_at_type(creature.position, type_idx);
-        let succeeded = apply_typed_eat(
+        let eaten = apply_typed_eat(
             creature,
             &mut sim.world,
             &sim.config,
             type_idx,
+            leave,
             &mut sim.stats.energy_flows,
         );
+        let succeeded = eaten > 0.0;
         sim.stats.last_tick_eat += 1;
         outcome_acc.record_action_result(ctx.id, succeeded);
         if succeeded {
-            amount = food_before;
+            amount = eaten;
             creature.record_applied_eat(type_idx);
             *sim.stats
                 .eat_actions_applied_total_by_type
                 .entry(type_idx)
                 .or_insert(0) += 1;
+            if eaten < food_before {
+                *sim.stats
+                    .eat_actions_partial_total_by_type
+                    .entry(type_idx)
+                    .or_insert(0) += 1;
+            }
         } else {
             action_result = ActionResult::NoFood;
             *sim.stats
@@ -1196,7 +1205,9 @@ fn run_phase_2(
             #[cfg_attr(not(feature = "telemetry-seams"), allow(unused_variables))]
             let entry = match *action {
                 WorldAction::NoOp => execute_noop(sim, &ctx, outcome_acc),
-                WorldAction::Eat { type_idx } => execute_eat(sim, &ctx, type_idx, outcome_acc),
+                WorldAction::Eat { type_idx, leave } => {
+                    execute_eat(sim, &ctx, type_idx, leave, outcome_acc)
+                }
                 WorldAction::Move(dir) => execute_move(sim, &ctx, dir, outcome_acc),
                 WorldAction::Reproduce {
                     direction,
@@ -1508,7 +1519,7 @@ mod final_action_observation_tests {
                         },
                         VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                         VmInstruction::WriteActionParam {
-                            field_idx: 1,
+                            field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction.index() as u8,
                             src: 0,
                         },
                         VmInstruction::AddVote { sink: 10, src: 2 },
@@ -1659,9 +1670,7 @@ mod final_action_observation_tests {
 
         let observations = observe_final_actions(&sim);
 
-        let expected = vec![WorldAction::Eat {
-            type_idx: OrdinaryFoodTypeId::new(0),
-        }];
+        let expected = vec![WorldAction::eat(OrdinaryFoodTypeId::new(0))];
         let observation = observations.first().expect("one observation");
         assert_eq!(observation.intact, expected);
         assert_eq!(observation.zeroed, expected);

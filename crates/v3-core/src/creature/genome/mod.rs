@@ -76,7 +76,7 @@ pub enum VmInstruction {
     /// Overwrite internal payload slot; invalid slot write ignored.
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Overwrite parameter-surface field `action_params[field_idx]`, the
-    /// `ActionParamField::ALL` position (`field_idx` in `0..3`, T11.F27); a
+    /// `ActionParamField::ALL` position (`field_idx` in `0..4`, T11.F27, T02.F08); a
     /// write to an invalid field is ignored and still costs.
     WriteActionParam { field_idx: u8, src: u8 },
     /// Add `regs[src]` to this dispatch's vote for `VoteSink::from_index(sink)`

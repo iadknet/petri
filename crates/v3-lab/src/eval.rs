@@ -664,7 +664,7 @@ pub fn run_scripted(
         ticks = tick;
         let intake_before: f64 = flows.food_intake_by_type.iter().sum();
         let ate = world.food_at_type(actor.position, FOOD) > 0.0
-            && apply_typed_eat(&mut actor, &mut world, config, FOOD, &mut flows);
+            && apply_typed_eat(&mut actor, &mut world, config, FOOD, 0.0, &mut flows) > 0.0;
         if ate {
             tally.food_eaten += 1;
             tally.first.get_or_insert(tick);

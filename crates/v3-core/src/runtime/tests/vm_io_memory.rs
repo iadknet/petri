@@ -103,6 +103,8 @@ fn write_action_param_ignores_and_charges_an_invalid_field() {
 
 #[test]
 fn write_action_param_overwrites_and_ignores_an_invalid_field() {
+    use crate::creature::genome::vote::{ActionParamField, ACTION_PARAM_FIELD_COUNT};
+    const REPRODUCE: u8 = ActionParamField::ReproduceTransferFraction.index() as u8;
     let (_, _, side) = run_vm(
         vec![
             VmInstruction::LoadConst {
@@ -110,7 +112,7 @@ fn write_action_param_overwrites_and_ignores_an_invalid_field() {
                 const_idx: 0,
             },
             VmInstruction::WriteActionParam {
-                field_idx: 1,
+                field_idx: REPRODUCE,
                 src: 0,
             },
             VmInstruction::LoadConst {
@@ -118,11 +120,11 @@ fn write_action_param_overwrites_and_ignores_an_invalid_field() {
                 const_idx: 1,
             },
             VmInstruction::WriteActionParam {
-                field_idx: 1,
+                field_idx: REPRODUCE,
                 src: 0,
             },
             VmInstruction::WriteActionParam {
-                field_idx: 3,
+                field_idx: ACTION_PARAM_FIELD_COUNT as u8,
                 src: 0,
             },
             VmInstruction::WriteActionParam {
@@ -137,7 +139,9 @@ fn write_action_param_overwrites_and_ignores_an_invalid_field() {
         zeroed_upstream(),
         100.0,
     );
-    assert_eq!(side.action_params, [0.0, -2.0, 0.0]);
+    let mut expected = [0.0; ACTION_PARAM_FIELD_COUNT];
+    expected[usize::from(REPRODUCE)] = -2.0;
+    assert_eq!(side.action_params, expected);
 }
 
 // ── ReadInput opcode ──────────────────────────────────────────────────────
@@ -559,9 +563,9 @@ fn vm_eats_when_food_here() {
     .actions;
     assert_eq!(
         actions.first(),
-        Some(&crate::contracts::WorldAction::Eat {
-            type_idx: crate::config::OrdinaryFoodTypeId::default()
-        }),
+        Some(&crate::contracts::WorldAction::eat(
+            crate::config::OrdinaryFoodTypeId::default()
+        )),
         "Expected Eat when food is present"
     );
 }

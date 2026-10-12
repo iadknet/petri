@@ -134,9 +134,15 @@ impl WorldState {
         self.food.consume(pos)
     }
 
-    /// Consume food only if the requested type owns the cell.
-    pub fn consume_food_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
-        self.food.consume_type(pos, type_idx)
+    /// Eat food of the requested type on the cell, leaving the share `leave`
+    /// in place (T02.F08); returns the amount eaten.
+    pub fn consume_food_type(
+        &mut self,
+        pos: Position,
+        type_idx: OrdinaryFoodTypeId,
+        leave: f32,
+    ) -> f32 {
+        self.food.consume_type(pos, type_idx, leave)
     }
 
     /// Get food density at a position.
@@ -394,7 +400,7 @@ mod tests {
         w.set_food_type(bitten, type0, 0.42);
 
         // Act
-        w.consume_food_type(bitten, type0);
+        w.consume_food_type(bitten, type0, 0.0);
 
         // Assert: the bitten cell reads the stored modifier, an ungrazed cell
         // and an unknown type read the ungrazed 1.0.

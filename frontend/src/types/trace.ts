@@ -141,7 +141,7 @@ export type PassEndReason =
 export type WorldAction =
 	| "NoOp"
 	| "Eat"
-	| { Eat: { type_idx: number } }
+	| { Eat: { type_idx: number; leave: number } }
 	| { Move: string }
 	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
 	| { StealEnergy: { direction: string; amount: number } };

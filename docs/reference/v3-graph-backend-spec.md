@@ -177,7 +177,7 @@ pub enum OutputSinkKind {
 ```
 
 The full sink catalog is fixed at genome construction: 24 CustomOutput + 8
-RouterGate + 16 WriteSlot + 16 ClearSlot + 30 ActionVote + 3 ActionParam = 97
+RouterGate + 16 WriteSlot + 16 ClearSlot + 30 ActionVote + 4 ActionParam = 98
 sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
 kinds.
 
@@ -190,13 +190,13 @@ to the kind's best direction vote, and it is never committed itself; it
 serializes as `{"Drive":"Move"}`. `VoteKind` is
 `Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
 `ActionParamField` holds exactly the fields the commit decoder reads, in the
-order `EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`
-(T11.F27); `Move` has no parameter field.
+order `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
+`StealEnergyAmount` (T11.F27, T02.F08); `Move` has no parameter field.
 
 A wired `ActionVote` sink writes its weighted sum into the visit's vote
 contribution, which replaces the node's earlier contribution in the pass; a
 wired `ActionParam(field)` sink overwrites `action_params[field.index()]`
-on the tick's three-field parameter surface. The pass end reads both
+on the tick's four-field parameter surface. The pass end reads both
 (`v3-mesh-execution-spec.md` Section 2); votes are how the graph acts, so a
 graph with no wired vote sink never commits an action. `pick_random_surface`
 makes one uniform draw over the compute nodes and then every sink in vector
@@ -229,9 +229,10 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
   highest effective vote (best sink's vote minus the kind's bar, its commits
   so far this tick) commits once, in its best sink's direction; a vote of
   `v` therefore commits `ceil(v)` actions over successive passes.
-- Parameters are read at commit from the kind's field: `Eat` reads
-  `EatFoodType`, `Reproduce` `ReproduceTransferFraction`, `StealEnergy`
-  `StealEnergyAmount`, and `Move` nothing
+- Parameters are read at commit from the kind's fields: `Eat` reads
+  `EatFoodType` and `EatLeaveShare` (the share of the cell's food it leaves,
+  clamped to `[0, 1]`, T02.F08), `Reproduce` `ReproduceTransferFraction`,
+  `StealEnergy` `StealEnergyAmount`, and `Move` nothing
   (`runtime::action_decode::decode_commit`, shared with the VM's
   `WriteActionParam`).
 - `Terminate` ends a non-empty tick when its vote is at least the best
@@ -590,7 +591,7 @@ from imposing a constant complexity tax.
 - 16 `WriteSlot(0..15)` sinks (32..48)
 - 16 `ClearSlot(0..15)` sinks (48..64)
 - 30 `ActionVote` sinks in `VoteSink` index order (64..94)
-- 3 `ActionParam` sinks in `ActionParamField::ALL` order (94..97)
+- 4 `ActionParam` sinks in `ActionParamField::ALL` order (94..98)
 
 All sinks start with empty edge Vecs (inert until evolution wires them).
 
