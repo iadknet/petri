@@ -3,8 +3,10 @@ use crate::arena::arena_config;
 use crate::calibration::draw_scenes;
 use crate::scene::SceneSpec;
 use proptest::prelude::*;
+use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge};
+use v3_core::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, RingProjection};
+use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::VmBackendDef;
 
 fn setup(lifetime: u32, start_energy: f32) -> Setup {
@@ -464,6 +466,133 @@ fn a_node_without_sentinel_headroom_is_unsupported() {
     assert!(ablation_supported(&tight));
     assert!(ablate(&tight, Family::ActionQueue).is_none());
     assert!(ablate(&tight, Family::AgeTicks).is_some());
+}
+
+/// Push a reference to `key` on the entry node: its index and the new
+/// reference index.
+fn with_ring(genome: &mut CreatureGenome, key: WorldInputKey) -> (usize, u16) {
+    let entry = genome
+        .nodes
+        .iter()
+        .position(|node| node.node_id == genome.entry_node_id)
+        .unwrap();
+    let node = &mut genome.nodes[entry];
+    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+    node.input_refs.push(InputReference::World(key));
+    (entry, ref_idx)
+}
+
+fn projections(genome: &CreatureGenome, node: usize) -> &[RingProjection] {
+    let BackendDef::Graph(graph) = &genome.nodes[node].backend_def else {
+        panic!("a graph node");
+    };
+    &graph.projections
+}
+
+#[test]
+fn a_ring_projection_is_a_consumer_and_ablation_masks_every_channel_of_its_family() {
+    let setup = setup(1, 100.0);
+    let mut genome = founder(&setup);
+    let (entry, barrier) = with_ring(&mut genome, WorldInputKey::NeighborBarrierRing);
+    let (_, occupied) = with_ring(&mut genome, WorldInputKey::NeighborOccupiedRing);
+    let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
+        panic!("the founder entry is a graph node");
+    };
+    graph.projections.extend([
+        RingProjection::new(barrier, DirectedVoteKind::Move, 0, 0.5),
+        RingProjection::new(occupied, DirectedVoteKind::Move, 3, -0.5),
+    ]);
+    let found = consumers(&genome);
+    assert!(found[&Family::NeighborBarrierRing].contains(&entry));
+    assert!(found[&Family::NeighborOccupiedRing].contains(&entry));
+
+    let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
+    // The production input-use mask: `ref_idx`, and with it every charge,
+    // unchanged.
+    let masks: Vec<(u16, u8)> = projections(&ablated, entry)
+        .iter()
+        .map(|projection| (projection.ref_idx, projection.ablated_channels))
+        .collect();
+    assert_eq!(masks, [(barrier, u8::MAX), (occupied, 0)]);
+    assert_eq!(ablated.genome_size(), genome.genome_size());
+    assert_eq!(ablated.complexity(), genome.complexity());
+    let left = consumers(&ablated);
+    assert!(!left.contains_key(&Family::NeighborBarrierRing));
+    assert!(left[&Family::NeighborOccupiedRing].contains(&entry));
+}
+
+#[test]
+fn a_sentinel_skips_an_out_of_range_projection_index() {
+    let setup = setup(1, 100.0);
+    let mut genome = founder(&setup);
+    let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
+        panic!("the founder's node 0 is a graph node");
+    };
+    // `functional_complexity` counts every projection's index, in range or
+    // not, as a consumed index.
+    graph.projections.push(RingProjection::new(
+        ABLATED_REF,
+        DirectedVoteKind::Move,
+        0,
+        0.5,
+    ));
+    let family = Family::of(&genome.nodes[0].input_refs[0]);
+    let ablated = ablate(&genome, family).unwrap();
+    assert_eq!(ablated.complexity(), genome.complexity());
+    assert!(!ref_idxs(&ablated).contains(&ABLATED_REF));
+}
+
+#[test]
+fn a_ring_read_only_through_a_projection_is_causal() {
+    let setup = setup(100, 100.0);
+    let mut genome = founder(&setup);
+    // Move every founder food-ring read from its edges onto a Move
+    // projection of the same reference.
+    let mut moved = 0;
+    for node in &mut genome.nodes {
+        let refs = &node.input_refs;
+        let BackendDef::Graph(graph) = &mut node.backend_def else {
+            continue;
+        };
+        let mut rings = BTreeSet::new();
+        let edges = graph
+            .compute_nodes
+            .iter_mut()
+            .map(|compute| &mut compute.inputs)
+            .chain(graph.output_sinks.iter_mut().map(|sink| &mut sink.inputs));
+        for inputs in edges {
+            inputs.retain(|edge| match edge.source {
+                GraphSource::InputLeaf { ref_idx, .. }
+                    if refs
+                        .get(usize::from(ref_idx))
+                        .is_some_and(|r| matches!(Family::of(r), Family::NeighborFoodRing(_))) =>
+                {
+                    rings.insert(ref_idx);
+                    false
+                }
+                _ => true,
+            });
+        }
+        moved += rings.len();
+        graph.projections.extend(
+            rings
+                .into_iter()
+                .map(|ref_idx| RingProjection::new(ref_idx, DirectedVoteKind::Move, 0, 1.0)),
+        );
+    }
+    assert!(moved > 0, "the founder reads its food ring");
+    let family = *consumers(&genome)
+        .keys()
+        .find(|family| matches!(family, Family::NeighborFoodRing(_)))
+        .expect("the projection consumes the ring");
+    let scenes = scenes(2);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let elite = observed(&genome, &ancestry, &scenes, &run);
+    let (Some(causal), _) = causal(&setup, &elite, &[family]) else {
+        panic!("supported");
+    };
+    assert!(causal[0].causal, "{causal:?}");
 }
 
 fn class() -> impl Strategy<Value = Class> {
