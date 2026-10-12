@@ -100,7 +100,7 @@ a representation only where the neighborhood reading still shows a gap.
   - Goal: Feedback projections, a later stage of a nervous system wiring back to an earlier one. A mesh can grow a route branch back to a node on its own working path, itself included, born silent like any new branch, so a loop that repeats a step or keeps state is one ordinary mutation away instead of a rare by-product of a slice copy.
 - [x] **T11.F31 — Ring Projection Motif** — Depends on: T19.F06, T20.F16
   - Goal: A topographic map from one developmental program, as central-complex columns repeat one circuit around the heading ring and molecular gradients wire a whole retinotopic map. A neighbor ring connects to a kind's direction group as a group: one gene with a drawn rotation offset and one weight feeds all eight directions and mutates as a unit, born silent at zero weight, while single edges stay as independent exceptions, so seeking, avoiding or aiming in every direction is one event and is kept or lost whole.
-- [ ] **T11.F30 — Kind Drives** — Depends on: T19.F06
+- [x] **T11.F30 — Kind Drives** — Depends on: T19.F06
   - Goal: Motor gating apart from aiming, as a collicular gate and burst vigor start a saccade whose direction the map sets, and as a bacterium's run keeps its heading until something turns it. Each directed action kind (Move, Reproduce, StealEnergy) gains one drive vote; a kind commits on its drive plus its best direction vote, the direction stays the kind's own argmax, and a tie goes to the creature's heading (its last move, at birth the direction away from its parent) rather than to North, so "move more when hungry" or "stop when full" is one edge instead of one per direction.
 
 ## Notes for AI Agents
