@@ -54,7 +54,7 @@ Compound inputs in v3alpha1:
 - `World(NearbyCreatureCore)` — 16 sub-values
 - `World(NearbyCreatureVitals)` — 8 sub-values
 - `World(NearbyCreatureIdentity)` — 12 sub-values
-- `ActionVotes`, `PreviousPassVotes` — 27 sub-values (Section 3.6)
+- `ActionVotes`, `PreviousPassVotes` — 30 sub-values (Section 3.6)
 - `CommitCounts` — 4 sub-values (Section 3.6)
 - `PreviousOutcome` — 4 sub-values (Section 3.7)
 
@@ -213,8 +213,8 @@ starts from zeros.
 
 | Reference | Width | Sub-value `i` | Value |
 | --- | --- | --- | --- |
-| `ActionVotes` | 27 | `VoteSink::from_index(i)` | The current pass's vote vector: the sanitized sum of every contribution committed so far this pass. A dispatch sees its own earlier contribution this pass, never the one it is staging. |
-| `PreviousPassVotes` | 27 | same | The vote vector at the previous pass's end; zeros in the tick's first pass. |
+| `ActionVotes` | 30 | `VoteSink::from_index(i)` | The current pass's vote vector: the sanitized sum of every contribution committed so far this pass. A dispatch sees its own earlier contribution this pass, never the one it is staging. |
+| `PreviousPassVotes` | 30 | same | The vote vector at the previous pass's end; zeros in the tick's first pass. |
 | `CommitCounts` | 4 | `VoteKind` index (Eat, Move, Reproduce, StealEnergy) | The per-kind bar as a raw count: commits of that kind this tick. |
 
 ### 3.7 Previous Outcome (Compound, T19.F05)

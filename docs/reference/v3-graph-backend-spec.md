@@ -171,19 +171,23 @@ pub enum OutputSinkKind {
     RouterGate(u8),          // eight routing gate scores, indices 0-7
     WriteSlot(u8),           // 16 slots, indices 0-15: shared memory write
     ClearSlot(u8),           // 16 slots, indices 0-15: shared memory clear
-    ActionVote(VoteSink),    // 27 vote sinks
+    ActionVote(VoteSink),    // 30 vote sinks
     ActionParam(ActionParamField), // 3 decoded parameter fields
 }
 ```
 
 The full sink catalog is fixed at genome construction: 24 CustomOutput + 8
-RouterGate + 16 WriteSlot + 16 ClearSlot + 27 ActionVote + 3 ActionParam = 94
+RouterGate + 16 WriteSlot + 16 ClearSlot + 30 ActionVote + 3 ActionParam = 97
 sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
 kinds.
 
 `VoteSink` is the fixed vote catalog: `Eat` (index 0), `Move(d)` (`1 + d`),
 `Reproduce(d)` (`9 + d`), `StealEnergy(d)` (`17 + d`) for `d` in the eight
-`Direction::ALL` slots, `Terminate` (25), and `Decide` (26). `VoteKind` is
+`Direction::ALL` slots, `Drive(Move)` (25), `Drive(Reproduce)` (26),
+`Drive(StealEnergy)` (27), `Terminate` (28), and `Decide` (29). A drive
+(T11.F30) votes for its kind without naming a direction: the pass end adds it
+to the kind's best direction vote, and it is never committed itself; it
+serializes as `{"Drive":"Move"}`. `VoteKind` is
 `Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
 `ActionParamField` holds exactly the fields the commit decoder reads, in the
 order `EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`
@@ -238,8 +242,9 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
 ### Qualified zero vote connections (T20.F02)
 
 F04 may append an ordinary `GraphEdge { source, weight: 0.0 }` to a
-**present** `ActionVote` sink. All 27 identities qualify: Eat, the eight
-Move, Reproduce and StealEnergy directions, Terminate and Decide. Both empty
+**present** `ActionVote` sink. All 30 identities qualify: Eat, the eight
+Move, Reproduce and StealEnergy directions, the three drives, Terminate and
+Decide. Both empty
 and wired vote sinks qualify; their position in `output_sinks` is irrelevant.
 Preserve the incumbent edge order and coefficients, compute nodes, input
 references and sink identities.
@@ -584,8 +589,8 @@ from imposing a constant complexity tax.
 - 8 `RouterGate(0..7)` sinks (24..32)
 - 16 `WriteSlot(0..15)` sinks (32..48)
 - 16 `ClearSlot(0..15)` sinks (48..64)
-- 27 `ActionVote` sinks in `VoteSink` index order (64..91)
-- 3 `ActionParam` sinks in `ActionParamField::ALL` order (91..94)
+- 30 `ActionVote` sinks in `VoteSink` index order (64..94)
+- 3 `ActionParam` sinks in `ActionParamField::ALL` order (94..97)
 
 All sinks start with empty edge Vecs (inert until evolution wires them).
 
