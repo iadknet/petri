@@ -1,6 +1,6 @@
 # T11.F30 — Kind Drives
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-12
 **Feature**: T11.F30
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -188,8 +188,8 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first (founder behavior changes),
-      then `make check` -> exit 0; results in the readings.
+- [x] `cargo test -p v3-core --test viability` first (founder behavior changes),
+      then `make check` -> exit 0 (`98b49975`); readings.
 - [x] Focused tests, one or more per Boundary row (tie rule, effective vote,
       heading update and birth, seeding draw, mutation reach, three-mode
       agreement, the commit-rule proptest with the drive term and tie order):
@@ -302,18 +302,18 @@ re-pin both epochs).**
 
 ## Success Criteria
 
-- [ ] A directed kind commits on its drive plus its best direction vote; one
+- [x] A directed kind commits on its drive plus its best direction vote; one
       selection of a genome with unwired drives under heading `N` is today's,
       and its tick queue is identical unless a `Move` commit precedes a
       within-kind tie in that tick; a within-kind tie goes to the first tied
       sink clockwise from the heading; the heading follows the last committed `Move`, the birth
       direction and the seeding draw, and nothing else.
-- [ ] Every existing draw over the catalog reaches a drive; every reader in the
+- [x] Every existing draw over the catalog reaches a drive; every reader in the
       Reader table sees drives; production, observed and traced execution agree.
-- [ ] Gate and goal ran once each and every row of the predeclaration is read;
+- [x] Gate and goal ran once each and every row of the predeclaration is read;
       every floor, bound, fingerprint and target is met, or the user has
       explicitly accepted its breach; an unresolved breach stops closure.
-- [ ] `make check` exits 0 and the mutation gate is recorded.
+- [x] `make check` exits 0 and the mutation gate is recorded.
 
 ## Notes for AI Agents
 
@@ -328,3 +328,4 @@ re-pin both epochs).**
   Performance table are accepted with their measured values, and both epochs
   are re-pinned to this feature's gate and goal summaries. The persistence
   floor, the harm bound and the drift bounds keep their values.
+- Cost: in the readings, "Close".
