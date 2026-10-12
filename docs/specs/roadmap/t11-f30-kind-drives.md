@@ -190,34 +190,28 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
 
 - [ ] `cargo test -p v3-core --test viability` first (founder behavior changes),
       then `make check` -> exit 0; results in the readings.
-- [x] Focused tests: the tie rule (heading `N` equals lowest index; a flat
-      channel with a positive drive commits the heading; the first tied sink
-      clockwise from a diagonal heading), the effective vote with and without a
-      drive (an unwired-drive selection under `N` equals today's; a `Move`
-      then a tie in one tick follows the new heading), the heading update on
-      `Move` commit only, the birth
-      heading on both delivery paths and the fallback cell, the seeding draw,
-      mutation reach per operator, traced/observed/production agreement, the
-      proptest commit-rule property extended to the drive term and the tie
-      order; names and results in the readings.
+- [x] Focused tests, one or more per Boundary row (tie rule, effective vote,
+      heading update and birth, seeding draw, mutation reach, three-mode
+      agreement, the commit-rule proptest with the drive term and tie order):
+      names and results in the readings' "Focused tests" table.
 - [x] Build and self-review, 2026-10-12: `cargo test -p v3-core --test
       viability` first (28 passed after the founder-only digest re-pin),
       `cargo test -p v3-core` (2,100 passed), `-p v3-telemetry` (73),
       `-p v3-server` (163), `-p v3-lab` (209), `-p v3-cli` (251 passed, 1
       failed: `gate_profile_has_no_severe_regression_against_series_references`,
-      `decided_passes` 0.000313 against the stored 0.000000), `cargo check
-      --workspace --all-targets`, `cargo fmt --all --check`, `make
-      rust-clippy` (exit 0), frontend `tsc -b --noEmit` (exit 0), `vitest run`
-      (383 passed), `biome check src` (no errors); `make check` not run. The
-      `v3-server`, `v3-lab` and `v3-cli` counts are from the build commits;
-      the self-review commit changes no code in those crates. Re-pins, the
-      gate failure and the small-world survival reading are in the readings.
+      `decided_passes` 0.000313 against the stored 0.000000, cleared by the
+      user's gate-epoch re-pin), `cargo check --workspace --all-targets`,
+      `cargo fmt --all --check`, `make rust-clippy` (exit 0), frontend `tsc -b
+      --noEmit` (exit 0), `vitest run` (383 passed), `biome check src` (no
+      errors); `make check` not run. Re-pins, the gate failure and the
+      small-world survival reading are in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
-- [ ] Benchmark summaries stored at `docs/progress/features/t11-f30-kind-drives.json`
+- [x] Benchmark summaries stored at `docs/progress/features/t11-f30-kind-drives.json`
       and `-goal.json`, local raw hash/byte count and verification time checked,
-      series entries point to the summaries, and no new full report staged.
+      series entries point to the summaries (both closed lists and both epochs,
+      user re-pin 2026-10-12), and no new full report staged.
 
 ## Performance and Goal Impact
 
@@ -266,16 +260,23 @@ make bench PROFILE=gate FEATURE=t11-f30-kind-drives
 make bench PROFILE=goal FEATURE=t11-f30-kind-drives
 ```
 
-**Measured verdict (2026-10-12, HEAD `63e03f03`).** Values in the readings.
+**Measured verdict (2026-10-12, HEAD `63e03f03`).** Both profiles ran once:
+CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2 (shell), `severe`
+true on `decided_passes` only. No world extinct; every reading not in the
+table below passed. Summaries 21,216 and 395,892 bytes; hashes in the readings.
+Both epochs are re-pinned to this feature's summaries in
+`docs/progress/benchmark-series.json`.
 
-- Gate: CLI exit 3, make exit 2, `severe` on `decided_passes` (0.000313 against
-  0; seeds 11 / 22 / 33: 1 / 44 / 0).
-- Goal: CLI exit 3, make exit 2, `severe` on `decided_passes` (0.029780, +221%
-  epoch, +172% F31).
-- Misses: Canyon final 1,249 and plateau 667.696; Confluence
-  `dead_per_all_births` 0.0058; drift depth 250 on every world. No world
-  extinct; other readings pass. Summaries 21,216 and 395,892 bytes. Severes and
-  misses go to the user, not rebased.
+**User-accepted breaches and re-pin (user, 2026-10-12, in chat: merge as-is,
+re-pin both epochs).**
+
+| Breach | Measured | Cause |
+| --- | --- | --- |
+| Gate `decided_passes` severe (zero reference) | 0.000313 per creature-tick; seeds 11 / 22 / 33: 1 / 44 / 0 of about 129,000 passes each | Mutated births carrying a `Decide` edge inside 75 ticks; draw remap, as predeclared. Gate epoch re-pinned. |
+| Goal `decided_passes` severe | 0.029780 per creature-tick, +221% epoch, +172% F31; Orchards 0.0100 / Canyon 0.0005 / Confluence 0.0680 | A drive raises `E[K]` for every direction at once, so a creature with a `Decide` edge and a drive ends more passes `Decided` (about 3% of passes); passes end earlier, wall per creature-tick fell 6.8%. Composition, not compute. Goal epoch re-pinned. |
+| Canyon persistence floor | final 1,249 vs floor 1,361 (45.9% of reference); plateau 667.696 vs 1,230.24 (27.1%); minimum 16 | A flat-channel creature runs along its heading and nothing turns it: a committed `Move` the barrier blocks still sets the heading, so a founder with no food in view keeps committing into the wall at `move_cost` until food appears. Harm scales with barrier density (Orchards minimum 3,231, Confluence 247, Canyon 16). Three 50,000-tick Canyon runs (seeds 22 / 122 / 222) recovered from troughs of 77 / at most 540 / 20 to finals 1,466 / 1,377 / 1,502, above the plateau floor from tick about 10,000 on, with barrier readers rising to 94 / 93 / 99.9% of barrier-adjacent moves (readings). |
+| Confluence `dead_per_all_births` | 0.0058 vs bound 0.0030 (Orchards 0.0054 / 0.0072, Canyon 0.0002 / 0.0096 pass) | Within the band of the last five closures (0.0008 to 0.0110); a drive edge born on a flat channel changes the queue, and the Confluence trough (minimum 247) selected the parents read. |
+| Drift walk depth 250 | 0.0340 / 0.0250 / 0.0340 vs bounds 0.0357 / 0.0277 / 0.0357 (depths 0, 22, 1,000, 2,000 pass) | Same sign on every world: the remapped map lands 3 of 97 `AddGraphEdge` surfaces and 3 of 30 born-connected destinations on unwired drives, silent at that depth. |
 
 - Summaries: [gate](../../progress/features/t11-f30-kind-drives.json),
   [goal](../../progress/features/t11-f30-kind-drives-goal.json).
@@ -305,4 +306,7 @@ make bench PROFILE=goal FEATURE=t11-f30-kind-drives
   2026-10-11 under the unattended-run instruction, each grounded in the row,
   the note §7 and the code (Inputs and Invariants, decision table).
 - Deferred: review P2, `drift.rs:648` refresh test (readings).
-- Exception: closure blocked pending the user's ruling (readings).
+- Decision: (user, 2026-10-12, in chat) merge as-is; the breaches in the
+  Performance table are accepted with their measured values, and both epochs
+  are re-pinned to this feature's gate and goal summaries. The persistence
+  floor, the harm bound and the drift bounds keep their values.

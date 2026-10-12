@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/effort-cost-defaults.json",
+    "epoch_baseline": "docs/progress/features/t11-f30-kind-drives.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -71,7 +71,8 @@
       "docs/progress/features/t11-f29-feedback-route-formation.json",
       "docs/progress/features/t16-f02-effort-priced-actions.json",
       "docs/progress/features/effort-cost-defaults.json",
-      "docs/progress/features/t11-f31-ring-projection-motif.json"
+      "docs/progress/features/t11-f31-ring-projection-motif.json",
+      "docs/progress/features/t11-f30-kind-drives.json"
     ]
   },
   "goal": {
@@ -116,7 +117,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/effort-cost-defaults-goal.json",
+    "epoch_baseline": "docs/progress/features/t11-f30-kind-drives-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -162,7 +163,8 @@
       "docs/progress/features/t11-f29-feedback-route-formation-goal.json",
       "docs/progress/features/t16-f02-effort-priced-actions-goal.json",
       "docs/progress/features/effort-cost-defaults-goal.json",
-      "docs/progress/features/t11-f31-ring-projection-motif-goal.json"
+      "docs/progress/features/t11-f31-ring-projection-motif-goal.json",
+      "docs/progress/features/t11-f30-kind-drives-goal.json"
     ]
   }
 }
