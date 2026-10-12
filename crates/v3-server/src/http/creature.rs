@@ -51,6 +51,8 @@ struct CreatureDetailResponse<'a> {
     max_energy: f32,
     age: u64,
     generation: u64,
+    /// The direction of the creature's last committed `Move` (T11.F30).
+    heading: v3_core::contracts::Direction,
     complexity: u32,
     genome_size: u32,
     phenotype: CreaturePhenotypeResponse,
@@ -365,6 +367,7 @@ pub async fn get_creature(
         max_energy: sim.config.energy.lifecycle.max_energy,
         age: creature.age,
         generation: creature.generation,
+        heading: creature.heading,
         complexity: creature.cached_complexity,
         genome_size: creature.genome.genome_size(),
         phenotype: CreaturePhenotypeResponse {

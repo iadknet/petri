@@ -2,6 +2,7 @@ import {
 	ACTION_PARAM_FIELDS,
 	type ActionParamField,
 	type ComputeNodeKind,
+	type DirectedVoteKind,
 	type GraphSource,
 	type InputReference,
 	type OutputSinkKind,
@@ -67,6 +68,10 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 
 /** Directions each directed vote sink covers — the `Direction::ALL` index range. */
 const VOTE_DIRECTION_COUNT = 8;
+/** The directed kinds in catalog order: their drives follow the direction sinks. */
+const DIRECTED_VOTE_KINDS: readonly DirectedVoteKind[] = ["Move", "Reproduce", "StealEnergy"];
+/** Catalog index of the first drive sink. */
+const FIRST_DRIVE_SINK = 1 + 3 * VOTE_DIRECTION_COUNT;
 
 /** The vote sink at a catalog index; null at or above the catalog count. */
 export function voteSinkFromIndex(index: number): VoteSink | null {
@@ -75,12 +80,30 @@ export function voteSinkFromIndex(index: number): VoteSink | null {
 	if (index < 1 + 2 * VOTE_DIRECTION_COUNT) {
 		return { Reproduce: index - 1 - VOTE_DIRECTION_COUNT };
 	}
-	if (index < 1 + 3 * VOTE_DIRECTION_COUNT) {
+	if (index < FIRST_DRIVE_SINK) {
 		return { StealEnergy: index - 1 - 2 * VOTE_DIRECTION_COUNT };
 	}
-	if (index === 1 + 3 * VOTE_DIRECTION_COUNT) return "Terminate";
-	if (index === 2 + 3 * VOTE_DIRECTION_COUNT) return "Decide";
+	const drive = DIRECTED_VOTE_KINDS[index - FIRST_DRIVE_SINK];
+	if (drive !== undefined) return { Drive: drive };
+	if (index === FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length) return "Terminate";
+	if (index === FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length + 1) return "Decide";
 	return null;
+}
+
+/** The catalog index of a vote sink, the inverse of `voteSinkFromIndex`. */
+export function voteSinkIndex(sink: VoteSink): number {
+	if (sink === "Eat") return 0;
+	if (sink === "Terminate") return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length;
+	if (sink === "Decide") return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length + 1;
+	if ("Move" in sink) return 1 + sink.Move;
+	if ("Reproduce" in sink) return 1 + VOTE_DIRECTION_COUNT + sink.Reproduce;
+	if ("StealEnergy" in sink) return 1 + 2 * VOTE_DIRECTION_COUNT + sink.StealEnergy;
+	return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.indexOf(sink.Drive);
+}
+
+/** The catalog index of a directed kind's drive. */
+export function driveSinkIndex(kind: DirectedVoteKind): number {
+	return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.indexOf(kind);
 }
 
 /** Label the vote sink at a catalog index; out of range reads as invalid. */
@@ -95,6 +118,7 @@ export function formatVoteSink(sink: VoteSink): string {
 	if ("Move" in sink) return `Move[${sink.Move}]`;
 	if ("Reproduce" in sink) return `Reproduce[${sink.Reproduce}]`;
 	if ("StealEnergy" in sink) return `StealEnergy[${sink.StealEnergy}]`;
+	if ("Drive" in sink) return `Drive ${sink.Drive}`;
 	return "?";
 }
 

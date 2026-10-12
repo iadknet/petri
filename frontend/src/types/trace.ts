@@ -1,4 +1,4 @@
-import type { InputReference, VmInstruction, VoteKind } from "./genome.ts";
+import type { InputReference, VmInstruction, VoteKind, VoteSink } from "./genome.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -146,8 +146,9 @@ export type WorldAction =
 	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
 	| { StealEnergy: { direction: string; amount: number } };
 
-/** Vote sinks in the catalog: Eat, 8 each of Move/Reproduce/StealEnergy, Terminate, Decide. */
-export const VOTE_SINK_COUNT = 27;
+/** Vote sinks in the catalog: Eat, 8 each of Move/Reproduce/StealEnergy, a
+ * drive per directed kind, Terminate, Decide. */
+export const VOTE_SINK_COUNT = 30;
 /** Action kinds carrying a vote commit counter, in `commit_counts` order. */
 export const VOTE_KINDS: readonly VoteKind[] = Object.freeze([
 	"Eat",
@@ -181,6 +182,11 @@ export interface MeshPassTrace {
 	pass_index: number;
 	end_reason: PassEndReason;
 	votes: readonly number[];
+	/** Each kind's best sink at the pass end, in `VOTE_KINDS` order: the
+	 * direction the heading tie chose for a directed kind. */
+	best: readonly VoteSink[];
+	/** The bars the pass started with, in `VOTE_KINDS` order. */
+	bars: readonly number[];
 	effective_votes: readonly number[];
 	committed: WorldAction | null;
 	hops: number;
@@ -188,6 +194,8 @@ export interface MeshPassTrace {
 
 export interface TickTrace {
 	tick_number: number;
+	/** The heading the tick started with (a `Direction`, e.g. `"NE"`). */
+	heading: string;
 	energy_before: number;
 	energy_after: number;
 	static_inputs: StaticInputsSnapshot;

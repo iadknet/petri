@@ -20,10 +20,10 @@ const selected: MeshHopTrace = {
 	energy_after: 9,
 	output_slots: [],
 	route: null,
-	vote_contribution: votes({ 0: 0.25, 26: 1 }),
+	vote_contribution: votes({ 0: 0.25, 29: 1 }),
 	decision_inputs: {
 		action_votes: votes({ 4: 0.5 }),
-		previous_pass_votes: votes({ 0: 1, 25: 0.125 }),
+		previous_pass_votes: votes({ 0: 1, 28: 0.125 }),
 		commit_counts: [1, 0, 2, 0],
 		hops_this_tick: 5,
 	},

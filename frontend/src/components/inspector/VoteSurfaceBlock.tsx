@@ -2,7 +2,13 @@ import { memo } from "react";
 import type { VoteKind } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace, WorldAction } from "../../types/trace.ts";
 import { VOTE_KINDS, VOTE_SINK_COUNT } from "../../types/trace.ts";
-import { voteSinkFromIndex, voteSinkLabel } from "./graphNodeFormatters.ts";
+import {
+	driveSinkIndex,
+	formatVoteSink,
+	voteSinkFromIndex,
+	voteSinkIndex,
+	voteSinkLabel,
+} from "./graphNodeFormatters.ts";
 import { formatAction } from "./inputRefUtils.ts";
 
 interface VoteSurfaceBlockProps {
@@ -11,12 +17,6 @@ interface VoteSurfaceBlockProps {
 
 /** The vote catalog, by index. */
 const SINKS = Array.from({ length: VOTE_SINK_COUNT }, (_, index) => voteSinkFromIndex(index));
-/** Catalog indices of each kind's sinks, in `VOTE_KINDS` order. */
-const KIND_SINKS: readonly (readonly number[])[] = VOTE_KINDS.map((kind) =>
-	SINKS.flatMap((sink, index) =>
-		sink === kind || (sink !== null && typeof sink === "object" && kind in sink) ? [index] : [],
-	),
-);
 const TERMINATE_SINK = SINKS.indexOf("Terminate");
 const DECIDE_SINK = SINKS.indexOf("Decide");
 
@@ -27,51 +27,44 @@ function actionKind(action: WorldAction | null): VoteKind | null {
 	return Object.keys(action)[0] as VoteKind;
 }
 
-/** Each kind's bar at the start of every pass: its commits in earlier passes. */
-function barsPerPass(passes: readonly MeshPassTrace[]): number[][] {
-	let bars = VOTE_KINDS.map(() => 0);
-	return passes.map((pass) => {
-		const start = bars;
-		const kind = actionKind(pass.committed);
-		bars = bars.map((bar, index) => (VOTE_KINDS[index] === kind ? bar + 1 : bar));
-		return start;
-	});
-}
-
 /** The largest of recorded values; zero when there are none. */
 function maxRecorded(values: readonly number[]): number {
 	return values.length === 0 ? 0 : Math.max(...values);
 }
 
-/** A kind's best sink vote: the maximum of its recorded sink votes. */
-function bestSinkVote(votes: readonly number[], sinks: readonly number[]): number {
-	return maxRecorded(sinks.map((sink) => votes[sink] ?? 0));
-}
-
 /**
- * Per kind: the best sink vote, the bar the pass started with, and the
- * recorded effective vote the commit rule compared; the committed kind is
- * highlighted. Kinds with no vote and no bar are omitted.
+ * Per kind, all recorded: the drive vote of a directed kind, the vote of the
+ * best sink the commit rule chose (the heading tie included), the bar the
+ * pass started with, and the effective vote it compared; the committed kind
+ * is highlighted. Kinds with no vote, drive, or effective vote are omitted.
  */
-function KindRows({ pass, bars }: { pass: MeshPassTrace; bars: readonly number[] }) {
+function KindRows({ pass }: { pass: MeshPassTrace }) {
 	const committedKind = actionKind(pass.committed);
-	const shown = VOTE_KINDS.map((kind, index) => ({
-		kind,
-		bar: bars[index] ?? 0,
-		best: bestSinkVote(pass.votes, KIND_SINKS[index] ?? []),
-		effective: pass.effective_votes[index] ?? 0,
-	})).filter((entry) => entry.best !== 0 || entry.effective !== 0);
+	const shown = VOTE_KINDS.flatMap((kind, index) => {
+		const best = pass.best[index];
+		if (best === undefined) return [];
+		const entry = {
+			kind,
+			bar: pass.bars[index] ?? 0,
+			best: formatVoteSink(best),
+			bestVote: pass.votes[voteSinkIndex(best)] ?? 0,
+			drive: kind === "Eat" ? null : (pass.votes[driveSinkIndex(kind)] ?? 0),
+			effective: pass.effective_votes[index] ?? 0,
+		};
+		return [entry];
+	}).filter((entry) => entry.bestVote !== 0 || entry.effective !== 0 || (entry.drive ?? 0) !== 0);
 	if (shown.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-1 mt-0.5">
 			<span className="text-[10px] font-mono text-slate-500">effective</span>
-			{shown.map(({ kind, bar, best, effective }) => (
+			{shown.map(({ kind, bar, best, bestVote, drive, effective }) => (
 				<span
 					key={kind}
 					data-testid={`effective-${pass.pass_index}-${kind}`}
 					className={`text-[10px] font-mono ${kind === committedKind ? "text-orange-300" : "text-slate-400"}`}
 				>
-					{kind} {best.toFixed(3)} − {bar} = {effective.toFixed(3)}
+					{kind} {drive === null ? "" : `drive ${drive.toFixed(3)} + `}
+					{best} {bestVote.toFixed(3)} − {bar} = {effective.toFixed(3)}
 				</span>
 			))}
 		</div>
@@ -80,7 +73,6 @@ function KindRows({ pass, bars }: { pass: MeshPassTrace; bars: readonly number[]
 
 interface PassRowProps {
 	pass: MeshPassTrace;
-	bars: readonly number[];
 	endsTerminateVotedTick: boolean;
 }
 
@@ -91,7 +83,7 @@ interface PassRowProps {
  * `Terminate` against the winning effective vote; a `Decided` pass names
  * the `Decide` vote that ended it.
  */
-function PassRow({ pass, bars, endsTerminateVotedTick }: PassRowProps) {
+function PassRow({ pass, endsTerminateVotedTick }: PassRowProps) {
 	const kindVotes = pass.votes
 		.map((value, index) => ({ value, index }))
 		.filter((entry) => entry.index < TERMINATE_SINK && entry.value !== 0);
@@ -119,7 +111,7 @@ function PassRow({ pass, bars, endsTerminateVotedTick }: PassRowProps) {
 					))}
 				</div>
 			)}
-			<KindRows pass={pass} bars={bars} />
+			<KindRows pass={pass} />
 			<div className="flex flex-wrap gap-2 mt-0.5 text-[10px] font-mono text-slate-400">
 				<span data-testid={`terminate-${pass.pass_index}`}>Terminate {terminate.toFixed(3)}</span>
 				<span data-testid={`decide-${pass.pass_index}`}>Decide {decide.toFixed(3)}</span>
@@ -140,19 +132,22 @@ function PassRow({ pass, bars, endsTerminateVotedTick }: PassRowProps) {
 }
 
 /**
- * The sampled tick's action selection: one row per recorded pass with the
- * votes it summed, each kind's recorded effective vote against its bar,
+ * The sampled tick's action selection: the heading it started with, one row
+ * per recorded pass with the votes it summed, each kind's recorded drive,
+ * best sink and effective vote against its recorded bar,
  * `Terminate` and `Decide`, why it ended, and the action it committed, then
  * the tick's end reason and the final per-kind bars. Every number shown is a
  * recorded value; the view only counts, groups, and selects.
  */
 export const VoteSurfaceBlock = memo(function VoteSurfaceBlock({ tick }: VoteSurfaceBlockProps) {
-	const bars = barsPerPass(tick.passes);
 	const lastPass = tick.passes.length - 1;
 	return (
 		<div className="px-3 py-2 border-t border-white/[0.06]">
 			<div className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1.5">
 				Action Selection · {tick.termination_reason}
+			</div>
+			<div data-testid="tick-heading" className="text-[10px] font-mono text-slate-400 mb-1">
+				heading at tick start {tick.heading}
 			</div>
 			{tick.passes.length === 0 ? (
 				<div className="text-[10px] font-mono text-slate-500 mb-1.5">no passes this tick</div>
@@ -161,7 +156,6 @@ export const VoteSurfaceBlock = memo(function VoteSurfaceBlock({ tick }: VoteSur
 					<PassRow
 						key={pass.pass_index}
 						pass={pass}
-						bars={bars[index] ?? []}
 						endsTerminateVotedTick={
 							index === lastPass && tick.termination_reason === "TerminateVoted"
 						}

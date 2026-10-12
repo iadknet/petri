@@ -15,6 +15,7 @@ vi.mock("./MeshHopTimeline.tsx", () => ({
 function buildSample(tickCount = 2): ExecutionSample {
 	const ticks: TickTrace[] = Array.from({ length: tickCount }, (_, i) => ({
 		tick_number: i,
+		heading: "N",
 		energy_before: 10,
 		energy_after: 9,
 		static_inputs: {
@@ -251,6 +252,8 @@ describe("SamplerBar", () => {
 			pass_index,
 			end_reason: "NoTargets" as const,
 			votes: ZERO_VOTES,
+			best: ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+			bars: [0, 0, 0, 0],
 			effective_votes: [0, 0, 0, 0],
 			committed: null,
 			hops: 1,

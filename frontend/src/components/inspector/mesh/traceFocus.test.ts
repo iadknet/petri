@@ -54,6 +54,7 @@ const sample: ExecutionSample = {
 	ticks: [
 		{
 			tick_number: 12,
+			heading: "N",
 			energy_before: 10,
 			energy_after: 9,
 			static_inputs: {

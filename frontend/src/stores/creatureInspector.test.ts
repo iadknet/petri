@@ -26,6 +26,7 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		maxEnergy: 200,
 		age: 50,
 		generation: 3,
+		heading: "N",
 		complexity: 5,
 		genomeSize: 12,
 		phenotype: {

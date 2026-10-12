@@ -10,6 +10,8 @@ export interface CreatureStats {
 	maxEnergy: number;
 	age: number;
 	generation: number;
+	/** The direction of the creature's last committed `Move` (T11.F30). */
+	heading: string;
 	complexity: number;
 	genomeSize: number;
 	phenotype: CreaturePhenotype;
@@ -56,6 +58,7 @@ interface CreatureInspectorState {
 		maxEnergy: number;
 		age: number;
 		generation: number;
+		heading: string;
 		complexity: number;
 		genomeSize: number;
 		phenotype: CreaturePhenotype;
@@ -132,6 +135,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			maxEnergy: detail.maxEnergy,
 			age: detail.age,
 			generation: detail.generation,
+			heading: detail.heading,
 			complexity: detail.complexity,
 			genomeSize: detail.genomeSize,
 			phenotype: detail.phenotype,

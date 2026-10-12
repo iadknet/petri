@@ -36,6 +36,7 @@ function buildCreatureDetail() {
 		max_energy: 100,
 		age: 8,
 		generation: 2,
+		heading: "N",
 		complexity: 5,
 		genome_size: 2,
 		phenotype: {

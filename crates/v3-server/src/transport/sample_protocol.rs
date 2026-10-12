@@ -11,6 +11,10 @@ pub type InputReferencePayload = serde_json::Value;
 pub type WorldActionPayload = serde_json::Value;
 /// Serialized VM-instruction shape owned by transport wire DTOs.
 pub type VmInstructionPayload = serde_json::Value;
+/// Serialized direction shape (`"N"`, `"NE"`, ...) owned by transport wire DTOs.
+pub type DirectionPayload = serde_json::Value;
+/// Serialized vote-sink shape (`"Eat"`, `{"Move":3}`, `{"Drive":"Move"}`).
+pub type VoteSinkPayload = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ExecutionSamplePayload {
@@ -21,6 +25,8 @@ pub struct ExecutionSamplePayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct TickTracePayload {
     pub tick_number: u64,
+    /// The heading the tick started with (T11.F30).
+    pub heading: DirectionPayload,
     pub energy_before: f32,
     pub energy_after: f32,
     pub static_inputs: StaticInputsSnapshotPayload,
@@ -61,6 +67,11 @@ pub struct MeshPassTracePayload {
     pub end_reason: PassEndReasonPayload,
     /// The pass's final vote vector, in `VoteSink` index order.
     pub votes: [f32; VOTE_SINK_COUNT],
+    /// Each kind's best sink at the pass end, in `VoteKind` index order: the
+    /// direction the heading tie chose for a directed kind (T11.F30).
+    pub best: Vec<VoteSinkPayload>,
+    /// The bars the pass started with, in `VoteKind` index order.
+    pub bars: [u32; VOTE_KIND_COUNT],
     /// Effective vote per kind against the bars the pass started with.
     pub effective_votes: [f32; VOTE_KIND_COUNT],
     pub committed: Option<WorldActionPayload>,

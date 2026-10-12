@@ -2039,6 +2039,14 @@ async fn get_creature_returns_full_detail() {
     assert!(body.get("reproductive_reserve_capacity").is_none());
     assert!(body["age"].is_number(), "missing age");
     assert!(body["generation"].is_number(), "missing generation");
+    assert!(
+        ["N", "NE", "E", "SE", "S", "SW", "W", "NW"].contains(
+            &body["heading"]
+                .as_str()
+                .expect("heading is a direction string")
+        ),
+        "heading is a direction"
+    );
     assert!(body["complexity"].is_number(), "missing complexity");
 
     // Phenotype

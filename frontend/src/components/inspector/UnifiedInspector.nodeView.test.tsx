@@ -65,6 +65,7 @@ const sample: ExecutionSample = {
 	ticks: [
 		{
 			tick_number: 1,
+			heading: "N",
 			energy_before: 10,
 			energy_after: 6,
 			static_inputs: {
@@ -81,6 +82,8 @@ const sample: ExecutionSample = {
 				pass_index,
 				end_reason: "PassCapReached" as const,
 				votes: ZERO_VOTES,
+				best: ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+				bars: [0, 0, 0, 0],
 				effective_votes: [0, 0, 0, 0],
 				committed: null,
 				hops: 2,
@@ -117,6 +120,7 @@ describe("UnifiedInspector node view", () => {
 					maxEnergy: 10,
 					age: 1,
 					generation: 0,
+					heading: "N",
 					complexity: 2,
 					genomeSize: 2,
 					position: { x: 0, y: 0 },
