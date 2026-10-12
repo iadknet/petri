@@ -499,6 +499,7 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
                 &[0.0; 16],
                 state,
                 &RuntimeConfig::default(),
+                crate::contracts::Direction::N,
             );
             assert_eq!(result.actions.len(), 1);
             let first = matches!(result.actions[0], WorldAction::Eat { .. });

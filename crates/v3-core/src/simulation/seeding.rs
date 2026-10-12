@@ -1,10 +1,10 @@
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use slotmap::{SecondaryMap, SlotMap};
 
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
-use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
+use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
 use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::genome::CreatureGenome;
@@ -27,7 +27,8 @@ const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 /// 3. Apply terrain and seed fertility from independent map/layer seeds.
 /// 4. Seed food from the run RNG.
 /// 5. Collect all non-barrier cells, shuffle, take the first `initial_creatures` positions.
-/// 6. Place a founder creature at each selected position.
+/// 6. Place a founder creature at each selected position, drawing its
+///    heading uniformly over `Direction::ALL` from the run RNG (T11.F30).
 /// 7. Return the assembled `Simulation`.
 pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let mut rng = SmallRng::seed_from_u64(seed);
@@ -93,9 +94,11 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         );
         let energy = config.energy.lifecycle.initial_energy;
         let identity = CreatureIdentityState::founder(founder_index, seed);
+        // One draw per founder, in placement order (T11.F30).
+        let heading = Direction::ALL[rng.gen_range(0..Direction::ALL.len())];
         // Insert into slotmap to get an id, then fill with actual state.
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(
+            let mut founder = CreatureState::new(
                 id,
                 genome,
                 pos,
@@ -106,7 +109,9 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 FOUNDER_POLARITY,
                 identity,
                 [0.0; crate::creature::state::SHARED_MEMORY_SLOTS],
-            )
+            );
+            founder.heading = heading;
+            founder
         });
         action_logs.insert(id, ActionLog::new(log_capacity));
         world.place_creature(pos, id);
@@ -214,6 +219,26 @@ mod tests {
         let s2 = seed_simulation(cfg, 42);
         assert_eq!(s1.creature_count(), s2.creature_count());
         assert_eq!(s1.world.total_food(), s2.world.total_food());
+    }
+
+    #[test]
+    fn founder_headings_are_drawn_over_every_direction_and_reproducible() {
+        let mut cfg = small_config();
+        cfg.population.initial_creatures = 200;
+        let headings = |seed| {
+            let sim = seed_simulation(cfg.clone(), seed);
+            let mut by_position: Vec<_> = sim
+                .creatures
+                .values()
+                .map(|c| (c.position, c.heading))
+                .collect();
+            by_position.sort_by_key(|(p, _)| (p.y, p.x));
+            by_position
+        };
+        let first = headings(42);
+        assert_eq!(first, headings(42));
+        let seen: HashSet<Direction> = first.iter().map(|(_, h)| *h).collect();
+        assert_eq!(seen.len(), Direction::ALL.len());
     }
 
     #[test]

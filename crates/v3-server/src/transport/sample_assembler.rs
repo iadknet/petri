@@ -391,6 +391,8 @@ mod tests {
                         pass_index: 0,
                         end_reason: PassEndReason::Decided,
                         votes: [1.0; VOTE_SINK_COUNT],
+                        best: [v3_core::creature::genome::vote::VoteSink::Eat; VOTE_KIND_COUNT],
+                        bars: [0; VOTE_KIND_COUNT],
                         effective_votes: [1.0; VOTE_KIND_COUNT],
                         committed: Some(v3_core::contracts::WorldAction::Eat {
                             type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
@@ -401,6 +403,8 @@ mod tests {
                         pass_index: 1,
                         end_reason: PassEndReason::PassCapReached,
                         votes: [0.0; VOTE_SINK_COUNT],
+                        best: [v3_core::creature::genome::vote::VoteSink::Eat; VOTE_KIND_COUNT],
+                        bars: [1, 0, 0, 0],
                         effective_votes: [-1.0, 0.0, 0.0, 0.0],
                         committed: None,
                         hops: 64,

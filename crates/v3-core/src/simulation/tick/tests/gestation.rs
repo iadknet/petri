@@ -255,8 +255,9 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // Re-seeded by T11.F31 (165 -> 328): the five ring projection operators
     // change every Graph-domain draw, and at seed 165 no creature holds
     // energy above the lowered cap at tick 50, the precondition of the
-    // lowered-cap case.
-    let mut sim = seed_simulation(cfg, 328);
+    // lowered-cap case. Re-seeded by T11.F30 (328 -> 433): the founder
+    // heading draws shift every later draw of the run, with the same miss.
+    let mut sim = seed_simulation(cfg, 433);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {
@@ -358,4 +359,43 @@ fn gestation_records_the_parent_age_at_delivery_by_birth_order() {
     assert_eq!((first.count, first.sum), (1, 60));
     let later = sim.stats.birth_parent_age.totals(BirthOrder::Later);
     assert_eq!((later.count, later.sum), (1, 401));
+}
+
+/// The child's heading (T11.F30) is the step from the parent's cell to the
+/// cell it is placed on: the validated `Reproduce` direction at span 0, the
+/// stored direction at delivery, or the fallback cell's direction; the
+/// parent's own heading is never copied.
+#[test]
+fn a_child_heads_away_from_its_parent_on_every_delivery_path() {
+    let child_heading = |sim: &Simulation, parent: CreatureId| {
+        sim.creatures
+            .iter()
+            .find(|(id, _)| *id != parent)
+            .map(|(_, c)| c.heading)
+            .expect("a child")
+    };
+    let reproduce = |direction| WorldAction::Reproduce {
+        direction,
+        energy_transfer_fraction: 0.5,
+    };
+
+    let (mut sim, id) = gestating_sim(0.0);
+    sim.creatures[id].heading = Direction::W;
+    slot(&mut sim, id, 0, vec![reproduce(Direction::SE)]);
+    assert_eq!(children(&sim, id), vec![Position::new(6, 6)]);
+    assert_eq!(child_heading(&sim, id), Direction::SE);
+    assert_eq!(sim.creatures[id].heading, Direction::W);
+
+    let (mut sim, id) = gestating_sim(1.0);
+    slot(&mut sim, id, 0, vec![reproduce(Direction::E)]);
+    slot(&mut sim, id, 1, vec![]);
+    assert_eq!(children(&sim, id), vec![Position::new(6, 5)]);
+    assert_eq!(child_heading(&sim, id), Direction::E);
+
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    sim.world.set_barrier(Position::new(5, 4), true);
+    slot(&mut sim, id, 1, vec![]);
+    assert_eq!(children(&sim, id), vec![Position::new(6, 4)]);
+    assert_eq!(child_heading(&sim, id), Direction::NE);
 }

@@ -352,6 +352,7 @@ fn dormant_activation_changes_a_later_live_energy_read() {
                 max_actions_per_turn: 1,
                 ..RuntimeConfig::default()
             },
+            crate::contracts::Direction::N,
         );
         assert_eq!(memory[0], energy / 200.0);
         results.push((energy, memory[0], result));

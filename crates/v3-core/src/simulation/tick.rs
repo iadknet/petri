@@ -415,6 +415,7 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
                 previous,
                 graph,
                 &sim.config.runtime,
+                creature.heading,
             )
             .actions
         };
@@ -480,6 +481,7 @@ fn observe_action_queue(
         &creature.prev_shared_memory,
         &mut graph_runtime,
         runtime_config,
+        creature.heading,
     )
     .actions
 }
@@ -523,8 +525,10 @@ fn run_cognition(
                 &creature.prev_shared_memory,
                 &mut creature.graph_runtime,
                 &runtime_config,
+                creature.heading,
             );
             creature.pending_death_cause = output.energy_observation.pending_cause;
+            creature.heading = output.heading;
             (*id, output)
         })
         .collect();
@@ -533,6 +537,7 @@ fn run_cognition(
     if let Some((tid, creature)) = traced_creature {
         if let Some((_, ss)) = inputs.iter().find(|(id, _)| *id == tid) {
             let energy_before = creature.energy;
+            let heading_before = creature.heading;
             let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
             #[cfg(feature = "telemetry-seams")]
@@ -551,6 +556,7 @@ fn run_cognition(
                 &creature.prev_shared_memory,
                 &mut creature.graph_runtime,
                 &runtime_config,
+                heading_before,
                 limit,
             );
             #[cfg(not(feature = "telemetry-seams"))]
@@ -562,8 +568,10 @@ fn run_cognition(
                 &creature.prev_shared_memory,
                 &mut creature.graph_runtime,
                 &runtime_config,
+                heading_before,
             );
             creature.pending_death_cause = output.energy_observation.pending_cause;
+            creature.heading = output.heading;
 
             // Record tick trace.
             if let Some(ref mut active) = trace {
@@ -574,6 +582,7 @@ fn run_cognition(
                 };
                 active.ticks.push(TickTrace {
                     tick_number,
+                    heading: heading_before,
                     energy_before,
                     energy_after: creature.energy,
                     static_inputs: si_snapshot,

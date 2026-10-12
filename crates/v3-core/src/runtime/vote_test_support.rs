@@ -3,7 +3,7 @@
 //! tick in all three execution modes and asserts they agree.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction};
+use crate::contracts::{Direction, InputReference, NodeId, RouteTarget, WorldAction};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
@@ -234,6 +234,18 @@ pub(crate) fn run_tick(
     energy: f32,
     memory: [f32; 16],
 ) -> Tick {
+    run_tick_heading(genome, senses, config, energy, memory, Direction::N)
+}
+
+/// [`run_tick`] from `heading` (T11.F30); every mode ends on the same heading.
+pub(crate) fn run_tick_heading(
+    genome: &CreatureGenome,
+    senses: Senses,
+    config: &RuntimeConfig,
+    energy: f32,
+    memory: [f32; 16],
+    heading: Direction,
+) -> Tick {
     let sensors = senses.snapshot();
     let mut energies = [energy; 3];
     let mut memories = [memory; 3];
@@ -252,6 +264,7 @@ pub(crate) fn run_tick(
         &[0.0; 16],
         plain_state,
         config,
+        heading,
         UntracedMeshExecution,
     );
     let (observed, observation) = execute_creature_mesh_impl(
@@ -262,6 +275,7 @@ pub(crate) fn run_tick(
         &[0.0; 16],
         observed_state,
         config,
+        heading,
         ObservedMeshExecution::default(),
     );
     let (traced, hops, passes) = execute_creature_mesh_traced(
@@ -272,6 +286,7 @@ pub(crate) fn run_tick(
         &[0.0; 16],
         traced_state,
         config,
+        heading,
     );
     for other in [&observed, &traced] {
         assert_eq!(plain.actions, other.actions);
@@ -280,6 +295,7 @@ pub(crate) fn run_tick(
         assert_eq!(plain.commit_counts, other.commit_counts);
         assert_eq!(plain.priority_bid.to_bits(), other.priority_bid.to_bits());
         assert_eq!(plain.energy_observation, other.energy_observation);
+        assert_eq!(plain.heading, other.heading);
     }
     assert_eq!(energies.map(f32::to_bits), [energies[0].to_bits(); 3]);
     assert_eq!(memories, [memories[0]; 3]);

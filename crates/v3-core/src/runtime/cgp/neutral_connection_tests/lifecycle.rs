@@ -197,6 +197,6 @@ fn native_node_copy_and_genome_serde_retain_channels_sink_identity_and_independe
     .unwrap();
     assert_eq!(decoded.nodes[1], original_worker);
     assert_eq!(genome.nodes[1], original_worker);
-    assert_eq!(graph(&genome.nodes[2]).edges().count(), 30);
-    assert_eq!(graph(&decoded.nodes[2]).edges().count(), 29);
+    assert_eq!(graph(&genome.nodes[2]).edges().count(), 33);
+    assert_eq!(graph(&decoded.nodes[2]).edges().count(), 32);
 }

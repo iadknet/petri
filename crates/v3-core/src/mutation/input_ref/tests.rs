@@ -422,11 +422,11 @@ fn decision_state_kinds_follow_the_swap_table() {
     let kind = |reference: &InputReference| input_ref_kind(reference);
     let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
     for (reference, class, width) in [
-        (InputReference::ActionVotes, MeshReadClass::Decision, 27),
+        (InputReference::ActionVotes, MeshReadClass::Decision, 30),
         (
             InputReference::PreviousPassVotes,
             MeshReadClass::Decision,
-            27,
+            30,
         ),
         (InputReference::CommitCounts, MeshReadClass::Decision, 4),
         (hops.clone(), MeshReadClass::Introspection, 1),
@@ -873,7 +873,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         );
     }
     let before_def = graph_def(&base.nodes[1]).clone();
-    assert_eq!(before_def.output_sinks.len(), 94, "a full sink catalog");
+    assert_eq!(before_def.output_sinks.len(), 97, "a full sink catalog");
     assert!(
         before_def
             .compute_nodes

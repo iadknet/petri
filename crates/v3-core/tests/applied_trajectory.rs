@@ -37,6 +37,9 @@
 //! Re-pinned by T11.F31 after two agreeing runs: five ring projection
 //! operators join the Graph catalog, which changes every Graph-domain draw
 //! and moves all four digests.
+//! Re-pinned by T11.F30 after two agreeing runs: the founder heading draws
+//! shift the run RNG and the three drive sinks remap every sink and surface
+//! draw, which moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -48,11 +51,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "c32110f7116c05395f60f522b51191a2008f6404dba0c1c07246c3203d03cd59"
+        "733ca59ff24c7da3c0ca398424fd46e32dabaac6c175c2643759f42fd76f60d3"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "bfc7f5518ebb1e707fabf1bc57ee097e5cbe8cc7f19de2e7c2af305ef03b8888"
+        "a27c63e6e244728443cfa104bdcb5956f2814e11ed78bdb5900eda46ec2f2fce"
     );
 }
 
@@ -125,11 +128,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "00698b2825cd9811175991ee3e9251719bcdb629a1d6933dc7ecc27f951773e7"
+        "fce2603114d41a9eea3c03dbf844bee3ccb392954eff29d69cf3526d59654135"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "4564cbb9a5d38636767b1e229b31a745295dc11c8cf191d342cff8b1d1487550"
+        "876245cea60b9fbf7f95f2ff435b57e2ae147c1a56c3f5add3de871a3af03673"
     );
 }
 

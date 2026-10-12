@@ -105,6 +105,7 @@ fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
         &[0.0; 16],
         &mut GraphRuntimeState::new(),
         &config,
+        crate::contracts::Direction::N,
         ObservedMeshExecution::default(),
     )
 }
@@ -166,6 +167,7 @@ fn backend_costs_accumulate_every_dispatch_and_close_the_energy_account() {
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             &config,
+            crate::contracts::Direction::N,
             ObservedMeshExecution::default(),
         );
         (output, 1000.0 - energy)
@@ -247,6 +249,7 @@ fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost()
                     &[0.25; 16],
                     &mut states[0],
                     &config,
+                    crate::contracts::Direction::N,
                     UntracedMeshExecution,
                 );
                 let (observed, observation) = execute_creature_mesh_impl(
@@ -257,6 +260,7 @@ fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost()
                     &[0.25; 16],
                     &mut states[1],
                     &config,
+                    crate::contracts::Direction::N,
                     ObservedMeshExecution::default(),
                 );
                 let (traced, hops, _) = execute_creature_mesh_traced(
@@ -267,6 +271,7 @@ fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost()
                     &[0.25; 16],
                     &mut states[2],
                     &config,
+                    crate::contracts::Direction::N,
                 );
                 for output in [&observed, &traced] {
                     assert_eq!(plain.actions, output.actions);

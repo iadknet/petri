@@ -2,7 +2,7 @@
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
-use crate::creature::genome::vote::{VoteVector, VOTE_KIND_COUNT};
+use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_KIND_COUNT};
 use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
@@ -30,6 +30,8 @@ pub struct ExecutionSample {
 #[derive(Debug, Clone, Serialize)]
 pub struct TickTrace {
     pub tick_number: u64,
+    /// The heading the tick started with (T11.F30).
+    pub heading: crate::contracts::Direction,
     pub energy_before: f32,
     pub energy_after: f32,
     pub static_inputs: StaticInputsSnapshot,
@@ -142,6 +144,11 @@ pub struct MeshPassTrace {
     pub end_reason: PassEndReason,
     /// The pass's final vote vector, in `VoteSink` index order.
     pub votes: VoteVector,
+    /// Each kind's best sink at the pass end, in `VoteKind` index order: the
+    /// direction the heading tie chose for a directed kind (T11.F30).
+    pub best: [VoteSink; VOTE_KIND_COUNT],
+    /// The bars the pass started with: commits per kind earlier this tick.
+    pub bars: [u32; VOTE_KIND_COUNT],
     /// Effective vote per kind against the bars the pass started with.
     pub effective_votes: [f32; VOTE_KIND_COUNT],
     /// The action the pass end committed, if any.

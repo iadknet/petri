@@ -65,6 +65,7 @@ fn run_both(
         &[0.0; 16],
         &mut state,
         config,
+        crate::contracts::Direction::N,
     );
     let (traced, hops, _) = super::traced_mesh::execute_creature_mesh_traced(
         genome,
@@ -74,6 +75,7 @@ fn run_both(
         &[0.0; 16],
         &mut traced_state,
         config,
+        crate::contracts::Direction::N,
     );
     assert_eq!(output.work_counters, traced.work_counters);
     assert_eq!(output.actions, traced.actions);

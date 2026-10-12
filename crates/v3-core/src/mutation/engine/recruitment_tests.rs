@@ -35,8 +35,10 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Re-pinned by T11.F31: five ring projection operators join the Graph
     // default arm (total weight 44 -> 56), remapping every Graph draw
     // (3281291995176387451 -> 16135082583858842888).
+    // Re-pinned by T11.F30: three drive sinks join every Graph node, remapping
+    // every sink and surface draw (16135082583858842888 -> 11747062888261140569).
     assert_eq!(
-        hash, 16135082583858842888,
+        hash, 11747062888261140569,
         "pin of the recruitment-Off production path"
     );
 }

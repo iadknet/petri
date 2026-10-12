@@ -8,8 +8,8 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// Decode the action a pass commits (T19.F04): the direction is the winning
 /// sink's, and the kind's parameter field supplies the rest (T11.F27): `Eat`
 /// reads `EatFoodType`, `Reproduce` `ReproduceTransferFraction` and
-/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. `Terminate` and
-/// `Decide` never commit and decode to `NoOp`.
+/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. A drive,
+/// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
     match sink {
@@ -27,7 +27,7 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
             direction: sink_direction(d),
             amount: clamp_non_negative_finite(params[ActionParamField::StealEnergyAmount.index()]),
         },
-        VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
+        VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
     }
 }
 

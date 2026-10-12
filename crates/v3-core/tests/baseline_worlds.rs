@@ -123,10 +123,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// operators join the Graph catalog and change every Graph-domain draw
 /// (default 7229388965272740622 -> 16142175903090917201, rate 0.0
 /// 7526238675349254538 -> 14486103714587518529).
+/// Re-pinned by T11.F30 after two agreeing runs: the founder heading draws
+/// shift the run RNG, the heading breaks within-kind ties, and the three
+/// drive sinks remap every sink and surface draw (default
+/// 16142175903090917201 -> 5792368611610278395, rate 0.0
+/// 14486103714587518529 -> 467545077909000578).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 16142175903090917201);
-    assert_eq!(short_run_identity(Some(0.0)), 14486103714587518529);
+    assert_eq!(short_run_identity(None), 5792368611610278395);
+    assert_eq!(short_run_identity(Some(0.0)), 467545077909000578);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

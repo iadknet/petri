@@ -34,6 +34,7 @@ fn sort_by_priority_bid_orders_descending() {
         work_counters: Default::default(),
         energy_observation: Default::default(),
         termination_reason: TerminationReason::NoDecision,
+        heading: crate::contracts::Direction::N,
         commit_counts: Default::default(),
     };
 
@@ -67,6 +68,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
         work_counters: Default::default(),
         energy_observation: Default::default(),
         termination_reason: TerminationReason::NoDecision,
+        heading: crate::contracts::Direction::N,
         commit_counts: Default::default(),
     };
 

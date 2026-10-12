@@ -541,8 +541,8 @@ mod tests {
         /// its width and `0.0` at or past it, never wrapping.
         #[test]
         fn decision_compounds_read_their_vector_and_zero_past_the_width(
-            votes in prop::array::uniform27(-1e6f32..1e6),
-            previous in prop::array::uniform27(-1e6f32..1e6),
+            votes in prop::array::uniform30(-1e6f32..1e6),
+            previous in prop::array::uniform30(-1e6f32..1e6),
             counts in prop::array::uniform4(0u32..100),
             outcome in prop::array::uniform4(-1f32..1.0),
             sub in any::<u16>(),

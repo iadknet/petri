@@ -23,6 +23,7 @@ pub(super) fn decision(actions: Vec<WorldAction>) -> MeshOutput {
         work_counters: Default::default(),
         energy_observation: Default::default(),
         termination_reason: TerminationReason::NoDecision,
+        heading: crate::contracts::Direction::N,
         commit_counts: Default::default(),
     }
 }

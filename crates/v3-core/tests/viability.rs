@@ -1114,12 +1114,14 @@ fn founder_only_trajectory_digest_is_pinned() {
     // Effort-cost defaults, 2026-10-10: floor 0.4, attempt 1.0, move 1.6
     // (default 195 -> 99 births, rate 0.0 297 -> 94; old digests in
     // docs/progress/readings/effort-cost-defaults.md). Measured on macOS aarch64.
+    // T11.F30 (founder heading draws, heading tie): default 99 -> 97 births,
+    // rate 0.0 94 -> 94; old digests in docs/progress/readings/t11-f30.md.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            99,
+            97,
             0,
-            "0948b6d22e1ff9e8186c9e8622c4c6fbc5aa8d1ad6a7bbb735eb678b4d424c85".to_owned()
+            "0d6295a965261b6fb1f1e54484bdb585c824572f377c2375123dd550174f0f50".to_owned()
         )
     );
     assert_eq!(
@@ -1127,7 +1129,7 @@ fn founder_only_trajectory_digest_is_pinned() {
         (
             94,
             0,
-            "50f761554d2f14dacd30a58b74fe5e33aa8c07f7b034ef1008a25d47bec5dd2b".to_owned()
+            "4cd55a734ddc8b36b061bd5a8559026250d3a2fb2f916c80ffb9462ab24f35f0".to_owned()
         )
     );
 }
