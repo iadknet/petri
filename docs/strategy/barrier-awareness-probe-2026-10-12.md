@@ -6,7 +6,9 @@ Question: on the running `v3-server` world (run `eec8aa1c…`, binary built from
 
 No. Real avoiders were not outbred: 93 of 377 sampled creatures (24.7%) steer off a wall they can see. Cutting their barrier inputs raises their lab blocked fraction from 0.00 to 0.24. The gap closed because the dashboard's reader label (`has_barrier_reader`, presence not use) now covers 80% of creatures. Two thirds of those carriers do not use the input, and in the live action logs that non-using majority is blocked more often than creatures without a reader. Whether the avoiders' lab skill pays off in the live maze is not confirmed: their live blocked rate per move is no lower than non-readers'.
 
-## 1. Dashboard series (Prometheus, 5 min windows)
+**Follow-up the same day (Section 6):** why avoidance was slow to spread, and why the dashboard started trending down after tick 30k. At tick 27.6k most avoiders used per-direction edges, and those give no benefit in the live world. A second route then swept: a T11.F31 ring projection that maps the barrier ring onto the Move sinks. It took avoiders from 24.7% to 41.8% of creatures by tick 37.9k.
+
+## 1. Dashboard series (Prometheus; 5 min windows to tick 23.5k, 3 min after)
 
 Share of moves next to a barrier that walked into it.
 
@@ -18,6 +20,10 @@ Share of moves next to a barrier that walked into it.
 | 15,190 | 0.56 | 0.66 | 0.10 | 55% |
 | 20,310 | 0.58 | 0.64 | 0.05 | 73% |
 | 23,510 | 0.60 | 0.61 | 0.01 | 79% |
+| 29,100 | 0.57 | 0.59 | 0.02 | 81% |
+| 33,510 | 0.56 | 0.60 | 0.03 | 87% |
+| 36,580 | 0.53 | 0.61 | 0.08 | 90% |
+| 37,250 | 0.52 | 0.63 | 0.11 | 91% |
 
 Over the same window, mean genome size went from 165 to 438. Drive carriers: steal went from 3% to 33%, reproduce from 9% to 39%, and move peaked at 26% around tick 9k–11k. Raw rates are per wall-clock minute and the run slowed about 4×, so only the ratios compare across ticks.
 
@@ -59,6 +65,48 @@ Over the same window, mean genome size went from 165 to 438. Drive carriers: ste
 1. **`v3_lab::readings::ablate` misses ring projections.** It leaves `RingProjection.ref_idx` reads live. 12 of the 110 users are only detected once projections are ablated (`ablated_channels = 0xFF`, as `neighborhood/input_use/consumers.rs` does). T22.F03 causal readings are affected for any family read through projections.
 2. **The `wall-v1` calibration predates the 2026-10-10 energy-cost tuning.** Its config digest was `2d9975…` at 809a7b48 and is now `19e743…`. The founder's score moved from +0.61 to −0.24 and the comparator's from 10.42 to 9.17. Recalibration is needed before any barrier campaign.
 
+## 6. Why avoidance spread slowly, and why it is spreading now
+
+**Live traces.** I traced 120 barrier-adjacent creatures carrying a barrier reader, 10 ticks each, using the inspector's read-only tracer (`POST /v3/simulation/creature/:id/sample`).
+
+**The default traps creatures against walls.** In 40 traces that kept the raw votes, 139 of 154 bumps happened when the Move votes tied at the top, usually the founder's four cardinals at 0.5, with at least one open direction among the tied.
+
+- The 0.5 tie is the founder's own wiring: `Move(d) = 0.4 × food_ring(d) + 0.5`, so with no food in view all four cardinals are equal (`creature/founder.rs`).
+- T11.F30 breaks ties clockwise from the heading, starting with the heading itself.
+- A committed Move sets the heading whether or not the move succeeds.
+
+So a creature that tied toward a wall picks the wall again on the next tick. In the first 80 traces, 34 creatures bumped on at least 5 of 10 ticks and 26 bumped on all 10. These stuck creatures produced 93% of the bumps. On 81% of bump ticks they also ate, so a stuck creature is a grazer pinned to a wall. Its blocked move costs the same 1.6 as a successful move.
+
+**What escapes the trap.** Any barrier-driven difference among the tied Move sinks breaks the tie. A traced projection avoider's projection shifted each walled direction's vote by about −0.02: enough to turn the four-way tie toward the open side. Ablating one barrier family at a time shows that every avoider in the tick-38k sample (171 of 171) uses the neighbour barrier ring, not the area summary.
+
+**The two routes.** Probe rerun on a fresh whole-world sample of 409 at ticks 37,693–38,126:
+
+| reading | tick ~27.6k (n 377) | tick ~37.9k (n 409) |
+| --- | ---: | ---: |
+| avoiders, share of all creatures | 93 (24.7%) | 171 (41.8%) |
+| through per-direction edges or VM reads | 71 | 50 |
+| through a reachable non-zero barrier ring projection | 22 | 121 |
+| barrier-reader carriers | 303 (80%) | 387 (95%) |
+
+Live blocked rate per move (bootstrap 95% interval):
+
+| group | tick 27.6k | tick 37.9k |
+| --- | --- | --- |
+| avoiders through edges or VM | 0.241 [0.16, 0.32] | 0.297 [0.20, 0.38] |
+| avoiders through a projection | 0.290 [0.13, 0.45] (n 22) | **0.116 [0.09, 0.15]** |
+| readers that do not avoid | 0.309 | 0.318 |
+| non-readers | 0.244 | 0.313 |
+
+In the 40 vote traces, projection avoiders bumped on 10 of 126 barrier-adjacent moving ticks (8%) and non-avoiders on 144 of 196 (73%).
+
+**Reading.**
+
+- The edge/VM route is perfect on the lab's single open wall but shows no detectable live advantage. That matches its flat share and its decline, and it is why the first probe found no live benefit.
+- The projection route works in the live maze. It is what the dashboard's falling reader line has measured since about tick 30k.
+- A plausible reason the projection route arrived late: T11.F31 projections are born with zero weight. Reaching barrier-ring-to-Move with a negative weight takes a retarget and a weight step, and the zero-weight intermediate is neutral. That is a drift wait, not a selection block. This reason is inferred; no lineage was tracked.
+
+**Still open.** Why edge/VM avoiders fail live although they handle all 16 lab walls is not identified. Candidates: they cover only the configurations the lab presents; the lab masks plasticity; or crowding. A fixed-genome read on live barrier patches would separate these.
+
 ## Recommendation
 
-No production change. The dashboard needs a use-based split: barrier readers whose readers actually feed an executed path to a move decision, rather than any reachable reader. That would be a T21-style telemetry feature. Open question for a later reading: why non-using carriers are blocked more often live.
+No production change. Natural selection is now doing the work. The dashboard needs a use-based split: barrier readers whose readers actually feed an executed path to a move decision, rather than any reachable reader. That would be a T21-style telemetry feature. Open question for a later reading: why non-using carriers are blocked more often live.
