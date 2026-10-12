@@ -46,7 +46,7 @@ describe("SelectedHopBlock", () => {
 		expect(screen.getByText(/Hop 4 · node #3 · pass 1 · no route/)).toBeInTheDocument();
 		expect(screen.getByTestId("hop-vote contribution")).toHaveTextContent("Eat 0.250");
 		expect(screen.getByTestId("hop-vote contribution")).toHaveTextContent("Decide 1.000");
-		expect(screen.getByTestId("hop-ActionVotes")).toHaveTextContent("Move[3] 0.500");
+		expect(screen.getByTestId("hop-ActionVotes")).toHaveTextContent("Move[SE] 0.500");
 		expect(screen.getByTestId("hop-PreviousPassVotes")).toHaveTextContent("Eat 1.000");
 		expect(screen.getByTestId("hop-PreviousPassVotes")).toHaveTextContent("Terminate 0.125");
 		for (const text of ["Eat 1", "Move 0", "Reproduce 2", "StealEnergy 0"]) {

@@ -80,7 +80,7 @@ describe("VoteSurfaceBlock", () => {
 		expect(screen.getByText("commit Eat(food0)")).toBeInTheDocument();
 		expect(screen.getByText("no commit")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 1.500")).toBeInTheDocument();
-		expect(screen.getByText("Move[2]: -2.250")).toBeInTheDocument();
+		expect(screen.getByText("Move[E]: -2.250")).toBeInTheDocument();
 		expect(screen.getByText("no kind votes this pass")).toBeInTheDocument();
 		// Decide and Terminate are fields of the pass, never kind votes.
 		expect(screen.queryByText("Decide: 0.500")).not.toBeInTheDocument();
@@ -116,7 +116,7 @@ describe("VoteSurfaceBlock", () => {
 		);
 
 		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent(
-			"Move drive 0.400 + Move[3] 0.900 − 2 = 0.125",
+			"Move drive 0.400 + Move[SE] 0.900 − 2 = 0.125",
 		);
 		expect(screen.getByText("Drive Move: 0.400")).toBeInTheDocument();
 		expect(screen.getByTestId("tick-heading")).toHaveTextContent("heading at tick start SE");
@@ -144,7 +144,7 @@ describe("VoteSurfaceBlock", () => {
 		);
 
 		expect(screen.getByTestId("effective-0-Reproduce")).toHaveTextContent(
-			"Reproduce drive 0.700 + Reproduce[1] 0.000 − 0 = 0.700",
+			"Reproduce drive 0.700 + Reproduce[NE] 0.000 − 0 = 0.700",
 		);
 		expect(screen.getByTestId("effective-0-Reproduce")).toHaveClass("text-orange-300");
 		expect(screen.queryByTestId("effective-0-Move")).not.toBeInTheDocument();
@@ -202,18 +202,18 @@ describe("VoteSurfaceBlock", () => {
 		);
 
 		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent(
-			"Move drive 0.000 + Move[2] 0.520 − 0 = 0.520",
+			"Move drive 0.000 + Move[E] 0.520 − 0 = 0.520",
 		);
 		expect(screen.getByTestId("effective-0-Move")).toHaveClass("text-orange-300");
 		expect(screen.getByTestId("effective-1-Move")).toHaveTextContent(
-			"Move drive 0.000 + Move[2] 0.520 − 1 = -0.480",
+			"Move drive 0.000 + Move[E] 0.520 − 1 = -0.480",
 		);
 		expect(screen.getByTestId("effective-1-Reproduce")).toHaveTextContent(
-			"Reproduce drive 0.000 + Reproduce[2] 0.026 − 0 = 0.026",
+			"Reproduce drive 0.000 + Reproduce[E] 0.026 − 0 = 0.026",
 		);
 		expect(screen.getByTestId("effective-1-Reproduce")).toHaveClass("text-orange-300");
 		expect(screen.getByTestId("effective-2-Reproduce")).toHaveTextContent(
-			"Reproduce drive 0.000 + Reproduce[2] 0.026 − 1 = -0.974",
+			"Reproduce drive 0.000 + Reproduce[E] 0.026 − 1 = -0.974",
 		);
 		expect(screen.getByTestId("effective-2-Reproduce")).not.toHaveClass("text-orange-300");
 		expect(screen.queryByTestId("effective-0-Eat")).not.toBeInTheDocument();
