@@ -30,4 +30,12 @@ describe("vote sink catalog", () => {
 		expect(voteSinkLabel(27)).toBe("Drive StealEnergy");
 		expect(voteSinkLabel(30)).toBe("invalid(30)");
 	});
+
+	it("names a directed sink by its compass direction", () => {
+		expect(voteSinkLabel(1)).toBe("Move[N]");
+		expect(voteSinkLabel(3)).toBe("Move[E]");
+		expect(voteSinkLabel(8)).toBe("Move[NW]");
+		expect(voteSinkLabel(13)).toBe("Reproduce[S]");
+		expect(voteSinkLabel(24)).toBe("StealEnergy[NW]");
+	});
 });

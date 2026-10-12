@@ -8,7 +8,7 @@ import {
 	type OutputSinkKind,
 	type VoteSink,
 } from "../../types/genome.ts";
-import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
+import { directionName, formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
 export function getKindName(kind: ComputeNodeKind): string {
 	if (typeof kind === "string") return kind;
@@ -117,9 +117,9 @@ export function voteSinkLabel(index: number): string {
 /** Format one vote sink of the catalog. */
 export function formatVoteSink(sink: VoteSink): string {
 	if (typeof sink === "string") return sink;
-	if ("Move" in sink) return `Move[${sink.Move}]`;
-	if ("Reproduce" in sink) return `Reproduce[${sink.Reproduce}]`;
-	if ("StealEnergy" in sink) return `StealEnergy[${sink.StealEnergy}]`;
+	if ("Move" in sink) return `Move[${directionName(sink.Move)}]`;
+	if ("Reproduce" in sink) return `Reproduce[${directionName(sink.Reproduce)}]`;
+	if ("StealEnergy" in sink) return `StealEnergy[${directionName(sink.StealEnergy)}]`;
 	if ("Drive" in sink) return `Drive ${sink.Drive}`;
 	return "?";
 }

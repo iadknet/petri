@@ -104,7 +104,7 @@ describe("buildFullGraphModel", () => {
 		);
 		const sinks = model.nodes.filter((n) => n.nodeType === "output_sink");
 		expect(sinks.map((n) => [n.id, n.category, n.label])).toEqual([
-			["sink:0", "output_action", "Vote Move[2]"],
+			["sink:0", "output_action", "Vote Move[E]"],
 			["sink:1", "output_action", "Param Reproduce.frac"],
 			["sink:3", "output_value", "Route[0]"],
 		]);
