@@ -43,6 +43,7 @@ export function buildGraphFlowScene(input: {
 			data: {
 				index: mn.arrayIndex,
 				kindLabel: mn.label,
+				description: mn.description,
 				subtitle: mn.subtitle,
 				category: mn.category,
 				isLive,

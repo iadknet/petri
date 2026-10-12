@@ -39,9 +39,9 @@ describe("getKindLabel", () => {
 	];
 
 	it("returns friendly names for string kinds", () => {
-		expect(getKindLabel("WeightedSum", inputRefs)).toBe("\u03A3 Weight");
+		expect(getKindLabel("WeightedSum", inputRefs)).toBe("\u03A3 Sum");
 		expect(getKindLabel("Clamp01", inputRefs)).toBe("Clamp");
-		expect(getKindLabel("GreaterThan", inputRefs)).toBe("GT");
+		expect(getKindLabel("GreaterThan", inputRefs)).toBe("A > B");
 	});
 
 	it("passes through string kinds without special labels", () => {

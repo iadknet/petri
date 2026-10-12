@@ -66,7 +66,7 @@ export const FOOD_OCCUPANCY_DEPLETION_TOGGLES: BooleanFieldDef[] = [
 		path: "world.food.shared.occupancy_depletion.enabled",
 		label: "Occupancy Depletion Enabled",
 		defaultValue: true,
-		tooltip: "Toggle occupancy-driven food suppression during live food growth",
+		tooltip: "When on, cells with a creature standing on them regrow food more slowly",
 		testId: "config-field-food-occupancy-depletion-enabled",
 	},
 ];
@@ -89,8 +89,7 @@ export const FOOD_GRAZING_TOGGLES: BooleanFieldDef[] = [
 		path: "world.food.shared.grazing.enabled",
 		label: "Grazing Enabled",
 		defaultValue: true,
-		tooltip:
-			"Toggle the per-cell grazing fertility modifier: each bite slows regrowth where it landed until the cell rests",
+		tooltip: "When on, each bite slows regrowth on that cell until the cell rests",
 		testId: "config-field-food-grazing-enabled",
 	},
 ];

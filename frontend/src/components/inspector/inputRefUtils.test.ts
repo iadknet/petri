@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
 import {
+	describeInputRef,
 	directionName,
 	formatAction,
 	formatActionList,
@@ -51,29 +52,28 @@ describe("formatInputRef", () => {
 				},
 			},
 		} as unknown as InputReference;
-		expect(formatInputRef(ref)).toBe("FoodHere[2]");
+		expect(formatInputRef(ref)).toBe("FoodHere[t2]");
 	});
 
 	it("formats StaticIntrospection variant", () => {
 		const ref: InputReference = { StaticIntrospection: "AgeTicks" };
-		expect(formatInputRef(ref)).toBe("AgeTicks");
+		expect(formatInputRef(ref)).toBe("Age");
 	});
 
 	it("formats UpstreamSlot variant", () => {
 		const ref: InputReference = { UpstreamSlot: 3 };
-		expect(formatInputRef(ref)).toBe("slot[3]");
+		expect(formatInputRef(ref)).toBe("Bus[3]");
 	});
 
-	it("labels the decision-state references by their variant names", () => {
-		expect(formatInputRef("ActionVotes")).toBe("ActionVotes");
-		expect(formatInputRef("PreviousOutcome")).toBe("PreviousOutcome");
-		expect(formatInputRef({ DynamicIntrospection: "HopsThisTick" })).toBe("HopsThisTick");
-		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("CommitCounts[2]");
+	it("labels the decision-state references by short names", () => {
+		expect(formatInputRef("ActionVotes")).toBe("Votes");
+		expect(formatInputRef("PreviousOutcome")).toBe("PrevOutcome");
+		expect(formatInputRef({ DynamicIntrospection: "HopsThisTick" })).toBe("Hops");
 	});
 
 	it("handles ActionQueue string variant without crashing", () => {
 		const ref: InputReference = "ActionQueue";
-		expect(formatInputRef(ref)).toBe("ActionQueue");
+		expect(formatInputRef(ref)).toBe("Queue");
 	});
 
 	it("handles unknown string variant gracefully", () => {
@@ -120,16 +120,59 @@ describe("inputRefColor", () => {
 });
 
 describe("formatInputRefWithSubIndex", () => {
-	it("uses direction labels for ring sensors", () => {
-		expect(formatInputRefWithSubIndex({ World: "NeighborFoodRing" }, 2)).toBe("FoodRing[E]");
+	it("uses direction labels for ring sensors, with the food type", () => {
+		expect(formatInputRefWithSubIndex({ World: "NeighborBarrierRing" }, 0)).toBe("BarrierRing[N]");
+		expect(formatInputRefWithSubIndex({ World: { NeighborFoodRing: { type_idx: 1 } } }, 2)).toBe(
+			"FoodRing[t1][E]",
+		);
 	});
 
-	it("uses numeric sub-index for non-ring world refs", () => {
-		expect(formatInputRefWithSubIndex({ World: "FoodHere" }, 3)).toBe("FoodHere[3]");
+	it("names every area-summary sub-field, index 0 included", () => {
+		const barrier: InputReference = { World: "AreaBarrierSummary" };
+		expect(formatInputRefWithSubIndex(barrier, 0)).toBe("AreaBarrier.density");
+		expect(formatInputRefWithSubIndex(barrier, 1)).toBe("AreaBarrier.adjacent");
+		expect(formatInputRefWithSubIndex(barrier, 6)).toBe("AreaBarrier.nearestDist");
+		expect(formatInputRefWithSubIndex({ World: { AreaFoodSummary: { type_idx: 0 } } }, 0)).toBe(
+			"AreaFood[t0].amount",
+		);
+		expect(formatInputRefWithSubIndex({ World: "AreaOccupancySummary" }, 6)).toBe(
+			"AreaOcc.crowding",
+		);
 	});
 
-	it("passes through base label for zero sub-index", () => {
-		expect(formatInputRefWithSubIndex({ DynamicIntrospection: "AgeTicks" }, 0)).toBe("AgeTicks");
+	it("names nearby-creature fields by rank, nearest first", () => {
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureCore" }, 0)).toBe("Nearest1.present");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureCore" }, 7)).toBe("Nearest2.dist");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureVitals" }, 1)).toBe("Nearest1.ready");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureIdentity" }, 3)).toBe("Nearest2.kin");
+	});
+
+	it("names decision-state and queue sub-values", () => {
+		expect(formatInputRefWithSubIndex("ActionVotes", 0)).toBe("Votes.Eat");
+		expect(formatInputRefWithSubIndex("ActionVotes", 22)).toBe("Votes.StealEnergy[SW]");
+		expect(formatInputRefWithSubIndex("PreviousPassVotes", 25)).toBe("PrevVotes.Drive Move");
+		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("Commits.Reproduce");
+		expect(formatInputRefWithSubIndex("PreviousOutcome", 0)).toBe("PrevOutcome.energy");
+		expect(formatInputRefWithSubIndex("ActionQueue", 0)).toBe("Queue1.type");
+		expect(formatInputRefWithSubIndex("ActionQueue", 4)).toBe("Queue2.param0");
+	});
+
+	it("keeps scalars bare and shows an out-of-range sub-index raw", () => {
+		expect(formatInputRefWithSubIndex({ DynamicIntrospection: "EnergyCurrent" }, 0)).toBe("Energy");
+		expect(formatInputRefWithSubIndex({ World: "AreaBarrierSummary" }, 9)).toBe("AreaBarrier[9]");
+	});
+});
+
+describe("describeInputRef", () => {
+	it("explains a sub-field in plain words", () => {
+		const d = describeInputRef({ World: "AreaBarrierSummary" }, 0);
+		expect(d.label).toBe("AreaBarrier.density");
+		expect(d.description).toMatch(/barrier/i);
+	});
+
+	it("explains every ring direction and nearby rank", () => {
+		expect(describeInputRef({ World: "NeighborOccupiedRing" }, 4).description).toMatch(/south/i);
+		expect(describeInputRef({ World: "NearbyCreatureCore" }, 4).description).toMatch(/2nd-nearest/);
 	});
 });
 

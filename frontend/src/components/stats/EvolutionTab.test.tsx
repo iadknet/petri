@@ -22,9 +22,9 @@ describe("EvolutionTab", () => {
 
 		render(<EvolutionTab />);
 
-		expect(screen.getByText("Skipped by Operator")).toBeInTheDocument();
-		expect(screen.getByText("mutate_edge")).toBeInTheDocument();
-		expect(screen.getByText("swap_input")).toBeInTheDocument();
+		expect(screen.getByText("Skipped, by mutation type")).toBeInTheDocument();
+		expect(screen.getByText("mutate edge")).toBeInTheDocument();
+		expect(screen.getByText("swap input")).toBeInTheDocument();
 		expect(screen.getByText("Target Reachability")).toBeInTheDocument();
 		expect(screen.getByText("Reachable 60.0%")).toBeInTheDocument();
 		expect(screen.getByText("Unreachable 20.0%")).toBeInTheDocument();

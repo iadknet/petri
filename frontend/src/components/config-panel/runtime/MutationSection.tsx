@@ -3,7 +3,7 @@ import type { AnyFieldDef, BooleanFieldDef, EnumFieldDef, FieldDef } from "../sh
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
 		path: "mutation.per_unit_rate",
-		label: "Rate / Unit",
+		label: "Rate per Genome Unit",
 		min: 0,
 		max: 0.1,
 		step: 0.0001,
@@ -14,13 +14,14 @@ export const MUTATION_FIELDS: FieldDef[] = [
 	},
 	{
 		path: "mutation.mesh_layer_probability",
-		label: "Mesh Layer Prob.",
+		label: "Mesh Mutation Chance",
 		min: 0,
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-mesh-layer-probability",
 		defaultValue: 0.2,
-		tooltip: "Probability of selecting a topology mutation instead of a node-internal mutation",
+		tooltip:
+			"Chance a mutation rewires the mesh (adds, removes, copies or reroutes nodes) instead of changing the inside of one node",
 	},
 	{
 		path: "mutation.large_copy_weight_percent",
@@ -79,7 +80,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 	},
 	{
 		path: "mutation.executed_bias",
-		label: "Bias: Executed",
+		label: "Target Recently Run",
 		min: 0,
 		max: 1,
 		step: 0.01,
@@ -90,57 +91,57 @@ export const MUTATION_FIELDS: FieldDef[] = [
 	},
 	{
 		path: "mutation.executed_window_ticks",
-		label: "Executed Window",
+		label: "Recently Run Window",
 		min: 1,
 		max: 10000,
 		step: 1,
 		testId: "config-field-mutation-executed-window-ticks",
 		defaultValue: 100,
-		tooltip: "How many ticks back a node dispatch still counts as recently executed",
+		tooltip: "How many ticks back a node run still counts as recent for Target Recently Run",
 	},
 	{
 		path: "mutation.reachable_bias.topology",
-		label: "Bias: Topology",
+		label: "Reachable Bias: Mesh",
 		min: 0,
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-topology",
 		defaultValue: 0,
 		tooltip:
-			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for topology mutations",
+			"Chance a mesh mutation targets a node the brain can reach from its entry node; 0 picks evenly among all eligible nodes",
 	},
 	{
 		path: "mutation.reachable_bias.vm",
-		label: "Bias: VM",
+		label: "Reachable Bias: VM",
 		min: 0,
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-vm",
 		defaultValue: 0,
 		tooltip:
-			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for VM mutations",
+			"Chance a VM mutation targets a node the brain can reach from its entry node; 0 picks evenly among all eligible nodes",
 	},
 	{
 		path: "mutation.reachable_bias.graph",
-		label: "Bias: Graph",
+		label: "Reachable Bias: Graph",
 		min: 0,
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-graph",
 		defaultValue: 0,
 		tooltip:
-			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for graph mutations",
+			"Chance a graph mutation targets a node the brain can reach from its entry node; 0 picks evenly among all eligible nodes",
 	},
 	{
 		path: "mutation.reachable_bias.input_ref",
-		label: "Bias: Input Ref",
+		label: "Reachable Bias: Inputs",
 		min: 0,
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-input-ref",
 		defaultValue: 0,
 		tooltip:
-			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for input reference mutations",
+			"Chance an input mutation targets a node the brain can reach from its entry node; 0 picks evenly among all eligible nodes",
 	},
 ];
 
@@ -174,7 +175,7 @@ export const MUTATION_ENUMS: EnumFieldDef[] = [
 			{ value: "WholeFamily", label: "Whole family" },
 		],
 		tooltip:
-			"Experimental (T20.F04): grows initially silent input-to-vote links, one channel or a whole sensor family at a time",
+			"Experimental: grows new input-to-vote links that start silent (weight 0), one sensor channel or a whole sensor family at a time",
 	},
 ];
 

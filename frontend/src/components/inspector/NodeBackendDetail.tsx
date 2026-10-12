@@ -82,7 +82,16 @@ export function NodeBackendDetail({
 								<span className="w-[5.5rem] shrink-0 truncate text-slate-400">
 									{readable.label}
 								</span>
-								<span className="flex-1 truncate text-slate-200">{readable.operands}</span>
+								<span
+									className="flex-1 truncate text-slate-200"
+									title={
+										readable.description
+											? `${readable.operands}\n${readable.description}`
+											: readable.operands
+									}
+								>
+									{readable.operands}
+								</span>
 								{readable.badges.length > 0 ? (
 									<span className="shrink-0 text-[9px] uppercase text-cyan-400/70">
 										{readable.badges.join(" ")}

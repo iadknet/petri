@@ -1,12 +1,20 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
-import { actionParamTargetLabel, voteSinkLabel } from "./graphNodeFormatters.ts";
-import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
+import {
+	actionParamDescription,
+	actionParamTargetLabel,
+	describeVoteSink,
+	voteSinkLabel,
+} from "./graphNodeFormatters.ts";
+import { describeInputRef } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
+import { voteSinkFromIndex } from "./voteSinks.ts";
 
 export interface ReadableInstruction {
 	label: string;
 	operands: string;
+	/** Plain-words tooltip for what the instruction reads or writes. */
+	description?: string;
 	badges: RuntimeIoBadge[];
 }
 
@@ -46,8 +54,8 @@ const OPCODE_LABELS: Record<string, string> = {
 	JumpIfZero: "branch",
 	Jump: "jump",
 	// Route / payload / action
-	WriteRouteGate: "gate",
-	WriteInternalPayload: "payload",
+	WriteRouteGate: "route",
+	WriteInternalPayload: "bus",
 	WriteActionParam: "param",
 	AddVote: "vote",
 	SetPriorityBid: "priority",
@@ -89,7 +97,8 @@ export function formatReadableInstruction(
 
 	const label = OPCODE_LABELS[name] ?? name.toLowerCase();
 	const operands = formatOperands(name, payload, inputRefs, constants, index);
-	return { label, operands, badges };
+	const description = describeOperands(name, payload, inputRefs);
+	return { label, operands, badges, ...(description ? { description } : {}) };
 }
 
 /** Format string-type instructions (Noop, Halt). */
@@ -119,7 +128,46 @@ function reg(idx: number): string {
 function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputReference[]): string {
 	const ref = inputRefs[refIdx];
 	if (!ref) return `input[${refIdx}]`;
-	return formatInputRefWithSubIndex(ref, subIdx);
+	return describeInputRef(ref, subIdx).label;
+}
+
+/** Tooltip for instructions whose operands name something outside the VM. */
+function describeOperands(
+	name: string,
+	p: Record<string, number>,
+	inputRefs: InputReference[],
+): string | undefined {
+	switch (name) {
+		case "ReadInput": {
+			const ref = inputRefs[f(p, "ref_idx") || f(p, "input_idx")];
+			return ref
+				? describeInputRef(ref, f(p, "sub_idx")).description
+				: "This node has no such input; reads 0.";
+		}
+		case "AddVote": {
+			const sink = voteSinkFromIndex(f(p, "sink"));
+			return sink ? describeVoteSink(sink) : "Not a vote sink.";
+		}
+		case "WriteActionParam":
+			return actionParamDescription(f(p, "field_idx"));
+		case "WriteRouteGate":
+			return "Score for this route slot. The next mesh node is the target with the highest bias + score.";
+		case "WriteInternalPayload":
+			return "Writes a bus slot; the next mesh node to run reads it as Bus[n].";
+		case "SetPriorityBid":
+			return "Energy bid paid at the end of the tick; higher bids act first. A bid at or above current energy ends the tick.";
+		case "LoadSlotPrev":
+			return "Shared memory as it stood at the start of this tick (last tick's final value).";
+		case "LoadSlot":
+		case "LoadSlotImm":
+			return "Shared memory now, including writes made earlier this tick.";
+		case "ReadActionQueueLength":
+		case "ReadActionQueueType":
+		case "ReadActionQueueParam":
+			return "Actions already committed this tick. Type codes: 0 none, 1 Eat, 2 Move, 3 Reproduce, 4 StealEnergy.";
+		default:
+			return undefined;
+	}
 }
 
 function formatOperands(
@@ -207,9 +255,9 @@ function formatOperands(
 
 		// ── Route / payload / action ──
 		case "WriteRouteGate":
-			return `gate[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
+			return `route[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
 		case "WriteInternalPayload":
-			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
+			return `bus[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
 		case "AddVote":
 			return `vote[${voteSinkLabel(f(p, "sink"))}] += ${reg(f(p, "src"))}`;
 		case "WriteActionParam":
