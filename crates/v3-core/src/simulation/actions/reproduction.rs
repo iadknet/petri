@@ -294,7 +294,7 @@ fn conceive(
             .gestation_ticks_per_founder_genome,
     );
     if span == 0 {
-        spawn_child(parent_id, sim, target, transfer, rng);
+        spawn_child(parent_id, sim, target, dir, transfer, rng);
     } else {
         sim.creatures[parent_id].pending_birth = Some(PendingBirth {
             direction: dir,
@@ -321,7 +321,8 @@ pub(crate) enum BirthDelivery {
 /// At the population cap the litter is lost; otherwise the stored direction
 /// is resolved from the parent's position, falling back to the first valid
 /// cell in `Direction::ALL` order, and no valid cell loses the litter. A
-/// delivered birth runs Steps 9 to 14 with the stored litter energy. The
+/// delivered birth runs Steps 9 to 14 with the stored litter energy, the
+/// child heading the direction of the cell it is placed on (T11.F30). The
 /// pending birth is cleared in every case. Callers check the parent holds a
 /// pending birth.
 pub(crate) fn deliver_pending_birth(
@@ -344,19 +345,29 @@ pub(crate) fn deliver_pending_birth(
             .resolve_neighbor(parent_pos, dir)
             .filter(|&cell| sim.world.is_valid_target_cell(cell))
     };
-    let Some(target) =
-        valid_cell(pending.direction).or_else(|| Direction::ALL.into_iter().find_map(valid_cell))
+    let valid_step = |dir: Direction| valid_cell(dir).map(|cell| (dir, cell));
+    let Some((direction, target)) =
+        valid_step(pending.direction).or_else(|| Direction::ALL.into_iter().find_map(valid_step))
     else {
         sim.stats.energy_flows.gestation_lost += f64::from(pending.litter_energy);
         sim.stats.gestations_lost_no_cell_total += 1;
         return BirthDelivery::LostNoCell;
     };
-    spawn_child(parent_id, sim, target, pending.litter_energy, rng);
+    spawn_child(
+        parent_id,
+        sim,
+        target,
+        direction,
+        pending.litter_energy,
+        rng,
+    );
     BirthDelivery::Delivered(target)
 }
 
 /// Steps 9 to 14: clone and mutate the parent's genome and state at this
-/// moment and place the child on `target` with `litter_energy`.
+/// moment and place the child on `target` with `litter_energy`. `direction`
+/// is the step from the parent's cell to `target`, the child's heading
+/// (T11.F30).
 #[allow(
     clippy::too_many_lines,
     reason = "Steps 9 to 14 of the unified reproduction sequence in \
@@ -366,6 +377,7 @@ fn spawn_child(
     parent_id: CreatureId,
     sim: &mut Simulation,
     target: Position,
+    direction: Direction,
     transfer: f32,
     rng: &mut impl Rng,
 ) {
@@ -553,6 +565,7 @@ fn spawn_child(
         };
         child.graph_runtime.plasticity_weights = child_plasticity;
         child.birth_mutation_operators = child_birth_mutation_operators;
+        child.heading = direction;
         child
     });
     sim.stats.energy_flows.offspring_energy_credit += f64::from(sim.creatures[child_id].energy);

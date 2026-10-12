@@ -554,6 +554,7 @@ fn vm_eats_when_food_here() {
         &[0.0f32; 16],
         &mut crate::creature::state::GraphRuntimeState::new(),
         &config(),
+        crate::contracts::Direction::N,
     )
     .actions;
     assert_eq!(
@@ -643,6 +644,7 @@ fn vm_noop_when_no_food() {
         &[0.0f32; 16],
         &mut crate::creature::state::GraphRuntimeState::new(),
         &config(),
+        crate::contracts::Direction::N,
     )
     .actions;
     assert_eq!(

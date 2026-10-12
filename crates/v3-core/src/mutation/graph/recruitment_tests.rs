@@ -183,7 +183,7 @@ fn every_valid_vote_occurrence_and_only_valid_votes_are_destinations() {
         inputs: vec![],
     });
     let sites = destinations(graph);
-    assert_eq!(sites.len(), 28);
+    assert_eq!(sites.len(), 31);
     for vote in VoteSink::all() {
         assert!(sites
             .iter()
@@ -222,7 +222,7 @@ proptest! {
         prop_assert!(after_graph.projections.iter().all(|projection| projection.weight == 0.0));
         prop_assert_eq!(changed + projected, 1);
         if projected == 0 {
-            prop_assert!((1..=27).contains(&added));
+            prop_assert!((1..=30).contains(&added));
             if !whole { prop_assert_eq!(added, 1); }
         } else {
             prop_assert_eq!(added, 0);

@@ -481,6 +481,7 @@ mod work_counter_tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output.work_counters.mesh_hops, 1);
@@ -552,6 +553,7 @@ mod work_counter_tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output.work_counters.plasticity_updates, 1);

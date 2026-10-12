@@ -185,6 +185,7 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                             &prev,
                             &mut states[i],
                             &runtime,
+                            crate::contracts::Direction::N,
                         ));
                     }
                     let (before, old_hops, _) = &results[0];

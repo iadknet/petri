@@ -1275,17 +1275,20 @@ mod tests {
     /// `[24, 24, 24, 23]`). Re-pinned by T11.F31: five ring projection
     /// operators change every Graph-domain draw (Graph Drift
     /// `[19, 15, 14, 5]` -> `[21, 18, 16, 7]`, Selection `[19, 19, 19, 18]`
-    /// -> `[21, 21, 21, 20]`; the VM rows are unchanged). The T13.F06
-    /// progress record stays historical.
+    /// -> `[21, 21, 21, 20]`; the VM rows are unchanged). Re-pinned by
+    /// T11.F30: three drive sinks remap every sink and surface draw (Graph
+    /// Drift `[21, 18, 16, 7]` -> `[20, 17, 15, 7]`, Selection
+    /// `[21, 21, 21, 20]` -> `[20, 20, 20, 19]`; the VM rows are unchanged).
+    /// The T13.F06 progress record stays historical.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [21, 18, 16, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [20, 17, 15, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [21, 21, 21, 20],
+                [20, 20, 20, 19],
                 [0, 0],
             ),
             ("vm_prepared", Policy::Drift, [24, 18, 18, 11], [0, 0]),
@@ -1410,12 +1413,14 @@ mod tests {
     /// (censored 9 -> 8) retained discoveries remain useful. Re-pinned by
     /// T11.F31 (five ring projection operators change every Graph-domain
     /// draw): 23/23 graph (censored 13 -> 9) and 23/23 VM (censored 8 -> 9)
-    /// retained discoveries remain useful.
+    /// retained discoveries remain useful. Re-pinned by T11.F30 (three drive
+    /// sinks remap every sink and surface draw): 22/22 graph (censored
+    /// 9 -> 10) and 23/23 VM retained discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [23, 23, 23, 23], 9),
+            ("graph_prepared", [22, 22, 22, 22], 10),
             ("vm_prepared", [23, 23, 23, 23], 9),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();

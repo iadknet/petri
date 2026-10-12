@@ -220,6 +220,9 @@ pub struct MeshOutput {
     /// Final per-kind bars (T19.F04): commits of each kind this tick. The
     /// pass count is `work_counters.passes`.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
+    /// The heading after the tick (T11.F30): the direction of the tick's last
+    /// committed `Move`, else the heading it started with.
+    pub heading: crate::contracts::Direction,
 }
 
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:

@@ -223,6 +223,11 @@ pub struct CreatureState {
     /// The litter this creature carries (T03.F12); `None` when not
     /// gestating. A gestating creature commits no action.
     pub pending_birth: Option<PendingBirth>,
+    /// The direction of this creature's last committed `Move` (T11.F30); at
+    /// birth the direction from its parent to its cell, at seeding a drawn
+    /// direction, `N` at every other construction. The pass end breaks a tie
+    /// within a directed kind toward it. Never inherited, never sensed.
+    pub heading: Direction,
 }
 
 impl CreatureState {
@@ -314,6 +319,7 @@ impl CreatureState {
             lifetime_energy_sample_count: 0,
             previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
             pending_birth: None,
+            heading: Direction::N,
         }
     }
 
@@ -373,6 +379,7 @@ impl CreatureState {
             lifetime_energy_sample_count: 0,
             previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
             pending_birth: None,
+            heading: Direction::N,
         }
     }
 }

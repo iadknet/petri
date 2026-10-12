@@ -630,23 +630,23 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
+        let (on_cadence_genomes, stale_genomes) = (replay(true), replay(false));
         let mut on_cadence = MeshTotals::default();
-        let mut stale = MeshTotals::default();
-        for (totals, genomes) in [(&mut on_cadence, replay(true)), (&mut stale, replay(false))] {
-            for genome in &genomes {
-                totals.record(battery.mesh_execution(
-                    genome,
-                    context.runtime,
-                    context.shared_memory_decay_rate,
-                ));
-            }
+        for genome in &on_cadence_genomes {
+            on_cadence.record(battery.mesh_execution(
+                genome,
+                context.runtime,
+                context.shared_memory_decay_rate,
+            ));
         }
         assert_eq!(
             actual[0].mesh, on_cadence,
             "the walk follows the predeclared refresh cadence"
         );
+        // T11.F30: the drive sinks remap the walk's draws so the stale
+        // replay's mesh totals now coincide; the genomes still differ.
         assert_ne!(
-            on_cadence, stale,
+            on_cadence_genomes, stale_genomes,
             "refreshing mid-walk changes which nodes later births target"
         );
     }

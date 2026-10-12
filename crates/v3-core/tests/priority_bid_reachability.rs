@@ -153,6 +153,7 @@ fn genome_emits_positive_priority_bid_with_real_action(genome: &CreatureGenome) 
             &prev_shared_memory,
             &mut graph_runtime,
             &runtime,
+            v3_core::contracts::Direction::N,
         );
         if output.priority_bid > 0.0
             && output

@@ -343,6 +343,7 @@ fn visit_sequence<M: MeshExecutionMode, B>(
             &prev_shared_memory,
             &mut graph_runtime,
             runtime,
+            crate::contracts::Direction::N,
             mode(),
         );
         visit(
@@ -436,6 +437,7 @@ fn execute_scenario_tick_reading<M: MeshExecutionMode, T>(
         &prev_shared_memory,
         &mut graph_runtime,
         runtime,
+        crate::contracts::Direction::N,
         mode,
     );
     read(

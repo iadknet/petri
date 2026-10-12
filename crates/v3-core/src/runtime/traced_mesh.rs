@@ -1,7 +1,7 @@
 //! Trace recording adapter for the shared mesh routing loop.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
+use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, NodeId};
 use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
@@ -32,6 +32,7 @@ pub fn execute_creature_mesh_traced(
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
+    heading: Direction,
 ) -> (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>) {
     let recorded = execute_creature_mesh_impl(
         genome,
@@ -41,6 +42,7 @@ pub fn execute_creature_mesh_traced(
         prev_shared_memory,
         graph_runtime,
         config,
+        heading,
         RecordingMeshExecution::new(config.max_mesh_hops.max(1) as usize),
     );
     (recorded.output, recorded.hops, recorded.passes)
@@ -61,6 +63,7 @@ pub(crate) fn execute_creature_mesh_budgeted(
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
+    heading: Direction,
     limit: Option<RecordLimit>,
 ) -> RecordedMesh {
     let mut mode = RecordingMeshExecution::new(config.max_mesh_hops.max(1) as usize);
@@ -73,6 +76,7 @@ pub(crate) fn execute_creature_mesh_budgeted(
         prev_shared_memory,
         graph_runtime,
         config,
+        heading,
         mode,
     )
 }
@@ -518,6 +522,7 @@ mod tests {
             &prev_a,
             &mut gr_a,
             &config,
+            crate::contracts::Direction::N,
         );
 
         // Run traced
@@ -533,6 +538,7 @@ mod tests {
             &prev_b,
             &mut gr_b,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output_a.actions, output_b.actions);
@@ -639,6 +645,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(
@@ -721,6 +728,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         // The infinite food-type parameter sanitizes to 1e9 and decodes to
@@ -782,6 +790,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -830,6 +839,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -899,6 +909,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -962,6 +973,7 @@ mod tests {
             &prev_a,
             &mut gr_a,
             &config,
+            crate::contracts::Direction::N,
         );
 
         // Run traced path.
@@ -977,6 +989,7 @@ mod tests {
             &prev_b,
             &mut gr_b,
             &config,
+            crate::contracts::Direction::N,
         );
 
         // Assert full MeshOutput equivalence.
@@ -1043,6 +1056,7 @@ mod tests {
             &[0.0; 16],
             &mut runtime_a,
             &config,
+            crate::contracts::Direction::N,
         );
         let mut energy_b = 100.0;
         let mut memory_b = [0.0; 16];
@@ -1055,6 +1069,7 @@ mod tests {
             &[0.0; 16],
             &mut runtime_b,
             &config,
+            crate::contracts::Direction::N,
         );
 
         assert_eq!(output_a.actions, output_b.actions);
@@ -1084,6 +1099,7 @@ mod tests {
             &previous_memory,
             &mut runtime_a,
             config,
+            crate::contracts::Direction::N,
         );
 
         let mut energy_b = starting_energy;
@@ -1097,6 +1113,7 @@ mod tests {
             &previous_memory,
             &mut runtime_b,
             config,
+            crate::contracts::Direction::N,
         );
 
         let reason = output_b.termination_reason;
@@ -1238,6 +1255,7 @@ mod tests {
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             config,
+            crate::contracts::Direction::N,
         )
     }
 
@@ -1471,7 +1489,7 @@ mod tests {
                 &mut [0.0; 16],
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
-                &config,
+                &config, crate::contracts::Direction::N,
                 Some(RecordLimit { events, bytes }),
             );
             let hop = size_of::<MeshHopTrace>();

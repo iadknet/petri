@@ -437,6 +437,7 @@ mod tests {
             &[0.0; 16],
             &mut runtime,
             &config,
+            crate::contracts::Direction::N,
         )
         .actions
     }

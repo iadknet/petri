@@ -270,11 +270,11 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
     }
     assert_eq!(
         sources.len(),
-        235,
-        "203 declared channels and 32 memory slots"
+        241,
+        "209 declared channels and 32 memory slots"
     );
     let votes: Vec<_> = VoteSink::all().collect();
-    assert_eq!(votes.len(), 27);
+    assert_eq!(votes.len(), 30);
     for vote in votes {
         for wired in [false, true] {
             for (refs, source, expected) in &sources {
@@ -485,6 +485,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
                 &previous[i],
                 &mut states[i],
                 &config,
+                crate::contracts::Direction::N,
             );
             outputs.push((result, side, mesh));
         }

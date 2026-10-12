@@ -296,6 +296,7 @@ fn work_on_fixtures(genome: &CreatureGenome, family: Family, config: &Simulation
             &[0.0; 16],
             &mut crate::creature::state::GraphRuntimeState::new(),
             &config.runtime,
+            crate::contracts::Direction::N,
             UntracedMeshExecution,
         );
         let counters = output.work_counters;

@@ -168,6 +168,7 @@ fn run_mesh(
         &[0.0; 16],
         &mut state,
         config,
+        crate::contracts::Direction::N,
     )
 }
 
@@ -394,6 +395,7 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
                 &[0.0; 16],
                 &mut state,
                 &config(),
+                crate::contracts::Direction::N,
             );
             assert!((memory_in[1] - expected).abs() < 1e-6);
             assert_eq!(memory_in[2], neighbor_write);
@@ -408,6 +410,7 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
             &[0.0; 16],
             &mut state,
             &config(),
+            crate::contracts::Direction::N,
         );
         assert!((memory_in[1] - 2.625).abs() < 1e-6);
         assert!((energy - (100.0 - 3.0 * per_tick_cost)).abs() < 1e-6);
@@ -609,7 +612,7 @@ proptest! {
 
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
-        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 27]);
+        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 30]);
         prop_assert_eq!(visited.side.action_params, [0.0; 3]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);

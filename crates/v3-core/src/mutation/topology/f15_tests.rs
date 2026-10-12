@@ -419,6 +419,7 @@ fn execute_with_config(
         &[1.0; 16],
         &mut crate::creature::state::GraphRuntimeState::new(),
         config,
+        crate::contracts::Direction::N,
         crate::runtime::mesh::ObservedMeshExecution::default(),
     );
     (output, observation, memory)

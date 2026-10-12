@@ -9,15 +9,15 @@
 /// The four world-action kinds a creature can vote for.
 pub const VOTE_KIND_COUNT: usize = 4;
 /// Vote sinks in the catalog: one `Eat`, eight each for the three directed
-/// kinds, `Terminate`, and `Decide`.
-pub const VOTE_SINK_COUNT: usize = 27;
+/// kinds, one drive per directed kind (T11.F30), `Terminate`, and `Decide`.
+pub const VOTE_SINK_COUNT: usize = 30;
 /// Directions a directed vote sink covers — the `Direction::ALL` index range.
 pub const VOTE_DIRECTION_COUNT: u8 = 8;
 /// Action-parameter fields: the fields `decode_commit` reads (T11.F27).
 pub const ACTION_PARAM_FIELD_COUNT: usize = 3;
 
 const _: () = assert!(VOTE_DIRECTION_COUNT as usize == crate::contracts::Direction::ALL.len());
-const _: () = assert!(VOTE_SINK_COUNT == 2 + 1 + 3 * VOTE_DIRECTION_COUNT as usize);
+const _: () = assert!(VOTE_SINK_COUNT == 2 + 1 + 3 * (VOTE_DIRECTION_COUNT as usize + 1));
 
 /// One node's contribution, or the mesh's accumulated vote, over the catalog.
 pub type VoteVector = [f32; VOTE_SINK_COUNT];
@@ -100,7 +100,9 @@ impl ActionParamField {
 }
 
 /// One addressable vote sink. `Terminate` and `Decide` carry no kind: they
-/// vote on ending the tick's action pass rather than on a world action.
+/// vote on ending the tick's action pass rather than on a world action. A
+/// `Drive` (T11.F30) votes for its kind without naming a direction: the pass
+/// end adds it to the kind's best direction vote.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum VoteSink {
     Eat,
@@ -110,13 +112,16 @@ pub enum VoteSink {
     Reproduce(u8),
     /// Directed sink; `u8` is a `Direction::ALL` index in `0..8`.
     StealEnergy(u8),
+    /// The kind's drive: whether to act, apart from where (T11.F30).
+    Drive(DirectedVoteKind),
     Terminate,
     Decide,
 }
 
 impl VoteSink {
     /// Catalog index: `Eat` 0, `Move(d)` `1 + d`, `Reproduce(d)` `9 + d`,
-    /// `StealEnergy(d)` `17 + d`, `Terminate` 25, `Decide` 26. A directed sink
+    /// `StealEnergy(d)` `17 + d`, `Drive(K)` `25 + K.index()`, `Terminate` 28,
+    /// `Decide` 29. A directed sink
     /// built with an out-of-range direction indexes past the catalog and is
     /// never constructed by the catalog itself.
     #[must_use]
@@ -127,6 +132,7 @@ impl VoteSink {
             Self::Move(d) => 1 + d as usize,
             Self::Reproduce(d) => 1 + directions + d as usize,
             Self::StealEnergy(d) => 1 + 2 * directions + d as usize,
+            Self::Drive(kind) => 1 + 3 * directions + kind.index(),
             Self::Terminate => VOTE_SINK_COUNT - 2,
             Self::Decide => VOTE_SINK_COUNT - 1,
         }
@@ -146,6 +152,9 @@ impl VoteSink {
             _ if index < 1 + 3 * directions => {
                 Some(Self::StealEnergy((index - 1 - 2 * directions) as u8))
             }
+            _ if index < 1 + 3 * directions + DirectedVoteKind::ALL.len() => Some(Self::Drive(
+                DirectedVoteKind::ALL[index - 1 - 3 * directions],
+            )),
             _ if index == VOTE_SINK_COUNT - 2 => Some(Self::Terminate),
             _ if index == VOTE_SINK_COUNT - 1 => Some(Self::Decide),
             _ => None,
@@ -166,6 +175,7 @@ impl VoteSink {
             Self::Move(_) => Some(VoteKind::Move),
             Self::Reproduce(_) => Some(VoteKind::Reproduce),
             Self::StealEnergy(_) => Some(VoteKind::StealEnergy),
+            Self::Drive(kind) => Some(kind.vote_kind()),
             Self::Terminate | Self::Decide => None,
         }
     }
@@ -207,15 +217,22 @@ impl DirectedVoteKind {
         }
     }
 
-    /// The kind and direction of a directed sink; `None` for any other sink.
+    /// The kind and direction of a directed sink; `None` for any other sink,
+    /// a drive included (it names no direction).
     #[must_use]
     pub const fn of_sink(sink: VoteSink) -> Option<(Self, u8)> {
         match sink {
             VoteSink::Move(d) => Some((Self::Move, d)),
             VoteSink::Reproduce(d) => Some((Self::Reproduce, d)),
             VoteSink::StealEnergy(d) => Some((Self::StealEnergy, d)),
-            VoteSink::Eat | VoteSink::Terminate | VoteSink::Decide => None,
+            VoteSink::Eat | VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => None,
         }
+    }
+
+    /// The kind's drive sink (T11.F30).
+    #[must_use]
+    pub const fn drive(self) -> VoteSink {
+        VoteSink::Drive(self)
     }
 
     /// The world-action kind.
@@ -246,6 +263,10 @@ mod tests {
         }
         for sink in [VoteSink::Eat, VoteSink::Terminate, VoteSink::Decide] {
             assert_eq!(DirectedVoteKind::of_sink(sink), None);
+        }
+        for kind in DirectedVoteKind::ALL {
+            assert_eq!(DirectedVoteKind::of_sink(kind.drive()), None);
+            assert_eq!(kind.drive().kind(), Some(kind.vote_kind()));
         }
     }
 
@@ -285,8 +306,12 @@ mod tests {
             assert_eq!(VoteSink::Reproduce(d).index(), 9 + d as usize);
             assert_eq!(VoteSink::StealEnergy(d).index(), 17 + d as usize);
         }
-        assert_eq!(VoteSink::Terminate.index(), 25);
-        assert_eq!(VoteSink::Decide.index(), 26);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Move).index(), 25);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Reproduce).index(), 26);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::StealEnergy).index(), 27);
+        assert_eq!(VoteSink::Terminate.index(), 28);
+        assert_eq!(VoteSink::Decide.index(), 29);
+        assert_eq!(VOTE_SINK_COUNT, 30);
     }
 
     #[test]
@@ -332,6 +357,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&VoteSink::Move(3)).unwrap(),
             "{\"Move\":3}"
+        );
+        assert_eq!(
+            serde_json::to_string(&VoteSink::Drive(DirectedVoteKind::Move)).unwrap(),
+            "{\"Drive\":\"Move\"}"
         );
         for kind in VoteKind::ALL {
             let json = serde_json::to_string(&kind).unwrap();

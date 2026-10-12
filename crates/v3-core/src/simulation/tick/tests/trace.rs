@@ -108,3 +108,31 @@ fn run_tick_with_none_trace_identical_behavior() {
     assert_eq!(sim.tick, 1);
     assert!(!sim.creatures.is_empty() || pop_before == 0);
 }
+
+/// A committed `Move` sets the stored heading after the tick, the world's
+/// block notwithstanding (T11.F30); the traced tick carries the heading it
+/// started with, and the traced and untraced paths store the same heading.
+#[test]
+fn a_committed_move_sets_the_stored_heading_and_the_trace_keeps_the_start() {
+    use crate::contracts::{Direction, Position};
+    use crate::creature::genome::vote::VoteSink;
+    use crate::creature::genome::VmInstruction;
+
+    let genome = vm_program_genome(vec![VmInstruction::AddVote {
+        sink: VoteSink::Move(6).index() as u8,
+        src: 0,
+    }]);
+    for traced in [false, true] {
+        let (mut sim, id) = make_sim_with_custom_genome(100.0, genome.clone());
+        sim.creatures[id].heading = Direction::SW;
+        // The move west is blocked: the creature still turns.
+        sim.world.set_barrier(Position::new(4, 5), true);
+        let mut trace = traced.then(|| ActiveTrace::new(id, 1));
+        run_tick(&mut sim, &mut trace);
+        assert_eq!(sim.creatures[id].position, Position::new(5, 5));
+        assert_eq!(sim.creatures[id].heading, Direction::W);
+        if let Some(active) = trace {
+            assert_eq!(active.ticks[0].heading, Direction::SW);
+        }
+    }
+}

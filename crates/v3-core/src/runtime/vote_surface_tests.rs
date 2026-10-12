@@ -161,6 +161,7 @@ fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run 
         &[0.0; 16],
         &mut state,
         &config,
+        crate::contracts::Direction::N,
     );
     Run {
         output,
@@ -492,6 +493,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &[0.0; 16],
                 &mut states[0],
                 &config,
+                crate::contracts::Direction::N,
                 crate::runtime::mesh::UntracedMeshExecution,
             );
             let (observed, _) = execute_creature_mesh_impl(
@@ -502,6 +504,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &[0.0; 16],
                 &mut states[1],
                 &config,
+                crate::contracts::Direction::N,
                 ObservedMeshExecution::default(),
             );
             let (traced, hops, passes) = execute_creature_mesh_traced(
@@ -512,6 +515,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &[0.0; 16],
                 &mut states[2],
                 &config,
+                crate::contracts::Direction::N,
             );
             for output in [&observed, &traced] {
                 assert_eq!(plain.commit_counts, output.commit_counts);

@@ -1396,6 +1396,7 @@ proptest! {
                 &prev_shared_memory,
                 &mut graph_runtime,
                 &cfg,
+                v3_core::contracts::Direction::N,
             );
 
             let after = graph_runtime.node_state[0][1];

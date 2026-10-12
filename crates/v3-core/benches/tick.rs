@@ -102,6 +102,7 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         &creature.prev_shared_memory,
                         &mut creature.graph_runtime,
                         &config,
+                        v3_core::contracts::Direction::N,
                     ));
                 }
             },

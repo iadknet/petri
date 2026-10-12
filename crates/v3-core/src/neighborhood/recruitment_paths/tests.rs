@@ -1026,7 +1026,8 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// that declare a reference on the born edge: `InputRef.Add` on a Graph
 /// scaffold appends the activating `Move(E)` vote edge, so `graph_blank`
 /// shortens 3 -> 2 events, `graph_detour` 2 -> 1 and `graph_unprepared`
-/// 5 -> 3.
+/// 5 -> 3. T11.F30 moved every Graph seed and the VM `vote_to_east` seed:
+/// the three drive sinks remap the sink, surface and `AddVote` draws.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1047,9 +1048,9 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         record,
         [
-            ("graph_blank", vec![(InputRefAdd, 2873), swap], None),
-            ("graph_copy", vec![(GraphAddGraphEdge, 743), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 743), swap], None),
+            ("graph_blank", vec![(InputRefAdd, 4251), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 713), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 653), swap], None),
             (
                 "vm_blank",
                 vec![
@@ -1063,7 +1064,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
                 "graph_unprepared",
-                vec![(InputRefAdd, 12_673), (GraphRemoveGraphEdge, 0), swap],
+                vec![(InputRefAdd, 82_914), (GraphRemoveGraphEdge, 0), swap],
                 None,
             ),
             (
@@ -1073,12 +1074,12 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (VmInstructionRawFieldMutation, 18),
                     (VmInstructionRawFieldMutation, 25),
                     (VmInstructionRawFieldMutation, 25),
-                    (VmInstructionMutation, 66_421),
+                    (VmInstructionMutation, 79_414),
                     swap,
                 ],
                 None,
             ),
-            ("graph_detour", vec![(InputRefAdd, 2873)], None),
+            ("graph_detour", vec![(InputRefAdd, 4251)], None),
             (
                 "vm_detour",
                 vec![
