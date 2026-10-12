@@ -438,6 +438,13 @@ the lab still runs its profiles. An exempt closure adds no benchmark summary
 and no series entry, so later comparisons reference the last measured closure,
 and the ordinary benchmark tests inside `make check` still run.
 
+**A feature the user exempts skips the profiles and the mutation gate.** When
+its track note records a dated user decision for light verification, the
+feature runs neither profile nor the mutation gate, no benchmark or mutation
+specialist is spawned, and its spec records `Not applicable: user exemption`
+with the date. The spec challenge loop, the Codex review and `make check`
+still apply.
+
 **Observability features skip the profiles and the mutation gate (user
 decision, 2026-09-26, recorded 2026-09-29; extended to T23 on 2026-10-01).**
 A T21 or T23 feature does not run the
