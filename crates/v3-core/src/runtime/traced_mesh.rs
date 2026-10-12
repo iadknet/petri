@@ -522,7 +522,7 @@ mod tests {
             &prev_a,
             &mut gr_a,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         // Run traced
@@ -538,7 +538,7 @@ mod tests {
             &prev_b,
             &mut gr_b,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(output_a.actions, output_b.actions);
@@ -645,7 +645,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(
@@ -728,7 +728,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         // The infinite food-type parameter sanitizes to 1e9 and decodes to
@@ -790,7 +790,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -839,7 +839,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -909,7 +909,7 @@ mod tests {
             &prev_smem,
             &mut gr,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
@@ -973,7 +973,7 @@ mod tests {
             &prev_a,
             &mut gr_a,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         // Run traced path.
@@ -989,7 +989,7 @@ mod tests {
             &prev_b,
             &mut gr_b,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         // Assert full MeshOutput equivalence.
@@ -1056,7 +1056,7 @@ mod tests {
             &[0.0; 16],
             &mut runtime_a,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
         let mut energy_b = 100.0;
         let mut memory_b = [0.0; 16];
@@ -1069,7 +1069,7 @@ mod tests {
             &[0.0; 16],
             &mut runtime_b,
             &config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         assert_eq!(output_a.actions, output_b.actions);
@@ -1099,7 +1099,7 @@ mod tests {
             &previous_memory,
             &mut runtime_a,
             config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         let mut energy_b = starting_energy;
@@ -1113,7 +1113,7 @@ mod tests {
             &previous_memory,
             &mut runtime_b,
             config,
-            crate::contracts::Direction::N,
+            Direction::N,
         );
 
         let reason = output_b.termination_reason;
@@ -1255,7 +1255,7 @@ mod tests {
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             config,
-            crate::contracts::Direction::N,
+            Direction::N,
         )
     }
 
@@ -1489,7 +1489,8 @@ mod tests {
                 &mut [0.0; 16],
                 &[0.0; 16],
                 &mut GraphRuntimeState::new(),
-                &config, crate::contracts::Direction::N,
+                &config,
+                Direction::N,
                 Some(RecordLimit { events, bytes }),
             );
             let hop = size_of::<MeshHopTrace>();
