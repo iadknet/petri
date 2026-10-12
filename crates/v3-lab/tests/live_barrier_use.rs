@@ -4,8 +4,10 @@
 //! body per file in `PETRI_DUMP_DIR`) runs on the 16 calibration scenes of the
 //! T22.F02 calibrated point (wall-v1, scale 2, lifetime 200, seed 1) against a
 //! copy with every barrier-family input ablated: graph input edges and VM
-//! `ReadInput` through `readings::ablate`, plus ring projections, which
-//! `ablate` does not cover. Observation only. Ignored by default; run with
+//! `ReadInput` through `readings::ablate`, plus ring projections. The probe
+//! was written when `ablate` left projections live; `ablate` now masks them
+//! too, so the `*_edges_only` fields equal the full ones and the recorded
+//! 98 -> 110 result is the pre-fix reading. Observation only. Ignored by default; run with
 //! `PETRI_DUMP_DIR=<dir> cargo test --release -p v3-lab --test live_barrier_use -- --ignored --nocapture`.
 //! Prints one `PROBE_SETUP` line, one `PROBE {json}` line per creature and a
 //! `PROBE_META` summary. Dump each tile's sample right after its snapshot:
@@ -117,8 +119,8 @@ fn differing(a: &[Run], b: &[Run]) -> usize {
 /// `genome` with every T11.F31 ring projection on a barrier-family reference
 /// fully channel-ablated (`ablated_channels = 0xFF`, the production
 /// input-use ablation state; reads 0.0, ref_idx and charges unchanged).
-/// `v3_lab::readings::ablate` rewrites only edges and `ReadInput`, so it
-/// leaves these projections live. Returns the copy and per-reachability
+/// `v3_lab::readings::ablate` now applies the same mask, so on its output
+/// this only re-masks and counts. Returns the copy and per-reachability
 /// counts: (projections, nonzero-weight projections, reachable, reachable nonzero).
 fn ablate_barrier_projections(genome: &CreatureGenome) -> (CreatureGenome, [u64; 4]) {
     let reachable = mesh_reachable_nodes(genome);
@@ -215,10 +217,12 @@ fn probe(setup: &Setup, scenes: &[Scene], dump: &Dump) -> Value {
         );
         (scenes_differ, delta)
     };
-    // Full ablation: edges + ReadInput (lab `ablate`) + barrier projections.
+    // Full ablation: lab `ablate` (edges, ReadInput, projections) plus the
+    // re-masked barrier projections.
     let full_runs = run_all(setup, &full_ablated, scenes);
     let (scenes_differ, delta) = compare(&full_runs);
-    // Lab `ablate` alone (edges + ReadInput), for comparison.
+    // Lab `ablate` alone: edges and ReadInput only when the probe ran, the
+    // same as the full ablation since `ablate` masks projections.
     let edge_runs = run_all(setup, &edge_ablated, scenes);
     let (edge_scenes_differ, edge_delta) = compare(&edge_runs);
     map.insert("unsupported".into(), json!(false));
