@@ -200,17 +200,18 @@ four-times-repeated gate (note §4) is the shape this encoding writes once.
       mutation reach per operator, traced/observed/production agreement, the
       proptest commit-rule property extended to the drive term and the tie
       order; names and results in the readings.
-- [x] Build pass, 2026-10-12: `cargo test -p v3-core --test viability` first
-      (28 passed after the founder-only digest re-pin), `cargo test -p v3-core`
-      (2,100 passed), `-p v3-telemetry` (73), `-p v3-server` (163),
-      `-p v3-lab` (209), `-p v3-cli` (251 passed, 1 failed:
-      `gate_profile_has_no_severe_regression_against_series_references`,
+- [x] Build and self-review, 2026-10-12: `cargo test -p v3-core --test
+      viability` first (28 passed after the founder-only digest re-pin),
+      `cargo test -p v3-core` (2,100 passed), `-p v3-telemetry` (73),
+      `-p v3-server` (163), `-p v3-lab` (209), `-p v3-cli` (251 passed, 1
+      failed: `gate_profile_has_no_severe_regression_against_series_references`,
       `decided_passes` 0.000313 against the stored 0.000000), `cargo check
       --workspace --all-targets`, `cargo fmt --all --check`, `make
-      rust-clippy` (exit 0), frontend `tsc -b --noEmit`, `vitest run` (383
-      passed), `biome check src/` (no errors); `make check` not run. Re-pins,
-      the gate failure and the small-world survival reading are in the
-      readings.
+      rust-clippy` (exit 0), frontend `tsc -b --noEmit` (exit 0), `vitest run`
+      (383 passed), `biome check src` (no errors); `make check` not run. The
+      `v3-server`, `v3-lab` and `v3-cli` counts are from the build commits;
+      the self-review commit changes no code in those crates. Re-pins, the
+      gate failure and the small-world survival reading are in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
