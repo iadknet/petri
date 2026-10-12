@@ -428,6 +428,7 @@ fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
                     "mutation_effects",
                     "input_use",
                     "ring_rules",
+                    "drives",
                 ] {
                     if let Some(value) = case.get(key) {
                         projected[key] = value.clone();
@@ -599,10 +600,10 @@ const KEPT_SAMPLE_FIELDS: [&str; 12] = [
     "sensor_census",
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
-/// `action_attempts` (T16.F02), `ring_rules` (T11.F31) and
+/// `action_attempts` (T16.F02), `ring_rules` (T11.F31), and `drives` and
 /// `mutation_value_totals_by_birth_edge_class` (T11.F30), which the page does
 /// not read but the readings do.
-const KEPT_CASE_BLOCKS: [&str; 24] = [
+const KEPT_CASE_BLOCKS: [&str; 25] = [
     "case",
     "cognition",
     "energy_flows",
@@ -626,6 +627,7 @@ const KEPT_CASE_BLOCKS: [&str; 24] = [
     "input_use",
     "action_attempts",
     "ring_rules",
+    "drives",
     "mutation_value_totals_by_birth_edge_class",
 ];
 

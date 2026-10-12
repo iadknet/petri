@@ -7,6 +7,7 @@
 
 pub mod artifacts;
 mod comparison;
+pub mod drives;
 mod indicators;
 pub mod input_use;
 pub mod mutation_effects;

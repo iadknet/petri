@@ -1,6 +1,7 @@
 //! Seed execution, environment detection, and report assembly.
 
 use super::comparison::{locked_rand_version, Comparison};
+use super::drives::{undefined_drives, Drives};
 use super::indicators::{
     assemble_goal_indicators, build_mutational_neighborhood_indicator,
     compute_founder_neighborhood, evolved_neighborhood_for_seed, lineage_diversity,
@@ -92,6 +93,8 @@ struct GoalObservation {
     input_use_wall_clock_ms: f64,
     /// `Some` only on the goal world set (T11.F31): pure structure, untimed.
     ring_rules: Option<RingRules>,
+    /// `Some` only on the goal world set (T11.F30): pure structure, untimed.
+    drives: Option<Drives>,
 }
 
 /// `Duration` as fractional milliseconds, the unit every wall-clock field in
@@ -277,6 +280,7 @@ pub(super) fn run_one_seed(
             .map(|observation| super::input_use::observe_world(seed, &sim, observation));
         let input_use_wall_clock_ms = millis(input_use_started.elapsed());
         let ring_rules = world_observation.map(|_| super::ring_rules::observe_world(&sim));
+        let drives = world_observation.map(|_| super::drives::observe_world(&sim));
         let neighborhood_read = read_with_exposure.map(|(read, _)| read);
 
         GoalObservation {
@@ -294,6 +298,7 @@ pub(super) fn run_one_seed(
             input_use,
             input_use_wall_clock_ms,
             ring_rules,
+            drives,
         }
     });
 
@@ -532,6 +537,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         let mut case_effects = undefined_mutation_effects();
         let mut case_input_use = undefined_input_use();
         let mut case_ring_rules = undefined_ring_rules();
+        let mut case_drives = undefined_drives();
         if let Some(observation) = run.goal_observation {
             lineage_diversity_per_seed.push(observation.lineage_diversity);
             memory_sensitivity_per_seed.push(observation.memory_sensitivity);
@@ -567,6 +573,9 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             if let Some(ring_rules) = observation.ring_rules {
                 case_ring_rules = Indicator::Defined(ring_rules);
             }
+            if let Some(drives) = observation.drives {
+                case_drives = Indicator::Defined(drives);
+            }
             case_read = timed_case_reading(
                 observation.neighborhood_read,
                 seed,
@@ -593,6 +602,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                 mutation_effects: case_effects,
                 input_use: case_input_use,
                 ring_rules: case_ring_rules,
+                drives: case_drives,
             });
         }
         per_seed.push(run.per_seed);

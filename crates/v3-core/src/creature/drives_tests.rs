@@ -1,0 +1,147 @@
+use super::*;
+use crate::config::FounderProfile;
+use crate::contracts::NodeId;
+use crate::creature::founder::founder_genome;
+use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::cgp::GraphEdge;
+use crate::creature::genome::{NodeGenome, VmBackendDef};
+
+fn census_of(genomes: &[CreatureGenome]) -> DriveCensus {
+    let reachable: Vec<Vec<usize>> = genomes.iter().map(mesh_reachable_nodes).collect();
+    DriveCensus::observe(
+        genomes
+            .iter()
+            .zip(&reachable)
+            .map(|(genome, reachable)| (genome, reachable.as_slice())),
+    )
+}
+
+fn memory(slot: u8) -> GraphSource {
+    GraphSource::SharedMemory {
+        slot,
+        previous: false,
+    }
+}
+
+fn wire(def: &mut CgpGraphBackendDef, sink: VoteSink, source: GraphSource, weight: f32) {
+    def.sink_mut(OutputSinkKind::ActionVote(sink))
+        .unwrap()
+        .inputs
+        .push(GraphEdge { source, weight });
+}
+
+fn graph_genome(def: CgpGraphBackendDef) -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Graph(def),
+            targets: vec![],
+        }],
+    }
+}
+
+#[test]
+fn the_founder_carries_four_fanouts_of_sixteen_edges_and_no_drive() {
+    for profile in [FounderProfile::default()] {
+        let census = census_of(&[founder_genome(profile)]);
+        assert_eq!(census.fanout_totals(), (4, 16), "{profile:?}");
+        let [moves, reproduce, steal] = census.kinds;
+        assert_eq!((moves.fanouts, moves.fanout_edges), (3, 12));
+        assert_eq!((reproduce.fanouts, reproduce.fanout_edges), (1, 4));
+        assert_eq!((steal.fanouts, steal.fanout_edges), (0, 0));
+        for row in census.kinds {
+            assert_eq!(row.drive_carriers, 0);
+            assert_eq!(row.drive_edges + row.drive_vm_paths, 0);
+        }
+    }
+}
+
+#[test]
+fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let drive = DirectedVoteKind::Move.drive();
+    wire(&mut def, drive, memory(0), 0.5);
+    wire(&mut def, drive, memory(1), -0.25);
+    wire(&mut def, drive, memory(2), 1e-4);
+    let graph = graph_genome(def);
+    let vm = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::AddVote {
+                        sink: DirectedVoteKind::StealEnergy.drive().index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::StealEnergy(3).index() as u8,
+                        src: 0,
+                    },
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let empty = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![],
+    };
+    let census = census_of(&[graph, vm, empty]);
+    assert_eq!(census.creatures, 3);
+    let moves = census.kinds[DirectedVoteKind::Move.index()];
+    assert_eq!(
+        (
+            moves.drive_carriers,
+            moves.drive_edges,
+            moves.drive_edges_positive,
+            moves.drive_edges_negative,
+            moves.drive_vm_paths
+        ),
+        (1, 2, 1, 1, 0)
+    );
+    let steal = census.kinds[DirectedVoteKind::StealEnergy.index()];
+    assert_eq!((steal.drive_carriers, steal.drive_vm_paths), (1, 1));
+    assert_eq!(
+        census.kinds[DirectedVoteKind::Reproduce.index()],
+        KindDrives::default()
+    );
+}
+
+#[test]
+fn a_fanout_needs_one_source_and_sign_into_two_direction_sinks_on_one_node() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    // Fan-out: memory(0) positive into Move(0) twice and Move(2): 3 edges.
+    wire(&mut def, VoteSink::Move(0), memory(0), 0.5);
+    wire(&mut def, VoteSink::Move(0), memory(0), 0.7);
+    wire(&mut def, VoteSink::Move(2), memory(0), 0.5);
+    // Not one: the opposite sign into a third direction, a lone edge, the
+    // drive, another kind, and a floored weight.
+    wire(&mut def, VoteSink::Move(4), memory(0), -0.5);
+    wire(&mut def, VoteSink::Move(5), memory(1), 0.5);
+    wire(&mut def, DirectedVoteKind::Move.drive(), memory(1), 0.5);
+    wire(&mut def, VoteSink::Reproduce(5), memory(1), 0.5);
+    wire(&mut def, VoteSink::Move(6), memory(1), 1e-4);
+    let census = census_of(&[graph_genome(def)]);
+    let moves = census.kinds[DirectedVoteKind::Move.index()];
+    assert_eq!(
+        (moves.fanout_creatures, moves.fanouts, moves.fanout_edges),
+        (1, 1, 3)
+    );
+    assert_eq!(census.kinds[DirectedVoteKind::Reproduce.index()].fanouts, 0);
+}
+
+#[test]
+fn unreachable_nodes_are_not_read() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    wire(&mut def, DirectedVoteKind::Move.drive(), memory(0), 0.5);
+    let genome = graph_genome(def);
+    let census = DriveCensus::observe([(&genome, &[][..])]);
+    assert_eq!(census.creatures, 1);
+    assert_eq!(census.kinds[0], KindDrives::default());
+}
