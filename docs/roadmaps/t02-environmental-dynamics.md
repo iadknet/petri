@@ -34,7 +34,7 @@ the world becoming a scripted puzzle with one permanent solution.
 - [ ] **T02.F07 — Environmental Transfer and Robustness Characterization Campaign** — Depends on: T01.F06, T02.F05, T10.F08
   - Goal: Deferred proof phase. Do evolved strategies hold up under weather they never saw?
 
-- [ ] **T02.F08 — Partial Bites** — Depends on: T02.F04
+- [x] **T02.F08 — Partial Bites** — Depends on: T02.F04
   - Goal: Partial grazing. Eat gains an evolvable share of the cell's food to leave behind, so a creature can stop short of energy it cannot store and a lightly grazed cell keeps growing in place.
 
 ## Notes for AI Agents

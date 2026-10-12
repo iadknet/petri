@@ -1,6 +1,6 @@
 # T02.F08 — Partial Bites
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-12
 **Feature**: T02.F08
 **Track**: [T02 — Environmental Dynamics](../../roadmaps/t02-environmental-dynamics.md)
@@ -181,15 +181,15 @@ founder's `genome_size` stays 97. Any other moved pin is a defect.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first (tick-loop and founder
-      path change; 28 passed), then `make check` -> exit 0 (runs once at
+- [x] `cargo test -p v3-core --test viability` first (tick-loop and founder
+      path change; 28 passed), then `make check` -> exit 0 at tested commit 695ab45e (runs once at
       closure); results in
       [`docs/progress/readings/t02-f08.md`](../../progress/readings/t02-f08.md).
 - [x] Focused tests, one or more per Fixed-design row: names and results in
       the readings' "Focused tests" table.
 - [x] Mutation gate: `Not applicable: user exemption (2026-10-12)`.
 - [x] Benchmark summary: `Not applicable: user exemption (2026-10-12)`.
-- [ ] Codex final review output path and findings in the readings file.
+- [x] Codex final review output path and findings in the readings file.
 
 ## Performance and Goal Impact
 
@@ -207,14 +207,14 @@ names T02.F08 among the changed inputs.
 
 ## Success Criteria
 
-- [ ] `decode_commit` yields `leave` in `[0, 1]` for any surface value and
+- [x] `decode_commit` yields `leave` in `[0, 1]` for any surface value and
       0.0 for an unwired field; the catalog, VM address space and runtime
       surface hold exactly the four decoded fields.
-- [ ] A creature eats `amount × (1 − leave)`, the rest stays on the cell and
+- [x] A creature eats `amount × (1 − leave)`, the rest stays on the cell and
       grows in place, the grazing bite is `factor^(1 − leave)`, `leave` 0.0
       is bit-identical to the previous full bite, and an eat that takes
       nothing is a failed eat.
-- [ ] Founders behave as before, every re-pinned value is attributed to the
+- [x] Founders behave as before, every re-pinned value is attributed to the
       representation, the draws or the nudge semantics (or their downstream
       trajectory), and `make check` passes with the Codex review's P1
       findings resolved.
@@ -224,3 +224,6 @@ names T02.F08 among the changed inputs.
 - Exception: user exemption (2026-10-12) from the benchmark gate, goal
   profile and mutation gate; verification is TDD with unit and proptest
   coverage, the spec challenge loop, the Codex review and `make check`.
+- Cost: `/usage` not captured (user command; unattended run); implementer 2
+  passes (advisor consults 2 and 1); 1 spec-owner resume after Plan; 3 Codex
+  challenge rounds, final `verdict: ready`; Codex review P1 0, P2 0, P3 0.
