@@ -10,7 +10,7 @@ export function OverviewTab() {
 
 	const pop = status?.population ?? 0;
 	const energy = status?.mean_energy ?? 0;
-	const actions = status?.last_tick_actions ?? { move: 0, eat: 0, reproduce: 0, noop: 0 };
+	const actions = status?.last_tick_actions ?? { move: 0, eat: 0, reproduce: 0, noop: 0, steal: 0 };
 
 	// Delta from 10 ticks ago
 	const delta =
@@ -21,19 +21,29 @@ export function OverviewTab() {
 	return (
 		<div className="flex flex-col gap-3 p-3">
 			<div className="flex gap-6">
-				<Gauge label="Population" value={pop} delta={delta} />
-				<Gauge label="Mean Energy" value={energy} format={(v) => v.toFixed(1)} />
+				<Gauge
+					label="Population"
+					value={pop}
+					delta={delta}
+					hint="Creatures alive now. The coloured number is the change over the last 10 ticks."
+				/>
+				<Gauge
+					label="Mean Energy"
+					value={energy}
+					format={(v) => v.toFixed(1)}
+					hint="Average energy per living creature."
+				/>
 			</div>
 			<ActionBar {...actions} />
 			<div>
-				<span className="text-[11px] text-slate-400">Population Trend</span>
+				<span className="text-[11px] text-slate-400">Population over time</span>
 				<MiniChart
 					data={statsHistory.map((s) => ({ tick: s.tick, value: s.population }))}
 					color="#10b981"
 				/>
 			</div>
 			<div>
-				<span className="text-[11px] text-slate-400">Energy Trend</span>
+				<span className="text-[11px] text-slate-400">Mean energy over time</span>
 				<MiniChart
 					data={statsHistory.map((s) => ({ tick: s.tick, value: s.meanEnergy }))}
 					color="#3b82f6"
