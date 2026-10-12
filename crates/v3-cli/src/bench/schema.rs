@@ -1,6 +1,7 @@
 //! Serialised report types and their `undefined_*` constructors.
 
 use super::comparison::{Comparison, MeasuredIdentity};
+use super::drives::{undefined_drives, Drives};
 use super::input_use::{undefined_input_use, InputUse};
 use super::mutation_effects::{undefined_mutation_effects, MutationEffects};
 use super::profiles::GoalCase;
@@ -179,6 +180,10 @@ pub struct GoalCaseObservation {
     /// unmeasured in reports stored before it.
     #[serde(default = "undefined_ring_rules")]
     pub ring_rules: Indicator<RingRules>,
+    /// The drive census of the terminal population (T11.F30); unmeasured in
+    /// reports stored before it.
+    #[serde(default = "undefined_drives")]
+    pub drives: Indicator<Drives>,
 }
 
 /// The rates [`WorldTracking`] implies, derived once so a total and its
