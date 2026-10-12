@@ -11,7 +11,7 @@ use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputK
 use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
 use crate::creature::founder::vm_decision_founder_genome;
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction, VoteSink,
 };
 use crate::creature::state::CreatureState;
 use crate::runtime::trace::domain::TickTrace;
@@ -186,9 +186,13 @@ fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Opti
 
 #[test]
 fn traced_and_untraced_runs_are_identical_for_graph_founders() {
+    // Kind drives (T11.F30), 2026-10-12: seed 7 to 12. At seed 7 a traced
+    // target dies of a move at tick 31, inside its window, and a dead
+    // creature's action log, the oracle, is removed with it; seeds 8 to 11
+    // also lose a target inside its window.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = seed_simulation(equivalence_config(), 7);
-        let plain = seed_simulation(equivalence_config(), 7);
+        let traced = seed_simulation(equivalence_config(), 12);
+        let plain = seed_simulation(equivalence_config(), 12);
         assert_equivalent(traced, plain, budget);
     }
 }
@@ -197,10 +201,12 @@ fn traced_and_untraced_runs_are_identical_for_graph_founders() {
 fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // Effort-cost defaults, 2026-10-10: seed 9 to 14. At seeds 9, 10, 12 and
     // 13 a traced target dies of a move inside its window, and a dead
-    // creature's action log, the oracle, is removed with it.
+    // creature's action log, the oracle, is removed with it. Kind drives
+    // (T11.F30), 2026-10-12: seed 14 to 16. At seed 14 a traced target dies
+    // of a move at tick 32, inside its window; seed 15 also loses one.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 14));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 14));
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 16));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 16));
         assert_equivalent(traced, plain, budget);
     }
 }
@@ -596,7 +602,10 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
         sim.config.predation.steal_cost_rate = 0.0;
         sim.creatures[attacker].genome = steal_north_genome();
         sim.creatures[victim].genome = vm_program_genome(vec![
-            VmInstruction::AddVote { sink: 25, src: 0 },
+            VmInstruction::AddVote {
+                sink: VoteSink::Terminate.index() as u8,
+                src: 0,
+            },
             VmInstruction::Halt,
         ]);
         if victim_first {
