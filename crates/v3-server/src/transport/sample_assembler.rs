@@ -406,9 +406,9 @@ mod tests {
                         ],
                         bars: [0; VOTE_KIND_COUNT],
                         effective_votes: [1.0; VOTE_KIND_COUNT],
-                        committed: Some(v3_core::contracts::WorldAction::Eat {
-                            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
-                        }),
+                        committed: Some(v3_core::contracts::WorldAction::eat(
+                            v3_core::config::OrdinaryFoodTypeId::default(),
+                        )),
                         hops: 1,
                     },
                     MeshPassTrace {
@@ -422,9 +422,9 @@ mod tests {
                         hops: 64,
                     },
                 ],
-                final_actions: vec![v3_core::contracts::WorldAction::Eat {
-                    type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
-                }],
+                final_actions: vec![v3_core::contracts::WorldAction::eat(
+                    v3_core::config::OrdinaryFoodTypeId::default(),
+                )],
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [1, 0, 0, 0],

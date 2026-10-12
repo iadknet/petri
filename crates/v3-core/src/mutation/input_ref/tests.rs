@@ -873,7 +873,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         );
     }
     let before_def = graph_def(&base.nodes[1]).clone();
-    assert_eq!(before_def.output_sinks.len(), 97, "a full sink catalog");
+    assert_eq!(before_def.output_sinks.len(), 98, "a full sink catalog");
     assert!(
         before_def
             .compute_nodes

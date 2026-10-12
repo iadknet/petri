@@ -74,12 +74,17 @@ export type VoteSink =
 /** An action kind carrying votes and a bar. */
 export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
 
-/** One action-parameter field the commit decoder reads (T11.F27). */
-export type ActionParamField = "EatFoodType" | "ReproduceTransferFraction" | "StealEnergyAmount";
+/** One action-parameter field the commit decoder reads (T11.F27, T02.F08). */
+export type ActionParamField =
+	| "EatFoodType"
+	| "EatLeaveShare"
+	| "ReproduceTransferFraction"
+	| "StealEnergyAmount";
 
 /** Catalog order: the Graph sink order and the VM `field_idx` addressing. */
 export const ACTION_PARAM_FIELDS: readonly ActionParamField[] = Object.freeze([
 	"EatFoodType",
+	"EatLeaveShare",
 	"ReproduceTransferFraction",
 	"StealEnergyAmount",
 ]);

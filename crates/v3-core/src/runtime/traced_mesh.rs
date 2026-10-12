@@ -544,9 +544,9 @@ mod tests {
         assert_eq!(output_a.actions, output_b.actions);
         assert_eq!(
             output_b.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }]
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )]
         );
         assert!(
             (energy_a - energy_b).abs() < 1e-6,
@@ -650,9 +650,9 @@ mod tests {
 
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            }]
+            vec![WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::default()
+            )]
         );
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
@@ -735,9 +735,9 @@ mod tests {
         // the largest type index.
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::new(u16::MAX)
-            }]
+            vec![WorldAction::eat(crate::config::OrdinaryFoodTypeId::new(
+                u16::MAX
+            ))]
         );
         assert_eq!(hops.len(), 2);
         assert_eq!(passes[0].committed, output.actions.first().copied());

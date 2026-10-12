@@ -56,8 +56,9 @@ A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
 from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, 8
 `Move`, 8 `Reproduce`, 8 `StealEnergy`, the drives `Drive(Move)`,
 `Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
-three-field parameter surface `action_params` (indexed by `ActionParamField`:
-`EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`); at the pass
+four-field parameter surface `action_params` (indexed by `ActionParamField`:
+`EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
+`StealEnergyAmount`); at the pass
 end at most one
 action commits. A node may be dispatched any number of times within a pass
 (T19.F02): cycles and self-targets are legal, every dispatch runs on the
@@ -100,14 +101,25 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 ```
 
 Commit decode (`runtime/action_decode.rs`): the direction is the winning
-sink's, and only the committed kind's own field is read: `Eat` reads its
-food type from `EatFoodType` (rounded, non-finite or negative reads type 0),
+sink's, and only the committed kind's own fields are read: `Eat` reads its
+food type from `EatFoodType` (rounded, non-finite or negative reads type 0)
+and its leave share from `EatLeaveShare` (clamped to `[0, 1]`, non-finite
+reads 0, T02.F08),
 `Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
 `[0, 1]`, non-finite reads 0), and `StealEnergy` its amount from
 `StealEnergyAmount` (non-negative finite, else 0). `Move` reads no field, and
 the drives, `Terminate` and `Decide`
 never commit and decode to `NoOp`. The parameter surface is zeroed
 at tick start, overwritten per visit, and read at commit.
+
+Consume split (T02.F08): an applied `Eat { type_idx, leave }` on a cell of
+density `amount` eats `eaten = amount × (1 − leave)`, leaves
+`amount − eaten` on the cell (which grows in place), credits
+`eaten × reward`, and bites the type's grazing modifier with share
+`1 − leave`: `max(floor, m × factor)` for a full bite (no `powf`, so
+`leave` 0.0 is the pre-feature consume), else `max(floor, m × factor^share)`.
+An eat that takes nothing (empty cell, `leave` 1.0, or an eat rounding to
+zero) changes nothing and is a failed eat.
 
 Guards and ties:
 - `Decide` ends a pass only when the pass end would act: some kind's

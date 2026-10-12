@@ -307,6 +307,10 @@ pub struct SimStats {
     /// [`SimStats::eat_actions_applied_total_by_type`]: together they are every
     /// typed Eat the population executed.
     pub eat_actions_failed_total_by_type: HashMap<OrdinaryFoodTypeId, u64>,
+    /// Applied Eat actions that left food on the cell (T02.F08), keyed by the
+    /// food type the action named (cumulative): a subset of
+    /// [`SimStats::eat_actions_applied_total_by_type`].
+    pub eat_actions_partial_total_by_type: HashMap<OrdinaryFoodTypeId, u64>,
     /// Fine-grained move blocked breakdown (cumulative).
     pub move_actions_blocked_total_by_cause: HashMap<MoveBlockedCause, u64>,
     /// Move blocked outcomes where at least one adjacent alternative target was valid.

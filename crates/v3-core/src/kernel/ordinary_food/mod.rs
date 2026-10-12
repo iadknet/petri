@@ -70,13 +70,15 @@ impl FoodResource {
         self.state.consume_any(pos, &self.config.shared.grazing)
     }
 
+    /// Eat `type_idx` at `pos`, leaving the share `leave` on the cell
+    /// (T02.F08); returns the amount eaten, 0.0 for an unknown type.
     #[must_use]
-    pub fn consume_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
+    pub fn consume_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId, leave: f32) -> f32 {
         if !self.catalog.is_valid(type_idx) {
             return 0.0;
         }
         self.state
-            .consume_type(pos, type_idx, &self.config.shared.grazing)
+            .consume_type(pos, type_idx, leave, &self.config.shared.grazing)
     }
 
     /// The grazing fertility modifier of `type_idx` at `pos`: 1.0 for an

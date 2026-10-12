@@ -76,14 +76,14 @@ describe("MeshHopTimeline", () => {
 			<MeshHopTimeline
 				hops={[hop(0, 0, 1, toNode(2)), hop(1, 0, 2, null), hop(2, 2, 1, toNode(2))]}
 				passes={[
-					pass(0, "Decided", 2, { Eat: { type_idx: 0 } }),
+					pass(0, "Decided", 2, { Eat: { type_idx: 0, leave: 0 } }),
 					pass(1, "EnergyExhausted", 1, null),
 					pass(2, "PassCapReached", 1, null),
 				]}
 				meshSemantics={null}
 				activeHopIndex={0}
 				terminationReason="EnergyExhausted"
-				finalActions={[{ Eat: { type_idx: 0 } }, { Move: "N" }]}
+				finalActions={[{ Eat: { type_idx: 0, leave: 0 } }, { Move: "N" }]}
 				onHopSelect={onHopSelect}
 			/>,
 		);

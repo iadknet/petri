@@ -160,9 +160,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
 
     assert_eq!(
         tick.final_actions[0],
-        WorldAction::Eat {
-            type_idx: v3_core::config::OrdinaryFoodTypeId::default()
-        }
+        WorldAction::eat(v3_core::config::OrdinaryFoodTypeId::default())
     );
     // Pass 0 runs the three-node chain and commits `Eat`; pass 1 repeats it
     // and ends `NoDecision` against the raised bar.
@@ -397,9 +395,7 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
     for (north_barrier, expected_action, expected_barrier_value) in [
         (
             false,
-            WorldAction::Eat {
-                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
-            },
+            WorldAction::eat(v3_core::config::OrdinaryFoodTypeId::default()),
             0.0f32,
         ),
         (true, WorldAction::NoOp, 1.0f32),

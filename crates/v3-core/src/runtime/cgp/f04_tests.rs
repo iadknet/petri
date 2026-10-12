@@ -12,7 +12,7 @@ use crate::contracts::{
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_node;
@@ -527,7 +527,9 @@ fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendD
         ),
         5 => wire(
             &mut def,
-            OutputSinkKind::ActionParam(ActionParamField::ALL[usize::from(slot % 3)]),
+            OutputSinkKind::ActionParam(
+                ActionParamField::ALL[usize::from(slot) % ACTION_PARAM_FIELD_COUNT],
+            ),
             edge,
         ),
         _ => wire(
@@ -595,7 +597,7 @@ proptest! {
         prop_assert_eq!(visited.energy, energy);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 0);
         prop_assert_eq!(visited.side.energy_observation.graph_compute, 0.0);
-        prop_assert_eq!(visited.side.action_params, [0.0; 3]);
+        prop_assert_eq!(visited.side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
     }
 
     /// Exhaustion: energy at most the entry charge exhausts before any effect.
@@ -613,7 +615,7 @@ proptest! {
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
         prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 30]);
-        prop_assert_eq!(visited.side.action_params, [0.0; 3]);
+        prop_assert_eq!(visited.side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);
         prop_assert_eq!(

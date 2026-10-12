@@ -61,9 +61,9 @@ pub enum BackendDef {
 `VmBackendDef` is defined in `v3-vm-isa-spec.md`.
 `GraphBackendDef` is defined in `v3-graph-backend-spec.md`. The graph backend
 uses a CGP-style layered model with implicit inputs, mutable compute nodes,
-and fixed structural outputs (the sinks). The fixed catalog holds 97 sinks: 24 `CustomOutput`, 8
-`RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 30 `ActionVote` (three kind drives included, T11.F30), and 3
-`ActionParam`, one per decoded parameter field (T11.F27); the vote and parameter sinks are how a graph acts
+and fixed structural outputs (the sinks). The fixed catalog holds 98 sinks: 24 `CustomOutput`, 8
+`RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 30 `ActionVote` (three kind drives included, T11.F30), and 4
+`ActionParam`, one per decoded parameter field (T11.F27, T02.F08); the vote and parameter sinks are how a graph acts
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
 `genome_size` counts wired sinks only, so unwired sinks add nothing to it;
 the founder is 97 units.

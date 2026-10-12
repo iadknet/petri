@@ -3399,13 +3399,16 @@ async fn energy_only_shared_reward_can_be_changed_live() {
         for type_idx in [OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1)] {
             sim.creatures[id].energy = 10.0;
             sim.world.set_food_type(position, type_idx, 0.5);
-            assert!(apply_typed_eat(
-                &mut sim.creatures[id],
-                &mut sim.world,
-                &sim.config,
-                type_idx,
-                &mut sim.stats.energy_flows
-            ));
+            assert!(
+                apply_typed_eat(
+                    &mut sim.creatures[id],
+                    &mut sim.world,
+                    &sim.config,
+                    type_idx,
+                    0.0,
+                    &mut sim.stats.energy_flows
+                ) > 0.0
+            );
             // 0.5 food × 7.5 credited, then the eat effort paid (T16.F02).
             let creature = &sim.creatures[id];
             let effort = sim.config.energy.action_effort(

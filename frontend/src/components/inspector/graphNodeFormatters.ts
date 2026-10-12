@@ -221,6 +221,7 @@ export function describeOutputSink(kind: OutputSinkKind): Described & { subtitle
 /** Short label of each action-parameter field. */
 const ACTION_PARAM_FIELD_LABELS: Readonly<Record<ActionParamField, string>> = {
 	EatFoodType: "Eat.food",
+	EatLeaveShare: "Eat.leave",
 	ReproduceTransferFraction: "Reproduce.frac",
 	StealEnergyAmount: "StealEnergy.amt",
 };

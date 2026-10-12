@@ -6,8 +6,9 @@ use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIE
 pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 
 /// Decode the action a pass commits (T19.F04): the direction is the winning
-/// sink's, and the kind's parameter field supplies the rest (T11.F27): `Eat`
-/// reads `EatFoodType`, `Reproduce` `ReproduceTransferFraction` and
+/// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
+/// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
+/// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction` and
 /// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
@@ -15,6 +16,7 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
     match sink {
         VoteSink::Eat => WorldAction::Eat {
             type_idx: decode_food_type_idx(params[ActionParamField::EatFoodType.index()]),
+            leave: clamp_unit_interval(params[ActionParamField::EatLeaveShare.index()]),
         },
         VoteSink::Move(d) => WorldAction::Move(sink_direction(d)),
         VoteSink::Reproduce(d) => WorldAction::Reproduce {
@@ -75,24 +77,42 @@ fn clamp_non_negative_finite(v: f32) -> f32 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use ActionParamField::{
+        EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount,
+    };
+
+    /// A parameter surface holding `fields` and zero elsewhere.
+    fn surface(fields: &[(ActionParamField, f32)]) -> ActionParams {
+        let mut params = [0.0; ACTION_PARAM_FIELD_COUNT];
+        for &(field, value) in fields {
+            params[field.index()] = value;
+        }
+        params
+    }
 
     #[test]
     fn directed_sinks_commit_their_own_direction() {
         for (d, direction) in Direction::ALL.into_iter().enumerate() {
             let d = d as u8;
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[9.0, 9.0, 9.0]),
+                decode_commit(VoteSink::Move(d), &[9.0; ACTION_PARAM_FIELD_COUNT]),
                 WorldAction::Move(direction)
             );
             assert_eq!(
-                decode_commit(VoteSink::Reproduce(d), &[0.0, 0.25, 0.0]),
+                decode_commit(
+                    VoteSink::Reproduce(d),
+                    &surface(&[(ReproduceTransferFraction, 0.25)])
+                ),
                 WorldAction::Reproduce {
                     direction,
                     energy_transfer_fraction: 0.25,
                 }
             );
             assert_eq!(
-                decode_commit(VoteSink::StealEnergy(d), &[0.0, 0.0, 3.0]),
+                decode_commit(
+                    VoteSink::StealEnergy(d),
+                    &surface(&[(StealEnergyAmount, 3.0)])
+                ),
                 WorldAction::StealEnergy {
                     direction,
                     amount: 3.0,
@@ -108,7 +128,7 @@ mod tests {
         let last = Direction::ALL[Direction::ALL.len() - 1];
         for d in [8, 9, u8::MAX] {
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[0.0; 3]),
+                decode_commit(VoteSink::Move(d), &[0.0; ACTION_PARAM_FIELD_COUNT]),
                 WorldAction::Move(last)
             );
         }
@@ -117,25 +137,61 @@ mod tests {
     #[test]
     fn eat_reads_its_food_type_field() {
         assert_eq!(
-            decode_commit(VoteSink::Eat, &[3.0, 8.0, 8.0]),
+            decode_commit(
+                VoteSink::Eat,
+                &surface(&[
+                    (EatFoodType, 3.0),
+                    (ReproduceTransferFraction, 8.0),
+                    (StealEnergyAmount, 8.0)
+                ])
+            ),
             WorldAction::eat(OrdinaryFoodTypeId::new(3))
         );
         for raw in [f32::NAN, f32::INFINITY, -1.0] {
             assert_eq!(
-                decode_commit(VoteSink::Eat, &[raw, 0.0, 0.0]),
+                decode_commit(VoteSink::Eat, &surface(&[(EatFoodType, raw)])),
                 WorldAction::eat(OrdinaryFoodTypeId::default())
             );
+        }
+    }
+
+    /// T02.F08: `Eat` reads its leave share clamped to `[0, 1]`; a zero
+    /// (unwired) surface eats the whole cell.
+    #[test]
+    fn eat_reads_its_leave_share_clamped_to_unit_interval() {
+        assert_eq!(
+            decode_commit(VoteSink::Eat, &[0.0; ACTION_PARAM_FIELD_COUNT]),
+            WorldAction::eat(OrdinaryFoodTypeId::default())
+        );
+        for (raw, expected) in [
+            (f32::NAN, 0.0_f32),
+            (f32::INFINITY, 0.0),
+            (f32::NEG_INFINITY, 0.0),
+            (-0.5, 0.0),
+            (0.0, 0.0),
+            (0.3, 0.3),
+            (1.0, 1.0),
+            (4.0, 1.0),
+        ] {
+            let WorldAction::Eat { type_idx, leave } = decode_commit(
+                VoteSink::Eat,
+                &surface(&[(EatFoodType, 2.0), (EatLeaveShare, raw)]),
+            ) else {
+                panic!("expected Eat");
+            };
+            assert_eq!(type_idx, OrdinaryFoodTypeId::new(2));
+            assert_eq!(leave.to_bits(), expected.to_bits(), "{raw}");
         }
     }
 
     #[test]
     fn pass_control_sinks_decode_to_noop() {
         assert_eq!(
-            decode_commit(VoteSink::Terminate, &[1.0; 3]),
+            decode_commit(VoteSink::Terminate, &[1.0; ACTION_PARAM_FIELD_COUNT]),
             WorldAction::NoOp
         );
         assert_eq!(
-            decode_commit(VoteSink::Decide, &[1.0; 3]),
+            decode_commit(VoteSink::Decide, &[1.0; ACTION_PARAM_FIELD_COUNT]),
             WorldAction::NoOp
         );
     }
@@ -144,7 +200,10 @@ mod tests {
     fn steal_amount_is_non_negative_finite() {
         for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
             assert_eq!(
-                decode_commit(VoteSink::StealEnergy(0), &[0.0, 0.0, raw]),
+                decode_commit(
+                    VoteSink::StealEnergy(0),
+                    &surface(&[(StealEnergyAmount, raw)])
+                ),
                 WorldAction::StealEnergy {
                     direction: Direction::N,
                     amount: 0.0,
@@ -170,7 +229,10 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Reproduce(0), &[0.0, raw, 0.0])
+            } = decode_commit(
+                VoteSink::Reproduce(0),
+                &surface(&[(ReproduceTransferFraction, raw)]),
+            )
             else {
                 panic!("expected Reproduce");
             };
@@ -216,7 +278,7 @@ mod tests {
         #[test]
         fn a_field_never_changes_another_kinds_commit(
             field_index in 0..ActionParamField::ALL.len(),
-            base in prop::array::uniform3(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
+            base in prop::array::uniform4(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
             value in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
         ) {
             let field = ActionParamField::ALL[field_index];
@@ -232,13 +294,28 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Reproduce(2), &[0.0, raw, 0.0])
+            } = decode_commit(VoteSink::Reproduce(2), &surface(&[(ReproduceTransferFraction, raw)]))
             else {
                 panic!("expected Reproduce");
             };
             prop_assert!((0.0..=1.0).contains(&energy_transfer_fraction));
             if raw.is_finite() {
                 prop_assert_eq!(energy_transfer_fraction, raw.clamp(0.0, 1.0));
+            }
+        }
+
+        /// T02.F08: the leave share lands in `[0, 1]` for any `f32` and is
+        /// `clamp(0, 1)` of a finite input.
+        #[test]
+        fn eat_leave_share_always_lands_in_unit_interval(raw in prop::num::f32::ANY) {
+            let WorldAction::Eat { leave, .. } =
+                decode_commit(VoteSink::Eat, &surface(&[(EatLeaveShare, raw)]))
+            else {
+                panic!("expected Eat");
+            };
+            prop_assert!((0.0..=1.0).contains(&leave));
+            if raw.is_finite() {
+                prop_assert_eq!(leave.to_bits(), raw.clamp(0.0, 1.0).to_bits());
             }
         }
     }

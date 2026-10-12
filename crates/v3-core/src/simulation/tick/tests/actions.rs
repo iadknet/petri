@@ -929,6 +929,130 @@ fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
     );
 }
 
+/// A one-node VM genome that eats food type 0 leaving the share `leave` on
+/// the cell (T02.F08): write `EatLeaveShare`, then vote one `Eat`.
+fn eat_leave_genome(leave: f32) -> CreatureGenome {
+    use crate::creature::genome::vote::{ActionParamField, VoteSink};
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![leave, 1.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::WriteActionParam {
+                        field_idx: ActionParamField::EatLeaveShare.index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::Eat.index() as u8,
+                        src: 1,
+                    },
+                    VmInstruction::Halt,
+                ],
+            }),
+            targets: vec![],
+        }],
+    }
+}
+
+/// T02.F08: an applied partial eat through `execute_eat` keeps
+/// `amount × leave` on the cell, credits only the eaten amount, logs it, and
+/// counts as applied and partial, not failed.
+#[test]
+fn partial_eat_retains_density_credits_the_eaten_amount_and_counts_partial() {
+    let pos = Position::new(5, 5);
+    let staple = crate::config::OrdinaryFoodTypeId::default();
+    let (mut sim, id) = make_sim_with_custom_genome(20.0, eat_leave_genome(0.75));
+    sim.action_logs
+        .insert(id, crate::creature::action_log::ActionLog::new(8));
+    sim.world.set_food_type(pos, staple, 1.0);
+    let reward = sim.config.world.food.types[0]
+        .energy_per_unit
+        .unwrap_or(sim.config.energy.costs.eat_reward_per_food);
+
+    run_tick(&mut sim, &mut None);
+
+    assert_eq!(sim.world.food_at_type(pos, staple), 0.75);
+    let credited = sim.stats.energy_flows.food_intake_by_type[0];
+    assert!(
+        (credited - f64::from(0.25 * reward)).abs() < 1e-4,
+        "credited {credited}, reward {reward}"
+    );
+    let entry = sim
+        .action_logs
+        .get(id)
+        .expect("creature action log")
+        .entries()
+        .iter()
+        .find(|entry| entry.action_type == ActionType::Eat)
+        .copied()
+        .expect("eat action log entry");
+    assert_eq!(entry.result, ActionResult::Success);
+    assert_eq!(entry.amount, 0.25);
+    assert_eq!(entry.food_type, Some(staple));
+    assert_eq!(
+        sim.stats.eat_actions_applied_total_by_type.get(&staple),
+        Some(&1)
+    );
+    assert_eq!(
+        sim.stats.eat_actions_partial_total_by_type.get(&staple),
+        Some(&1)
+    );
+    assert_eq!(
+        sim.stats.eat_actions_failed_total_by_type.get(&staple),
+        None
+    );
+}
+
+/// T02.F08: an eat that clears the cell is applied but not partial; an eat
+/// leaving everything is a failed eat with the cell untouched.
+#[test]
+fn full_eat_is_not_partial_and_leave_one_is_a_failed_eat() {
+    let pos = Position::new(5, 5);
+    let staple = crate::config::OrdinaryFoodTypeId::default();
+
+    let (mut sim, _id) = make_sim_with_custom_genome(20.0, eat_leave_genome(0.0));
+    sim.world.set_food_type(pos, staple, 1.0);
+    run_tick(&mut sim, &mut None);
+    assert_eq!(sim.world.food_at_type(pos, staple), 0.0);
+    assert_eq!(
+        sim.stats.eat_actions_applied_total_by_type.get(&staple),
+        Some(&1)
+    );
+    assert_eq!(
+        sim.stats.eat_actions_partial_total_by_type.get(&staple),
+        None
+    );
+
+    let (mut sim, _id) = make_sim_with_custom_genome(20.0, eat_leave_genome(1.0));
+    sim.world.set_food_type(pos, staple, 1.0);
+    run_tick(&mut sim, &mut None);
+    assert_eq!(sim.world.food_at_type(pos, staple), 1.0);
+    assert_eq!(
+        sim.stats.eat_actions_applied_total_by_type.get(&staple),
+        None
+    );
+    assert_eq!(
+        sim.stats.eat_actions_partial_total_by_type.get(&staple),
+        None
+    );
+    assert_eq!(
+        sim.stats.eat_actions_failed_total_by_type.get(&staple),
+        Some(&1)
+    );
+}
+
 #[test]
 fn move_attempts_count_blocked_and_successful_moves_alike() {
     let genome = vm_program_genome(vec![

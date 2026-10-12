@@ -360,9 +360,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     assert_eq!(emit_trace.ticks.len(), 1);
     assert_eq!(
         emit_trace.ticks[0].final_actions[0],
-        WorldAction::Eat {
-            type_idx: v3_core::config::OrdinaryFoodTypeId::default()
-        }
+        WorldAction::eat(v3_core::config::OrdinaryFoodTypeId::default())
     );
     assert!(
         (sim_emit.world.food_at(emit_pos) - 0.0).abs() < 1e-6,

@@ -2288,19 +2288,19 @@ mod tests {
 
     /// The draw is one uniform `gen_range` over every compute node, then every
     /// sink in vector order (T11.F27): on the fixed catalog that is one
-    /// `gen_range(0..c + 97)`, `k < c` naming `ComputeInput(k)` and otherwise
+    /// `gen_range(0..c + 98)`, `k < c` naming `ComputeInput(k)` and otherwise
     /// `SinkInput(k - c)`.
     #[test]
     fn pick_random_surface_draws_uniformly_over_compute_nodes_and_every_sink() {
         let def = founder_graph_def();
         let compute = def.compute_nodes.len();
-        assert_eq!(def.output_sinks.len(), 97);
+        assert_eq!(def.output_sinks.len(), 98);
         let mut drawn = std::collections::HashSet::new();
         for seed in 0u64..16_384 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let surface = pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
             let mut replay = rand::rngs::SmallRng::seed_from_u64(seed);
-            let k = replay.gen_range(0..compute + 97);
+            let k = replay.gen_range(0..compute + 98);
             let expected = if k < compute {
                 EdgeSurface::ComputeInput(k)
             } else {
@@ -2310,7 +2310,7 @@ mod tests {
             assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "one draw only");
             drawn.insert(surface);
         }
-        assert_eq!(drawn.len(), compute + 97, "every candidate stays drawable");
+        assert_eq!(drawn.len(), compute + 98, "every candidate stays drawable");
         let empty = CgpGraphBackendDef {
             projections: Vec::new(),
             birth_weights: None,
@@ -2324,7 +2324,7 @@ mod tests {
         assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>(), "no RNG consumed");
     }
 
-    /// Fresh `AddGraphEdge` targets reach each of the three parameter sinks.
+    /// Fresh `AddGraphEdge` targets reach each of the four parameter sinks.
     #[test]
     fn add_edge_reaches_every_parameter_sink() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();

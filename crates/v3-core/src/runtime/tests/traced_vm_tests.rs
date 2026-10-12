@@ -964,7 +964,7 @@ fn result_equivalence_all_41_opcodes() {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        field_idx: 1,
+                        field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction.index() as u8,
                         src: 0,
                     },
                     VmInstruction::AddVote { sink: 1, src: 0 },

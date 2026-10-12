@@ -81,20 +81,23 @@ pub fn apply_noop(
     );
 }
 
-/// Apply a typed Eat action using the configured food owner for the cell.
+/// Apply a typed Eat action using the configured food owner for the cell,
+/// leaving the share `leave` of the cell's food in place (T02.F08). Credits
+/// `eaten × reward` and returns the amount eaten; 0.0 is a failed eat.
 #[must_use]
 pub fn apply_typed_eat(
     creature: &mut CreatureState,
     world: &mut WorldState,
     config: &SimulationConfig,
     type_idx: OrdinaryFoodTypeId,
+    leave: f32,
     flows: &mut EnergyFlows,
-) -> bool {
+) -> f32 {
     flows
         .food_intake_by_type
         .resize(config.world.food.types.len(), 0.0);
-    let food = world.consume_food_type(creature.position, type_idx);
-    if food > 0.0 {
+    let eaten = world.consume_food_type(creature.position, type_idx, leave);
+    if eaten > 0.0 {
         let reward = config
             .world
             .food
@@ -103,7 +106,7 @@ pub fn apply_typed_eat(
             .and_then(|food_type| food_type.energy_per_unit)
             .unwrap_or(config.energy.costs.eat_reward_per_food);
         let before = creature.energy;
-        let credited = creature.energy + food * reward;
+        let credited = creature.energy + eaten * reward;
         creature.energy = credited.clamp(0.0, config.energy.lifecycle.max_energy);
         flows.food_intake_by_type[usize::from(type_idx.get())] += applied_debit(credited, before);
         flows.maximum_energy_clamp_loss += applied_debit(credited, creature.energy).max(0.0);
@@ -117,11 +120,10 @@ pub fn apply_typed_eat(
         DeathCause::ActionEat,
     );
     flows.action_charges.eat += effort;
-    let succeeded = food > 0.0;
-    if !succeeded {
+    if eaten <= 0.0 {
         flows.failed_action_effort.eat += effort;
     }
-    succeeded
+    eaten
 }
 
 /// Apply a Move action: move one step in `dir` if the target is valid.
@@ -277,6 +279,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            0.0,
             &mut sim.stats.energy_flows,
         );
         assert!(
@@ -304,6 +307,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            0.0,
             &mut sim.stats.energy_flows,
         );
         assert_eq!(
@@ -327,10 +331,11 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::new(0),
+            0.0,
             &mut sim.stats.energy_flows,
         );
 
-        assert!(succeeded);
+        assert!(succeeded > 0.0);
         // Effort-cost defaults, 2026-10-10: the eat pays the 0.4 effort floor after the credit.
         assert!((sim.creatures[id].energy - (before + 0.25 * 5.0 - 0.4)).abs() < 1e-5);
     }
@@ -1326,9 +1331,10 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            0.0,
             &mut sim.stats.energy_flows,
         );
-        assert!(result, "eating food should return true");
+        assert!(result > 0.0, "eating food should return the eaten amount");
     }
 
     #[test]
@@ -1342,9 +1348,10 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            0.0,
             &mut sim.stats.energy_flows,
         );
-        assert!(!result, "eating empty cell should return false");
+        assert_eq!(result, 0.0, "eating empty cell should eat nothing");
     }
 
     #[test]
@@ -1361,10 +1368,11 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::new(99),
+            0.0,
             &mut sim.stats.energy_flows,
         );
 
-        assert!(!result);
+        assert_eq!(result, 0.0);
         assert_eq!(
             sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)),
             food_before
@@ -1487,6 +1495,7 @@ mod tests {
                 &mut sim_low.world,
                 &sim_low.config,
                 OrdinaryFoodTypeId::default(),
+                0.0,
                 &mut sim_low.stats.energy_flows,
             );
         }
@@ -1503,6 +1512,7 @@ mod tests {
                 &mut sim_high.world,
                 &sim_high.config,
                 OrdinaryFoodTypeId::default(),
+                0.0,
                 &mut sim_high.stats.energy_flows,
             );
         }
@@ -1704,6 +1714,7 @@ mod tests {
                 &mut sim_young.world,
                 &sim_young.config,
                 OrdinaryFoodTypeId::default(),
+                0.0,
                 &mut sim_young.stats.energy_flows,
             );
         }
@@ -1720,6 +1731,7 @@ mod tests {
                 &mut sim_old.world,
                 &sim_old.config,
                 OrdinaryFoodTypeId::default(),
+                0.0,
                 &mut sim_old.stats.energy_flows,
             );
         }
@@ -1919,8 +1931,8 @@ mod tests {
             for selected in 0..2 {
                 sim.creatures[id].energy = 10.0;
                 for index in 0..2 { sim.world.set_food_type(pos, OrdinaryFoodTypeId::new(index), density); }
-                let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected), &mut sim.stats.energy_flows);
-                proptest::prop_assert!(applied);
+                let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected), 0.0, &mut sim.stats.energy_flows);
+                proptest::prop_assert_eq!(applied, density);
                 proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward - 0.4)).abs() < 1e-5);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(selected)), 0.0);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1-selected)), density);
@@ -2036,13 +2048,17 @@ mod tests {
         let (mut sim, id) = make_sim_one_creature(Position::new(3, 3), 50.0);
         sim.config.energy.lifecycle.max_energy = 20.0;
         sim.config.energy.costs.eat_cost = 2.0;
-        assert!(!apply_typed_eat(
-            &mut sim.creatures[id],
-            &mut sim.world,
-            &sim.config,
-            OrdinaryFoodTypeId::default(),
-            &mut sim.stats.energy_flows
-        ));
+        assert_eq!(
+            apply_typed_eat(
+                &mut sim.creatures[id],
+                &mut sim.world,
+                &sim.config,
+                OrdinaryFoodTypeId::default(),
+                0.0,
+                &mut sim.stats.energy_flows
+            ),
+            0.0
+        );
         assert_eq!(sim.creatures[id].energy, 48.0);
     }
 

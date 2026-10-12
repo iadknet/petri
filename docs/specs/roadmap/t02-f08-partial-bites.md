@@ -122,9 +122,11 @@ over `c + 98`); and the nudge (`mutate_one_instruction_field`'s ±1 on a
 `WriteActionParam` field index now lands on a field with a different
 meaning). Pins hashing a default run or a mutating trajectory (for example
 `legacy_default_short_run_identity`,
-`accounting_preserves_pre_feature_sampled_trajectories_and_actions`) and
-tests asserting 97 sinks (`cgp.rs`, `mutation/graph/operators.rs`) are
-re-pinned once, old and new values in the readings file, each attributed to
+`accounting_preserves_pre_feature_sampled_trajectories_and_actions`, the
+`recruitment_paths` seed-search results, whose searches draw over the 98-sink
+surface, and `production_cost_selection_lineages_pin_the_first_reading`,
+downstream of the same draws) and tests asserting 97 sinks (`cgp.rs`,
+`mutation/graph/operators.rs`) are re-pinned once, old and new values in the readings file, each attributed to
 one of the three causes or to the trajectory downstream of one. Unwired
 behavior is verified by tests on `decode_commit` and `consume_type`, not by
 a genome hash. No config changes, so no config digest moves, and the
@@ -134,19 +136,19 @@ founder's `genome_size` stays 97. Any other moved pin is a defect.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
-| `petri.run.eat_actions_partial_by_type` | counter (`Sum`), as `petri.run.eat_actions_applied_by_type` is | `SimStats.eat_actions_partial_total_by_type`: applied eats that left food on the cell | attribute `petri.food_type`; a row in the expected families of `crates/v3-telemetry/src/metrics/tests.rs` and its Prometheus name in `scripts/telemetry-dashboards-check` `keyed_names` |
+| `petri.run.eat_actions_partial_by_type` | counter (`Sum`), as `petri.run.eat_actions_applied_by_type` is | `SimStats.eat_actions_partial_total_by_type`: applied eats that left food on the cell | attribute `petri.food_type`; a row in the expected families of `crates/v3-telemetry/src/metrics/tests.rs`. Not listed in `scripts/telemetry-dashboards-check`: its map has a key only when a creature evolves a wired positive `EatLeaveShare`, which the check's fixed seed-7 workload does not promise, and the T21 convention lists a keyed name only when the workload gives its map a key (absent, never zero) |
 | `Param Eat.leave` | creature inspector label for the Graph sink and the VM `WriteActionParam` target, not a metric | the genome | none |
 | `maximum_energy_clamp_loss`, `failed_action_effort.eat` (existing `petri.run.energy_flow` flows), `petri.tick.food_grazed_cell_share` | existing signals the mechanism moves: clamp loss falls when creatures leave food, failed eat effort rises when they leave all of it | unchanged | unchanged |
 | configuration | none: no config field or mechanism switch is added, so nothing new reaches `run.started` or a phase group | — | — |
 
 ## Implementation Tasks
 
-- [ ] Catalog and decoder: `EatLeaveShare`, counts 4 and 98, `WorldAction::Eat
+- [x] Catalog and decoder: `EatLeaveShare`, counts 4 and 98, `WorldAction::Eat
       { leave }`, `param(1)`, `decode_commit`, founder index by `index()`;
       decode unit tests and a proptest that `leave` lands in `[0, 1]` for any
       `f32` and equals `clamp(0, 1)` of a finite input; the existing
       sensitivity and independence tests cover the new field through `ALL`.
-- [ ] Consume split and bite: `consume_type` with `leave`, `bite_modifier`
+- [x] Consume split and bite: `consume_type` with `leave`, `bite_modifier`
       with `share`, `GrazingLayer::bite` with `share`; unit tests for `leave`
       0.0 (bit-identical full bite), 1.0 (failed eat, cell and modifier
       untouched) and a mid value; edge cases: a positive subnormal density
@@ -163,29 +165,30 @@ founder's `genome_size` stays 97. Any other moved pin is a defect.
       relative bound holds; equivalence is not claimed in the subnormal
       range) where the floor is not reached, two half bites equal to one
       full bite within a relative `1e-5`.
-- [ ] Eat action and stats: `apply_typed_eat` returns the eaten amount,
+- [x] Eat action and stats: `apply_typed_eat` returns the eaten amount,
       `execute_eat` logs it and counts `eat_actions_partial_total_by_type`;
-      the counter exported, listed in the telemetry tests and the dashboards
-      check. An applied partial-eat fixture through `execute_eat` checks the
+      the counter exported and listed in the telemetry tests, not in the
+      dashboards check. An applied partial-eat fixture through `execute_eat` checks the
       retained density, the credited energy, the logged amount and the
       partial, applied and failed counters; the pass-loop commit fixture
       (`runtime/pass_loop_tests.rs`) gains `EatLeaveShare`, including a value
       written in an earlier pass and committed in a later one.
-- [ ] Growth fixture: a partially eaten cell grows in place on the next
+- [x] Growth fixture: a partially eaten cell grows in place on the next
       growth pass; a cleared cell with no food neighbor and recovery spawns
       off stays empty.
-- [ ] Frontend types, labels and fixtures; reference docs; re-pins recorded in
+- [x] Frontend types, labels and fixtures; reference docs; re-pins recorded in
       the readings file.
 
 ## Verification
 
 - [ ] `cargo test -p v3-core --test viability` first (tick-loop and founder
-      path change), then `make check` -> exit 0; results in
+      path change; 28 passed), then `make check` -> exit 0 (runs once at
+      closure); results in
       [`docs/progress/readings/t02-f08.md`](../../progress/readings/t02-f08.md).
-- [ ] Focused tests, one or more per Fixed-design row: names and results in
+- [x] Focused tests, one or more per Fixed-design row: names and results in
       the readings' "Focused tests" table.
-- [ ] Mutation gate: `Not applicable: user exemption (2026-10-12)`.
-- [ ] Benchmark summary: `Not applicable: user exemption (2026-10-12)`.
+- [x] Mutation gate: `Not applicable: user exemption (2026-10-12)`.
+- [x] Benchmark summary: `Not applicable: user exemption (2026-10-12)`.
 - [ ] Codex final review output path and findings in the readings file.
 
 ## Performance and Goal Impact

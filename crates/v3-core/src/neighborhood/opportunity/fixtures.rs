@@ -212,7 +212,7 @@ fn eats(queue: &[WorldAction]) -> Vec<OrdinaryFoodTypeId> {
     queue
         .iter()
         .filter_map(|action| match action {
-            WorldAction::Eat { type_idx } => Some(*type_idx),
+            WorldAction::Eat { type_idx, .. } => Some(*type_idx),
             _ => None,
         })
         .collect()

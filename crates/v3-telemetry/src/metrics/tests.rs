@@ -198,6 +198,7 @@ fn populated() -> SimStats {
     for food in types {
         s.eat_actions_applied_total_by_type.insert(food, 1);
         s.eat_actions_failed_total_by_type.insert(food, 1);
+        s.eat_actions_partial_total_by_type.insert(food, 1);
     }
     for cause in [
         MoveBlockedCause::Barrier,
@@ -582,7 +583,7 @@ fn outcome_families(families: &mut Vec<Family>) {
     ] {
         families.push((format!("petri.run.{field}"), MonotonicSum, vec![reader()]));
     }
-    for verb in ["applied", "failed"] {
+    for verb in ["applied", "failed", "partial"] {
         families.push((
             format!("petri.run.eat_actions_{verb}_by_type"),
             MonotonicSum,

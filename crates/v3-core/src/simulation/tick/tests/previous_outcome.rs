@@ -131,7 +131,8 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
             const_idx: 0,
         },
         VmInstruction::WriteActionParam {
-            field_idx: 1,
+            field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction
+                .index() as u8,
             src: 0,
         },
         VmInstruction::AddVote {

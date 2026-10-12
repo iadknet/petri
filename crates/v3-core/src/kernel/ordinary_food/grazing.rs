@@ -5,12 +5,23 @@ use crate::config::{GrazingConfig, OrdinaryFoodTypeId};
 use crate::kernel::Grid;
 use rayon::prelude::*;
 
-/// The modifier after one consuming bite: multiplied by `factor`, never below
-/// `floor`.
+/// The share of a full bite: a consume that clears the cell (T02.F08).
+pub(super) const FULL_BITE: f32 = 1.0;
+
+/// The modifier after one consuming bite that ate `share` (in `(0, 1]`) of the
+/// cell's food (T02.F08): multiplied by `factor^share`, never below `floor`.
+/// A full bite multiplies by `factor` itself, with no `powf`, so it is
+/// bit-identical to the pre-T02.F08 bite; `n` bites of share `1/n` compound to
+/// one full bite.
 #[inline]
 #[must_use]
-pub(super) fn bite_modifier(modifier: f32, factor: f32, floor: f32) -> f32 {
-    (modifier * factor).max(floor)
+pub(super) fn bite_modifier(modifier: f32, factor: f32, floor: f32, share: f32) -> f32 {
+    let strength = if share >= FULL_BITE {
+        factor
+    } else {
+        factor.powf(share)
+    };
+    (modifier * strength).max(floor)
 }
 
 /// The modifier after one tick of rest: raised by `step`, never above 1.0.
@@ -102,13 +113,14 @@ impl GrazingLayer {
         }
     }
 
-    /// Record one consuming bite of `type_idx` at the cell. Disabled grazing
-    /// records nothing.
+    /// Record one consuming bite of `type_idx` at the cell that ate `share`
+    /// (in `(0, 1]`) of its food. Disabled grazing records nothing.
     pub(super) fn bite(
         &mut self,
         x: u16,
         y: u16,
         type_idx: OrdinaryFoodTypeId,
+        share: f32,
         config: &GrazingConfig,
     ) {
         if !config.enabled {
@@ -116,7 +128,7 @@ impl GrazingLayer {
         }
         if let Some(grid) = self.by_type.get_mut(usize::from(type_idx.get())) {
             let cell = grid.get_mut(x, y);
-            *cell = bite_modifier(*cell, config.factor, config.floor);
+            *cell = bite_modifier(*cell, config.factor, config.floor, share);
         }
     }
 
@@ -211,9 +223,40 @@ mod tests {
             (floor, modifier) in floor_and_modifier(),
             factor in 0.0f32..=1.0,
         ) {
-            let bitten = bite_modifier(modifier, factor, floor);
+            let bitten = bite_modifier(modifier, factor, floor, FULL_BITE);
             prop_assert!(bitten >= floor && bitten <= 1.0);
             prop_assert!(bitten <= modifier);
+        }
+
+        /// T02.F08: a partial bite stays in `[floor, modifier]` and never
+        /// grazes harder than the full bite.
+        #[test]
+        fn a_partial_bite_lies_between_the_full_bite_and_no_bite(
+            (floor, modifier) in floor_and_modifier(),
+            factor in 0.0f32..=1.0,
+            share in (0.0f32..=1.0).prop_filter("share in (0, 1]", |s| *s > 0.0),
+        ) {
+            let bitten = bite_modifier(modifier, factor, floor, share);
+            prop_assert!(bitten >= floor && bitten <= modifier, "{bitten}");
+            prop_assert!(bitten >= bite_modifier(modifier, factor, floor, FULL_BITE), "{bitten}");
+        }
+
+        /// T02.F08: two half bites compound to one full bite while the floor
+        /// is not reached. `modifier` and `factor` stay in `[1e-3, 1]` so every
+        /// product is normal and the relative bound holds.
+        #[test]
+        fn two_half_bites_equal_one_full_bite_above_the_floor(
+            (modifier, factor, floor) in (1e-3f32..=1.0, 1e-3f32..=1.0)
+                .prop_flat_map(|(m, f)| (Just(m), Just(f), 0.0f32..m * f)),
+        ) {
+            let full = bite_modifier(modifier, factor, floor, FULL_BITE);
+            let halves = bite_modifier(
+                bite_modifier(modifier, factor, floor, 0.5),
+                factor,
+                floor,
+                0.5,
+            );
+            prop_assert!(((halves - full) / full).abs() <= 1e-5, "{halves} vs {full}");
         }
 
         #[test]
@@ -268,7 +311,7 @@ mod tests {
                 .map(|grid| grid.as_slice().iter().map(|v| v.to_bits()).collect())
                 .collect();
             for _ in 0..bites {
-                layer.bite(x, y, type_id(bitten_type), &config);
+                layer.bite(x, y, type_id(bitten_type), FULL_BITE, &config);
             }
             for (idx, grid) in layer.by_type.iter().enumerate() {
                 if idx == usize::from(bitten_type) {
@@ -286,10 +329,49 @@ mod tests {
         let mut layer = GrazingLayer::new(1, 1, 1);
         let mut readings = Vec::new();
         for _ in 0..5 {
-            layer.bite(0, 0, type_id(0), &config);
+            layer.bite(0, 0, type_id(0), FULL_BITE, &config);
             readings.push(layer.modifier_at(0, 0, type_id(0)));
         }
         assert_eq!(readings, vec![0.5, 0.25, 0.125, 0.0625, 0.05]);
+    }
+
+    /// T02.F08: share 1.0 is the pre-feature `max(floor, m × factor)` bit for
+    /// bit (no `powf`); a mid share bites by `factor^share`.
+    #[test]
+    fn bite_share_one_is_the_full_bite_and_a_mid_share_bites_by_the_power() {
+        for (modifier, factor, floor) in [
+            (1.0f32, 0.5f32, 0.05f32),
+            (0.7, 0.3, 0.0),
+            (0.06, 0.5, 0.05),
+        ] {
+            assert_eq!(
+                bite_modifier(modifier, factor, floor, FULL_BITE).to_bits(),
+                (modifier * factor).max(floor).to_bits()
+            );
+        }
+        let bitten = bite_modifier(1.0, 0.25, 0.0, 0.5);
+        assert!((bitten - 0.5).abs() < 1e-6, "{bitten}");
+        // A stored modifier below a live-edited floor clamps up to the floor.
+        assert_eq!(bite_modifier(0.1, 0.9, 0.2, 0.5), 0.2);
+    }
+
+    #[test]
+    fn a_partial_bite_through_the_layer_scales_by_share_and_disabled_records_nothing() {
+        let config = GrazingConfig {
+            enabled: true,
+            factor: 0.25,
+            floor: 0.0,
+            recovery_ticks: 1000,
+        };
+        let mut layer = GrazingLayer::new(1, 1, 1);
+        layer.bite(0, 0, type_id(0), 0.5, &config);
+        assert!((layer.modifier_at(0, 0, type_id(0)) - 0.5).abs() < 1e-6);
+        let disabled = GrazingConfig {
+            enabled: false,
+            ..config
+        };
+        layer.bite(0, 0, type_id(0), 0.5, &disabled);
+        assert!((layer.modifier_at(0, 0, type_id(0)) - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -299,9 +381,9 @@ mod tests {
             ..GrazingConfig::default()
         };
         let mut layer = GrazingLayer::new(2, 1, 1);
-        layer.bite(1, 0, type_id(0), &config);
+        layer.bite(1, 0, type_id(0), FULL_BITE, &config);
         assert_eq!(layer.modifier_at(1, 0, type_id(0)), 1.0);
-        layer.bite(1, 0, type_id(0), &GrazingConfig::default());
+        layer.bite(1, 0, type_id(0), FULL_BITE, &GrazingConfig::default());
         assert_eq!(layer.modifier_at(1, 0, type_id(0)), 0.5);
         assert_eq!(layer.multiplier_at(1, 0, type_id(0), false), 1.0);
         assert_eq!(layer.multiplier_at(1, 0, type_id(0), true), 0.5);
@@ -316,8 +398,8 @@ mod tests {
         let mut barriers = Grid::new(2, 2, false);
         barriers.set(1, 1, true);
         let mut layer = GrazingLayer::new(2, 2, 2);
-        layer.bite(0, 0, type_id(0), &config);
-        layer.bite(0, 0, type_id(0), &config);
+        layer.bite(0, 0, type_id(0), FULL_BITE, &config);
+        layer.bite(0, 0, type_id(0), FULL_BITE, &config);
         layer.by_type[1].set(1, 1, 0.1);
 
         let (summary, passable) = layer.recover(&barriers, &config);
@@ -334,10 +416,10 @@ mod tests {
     fn reset_and_resize_start_from_one() {
         let config = GrazingConfig::default();
         let mut layer = GrazingLayer::new(2, 1, 1);
-        layer.bite(0, 0, type_id(0), &config);
+        layer.bite(0, 0, type_id(0), FULL_BITE, &config);
         layer.reset();
         assert_eq!(layer.modifier_at(0, 0, type_id(0)), 1.0);
-        layer.bite(0, 0, type_id(0), &config);
+        layer.bite(0, 0, type_id(0), FULL_BITE, &config);
         layer.resize_type_storage(3);
         assert_eq!(layer.by_type.len(), 3);
         assert_eq!(layer.modifier_at(0, 0, type_id(0)), 1.0);

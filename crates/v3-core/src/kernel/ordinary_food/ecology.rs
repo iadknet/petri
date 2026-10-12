@@ -1302,7 +1302,7 @@ mod tests {
         state.set_food_type_density(source, type_idx, 1.0);
         for _ in 0..bites_on_target {
             state.set_food_type_density(target, type_idx, 1.0);
-            let _ = state.consume_type(target, type_idx, &config.shared.grazing);
+            let _ = state.consume_type(target, type_idx, 0.0, &config.shared.grazing);
         }
         let mut occupancy_depletion = OccupancyDepletionLayer::new(2, 1);
         let barriers = barrier_grid(2, 1);
@@ -1322,6 +1322,64 @@ mod tests {
             key,
         );
         (state.food_at_type(target, type_idx), summary)
+    }
+
+    /// One isolated 1x1 cell of food type 0 at density 1.0, eaten once with
+    /// `leave`, then one growth pass with recovery spawns off; returns the
+    /// density after the eat and after the pass.
+    fn eat_then_grow_isolated_cell(leave: f32) -> (f32, f32) {
+        let mut config = FoodConfig::default();
+        config.fertility.enabled = false;
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 1.0;
+        config.shared.spread_threshold_ratio = 0.0;
+        config.shared.recovery_spawn_rate = 0.0;
+        config.shared.recovery_floor_ratio = 0.0;
+        config.shared.max_density = 10.0;
+        config.shared.occupancy_depletion.enabled = false;
+        config.types = vec![crate::config::FoodTypeConfig {
+            growth_inhibitor: 0.0,
+            ..crate::config::FoodTypeConfig::default()
+        }];
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
+        let pos = Position::new(0, 0);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        state.set_food_type_density(pos, type_idx, 1.0);
+        let _ = state.consume_type(pos, type_idx, leave, &config.shared.grazing);
+        let after_eat = state.food_at_type(pos, type_idx);
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
+        let _ = grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut occupancy_depletion,
+            &mut GrowthScratch::default(),
+            &barrier_grid(1, 1),
+            &occupancy_grid::<()>(1, 1),
+            WorldEdgeMode::Bounded,
+            0,
+            FoodStreamKey::from_run_seed(3),
+        );
+        (after_eat, state.food_at_type(pos, type_idx))
+    }
+
+    /// T02.F08: food left by a partial eat is a positive source, so the cell
+    /// grows in place on the next pass; a cleared cell with no food neighbor
+    /// and recovery spawns off stays empty.
+    #[test]
+    fn a_partially_eaten_cell_grows_in_place_and_a_cleared_cell_stays_empty() {
+        let (left, grown) = eat_then_grow_isolated_cell(0.5);
+        assert_eq!(left, 0.5);
+        assert!(
+            grown > left,
+            "partial cell grows in place: {left} -> {grown}"
+        );
+
+        let (cleared, after) = eat_then_grow_isolated_cell(0.0);
+        assert_eq!(cleared, 0.0);
+        assert_eq!(after, 0.0);
     }
 
     #[test]
@@ -1377,7 +1435,7 @@ mod tests {
         let type_idx = OrdinaryFoodTypeId::new(0);
         state.set_food_type_density(pos, type_idx, 1.0);
         assert_eq!(
-            state.consume_type(pos, type_idx, &config.shared.grazing),
+            state.consume_type(pos, type_idx, 0.0, &config.shared.grazing),
             1.0
         );
         assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
@@ -1433,7 +1491,7 @@ mod tests {
         let pos = Position::new(0, 0);
         let type_idx = OrdinaryFoodTypeId::new(0);
         state.set_food_type_density(pos, type_idx, 1.0);
-        let _ = state.consume_type(pos, type_idx, &current.shared.grazing);
+        let _ = state.consume_type(pos, type_idx, 0.0, &current.shared.grazing);
         assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
 
@@ -1457,7 +1515,7 @@ mod tests {
             &mut occupancy_depletion,
             false,
         );
-        let _ = state.consume_type(pos, type_idx, &current.shared.grazing);
+        let _ = state.consume_type(pos, type_idx, 0.0, &current.shared.grazing);
         assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
 
         // Live edits to factor, floor, and recovery_ticks leave the grid alone.
@@ -1497,7 +1555,7 @@ mod tests {
         let pos = Position::new(0, 0);
         let type_idx = OrdinaryFoodTypeId::new(0);
         state.set_food_type_density(pos, type_idx, 1.0);
-        let _ = state.consume_type(pos, type_idx, &config.shared.grazing);
+        let _ = state.consume_type(pos, type_idx, 0.0, &config.shared.grazing);
         state.set_food_type_density(pos, type_idx, 1.0);
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
         let barriers = barrier_grid(1, 1);
@@ -1942,6 +2000,7 @@ mod tests {
                     pos.x,
                     pos.y,
                     OrdinaryFoodTypeId::new(type_raw),
+                    super::super::grazing::FULL_BITE,
                     &fixture.config.shared.grazing,
                 );
             }

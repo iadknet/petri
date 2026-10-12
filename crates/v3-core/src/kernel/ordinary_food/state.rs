@@ -2,7 +2,7 @@ use crate::config::{GrazingConfig, OrdinaryFoodTypeId};
 use crate::contracts::Position;
 use crate::kernel::Grid;
 
-use super::grazing::GrazingLayer;
+use super::grazing::{GrazingLayer, FULL_BITE};
 
 #[derive(Debug)]
 pub struct OrdinaryFoodState {
@@ -141,30 +141,46 @@ impl OrdinaryFoodState {
             let Ok(type_raw) = u16::try_from(type_index) else {
                 continue;
             };
-            self.grazing
-                .bite(pos.x, pos.y, OrdinaryFoodTypeId::new(type_raw), grazing);
+            self.grazing.bite(
+                pos.x,
+                pos.y,
+                OrdinaryFoodTypeId::new(type_raw),
+                FULL_BITE,
+                grazing,
+            );
         }
         amount
     }
 
-    /// Remove one type's density at the cell. A positive removal is one bite;
-    /// an empty cell is not.
+    /// Eat one type's density at the cell, leaving the share `leave` (in
+    /// `[0, 1]`) in place (T02.F08), and return the amount eaten,
+    /// `amount × (1 − leave)`. A positive eat is one bite of share
+    /// `1 − leave`; an empty cell, `leave` 1.0, or an eat that rounds to zero
+    /// changes nothing and returns 0.0. `leave` 0.0 clears the cell with a
+    /// full bite.
     #[must_use]
     pub fn consume_type(
         &mut self,
         pos: Position,
         type_idx: OrdinaryFoodTypeId,
+        leave: f32,
         grazing: &GrazingConfig,
     ) -> f32 {
         let Some(grid) = self.density_by_type.get_mut(usize::from(type_idx.get())) else {
             return 0.0;
         };
         let amount = *grid.get(pos.x, pos.y);
-        if amount > 0.0 {
-            grid.set(pos.x, pos.y, 0.0);
-            self.grazing.bite(pos.x, pos.y, type_idx, grazing);
+        if amount <= 0.0 {
+            return 0.0;
         }
-        amount
+        let share = 1.0 - leave;
+        let eaten = amount * share;
+        if eaten <= 0.0 {
+            return 0.0;
+        }
+        grid.set(pos.x, pos.y, amount - eaten);
+        self.grazing.bite(pos.x, pos.y, type_idx, share, grazing);
+        eaten
     }
 
     #[must_use]
@@ -216,7 +232,9 @@ impl OrdinaryFoodState {
 
 #[cfg(test)]
 mod tests {
+    use super::super::grazing::bite_modifier;
     use super::*;
+    use proptest::strategy::{Just, Strategy};
 
     fn pos(x: u16, y: u16) -> Position {
         Position::new(x, y)
@@ -277,6 +295,7 @@ mod tests {
             state.consume_type(
                 pos(1, 1),
                 OrdinaryFoodTypeId::new(0),
+                0.0,
                 &GrazingConfig::default()
             ),
             1.5
@@ -299,7 +318,7 @@ mod tests {
         state.set_food_type_density(pos(1, 1), OrdinaryFoodTypeId::new(0), 1.5);
 
         assert_eq!(
-            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), &grazing),
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), 0.0, &grazing),
             1.5
         );
         assert_eq!(
@@ -323,7 +342,7 @@ mod tests {
 
         // The cell is empty now: no bite.
         assert_eq!(
-            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), &grazing),
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), 0.0, &grazing),
             0.0
         );
         assert_eq!(
@@ -333,7 +352,7 @@ mod tests {
             0.5
         );
         assert_eq!(
-            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(1), &grazing),
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(1), 0.0, &grazing),
             0.0
         );
         assert_eq!(
@@ -377,7 +396,7 @@ mod tests {
         let grazing = GrazingConfig::default();
         let mut state = OrdinaryFoodState::new(2, 2, 1);
         state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(0), 1.0);
-        let _ = state.consume_type(pos(0, 0), OrdinaryFoodTypeId::new(0), &grazing);
+        let _ = state.consume_type(pos(0, 0), OrdinaryFoodTypeId::new(0), 0.0, &grazing);
         state.resize_type_storage(2);
         assert_eq!(
             state
@@ -439,5 +458,157 @@ mod tests {
             state.food_at_type(pos(1, 0), OrdinaryFoodTypeId::new(1)),
             0.5
         );
+    }
+
+    fn live_grazing(factor: f32, floor: f32) -> GrazingConfig {
+        GrazingConfig {
+            enabled: true,
+            factor,
+            floor,
+            recovery_ticks: 1000,
+        }
+    }
+
+    /// One cell of type 0 holding `amount`, its modifier pre-set to
+    /// `modifier` by a bite of factor `modifier` from 1.0.
+    fn cell_with(amount: f32, modifier: f32) -> OrdinaryFoodState {
+        let mut state = OrdinaryFoodState::new(1, 1, 1);
+        state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(0), amount);
+        state.grazing_mut().bite(
+            0,
+            0,
+            OrdinaryFoodTypeId::new(0),
+            FULL_BITE,
+            &live_grazing(modifier, 0.0),
+        );
+        state
+    }
+
+    fn food(state: &OrdinaryFoodState) -> f32 {
+        state.food_at_type(pos(0, 0), OrdinaryFoodTypeId::new(0))
+    }
+
+    fn modifier(state: &OrdinaryFoodState) -> f32 {
+        state
+            .grazing()
+            .modifier_at(0, 0, OrdinaryFoodTypeId::new(0))
+    }
+
+    fn eat(state: &mut OrdinaryFoodState, leave: f32, grazing: &GrazingConfig) -> f32 {
+        state.consume_type(pos(0, 0), OrdinaryFoodTypeId::new(0), leave, grazing)
+    }
+
+    /// T02.F08: `leave` 0.0 is the pre-feature consume bit for bit: the whole
+    /// amount eaten, the cell cleared, one full bite.
+    #[test]
+    fn consume_type_leave_zero_is_the_full_bite() {
+        let grazing = live_grazing(0.5, 0.05);
+        let mut state = cell_with(1.3, 0.7);
+        assert_eq!(eat(&mut state, 0.0, &grazing).to_bits(), 1.3f32.to_bits());
+        assert_eq!(food(&state).to_bits(), 0.0f32.to_bits());
+        assert_eq!(
+            modifier(&state).to_bits(),
+            (0.7f32 * 0.5).max(0.05).to_bits()
+        );
+    }
+
+    /// T02.F08: `leave` 1.0 eats nothing: cell and modifier untouched.
+    #[test]
+    fn consume_type_leave_one_is_a_failed_eat() {
+        let mut state = cell_with(1.3, 0.7);
+        assert_eq!(eat(&mut state, 1.0, &live_grazing(0.5, 0.05)), 0.0);
+        assert_eq!(food(&state), 1.3);
+        assert_eq!(modifier(&state), 0.7);
+    }
+
+    /// T02.F08: a mid `leave` eats `amount × (1 − leave)`, keeps the rest
+    /// and bites by `factor^(1 − leave)`.
+    #[test]
+    fn consume_type_mid_leave_splits_the_cell_and_bites_by_the_share() {
+        let mut state = cell_with(2.0, 1.0);
+        let eaten = eat(&mut state, 0.75, &live_grazing(0.25, 0.0));
+        assert_eq!(eaten, 0.5);
+        assert_eq!(food(&state), 1.5);
+        assert!((modifier(&state) - 0.25f32.powf(0.25)).abs() < 1e-6);
+    }
+
+    /// T02.F08: a positive subnormal density whose eaten share rounds to zero
+    /// is a failed eat with the cell untouched.
+    #[test]
+    fn consume_type_eat_rounding_to_zero_is_a_failed_eat() {
+        let tiny = f32::from_bits(1);
+        let mut state = cell_with(tiny, 1.0);
+        assert_eq!(eat(&mut state, 0.75, &live_grazing(0.5, 0.0)), 0.0);
+        assert_eq!(food(&state).to_bits(), tiny.to_bits());
+        assert_eq!(modifier(&state), 1.0);
+    }
+
+    /// T02.F08: a positive `leave` whose complement rounds to 1.0 is a full
+    /// bite.
+    #[test]
+    fn consume_type_tiny_leave_is_a_full_bite() {
+        let leave = f32::EPSILON / 4.0;
+        assert_eq!(1.0 - leave, 1.0);
+        let mut state = cell_with(1.3, 0.7);
+        assert_eq!(eat(&mut state, leave, &live_grazing(0.5, 0.05)), 1.3);
+        assert_eq!(food(&state), 0.0);
+        assert_eq!(modifier(&state).to_bits(), (0.7f32 * 0.5).to_bits());
+    }
+
+    /// T02.F08: with grazing disabled the split still applies, with no bite.
+    #[test]
+    fn consume_type_disabled_grazing_splits_without_a_bite() {
+        let disabled = GrazingConfig {
+            enabled: false,
+            ..live_grazing(0.5, 0.05)
+        };
+        let mut state = cell_with(2.0, 0.7);
+        assert_eq!(eat(&mut state, 0.5, &disabled), 1.0);
+        assert_eq!(food(&state), 1.0);
+        assert_eq!(modifier(&state), 0.7);
+    }
+
+    /// T02.F08: a stored modifier below a live-edited floor clamps up to it.
+    #[test]
+    fn consume_type_partial_bite_below_the_floor_clamps_to_the_floor() {
+        let mut state = cell_with(2.0, 0.1);
+        let _ = eat(&mut state, 0.5, &live_grazing(0.9, 0.2));
+        assert_eq!(modifier(&state), 0.2);
+    }
+
+    proptest::proptest! {
+        /// T02.F08 consume split: the eaten and left parts are non-negative,
+        /// sum to the amount within an ulp-scale bound, and the modifier is the
+        /// bite of share `1 − leave` (none when nothing is eaten), within
+        /// `[floor, m]` and never below the full bite's.
+        #[test]
+        fn consume_type_splits_the_cell_and_bites_by_the_eaten_share(
+            amount in proptest::num::f32::POSITIVE | proptest::num::f32::NORMAL | proptest::num::f32::SUBNORMAL,
+            leave in 0.0f32..=1.0,
+            factor in 0.0f32..=1.0,
+            (floor, m) in (0.0f32..=1.0).prop_flat_map(|floor| (Just(floor), floor..=1.0f32)),
+        ) {
+            let grazing = live_grazing(factor, floor);
+            let mut state = cell_with(amount, m);
+            let eaten = eat(&mut state, leave, &grazing);
+            let left = food(&state);
+            proptest::prop_assert!((0.0..=amount).contains(&eaten));
+            proptest::prop_assert!(left >= 0.0);
+            proptest::prop_assert!(((eaten + left) - amount).abs() <= f32::EPSILON * amount);
+            let bitten = modifier(&state);
+            if eaten > 0.0 {
+                proptest::prop_assert_eq!(
+                    bitten.to_bits(),
+                    bite_modifier(m, factor, floor, 1.0 - leave).to_bits()
+                );
+            } else {
+                proptest::prop_assert_eq!(left.to_bits(), amount.to_bits());
+                proptest::prop_assert_eq!(bitten.to_bits(), m.to_bits());
+            }
+            proptest::prop_assert!(bitten >= floor && bitten <= m);
+            proptest::prop_assert!(
+                bitten >= bite_modifier(m, factor, floor, FULL_BITE)
+            );
+        }
     }
 }
