@@ -1,15 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
 import { NodeConnections } from "./NodeConnections.tsx";
 
-vi.mock("./inputRefUtils.ts", () => ({
-	formatInputRef: (ref: unknown) => JSON.stringify(ref),
-}));
-
 describe("NodeConnections", () => {
-	it("renders input refs as comma-separated list", () => {
-		const inputRefs: InputReference[] = [{ World: "FoodHere" }, { UpstreamSlot: 0 }];
+	it("lists input refs by label, each explained in a tooltip", () => {
+		const inputRefs: InputReference[] = [{ World: "AreaBarrierSummary" }, { UpstreamSlot: 0 }];
 
 		render(
 			<NodeConnections
@@ -18,8 +14,10 @@ describe("NodeConnections", () => {
 			/>,
 		);
 
-		const text = `${JSON.stringify({ World: "FoodHere" })}, ${JSON.stringify({ UpstreamSlot: 0 })}`;
-		expect(screen.getByText(text)).toBeInTheDocument();
+		const bus = screen.getByText(/Bus\[0\]/);
+		expect(bus.parentElement?.textContent).toBe("AreaBarrier, Bus[0]");
+		expect(screen.getByText("AreaBarrier").getAttribute("title")).toMatch(/barriers/);
+		expect(bus.getAttribute("title")).toMatch(/previous mesh node/);
 	});
 
 	it("renders target node IDs", () => {

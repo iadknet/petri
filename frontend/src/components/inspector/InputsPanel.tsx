@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { InputReference } from "../../types/genome.ts";
-import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
+import { describeWholeInputRef, formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 interface InputsPanelProps {
 	inputRefs: InputReference[];
@@ -19,7 +19,12 @@ export const InputsPanel = memo(function InputsPanel({
 			<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
 				{inputRefs.map((ref, i) => (
 					<div key={`${formatInputRef(ref)}-${i}`} className="flex justify-between">
-						<span style={{ color: inputRefColor(ref) }}>{formatInputRef(ref)}</span>
+						<span
+							style={{ color: inputRefColor(ref) }}
+							title={describeWholeInputRef(ref).description || undefined}
+						>
+							{formatInputRef(ref)}
+						</span>
 						<span className="text-slate-400">{(upstreamSlots[i] ?? 0).toFixed(2)}</span>
 					</div>
 				))}

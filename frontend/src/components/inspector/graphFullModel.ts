@@ -6,14 +6,19 @@ import type {
 } from "../../types/genome.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
-import { formatOutputSinkKind, getKindLabel, outputSinkSubtitle } from "./graphNodeFormatters.ts";
-import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
+import {
+	describeComputeKind,
+	describeGraphSource,
+	describeOutputSink,
+} from "./graphNodeFormatters.ts";
 
 export interface GraphModelNode {
 	id: string;
 	nodeType: "input" | "compute" | "output_sink";
 	category: NodeCategory;
 	label: string;
+	/** Plain-words tooltip: what the node reads, computes or does. */
+	description: string;
 	subtitle?: string;
 	arrayIndex: number;
 	baseWidth: number;
@@ -46,23 +51,8 @@ function inputNodeId(source: GraphSource): string | null {
 	return null;
 }
 
-function inputLabel(source: GraphSource, inputRefs: InputReference[]): string {
-	if ("InputLeaf" in source) {
-		const { ref_idx, sub_idx } = source.InputLeaf;
-		if (ref_idx === 0xffff) return sub_idx > 0 ? `Dead[${sub_idx}]` : "Dead";
-		const ref = inputRefs[ref_idx];
-		if (!ref) return `In(${ref_idx})`;
-		return formatInputRefWithSubIndex(ref, sub_idx);
-	}
-	if ("SharedMemory" in source) {
-		const { slot, previous } = source.SharedMemory;
-		return previous ? `Prev s[${slot}]` : `Read s[${slot}]`;
-	}
-	return "?";
-}
-
 function computeBaseWidth(label: string): number {
-	return Math.max(72, Math.min(label.length * 7 + 24, 140));
+	return Math.max(72, Math.min(label.length * 7 + 24, 200));
 }
 
 function collectEdgesFromSources(
@@ -132,12 +122,13 @@ export function buildFullGraphModel(
 		const inId = inputNodeId(edge.source);
 		if (inId && !inputNodeIds.has(inId)) {
 			inputNodeIds.add(inId);
-			const label = inputLabel(edge.source, inputRefs);
+			const { label, description } = describeGraphSource(edge.source, inputRefs);
 			nodes.push({
 				id: inId,
 				nodeType: "input",
 				category: "input",
 				label,
+				description,
 				arrayIndex: -1,
 				baseWidth: computeBaseWidth(label),
 				height: 24,
@@ -149,13 +140,14 @@ export function buildFullGraphModel(
 	for (let i = 0; i < graphDef.compute_nodes.length; i++) {
 		const cn = graphDef.compute_nodes[i];
 		if (!cn) continue;
-		const label = getKindLabel(cn.kind, inputRefs);
+		const { label, description } = describeComputeKind(cn.kind);
 		const category = categorizeComputeNode(cn.kind);
 		nodes.push({
 			id: `cn:${i}`,
 			nodeType: "compute",
 			category,
 			label,
+			description,
 			arrayIndex: i,
 			baseWidth: computeBaseWidth(label),
 			height: 24,
@@ -166,14 +158,14 @@ export function buildFullGraphModel(
 	for (let i = 0; i < graphDef.output_sinks.length; i++) {
 		const sink = graphDef.output_sinks[i];
 		if (!sink || sink.inputs.length === 0) continue;
-		const label = formatOutputSinkKind(sink.kind);
-		const subtitle = outputSinkSubtitle(sink.kind);
+		const { label, subtitle, description } = describeOutputSink(sink.kind);
 		nodes.push({
 			id: `sink:${i}`,
 			nodeType: "output_sink",
 			category:
 				"ActionVote" in sink.kind || "ActionParam" in sink.kind ? "output_action" : "output_value",
 			label,
+			description,
 			subtitle,
 			arrayIndex: i,
 			baseWidth: computeBaseWidth(label),

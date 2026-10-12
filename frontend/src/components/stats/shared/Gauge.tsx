@@ -3,10 +3,18 @@ export function Gauge({
 	value,
 	delta,
 	format,
-}: { label: string; value: number; delta?: number; format?: (v: number) => string }) {
+	hint,
+}: {
+	label: string;
+	value: number;
+	delta?: number;
+	format?: (v: number) => string;
+	/** Tooltip: what the number counts and over what span. */
+	hint?: string;
+}) {
 	const fmt = format ?? ((v: number) => v.toLocaleString());
 	return (
-		<div className="flex flex-col">
+		<div className={`flex flex-col ${hint ? "cursor-help" : ""}`} title={hint}>
 			<span className="text-[11px] font-sans text-slate-400">{label}</span>
 			<div className="flex items-baseline gap-1.5">
 				<span className="text-xl font-mono text-slate-100 tabular-nums">{fmt(value)}</span>

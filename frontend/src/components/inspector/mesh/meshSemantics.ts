@@ -448,11 +448,11 @@ function formatRoleLabel(role: MeshSemanticRole, backendKind: MeshBackendKind): 
 		case "action_writer":
 			return "Action Writer";
 		case "memory_writer":
-			return "Slot Writer";
+			return "Memory Writer";
 		case "memory_reader":
-			return "Slot Reader";
+			return "Memory Reader";
 		case "payload_emitter":
-			return "Payload Emitter";
+			return "Bus Writer";
 		case "stateful_mixer":
 			return "Stateful Mixer";
 		case "sensor_reader":
@@ -475,7 +475,7 @@ function formatSourceClass(sourceClass: MeshReadClass): string {
 		case "introspection":
 			return "Introspection";
 		case "upstream":
-			return "Upstream";
+			return "Bus";
 		case "action_queue":
 			return "Action Queue";
 		case "decision":
@@ -486,15 +486,15 @@ function formatSourceClass(sourceClass: MeshReadClass): string {
 function describeRoleReason(role: MeshSemanticRole): string {
 	switch (role) {
 		case "route_selector":
-			return "Writes route targets for downstream routing.";
+			return "Scores route slots to choose which mesh node runs next.";
 		case "action_writer":
-			return "Writes world actions or action metadata.";
+			return "Votes on actions or sets action parameters.";
 		case "memory_writer":
 			return "Writes shared-memory slots.";
 		case "memory_reader":
 			return "Reads shared-memory slots without owning a stronger write role.";
 		case "payload_emitter":
-			return "Emits payload/custom output signals.";
+			return "Writes bus slots that the next mesh node reads.";
 		case "stateful_mixer":
 			return "Uses stateful graph internals to carry signal over time.";
 		case "sensor_reader":

@@ -1,5 +1,10 @@
 import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
+import { VOTE_KINDS } from "../../types/trace.ts";
+import { directionName, directionWord } from "./directions.ts";
+import { formatVoteSink, voteSinkFromIndex } from "./voteSinks.ts";
+
+export { directionName } from "./directions.ts";
 
 export function formatAction(action: WorldAction | null | undefined): string {
 	if (!action) return "?";
@@ -41,12 +46,153 @@ const SENSOR_LABELS: Record<string, string> = {
 	NearbyCreatureIdentity: "NearbyIdent",
 };
 
-const DIRECTION_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+/** What each whole world sensor reads, for tooltips. The view is the
+ * (2r+1)² square around the creature (r = vision radius, default 5);
+ * barriers block line of sight. */
+const SENSOR_DESCRIPTIONS: Record<string, string> = {
+	FoodHere: "Food on the creature's own cell (0 to 1).",
+	NeighborFoodRing: "Food on each of the 8 neighboring cells (0 to 1).",
+	NeighborBarrierRing: "Whether each of the 8 neighboring cells is a barrier (1) or open (0).",
+	NeighborOccupiedRing: "Whether another creature stands on each of the 8 neighboring cells.",
+	AreaFoodSummary: "Summary of the food the creature can see.",
+	AreaBarrierSummary: "Summary of the barriers the creature can see.",
+	AreaOccupancySummary: "Summary of the other creatures the creature can see.",
+	NearbyCreatureCore: "Position of the 4 nearest visible creatures.",
+	NearbyCreatureVitals: "Energy and breeding readiness of the 4 nearest visible creatures.",
+	NearbyCreatureIdentity: "Relatedness of the 4 nearest visible creatures.",
+};
 
-/** Map a ring sensor sub_idx to a direction name (N=0, NE=1, ..., NW=7). */
-export function directionName(subIdx: number): string {
-	return DIRECTION_NAMES[subIdx % 8] ?? `?${subIdx}`;
+interface SubField {
+	name: string;
+	description: string;
 }
+
+const NONE_VISIBLE = " 0 when none visible.";
+
+/** Offset-to-nearest tooltip; offsets are fractions of the vision radius. */
+function nearestOffset(axis: "x" | "y", thing: string, none: string): string {
+	const sign = axis === "x" ? "+ east, − west" : "+ south, − north";
+	return `${axis.toUpperCase()} offset to the nearest ${thing}, as a fraction of vision radius (${sign}).${none}`;
+}
+
+/** Area summary sub-fields, in the index order of `perception.rs`. */
+const AREA_FIELDS: Record<string, readonly SubField[]> = {
+	AreaFoodSummary: [
+		{ name: "amount", description: "Total food in view, as a fraction of the view's capacity." },
+		{ name: "gradX", description: "Which side holds more food: + east, − west." },
+		{ name: "gradY", description: "Which side holds more food: + south, − north." },
+		{ name: "nearestDx", description: nearestOffset("x", "food", "") },
+		{ name: "nearestDy", description: nearestOffset("y", "food", "") },
+		{
+			name: "nearestDist",
+			description:
+				"Distance to the nearest food (0 = on this cell, 1 = edge of view). Also 0 when no food is visible.",
+		},
+		{ name: "max", description: "Richest single cell in view (0 to 1)." },
+	],
+	AreaBarrierSummary: [
+		{ name: "density", description: "Share of the view that is barrier (0 to 1)." },
+		{ name: "adjacent", description: "Share of the 8 neighboring cells that are barrier." },
+		{ name: "gradX", description: "Which side holds more barrier: + east, − west." },
+		{ name: "gradY", description: "Which side holds more barrier: + south, − north." },
+		{ name: "nearestDx", description: nearestOffset("x", "barrier", NONE_VISIBLE) },
+		{ name: "nearestDy", description: nearestOffset("y", "barrier", NONE_VISIBLE) },
+		{
+			name: "nearestDist",
+			description: "Distance to the nearest barrier (1 = edge of view). 0 when none visible.",
+		},
+	],
+	AreaOccupancySummary: [
+		{ name: "count", description: "Other creatures in view, as a share of the view's cells." },
+		{ name: "centerX", description: "Average x of the creatures in view: + east, − west." },
+		{ name: "centerY", description: "Average y of the creatures in view: + south, − north." },
+		{ name: "nearestDx", description: nearestOffset("x", "creature", NONE_VISIBLE) },
+		{ name: "nearestDy", description: nearestOffset("y", "creature", NONE_VISIBLE) },
+		{
+			name: "nearestDist",
+			description: "Distance to the nearest creature (1 = edge of view). 0 when none visible.",
+		},
+		{ name: "crowding", description: "How crowded the view is, closer creatures counting more." },
+	],
+};
+
+/** Per-creature fields of the nearby banks: 4 slots, nearest first. */
+const NEARBY_FIELDS: Record<string, readonly SubField[]> = {
+	NearbyCreatureCore: [
+		{ name: "present", description: "1 when this slot holds a creature, 0 when empty." },
+		{ name: "dx", description: "x offset, as a fraction of vision radius (+ = east)." },
+		{ name: "dy", description: "y offset, as a fraction of vision radius (+ = south)." },
+		{ name: "dist", description: "Distance (1 = edge of view)." },
+	],
+	NearbyCreatureVitals: [
+		{ name: "energy", description: "Energy as a fraction of max energy." },
+		{ name: "ready", description: "1 when it has the energy and age to reproduce." },
+	],
+	NearbyCreatureIdentity: [
+		{ name: "kin", description: "Kin-tag similarity (1 = identical tags)." },
+		{ name: "lineage", description: "1 when it shares this creature's lineage." },
+		{ name: "similar", description: "Body (phenotype) similarity (1 = identical)." },
+	],
+};
+
+/** Number of ranked slots in each nearby bank. */
+const NEARBY_SLOTS = 4;
+
+const OUTCOME_FIELDS: readonly SubField[] = [
+	{
+		name: "energy",
+		description: "Energy change over the last tick, as a fraction of max energy (−1 to 1).",
+	},
+	{
+		name: "success",
+		description: "Share of last tick's attempted actions that succeeded (0 if none attempted).",
+	},
+	{
+		name: "damage",
+		description:
+			"Energy stolen from this creature last tick, as a negative fraction of max energy.",
+	},
+	{ name: "offspring", description: "Offspring born last tick (a raw count)." },
+];
+
+const QUEUE_FIELDS: readonly SubField[] = [
+	{ name: "type", description: "Action code: 0 none, 1 Eat, 2 Move, 3 Reproduce, 4 StealEnergy." },
+	{ name: "param0", description: "Direction index (N=0 … NW=7); for Eat, the food type." },
+	{ name: "param1", description: "Reproduce: energy share given; StealEnergy: amount requested." },
+];
+
+const SCALAR_LABELS: Record<string, { label: string; description: string }> = {
+	AgeTicks: { label: "Age", description: "Age as a fraction of the reference age (caps at 1)." },
+	EnergyCurrent: { label: "Energy", description: "Current energy as a fraction of max energy." },
+	EnergyConsumedThisTick: {
+		label: "EnergySpent",
+		description: "Energy spent so far this tick, as a fraction of max energy.",
+	},
+	HopsThisTick: {
+		label: "Hops",
+		description: "Mesh nodes run so far this tick, this one included (a raw count).",
+	},
+};
+
+const STRING_REFS: Record<string, { label: string; description: string }> = {
+	ActionQueue: {
+		label: "Queue",
+		description: "Actions already committed this tick (empty in the first pass).",
+	},
+	ActionVotes: { label: "Votes", description: "This pass's running vote for each action." },
+	PreviousPassVotes: {
+		label: "PrevVotes",
+		description: "The votes at the end of the previous pass (0 in the first pass).",
+	},
+	CommitCounts: {
+		label: "Commits",
+		description: "How many times each action kind has been committed this tick.",
+	},
+	PreviousOutcome: { label: "PrevOutcome", description: "How the last tick went." },
+};
+
+const ORDINALS = ["nearest", "2nd-nearest", "3rd-nearest", "4th-nearest"] as const;
+const QUEUE_ORDINALS = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"] as const;
 
 /** True if the given World key is a ring sensor (compound with 8 directional sub-values). */
 export function isRingSensor(worldKey: string): boolean {
@@ -86,32 +232,145 @@ export function parseWorldInputRef(world: WorldInputReference): ParsedWorldInput
 	};
 }
 
-export function formatInputRef(ref: InputReference): string {
-	if (typeof ref === "string") return ref;
+/** A readable name for an input and a plain-words explanation for its tooltip. */
+export interface InputDescription {
+	label: string;
+	description: string;
+}
+
+/** Describe a whole input reference (no sub-value selected). */
+export function describeWholeInputRef(ref: InputReference): InputDescription {
+	if (typeof ref === "string") {
+		return STRING_REFS[ref] ?? { label: ref, description: "" };
+	}
 	if ("World" in ref) {
 		const parsed = parseWorldInputRef(ref.World);
 		const base = SENSOR_LABELS[parsed.key] ?? parsed.key;
+		const description = SENSOR_DESCRIPTIONS[parsed.key] ?? "";
 		if (parsed.typeIdx !== null) {
-			return `${base}[${parsed.typeIdx}]`;
+			return {
+				label: `${base}[t${parsed.typeIdx}]`,
+				description: `${description} Food type ${parsed.typeIdx} only.`,
+			};
 		}
-		return base;
+		return { label: base, description };
 	}
-	if ("StaticIntrospection" in ref) return String(ref.StaticIntrospection);
-	if ("DynamicIntrospection" in ref) return String(ref.DynamicIntrospection);
-	if ("UpstreamSlot" in ref) return `slot[${ref.UpstreamSlot}]`;
-	return "?";
+	if ("StaticIntrospection" in ref) {
+		const key = String(ref.StaticIntrospection);
+		return SCALAR_LABELS[key] ?? { label: key, description: "" };
+	}
+	if ("DynamicIntrospection" in ref) {
+		const key = String(ref.DynamicIntrospection);
+		return SCALAR_LABELS[key] ?? { label: key, description: "" };
+	}
+	if ("UpstreamSlot" in ref) {
+		return {
+			label: `Bus[${ref.UpstreamSlot}]`,
+			description: `Bus slot ${ref.UpstreamSlot}: the value the previous mesh node wrote there (0 at tick start).`,
+		};
+	}
+	return { label: "?", description: "" };
+}
+
+export function formatInputRef(ref: InputReference): string {
+	return describeWholeInputRef(ref).label;
+}
+
+/** Name one sub-value of an input: a direction, rank or field, never a bare
+ * index. Scalars stay bare; an index past the compound's width shows raw. */
+export function describeInputRef(ref: InputReference, subIdx: number): InputDescription {
+	const whole = describeWholeInputRef(ref);
+	const raw = (): InputDescription => ({
+		label: subIdx > 0 ? `${whole.label}[${subIdx}]` : whole.label,
+		description: whole.description,
+	});
+
+	if (typeof ref === "string") {
+		switch (ref) {
+			case "ActionVotes":
+			case "PreviousPassVotes": {
+				const sink = voteSinkFromIndex(subIdx);
+				if (sink === null) return raw();
+				const name = formatVoteSink(sink);
+				const description =
+					ref === "ActionVotes"
+						? `This pass's running vote for ${name}.`
+						: `The vote for ${name} at the end of the previous pass (0 in the first pass).`;
+				return { label: `${whole.label}.${name}`, description };
+			}
+			case "CommitCounts": {
+				const kind = VOTE_KINDS[subIdx];
+				if (kind === undefined) return raw();
+				return {
+					label: `${whole.label}.${kind}`,
+					description: `${kind} commits so far this tick; each raises the bar the next ${kind} vote must clear.`,
+				};
+			}
+			case "PreviousOutcome":
+				return field(whole.label, OUTCOME_FIELDS[subIdx]) ?? raw();
+			case "ActionQueue": {
+				const slot = Math.floor(subIdx / QUEUE_FIELDS.length);
+				const queueField = QUEUE_FIELDS[subIdx % QUEUE_FIELDS.length];
+				const ordinal = QUEUE_ORDINALS[slot] ?? `#${slot + 1}`;
+				if (!queueField) return raw();
+				return {
+					label: `Queue${slot + 1}.${queueField.name}`,
+					description: `The ${ordinal} action committed this tick. ${queueField.description}`,
+				};
+			}
+			default:
+				return raw();
+		}
+	}
+
+	if (!("World" in ref)) return raw();
+	const parsed = parseWorldInputRef(ref.World);
+
+	if (isRingSensor(parsed.key)) {
+		const cell = `the cell to the ${directionWord(subIdx)}`;
+		const food = parsed.typeIdx !== null ? ` Food type ${parsed.typeIdx} only.` : "";
+		const description =
+			parsed.key === "NeighborFoodRing"
+				? `Food on ${cell} (0 to 1).${food}`
+				: parsed.key === "NeighborBarrierRing"
+					? `1 when ${cell} is a barrier, 0 when open.`
+					: `1 when another creature stands on ${cell}.`;
+		return { label: `${whole.label}[${directionName(subIdx)}]`, description };
+	}
+
+	const area = AREA_FIELDS[parsed.key];
+	if (area) {
+		const described = field(whole.label, area[subIdx]);
+		if (!described) return raw();
+		const food = parsed.typeIdx !== null ? ` Food type ${parsed.typeIdx} only.` : "";
+		return { ...described, description: `${described.description}${food}` };
+	}
+
+	const nearby = NEARBY_FIELDS[parsed.key];
+	if (nearby) {
+		const slot = Math.floor(subIdx / nearby.length);
+		const nearbyField = nearby[subIdx % nearby.length];
+		if (slot >= NEARBY_SLOTS || !nearbyField) return raw();
+		return {
+			label: `Nearest${slot + 1}.${nearbyField.name}`,
+			description: `The ${ORDINALS[slot]} visible creature: ${lowerFirst(nearbyField.description)} All 0 when the slot is empty.`,
+		};
+	}
+
+	return raw();
+}
+
+function field(base: string, subField: SubField | undefined): InputDescription | null {
+	if (!subField) return null;
+	return { label: `${base}.${subField.name}`, description: subField.description };
+}
+
+function lowerFirst(text: string): string {
+	return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 export function formatInputRefWithSubIndex(ref: InputReference, subIdx: number): string {
-	const label = formatInputRef(ref);
-	if (
-		typeof ref !== "string" &&
-		"World" in ref &&
-		isRingSensor(parseWorldInputRef(ref.World).key)
-	) {
-		return `${label}[${directionName(subIdx)}]`;
-	}
-	return subIdx > 0 ? `${label}[${subIdx}]` : label;
+	return describeInputRef(ref, subIdx).label;
 }
 
 const STRING_REF_COLORS: Record<string, string> = {

@@ -9,7 +9,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		step: 1,
 		defaultValue: 64,
 		tooltip:
-			"Per-pass hop cap: a pass dispatches at most this many mesh nodes, cycles included; reaching it ends the pass with its queue kept",
+			"Most mesh nodes one pass may run, repeats included; reaching it ends the pass and keeps the actions already committed",
 	},
 	{
 		path: "runtime.max_vm_steps",
@@ -19,7 +19,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		step: 1,
 		defaultValue: 10000,
 		sliderMax: 20000,
-		tooltip: "Maximum VM instructions executed per VM node dispatch",
+		tooltip: "Most instructions one VM node may execute each time it runs",
 	},
 	{
 		path: "runtime.graph_node_base_cost",
@@ -29,17 +29,17 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		step: 0.000001,
 		defaultValue: 0.00001,
 		slider: false,
-		tooltip: "Base compute cost per graph node during evaluation",
+		tooltip: "Energy charged for each graph node evaluated",
 	},
 	{
 		path: "runtime.vm.opcode_cost_multiplier",
-		label: "Opcode Cost Mult.",
+		label: "VM Instruction Cost ×",
 		min: 0,
 		max: 10,
 		step: 0.0000001,
 		defaultValue: 0.000001,
 		slider: false,
-		tooltip: "Multiplier applied to each VM opcode's compute cost",
+		tooltip: "Multiplier on every VM instruction's energy cost",
 	},
 	{
 		path: "runtime.vm.step_ramp_allowance",
@@ -48,7 +48,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10000,
 		step: 1,
 		defaultValue: 100,
-		tooltip: "Free VM instructions per node dispatch before the activity ramp starts charging",
+		tooltip: "Instructions one VM node may run each time before Step Ramp Cost starts charging",
 	},
 	{
 		path: "runtime.vm.step_ramp_cost",
@@ -59,7 +59,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		defaultValue: 0.000001,
 		slider: false,
 		tooltip:
-			"Extra energy per excess step, per step past the allowance, within one VM node dispatch",
+			"Ramp slope: the k-th instruction past the allowance costs k × this, so long loops get expensive fast. Resets each time the node runs",
 	},
 	{
 		path: "runtime.hop_ramp_allowance",
@@ -71,7 +71,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		sliderMax: 1024,
 		testId: "config-field-runtime-hop-ramp-allowance",
 		tooltip:
-			"Free mesh hops per world tick before the hop ramp starts charging; 0 ramps from the first hop",
+			"Mesh node runs per tick before Hop Ramp Cost starts charging; 0 charges from the first",
 	},
 	{
 		path: "runtime.hop_ramp_cost",
@@ -83,7 +83,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		slider: false,
 		testId: "config-field-runtime-hop-ramp-cost",
 		tooltip:
-			"Extra energy per excess hop, per hop past the allowance, within one world tick; 0 turns the ramp off",
+			"Ramp slope: the k-th node run past the allowance costs k × this. Resets each tick; 0 turns the ramp off",
 	},
 	{
 		path: "runtime.plasticity_update_cost",
@@ -92,7 +92,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.001,
 		defaultValue: 0.0,
-		tooltip: "Energy cost per plasticity weight update during neural processing",
+		tooltip: "Energy charged per edge weight a plastic (Hebbian) node changes",
 	},
 	{
 		path: "runtime.reward_learning_cost",
@@ -101,16 +101,16 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.001,
 		defaultValue: 0.0,
-		tooltip: "Energy cost per reward-modulated weight update during learning",
+		tooltip: "Energy charged per edge weight changed by reward-driven learning",
 	},
 	{
 		path: "runtime.max_actions_per_turn",
-		label: "Max Actions/Turn",
+		label: "Max Actions per Tick",
 		min: 1,
 		max: 20,
 		step: 1,
 		defaultValue: 10,
-		tooltip: "Maximum number of actions a creature can queue per turn",
+		tooltip: "Most actions a creature may commit in one tick; reaching it ends the tick",
 	},
 	{
 		path: "runtime.perception.vision_radius",
@@ -119,6 +119,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 8,
 		step: 1,
 		defaultValue: 5,
-		tooltip: "Vision radius for extended perception area summaries",
+		tooltip:
+			"How far a creature sees, in cells, for the area and nearby-creature sensors (view is a square 2r+1 wide)",
 	},
 ];

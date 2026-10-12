@@ -2,13 +2,22 @@ import {
 	ACTION_PARAM_FIELDS,
 	type ActionParamField,
 	type ComputeNodeKind,
-	type DirectedVoteKind,
 	type GraphSource,
 	type InputReference,
 	type OutputSinkKind,
 	type VoteSink,
 } from "../../types/genome.ts";
-import { directionName, formatInputRefWithSubIndex } from "./inputRefUtils.ts";
+import { directionWord } from "./directions.ts";
+import { describeInputRef } from "./inputRefUtils.ts";
+import { formatVoteSink } from "./voteSinks.ts";
+
+export {
+	driveSinkIndex,
+	formatVoteSink,
+	voteSinkFromIndex,
+	voteSinkIndex,
+	voteSinkLabel,
+} from "./voteSinks.ts";
 
 export function getKindName(kind: ComputeNodeKind): string {
 	if (typeof kind === "string") return kind;
@@ -16,112 +25,197 @@ export function getKindName(kind: ComputeNodeKind): string {
 	return name;
 }
 
-/** Produce a human-readable label for a compute node kind. */
-export function getKindLabel(kind: ComputeNodeKind, _inputRefs: InputReference[]): string {
-	if (typeof kind === "string") {
-		switch (kind) {
-			case "WeightedSum":
-				return "\u03A3 Weight";
-			case "Clamp01":
-				return "Clamp";
-			case "GreaterThan":
-				return "GT";
-			default:
-				return kind;
-		}
-	}
-	const [name, value] = Object.entries(kind)[0] ?? ["?", ""];
+/** A graph element's display name and the plain-words tooltip behind it. */
+export interface Described {
+	label: string;
+	description: string;
+}
+
+/** Stateful kinds advance once per run of their mesh node and keep their
+ * state across passes and ticks. */
+const STATEFUL_NOTE = "Its state advances each time this mesh node runs and carries across ticks.";
+
+const STRING_KINDS: Record<string, Described> = {
+	Add: { label: "Add", description: "Sum of the weighted inputs (each input × its edge weight)." },
+	WeightedSum: {
+		label: "Σ Sum",
+		description: "Sum of the weighted inputs (each input × its edge weight). Same as Add.",
+	},
+	Multiply: {
+		label: "Multiply",
+		description: "Product of the weighted inputs (1 with no inputs).",
+	},
+	Negate: { label: "Negate", description: "Minus the weighted sum." },
+	Abs: { label: "Abs", description: "Absolute value of the weighted sum." },
+	Min: { label: "Min", description: "Smallest weighted input (0 with no inputs)." },
+	Max: { label: "Max", description: "Largest weighted input (0 with no inputs)." },
+	Sigmoid: { label: "Sigmoid", description: "Squashes the weighted sum into 0 to 1." },
+	Tanh: { label: "Tanh", description: "Squashes the weighted sum into −1 to 1." },
+	Relu: { label: "Relu", description: "The weighted sum, or 0 when it is negative." },
+	Clamp01: { label: "Clamp", description: "The weighted sum, clipped to 0 to 1." },
+	GreaterThan: {
+		label: "A > B",
+		description: "1 when weighted input 0 is greater than weighted input 1, otherwise 0.",
+	},
+	Select: {
+		label: "Select",
+		description: "Switch: outputs input 1 when input 0 is at least 0.5, otherwise input 2.",
+	},
+	AdaptiveGain: {
+		label: "AdaptiveGain",
+		description: `The weighted sum times a gain (0.1 to 2) that rises with positive input and falls with negative. ${STATEFUL_NOTE}`,
+	},
+};
+
+/** Describe a compute node kind, naming its parameter in the tooltip. */
+export function describeComputeKind(kind: ComputeNodeKind): Described {
+	if (typeof kind === "string") return STRING_KINDS[kind] ?? { label: kind, description: "" };
+	const [name, raw] = Object.entries(kind)[0] ?? ["?", 0];
+	const value = typeof raw === "number" ? raw : Number.NaN;
+	const v = value.toFixed(2);
 	switch (name) {
 		case "Constant":
-			return `Const(${(value as number).toFixed(2)})`;
+			return { label: `Const(${v})`, description: `Always outputs ${v}; ignores inputs.` };
 		case "Threshold":
-			return `Thresh(${(value as number).toFixed(2)})`;
+			return {
+				label: `Thresh(${v})`,
+				description: `1 when the weighted sum is above ${v}, otherwise 0.`,
+			};
 		case "DecayIntegrator":
-			return `Decay(${(value as number).toFixed(2)})`;
+			return {
+				label: `Decay(${v})`,
+				description: `Running average: each run keeps ${(1 - value).toFixed(2)} of the old value and adds ${v} × the weighted sum. ${STATEFUL_NOTE}`,
+			};
 		case "Momentum":
-			return `Momentum(${(value as number).toFixed(2)})`;
+			return {
+				label: `Momentum(${v})`,
+				description: `Running average: each run keeps ${v} of the old value and adds ${(1 - value).toFixed(2)} × the weighted sum. ${STATEFUL_NOTE}`,
+			};
 		case "Oscillator":
-			return `Osc(${(value as number).toFixed(2)})`;
+			return {
+				label: `Osc(${v})`,
+				description: `Sine wave advancing ${v} cycles per run; only the fractional part matters, so 1.00 is flat. Ignores inputs. ${STATEFUL_NOTE}`,
+			};
 		default:
-			if (typeof value === "number") {
-				return `${name}(${Number.isInteger(value) ? value : (value as number).toFixed(2)})`;
-			}
-			return name;
+			return {
+				label: Number.isNaN(value)
+					? name
+					: `${name}(${Number.isInteger(value) ? value : value.toFixed(2)})`,
+				description: "",
+			};
 	}
+}
+
+/** Produce a human-readable label for a compute node kind. */
+export function getKindLabel(kind: ComputeNodeKind, _inputRefs: InputReference[]): string {
+	return describeComputeKind(kind).label;
+}
+
+/** Describe the source of a graph edge: an input, a memory read or a node. */
+export function describeGraphSource(source: GraphSource, inputRefs: InputReference[]): Described {
+	if ("ComputeNode" in source) {
+		return { label: `CN${source.ComputeNode}`, description: `Compute node ${source.ComputeNode}.` };
+	}
+	if ("SharedMemory" in source) {
+		const { slot, previous } = source.SharedMemory;
+		return previous
+			? {
+					label: `PrevMem[${slot}]`,
+					description: `Shared memory slot ${slot} as it stood at the start of this tick (last tick's final value).`,
+				}
+			: {
+					label: `Mem[${slot}]`,
+					description: `Shared memory slot ${slot} now, including writes made earlier this tick.`,
+				};
+	}
+	if ("InputLeaf" in source) {
+		const { ref_idx, sub_idx } = source.InputLeaf;
+		const ref = ref_idx === 0xffff ? undefined : inputRefs[ref_idx];
+		if (!ref) {
+			return {
+				label: "No input",
+				description: `Points at input ${ref_idx}, which this node does not have; it reads 0.`,
+			};
+		}
+		return describeInputRef(ref, sub_idx);
+	}
+	return { label: "?", description: "" };
 }
 
 /** Format a GraphSource as a human-readable label. */
 export function formatGraphSource(source: GraphSource, inputRefs: InputReference[]): string {
-	if ("ComputeNode" in source) return `CN${source.ComputeNode}`;
-	if ("SharedMemory" in source) {
-		const { slot, previous } = source.SharedMemory;
-		return previous ? `Prev s[${slot}]` : `Read s[${slot}]`;
+	return describeGraphSource(source, inputRefs).label;
+}
+
+/** What a vote for each sink does once the pass ends. */
+export function describeVoteSink(sink: VoteSink): string {
+	if (sink === "Eat") {
+		return "Vote to eat. At pass end the action whose vote most exceeds its bar commits.";
 	}
-	if ("InputLeaf" in source) {
-		const { ref_idx, sub_idx } = source.InputLeaf;
-		if (ref_idx === 0xffff) return sub_idx > 0 ? `Dead[${sub_idx}]` : "Dead";
-		const ref = inputRefs[ref_idx];
-		return ref ? formatInputRefWithSubIndex(ref, sub_idx) : `In(${ref_idx})`;
+	if (sink === "Terminate") {
+		return "Ends the tick without another action when it is at least the winning vote. Needs an action already committed this tick.";
 	}
-	return "?";
-}
-
-/** Directions each directed vote sink covers — the `Direction::ALL` index range. */
-const VOTE_DIRECTION_COUNT = 8;
-/** The directed kinds in catalog order: their drives follow the direction sinks. */
-const DIRECTED_VOTE_KINDS: readonly DirectedVoteKind[] = ["Move", "Reproduce", "StealEnergy"];
-/** Catalog index of the first drive sink. */
-const FIRST_DRIVE_SINK = 1 + 3 * VOTE_DIRECTION_COUNT;
-/** Catalog index of `Terminate`; `Decide` follows it. */
-const TERMINATE_SINK = FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.length;
-
-/** The vote sink at a catalog index; null at or above the catalog count. */
-export function voteSinkFromIndex(index: number): VoteSink | null {
-	if (index === 0) return "Eat";
-	if (index < 1 + VOTE_DIRECTION_COUNT) return { Move: index - 1 };
-	if (index < 1 + 2 * VOTE_DIRECTION_COUNT) {
-		return { Reproduce: index - 1 - VOTE_DIRECTION_COUNT };
+	if (sink === "Decide") {
+		return "When positive and some action is winning, ends this pass at once, skipping routing.";
 	}
-	if (index < FIRST_DRIVE_SINK) {
-		return { StealEnergy: index - 1 - 2 * VOTE_DIRECTION_COUNT };
+	if ("Drive" in sink) {
+		return `Added to ${sink.Drive}'s best direction vote: whether to ${sink.Drive} at all, not where. With flat direction votes a positive drive keeps the current heading; a negative one suppresses ${sink.Drive}.`;
 	}
-	const drive = DIRECTED_VOTE_KINDS[index - FIRST_DRIVE_SINK];
-	if (drive !== undefined) return { Drive: drive };
-	if (index === TERMINATE_SINK) return "Terminate";
-	if (index === TERMINATE_SINK + 1) return "Decide";
-	return null;
+	const [kind, dir] = Object.entries(sink)[0] ?? ["?", 0];
+	return `Vote to ${kind} toward the ${directionWord(Number(dir))}. The highest of ${kind}'s 8 direction votes sets its direction.`;
 }
 
-/** The catalog index of a vote sink, the inverse of `voteSinkFromIndex`. */
-export function voteSinkIndex(sink: VoteSink): number {
-	if (sink === "Eat") return 0;
-	if (sink === "Terminate") return TERMINATE_SINK;
-	if (sink === "Decide") return TERMINATE_SINK + 1;
-	if ("Move" in sink) return 1 + sink.Move;
-	if ("Reproduce" in sink) return 1 + VOTE_DIRECTION_COUNT + sink.Reproduce;
-	if ("StealEnergy" in sink) return 1 + 2 * VOTE_DIRECTION_COUNT + sink.StealEnergy;
-	return driveSinkIndex(sink.Drive);
-}
+const ACTION_PARAM_DESCRIPTIONS: Readonly<Record<ActionParamField, string>> = {
+	EatFoodType: "Which food type Eat targets (rounded). A type that does not exist eats nothing.",
+	ReproduceTransferFraction: "Share of the parent's energy given to the child (0 to 1).",
+	StealEnergyAmount: "Energy to steal; the effort cost grows with the amount asked.",
+};
 
-/** The catalog index of a directed kind's drive. */
-export function driveSinkIndex(kind: DirectedVoteKind): number {
-	return FIRST_DRIVE_SINK + DIRECTED_VOTE_KINDS.indexOf(kind);
-}
-
-/** Label the vote sink at a catalog index; out of range reads as invalid. */
-export function voteSinkLabel(index: number): string {
-	const sink = voteSinkFromIndex(index);
-	return sink === null ? `invalid(${index})` : formatVoteSink(sink);
-}
-
-/** Format one vote sink of the catalog. */
-export function formatVoteSink(sink: VoteSink): string {
-	if (typeof sink === "string") return sink;
-	if ("Move" in sink) return `Move[${directionName(sink.Move)}]`;
-	if ("Reproduce" in sink) return `Reproduce[${directionName(sink.Reproduce)}]`;
-	if ("StealEnergy" in sink) return `StealEnergy[${directionName(sink.StealEnergy)}]`;
-	if ("Drive" in sink) return `Drive ${sink.Drive}`;
-	return "?";
+/** Describe an output sink: its label, subtitle and tooltip. */
+export function describeOutputSink(kind: OutputSinkKind): Described & { subtitle?: string } {
+	if ("RouterGate" in kind) {
+		return {
+			label: `Route[${kind.RouterGate}]`,
+			subtitle: "route score",
+			description: `Score for route slot ${kind.RouterGate}. The next mesh node is the target with the highest bias + score. Ignored when the pass decides.`,
+		};
+	}
+	if ("CustomOutput" in kind) {
+		return {
+			label: `Bus[${kind.CustomOutput}]`,
+			subtitle: "to next node",
+			description: `Writes bus slot ${kind.CustomOutput}; the next mesh node to run reads it as Bus[${kind.CustomOutput}].`,
+		};
+	}
+	if ("WriteSlot" in kind) {
+		return {
+			label: `Write Mem[${kind.WriteSlot}]`,
+			subtitle: "shared memory",
+			description: `Overwrites shared memory slot ${kind.WriteSlot} at once. Read back as Mem[${kind.WriteSlot}] this tick and PrevMem[${kind.WriteSlot}] next tick.`,
+		};
+	}
+	if ("ClearSlot" in kind) {
+		return {
+			label: `Clear Mem[${kind.ClearSlot}]`,
+			subtitle: "shared memory",
+			description: `Sets shared memory slot ${kind.ClearSlot} to 0 whenever this node runs, whatever its input.`,
+		};
+	}
+	if ("ActionVote" in kind) {
+		return {
+			label: `Vote ${formatVoteSink(kind.ActionVote)}`,
+			subtitle: "action vote",
+			description: describeVoteSink(kind.ActionVote),
+		};
+	}
+	if ("ActionParam" in kind) {
+		return {
+			label: `Param ${ACTION_PARAM_FIELD_LABELS[kind.ActionParam]}`,
+			subtitle: "action parameter",
+			description: ACTION_PARAM_DESCRIPTIONS[kind.ActionParam],
+		};
+	}
+	return { label: "?", description: "" };
 }
 
 /** Short label of each action-parameter field. */
@@ -138,24 +232,20 @@ export function actionParamTargetLabel(fieldIdx: number): string {
 	return field ? `param ${ACTION_PARAM_FIELD_LABELS[field]}` : `param[${fieldIdx}]`;
 }
 
+/** Tooltip for a VM `WriteActionParam` at `field_idx`. */
+export function actionParamDescription(fieldIdx: number): string {
+	const field = ACTION_PARAM_FIELDS[fieldIdx];
+	return field
+		? ACTION_PARAM_DESCRIPTIONS[field]
+		: "Not a parameter field; the VM ignores this write.";
+}
+
 /** Format an OutputSinkKind as a human-readable label. */
 export function formatOutputSinkKind(kind: OutputSinkKind): string {
-	if ("RouterGate" in kind) return `Route[${kind.RouterGate}]`;
-	if ("CustomOutput" in kind) return `Payload[${kind.CustomOutput}]`;
-	if ("WriteSlot" in kind) return `Write Mem[${kind.WriteSlot}]`;
-	if ("ClearSlot" in kind) return `Clear Mem[${kind.ClearSlot}]`;
-	if ("ActionVote" in kind) return `Vote ${formatVoteSink(kind.ActionVote)}`;
-	if ("ActionParam" in kind) return `Param ${ACTION_PARAM_FIELD_LABELS[kind.ActionParam]}`;
-	return "?";
+	return describeOutputSink(kind).label;
 }
 
 /** Human-readable subtitle for an OutputSinkKind. */
 export function outputSinkSubtitle(kind: OutputSinkKind): string | undefined {
-	if ("CustomOutput" in kind) return "downstream slot value";
-	if ("RouterGate" in kind) return "route score";
-	if ("WriteSlot" in kind) return "shared memory";
-	if ("ClearSlot" in kind) return "shared memory";
-	if ("ActionVote" in kind) return "action vote";
-	if ("ActionParam" in kind) return "action parameter";
-	return undefined;
+	return describeOutputSink(kind).subtitle;
 }

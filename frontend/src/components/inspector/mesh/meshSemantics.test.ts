@@ -102,7 +102,7 @@ describe("meshSemantics", () => {
 		expect(node?.confidence).toBe("high");
 		expect(node?.label).toBe("Route Selector · Food");
 		expect(node?.badges).toEqual(expect.arrayContaining(["input", "route"]));
-		expect(node?.rationale.role).toContain("Writes route");
+		expect(node?.rationale.role).toContain("Scores route slots");
 		expect(node?.rationale.confidence).toContain("server-provided");
 	});
 
@@ -113,7 +113,7 @@ describe("meshSemantics", () => {
 		expect(node?.role).toBe("memory_reader");
 		expect(node?.confidence).toBe("medium");
 		expect(node?.badges).toContain("slot");
-		expect(node?.label).toBe("Slot Reader · Introspection");
+		expect(node?.label).toBe("Memory Reader · Introspection");
 		expect(node?.rationale.confidence).toContain("Inferred");
 	});
 

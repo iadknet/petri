@@ -45,12 +45,12 @@ describe("NodeIdentity", () => {
 				backendSummary={{ label: "VM", detail: "3 ops · 1 regs" }}
 				isEntry={false}
 				reachable={false}
-				semanticLabel="Slot Writer"
+				semanticLabel="Memory Writer"
 				badges={["slot"]}
 			/>,
 		);
 
-		expect(screen.getByText("Slot Writer")).toBeInTheDocument();
+		expect(screen.getByText("Memory Writer")).toBeInTheDocument();
 		expect(screen.getByText("unreachable")).toBeInTheDocument();
 		expect(screen.getByText("slot")).toBeInTheDocument();
 	});

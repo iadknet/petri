@@ -5,6 +5,8 @@ import type { NodeCategory } from "./graphNodeCategories.ts";
 export interface GraphInternalsNodeData extends Record<string, unknown> {
 	index: number;
 	kindLabel: string;
+	/** Native tooltip: the full label and what the node does. */
+	description?: string;
 	subtitle?: string;
 	category: NodeCategory;
 	isLive: boolean;
@@ -57,6 +59,7 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 
 	return (
 		<div
+			title={data.description ? `${data.kindLabel}\n${data.description}` : data.kindLabel}
 			className={`flex flex-col justify-center h-full rounded px-1.5 text-[9px] font-mono leading-none transition-all ${
 				data.isLive ? "" : "opacity-35"
 			}`}

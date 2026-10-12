@@ -33,7 +33,11 @@ export function RingProjectionList({ projections, inputRefs }: RingProjectionLis
 					>
 						<span>{ringLabel(projection.ref_idx, inputRefs)}</span>
 						<span className="text-slate-400">{projection.kind}</span>
-						<span>offset {projection.offset % 8}</span>
+						<span
+							title={`Each ring cell votes ${projection.kind} toward the direction ${projection.offset % 8} steps clockwise from that cell (0 = same, 4 = opposite), scaled by the weight.`}
+						>
+							offset {projection.offset % 8}
+						</span>
 						<span>w={projection.weight.toFixed(3)}</span>
 					</li>
 				))}

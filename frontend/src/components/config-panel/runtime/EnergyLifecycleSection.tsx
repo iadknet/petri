@@ -12,7 +12,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 	},
 	{
 		path: "energy.lifecycle.energy_decay_per_tick",
-		label: "Decay / Tick",
+		label: "Energy Decay / Tick",
 		min: 0,
 		max: 10,
 		step: 0.01,
@@ -27,7 +27,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.00001,
 		defaultValue: 0.0001,
 		tooltip:
-			"Energy charged each tick per unit of genome_size() \u2014 maintenance on carried structure, junk included",
+			"Energy charged each tick per genome unit (each node, instruction, input, edge…), junk included",
 	},
 	{
 		path: "energy.lifecycle.genome_replication_cost_per_unit",
@@ -37,7 +37,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.001,
 		defaultValue: 0.1,
 		tooltip:
-			"Per-birth multiplier on the parent's reproduce charge: 1 + rate \u00d7 units of genome_size() above the founder's 97",
+			"Raises the parent's reproduce charge for big genomes: the charge is multiplied by 1 + rate \u00d7 (genome units above the founder's 97)",
 	},
 	{
 		path: "energy.lifecycle.gestation_ticks_per_founder_genome",
@@ -47,7 +47,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.1,
 		defaultValue: 1.0,
 		tooltip:
-			"Ticks a parent gestates before its child is born: ceil(rate \u00d7 genome_size() / 97); it acts on none of them and a death loses the litter. 0 delivers at once",
+			"Gestation ticks per founder-sized genome (97 units); bigger genomes gestate longer, rounded up. The parent cannot act until the birth, and its death loses the child. 0 delivers at once",
 	},
 	{
 		path: "energy.lifecycle.min_reproduce_energy",
@@ -78,8 +78,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		defaultValue: 500,
 		sliderMax: 5000,
 		testId: "config-field-energy-lifecycle-age-reference-ticks",
-		tooltip:
-			"Ticks over which a creature's age input rises from 0 to 1: the brain reads min(age / span, 1)",
+		tooltip: "Ticks over which the brain's Age input rises from 0 to 1, then stays at 1",
 	},
 	{
 		path: "energy.lifecycle.default_offspring_energy",

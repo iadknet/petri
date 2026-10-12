@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { VOTE_SINK_COUNT } from "../../types/trace.ts";
 import {
+	describeComputeKind,
+	describeGraphSource,
+	describeOutputSink,
 	driveSinkIndex,
 	voteSinkFromIndex,
 	voteSinkIndex,
@@ -37,5 +40,25 @@ describe("vote sink catalog", () => {
 		expect(voteSinkLabel(8)).toBe("Move[NW]");
 		expect(voteSinkLabel(13)).toBe("Reproduce[S]");
 		expect(voteSinkLabel(24)).toBe("StealEnergy[NW]");
+	});
+});
+
+describe("graph tooltips", () => {
+	it("explains every compute kind, naming its parameter", () => {
+		expect(describeComputeKind("Select").description).toMatch(/input 1/);
+		expect(describeComputeKind({ DecayIntegrator: 0.25 }).description).toMatch(/0\.25/);
+		expect(describeComputeKind({ Oscillator: 0.5 }).description).toMatch(/per run/);
+	});
+
+	it("names memory reads by tick and links the bus on both ends", () => {
+		const slot = (previous: boolean) => ({ SharedMemory: { slot: 3, previous } });
+		expect(describeGraphSource(slot(false), []).label).toBe("Mem[3]");
+		expect(describeGraphSource(slot(true), []).label).toBe("PrevMem[3]");
+		expect(describeGraphSource(slot(true), []).description).toMatch(/last tick/);
+		expect(describeGraphSource({ InputLeaf: { ref_idx: 0xffff, sub_idx: 0 } }, []).label).toBe(
+			"No input",
+		);
+		expect(describeOutputSink({ CustomOutput: 2 }).label).toBe("Bus[2]");
+		expect(describeOutputSink({ ActionVote: { Drive: "Move" } }).description).toMatch(/heading/);
 	});
 });
