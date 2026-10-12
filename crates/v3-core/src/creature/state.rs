@@ -12,7 +12,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmInstruction, OUTCOME_CHANNEL_COUNT,
 };
 use crate::creature::identity::CreatureIdentityState;
-use crate::mutation::MutationOperator;
+use crate::mutation::{BirthEdgeClass, MutationOperator};
 
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
 pub const SHARED_MEMORY_SLOTS: usize = 16;
@@ -193,6 +193,10 @@ pub struct CreatureState {
     pub cached_live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
     /// Mutation operators applied when this creature was born.
     pub birth_mutation_operators: Box<[MutationOperator]>,
+    /// The class of the vote sink its birth's sole `AddGraphEdge` or
+    /// `InputRef.Add` pushed an edge onto (T11.F30); `None` for any other
+    /// birth.
+    pub birth_edge_class: Option<BirthEdgeClass>,
     /// Number of offspring this creature has spawned.
     pub offspring_spawned_count: u64,
     /// Lifetime action attempts executed by this creature.
@@ -307,6 +311,7 @@ impl CreatureState {
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
+            birth_edge_class: None,
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
             lifetime_actions_attempted_by_type: [0; ACTION_TYPE_COUNT as usize],
@@ -367,6 +372,7 @@ impl CreatureState {
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
+            birth_edge_class: None,
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
             lifetime_actions_attempted_by_type: [0; ACTION_TYPE_COUNT as usize],

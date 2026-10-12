@@ -599,9 +599,10 @@ const KEPT_SAMPLE_FIELDS: [&str; 12] = [
     "sensor_census",
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
-/// `action_attempts` (T16.F02) and `ring_rules` (T11.F31), which the page
-/// does not read but the readings do.
-const KEPT_CASE_BLOCKS: [&str; 23] = [
+/// `action_attempts` (T16.F02), `ring_rules` (T11.F31) and
+/// `mutation_value_totals_by_birth_edge_class` (T11.F30), which the page does
+/// not read but the readings do.
+const KEPT_CASE_BLOCKS: [&str; 24] = [
     "case",
     "cognition",
     "energy_flows",
@@ -625,6 +626,7 @@ const KEPT_CASE_BLOCKS: [&str; 23] = [
     "input_use",
     "action_attempts",
     "ring_rules",
+    "mutation_value_totals_by_birth_edge_class",
 ];
 
 /// Apply `project` to an object, passing anything else through unchanged.

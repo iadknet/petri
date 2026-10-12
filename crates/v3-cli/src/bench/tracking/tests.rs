@@ -664,6 +664,15 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             ..MutationValueTotals::default()
         },
     );
+    stats.mutation_value_totals_by_birth_edge_class.insert(
+        v3_core::mutation::BirthEdgeClass::Drive,
+        MutationValueTotals {
+            carriers_observed_total: 3,
+            helpful_total: 2,
+            neutral_total: 1,
+            ..MutationValueTotals::default()
+        },
+    );
     stats.predation_actions_attempted_total = 8;
     stats.predation_actions_transferred_total = 5;
     stats.predation_actions_rejected_total = 3;
@@ -712,6 +721,19 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
                 helpful_total: Some(1),
                 neutral_total: Some(0),
                 detrimental_total: Some(1),
+                ..MutationOutcomeTotals::default()
+            },
+        )]))
+    );
+    assert_eq!(
+        tracking.mutation_value_totals_by_birth_edge_class,
+        Some(BTreeMap::from([(
+            "drive".to_string(),
+            MutationOutcomeTotals {
+                carriers_observed_total: 3,
+                helpful_total: Some(2),
+                neutral_total: Some(1),
+                detrimental_total: Some(0),
                 ..MutationOutcomeTotals::default()
             },
         )]))
@@ -780,6 +802,7 @@ fn checkpoint_tracking_omits_every_transferred_block() {
         "mutation_supply",
         "mutation_outcome_summary",
         "mutation_value_totals_by_operator",
+        "mutation_value_totals_by_birth_edge_class",
         "predation",
         "action_attempts",
         "mortality",
@@ -1280,6 +1303,13 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
             }),
             mutation_value_totals_by_operator: Some(BTreeMap::from([(
                 "Topology.AddNode".to_string(),
+                MutationOutcomeTotals {
+                    carriers_observed_total: 1,
+                    ..MutationOutcomeTotals::default()
+                },
+            )])),
+            mutation_value_totals_by_birth_edge_class: Some(BTreeMap::from([(
+                "drive".to_string(),
                 MutationOutcomeTotals {
                     carriers_observed_total: 1,
                     ..MutationOutcomeTotals::default()

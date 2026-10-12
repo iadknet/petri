@@ -111,8 +111,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // and only seeds 22 and 50 of 0..=60 survive (T11.F29 moved it from 13).
     // T11.F31 moved it from 22 to 14: the ring projection operators change
     // every Graph-domain draw and seed 22 goes extinct at tick 151; seeds
-    // 14, 50, 67, 73, 78, 80 and 151 of 0..=200 survive.
-    const SEED: u64 = 14;
+    // 14, 50, 67, 73, 78, 80 and 151 of 0..=200 survive. T11.F30 moved it
+    // from 14 to 207: the heading tie sends seed 14 extinct at tick 194, no
+    // seed of 0..=200 survives the horizon, and seeds 207, 281, 289, 499,
+    // 597, 729, 730 and 1184 of 201..=1200 do.
+    const SEED: u64 = 207;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -182,8 +185,9 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
 fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
     // Effort-cost defaults, 2026-10-10: seed 16 goes extinct at tick 150;
     // seed 22 survives the horizon. T11.F31: seed 22 goes extinct at tick
-    // 151 and seed 14 survives (see the post-tick-state test).
-    const SEED: u64 = 14;
+    // 151 and seed 14 survives (see the post-tick-state test). T11.F30: seed
+    // 14 goes extinct at tick 194 and seed 207 survives.
+    const SEED: u64 = 207;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -308,8 +312,10 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // cell). T24.F02 had moved it from seed 2 to 0, T24.F01 from 1 to 2,
     // T19.F04 from 3 to 1 (its vote founder sent seed 3 extinct), T11.F23
     // from 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18. T11.F31
-    // moved it from 22 to 14: seed 22 goes extinct at tick 151.
-    const SEED: u64 = 14;
+    // moved it from 22 to 14: seed 22 goes extinct at tick 151. T11.F30 moved
+    // it from 14 to 207: seed 14 goes extinct at tick 194; seed 207 keeps 5
+    // creatures over 5 cells.
+    const SEED: u64 = 207;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

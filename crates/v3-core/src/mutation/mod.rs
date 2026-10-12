@@ -12,10 +12,12 @@ pub mod vm;
 
 #[cfg(test)]
 mod applicability_tests;
+#[cfg(test)]
+mod drive_reach_tests;
 
 pub use engine::MutationEngine;
 pub use types::{
-    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
-    MutationOperator, MutationOperatorFunnel, MutationSkipReason, MutationSummary,
-    TargetReachability,
+    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    MutationEventRecord, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
+    MutationSummary, TargetReachability,
 };

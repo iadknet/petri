@@ -99,10 +99,15 @@ impl SteeringPooled {
 /// Whether a node in `executed` structurally contributes to a `Move` sink
 /// (T19.F04): a VM program with an `AddVote` naming a `Move` sink, or a graph
 /// with a wired `ActionVote(Move(_))` sink or a `Move` ring projection
-/// (T11.F31).
+/// (T11.F31); the `Move` drive counts as a `Move` sink (T11.F30).
 #[must_use]
 pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
-    let is_move = |sink: Option<VoteSink>| matches!(sink, Some(VoteSink::Move(_)));
+    let is_move = |sink: Option<VoteSink>| {
+        matches!(
+            sink,
+            Some(VoteSink::Move(_) | VoteSink::Drive(DirectedVoteKind::Move))
+        )
+    };
     genome
         .nodes
         .iter()
@@ -116,7 +121,10 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
                 graph.projects_kind(DirectedVoteKind::Move)
                     || graph.output_sinks.iter().any(|sink| {
                         !sink.inputs.is_empty()
-                            && matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
+                            && match sink.kind {
+                                OutputSinkKind::ActionVote(vote) => is_move(Some(vote)),
+                                _ => false,
+                            }
                     })
             }
         })
@@ -260,6 +268,55 @@ mod tests {
             &genome_with(DirectedVoteKind::Move),
             &BTreeSet::new()
         ));
+    }
+
+    #[test]
+    fn an_edge_or_add_vote_into_the_move_drive_votes_move() {
+        use crate::creature::genome::cgp::{GraphEdge, GraphSource};
+        use crate::creature::genome::{VmBackendDef, VmInstruction};
+        let node = |backend_def| CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def,
+                targets: vec![],
+            }],
+        };
+        let graph_into = |kind: DirectedVoteKind| {
+            let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+            def.sink_mut(OutputSinkKind::ActionVote(kind.drive()))
+                .unwrap()
+                .inputs
+                .push(GraphEdge {
+                    source: GraphSource::SharedMemory {
+                        slot: 0,
+                        previous: false,
+                    },
+                    weight: 1.0,
+                });
+            node(BackendDef::Graph(def))
+        };
+        let vm_into = |kind: DirectedVoteKind| {
+            node(BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![VmInstruction::AddVote {
+                    sink: kind.drive().index() as u8,
+                    src: 0,
+                }],
+            }))
+        };
+        let executed = BTreeSet::from([NodeId::new(0)]);
+        let builds: [&dyn Fn(DirectedVoteKind) -> CreatureGenome; 2] = [&graph_into, &vm_into];
+        for build in builds {
+            assert!(votes_move(&build(DirectedVoteKind::Move), &executed));
+            assert!(!votes_move(&build(DirectedVoteKind::Reproduce), &executed));
+            assert!(!votes_move(
+                &build(DirectedVoteKind::StealEnergy),
+                &executed
+            ));
+        }
     }
 
     #[test]

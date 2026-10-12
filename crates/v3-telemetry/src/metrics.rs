@@ -377,6 +377,28 @@ fn birth_parent_age(f: &mut Families, s: &SimStats) {
 }
 
 /// The twenty fields of a [`MutationValueTotals`], `_total` removed.
+/// One `Sum` family per `MutationValueTotals` field under `prefix`, one
+/// point per keyed row with `attribute` naming its key.
+fn value_families<'a>(
+    f: &mut Families,
+    prefix: &str,
+    attribute: &'static str,
+    rows: impl Iterator<Item = (&'static str, &'a MutationValueTotals)>,
+) {
+    let rows: Vec<_> = rows
+        .map(|(key, totals)| (key, value_fields(totals)))
+        .collect();
+    for (index, (field, _)) in value_fields(&MutationValueTotals::default())
+        .into_iter()
+        .enumerate()
+    {
+        let points = rows
+            .iter()
+            .map(|(key, fields)| (vec![(attribute, (*key).to_owned())], fields[index].1));
+        f.push(format!("{prefix}.{field}"), Kind::Sum, "", points);
+    }
+}
+
 fn value_fields(totals: &MutationValueTotals) -> [(&'static str, Value); 20] {
     [
         ("carriers_observed", totals.carriers_observed_total.into()),
@@ -716,28 +738,23 @@ fn mutations(f: &mut Families, s: &SimStats) {
         },
     );
 
-    let by_operator: Vec<_> = s
-        .mutation_value_totals_by_operator
-        .iter()
-        .map(|(operator, totals)| (operator.as_key(), value_fields(totals)))
-        .collect();
-    for (index, (field, _)) in value_fields(&MutationValueTotals::default())
-        .into_iter()
-        .enumerate()
-    {
-        let points = by_operator.iter().map(|(operator, fields)| {
-            (
-                vec![("petri.operator", (*operator).to_owned())],
-                fields[index].1,
-            )
-        });
-        f.push(
-            format!("petri.run.mutation_value.{field}"),
-            Kind::Sum,
-            "",
-            points,
-        );
-    }
+    value_families(
+        f,
+        "petri.run.mutation_value",
+        "petri.operator",
+        s.mutation_value_totals_by_operator
+            .iter()
+            .map(|(operator, totals)| (operator.as_key(), totals)),
+    );
+    // `drive_births` (T11.F30): the same families keyed by birth edge class.
+    value_families(
+        f,
+        "petri.run.mutation_value_by_birth_edge_class",
+        "petri.birth_edge_class",
+        s.mutation_value_totals_by_birth_edge_class
+            .iter()
+            .map(|(class, totals)| (class.as_key(), totals)),
+    );
     for (field, value) in value_fields(&s.mutation_outcome_summary) {
         f.scalar(
             format!("petri.run.mutation_outcome_summary.{field}"),

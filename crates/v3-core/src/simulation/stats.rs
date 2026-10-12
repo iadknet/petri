@@ -5,15 +5,15 @@ use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::WorldInputKey;
 use crate::kernel::FoodGrowthSummary;
 use crate::mutation::{
-    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationOperatorFunnel,
-    MutationSkipReason,
+    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
+    MutationOperatorFunnel, MutationSkipReason,
 };
 use crate::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, PredationActionResult, PredationEventRecord,
     ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct MutationValueTotals {
     pub carriers_observed_total: u64,
     pub survival_ticks_sum: u64,
@@ -336,6 +336,10 @@ pub struct SimStats {
     pub mutation_not_applicable_target_total: u64,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
     pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
+    /// The same aggregates keyed by birth edge class (`drive_births`,
+    /// T11.F30): carriers whose birth pushed one edge onto a drive or a
+    /// direction sink and nothing else.
+    pub mutation_value_totals_by_birth_edge_class: HashMap<BirthEdgeClass, MutationValueTotals>,
     /// Mutation lifecycle outcome summary across all creatures with at least one
     /// applied birth mutation operator.
     pub mutation_outcome_summary: MutationValueTotals,
