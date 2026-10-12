@@ -1008,6 +1008,158 @@
       }
     },
     {
+      "id": 37,
+      "type": "xychart",
+      "pluginVersion": "13.2.2",
+      "title": "Barrier bumps next to a barrier, by tick",
+      "description": "The run-so-far bars over time: of the moves a creature made while standing next to a barrier, the share that walked into the barrier (1m window), plotted against simulation tick. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). A gap opening with barrier readers below non-readers means the sensor is shaping movement; overlapping lines mean it is not.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(petri_run_tick{petri_run_id=\"$run_id\"})",
+          "legendFormat": "tick",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(petri_run_move_blocked_barrier_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"has_barrier_reader\"}[1m])) or 0 * sum(rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"has_barrier_reader\"}[1m]))) / sum(rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"has_barrier_reader\"}[1m]))",
+          "legendFormat": "has_barrier_reader",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(petri_run_move_blocked_barrier_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"no_barrier_reader\"}[1m])) or 0 * sum(rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"no_barrier_reader\"}[1m]))) / sum(rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\",petri_reader_state=\"no_barrier_reader\"}[1m]))",
+          "legendFormat": "no_barrier_reader",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "show": "points",
+            "pointSize": {
+              "fixed": 4
+            }
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "tick"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "min"
+              },
+              {
+                "id": "max"
+              }
+            ]
+          }
+        ]
+      },
+      "interval": "1s",
+      "options": {
+        "mapping": "manual",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "has_barrier_reader"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "no_barrier_reader"
+              }
+            }
+          }
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 28,
       "type": "bargauge",
       "title": "Offspring per removed creature, by cognitive class",
@@ -1018,7 +1170,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 66,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1082,7 +1234,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 66,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1146,7 +1298,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 74,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -1207,7 +1359,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 74,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -1266,7 +1418,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 82,
+        "y": 90,
         "w": 12,
         "h": 8
       },
@@ -1327,7 +1479,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 82,
+        "y": 90,
         "w": 12,
         "h": 8
       },
@@ -1385,7 +1537,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 90,
+        "y": 98,
         "w": 24,
         "h": 8
       },
@@ -1481,7 +1633,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 98,
+        "y": 106,
         "w": 12,
         "h": 8
       },
@@ -1545,7 +1697,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 98,
+        "y": 106,
         "w": 12,
         "h": 8
       },
@@ -1604,7 +1756,7 @@
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 106,
+        "y": 114,
         "w": 24,
         "h": 1
       },
@@ -1621,7 +1773,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 107,
+        "y": 115,
         "w": 12,
         "h": 8
       },
@@ -1698,7 +1850,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 107,
+        "y": 115,
         "w": 12,
         "h": 8
       },
@@ -1775,7 +1927,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 115,
+        "y": 123,
         "w": 12,
         "h": 8
       },
@@ -1852,7 +2004,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 115,
+        "y": 123,
         "w": 12,
         "h": 8
       },
@@ -1929,7 +2081,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 123,
+        "y": 131,
         "w": 12,
         "h": 8
       },
@@ -2002,7 +2154,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 131,
+        "y": 139,
         "w": 24,
         "h": 1
       },
@@ -2020,7 +2172,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 132,
+        "y": 140,
         "w": 24,
         "h": 10
       },
@@ -2047,7 +2199,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 142,
+        "y": 150,
         "w": 24,
         "h": 1
       },
@@ -2065,7 +2217,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 143,
+        "y": 151,
         "w": 24,
         "h": 10
       },
