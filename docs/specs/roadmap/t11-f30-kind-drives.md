@@ -304,3 +304,5 @@ make bench PROFILE=goal FEATURE=t11-f30-kind-drives
   every out-of-tick mesh execution uses `N`; taken by the spec owner on
   2026-10-11 under the unattended-run instruction, each grounded in the row,
   the note §7 and the code (Inputs and Invariants, decision table).
+- Deferred: review P2, `drift.rs:648` refresh test (readings).
+- Exception: closure blocked pending the user's ruling (readings).
