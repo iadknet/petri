@@ -1,12 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { VoteSink } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace } from "../../types/trace.ts";
 import { VOTE_SINK_COUNT } from "../../types/trace.ts";
 import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
 
-function makeTick(passes: MeshPassTrace[], commitCounts: number[]): TickTrace {
+function makeTick(passes: MeshPassTrace[], commitCounts: number[], heading = "N"): TickTrace {
 	return {
 		tick_number: 3,
+		heading,
 		energy_before: 10,
 		energy_after: 9,
 		static_inputs: {
@@ -31,32 +33,43 @@ function zeroVotes(): number[] {
 	return Array.from({ length: VOTE_SINK_COUNT }, () => 0);
 }
 
+/** Each kind's best sink under heading `N` with no votes. */
+const NORTH_BEST: readonly VoteSink[] = ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }];
+
+function makePass(
+	fields: Partial<MeshPassTrace> & Pick<MeshPassTrace, "pass_index">,
+): MeshPassTrace {
+	return {
+		end_reason: "NoTargets",
+		votes: zeroVotes(),
+		best: NORTH_BEST,
+		bars: [0, 0, 0, 0],
+		effective_votes: [0, 0, 0, 0],
+		committed: null,
+		hops: 1,
+		...fields,
+	};
+}
+
 describe("VoteSurfaceBlock", () => {
 	it("shows each pass's reason, commit, kind votes, and Terminate and Decide as their own fields", () => {
 		const votes = zeroVotes();
 		votes[0] = 1.5;
 		votes[3] = -2.25;
-		votes[26] = 0.5;
+		votes[29] = 0.5;
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
 					[
-						{
+						makePass({
 							pass_index: 0,
 							end_reason: "Decided",
 							votes,
 							effective_votes: [1.5, 0, 0, 0],
 							committed: { Eat: { type_idx: 0 } },
 							hops: 2,
-						},
-						{
-							pass_index: 1,
-							end_reason: "NoTargets",
-							votes: zeroVotes(),
-							effective_votes: [-1, 0, 0, 0],
-							committed: null,
-							hops: 1,
-						},
+						}),
+						makePass({ pass_index: 1, effective_votes: [-1, 0, 0, 0], bars: [1, 0, 0, 0] }),
 					],
 					[1, 0, 0, 0],
 				)}
@@ -78,46 +91,78 @@ describe("VoteSurfaceBlock", () => {
 		expect(screen.queryByTestId("terminate-verdict")).not.toBeInTheDocument();
 	});
 
-	it("shows the recorded effective vote beside the best sink vote and bar, not a recomputation", () => {
+	it("shows the recorded best sink, drive, bar and effective vote, not a recomputation", () => {
 		const votes = zeroVotes();
-		votes[1] = 0.3; // Move[0]
-		votes[4] = 0.9; // Move[3], the kind's best sink
+		votes[1] = 0.9; // Move[0], tied with Move[3]
+		votes[4] = 0.9; // Move[3], the sink the heading tie recorded
+		votes[25] = 0.4; // Drive Move
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
 					[
-						{
+						makePass({
 							pass_index: 0,
-							end_reason: "NoTargets",
 							votes,
-							// Deliberately not best − bar: the view must show what was recorded.
+							best: ["Eat", { Move: 3 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+							bars: [0, 2, 0, 0],
+							// Deliberately not drive + best − bar: the view must show what was recorded.
 							effective_votes: [0, 0.125, 0, 0],
-							committed: null,
-							hops: 1,
-						},
+						}),
 					],
-					[0, 0, 0, 0],
+					[0, 2, 0, 0],
+					"SE",
 				)}
 			/>,
 		);
 
-		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent("Move 0.900 − 0 = 0.125");
+		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent(
+			"Move drive 0.400 + Move[3] 0.900 − 2 = 0.125",
+		);
+		expect(screen.getByText("Drive Move: 0.400")).toBeInTheDocument();
+		expect(screen.getByTestId("tick-heading")).toHaveTextContent("heading at tick start SE");
+	});
+
+	it("shows a kind whose only vote is its drive", () => {
+		const votes = zeroVotes();
+		votes[26] = 0.7; // Drive Reproduce
+		render(
+			<VoteSurfaceBlock
+				tick={makeTick(
+					[
+						makePass({
+							pass_index: 0,
+							votes,
+							best: ["Eat", { Move: 0 }, { Reproduce: 1 }, { StealEnergy: 0 }],
+							effective_votes: [0, 0, 0.7, 0],
+							committed: { Reproduce: { direction: "NE", energy_transfer_fraction: 0 } },
+						}),
+					],
+					[0, 0, 1, 0],
+					"NE",
+				)}
+			/>,
+		);
+
+		expect(screen.getByTestId("effective-0-Reproduce")).toHaveTextContent(
+			"Reproduce drive 0.700 + Reproduce[1] 0.000 − 0 = 0.700",
+		);
+		expect(screen.getByTestId("effective-0-Reproduce")).toHaveClass("text-orange-300");
+		expect(screen.queryByTestId("effective-0-Move")).not.toBeInTheDocument();
 	});
 
 	it("shows Terminate against the winning effective vote on the pass that ends a TerminateVoted tick", () => {
 		const votes = zeroVotes();
 		votes[0] = 0.4;
-		votes[25] = 0.75;
+		votes[28] = 0.75;
 		const tick = makeTick(
 			[
-				{
+				makePass({
 					pass_index: 0,
-					end_reason: "NoTargets",
 					votes,
+					bars: [0, 1, 0, 0],
 					effective_votes: [0.4, -1, 0.2, 0],
-					committed: null,
 					hops: 3,
-				},
+				}),
 			],
 			[0, 1, 0, 0],
 		);
@@ -129,46 +174,46 @@ describe("VoteSurfaceBlock", () => {
 		);
 	});
 
-	it("shows each pass's effective vote per kind against the bar so the commits line up", () => {
+	it("shows each pass's effective vote per kind against its recorded bar so the commits line up", () => {
 		const votes = zeroVotes();
 		votes[3] = 0.52; // Move[2]
 		votes[11] = 0.026; // Reproduce[2]
+		const best: VoteSink[] = ["Eat", { Move: 2 }, { Reproduce: 2 }, { StealEnergy: 0 }];
 		const pass = (
 			pass_index: number,
+			bars: number[],
 			effective_votes: number[],
 			committed: MeshPassTrace["committed"],
-		): MeshPassTrace => ({
-			pass_index,
-			end_reason: "NoTargets",
-			votes,
-			effective_votes,
-			committed,
-			hops: 3,
-		});
+		): MeshPassTrace =>
+			makePass({ pass_index, votes, best, bars, effective_votes, committed, hops: 3 });
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
 					[
-						pass(0, [0, 0.52, 0.026, 0], { Move: "E" }),
-						pass(1, [0, -0.48, 0.026, 0], {
+						pass(0, [0, 0, 0, 0], [0, 0.52, 0.026, 0], { Move: "E" }),
+						pass(1, [0, 1, 0, 0], [0, -0.48, 0.026, 0], {
 							Reproduce: { direction: "E", energy_transfer_fraction: 0.5 },
 						}),
-						pass(2, [0, -0.48, -0.974, 0], null),
+						pass(2, [0, 1, 1, 0], [0, -0.48, -0.974, 0], null),
 					],
 					[0, 1, 1, 0],
 				)}
 			/>,
 		);
 
-		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent("Move 0.520 − 0 = 0.520");
+		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent(
+			"Move drive 0.000 + Move[2] 0.520 − 0 = 0.520",
+		);
 		expect(screen.getByTestId("effective-0-Move")).toHaveClass("text-orange-300");
-		expect(screen.getByTestId("effective-1-Move")).toHaveTextContent("Move 0.520 − 1 = -0.480");
+		expect(screen.getByTestId("effective-1-Move")).toHaveTextContent(
+			"Move drive 0.000 + Move[2] 0.520 − 1 = -0.480",
+		);
 		expect(screen.getByTestId("effective-1-Reproduce")).toHaveTextContent(
-			"Reproduce 0.026 − 0 = 0.026",
+			"Reproduce drive 0.000 + Reproduce[2] 0.026 − 0 = 0.026",
 		);
 		expect(screen.getByTestId("effective-1-Reproduce")).toHaveClass("text-orange-300");
 		expect(screen.getByTestId("effective-2-Reproduce")).toHaveTextContent(
-			"Reproduce 0.026 − 1 = -0.974",
+			"Reproduce drive 0.000 + Reproduce[2] 0.026 − 1 = -0.974",
 		);
 		expect(screen.getByTestId("effective-2-Reproduce")).not.toHaveClass("text-orange-300");
 		expect(screen.queryByTestId("effective-0-Eat")).not.toBeInTheDocument();

@@ -9,6 +9,7 @@ function makeSample(): ExecutionSample {
 		ticks: [
 			{
 				tick_number: 1,
+				heading: "N",
 				energy_before: 10,
 				energy_after: 9,
 				static_inputs: {
@@ -104,6 +105,7 @@ function makeSample(): ExecutionSample {
 			},
 			{
 				tick_number: 2,
+				heading: "N",
 				energy_before: 9.5,
 				energy_after: 9,
 				static_inputs: {

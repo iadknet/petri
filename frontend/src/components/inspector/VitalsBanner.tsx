@@ -48,6 +48,8 @@ interface VitalsBannerProps {
 	id: number;
 	rgb: [number, number, number];
 	generation: number;
+	/** The direction of the creature's last committed `Move`. */
+	heading: string;
 	age: number;
 	energy: number;
 	maxEnergy: number;
@@ -62,6 +64,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 	id,
 	rgb,
 	generation,
+	heading,
 	age,
 	energy,
 	maxEnergy,
@@ -108,6 +111,9 @@ export const VitalsBanner = memo(function VitalsBanner({
 				{/* Gen / Age */}
 				<span className="text-slate-400">Gen {generation}</span>
 				<span className="text-slate-400">Age {age}</span>
+				<span data-testid="vitals-heading" className="text-slate-400">
+					Heading {heading}
+				</span>
 
 				{/* Energy bar */}
 				<div className="flex items-center gap-1.5 min-w-0">

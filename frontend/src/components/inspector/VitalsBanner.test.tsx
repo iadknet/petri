@@ -28,6 +28,7 @@ const defaultProps = {
 	id: 42,
 	rgb: [120, 200, 80] as [number, number, number],
 	generation: 5,
+	heading: "N",
 	age: 150,
 	energy: 62,
 	maxEnergy: 100,

@@ -28,6 +28,7 @@ interface UnifiedInspectorProps {
 		maxEnergy: number;
 		age: number;
 		generation: number;
+		heading: string;
 		complexity: number;
 		genomeSize: number;
 		position: { x: number; y: number };
@@ -185,6 +186,7 @@ export function UnifiedInspector({
 				id={stats.id}
 				rgb={stats.phenotype.rgb}
 				generation={stats.generation}
+				heading={stats.heading}
 				age={stats.age}
 				energy={stats.energy}
 				maxEnergy={stats.maxEnergy}

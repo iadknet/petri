@@ -19,6 +19,7 @@ vi.mock("../../../hooks/useExecutionSampler.ts", () => ({
 function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 	const ticks = Array.from({ length: tickCount }, (_, i) => ({
 		tick_number: i,
+		heading: "N",
 		energy_before: 10,
 		energy_after: 9,
 		static_inputs: {

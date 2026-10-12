@@ -117,6 +117,7 @@ function makeDetail(id: number) {
 		maxEnergy: 24,
 		age: 12,
 		generation: 3,
+		heading: "N",
 		complexity: 8,
 		genomeSize: 12,
 		phenotype: {

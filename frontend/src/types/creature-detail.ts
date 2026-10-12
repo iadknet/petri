@@ -62,6 +62,8 @@ export interface CreatureDetail {
 	max_energy: number;
 	age: number;
 	generation: number;
+	/** The direction of the creature's last committed `Move`, e.g. `"NE"`. */
+	heading: string;
 	complexity: number;
 	genome_size: number;
 	phenotype: CreaturePhenotype;

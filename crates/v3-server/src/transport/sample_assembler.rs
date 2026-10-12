@@ -35,6 +35,7 @@ pub fn assemble_execution_sample(
 fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_json::Error> {
     Ok(TickTracePayload {
         tick_number: tick.tick_number,
+        heading: serialize_core_shape(tick.heading)?,
         energy_before: tick.energy_before,
         energy_after: tick.energy_after,
         static_inputs: StaticInputsSnapshotPayload {
@@ -101,6 +102,12 @@ fn assemble_pass(
             core_trace::PassEndReason::EnergyExhausted => PassEndReasonPayload::EnergyExhausted,
         },
         votes: pass.votes,
+        best: pass
+            .best
+            .into_iter()
+            .map(serialize_core_shape)
+            .collect::<Result<Vec<_>, _>>()?,
+        bars: pass.bars,
         effective_votes: pass.effective_votes,
         committed: pass.committed.map(serialize_core_shape).transpose()?,
         hops: pass.hops,
@@ -218,7 +225,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
 #[cfg(test)]
 mod tests {
     use super::*;
-    use v3_core::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+    use v3_core::creature::genome::vote::{VoteSink, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphOutputSinkTrace, GraphTrace, MeshHopTrace,
         MeshPassTrace, PassEndReason, TickTrace, TraceGateScore, TraceRouteDecision, VmTrace,
@@ -391,7 +398,12 @@ mod tests {
                         pass_index: 0,
                         end_reason: PassEndReason::Decided,
                         votes: [1.0; VOTE_SINK_COUNT],
-                        best: [v3_core::creature::genome::vote::VoteSink::Eat; VOTE_KIND_COUNT],
+                        best: [
+                            VoteSink::Eat,
+                            VoteSink::Move(2),
+                            VoteSink::Reproduce(0),
+                            VoteSink::StealEnergy(7),
+                        ],
                         bars: [0; VOTE_KIND_COUNT],
                         effective_votes: [1.0; VOTE_KIND_COUNT],
                         committed: Some(v3_core::contracts::WorldAction::Eat {
@@ -403,7 +415,7 @@ mod tests {
                         pass_index: 1,
                         end_reason: PassEndReason::PassCapReached,
                         votes: [0.0; VOTE_SINK_COUNT],
-                        best: [v3_core::creature::genome::vote::VoteSink::Eat; VOTE_KIND_COUNT],
+                        best: [VoteSink::Eat; VOTE_KIND_COUNT],
                         bars: [1, 0, 0, 0],
                         effective_votes: [-1.0, 0.0, 0.0, 0.0],
                         committed: None,
@@ -416,6 +428,7 @@ mod tests {
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [1, 0, 0, 0],
+                heading: v3_core::contracts::Direction::SE,
                 ..recorded_tick()
             }],
         };
@@ -445,6 +458,16 @@ mod tests {
         assert_eq!(tick.commit_counts, [1, 0, 0, 0]);
         let json = serde_json::to_value(tick).expect("pass records serialize");
         assert_eq!(json["passes"][0]["end_reason"], "Decided");
+        assert_eq!(json["heading"], "SE");
+        assert_eq!(
+            json["passes"][0]["best"],
+            serde_json::json!(["Eat", {"Move": 2}, {"Reproduce": 0}, {"StealEnergy": 7}])
+        );
+        assert_eq!(json["passes"][1]["bars"], serde_json::json!([1, 0, 0, 0]));
+        assert_eq!(
+            json["passes"][0]["votes"].as_array().map(Vec::len),
+            Some(30)
+        );
         assert_eq!(json["termination_reason"], "NoDecision");
         assert_eq!(
             json["static_inputs"]["previous_outcome"],

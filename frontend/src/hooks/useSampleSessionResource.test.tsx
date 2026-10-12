@@ -26,6 +26,7 @@ function buildSample(creatureId: number): ExecutionSample {
 		ticks: [
 			{
 				tick_number: 1,
+				heading: "N",
 				energy_before: 10,
 				energy_after: 9,
 				static_inputs: {

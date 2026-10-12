@@ -60,12 +60,14 @@ export interface ComputeNode {
 	plasticity?: PlasticityConfig | null;
 }
 
-/** One vote sink in the catalog; the number is a `Direction::ALL` index. */
+/** One vote sink in the catalog; the number is a `Direction::ALL` index. A
+ * `Drive` votes for its directed kind without naming a direction (T11.F30). */
 export type VoteSink =
 	| "Eat"
 	| { Move: number }
 	| { Reproduce: number }
 	| { StealEnergy: number }
+	| { Drive: DirectedVoteKind }
 	| "Terminate"
 	| "Decide";
 
