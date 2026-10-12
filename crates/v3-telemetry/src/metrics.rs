@@ -21,6 +21,8 @@ use opentelemetry_proto::tonic::metrics::v1::{
     Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
+use v3_core::creature::drives::DriveCensus;
+use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
@@ -120,6 +122,12 @@ pub struct Census {
     pub mean_genome_size: f64,
     pub mean_mesh_nodes: f64,
     pub mean_generation: f64,
+    /// Per directed kind, in `DirectedVoteKind::ALL` order: creatures with a
+    /// path into the kind's drive (the `drives-v1` census).
+    pub drive_carriers: [u64; DirectedVoteKind::ALL.len()],
+    /// Per directed kind: creatures repeating one source across the kind's
+    /// direction sinks, the duplication a drive writes once.
+    pub drive_fanout_creatures: [u64; DirectedVoteKind::ALL.len()],
 }
 
 impl Census {
@@ -130,7 +138,14 @@ impl Census {
             return Self::default();
         }
         let mean = |total: u64| total as f64 / population as f64;
+        let drives = DriveCensus::observe(
+            sim.creatures
+                .values()
+                .map(|c| (&c.genome, &*c.cached_reachable_nodes)),
+        );
         Self {
+            drive_carriers: drives.kinds.map(|kind| kind.drive_carriers),
+            drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
             mean_energy: sim.mean_energy(),
             mean_genome_size: mean(
@@ -918,6 +933,34 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
         sampled,
         census.mean_generation,
     );
+    for (name, counts) in [
+        ("drive_carriers", census.drive_carriers),
+        ("drive_fanout_creatures", census.drive_fanout_creatures),
+    ] {
+        f.push(
+            format!("petri.tick.{name}"),
+            sampled,
+            "",
+            DirectedVoteKind::ALL
+                .iter()
+                .zip(counts)
+                .map(|(kind, count)| {
+                    (
+                        vec![("petri.drive_kind", drive_kind_key(*kind).to_owned())],
+                        count.into(),
+                    )
+                }),
+        );
+    }
+}
+
+/// The `petri.drive_kind` attribute value of a directed kind.
+fn drive_kind_key(kind: DirectedVoteKind) -> &'static str {
+    match kind {
+        DirectedVoteKind::Move => "move",
+        DirectedVoteKind::Reproduce => "reproduce",
+        DirectedVoteKind::StealEnergy => "steal_energy",
+    }
 }
 
 /// Encodes one snapshot as an OTLP metrics request.

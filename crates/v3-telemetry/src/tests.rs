@@ -1203,3 +1203,61 @@ fn run_ended_with_totals_encodes_each_as_petri_total() {
     assert_eq!(ended.attribute("petri.tick"), Some("20"));
     assert!(ended.time_unix_nano > 0);
 }
+
+#[test]
+fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
+    use v3_core::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+    use v3_core::creature::genome::vote::{DirectedVoteKind, VoteSink};
+    use v3_core::creature::genome::BackendDef;
+
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
+    let config = small_config();
+    let mut sim = simulation(&config);
+    // Wire one founder's entry node, which is reachable, into the Move drive.
+    let creature = sim.creatures.values_mut().next().unwrap();
+    let entry = creature.cached_reachable_nodes[0];
+    let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
+        panic!("the default founder's entry node is a Graph node");
+    };
+    def.sink_mut(OutputSinkKind::ActionVote(VoteSink::Drive(
+        DirectedVoteKind::Move,
+    )))
+    .unwrap()
+    .inputs
+    .push(GraphEdge {
+        source: GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        },
+        weight: 0.5,
+    });
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+    telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
+
+    let snapshot = &receiver.snapshots()[0];
+    let value = |name: &str, kind: &str| {
+        snapshot
+            .value(name, &[("petri.drive_kind", kind)])
+            .unwrap()
+            .as_f64()
+    };
+    let population = sim.creatures.len() as f64;
+    assert_eq!(value("petri.tick.drive_carriers", "move"), 1.0);
+    assert_eq!(value("petri.tick.drive_carriers", "reproduce"), 0.0);
+    assert_eq!(value("petri.tick.drive_carriers", "steal_energy"), 0.0);
+    // Every founder repeats one source across Move and Reproduce directions.
+    assert_eq!(
+        value("petri.tick.drive_fanout_creatures", "move"),
+        population
+    );
+    assert_eq!(
+        value("petri.tick.drive_fanout_creatures", "reproduce"),
+        population
+    );
+    assert_eq!(
+        value("petri.tick.drive_fanout_creatures", "steal_energy"),
+        0.0
+    );
+}
