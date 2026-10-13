@@ -116,8 +116,10 @@ have no such mapping and whole-family bundles do not supply one.
   built in. No feature-specific sensor, no computed behavior.
 - Evolvability, not target abilities: the features improve what evolution can
   find; the creature-interaction examples are yardsticks only.
-- No backward compatibility: stored genomes, hash pins and draw sequences
-  constrain nothing. Expected re-pins are predeclared.
+- No backward compatibility, ever: no existing world, creature, genome,
+  artifact or wire shape constrains the design, and nothing is converted or
+  migrated. A running world restarts from the founder on the new build;
+  stored artifacts stay historical. Expected re-pins are predeclared.
 - KISS: the smallest set of concepts that covers the user's decisions; no
   parallel mechanisms.
 - Determinism: every draw order is documented; readers draw no RNG.
@@ -340,7 +342,8 @@ Decisions behind the model:
   `FOUNDER_GENOME_SIZE_UNITS` re-pinned so the founder's replication
   multiplier stays 1.0 and its gestation 1 tick; the founder's carrying cost
   falls 0.0097 → 0.0080 per tick. For a creature with `P` projections and
-  `S` wired sinks, `Δgenome_size = 8P − S`; a migrated group is +8 relative
+  `S` wired sinks, `Δgenome_size = 8P − S` (`P` counted as the ring groups
+  the same wiring would be under the new rule); a ring group is +8 relative
   to non-carriers. Readers that move: carrying cost (`1e-4` per unit per
   tick), mutation supply (`Binomial(size, rate)`: the per-unit rate becomes
   `0.485 / 80 = 0.0060625`, option a, user 2026-10-13, so the founder's
@@ -354,7 +357,7 @@ Decisions behind the model:
   `Binomial(anchor, rate)`. Functional complexity keeps its rules: a wired
   sink counts one whether its edges are members or not, sink edges are not
   counted individually, a group record counts one, a consumed reference one;
-  a migrated projection onto unwired sinks raises complexity by up to 8,
+  a ring group onto previously unwired sinks raises complexity by up to 8,
   which the action-cost multiplier, the reproduce charge and the predation
   kill bonus read, all off at defaults.
 
@@ -630,11 +633,11 @@ its own skip reason and counter, so a container defect surfaces as a named
 count, never as a silent rollback.
 
 **The three readers that treat projections differently today** get explicit
-post-migration expectations in F03: a motor node whose only votes come from
+post-change expectations in F03: a motor node whose only votes come from
 members is a voting node in `ladder/track.rs`; member channels are on the
 vote surface in `discovery.rs`; the frontend counts members as action
-writers through the server's annotations. Readers the migration must not
-change are pinned on group-free fixtures.
+writers through the server's annotations. Readers the change must not
+affect are pinned on group-free fixtures.
 
 **Determinism and pins.** F01 moves no pin; any movement under it is a
 defect. From F02 on every feature predeclares its re-pins, one cause per
@@ -720,8 +723,10 @@ tests run, a "Predeclared re-pins" line, a "Reference specs" line, and a
   - Scope: `Membership`, `GroupId`, `Group`, `Shape::Ring`, `compose`,
     `genomic_weight`, `own_weight` private, I2–I9 and `validate_graph` with
     its gate skip reason; derived `Debug`/`PartialEq` apart from the seeds
-    field; migration of `RingProjection` to `Ring` groups; the five group
-    operators (table below) with two-phase relocation; detach on retarget,
+    field; `RingProjection`, its evaluator and its list deleted outright,
+    `Ring` groups in their place with no converter and no serde alias (a
+    running world restarts from the founder, which has no projections); the
+    five group operators (table below) with two-phase relocation; detach on retarget,
     raw-field and split; `GroupKey::Ring` deleted and refinement's structs
     renamed; recruitment's ring case under both arms; the projection
     branches of both ablation paths and `ablated_channels` deleted;
@@ -768,7 +773,7 @@ tests run, a "Predeclared re-pins" line, a "Reference specs" line, and a
     `Δgenome_size` per operation equal to its declared change; the
     identity destructuring test; serde and `Debug` round trip over random
     valid genomes.
-  - Readings: the three readers' post-migration expectations; members per
+  - Readings: the three readers' post-change expectations; members per
     surviving group and detach or remove events per group over the goal run
     against the erosion rate the weights predict; goal indicators not down.
   - Reference specs: `v3-graph-backend-spec.md` §2, §6 (ring projections →
@@ -866,7 +871,7 @@ tests run, a "Predeclared re-pins" line, a "Reference specs" line, and a
   - Tests first: `sink_edge_learns_from_the_recorded_sample_not_a_replay`
     (a `WriteSlot` earlier in sink order changes memory a later sink edge
     read); `a_non_learning_graph_allocates_no_learned_state`; the
-    self-edge regression; the migration oracle keeping
+    self-edge regression; the behavior oracle keeping
     `plasticity/tests.rs:140-661` expectations with each node's config on
     its compute-input edges; `clear_slot_edges_are_never_eligible`.
   - Readings: learning edges by mode and surface; drift and sampled clamp

@@ -42,9 +42,11 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 - Energy is ecological accounting: every new capacity has an applied cost or
   tradeoff owned by the feature that introduces it, unless the user grants an
   explicit exception recorded in the feature's design note.
-- Backward compatibility is never a constraint: stored genomes, catalog
-  numbering, hash pins and draw sequences constrain nothing. Each feature
-  predeclares the re-pins it expects.
+- Backward compatibility is never a constraint: no existing world, creature,
+  genome, artifact, catalog numbering, hash pin or draw sequence constrains a
+  design, and nothing is converted or migrated; a running world restarts
+  from the founder on the new build. Each feature predeclares the re-pins it
+  expects.
 - Each spec declares its verification plan (benchmark profiles, mutation
   gate, slow tests) with one reason each, choosing the cheapest plan that
   answers the feature's question. The 2,000-tick goal profile does not
