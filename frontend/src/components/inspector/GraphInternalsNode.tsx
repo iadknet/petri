@@ -96,7 +96,7 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 				className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0"
 			/>
 			<div className="flex items-center gap-1 min-w-0 overflow-hidden">
-				{data.index >= 0 ? <span className="text-slate-500 shrink-0">{data.index}</span> : null}
+				{data.index >= 0 ? <span className="text-slate-400 shrink-0">{data.index}</span> : null}
 				<span className="truncate" style={{ color: c.text }}>
 					{data.kindLabel}
 				</span>
@@ -106,15 +106,15 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 							const changed = Math.abs(initial - data.outputValue) > 0.005;
 							return changed ? (
 								<>
-									<span className="shrink-0 text-[8px] text-slate-500">{initial.toFixed(2)}</span>
-									<span className="shrink-0 text-slate-600">{"\u2192"}</span>
+									<span className="shrink-0 text-[8px] text-slate-400">{initial.toFixed(2)}</span>
+									<span className="shrink-0 text-slate-400">{"\u2192"}</span>
 									<span className="shrink-0 text-[9px] text-cyan-300">
 										{data.outputValue.toFixed(2)}
 									</span>
 								</>
 							) : (
 								<>
-									<span className="shrink-0 text-slate-600">=</span>
+									<span className="shrink-0 text-slate-400">=</span>
 									<span className="shrink-0 text-[9px] text-cyan-300">
 										{data.outputValue.toFixed(2)}
 									</span>
@@ -133,16 +133,16 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 				) : null}
 			</div>
 			{data.subtitle ? (
-				<div className="text-[8px] text-slate-600 truncate mt-px">{data.subtitle}</div>
+				<div className="text-[8px] text-slate-400 truncate mt-px">{data.subtitle}</div>
 			) : null}
 			{hasRouteTargets ? (
 				<div className="flex items-center gap-0.5 mt-px text-[8px] overflow-hidden">
-					<span className="text-slate-600 shrink-0">{"\u2192"}</span>
+					<span className="text-slate-400 shrink-0">{"\u2192"}</span>
 					{data.routeTargets!.map((id, i) => (
 						<span
 							key={id}
 							className={`shrink-0 ${
-								data.selectedTarget === id ? "text-cyan-300" : "text-slate-600"
+								data.selectedTarget === id ? "text-cyan-300" : "text-slate-400"
 							}`}
 						>
 							#{id}

@@ -14,21 +14,6 @@
 	--color-petri-border-subtle: #334155;
 }
 
-/* NodeGraph active node glow pulse */
-@keyframes glow-pulse {
-	0%,
-	100% {
-		opacity: 0.4;
-	}
-	50% {
-		opacity: 0.9;
-	}
-}
-
-.animate-glow-pulse {
-	animation: glow-pulse 2s ease-in-out infinite;
-}
-
 /* MeshFlowEdge active dash animation */
 @keyframes meshEdgeDash {
 	to {
@@ -54,6 +39,16 @@
 	background: var(--color-slate-700);
 	cursor: pointer;
 	transition: background-color 140ms ease-out;
+}
+/* Invisible hit area: grows the 26x15 (sm 22x13) track to WCAG 2.5.8's 24px. */
+.config-switch::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: max(100%, 24px);
+	height: max(100%, 24px);
+	transform: translate(-50%, -50%);
 }
 .config-switch::after {
 	content: "";

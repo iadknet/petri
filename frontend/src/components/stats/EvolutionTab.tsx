@@ -60,7 +60,7 @@ export function EvolutionTab() {
 				</div>
 				{Object.keys(reproRejectedByReason).length > 0 && (
 					<div className="mt-1 pl-2 border-l border-slate-700">
-						<span className="text-[11px] text-slate-500">Why tries were rejected</span>
+						<span className="text-[11px] text-slate-400">Why tries were rejected</span>
 						{Object.entries(reproRejectedByReason).map(([reason, count]) => (
 							<div key={reason} className="flex justify-between text-[11px]">
 								<span className="text-slate-400" title={rejectionReason(reason).hint || undefined}>
@@ -93,9 +93,9 @@ export function EvolutionTab() {
 					/>
 				</div>
 				<div className="mt-1 pl-2 border-l border-slate-700">
-					<span className="text-[11px] text-slate-500">Skipped, by mutation type</span>
+					<span className="text-[11px] text-slate-400">Skipped, by mutation type</span>
 					{skipByOperatorEntries.length === 0 && (
-						<div className="text-[11px] text-slate-500">No operator-level skips recorded yet.</div>
+						<div className="text-[11px] text-slate-400">No operator-level skips recorded yet.</div>
 					)}
 					{skipByOperatorEntries.map(([operator, count]) => (
 						<div key={operator} className="flex justify-between text-[11px]">
@@ -108,7 +108,7 @@ export function EvolutionTab() {
 				</div>
 				<div className="mt-1 pl-2 border-l border-slate-700">
 					<span
-						className="text-[11px] text-slate-500 cursor-help"
+						className="text-[11px] text-slate-400 cursor-help"
 						title="Whether each mutation hit a mesh node the brain can reach from its entry node. Unreachable nodes never run, so changes there do nothing until rewired."
 					>
 						Target Reachability

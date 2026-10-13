@@ -42,7 +42,7 @@ export function MeshCanvas({
 	if (!layout) {
 		return (
 			<div className="flex h-full items-center justify-center bg-slate-950">
-				<p className="text-sm text-slate-500">Computing stable mesh layout…</p>
+				<p className="text-sm text-slate-400">Computing stable mesh layout…</p>
 			</div>
 		);
 	}
@@ -53,7 +53,7 @@ export function MeshCanvas({
 				<Suspense
 					fallback={
 						<div className="flex h-full items-center justify-center bg-slate-950">
-							<p className="text-sm text-slate-500">Loading topology canvas…</p>
+							<p className="text-sm text-slate-400">Loading topology canvas…</p>
 						</div>
 					}
 				>

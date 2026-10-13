@@ -78,18 +78,18 @@ export function Category({
 				>
 					<Icon
 						name="chevron"
-						className={`mt-0.5 size-3.5 text-slate-500 transition-transform duration-150 group-hover:text-slate-300 motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}
+						className={`mt-0.5 size-3.5 text-slate-400 transition-transform duration-150 group-hover:text-slate-300 motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}
 					/>
 					<span className="flex min-w-0 flex-1 flex-col">
 						<span className="flex items-baseline gap-2">
 							<span className="text-[13px] font-semibold text-slate-100">{title}</span>
 							{settingCount !== undefined && (
-								<span className="font-mono text-[10px] tabular-nums text-slate-600">
+								<span className="font-mono text-[10px] tabular-nums text-slate-400">
 									{settingCount}
 								</span>
 							)}
 						</span>
-						<span className="text-[11px] leading-snug text-slate-500">{summary}</span>
+						<span className="text-[11px] leading-snug text-slate-400">{summary}</span>
 					</span>
 					{changedCount > 0 && (
 						<span

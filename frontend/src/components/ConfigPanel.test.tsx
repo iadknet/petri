@@ -5,6 +5,7 @@ import { useConfigStore } from "../stores/config.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useStartupConfigStore } from "../stores/startupConfig.ts";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
+import { targetSize } from "../test/targetSize.ts";
 import type { FieldError } from "../types/errors.ts";
 import { ConfigPanel } from "./ConfigPanel.tsx";
 
@@ -767,6 +768,26 @@ describe("ConfigPanel", () => {
 			fireEvent.click(screen.getByTestId("revert-population-initial_creatures"));
 			expect(useStartupConfigStore.getState().preset.population.initial_creatures).toBe(50);
 		});
+	});
+
+	it("gives the small row and search buttons 24px pointer targets", () => {
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-move-cost"), {
+			target: { value: "3.25" },
+		});
+		fireEvent.change(screen.getByRole("searchbox"), { target: { value: "cost" } });
+		const buttons = [
+			screen.getByTestId("revert-energy-costs-move_cost"),
+			...screen.getAllByTestId(/^reset-/),
+			screen.getByRole("button", { name: "Clear search" }),
+		];
+		for (const button of buttons) {
+			const { width, height } = targetSize(button);
+			expect(height, button.outerHTML).toBeGreaterThanOrEqual(24);
+			if (!/(^|\s)px-/.test(button.className)) {
+				expect(width, button.outerHTML).toBeGreaterThanOrEqual(24);
+			}
+		}
 	});
 
 	it("keeps a hovered tooltip open when its icon is clicked", () => {

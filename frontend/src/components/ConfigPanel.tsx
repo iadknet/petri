@@ -272,7 +272,7 @@ export function ConfigPanel() {
 				<div className="relative">
 					<Icon
 						name="search"
-						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-slate-500"
+						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-slate-400"
 					/>
 					<input
 						ref={searchInput}
@@ -288,7 +288,7 @@ export function ConfigPanel() {
 								setQuery("");
 							}
 						}}
-						className="config-search h-7 w-full rounded border border-slate-700 bg-slate-950/60 pr-7 pl-7 text-xs text-slate-100 placeholder:text-slate-500 hover:border-slate-600 focus:border-sky-500/70 focus:outline-none"
+						className="config-search h-7 w-full rounded border border-slate-700 bg-slate-950/60 pr-7 pl-7 text-xs text-slate-100 placeholder:text-slate-400 hover:border-slate-600 focus:border-sky-500/70 focus:outline-none"
 					/>
 					{query ? (
 						<button
@@ -298,18 +298,18 @@ export function ConfigPanel() {
 								setQuery("");
 								searchInput.current?.focus();
 							}}
-							className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+							className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 before:absolute before:-inset-0.5 hover:bg-slate-800 hover:text-slate-200"
 						>
 							<Icon name="close" className="size-3" />
 						</button>
 					) : (
-						<kbd className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 rounded border border-slate-700 px-1 font-mono text-[10px] leading-4 text-slate-500">
+						<kbd className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 rounded border border-slate-700 px-1 font-mono text-[10px] leading-4 text-slate-400">
 							/
 						</kbd>
 					)}
 				</div>
 
-				<div className="flex min-h-5 items-center justify-between gap-2 text-[11px] text-slate-500">
+				<div className="flex min-h-5 items-center justify-between gap-2 text-[11px] text-slate-400">
 					<span aria-live="polite" className="truncate">
 						{searching
 							? `${plural(currentMatches, "match")} here`
@@ -339,7 +339,7 @@ export function ConfigPanel() {
 					data-testid="config-locked"
 					className="flex shrink-0 items-center gap-2 border-b border-petri-border bg-slate-950/40 px-3 py-2"
 				>
-					<Icon name="lock" className="size-3.5 text-slate-500" />
+					<Icon name="lock" className="size-3.5 text-slate-400" />
 					<p className="flex-1 text-[11px] leading-snug text-slate-400">
 						Live settings are locked while the world runs.
 					</p>

@@ -462,7 +462,7 @@ export function FertilitySection({
 							</button>
 						</div>
 						{fertilityLayers.length === 0 && (
-							<p className="text-[11px] text-slate-500">
+							<p className="text-[11px] text-slate-400">
 								No explicit layers configured. Add one to override backend defaults.
 							</p>
 						)}
