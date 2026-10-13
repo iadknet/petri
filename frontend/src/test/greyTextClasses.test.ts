@@ -35,10 +35,20 @@ const DISABLED_ALLOWLIST: Array<{ file: string; classes: string }> = [
 ];
 
 function faintGreyClasses(source: string): string[] {
-	return source.split(/[\s"'`{}]+/).filter((token) => /(^|:)text-slate-(500|600)$/.test(token));
+	return source
+		.split(/[\s"'`{}]+/)
+		.filter((token) => /(^|:)!?text-slate-(500|600)(\/[\d.]+)?!?$/.test(token));
 }
 
 describe("muted grey text classes", () => {
+	it("catches variant, opacity and important forms of the faint shades", () => {
+		expect(
+			faintGreyClasses(
+				'"hover:text-slate-500 text-slate-600/80 !text-slate-500 text-slate-400 text-slate-500x"',
+			),
+		).toEqual(["hover:text-slate-500", "text-slate-600/80", "!text-slate-500"]);
+	});
+
 	it("uses no sub-AA grey text outside disabled states", () => {
 		const offenders = sourceFiles(SRC).flatMap((file) => {
 			const name = relative(SRC, file);
