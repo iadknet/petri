@@ -100,7 +100,8 @@ historical reports omit these metadata fields and keep existing comparisons.
 
 From T12.F04, the standard `bench --profile goal` selects three built-in
 recipe cases: Orchards in grassland/11, Canyon country/22 and Confluence/33.
-Each executes once at 2,000 ticks with production creature policies and full
+Each executes once at 2,000 ticks (40,000 under `--profile goal-long`, its own
+`goal-worlds-long-v1` profile and series) with production creature policies and full
 goal observations, using that case's effective config and food-type count.
 The profile identifies case name, recipe path, effective digest and run seed;
 case-specific neighborhood/drift observations retain that attribution. Each

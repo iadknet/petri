@@ -690,13 +690,19 @@ fn gate_and_goal_series_select_only_their_own_references() {
     let gate_epoch = scratch_dir.join("gate-epoch.json");
     let gate_latest = scratch_dir.join("gate-latest.json");
     let goal_epoch = scratch_dir.join("goal-epoch.json");
-    for path in [&gate_epoch, &gate_latest, &goal_epoch] {
+    let goal_long_epoch = scratch_dir.join("goal-long-epoch.json");
+    for path in [&gate_epoch, &gate_latest, &goal_epoch, &goal_long_epoch] {
         std::fs::write(path, "{}").expect("create reference placeholder");
     }
     let index = bench::BenchmarkSeriesIndex {
         goal_worlds: Some(bench::SeriesIndex {
             series: "goal-worlds-v1".to_string(),
             epoch_baseline: goal_epoch.display().to_string(),
+            closed: vec![],
+        }),
+        goal_worlds_long: Some(bench::SeriesIndex {
+            series: "goal-worlds-long-v1".to_string(),
+            epoch_baseline: goal_long_epoch.display().to_string(),
             closed: vec![],
         }),
         gate: bench::SeriesIndex {
@@ -731,6 +737,14 @@ fn gate_and_goal_series_select_only_their_own_references() {
         bench::default_goal_references(&index_path).expect("read goal references"),
         bench::ReferenceSelection {
             paths: vec![goal_epoch],
+            absence: None,
+        }
+    );
+    // The long goal profile reads only its own series, never the 2,000-tick one.
+    assert_eq!(
+        bench::default_goal_long_references(&index_path).expect("read goal-long references"),
+        bench::ReferenceSelection {
+            paths: vec![goal_long_epoch],
             absence: None,
         }
     );
@@ -787,6 +801,7 @@ fn series_index_absence_causes_are_each_recorded() {
                 closed: vec![],
             },
             goal_worlds,
+            goal_worlds_long: None,
         };
         std::fs::write(
             &missing_index,
@@ -799,6 +814,12 @@ fn series_index_absence_causes_are_each_recorded() {
     let goal = bench::default_goal_references(&missing_index).expect("index parses");
     assert_eq!(goal.paths, Vec::<PathBuf>::new());
     assert_eq!(goal.absence.as_deref(), Some(expected_no_baseline));
+    let goal_long = bench::default_goal_long_references(&missing_index).expect("index parses");
+    assert_eq!(goal_long.paths, Vec::<PathBuf>::new());
+    assert_eq!(
+        goal_long.absence.as_deref(),
+        Some("series goal-worlds-long-v1 has no stored epoch baseline yet")
+    );
     write_index(Some(bench::SeriesIndex {
         series: "goal-worlds-v1".to_string(),
         epoch_baseline: scratch_dir.join("never-written.json").display().to_string(),

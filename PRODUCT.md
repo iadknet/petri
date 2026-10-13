@@ -59,8 +59,9 @@ neighbouring ALife projects do not claim:
   running simulation through the typed v3 server API.
 - **Telemetry stack** (`telemetry/`, Grafana on `127.0.0.1:3300`): run
   dashboards and the creature-windows report.
-- **Goal profile:** three saved worlds, run once per closure for 2,000 ticks
-  from 10,000 founders:
+- **Goal profile:** three saved worlds, run for 2,000 ticks from 10,000
+  founders when a feature's Verification Plan declares it; the long goal
+  profile runs the same worlds to 40,000 ticks:
   - Orchards in grassland, seed 11;
   - Canyon country, seed 22;
   - Confluence, seed 33.

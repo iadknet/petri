@@ -21,16 +21,18 @@ mod tracking;
 
 pub use comparison::{
     apply_comparisons, apply_comparisons_for_outputs, compare_against, compare_against_path,
-    default_gate_references, default_goal_references, BenchmarkSeriesIndex, Comparison,
-    ComparisonInputs, MeasuredIdentity, ReferenceSelection, SeriesIndex,
+    default_gate_references, default_goal_long_references, default_goal_references,
+    BenchmarkSeriesIndex, Comparison, ComparisonInputs, MeasuredIdentity, ReferenceSelection,
+    SeriesIndex,
 };
 use comparison::{
     FLAG_PERCENT, SEVERE_PERCENT, WALL_CLOCK_FLAG_PERCENT, WALL_CLOCK_SEVERE_PERCENT,
 };
 pub use profiles::{
-    build_config, effective_config_digest, gate_profile_params, goal_profile_params,
-    goal_world_configs, GoalCase, NeighborhoodSizes, ProfileParams, Recipe, COUNTER_NAMES,
-    GOAL_WORLD_SET, SAMPLE_EVERY_TICKS, SCHEMA_VERSION,
+    build_config, effective_config_digest, gate_profile_params, goal_long_profile_params,
+    goal_profile_params, goal_world_configs, is_goal_world_set, GoalCase, NeighborhoodSizes,
+    ProfileParams, Recipe, COUNTER_NAMES, GOAL_LONG_TICKS, GOAL_LONG_WORLD_SET, GOAL_WORLD_SET,
+    SAMPLE_EVERY_TICKS, SCHEMA_VERSION,
 };
 pub use run::{
     build_report, build_report_with_threads, detect_git_revision, deterministic_block_json,

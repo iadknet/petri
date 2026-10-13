@@ -48,6 +48,11 @@ itself.
   recorded result is implausible given the code (for example, a test file the
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
+- Verification Plan: the spec's declared benchmark profiles and mutation gate
+  fit the diff under the workflow's "Verification plan" table. A plan the diff
+  contradicts, such as `none` with a simulation trajectory change or mutation
+  `not run` on new production logic in `v3-core`, `v3-cli` or `v3-server`, is a
+  P1.
 - **Not** the mutation survivor record. The mutation gate runs after this review,
   on the final code, so there is nothing final for you to audit; the orchestrator
   audits it at the closure gate. Do not report a missing survivor list as a

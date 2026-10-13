@@ -25,6 +25,7 @@ per-tick traces unless a spec predeclares them with a projected size; the
 | --- | --- | --- |
 | Gate | `.bench-artifacts/<feature>/gate.json` | `docs/progress/features/<feature>.json` |
 | Goal | `.bench-artifacts/<feature>/goal.json` | `docs/progress/features/<feature>-goal.json` |
+| Goal-long (40,000 ticks, its own `goal_worlds_long` series) | `.bench-artifacts/<feature>/goal-long.json` | `docs/progress/features/<feature>-goal-long.json` |
 | Sweep | `.bench-artifacts/<feature>/sweep.json` | `docs/progress/features/<feature>-sweep.json` |
 | Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3. The byte cap is checked after each record lands, so lineages already in flight on other threads still append: the raw file may exceed `--byte-cap` by up to `threads − 1` lineage records. | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check. The writer is unchanged, but an S0 summary over 1 MiB is not committed: it stays local-only beside its raw file under `.bench-artifacts/<feature>/`, and the committed reading carries its numbers plus its path, SHA-256 and bytes. |
 
@@ -38,6 +39,7 @@ missing Git context requires explicit output paths.
 ```sh
 make bench PROFILE=gate FEATURE=tNN-fNN-slug
 make bench PROFILE=goal FEATURE=tNN-fNN-slug
+make bench PROFILE=goal-long FEATURE=tNN-fNN-slug
 make bench PROFILE=sweep FEATURE=tNN-fNN-slug \
   BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300"
 make bench PROFILE=sweep OUT="/tmp/ad hoc/full.json" \

@@ -1,6 +1,6 @@
 use super::*;
 use crate::bench::profiles::{
-    goal_profile_params, goal_recipe_seeds, GOAL_RECIPES, SAMPLE_EVERY_TICKS,
+    goal_profile_params, goal_recipe_seeds, GOAL_RECIPES, GOAL_WORLD_SET, SAMPLE_EVERY_TICKS,
 };
 use crate::bench::schema::MeshExecution;
 use crate::bench::tests::small_profile;

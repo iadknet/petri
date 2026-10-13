@@ -86,7 +86,7 @@ fn stored_artifact_comparison_parity() {
         serde_json::from_slice(&std::fs::read(env_path("PETRI_PARITY_SERIES")).unwrap()).unwrap();
 
     let mut pairs = Vec::new();
-    for name in ["gate", "goal", "goal_worlds"] {
+    for name in ["gate", "goal", "goal_worlds", "goal_worlds_long"] {
         let Some(series) = index.get(name) else {
             continue;
         };

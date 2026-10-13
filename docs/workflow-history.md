@@ -272,8 +272,23 @@ runs once per feature at Close; passes use `cargo check`, `cargo fmt --check`,
 crate tests and clippy, docs-only follow-ups use `make check-docs`, and a
 rebase reruns it only when `main` gained code.
 
+On 2026-10-12, after the program 1 roadmap reset, the user ruled that the
+expensive checks run only where their result could change a decision. Every
+feature had paid for a goal-profile run and a mutation gate, including
+documentation, frontend and telemetry work that could not change a simulation
+trajectory. Each spec now declares a Verification Plan: benchmark profiles
+(`none`, `gate`, `gate + goal`, or `gate + goal-long`) and the mutation gate
+(`run` or `not run`), each with a reason, checked by the reviewer against the
+diff. The lab, user and observability exemptions folded into that table. The
+same day added the long goal profile, the goal worlds at 40,000 ticks in their
+own series: long live runs had shown barrier avoidance, recovery from early
+troughs and memory use that a 2,000-tick reading could not see, and the user
+chose to keep 2,000 ticks as the ordinary goal horizon rather than pay an hour
+or more per closure.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
-[historical V3 roadmap](archive/v3-program-roadmap.md), and the
+[historical V3 roadmap](archive/v3-program-roadmap.md), the
+[program 1 roadmap archive](archive/program-1/README.md), and the
 [legacy workflow inventory](archive/legacy-workflow-inventory.md).
