@@ -1,7 +1,7 @@
 # T13.F01 — module recruitment observability: measured readings
 
 Measured evidence for
-[`docs/specs/roadmap/t13-f01-module-recruitment-observability.md`](../../specs/roadmap/t13-f01-module-recruitment-observability.md).
+[`docs/specs/roadmap/t13-f01-module-recruitment-observability.md`](../../archive/program-1/specs/roadmap/t13-f01-module-recruitment-observability.md).
 The spec keeps the predeclaration, the verdict, and the mutation survivor
 record. Machine-written reports:
 [gate](../features/t13-f01-module-recruitment-observability.json),

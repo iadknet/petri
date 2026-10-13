@@ -1,0 +1,440 @@
+# T13.F01 — Module Recruitment Observability
+
+**Status**: Complete
+**Last updated**: 2026-09-10
+**Feature**: T13.F01
+**Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
+
+This spec is the contract, not the record. Measured evidence lives in
+`docs/progress/features/t13-f01-module-recruitment-observability{,-goal}.json`
+and `docs/progress/readings/t13-f01-module-recruitment-observability.md`.
+
+## Goal
+
+Every goal closure shows, for the brain modules that appear along the existing
+mutation-only drift walk, where recruitment advances or stalls: how many new
+modules were created, whether mutation ever selected them, whether a selected
+event found an applicable site, whether the module changed internally, whether
+the fixed battery dispatched it, whether bypassing it changed the battery's
+actions, and whether it was deleted or retained. The same walk reports, per
+lineage, the mutation opportunities production actually offered by operator and
+domain, so mutation starvation of the executed core is distinguishable from
+silent scaffold before any substrate change.
+
+## Non-Goals
+
+- No change to mutation semantics, target applicability (T13.F03), Graph
+  effect activation (T13.F04), recruitment paths (T13.F05), usefulness or
+  retention under selection (T13.F02, T13.F06), or supply policy (T11.F13).
+- No per-node output/state effect trace, no measure of usefulness, no named
+  task, no ecological cohort tracking of the goal worlds' living populations,
+  and no production genealogy: cohort identity lives in the drift harness only.
+- No new dashboard, database, profile, campaign runner, CLI command, or
+  `docs/progress/index.html` change. No frontend change.
+- No change to the walk's seeds, sizes, checkpoints, refresh cadence, battery,
+  knockout method, existing drift fields, or the standing depth floors.
+
+## Inputs and Invariants
+
+- Sources: the owning track's T13.F01 row, its "F01 scope" and "F01 semantics
+  and limits" notes; [T11.F14](t11-f14-mesh-execution-observability.md)
+  (`mesh-execution-v1`, `static-successor-bypass-v1`);
+  [T11.F16](t11-f16-drift-depth-indicator.md) and T11.F17 (`drift-depth-v2`
+  walk: 50 lineages, checkpoints 0/22/250/1,000/2,000, executed-set refresh
+  every 10 generations, 20 birth lineages × 100 births); T11.F18's additive
+  `MeshBackendCounts`; the [recruitment research note](../../../../strategy/neutral-module-recruitment-research-2026-09-08.md)
+  (inspected `NoApplicableTarget` discard and zero-compute Graph early return).
+  Dependencies live in the track row.
+- Seams: `MutationEngine::apply_mutations_with_food_type_count` and its
+  `MutationSummary` (already carries attempted/applied/skipped events, per
+  operator funnels, skip reasons, domain tallies, reachable/executed target
+  counts); `mutation::reachability::TargetSelector::select`;
+  `neighborhood::drift::{observe, observe_checkpoint, refresh_executed_ids,
+  MeshTotals, Checkpoint}`; `Battery::{executed_node_ids, mesh_execution}`;
+  `DriftDepth`/`DriftDepthCheckpoint` and `drift_checkpoint` in
+  `crates/v3-cli/src/bench.rs`; `docs/progress.md`. Runtime, mutation, and
+  simulation must not depend on neighborhood or CLI types.
+- Research decision, 2026-09-10: observe recruitment inside the existing drift
+  walk rather than a new lineage tracer or an ecological genealogy. The walk
+  already applies the production engine once per generation per lineage,
+  refreshes each lineage's executed node ids every 10 generations, and runs the
+  knockout battery at every checkpoint, so every cohort fact below is derivable
+  from records the walk already produces or from the engine's own summary. The
+  engine's summary discards which node each event selected; surfacing it is the
+  one engine-side addition and it is the fact T13.F03 needs. The alternative of
+  inferring selection from genome diffs cannot see a selected-but-inapplicable
+  event at all.
+
+**Engine event records (additive, deterministic, no RNG).** `MutationSummary`
+gains `events: Vec<MutationEventRecord>`, one record per attempted event in
+draw order: the `MutationDomain`, the `MutationOperator`, the `NodeId` of the
+first node the event's `TargetSelector` returned (`None` when the operator
+skipped before any selection, e.g. no node of the required backend exists), and
+the outcome: applied with its `TargetReachability`, or skipped with its
+`MutationSkipReason`. `TargetSelector` remembers its first pick; recording reads
+it after the operator returns and translates the pre-event index to the id the
+genome carried before that event. Recording consumes no RNG, changes no
+selection, and leaves every existing summary field and production genome
+byte-identical. `events.len() == attempted_events`, and the applied/skipped
+records agree with `applied_events`/`skipped_events` and with each operator's
+funnel. Because the engine discards an operator that returns
+`NoApplicableTarget` and retries another operator of the same domain, the
+record also lists, in order, every operator discarded for that event with the
+node it first selected (`None` when it selected nothing): a discarded operator
+that selected a node is the *selected but no applicable site* fact the track
+names and T13.F03 repairs, and it must be visible even when a later operator
+applied. A record whose domain exhausted every operator is a skipped event
+carrying the first node any of its discarded operators selected. This runs on
+every production birth; its cost is two small vectors per birth that draws
+events — the reused `node_ids` scratch, sized to the genome's node count, and
+`summary.events` — plus one allocation per event that discards an operator and
+none for an event without a discard.
+
+**Opportunity accounting (per lineage, cumulative).** The walk pools each
+lineage's per-generation summaries from depth 0 to each checkpoint:
+births, zero-event births, attempted/applied/skipped events; per operator
+attempted, applied, and skipped by reason; per domain (Topology/Vm/Graph/
+InputRef) attempted and applied; reachable-, unreachable-, and executed-target
+events; and, from the event records, per operator the count of discards that
+*selected a target but found no applicable site* and of discards with *no
+eligible node*, plus per domain the same split for events whose domain
+exhausted every operator. Report pooled totals
+across the 50 lineages per checkpoint, and per-lineage rows carrying births,
+attempted, applied, skipped, the lineage's discarded selected-inapplicable
+count (its `discarded_selected_inapplicable_by_operator` total, so the rows sum
+to the pooled map), and applied by domain.
+Nothing is inferred from a checkpoint's fresh births; those keep their existing
+`BirthResult` role.
+
+**Module identity and provenance.** A module is one mesh node in one lineage,
+identified by `(lineage, NodeId, creation depth)`. Founder nodes are created at
+depth 0 with provenance `founder`. After each generation's birth the harness
+compares the lineage's node id set before and after: ids that vanished are
+`deleted` at that depth; ids that appeared are new modules with the backend
+they carry at creation and provenance `copy` when that birth applied at least
+one `CopyNode` event and the new node's `backend_def` equals some pre-birth
+node's, otherwise `new`. Because `next_node_id` reuses the lowest free id above
+the current maximum, an id that vanishes and reappears is two distinct
+modules; the id set diff is the whole identity rule, so an id present both
+before and after a birth is the same module whatever its content did.
+No cross-lineage identity exists. The harness stores only this table; it is
+bounded by nodes created along the walk, never a production genealogy.
+
+**Cohort facts (separate, never merged).** For each module the harness records
+the depth of: creation; first *selection* (an event record or one of its
+discarded operators naming its id, any outcome); first *applicable selection*
+(an applied event naming its id); first
+*internal change* (its `NodeGenome` differs from the previous generation's node
+with the same id, including input refs, targets, and backend content); first
+*dispatch* (its id is in the lineage's executed set at an executed-set refresh
+or checkpoint reading, so resolution is the existing 10-generation cadence plus
+checkpoints); first *battery contribution* (at a checkpoint, its id is executed
+and its static-successor bypass changes the complete `Signature`, i.e. the
+existing knockout loop's non-identical set, which `mesh_execution` now also
+returns as node id sets); and deletion. Dispatch is not an effect, a
+contribution is battery sensitivity only, and usefulness is unmeasured here;
+the reading names those limits. Modules deleted before reaching a fact and
+modules present at the end of observation without it are reported as separate
+censoring counts, never dropped from the denominator.
+
+**Cohort readings per checkpoint.** Over all modules with provenance `new` or
+`copy` created at or before the checkpoint, split by creation backend
+(Graph/VM) and pooled: created, deleted by now, present; among present, the
+exclusive state ladder *never selected*, *selected only* (no applied event),
+*applied only* (an applied event but no internal change, e.g. a route slot
+write on another node counts for that node, not this one), *changed only*,
+*dispatched not contributing* (dispatched at the latest executed reading at or
+before this checkpoint), *contributing* (this checkpoint's knockout); a module
+sits in the highest rung it has reached. Founder modules get the same present/
+deleted/contributing counts as a reference row. Time-to-first readings: for
+each fact, the count reached, the integer median generations from creation
+among those (upper-middle rule for even counts), and the two censoring counts.
+Retention between consecutive checkpoints: of modules contributing at the
+earlier one, how many are contributing, present but not contributing, or
+deleted at the later one. Per-lineage rows at each checkpoint carry created,
+present, dispatched, and contributing counts for `new`+`copy` modules.
+Invariants: created = present + deleted; the ladder partitions present;
+contributing ⊆ dispatched ⊆ present; per-lineage sums equal pooled totals;
+backend splits sum to totals; every count is an integer and the reading is
+identical across thread counts and processes.
+
+**Isolation.** Observation reads genomes and summaries the walk already
+produces, consumes no walk or birth RNG, changes no lineage genome, adds no
+battery execution beyond the existing refresh and checkpoint readings, and
+leaves every existing `drift-depth-v2` field, checkpoint birth result, mesh
+total, and the walk's genome sequence byte-identical. The version string
+becomes `drift-depth-v3`; the new blocks are serde-defaulted so historical
+reports load as `Undefined`/absent, never as zero. The walk's 30-second
+release cap per goal world is unchanged and covers the new work.
+
+## Implementation Tasks
+
+- [x] `TargetSelector` first-pick memory and `MutationSummary::events` with
+      `MutationEventRecord`; tests for the record/funnel agreement against
+      `attempted`/`applied`/`skipped`, the selected-but-inapplicable case on an
+      edgeless Graph module, the no-eligible-node case, the discard that stays
+      visible when a later operator applied, and pre-event id translation.
+      Recording is always on, so no in-tree reference path exists to compare a
+      genome or an RNG draw count against; that claim rests instead on
+      `drift.rs`'s byte-identical walk isolation tests, the recursive
+      structural comparison against T12.F04's reports, and the six 0.000000%
+      counters in both profiles (see Verification and Notes).
+- [x] `mesh_execution` exposes the executed and contributing node id sets
+      beside the existing counts, with the counts unchanged.
+- [x] Drift harness: per-lineage opportunity pooling, the module table with
+      the identity/provenance rule, cohort facts, per-checkpoint cohort and
+      retention readings; property tests for the invariants above; fixtures
+      for id reuse as two modules, copy provenance, the censoring split, and
+      walk isolation (genomes/RNG identical with and without the readings).
+- [x] `bench.rs`: `drift-depth-v3` blocks under each checkpoint reading,
+      serde-defaulted, six-decimal fractions from pooled integers; readings
+      file and `docs/progress.md` row.
+
+## Verification
+
+Evidence lives in
+[`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../../../progress/readings/t13-f01-module-recruitment-observability.md),
+which also names the seventeen focused tests written with the feature; the
+eight the mutation gate added are named in the mutation item below.
+
+- [x] `cargo test -p v3-core --test viability` (engine birth path touched):
+      `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
+      self-review commit, at `c1cfee5a` after the 2026-09-10 remediation, and
+      at `ea0044d5` after the 2026-09-10 review remediation, each with the same
+      result.
+- [x] `make check` re-run on the final code: exit 0 at `2f93d32a`
+      (log `/tmp/t13-f01-check6.log`), the mutation-gate commit that added the
+      eight kill tests and the last commit on this branch to touch code; the
+      earlier run was exit 0 at `ea0044d5` (log `/tmp/t13-f01-check5.log`).
+      At integration the branch was rebased without conflicts onto main
+      `f3798191` (documentation-only change, no overlapping files) and
+      `make check` exited 0 again on the rebased closure commit `f3bb1082`
+      (log `/tmp/t13-f01-check-rebased.log`).
+- [x] Focused tests: at `ea0044d5`, before the mutation gate,
+      `cargo test -p v3-core` (1281 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
+      passed, 0 failed) and `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed,
+      0 failed), plus `cargo clippy -p v3-core -p v3-cli --all-targets --
+      -D warnings` clean. Re-run at `2f93d32a` with the eight kill tests added:
+      `cargo test -p v3-core` (1289 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
+      passed, 0 failed); `v3-cli` is untouched by that commit and `make check`
+      above covers it.
+- [x] Measured results recorded in the readings file above.
+- [x] Structural comparison, a recursive diff of the whole `deterministic`
+      block against T12.F04's reports, re-run on the re-measured reports:
+      **no pre-existing field differs.** Gate 0 difference lines; goal 42,
+      every one a field new in `drift-depth-v3` (15 `recruitment`,
+      15 `opportunities`, 3 `version`, and 9 lines of the three new
+      `drift_depth` recruitment-contract strings, which sit outside the three
+      named exclusions and are reported as their own group).
+- [x] Per goal world: `drift_depth_wall_clock_ms` is one accumulated
+      18,956.8 ms over the three worlds, so every world is under the 30 s cap
+      (average 6.32 s); T12.F04 read 11,179.5 ms, so the observation adds
+      +2.59 s per world, down from +4.61 s before the in-place node diff, and
+      still above the predeclared "under 2 s". Cohort, opportunity, retention
+      and censoring tables per checkpoint are in the readings file. Drift
+      changed/all births 0.0045/0.006, 0.010/0.005, 0.0045/0.006 at depths
+      1,000/2,000 all meet the 0.0015 and 0.005 floors, byte-identical to
+      T12.F04.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`, run mode `fresh` ("fresh
+      run; no prior mutant results reused"), output in
+      `~/.local/share/petri-tools/mutants/t13-f01/mutants.out`. Summary line as
+      printed: `181 mutants tested in 13m: 25 missed, 138 caught, 18 unviable`.
+      `timeout.txt` is empty, so the 25 missed are the whole survivor list.
+      Closure audit 2026-09-10 (orchestrator): the incremental confirmation
+      run reused that output directory, so `missed.txt` there is now empty
+      and `run-mode.txt` reads `incremental`; the fresh run's 25 `MISSED`
+      lines in `/tmp/t13-f01-mutants.log` match this list one for one.
+      **All 25 killed** by eight tests added at `2f93d32a`, confirmed by
+      `MUTANTS_ITERATE=1 make rust-mutants`: `25 mutants tested in 3m:
+      25 caught` (incremental, so not closure evidence on its own; no
+      production code, test selection or tool configuration changed, so no
+      second fresh run is required). Survivors, by the test that kills each —
+      the first seven are in `crates/v3-core/src/neighborhood/recruitment/tests.rs`,
+      the last in `crates/v3-core/src/neighborhood/drift.rs`:
+  - `every_reported_key_is_its_documented_string` — killed
+    `recruitment.rs:45:9: replace ModuleBackend::as_key -> &'static str with ""`,
+    `recruitment.rs:45:9: ... with "xyzzy"`,
+    `recruitment.rs:77:9: replace Provenance::as_key -> &'static str with ""`,
+    `recruitment.rs:77:9: ... with "xyzzy"`,
+    `recruitment.rs:218:9: replace CohortFact::as_key -> &'static str with ""`,
+    `recruitment.rs:218:9: ... with "xyzzy"`.
+  - `the_state_accessors_follow_the_latest_reading` — killed
+    `recruitment.rs:141:9: replace Module::is_dispatched -> bool with true`,
+    `... with false`, `recruitment.rs:147:9: replace
+    Module::is_contributing -> bool with true`, and `... with false`.
+  - `pooling_one_birth_sums_every_event_total` — killed
+    `recruitment.rs:282:32: replace += with *= in Opportunities::record`,
+    `recruitment.rs:282:70: replace == with != in Opportunities::record`,
+    `recruitment.rs:286:38: replace += with *=`,
+    `recruitment.rs:287:40: replace += with *=`, and
+    `recruitment.rs:288:37: replace += with *=`, all in
+    `Opportunities::record`.
+  - `merging_lineage_opportunities_adds_every_total` (proptest) — killed
+    `recruitment.rs:327:32`, `:331:38`, `:332:40` and `:333:37: replace +=
+    with *= in Opportunities::merge`. The existing partition proptest could
+    not: it pooled its own expectation with the same `merge`, so a mutated
+    merge stayed self-consistent. No `proptest-regressions` entry appeared.
+  - `an_internally_changed_module_reaches_the_changed_only_rung` — killed
+    `recruitment.rs:581:31: replace match guard slot == node with true in
+    RecruitmentTracker::record_birth` and `recruitment.rs:392:52: replace +=
+    with *= in CohortCounts::record`. The existing partition proptest never
+    changed a kept node's content, so no module reached the changed-only rung.
+  - `every_lineage_row_names_its_own_lineage` — killed
+    `recruitment.rs:735:17: delete field lineage from struct LineageRow
+    expression in RecruitmentTracker::checkpoint`.
+  - `a_deleted_founder_leaves_the_founder_row` — killed
+    `recruitment.rs:747:42: replace += with *= in
+    RecruitmentTracker::checkpoint` (the founder `deleted` count).
+  - `the_walk_dates_modules_from_their_birth_and_from_every_refresh` — killed
+    `drift.rs:135:30: replace + with * in observe` (the birth's depth) and
+    `drift.rs:189:5: replace record_dispatch with ()`. Both are observable
+    only through the cohort's time-to-first medians, so the test pins a
+    deterministic 8-lineage walk over checkpoints `[1, 20]` in which four
+    cohort modules are dispatched.
+- [x] Benchmark reports stored at
+      `docs/progress/features/t13-f01-module-recruitment-observability.json`
+      and `-goal.json`, each re-run exactly once at `ea0044d5` after the review
+      remediation (`make bench PROFILE=gate` then `PROFILE=goal`, sequential,
+      nothing else running, both exit 0, logs `/tmp/t13-f01-gate4.log` and
+      `/tmp/t13-f01-goal4.log`); they overwrite the superseded `c1cfee5a`
+      reports because the retention row and the per-lineage opportunity row
+      changed. Every cohort ladder, founder row, time-to-first row and discard
+      total is unchanged from that pair; the retention rows and the per-lineage
+      rows are the only recruitment readings that moved. The second goal run is
+      not required (user decision 2026-09-05, `docs/workflow.md`).
+
+## Performance and Goal Impact
+
+**Predeclaration — written before the run.** Observation-only feature; the
+natural-analog requirement does not apply. Production births gain one small
+event-record vector; no simulation semantics, RNG draw, or work counter
+changes. Predeclared: all six normalized counters exactly unchanged in both
+profiles against the previous closure T12.F04 (gate epoch
+`remove-complementary-nutrition`; goal series `goal-worlds-v1` compares to
+T12.F04 as its only reference); wall time per creature-tick within the
+existing threshold, with any flag investigated before closure. The drift walk
+gains per-generation id-set diffs and node comparisons for 50 lineages ×
+2,000 generations and no battery work; expected under 2 s added per world
+inside the unchanged 30 s cap. Founder 10 s, evolved 180 s, and the 15-minute
+goal investigation thresholds are unchanged. No indicator is predeclared to
+move; existing drift fields per world are predeclared byte-identical to
+T12.F04. The new cohort and opportunity readings are descriptive baselines
+with no floor; T13.F02 owns the replicated baseline. Cognition indicators
+remain `Undefined`.
+
+**Measured verdict** (re-measured at `ea0044d5` after the 2026-09-10 review remediation; the `ab00bb07` and `c1cfee5a` measurements are superseded). Gate: `make bench PROFILE=gate` exit 0, `comparison.severe=false`, no threshold crossed — all six counters 0.000000% against T11.F18 and wall/creature-tick 0.0013768476 ok against both references; gate epoch not re-pinned. Goal: `make bench PROFILE=goal` exit 0, `comparison.severe=false`, no counter or wall threshold crossed — all six counters 0.000000% against T12.F04 and wall/creature-tick 0.0078041359 (+5.37%) ok, end-to-end 507 s inside the 15-minute threshold; the drift walk's accumulated 18,956.8 ms keeps every world inside the 30 s cap and the in-place node diff cut the added time from +4.61 s to +2.59 s per world, which still misses the predeclared "under 2 s added per world"; goal epoch not re-pinned. The observation reports the selected-but-inapplicable fact: 27,096 / 28,380 / 27,096 discarded operators had selected a module and found no applicable site by depth 2,000, unchanged by this remediation, and the `selected only` rung holds 609 / 621 / 609 present modules. Retention now counts cohort modules only: 2/32, 6/36 and 2/32 of the modules contributing at depth 1,000 still contribute at depth 2,000.
+
+- Reports: [gate](../../../../progress/features/t13-f01-module-recruitment-observability.json),
+  [goal](../../../../progress/features/t13-f01-module-recruitment-observability-goal.json).
+- Full readings: [`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../../../progress/readings/t13-f01-module-recruitment-observability.md).
+
+## Success Criteria
+
+- [x] The goal report and `docs/progress.md` show, per world and checkpoint,
+      new-module cohorts by backend across the state ladder with censoring and
+      retention, and per-lineage mutation opportunities by operator with the
+      selected-but-inapplicable split, all with denominators.
+- [x] Existing drift, birth, and mesh readings and every production
+      trajectory are unchanged, and the observation stays inside its caps.
+
+## Notes for AI Agents
+
+- Readiness review 2026-09-10 (orchestrator, one pass): the first draft said
+  a new module's first *selection* could be inferred from genome diffs; that
+  cannot see a selected-but-inapplicable event, which is the fact T13.F03
+  repairs, so the engine event record was added and the ladder's *selected
+  only* rung defined from it. The copy-provenance rule was tightened to
+  require a `CopyNode` event in the same birth so blank detours matching an
+  existing blank node are not labeled copies.
+- Unobserved facts stay unmeasured: effects and usefulness have no field here.
+- Implementation deviations, 2026-09-10 (build pass, `12ccdb6b`..`af5dc3a1`):
+  - The engine retries every operator of a drawn domain before recording a
+    skip, so an operator-level `NoApplicableTarget` never reaches the summary
+    and the *selected-but-inapplicable* / *no-eligible-node* split is reported
+    **per domain**, not per operator. `MutationEventRecord::operator` is
+    therefore `Option<MutationOperator>`: `None` marks a domain-exhausted
+    attempt, and the record still carries the first node any of that domain's
+    operators selected, which is what separates the two cases.
+  - The pure observation types and the module table live in
+    `crates/v3-core/src/neighborhood/recruitment.rs`; `drift.rs` owns the walk
+    and feeds them. `observe` now returns `DriftWalk { checkpoints,
+    recruitment }` so every existing `Checkpoint` field and its equality tests
+    stay untouched.
+  - Copy provenance keys on `Topology.CopyNode` only, as the spec's literal
+    `CopyNode`; the mesh slice-copy operators also create nodes and are
+    recorded as `new`.
+  - `observe_checkpoint` reads `Battery::mesh_execution_sets` once per lineage,
+    so the checkpoint runs no battery pass beyond the existing one.
+- Remediation, 2026-09-10 (`afa6ae5c`..`c1cfee5a`), which supersedes the first bullet
+  above: the per-domain-only split was an observation gap, not the whole
+  truth. `MutationEventRecord` now carries an ordered `discarded` list of
+  `(operator, Option<NodeId>)` entries, one per operator the event threw away
+  for reporting `NoApplicableTarget`, so a module selected by an operator that
+  found no site stays visible even when a later operator of the same domain
+  applied. `Opportunities` splits those discards per operator
+  (`discarded_selected_inapplicable_by_operator`,
+  `discarded_no_eligible_node_by_operator`, both serde-defaulted in the report)
+  and feeds their picks into first *selection*, which makes the ladder's
+  *selected only* rung reachable; the per-domain event-level split is kept and
+  still reads empty, because only a domain that exhausts every operator
+  records an event-level skip. The record drops `Copy` and keeps
+  `Clone`/`PartialEq`/`Eq`/`Ord`/`Hash`; an event without a discard allocates
+  nothing; no RNG draw, selection, or existing summary field changed.
+  Copy provenance still asks whether some *pre-birth* node carried the new
+  node's `backend_def`: the birth is classified against the untouched
+  snapshot and the snapshot is written only afterwards, so a node added
+  beside a changed source or beside another new node is not called a copy.
+  Separately, the walk no longer clones each parent's `nodes` every
+  generation: `RecruitmentTracker` retains one node snapshot per lineage,
+  seeded by `seed_founder`, diffs the birth against it in place, and clones
+  only the nodes the birth changed or added, so `BirthObservation` no longer
+  carries `before`. Every existing `Checkpoint` field, walk genome, and RNG
+  stream is unchanged, which the unmodified isolation tests and the re-run
+  structural comparison both confirm.
+- Review 2026-09-10: P1 1, P2 3, P3 2; all remediated in this pass
+  (`9d6945bc`..`ea0044d5` plus these document edits).
+  - P1-1 (documentary): the first Implementation Task claimed a property test
+    that recording leaves the genome, RNG stream, and summary fields
+    unchanged. No such test exists and none can be written in-tree: recording
+    is always on, so there is no non-recording reference path to compare a
+    genome or an RNG draw count against. The box now names the five tests
+    that do exist and cites the evidence that carries the unchanged-genome and
+    unchanged-RNG claim — the byte-identical walk isolation tests in
+    `drift.rs`, the recursive structural comparison against T12.F04, and the
+    0.000000% counters in both profiles.
+  - P2-1 (correctness): `RecruitmentTracker::checkpoint` inserted every
+    contributing module into the next checkpoint's retention set before the
+    cohort filter, so founder modules were counted in `contributing_before`
+    (depth 22 read 100, depth 2,000 read 37 = cohort 32 + founders 5).
+    Retention is a cohort reading, so only `new`/`copy` modules enter it now;
+    the retention test carries a contributing founder and the property test
+    asserts `contributing_before` equals the earlier checkpoint's cohort
+    `contributing`. The readings were re-derived from a fresh measured run.
+  - P2-2 (truthfulness of a zero): the per-lineage opportunity row summed the
+    event-level per-domain split, which is empty by construction, so all 50
+    rows read 0 while the pooled discard count was tens of thousands. The row
+    is now `discarded_selected_inapplicable`, the sum of that lineage's
+    `discarded_selected_inapplicable_by_operator`, and the rows sum to the
+    pooled map — asserted in the deterministic bench fixture (where the two
+    splits deliberately differ), in the small goal report, and in the core
+    property test.
+  - P2-3 (maintainability): cohort facts are indexed by `CohortFact`.
+    `Module` carries `first: [Option<u64>; CohortFact::COUNT]` behind
+    `Module::first`, the checkpoint carries `[TimeToFirst; COUNT]` behind the
+    existing `time_to_first(fact)`, and `CohortFact::{ALL, COUNT, as_key}` let
+    the bench loop once, so a new fact is one enum edit. `Rung` and the
+    report's `CohortLadder` were left alone: their rungs are named JSON
+    fields. Serialized names and values are unchanged apart from P2-2's
+    rename.
+  - P3-1: the engine event record costs two small vectors per birth that draws
+    events (`node_ids` and `summary.events`), not one; the wording is fixed.
+  - P3-2: the `bench.rs` task is checked and its stale parenthetical dropped —
+    the readings file and the `docs/progress.md` row both exist.
+- Cost record 2026-09-10 (telemetry only): `/usage` totals not collected (the
+  user was not present at closure). Implementer passes: build (3 advisor
+  consults), self-review and benchmarks (3), discarded-operator remediation
+  and re-measurement (2), post-review remediation and re-measurement (2),
+  mutation gate (3); five passes, 13 consults. Reviewer findings: P1 1, P2 3,
+  P3 2, all remediated. Goal profile ran three times because the measured
+  code changed twice after the first run; the stored reports are from the
+  final code.

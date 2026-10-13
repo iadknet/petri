@@ -10,7 +10,7 @@ follow-up's N3 row narrowed to three observation questions it could not
 answer with the instrument it had. This plan answers those three questions
 with instrument work only, no mechanism prototype, **on current production**.
 It runs under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 in the form of the [deletion-rate plan](deletion-rate-experiment-plan-2026-10-09.md).
 
 ## Problem and constraints

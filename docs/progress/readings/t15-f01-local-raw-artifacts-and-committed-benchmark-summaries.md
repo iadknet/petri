@@ -1,6 +1,6 @@
 # T15.F01 readings
 
-[Spec](../../specs/roadmap/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.md)
+[Spec](../../archive/program-1/specs/roadmap/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.md)
 and [artifact format/commands](../../benchmark-artifacts.md).
 
 ## Implementation verification

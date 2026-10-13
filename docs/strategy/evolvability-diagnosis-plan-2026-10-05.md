@@ -1,7 +1,7 @@
 # Evolvability diagnosis run: plan
 
 Date: 2026-10-05. Status: plan for one unattended run under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 executing the experiment ledger of the
 [evolvability diagnosis note](evolvability-diagnosis-2026-10-05.md) (read it first; this
 plan does not repeat its argument) and the sibling

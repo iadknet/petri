@@ -4,7 +4,7 @@ Date: 2026-10-05. Plan:
 [evolvability-diagnosis-plan-2026-10-05.md](evolvability-diagnosis-plan-2026-10-05.md)
 (the run's contract), executing the ledger of the
 [evolvability diagnosis note](evolvability-diagnosis-2026-10-05.md) under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md);
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md);
 the [run 1 plan](evolvability-exploration-plan-2026-10-01.md) governs what the
 plan does not cover. Status: **complete**.
 

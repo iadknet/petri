@@ -8,7 +8,7 @@ the [output-wiring run](output-wiring-run-2026-10.md)'s gates,
 frozen-instrument pattern and Advice table as the precedent, extending the
 [diagnosis follow-up run](evolvability-diagnosis-run-2026-10-followup.md)'s
 row N3 instrument, inside the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Status: **complete** (gates V0.2 and V0 passed; V1 completed to 50,000; D
 run beside on both Canyon seeds; Codex reviews (a) and (b) disposed; landed
 on `main` as docs only, the `instr:` commits kept on the branch).

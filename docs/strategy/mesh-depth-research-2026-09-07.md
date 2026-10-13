@@ -1,6 +1,6 @@
 # Depth Research Note: Why the Overnight Run Stalled
 
-**Status**: Research (companion to the [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md), the [brain evolvability audit](brain-evolvability-audit-2026-09-04.md), and the [mesh evolvability research note](mesh-evolvability-research-2026-09-06.md); not executable roadmap guidance)
+**Status**: Research (companion to the [T11 track](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md), the [brain evolvability audit](brain-evolvability-audit-2026-09-04.md), and the [mesh evolvability research note](mesh-evolvability-research-2026-09-06.md); not executable roadmap guidance)
 **Date**: 2026-09-07
 **Code**: `main` at 32468c20 (T11.F08 closed); the inspected server binary was built at 22:28 on 2026-09-06, after that commit, and its counters show the T11.F15 operator set (no `RewriteNodeId` row)
 **Subject**: the user's overnight `serve` run, paused at tick 281,405 with 4,742 creatures, production defaults, 1600 by 1600, 10,000 V3Alpha1 founders
@@ -34,7 +34,7 @@ Counterfactuals on the live genomes (Section 5) put the cause where the code put
 
 **Problem.** Mesh evolution at depth. The goal profile closes features at 2,000 ticks (22 generations at the median); the user runs for 281,405 ticks (1,990 generations). Whatever the T11 repairs did at 22 generations, the question is what the substrate does at 2,000.
 
-**Constraints carried from the program** ([roadmap notes](../roadmap.md#notes-for-ai-agents)): ecological selection only; every mechanism names a natural analog and reaches creatures through world or body; seeded runs stay byte-for-byte reproducible; the T11.F04 neutral scaffold stays unless measured; the 5% dead-birth and 60% single-event-silent floors are targets, not scores; brain execution is on the hot path.
+**Constraints carried from the program** ([roadmap notes](../archive/program-1/roadmap.md#notes-for-ai-agents)): ecological selection only; every mechanism names a natural analog and reaches creatures through world or body; seeded runs stay byte-for-byte reproducible; the T11.F04 neutral scaffold stays unless measured; the 5% dead-birth and 60% single-event-silent floors are targets, not scores; brain execution is on the hot path.
 
 **Decision criteria.** Whether an option restores mutational exposure of the functional core at depth without raising dead births above the floor; whether it bounds junk without freezing the core; hot-path and mutation-time cost; whether it is a bounded T11 feature with a natural analog; whether the closure instruments would detect a regression of it.
 
@@ -42,7 +42,7 @@ Counterfactuals on the live genomes (Section 5) put the cause where the code put
 
 | Item | Covers | Does not cover |
 | --- | --- | --- |
-| T11.F04 ([spec](../specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md)) | 0.55 requested events per birth as mostly single events; `reachable_bias` 0.0 in every domain so inactive structure gets the same target opportunity as live code; size pressure off | The consequence at depth: as inactive structure grows, the live core's share of events falls in proportion. The mesh note recorded this as "a known trade, not a T11 repair target" (its Section 4, item 10) from a structure-only reading; the functional cost is measured here |
+| T11.F04 ([spec](../archive/program-1/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md)) | 0.55 requested events per birth as mostly single events; `reachable_bias` 0.0 in every domain so inactive structure gets the same target opportunity as live code; size pressure off | The consequence at depth: as inactive structure grows, the live core's share of events falls in proportion. The mesh note recorded this as "a known trade, not a T11 repair target" (its Section 4, item 10) from a structure-only reading; the functional cost is measured here |
 | T11.F13 (after T11.F10) | Fixed-rate arms below, at, and above 0.55; treatment arms for size-scaled supply, depth-weighted targeting, and reachable bias with CGP's single active-gene mutation as the reference arm | Executed-biased targeting (the reachable set is five times the executed set on the live population, Section 3.3); a junk bound; a depth reading. Its Sims arm is described as the answer to dilution, but Sims' rule holds per-genome supply constant, which is Petri's current regime (Section 6) |
 | T11.F14 | Executed count, route variation, knockouts, hop-cap hits, generation depth of the goal profile | Any reading deeper than the goal profile's 22 generations; no drift-to-depth component |
 | T11.F15 | Branch with bid, activation-neutral destinations, single-visit routing | Nothing missing for this question; its effect is confirmed at depth (Section 3.3) |
@@ -295,7 +295,7 @@ Not applied: the master roadmap's final success criteria are unchanged, since th
 - [Ikeda, Kaneko, and Hatakeyama, 2026](https://arxiv.org/abs/2608.24704)
 - [Park, Qian, and Zhang, Genomic evidence for elevated mutation rates in highly expressed genes, EMBO Reports 2012](https://www.embopress.org/doi/full/10.1038/embor.2012.165) (abstract, via Europe PMC: "the rate of point mutation in a gene increases with the expression level of the gene"; the natural analog named by T11.F17)
 - Scanned, set aside: [Akhtyrchenko, Katsnelson, and Ustyuzhanin, 2026](https://arxiv.org/abs/2606.17091); [Hamon, Nisioti, and Moulin-Frier, 2023](https://arxiv.org/abs/2302.09334); [Lu et al., JaxLife, 2024](https://arxiv.org/abs/2409.00853)
-- Local: [brain evolvability audit](brain-evolvability-audit-2026-09-04.md); [mesh evolvability research note](mesh-evolvability-research-2026-09-06.md); [T11.F15 spec](../specs/roadmap/t11-f15-mesh-routing-connection-semantics.md) (founder and generation-22 rows); [T11.F04 spec](../specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md)
+- Local: [brain evolvability audit](brain-evolvability-audit-2026-09-04.md); [mesh evolvability research note](mesh-evolvability-research-2026-09-06.md); [T11.F15 spec](../archive/program-1/specs/roadmap/t11-f15-mesh-routing-connection-semantics.md) (founder and generation-22 rows); [T11.F04 spec](../archive/program-1/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md)
 
 ## Appendix A: reproducing the readings
 

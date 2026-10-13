@@ -2,7 +2,7 @@
 
 Date: 2026-10-04. Status: plan (research workflow, three critics, Codex rounds 1–3, round 3 `ready`), written after
 [run 5](evolvability-exploration-2026-10-run5.md) (outcome B), under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 User direction (2026-10-02 side chat, unattended): change the scale, not the
 knobs. Run fewer arms over much longer horizons and plot time-to-reach. Change
 the starting genome. Check against the real world.

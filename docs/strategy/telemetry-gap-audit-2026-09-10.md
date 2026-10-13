@@ -1,6 +1,6 @@
 # Telemetry Gap Audit — 2026-09-10
 
-**Status**: Evidence base for [T14](../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
+**Status**: Evidence base for [T14](../archive/program-1/roadmaps/t14-runtime-telemetry-and-report-integrity.md)
 **Machine-readable companion**: [telemetry-gap-audit-2026-09-10.results.json](telemetry-gap-audit-2026-09-10.results.json)
 
 This note records what the simulator records, what it does not, and which

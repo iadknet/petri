@@ -1,7 +1,7 @@
 # T11.F18 — backend-neutral mesh node growth: measured readings
 
 Measured evidence relocated on 2026-09-09 from
-[`docs/specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md`](../../specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md),
+[`docs/specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md`](../../archive/program-1/specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md),
 unchanged in content. The spec keeps the predeclaration, the verdict, the
 mutation survivor record, and every user decision. Machine-written reports:
 [gate](../features/t11-f18-backend-neutral-mesh-node-growth.json), [goal](../features/t11-f18-backend-neutral-mesh-node-growth-goal.json).

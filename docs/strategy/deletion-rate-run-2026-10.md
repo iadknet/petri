@@ -12,7 +12,7 @@ effect. Its form follows the
 pattern, Advice table, Codex reviews), under the
 [diagnosis plan](evolvability-diagnosis-plan-2026-10-05.md)'s rules 1 to 9 as
 far as they apply to a one-row run, and inside the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Status: **stopped by user decision** (2026-10-09, about 20:05). Gates S0-F
 and S0.2 passed and S0 was a go (recorded below). S1 ran 15 of 16 runs; the
 last one, `del-0.03` on seed 4022, was stopped before completing. S1 was not

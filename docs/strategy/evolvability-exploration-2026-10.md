@@ -1,7 +1,7 @@
 # Evolvability exploration: results (2026-10)
 
 Status: complete; reviewed by Codex (two reviews, two advice rounds). Contract: the [run plan](evolvability-exploration-plan-2026-10-01.md)
-under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+under the [T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Launch revision `ce40054dca9d68e0286755074a772a7cd510e5c1` (clean `main`, 2026-10-01).
 Experiment branch `worktree-evolvability-exploration` (never merges). Compact
 summaries cited below live in [`evolvability-exploration-2026-10/`](evolvability-exploration-2026-10/);

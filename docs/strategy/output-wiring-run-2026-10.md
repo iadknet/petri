@@ -14,7 +14,7 @@ far as they apply to a one-row run and the
 [run 1 plan](evolvability-exploration-plan-2026-10-01.md) (the five
 not-forcing checks, matched controls, commit kinds, the Codex review command,
 the close order), inside the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Status: **complete** (every gate passed; W1 completed, **not validated** by
 its predeclared rule on one seed of two; the horizon question answered on
 `default`: **horizon**; Codex reviews (a) and (b) disposed; landed on `main`
@@ -320,7 +320,7 @@ would either make production or remove: finding 16), the
 clause naming the vote sink, and the
 [mutation spec](../reference/v3-mutation-spec.md)'s InputRef-domain `Add`
 paragraph, which names the vote sink draw `gen_range(0..27)`; the T20.F02
-[neutral-connection contract](../specs/roadmap/t20-f02-graph-neutral-connection-contract.md)'s
+[neutral-connection contract](../archive/program-1/specs/roadmap/t20-f02-graph-neutral-connection-contract.md)'s
 unsupported-destinations row (`ClearSlot`, `WriteSlot`, `CustomOutput`,
 `ActionParam`, `RouterGate` outside the eligible set because a wired empty
 sink can clear or overwrite incumbent data): F02 qualifies **zero-weight

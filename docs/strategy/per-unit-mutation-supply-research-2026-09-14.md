@@ -213,7 +213,7 @@ What this feature does not do: it does not make the core less robust (four in fi
 - [Drake, A constant rate of spontaneous mutation in DNA-based microbes, PNAS 1991](https://pmc.ncbi.nlm.nih.gov/articles/PMC52253/)
 - [Sung, Ackerman, Miller, Doak, Lynch, Drift-barrier hypothesis and mutation-rate evolution, PNAS 2012](https://pmc.ncbi.nlm.nih.gov/articles/PMC3494944/); Lynch et al. 2016 (Nature Reviews Genetics) is not in PMC and was not read
 - [Ochoa, Error Thresholds in Genetic Algorithms, Evolutionary Computation 2006](https://pubmed.ncbi.nlm.nih.gov/16831105/) (abstract); [Bäck, Optimal Mutation Rates in Genetic Search, ICGA 1993](https://dl.acm.org/doi/10.5555/645513.657408) (abstract)
-- Local: [depth note](mesh-depth-research-2026-09-07.md); [T03.F08 spec](../specs/roadmap/t03-f08-genome-size-maintenance-cost.md) and [sweep](../progress/sweeps/t03-f08/); [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md) (T11.F13 and T11.F17 notes); [T13.F06 goal report](../progress/features/t13-f06-recruitment-and-retention-qualification-goal.json)
+- Local: [depth note](mesh-depth-research-2026-09-07.md); [T03.F08 spec](../archive/program-1/specs/roadmap/t03-f08-genome-size-maintenance-cost.md) and [sweep](../progress/sweeps/t03-f08/); [T11 track](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md) (T11.F13 and T11.F17 notes); [T13.F06 goal report](../progress/features/t13-f06-recruitment-and-retention-qualification-goal.json)
 
 ## Appendix: the prototype
 

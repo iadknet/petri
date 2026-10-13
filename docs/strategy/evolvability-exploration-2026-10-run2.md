@@ -4,7 +4,7 @@ Status: complete; evidence outcome **C (blocker)**: no admissible, validated
 food-seeking instrument exists for the required two-assay mechanism
 contrasts. Reviewed by Codex (four reviews, one advice round; review 4 verdict `ready`). Contract: the [run 2 plan](evolvability-exploration-plan-2026-10-02.md),
 which amends the [run 1 plan](evolvability-exploration-plan-2026-10-01.md), under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Launch revision `eefca5db369cc1c90ffdc943845340518af5efaa` (clean `main`, 2026-10-01).
 Experiment branch `worktree-evolvability-exploration-2` (never merges). Compact
 summaries cited below live in [`evolvability-exploration-2026-10-run2/`](evolvability-exploration-2026-10-run2/);

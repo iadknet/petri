@@ -165,7 +165,7 @@ guard first.
   gamete investment, which is spent whether or not a mate or a litter results).
 - **A queue end exists in the engine, after a success.** T03.F12 ends the
   parent's action queue on a successful conception that starts a gestation
-  hold ([spec](../specs/roadmap/t03-f12-genome-length-dependent-reproductive-time.md),
+  hold ([spec](../archive/program-1/specs/roadmap/t03-f12-genome-length-dependent-reproductive-time.md),
   Commit row). That is the seam a plan break would use, not a precedent for
   ending a plan on failure. The pass loop commits one action per pass up to
   `max_actions_per_turn` (10) with a per-kind rising bar

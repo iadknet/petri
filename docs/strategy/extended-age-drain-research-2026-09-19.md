@@ -74,7 +74,7 @@ Construct three parents with the same active two-node founder. The larger parent
 | 333 | 0.0 | 1.6480 | 13.17% | 3.26% |
 | 999 | 0.0 | 4.9810 | 13.54% | 3.17% |
 
-The history explains why both settings exist. [T11.F17](../specs/roadmap/t11-f17-executed-biased-mutation-targeting.md) deliberately concentrated a fixed per-birth mutation budget on executed nodes so accumulated dormant material would not dilute functional mutation. [T11.F19](../specs/roadmap/t11-f19-per-unit-mutation-supply.md) subsequently made the total budget proportional to genome size while explicitly retaining that bias. Earlier research measured increased behavior change and warned that growth was not bounded; this experiment specifically holds the active controller constant and measures loss of its reproductive response. The two mechanisms are implemented according to their specifications. The defect is in their combined evolvability tradeoff, not an arithmetic error or a claim that either feature failed its implementation contract.
+The history explains why both settings exist. [T11.F17](../archive/program-1/specs/roadmap/t11-f17-executed-biased-mutation-targeting.md) deliberately concentrated a fixed per-birth mutation budget on executed nodes so accumulated dormant material would not dilute functional mutation. [T11.F19](../archive/program-1/specs/roadmap/t11-f19-per-unit-mutation-supply.md) subsequently made the total budget proportional to genome size while explicitly retaining that bias. Earlier research measured increased behavior change and warned that growth was not bounded; this experiment specifically holds the active controller constant and measures loss of its reproductive response. The two mechanisms are implemented according to their specifications. The defect is in their combined evolvability tradeoff, not an arithmetic error or a claim that either feature failed its implementation contract.
 
 ![Disconnected-copy mutation assay](../../.bench-artifacts/extended-age-drain-research-2026-09-19/mutation-coupling.png)
 
@@ -143,7 +143,7 @@ Relevant current code:
 - [Basal and genome maintenance](../../crates/v3-core/src/simulation/tick.rs), `phase_0_energy_charge`; [eating, movement, and NoOp charges](../../crates/v3-core/src/simulation/actions/mod.rs).
 - [Immediate learning signals](../../crates/v3-core/src/simulation/outcomes.rs); [reward-modulated weight updates](../../crates/v3-core/src/runtime/plasticity/reward.rs).
 - [Observational mutation score](../../crates/v3-core/src/simulation/simulation.rs) and [its retrospective classification](../../crates/v3-core/src/simulation/stats.rs).
-- [Existing T17 scope and terminal-branch hazard](../roadmaps/t17-brain-boundary-evolvability.md); [existing T18 founder architecture work](../roadmaps/t18-founder-architecture.md).
+- [Existing T17 scope and terminal-branch hazard](../archive/program-1/roadmaps/t17-brain-boundary-evolvability.md); [existing T18 founder architecture work](../archive/program-1/roadmaps/t18-founder-architecture.md).
 
 Earlier local audits are historical evidence, not measurements of this revision. In particular, the September 4 founder shape, older mutation schedules, and pre-T17 raw energy/age scaling have changed. Their quantitative defect rates were not substituted for fresh measurements here.
 

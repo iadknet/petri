@@ -6,7 +6,7 @@ and every arm is `inconclusive` for outcome B. Reviewed by Codex (three
 reviews; review 3 `ready`). Contract: the [run 3 plan](evolvability-exploration-plan-2026-10-02-run3.md),
 which amends [run 2's](evolvability-exploration-plan-2026-10-02.md) and through
 it [run 1's](evolvability-exploration-plan-2026-10-01.md), under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Launch revision `5ccd8a7fb6dd34feaa575bfecdaa3f54a736208d` (clean `main`,
 2026-10-02). Experiment branch `worktree-evolvability-exploration-3` (never
 merges). Compact summaries live in

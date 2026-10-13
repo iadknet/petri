@@ -1,7 +1,7 @@
 # T13.F05 — Function-Preserving Module Recruitment readings
 
 Tables and transcripts for the feature spec
-[`docs/specs/roadmap/t13-f05-function-preserving-module-recruitment.md`](../../specs/roadmap/t13-f05-function-preserving-module-recruitment.md).
+[`docs/specs/roadmap/t13-f05-function-preserving-module-recruitment.md`](../../archive/program-1/specs/roadmap/t13-f05-function-preserving-module-recruitment.md).
 Every path is replayed by `crates/v3-core/src/neighborhood/recruitment_paths/qualification.rs`
 (`qualified_paths()`), whose tests pin the operator/seed record below.
 

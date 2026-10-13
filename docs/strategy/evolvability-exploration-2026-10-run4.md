@@ -4,7 +4,7 @@ Date: 2026-10-02. Plan:
 [evolvability-exploration-plan-2026-10-02-run4.md](evolvability-exploration-plan-2026-10-02-run4.md)
 (committed on main at `4bb0c491` after five Codex rounds), continuing
 [run 3](evolvability-exploration-2026-10-run3.md) under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 
 **Evidence outcome: B (supported negative), for the declared effects only.**
 **Execution status: complete** (all 88 campaigns, 72 masking probes and the

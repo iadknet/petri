@@ -135,7 +135,7 @@ Required contracts:
    between live `EnergyCurrent` and unchanged `EnergyConsumedThisTick` across
    the plasticity deduction. Correct directly affected
    planned requirements in
-   [T06.F02](roadmap/t06-f02-food-transport-and-caching.md) to use the shared
+   [T06.F02](../archive/program-1/specs/roadmap/t06-f02-food-transport-and-caching.md) to use the shared
    energy reward and ordinary typed food; do not implement that feature or
    rewrite completed T11 records and archives. Add a dated note to the original
    [complementary-nutrition record](../prds/archive/complementary-nutrition-budget/master-prd.md)

@@ -1,6 +1,6 @@
 # Mesh Evolvability Research Note
 
-**Status**: Research (companion to the [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md) and the [brain evolvability audit](brain-evolvability-audit-2026-09-04.md); not executable roadmap guidance)
+**Status**: Research (companion to the [T11 track](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md) and the [brain evolvability audit](brain-evolvability-audit-2026-09-04.md); not executable roadmap guidance)
 **Date**: 2026-09-06
 **Code**: baseline probes on `main` at c387e423 (T11.F06 closed); counterfactual probes in a scratch worktree at 43d966c1; V3Alpha1 founder, production defaults
 **Method**: code reading; re-analysis of the stored goal reports; a functional census probe run on mutation-only walks and on one whole goal-profile population; three cumulative counterfactual patches to the mesh operators and executor, each re-read with the same probes; primary literature read in full text (fourteen papers, listed in Section 6)
@@ -36,7 +36,7 @@ The cause is not the single-successor chain, which Tangled Program Graphs show c
 
 **Problem.** A creature's mesh is a set of nodes (VM programs or CGP graphs) with route targets. Each tick the chain runs from `entry_node_id`; each node's gate scores pick one successor; the chain ends at a terminal instruction, a missing target, or the hop cap ([`runtime/mesh.rs`](../../crates/v3-core/src/runtime/mesh.rs)). The founder is two nodes. Evolved creatures still look like two nodes with decoration.
 
-**Constraints carried from the program** ([roadmap notes](../roadmap.md#notes-for-ai-agents)): ecological selection only, no global fitness or speciation; every mechanism names a natural analog and reaches creatures through world or body; seeded runs stay byte-for-byte reproducible; the neutral scaffold delivered by T11.F04 stays; the single-successor chain stays unless a measured gap implicates it; brain execution is on the hot path at about ten thousand creatures.
+**Constraints carried from the program** ([roadmap notes](../archive/program-1/roadmap.md#notes-for-ai-agents)): ecological selection only, no global fitness or speciation; every mechanism names a natural analog and reaches creatures through world or body; seeded runs stay byte-for-byte reproducible; the neutral scaffold delivered by T11.F04 stays; the single-successor chain stays unless a measured gap implicates it; brain execution is on the hot path at about ten thousand creatures.
 
 **Decision criteria.** Whether an option supplies a small step where the code has none; whether growth is neutral both when it fires and when it activates; whether activation can make behavior depend on the input; hot-path cost; compatibility with the node-type contract and the no-regression rule; whether it is a bounded T11 feature rather than a substrate change.
 

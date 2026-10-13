@@ -4,7 +4,7 @@ Date: 2026-10-02. Status: written and reviewed while run 4's campaigns run.
 A research workflow (code map, prior art, statistics, inherited rules), three
 adversarial critics, and three Codex rounds (round 3 `ready`) shaped it.
 Run 5 launches after [run 4](evolvability-exploration-2026-10-run4.md) closes,
-under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+under the [T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 User direction (2026-10-02, unattended): measure mutation effects directly
 instead of running evolution, test larger weight jumps first, and give full
 campaigns only to mechanisms that pass.

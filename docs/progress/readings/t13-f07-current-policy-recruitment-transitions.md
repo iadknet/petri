@@ -1,7 +1,7 @@
 # T13.F07 — Current-Policy Recruitment Transitions readings
 
 Tables and transcripts for the feature spec
-[`docs/specs/roadmap/t13-f07-current-policy-recruitment-transitions.md`](../../specs/roadmap/t13-f07-current-policy-recruitment-transitions.md).
+[`docs/specs/roadmap/t13-f07-current-policy-recruitment-transitions.md`](../../archive/program-1/specs/roadmap/t13-f07-current-policy-recruitment-transitions.md).
 
 ## Benchmark (roadmap-benchmark-specialist, 2026-09-20)
 

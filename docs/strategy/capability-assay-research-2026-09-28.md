@@ -21,7 +21,7 @@ capability; it never becomes a production mechanism, objective or gate.
 
 This implements a decision the master roadmap already records: "bounded
 fixed environments as assays and endogenous feedback as the long-term
-pressure" ([roadmap Notes](../roadmap.md#notes-for-ai-agents)). The lab is
+pressure" ([roadmap Notes](../archive/program-1/roadmap.md#notes-for-ai-agents)). The lab is
 the assay half of that sentence, made cheap enough to use every day.
 
 ## Problem, constraints and decision criteria
@@ -37,7 +37,7 @@ Constraints, all from existing project rules:
 
 - The living world stays natural and open-ended. Nothing task-specific,
   no curriculum, no reward and no authored solution enters production
-  ([natural-analog rule](../roadmap.md#notes-for-ai-agents); "no feature may
+  ([natural-analog rule](../archive/program-1/roadmap.md#notes-for-ai-agents); "no feature may
   optimize against an indicator").
 - Determinism where assertions depend on it; POSIX `sh`; no new dependency
   merely to avoid a small stable piece of code (`AGENTS.md`, `CONTRIBUTING`).
@@ -137,7 +137,7 @@ Maintenance facts read from the crates.io API on 2026-09-28.
 | [`genetic_algorithm`](https://github.com/basvanwesting/genetic-algorithm) 0.27.4 | Released 2026-09-26; MIT/Apache-2.0; genotypes are the crate's own Binary/List/Range/Unique/MultiRange vectors ([docs.rs](https://docs.rs/genetic_algorithm/latest/genetic_algorithm/genotype/index.html)) | No custom genotype; Petri's genome is a node mesh with typed backends | Reject |
 | [`genevo`](https://github.com/innoave/genevo) 0.7.1 | Last release 2022-03-13; MIT/Apache-2.0 | Unmaintained for four years | Reject |
 | [`oxigen`](https://github.com/Martin1887/oxigen) 2.2.2 | Last release 2021-02-28; MPL-2.0 | Unmaintained; copyleft | Reject |
-| MABE2, Avida | Reviewed 2026-09-03 as platforms; rejected because neither hosts Petri's evolvable topology ([roadmap Notes](../roadmap.md#notes-for-ai-agents)) | Their *method* is the precedent: evaluate genomes in a controlled environment separate from the living population | Borrow the method, not the platform |
+| MABE2, Avida | Reviewed 2026-09-03 as platforms; rejected because neither hosts Petri's evolvable topology ([roadmap Notes](../archive/program-1/roadmap.md#notes-for-ai-agents)) | Their *method* is the precedent: evaluate genomes in a controlled environment separate from the living population | Borrow the method, not the platform |
 | Python quality-diversity tooling (pyribs, QDax) | Different language and runtime | The analysis layer can stay Python-optional, as the ring probes did; the evaluation must be Rust to run real Petri genomes | Not needed for v1 |
 | Extend `recruitment_paths` or `input_discovery` | In `v3-core`; one-tick scoring; feature-specific records | Would inherit the failure mode and keep assay code inside production | Reject |
 | Extend `v3-cli bench` | Whole-world profiles | Wrong instrument for capability questions | Reject |
@@ -352,7 +352,7 @@ that only if an experiment needs no Rust and no workflow:
 ## Placement
 
 A new track, **T22 — Capability Assays and Evolvability Lab**
-([draft](../roadmaps/t22-capability-assays-and-evolvability-lab.md)), with
+([draft](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md)), with
 four features: F01 harness plus the food-seeking assay and controls; F02 the
 barrier-navigation assay and arena files; F03 brain and sensor change readings
 on the same runs; F04 the why-not diagnostic ladder. T21 is left free for the observability track the 2026-09-27 revert rolled
@@ -434,7 +434,7 @@ findings. The loop ended at a `ready` verdict after three rounds.
 
 ## Sources
 
-- [Petri master roadmap, Notes for AI Agents](../roadmap.md#notes-for-ai-agents): "bounded fixed environments as assays"; platform review of MABE2, Avida and JAX simulators (2026-09-03).
+- [Petri master roadmap, Notes for AI Agents](../archive/program-1/roadmap.md#notes-for-ai-agents): "bounded fixed environments as assays"; platform review of MABE2, Avida and JAX simulators (2026-09-03).
 - [Ring wiring experiment, 2026-09-23](ring-wiring-experiment-2026-09-23.md); [ring group experiments](ring-group-experiments-2026-09-23.md); probe sources under `.bench-artifacts/ring-*`.
 - Reverted T20.F09 reading, `git show 1c7ba514:docs/progress/readings/t20-f09.md`.
 - crates.io API, read 2026-09-28: `radiate`, `genetic_algorithm`, `genevo`, `oxigen`.

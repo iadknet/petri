@@ -2,7 +2,7 @@
 
 Date: 2026-10-02. Source: `a0559bbd`. Status: plan for the continuation of
 [run 3](evolvability-exploration-2026-10-run3.md) (outcome C by exhaustion),
-under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+under the [T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 User direction (2026-10-02): keep going unattended.
 
 ## Why a fourth run
