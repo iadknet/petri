@@ -72,6 +72,18 @@ describe("StatsPanel tabs", () => {
 		expect(selectedTab().tabIndex).toBe(0);
 	});
 
+	it("leaves modified arrow, Home and End keys to the browser", () => {
+		render(<StatsPanel />);
+		fireEvent.click(screen.getByRole("tab", { name: "Evolution" }));
+		for (const modifier of ["ctrlKey", "metaKey", "altKey"]) {
+			for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) {
+				const notCancelled = fireEvent.keyDown(selectedTab(), { key, [modifier]: true });
+				expect(notCancelled).toBe(true);
+			}
+		}
+		expect(selectedTab()).toHaveTextContent("Evolution");
+	});
+
 	it("selects a tab on click", () => {
 		render(<StatsPanel />);
 		fireEvent.click(screen.getByRole("tab", { name: "Evolution" }));

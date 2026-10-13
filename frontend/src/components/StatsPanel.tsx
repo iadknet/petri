@@ -25,6 +25,7 @@ export function StatsPanel() {
 
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+			if (event.ctrlKey || event.metaKey || event.altKey) return;
 			const last = TABS.length - 1;
 			let nextIndex: number;
 			if (event.key === "ArrowRight") nextIndex = index === last ? 0 : index + 1;

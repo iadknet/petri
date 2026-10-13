@@ -9,7 +9,14 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
 import type { Frame } from "../types/api.ts";
+import { StatsPanel } from "./StatsPanel.tsx";
 import { WorldViewport } from "./WorldViewport.tsx";
+
+vi.mock("./stats/OverviewTab.tsx", () => ({ OverviewTab: () => <p>overview body</p> }));
+vi.mock("./stats/ActionsTab.tsx", () => ({ ActionsTab: () => <p>actions body</p> }));
+vi.mock("./stats/EvolutionTab.tsx", () => ({ EvolutionTab: () => <p>evolution body</p> }));
+vi.mock("./stats/ComputationTab.tsx", () => ({ ComputationTab: () => <p>computation body</p> }));
+vi.mock("./stats/PredationTab.tsx", () => ({ PredationTab: () => <p>predation body</p> }));
 
 const rendererSpies = vi.hoisted(() => ({
 	fitToWorld: vi.fn((width: number, height: number) => ({
@@ -204,6 +211,53 @@ describe("WorldViewport keyboard access", () => {
 		// Assert
 		expect(rendererSpies.resetView).not.toHaveBeenCalled();
 		expect(useViewportStore.getState().camera).toEqual(userCamera);
+	});
+
+	it("Home on a focused stats tab selects the first tab without resetting the camera", () => {
+		// Arrange
+		render(
+			<>
+				<StatsPanel />
+				<WorldViewport />
+			</>,
+		);
+		act(() => {
+			useWorldViewStore.setState({ frame: frame(512, 512) });
+		});
+		const userCamera = { x: -320, y: -180, zoom: 4 };
+		act(() => {
+			useViewportStore.getState().setCamera(userCamera);
+		});
+		const predation = screen.getByRole("tab", { name: "Predation" });
+		fireEvent.click(predation);
+		predation.focus();
+
+		// Act
+		fireEvent.keyDown(predation, { key: "Home" });
+
+		// Assert
+		expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Overview");
+		expect(rendererSpies.resetView).not.toHaveBeenCalled();
+		expect(useViewportStore.getState().camera).toEqual(userCamera);
+	});
+
+	it("ignores modified Home and Escape so browser and system shortcuts pass through", () => {
+		// Arrange
+		render(<WorldViewport />);
+		act(() => {
+			useWorldViewStore.setState({ frame: frame(512, 512) });
+			useCreatureInspectorStore.getState().selectCreature(7);
+		});
+
+		// Act
+		for (const modifier of ["ctrlKey", "metaKey", "altKey"]) {
+			fireEvent.keyDown(document.body, { key: "Home", [modifier]: true });
+			fireEvent.keyDown(document.body, { key: "Escape", [modifier]: true });
+		}
+
+		// Assert
+		expect(rendererSpies.resetView).not.toHaveBeenCalled();
+		expect(selectedId()).toBe(7);
 	});
 
 	it("still clears the selection on Escape outside editable fields", () => {
