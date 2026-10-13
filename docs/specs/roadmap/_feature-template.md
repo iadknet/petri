@@ -45,14 +45,14 @@ one table; tables are free under the prose budget.
 | `<name>` | counter, gauge, span, span event or log record | the applied behavior it derives from | the config values and mechanism switches that govern it |
 
 Conventions T21 delivered. `From` names the source: a closed T21 spec
-([F01](t21-f01-local-telemetry-stack-and-run-identity.md),
-[F02](t21-f02-run-metrics-and-dashboards.md),
-[F03](t21-f03-tick-and-phase-tracing.md),
-[F04](t21-f04-creature-cognition-windows.md),
-[F05](t21-f05-qualified-sampling-defaults.md),
-[F06](t21-f06-benchmark-assay-and-lab-run-records.md); "inv." is one of its
+([F01](../../archive/program-1/specs/roadmap/t21-f01-local-telemetry-stack-and-run-identity.md),
+[F02](../../archive/program-1/specs/roadmap/t21-f02-run-metrics-and-dashboards.md),
+[F03](../../archive/program-1/specs/roadmap/t21-f03-tick-and-phase-tracing.md),
+[F04](../../archive/program-1/specs/roadmap/t21-f04-creature-cognition-windows.md),
+[F05](../../archive/program-1/specs/roadmap/t21-f05-qualified-sampling-defaults.md),
+[F06](../../archive/program-1/specs/roadmap/t21-f06-benchmark-assay-and-lab-run-records.md); "inv." is one of its
 invariants, and its attribute and family tables are authoritative), the
-[T21 track](../../roadmaps/t21-run-observability-and-execution-tracing.md),
+[T21 track](../../archive/program-1/roadmaps/t21-run-observability-and-execution-tracing.md),
 `AGENTS.md` or `docs/workflow.md`. "Spec" means the feature spec that adds
 the thing.
 

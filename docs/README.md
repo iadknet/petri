@@ -3,6 +3,7 @@
 - [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
 - [Codex adapter](workflow-codex.md) (Codex model, tool, and worktree substitutions for that contract)
 - [Roadmap contract](roadmaps/README.md)
+- [Capability lab contract](lab.md) (standing rules for `crates/v3-lab` and lab exploration runs)
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
 - [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
