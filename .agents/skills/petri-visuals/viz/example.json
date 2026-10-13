@@ -1,0 +1,71 @@
+{
+	"views": [
+		{
+			"name": "Today: rob weak strangers",
+			"caption": "Four compute nodes gate one ring projection. The gate reads Nearest1, which may not be the creature the ring points at.",
+			"nodes": [
+				{"id": "i0", "in": "Nearest1.present"},
+				{"id": "i1", "in": "Nearest1.dist"},
+				{"id": "i2", "in": "Nearest1.kin"},
+				{"id": "i3", "in": "Nearest1.energy"},
+				{"id": "i4", "in": "Energy"},
+				{"id": "c0", "kind": {"Threshold": -0.25}, "from": [["i1", -1]]},
+				{"id": "c1", "kind": {"Threshold": -0.8}, "from": [["i2", -1]]},
+				{"id": "c2", "kind": "GreaterThan", "from": [["i4", 1], ["i3", 1]]},
+				{"id": "c3", "kind": "Multiply", "from": [["i0", 1], ["c0", 1], ["c1", 1], ["c2", 1]]},
+				{"id": "o0", "out": "Vote Drive StealEnergy", "from": [["c3", 2]]},
+				{"id": "o1", "out": "Param StealEnergy.amt", "sub": "action parameter", "from": [["i3", 40]]}
+			],
+			"projections": [
+				{"ring": "OccRing", "kind": "StealEnergy", "offset": 0, "w": 0.5}
+			],
+			"ticks": [
+				{"name": "Weak stranger to the E", "values": {"i0": 1, "i1": 0.14, "i2": 0.53, "i3": 0.2, "i4": 0.65}, "rings": {"OccRing": [0, 0, 1, 0, 0, 0, 0, 0]}, "scene": {"creatures": [[1, 0, "stranger"]], "arrow": "E"}, "note": "All four gates pass: the drive adds 2.00 on top of the ring's StealEnergy[E] vote."},
+				{"name": "Relative to the E", "values": {"i0": 1, "i1": 0.14, "i2": 0.94, "i3": 0.2, "i4": 0.65}, "rings": {"OccRing": [0, 0, 1, 0, 0, 0, 0, 0]}, "scene": {"creatures": [[1, 0, "kin"]]}, "note": "The kin gate closes the drive, but the ring still votes StealEnergy[E]: it cannot see who is there."}
+			],
+			"cards": [["Compute nodes", "4"], ["Ring projections", "1"]]
+		},
+		{
+			"name": "Proposal: direction projection",
+			"caption": "Nearest1's plain fields feed the drive (whether); dx and dy fan out to all 8 Steal sinks in a fixed pattern under one weight (where).",
+			"nodes": [
+				{"id": "i0", "in": "Nearest1.present"},
+				{"id": "i1", "in": "Nearest1.energy"},
+				{"id": "i2", "in": "Nearest1.kin"},
+				{"id": "i3", "in": "Nearest1.dx"},
+				{"id": "i4", "in": "Nearest1.dy"},
+				{"id": "o0", "out": "Vote Drive StealEnergy", "sub": "whether", "from": [["i0", 1], ["i1", -0.5], ["i2", -1.2]]},
+				{"id": "o1", "out": "Vote Steal[N]", "sub": "where", "from": [["i4", -2.5]]},
+				{"id": "o2", "out": "Vote Steal[NE]", "sub": "where", "from": [["i3", 1.77], ["i4", -1.77]]},
+				{"id": "o3", "out": "Vote Steal[E]", "sub": "where", "from": [["i3", 2.5]]},
+				{"id": "o4", "out": "Vote Steal[SE]", "sub": "where", "from": [["i3", 1.77], ["i4", 1.77]]},
+				{"id": "o5", "out": "Vote Steal[S]", "sub": "where", "from": [["i4", 2.5]]},
+				{"id": "o6", "out": "Vote Steal[SW]", "sub": "where", "from": [["i3", -1.77], ["i4", 1.77]]},
+				{"id": "o7", "out": "Vote Steal[W]", "sub": "where", "from": [["i3", -2.5]]},
+				{"id": "o8", "out": "Vote Steal[NW]", "sub": "where", "from": [["i3", -1.77], ["i4", -1.77]]}
+			],
+			"groups": [
+				{"label": "Nearest1 · added together", "ids": ["i0", "i1", "i2", "i3", "i4"]}
+			],
+			"projectionsTitle": "Direction projections",
+			"projections": [
+				{"ring": "Nearest1.dx, dy", "kind": "StealEnergy", "offset": 0, "w": 2.5, "isNew": true, "note": "pattern fixed by geometry"}
+			],
+			"grid": {
+				"title": "What dx and dy add to each Steal sink",
+				"cols": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+				"rows": [
+					{"label": "Nearest1.dx", "key": "i3", "w": [0, 1.77, 2.5, 1.77, 0, -1.77, -2.5, -1.77]},
+					{"label": "Nearest1.dy", "key": "i4", "w": [-2.5, -1.77, 0, 1.77, 2.5, 1.77, 0, -1.77]}
+				],
+				"vote": "direction vote"
+			},
+			"ticks": [
+				{"name": "Stranger to the E", "values": {"i0": 1, "i1": 0.2, "i2": 0.53, "i3": 0.2, "i4": 0}, "scene": {"creatures": [[1, 0, "stranger"]], "arrow": {"kind": "Steal"}}, "note": "dx pushes Steal[E] up and Steal[W] down; the drive says whether."},
+				{"name": "Stranger to the NE", "values": {"i0": 1, "i1": 0.2, "i2": 0.53, "i3": 0.2, "i4": -0.2}, "scene": {"creatures": [[1, -1, "stranger"]], "arrow": {"kind": "Steal"}}, "note": "dx and dy both push NE: one shared weight covers diagonals."}
+			],
+			"cards": [["Built in", "which way dx and dy point"], ["Evolved", "every weight, including its sign"]],
+			"edgeLabels": false
+		}
+	]
+}
