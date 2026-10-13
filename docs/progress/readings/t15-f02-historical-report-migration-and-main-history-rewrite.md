@@ -72,7 +72,7 @@ no production compatibility change is needed.
 
 | Blob | Preserved reason |
 | --- | --- |
-| `c86114628181448c26c7f10b23beb56f8f58d2e4` | T11.F04's intentionally unreadable pre-schema-fix gate stores an integer-keyed requested-event histogram; the supported shape uses ordered buckets. The [original spec](../../specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md) expressly excludes it from series references. Its former tracked raw file is removed; its local raw remains recoverable. |
+| `c86114628181448c26c7f10b23beb56f8f58d2e4` | T11.F04's intentionally unreadable pre-schema-fix gate stores an integer-keyed requested-event histogram; the supported shape uses ordered buckets. The [original spec](../../archive/program-1/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md) expressly excludes it from series references. Its former tracked raw file is removed; its local raw remains recoverable. |
 | `8fcae474fa29b6b049ddd87d95d4357550294d12` | Superseded T13.F01 goal at `ab00bb07`: per-lineage `selected_inapplicable` predates the corrected `discarded_selected_inapplicable` observation. |
 | `e6d401d5ec40c56b091955853d357db1196a76aa` | Superseded T13.F01 goal at `afa6ae5c`, with the same retired field semantics. |
 | `e2f57a9d7a418cdbb3720924f56e8d802c9fc2dc` | Superseded T13.F01 goal at `c1cfee5a`, with the same retired field semantics. |

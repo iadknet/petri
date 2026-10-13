@@ -2,7 +2,7 @@
 
 Date: 2026-10-05. Source read at `main` `18c796ae` (run 6 still in flight in its own
 worktree; nothing here touches it). Status: research note and experiment plan under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md);
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md);
 no production source, default, founder or roadmap row changed. Primary texts read in
 full by four research readers on 2026-10-05 (Sources). Reviewed by a Fable advisor
 before and after writing; not yet reviewed by Codex.

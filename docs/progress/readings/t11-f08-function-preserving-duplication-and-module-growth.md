@@ -1,7 +1,7 @@
 # T11.F08 — function-preserving duplication and module growth: measured readings
 
 Measured evidence relocated on 2026-09-09 from
-[`docs/specs/roadmap/t11-f08-function-preserving-duplication-and-module-growth.md`](../../specs/roadmap/t11-f08-function-preserving-duplication-and-module-growth.md),
+[`docs/specs/roadmap/t11-f08-function-preserving-duplication-and-module-growth.md`](../../archive/program-1/specs/roadmap/t11-f08-function-preserving-duplication-and-module-growth.md),
 unchanged in content. The spec keeps the predeclaration, the verdict, the
 mutation survivor record, and every user decision. Machine-written reports:
 [gate](../features/t11-f08-function-preserving-duplication-and-module-growth.json), [goal](../features/t11-f08-function-preserving-duplication-and-module-growth-goal.json).

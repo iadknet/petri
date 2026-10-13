@@ -1,7 +1,7 @@
 # T11.F04 — mutation supply and neutral scaffold: measured readings
 
 Measured evidence relocated on 2026-09-09 from
-[`docs/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md`](../../specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md),
+[`docs/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md`](../../archive/program-1/specs/roadmap/t11-f04-mutation-supply-and-neutral-scaffold.md),
 unchanged in content. The spec keeps the predeclaration, the verdict, the
 mutation survivor record, and every user decision. Machine-written reports:
 [gate](../features/t11-f04-mutation-supply-and-neutral-scaffold.json), [goal](../features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json).

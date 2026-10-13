@@ -7,7 +7,7 @@ action parameters) suffer the same under-use the vote surface did before
 T20.F16, and should a born edge be allowed to land on them? The user proposes
 an experiment. This note inspects the local evidence first, then the external
 precedent, then lays out the options and one predeclared run under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 in the form of the [born-connected run](born-connected-run-2026-10.md).
 
 ## Problem and constraints

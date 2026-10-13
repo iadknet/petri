@@ -8,7 +8,7 @@ configuration change or a mutation code change? The answer is code, so the
 user asked for this plan: a stricter re-screen of the follow-up run's N2 lead
 (T11.F28, "stays a lead"), on the T20.F16 baseline, with the loss routes
 widened past `Prune`. It runs under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 in the form of the [output-wiring plan](output-wiring-experiment-plan-2026-10-09.md).
 
 ## Problem and constraints

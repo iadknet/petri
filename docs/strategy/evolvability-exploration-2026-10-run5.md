@@ -4,7 +4,7 @@ Date: 2026-10-02. Plan:
 [evolvability-exploration-plan-2026-10-02-run5.md](evolvability-exploration-plan-2026-10-02-run5.md)
 (committed on main at `2d1b6946` after three Codex rounds), following
 [run 4](evolvability-exploration-2026-10-run4.md) (outcome B) under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 **Evidence outcome: B (supported negative), for the declared effect only.**
 **Execution status: complete** (screen, A/A, controls and comparison set, and
 the single analysis point). Closure: the note lands on `main` in the inherited

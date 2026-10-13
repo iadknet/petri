@@ -1,6 +1,6 @@
 # Petri Brain Evolvability Audit
 
-**Status**: Reference (companion to the [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md); not executable roadmap guidance)
+**Status**: Reference (companion to the [T11 track](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md); not executable roadmap guidance)
 **Date**: 2026-09-04
 **Code**: `main` at commit 4b8650ef, V3Alpha1 founder, production defaults
 **Method**: code reading, two in-process probes (400 trials per operator, 6,000 births through the engine), primary literature

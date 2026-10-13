@@ -2,7 +2,7 @@
 
 Date: 2026-10-02. Source: `5a9b279f`. Status: plan for the continuation of
 [run 2](evolvability-exploration-2026-10-run2.md) (outcome C), under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 No experiment run yet. Reviewed by Codex `gpt-6.1-sol` `high` on 2026-10-02
 in five rounds:
 

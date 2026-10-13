@@ -1,7 +1,7 @@
 # T11.F07 — reward trace clock: measured readings
 
 Measured evidence relocated on 2026-09-09 from
-[`docs/specs/roadmap/t11-f07-reward-trace-clock.md`](../../specs/roadmap/t11-f07-reward-trace-clock.md),
+[`docs/specs/roadmap/t11-f07-reward-trace-clock.md`](../../archive/program-1/specs/roadmap/t11-f07-reward-trace-clock.md),
 unchanged in content. The spec keeps the predeclaration, the verdict, the
 mutation survivor record, and every user decision. Machine-written reports:
 [gate](../features/t11-f07-reward-trace-clock.json), [goal](../features/t11-f07-reward-trace-clock-goal.json).

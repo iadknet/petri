@@ -1,7 +1,7 @@
 # Genome-length-dependent reproductive time: design research for T03.F12
 
 **Date**: 2026-10-06 (research date for every external citation)
-**Feeds**: the T03.F12 spec (track [T03](../roadmaps/t03-functional-traits-and-metabolism.md),
+**Feeds**: the T03.F12 spec (track [T03](../archive/program-1/roadmaps/t03-functional-traits-and-metabolism.md),
 row added 2026-10-06). This note decides nothing; it gives the spec owner the
 evidence and a recommendation for each of the row's open questions and for the
 two the user raised (an extra energy drain during the span; concurrent

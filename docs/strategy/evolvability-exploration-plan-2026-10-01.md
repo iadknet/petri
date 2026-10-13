@@ -1,7 +1,7 @@
 # Evolvability exploration: run plan
 
 Date: 2026-10-01. Source: `a1258205`. Status: plan for one long exploration
-run under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md);
+run under the [T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md);
 no experiment run yet, no production source, default or founder changed.
 The run writes its results to a separate note, named below. Reviewed by
 Codex `gpt-6.1-sol` `high` on 2026-10-01 (verdict `not-ready`, 12 blocking,
@@ -77,7 +77,7 @@ T11, T13, T17 and T20 tracks for defects repaired since.
   [capability assay research](capability-assay-research-2026-09-28.md).
 - Track notes for T11, T13, T17, T20, T21 and T22, so the run neither
   re-proposes a planned feature nor revives a rejected one, and the master
-  rules in [`docs/roadmap.md`](../roadmap.md) (natural-analog rule; no feature
+  rules in [`docs/roadmap.md`](../archive/program-1/roadmap.md) (natural-analog rule; no feature
   optimizes against an indicator).
 
 Opening hypotheses, to be confirmed, refined or killed:

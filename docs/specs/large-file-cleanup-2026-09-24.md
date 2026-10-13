@@ -14,7 +14,7 @@ the progress page and the closure comparison. Full payloads live in the
 ignored `.bench-artifacts/` tree, and no tracked file exceeds 1 MiB. After
 Phase A, the superseded large blobs are removed from `main` history, and the
 rewritten `main` replaces `origin/main` through an exact-lease force push, as
-[T15.F02](roadmap/t15-f02-historical-report-migration-and-main-history-rewrite.md)
+[T15.F02](../archive/program-1/specs/roadmap/t15-f02-historical-report-migration-and-main-history-rewrite.md)
 did.
 
 ## Non-Goals

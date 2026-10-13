@@ -1,6 +1,6 @@
 # Neutral Module Recruitment: From Silent Structure to Useful Behavior
 
-**Status**: Research (evidence for [T13](../roadmaps/t13-neutral-module-recruitment.md); not a feature spec)
+**Status**: Research (evidence for [T13](../archive/program-1/roadmaps/t13-neutral-module-recruitment.md); not a feature spec)
 **Date**: 2026-09-08
 **Code inspected**: initial main at `d14136db`; T11.F18 measured implementation at `b16f2820`. Closure status checked on main at `e61343db`.
 
@@ -43,11 +43,11 @@ Primary sources checked 2026-09-08; read depth and transfer limits follow.
   3/2,000 at depth 1,000. At depth 2,000, total action-contributing modules
   across 50 lineages rose from 31 to 36. These observations do not establish
   the mechanism of the drift regression. T11.F18 subsequently closed on main
-  with a [recorded feature-specific user exception](../specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md#performance-and-goal-impact)
+  with a [recorded feature-specific user exception](../archive/program-1/specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md#performance-and-goal-impact)
   for the 0.005 reading; the standing 0.008 floor remained for later features
   until 2026-09-09, when the user re-based it permanently to 0.005 at
   T12.F04's closure (dated note in the
-  [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md#notes-for-ai-agents)).
+  [T11 track](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md#notes-for-ai-agents)).
 - The walk retains every descendant without ecological selection. Birth
   observations use 100 offspring from each of 20 parent lineages. A new RNG
   draw changes subsequent lineage histories. Preserve per-lineage results;

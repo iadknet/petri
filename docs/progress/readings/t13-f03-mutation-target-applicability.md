@@ -1,7 +1,7 @@
 # T13.F03 — Mutation Target Applicability readings
 
 Tables and transcripts for the feature spec
-[`docs/specs/roadmap/t13-f03-mutation-target-applicability.md`](../../specs/roadmap/t13-f03-mutation-target-applicability.md).
+[`docs/specs/roadmap/t13-f03-mutation-target-applicability.md`](../../archive/program-1/specs/roadmap/t13-f03-mutation-target-applicability.md).
 
 ## Build-pass verification
 

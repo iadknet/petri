@@ -18,7 +18,7 @@ choosing well pay, without blocking the complex solutions evolution has not
 yet reached? The evidence is in the
 [research note](action-choice-pressure-research-2026-10-09.md); this plan
 turns its Section 6 into predeclared rows under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 in the form of the [deletion-rate plan](deletion-rate-experiment-plan-2026-10-09.md).
 
 ## Problem and constraints

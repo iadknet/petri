@@ -2,7 +2,7 @@
 
 Date: 2026-10-02. Source: `6d2efeb5`. Status: plan for the continuation of
 the [first exploration run](evolvability-exploration-2026-10.md), under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 No experiment run yet; no production source, default or founder changed.
 Reviewed by Codex `gpt-6.1-sol` `high` on 2026-10-01 (round 1 `not-ready`,
 5 blocking and 4 advisory, all applied below; round 2 confirmed 7 and

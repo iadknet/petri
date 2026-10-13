@@ -87,7 +87,7 @@ so it stays at abstract depth.
   (`campaign.rs`, the per-generation draw), so samples vary but the layout
   distribution never does; `crates/v3-lab` has no schedule that changes the
   distribution across generations. `crates/v3-core` has no seasonal or fluctuating
-  resource driver; [T02.F01 Seasons](../roadmaps/t02-environmental-dynamics.md)
+  resource driver; [T02.F01 Seasons](../archive/program-1/roadmaps/t02-environmental-dynamics.md)
   and T02.F03 regional offsets are unchecked.
 - Kumawat et al. is cited five times (T11.F04 spec, population-decline note,
   incremental-recruitment note, drift-silence note, depth note), each at
@@ -157,7 +157,7 @@ reachable from the founder. That is exactly what the experiment measures.
 
 ## The experiment this recommends (run 7 candidate, not run 6)
 
-Under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md),
+Under the [T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md),
 as an `instr:` commit on an exploration branch, after run 6 closes:
 
 1. **Instrument.** `food-seeking-hunger` with two frozen food layouts A and B
@@ -180,7 +180,7 @@ as an `instr:` commit on an exploration branch, after run 6 closes:
 4. **Not-forcing.** The rule names no sensor, sink or assay; both layouts are
    admissible food scenes; no founder or authored wiring changes.
 5. **Outcome routing.** A positive result is a lead for
-   [T02.F01 Seasons](../roadmaps/t02-environmental-dynamics.md) priority and
+   [T02.F01 Seasons](../archive/program-1/roadmaps/t02-environmental-dynamics.md) priority and
    for the T22 instrument set, never a production default; a supported negative
    at the predeclared effect size closes the environmental-fluctuation
    hypothesis for this instrument class. A positive result is evidence that the

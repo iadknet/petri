@@ -28,11 +28,11 @@ that per-unit supply alone could grow genomes explosively without selection;
 its selected runs behaved differently. Neither finding automatically explains
 the post-T19, post-T11.F24 observation.
 
-The current [T11 roadmap](../roadmaps/t11-brain-genotype-phenotype-map.md) already
+The current [T11 roadmap](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md) already
 owns neutral-network characterization (F12), supply/targeting calibration (F13),
 and memory discovery (F10). F25 already addresses mutation draws targeting action
-parameters the body does not consume. [T13](../roadmaps/t13-neutral-module-recruitment.md)
-owns module recruitment and retention; [T20](../roadmaps/t20-input-evolvability-and-structured-variation.md)
+parameters the body does not consume. [T13](../archive/program-1/roadmaps/t13-neutral-module-recruitment.md)
+owns module recruitment and retention; [T20](../archive/program-1/roadmaps/t20-input-evolvability-and-structured-variation.md)
 owns input recruitment, structured refinement, and its discovery/retention/transfer
 qualification. New general diagnostics fit T11, reusing the existing observation
 machinery. They should inform those owners rather than duplicate their mechanisms.

@@ -1,7 +1,7 @@
 # T13.F06 — Recruitment and Retention Qualification readings
 
 Benchmark-specialist tables and transcripts for the feature spec
-[`docs/specs/roadmap/t13-f06-recruitment-and-retention-qualification.md`](../../specs/roadmap/t13-f06-recruitment-and-retention-qualification.md).
+[`docs/specs/roadmap/t13-f06-recruitment-and-retention-qualification.md`](../../archive/program-1/specs/roadmap/t13-f06-recruitment-and-retention-qualification.md).
 Tested commit `e57d6f67c878faeeed96d6aadf32b00e0409bcb8`. Both profiles run
 from the worktree `.claude/worktrees/t13-f06`; raw artifacts land in the main
 checkout's ignored `.bench-artifacts/t13-f06-recruitment-and-retention-qualification/`.

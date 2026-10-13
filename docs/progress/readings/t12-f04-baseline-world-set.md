@@ -1,7 +1,7 @@
 # T12.F04 — baseline world set: measured readings
 
 Measured evidence relocated on 2026-09-09 from
-[`docs/specs/roadmap/t12-f04-baseline-world-set.md`](../../specs/roadmap/t12-f04-baseline-world-set.md),
+[`docs/specs/roadmap/t12-f04-baseline-world-set.md`](../../archive/program-1/specs/roadmap/t12-f04-baseline-world-set.md),
 unchanged in content. The spec keeps the predeclaration, the verdict, the
 final mutation survivor record, and every user decision. Machine-written
 reports: [gate](../features/t12-f04-baseline-world-set.json), [goal](../features/t12-f04-baseline-world-set-goal.json).

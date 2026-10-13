@@ -1,6 +1,6 @@
 # Mesh Action Selection and Live Internal State: Adversarial Architecture Review
 
-**Status**: Research (review of a proposed refactor; nothing implemented). Placed on the roadmap as [T19](../roadmaps/t19-mesh-action-selection-and-live-state.md) on 2026-09-21 at the user's direction, with the Section 8 probe skipped by the user's decision
+**Status**: Research (review of a proposed refactor; nothing implemented). Placed on the roadmap as [T19](../archive/program-1/roadmaps/t19-mesh-action-selection-and-live-state.md) on 2026-09-21 at the user's direction, with the Section 8 probe skipped by the user's decision
 **Date**: 2026-09-20
 **Code**: `main` at 8bfab0d4 (T13.F07 closed); T18.F01 is the next new start
 **Method**: code reading of the mesh executor, both backends, plasticity, the tick loop, the topology and backend mutation operators, the reference specs, and the prior strategy notes; primary literature read in full by four reading agents on 2026-09-20 and 2026-09-21 (the Sources list states per text whether it was obtained in full); no counterfactual was run, because the request withholds implementation authorization and the runtime change is not a one-line patch. Section 8 specifies the scratch probe that would supply the measurement.

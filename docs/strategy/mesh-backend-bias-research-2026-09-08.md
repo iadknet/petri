@@ -1,6 +1,6 @@
 # Mesh Backend Bias: One Graph and a VM Chain
 
-**Status**: Research (evidence for [T11.F18](../roadmaps/t11-brain-genotype-phenotype-map.md); not an implementation spec)
+**Status**: Research (evidence for [T11.F18](../archive/program-1/roadmaps/t11-brain-genotype-phenotype-map.md); not an implementation spec)
 **Date**: 2026-09-08
 **Code**: analysis probe linked against `main` at `beee4c05`
 **Subject**: paused local server at tick 73,035, population 49,545; 200 creatures sampled without replacement using Python `random.Random(20260908)`

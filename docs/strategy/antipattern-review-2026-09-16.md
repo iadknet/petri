@@ -88,7 +88,7 @@ Measured cost: not isolated. The survey found identity inputs change the action 
 
 ## 7. Where this points (nothing implemented)
 
-Items 1 to 3 became track [T16 — Cost and Cue Fidelity](../roadmaps/t16-cost-and-cue-fidelity.md) on 2026-09-16 at the user's direction (T16.F01 gate before charge, T16.F02 effort-priced failed actions, T16.F03 phenotypic kin recognition); the multi-action tick and priority bid were judged designs to keep.
+Items 1 to 3 became track [T16 — Cost and Cue Fidelity](../archive/program-1/roadmaps/t16-cost-and-cue-fidelity.md) on 2026-09-16 at the user's direction (T16.F01 gate before charge, T16.F02 effort-priced failed actions, T16.F03 phenotypic kin recognition); the multi-action tick and priority bid were judged designs to keep.
 
 1. **Retire the failed-action energy penalty** (or reduce it to the effort cost the action already charges). The move cost, eat cost, and reproduce cost are the natural prices; the penalty adds a charge with no analog and no measured selective effect. Read at closure: failed-action share of action energy, blocked-move fraction, and the survey's avoidance fraction, so a later feature that makes avoidance one edge away (T11.F21) is read on a substrate where the penalty is not the confound.
 2. **Move the reproduce energy gate ahead of the charge** and check transfer feasibility before charging. A bug-sized change with a TDD test on the `RejectedEnergyConstraints` path asserting no energy change.

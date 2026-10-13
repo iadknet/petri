@@ -9,7 +9,7 @@ far as they apply to a one-row run) and the
 [run 1 plan](evolvability-exploration-plan-2026-10-01.md) it inherits (the
 five not-forcing checks, matched controls, commit kinds, baseline identity,
 the Codex review command, the close order), inside the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 The idea's earlier readings: the [diagnosis run](evolvability-diagnosis-run-2026-10.md)'s
 rows E4 (the two-step rates this prototype shortens), E5 (the projection
 operator, not advanced) and E10 (run 6's ALT arm, the idea's lab form,
@@ -248,7 +248,7 @@ it fires", listing `InputRef.Add` among the growth operators) and its
 InputRef-domain `Add` paragraph (the new reference "is wired into nothing on
 either backend" and becomes addressable only through a later connection
 operator, which the `apply_add` doc comment repeats; finding 18), and the
-[T20 roadmap](../roadmaps/t20-input-evolvability-and-structured-variation.md)'s
+[T20 roadmap](../archive/program-1/roadmaps/t20-input-evolvability-and-structured-variation.md)'s
 F04 row ("Preserve `InputRef.Add` as neutral declaration and the existing
 separate connection path; do not silently redefine either"). On this branch
 the prototype is a `policy-deviation` arm behind a default-off flag; a

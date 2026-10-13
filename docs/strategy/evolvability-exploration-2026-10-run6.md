@@ -4,7 +4,7 @@ Date: 2026-10-04. Plan:
 [evolvability-exploration-plan-2026-10-04-run6.md](evolvability-exploration-plan-2026-10-04-run6.md)
 (committed on main at `18c796ae` after three Codex rounds), following
 [run 5](evolvability-exploration-2026-10-run5.md) under the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Status: **incomplete; outcome C (incomplete, closed by user decision on 2026-10-05)**.
 The run stopped at about 06:02 on 2026-10-05 when the host slept on battery: no
 process survived, main batches `food-s12` and `wall-s12` completed, `food-s13`

@@ -8,7 +8,7 @@ to 9, as far as they apply to a follow-up) and the
 [run 1 plan](evolvability-exploration-plan-2026-10-01.md) it inherits (the
 natural-world check, matched controls, commit kinds, baseline identity, the
 Codex review command, the close order), inside the
-[T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
+[T22 exploration contract](../archive/program-1/roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Status: **complete** (N1, N2 and N3 completed; Codex reviews (a) and (b)
 disposed; landed on `main` as docs plus the dependency fix).
 
