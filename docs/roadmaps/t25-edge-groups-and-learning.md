@@ -12,46 +12,64 @@ Ring projections become such groups; a sensed `(x, y)` offset can reach a
 kind's eight direction votes as one silent gene; learning lives on edges and
 groups with an evolvable reward source and trace decay; mutation has a group
 layer and an edge layer. Design, boundaries, options and contracts:
-[edge groups and learning design note](../strategy/edge-groups-and-learning-design-2026-10-13.md).
+[edge groups and learning design note](../strategy/edge-groups-and-learning-design-2026-10-13.md)
+(version 2, after three Codex rounds and nine Opus facet reviews recorded in
+[the review readings](../progress/readings/t25-design-review.md)).
 
 ## Track Success Criteria
 
-- [ ] One owner edits the graph, one folds a parent's learned state into a child's birth seeds, and one builds the running brain from them; no mutation operator keeps birth alignment by hand.
-- [ ] Ring projections are edge groups: eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts them as edges, reads membership from the genome, and no reader re-derives explicit membership (derived wiring analyses such as ring rules and drive fan-outs keep their own definitions).
+- [ ] One owner edits the graph, one captures a parent's learned state as a child's birth seeds, and one builds the running brain from them; no mutation operator keeps birth alignment by hand, and no struct literal builds an edge outside the constructors.
+- [ ] An edge costs one genome unit wherever it lives and a group record one; no wired-sink unit remains, and the founder anchor is re-pinned.
+- [ ] Ring projections are edge groups: eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts them as edges, reads membership from the genome, and no reader re-derives explicit membership (derived wiring analyses keep their own definitions over non-member edges).
 - [ ] A direction-pair group born silent on a creature, food, barrier or crowd offset is retained and its scale moves off zero in a 40,000-tick goal-long run on at least one standard goal world.
-- [ ] Learning mode, reward source, trace decay, Lamarckian flag and scope are per-edge and per-group heritable attributes; vote edges can learn; a group-scope update changes every member equally.
-- [ ] Every attribute mutation draws its scope (F04); group creation is uniform or randomized, a member can be detached and a group removed (F02, F04, F05).
+- [ ] The three creature families are one `NearbyCreature` family declared once in `contracts::inputs`.
+- [ ] Learning mode, reward source, trace decay and the Lamarckian flag are per-edge heritable attributes on both surfaces; vote edges can learn; no cost knob or lazy initializer remains.
+- [ ] Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
+- [ ] Group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators with a bijection test.
 
 ## Executable Features
 
-- [ ] **T25.F01 — Edge Container, Edit Records and Birth Seeds** — Depends on: None
-  - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one turns a parent's learned state into what a child is born with, and one builds the running brain from it, with no behavior change.
-- [ ] **T25.F02 — Edge Groups Replace Ring Projections** — Depends on: T25.F01
+- [ ] **T25.F01 — Edge Container, Constructors and Birth Seeds** — Depends on: None
+  - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one captures what a child is born with, and one builds the running brain from it, with no behavior change.
+- [ ] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
+  - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, and the founder is re-anchored.
+- [ ] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
-- [ ] **T25.F03 — Direction-Pair Groups** — Depends on: T25.F02
+- [ ] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
   - Goal: The sensory map sits in register with the motor map (superior colliculus): a creature's sensed offset to food, a barrier, a crowd or another creature can reach all eight direction votes of one kind as one silent gene, and that thing's plain facts reach the kind's drive.
-- [ ] **T25.F04 — Learning Per Edge and Group** — Depends on: T25.F02
-  - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts; a synapse a group program built can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
-- [ ] **T25.F05 — Group Creation Forms, Detach and the Catalog** — Depends on: T25.F03, T25.F04
+- [ ] **T25.F05 — The NearbyCreature Family** — Depends on: T25.F04
+  - Goal: One sense of another creature, as an animal reads a neighbor's place, condition and kinship in one glance: the three creature families become one, so a slot's position, vitals and identity arrive from one declaration.
+- [ ] **T25.F06 — Learning Per Edge** — Depends on: T25.F05
+  - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts, and a synapse onto a vote can learn like one onto a neuron.
+- [ ] **T25.F07 — Group-Scope Learning** — Depends on: T25.F06
+  - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
+- [ ] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.
 
 ## Notes for AI Agents
 
 - Decisions (user, 2026-10-13): only geometry is built in (the compass
-  pattern and the eligible `(x, y)` pairs declared on the sensor layout),
-  never a computation; the bundle gene was rejected. Reward source and trace
-  decay are evolvable per edge or group; shared credit changes every member
-  equally (one change to the shared scale); the plasticity update cost
-  stays 0; group creation randomizes learning attributes, never the pattern.
-- Decided (user, 2026-10-13): F03 merges `NearbyCreatureCore`, `Vitals` and
-  `Identity` into one `NearbyCreature` family; an edge costs one genome unit
-  wherever it lives and a group record one; `genome_size`'s per-wired-sink
-  unit is dropped so that rule is uniform (a ring group costs 9 units) and
-  the founder anchor is re-pinned (user confirmation, 2026-10-13). Open:
-  F05 decides the `GroupKey::Slots` refinement disposition with a reading.
-- F01 is behavior-preserving infrastructure: any pin that moves under it is
-  a defect. From F02 on, genome identity and every hash or draw pin move
-  with each feature and are predeclared.
-- Verification plans are in the design note's §8: F01 gate; F02 gate +
-  goal; F03 gate + goal-long; F04 gate + goal; F05 gate + goal; mutation
-  gate and slow tests run on all five.
+  pattern and the `(x, y)` pairs declared in `contracts::inputs`), never a
+  computation; the bundle gene was rejected. Reward source and trace decay
+  are evolvable per edge or group; shared credit is one pattern-weighted
+  change to the shared scale; the plasticity update cost is 0 and its
+  machinery is deleted; group creation randomizes learning attributes, never
+  the pattern; the three creature families merge; an edge costs one genome
+  unit wherever it lives, the per-wired-sink unit is dropped and the founder
+  anchor re-pinned (97 → 80).
+- Decided (user, 2026-10-13): under uniform size the per-unit mutation
+  rate becomes `0.485 / 80 = 0.0060625`, so the founder's supply is
+  unchanged (the note's D14, option a).
+- Open: F08 decides the `GroupKey::Slots` refinement disposition from the
+  refinement-by-key readings F04 and F05 record.
+- The chain is linear by design (D10): a later feature edits the same
+  operator catalog and draws as the one before it, so a rebase during a
+  goal-long run would invalidate the reading.
+- F01 is behavior-preserving: any pin that moves under it is a defect. From
+  F02 on every feature predeclares its re-pins, one cause per commit; the
+  note's §8 carries each feature's re-pin line, reference-spec line and the
+  tests the implementer writes first.
+- Verification plans (note §8): F01 gate; F02 gate + goal + goal-long with
+  viability first; F03 gate + goal; F04 gate + goal-long; F05 gate + goal;
+  F06 gate + goal with viability first; F07 gate + goal; F08 gate + goal;
+  mutation gate and slow tests run on all eight.

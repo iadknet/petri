@@ -62,11 +62,13 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   past 20,000 ticks; the unbounded steal request, and that every live steal
   requests 0 energy (2026-10-12 probe).
 
-Priority order for new starts: T25.F01, T25.F02, T25.F03, T25.F04, T25.F05.
+Priority order for new starts: T25.F01, T25.F02, T25.F03, T25.F04, T25.F05,
+T25.F06, T25.F07, T25.F08.
 
 - T25 was placed on 2026-10-13 at the user's direction from the
   [edge groups and learning design note](strategy/edge-groups-and-learning-design-2026-10-13.md),
   after a live probe found that only the ring-shaped creature input became
   behavior while the multi-field creature sensors and whole-family bundles
   did not. The note's §8 contracts are what each spec owner reads; the track
-  rows are authoritative.
+  rows are authoritative. Version 2 of the note (eight features) followed
+  three Codex review rounds and nine Opus facet reviews on 2026-10-13.
