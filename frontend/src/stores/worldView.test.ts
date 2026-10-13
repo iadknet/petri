@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
 import type {
 	HealthPayload,
 	SnapshotResponse,
@@ -45,6 +46,7 @@ function buildStatusPayload(): StatusPayload {
 
 function buildHealthPayload(): HealthPayload {
 	return {
+		...MOCK_HEALTH_CENSUS,
 		population: 12,
 		mean_energy: 42,
 		mutation_events_attempted_total: 5,

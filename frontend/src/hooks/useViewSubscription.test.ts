@@ -3,6 +3,7 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
+import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
 import type {
 	HealthPayload,
 	ServerMessage,
@@ -59,6 +60,7 @@ function buildStatusPayload(): StatusPayload {
 
 function buildHealthPayload(): HealthPayload {
 	return {
+		...MOCK_HEALTH_CENSUS,
 		population: 7,
 		mean_energy: 15,
 		mutation_events_attempted_total: 3,
@@ -171,7 +173,7 @@ describe("useViewSubscription store helpers", () => {
 		expect(useSimulationStore.getState().status?.population).toBe(7);
 		expect(useWorldViewStore.getState().projectionRevision).toBe(5);
 		expect(useViewportStore.getState().worldSize).toEqual({ width: 12, height: 10 });
-		expect(useStatsHistoryStore.getState().statsHistory).toEqual([]);
+		expect(useStatsHistoryStore.getState().samples).toEqual([]);
 		expect(useStatsHistoryStore.getState().reproAttempted).toBe(4);
 		expect(useStatsHistoryStore.getState().mutationSkippedByOperator.duplicate_mutation).toBe(1);
 		expect(useStatsHistoryStore.getState().mutationTargetReachabilityTotal.unreachable).toBe(1);

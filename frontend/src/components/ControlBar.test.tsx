@@ -299,7 +299,9 @@ describe("ControlBar", () => {
 			},
 			energy: { initial_energy: 20 },
 		});
-		useStatsHistoryStore.getState().pushStats(3, 10, 25);
+		useStatsHistoryStore
+			.getState()
+			.recordStatus({ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 }, 0.5);
 
 		vi.mocked(api.startup).mockResolvedValue({
 			protocol_version: "v3alpha1",
@@ -376,7 +378,7 @@ describe("ControlBar", () => {
 			);
 			expect(useSimulationStore.getState().simState).toBe("idle");
 			expect(useSimulationStore.getState().tick).toBe(0);
-			expect(useStatsHistoryStore.getState().statsHistory).toHaveLength(0);
+			expect(useStatsHistoryStore.getState().lastActions).toBeNull();
 			expect(useConfigStore.getState().serverConfig).toEqual(MOCK_CONFIG);
 		});
 	});

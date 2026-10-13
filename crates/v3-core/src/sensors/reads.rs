@@ -140,6 +140,13 @@ impl WorldKeySet {
     pub fn is_empty(&self) -> bool {
         self.words.iter().all(|&word| word == 0) && self.spill.is_empty()
     }
+
+    /// Number of keys in the set.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        let inline: u32 = self.words.iter().map(|word| word.count_ones()).sum();
+        inline as usize + self.spill.len()
+    }
 }
 
 impl FromIterator<WorldInputKey> for WorldKeySet {
@@ -220,6 +227,7 @@ mod tests {
                 .map(|(key, _)| *key)
                 .collect();
             prop_assert_eq!(&collected, &set);
+            prop_assert_eq!(set.len(), picks.iter().take(universe.len()).filter(|&&p| p).count());
         }
     }
 }
