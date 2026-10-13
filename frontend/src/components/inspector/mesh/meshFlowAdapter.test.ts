@@ -160,4 +160,24 @@ describe("meshFlowAdapter", () => {
 		expect(scene.nodes[0]?.data.hasSharedMemory).toBe(true);
 		expect(scene.nodes[1]?.data.hasSharedMemory).toBe(false);
 	});
+
+	it("gives each node a keyboard-facing accessible label, role and focus ring", () => {
+		const analysis = analyzeMesh(genome);
+		const semantics = deriveMeshSemantics(genome, annotations);
+
+		const scene = buildMeshFlowScene({
+			analysis,
+			layout,
+			semanticsById: semantics.nodesById,
+			selectedNodeId: 1,
+			activeNodeId: null,
+			activeEdgeId: null,
+			dimmedNodeIds: new Set<number>(),
+		});
+
+		expect(scene.nodes[0]?.ariaLabel).toBe("Route Selector · Food, VM node, entry, selected");
+		expect(scene.nodes[1]?.ariaLabel).toMatch(/^.+, Graph node$/);
+		expect(scene.nodes[0]?.ariaRole).toBe("button");
+		expect(scene.nodes[0]?.className).toContain("focus-visible:outline-2");
+	});
 });

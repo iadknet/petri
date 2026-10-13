@@ -129,9 +129,20 @@ const MeshFlowScene = memo(function MeshFlowScene({
 				nodeTypes={NODE_TYPES}
 				edgeTypes={EDGE_TYPES}
 				onNodeClick={(_, node) => onSelectNode(Number(node.id))}
+				onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
+					if (event.key !== "Enter" && event.key !== " ") return;
+					const nodeElement =
+						event.target instanceof Element
+							? event.target.closest<HTMLElement>(".react-flow__node")
+							: null;
+					const nodeId = nodeElement?.dataset.id;
+					if (nodeId === undefined) return;
+					event.preventDefault();
+					onSelectNode(Number(nodeId));
+				}}
 				nodesDraggable={false}
 				nodesConnectable={false}
-				nodesFocusable={false}
+				nodesFocusable
 				elementsSelectable={false}
 				proOptions={{ hideAttribution: true }}
 				panOnScroll={false}
