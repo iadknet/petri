@@ -268,3 +268,45 @@ describe("WorldRenderer devicePixelRatio sizing", () => {
 		expect(recorder.transforms.at(-1)).toEqual([2, 0, 0, 2, 0, 0]);
 	});
 });
+
+describe("WorldRenderer predation flashes", () => {
+	it("repaints once when the last flash expires on an unchanged tick", () => {
+		// Arrange: a paused world (tick never changes) with one predation event.
+		const recorder = recordingContext();
+		const frame = emptyFrame(4, 4);
+		const renderer = new WorldRenderer(fakeCanvas(recorder, 40, 40), () =>
+			model(
+				frame,
+				{ x: 0, y: 0, zoom: 10 },
+				{
+					predationEvents: [
+						{
+							attacker_x: 0,
+							attacker_y: 0,
+							victim_x: 1,
+							victim_y: 0,
+							energy_stolen: 5,
+							killed: false,
+						},
+					],
+				},
+			),
+		);
+		renderer.resize(40, 40, 1);
+		renderer.render(0);
+		const flashFills = recorder.fills.filter((fill) => fill.style.startsWith("rgb"));
+		expect(flashFills.length).toBeGreaterThan(0);
+		recorder.fills.length = 0;
+
+		// Act: the flash expires, then a later frame arrives with nothing new.
+		renderer.render(150);
+		const repaint = [...recorder.fills];
+		recorder.fills.length = 0;
+		renderer.render(200);
+
+		// Assert: the expiry frame repaints the background without the flash, once.
+		expect(repaint.some((fill) => fill.w === 40 && fill.h === 40)).toBe(true);
+		expect(repaint.some((fill) => fill.style.startsWith("rgb"))).toBe(false);
+		expect(recorder.fills).toHaveLength(0);
+	});
+});
