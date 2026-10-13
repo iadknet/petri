@@ -347,6 +347,7 @@ export class WorldRenderer {
 
 		const { frame, overview, tick, predationEvents, camera, fertilityOverlay } = model;
 
+		const hadFlashes = this.flashOverlay.hasActiveFlashes;
 		if (tick !== this.lastRenderedTick) {
 			this.flashOverlay.update(predationEvents, frame.width, now);
 		} else {
@@ -354,7 +355,9 @@ export class WorldRenderer {
 		}
 
 		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
-		if (tick === this.lastRenderedTick && !hasPreview && !this.flashOverlay.hasActiveFlashes) {
+		// Flashes that just expired still need one repaint to erase their last mark.
+		const flashesActive = hadFlashes || this.flashOverlay.hasActiveFlashes;
+		if (tick === this.lastRenderedTick && !hasPreview && !flashesActive) {
 			return;
 		}
 		this.lastRenderedTick = tick;
