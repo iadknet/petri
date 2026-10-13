@@ -39,7 +39,7 @@ describe("StatsHistoryStore", () => {
 	it("gives the pushed series a new array and leaves the other series untouched", () => {
 		const store = useStatsHistoryStore.getState();
 		store.pushStats(1, 50, 37.4);
-		store.pushActions(1, { move: 1, eat: 2, reproduce: 0, noop: 0, steal: 0 });
+		store.pushActions(1, { move: 1, eat: 2, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 });
 		store.pushCompute(1, 3, 1, 5, 2, 1);
 		store.pushComplexity(1, 10, 5, 20);
 		const before = useStatsHistoryStore.getState();
