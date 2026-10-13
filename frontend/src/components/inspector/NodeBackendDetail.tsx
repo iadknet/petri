@@ -43,7 +43,7 @@ export function NodeBackendDetail({
 
 		return (
 			<div className="px-3 py-2">
-				<div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+				<div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
 					VM Program ({vm.program.length}) · {vm.register_count} regs
 				</div>
 				<div className="space-y-px overflow-y-auto">
@@ -78,7 +78,7 @@ export function NodeBackendDetail({
 								data-junk={isLive ? "false" : "true"}
 								className={`flex items-baseline gap-2 rounded px-1.5 py-0.5 text-[11px] font-mono leading-relaxed ${rowClass}`}
 							>
-								<span className="w-5 shrink-0 text-right text-slate-600">{index}</span>
+								<span className="w-5 shrink-0 text-right text-slate-400">{index}</span>
 								<span className="w-[5.5rem] shrink-0 truncate text-slate-400">
 									{readable.label}
 								</span>

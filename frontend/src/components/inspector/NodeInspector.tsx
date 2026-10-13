@@ -44,7 +44,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 	if (!node) {
 		return (
 			<div className="px-3 py-3 text-center">
-				<p className="text-[10px] font-mono text-slate-500">Select a node to inspect</p>
+				<p className="text-[10px] font-mono text-slate-400">Select a node to inspect</p>
 			</div>
 		);
 	}
@@ -69,7 +69,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 				<Suspense
 					fallback={
 						<div className="px-3 py-4 text-center">
-							<p className="text-[10px] font-mono text-slate-500">Loading graph viz…</p>
+							<p className="text-[10px] font-mono text-slate-400">Loading graph viz…</p>
 						</div>
 					}
 				>

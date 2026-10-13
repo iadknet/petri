@@ -156,11 +156,9 @@ export function UnifiedInspector({
 		<div
 			role="complementary"
 			aria-label="Creature Inspector"
-			className="relative flex h-full min-h-0 flex-col overflow-hidden border-l border-slate-800 bg-slate-950 shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]"
-			data-testid="unified-inspector"
+			className="relative h-full min-h-0 min-w-0"
 		>
-			<h2 className="sr-only">Creature Inspector</h2>
-			{/* Resize handle */}
+			{/* Resize handle: straddles the border so its 24px target covers no inspector content */}
 			{/* biome-ignore lint/a11y/useSemanticElements: interactive resize handle cannot use <hr> */}
 			<div
 				role="separator"
@@ -172,108 +170,110 @@ export function UnifiedInspector({
 				aria-valuenow={inspectorWidth}
 				onMouseDown={handleResizeStart}
 				onKeyDown={handleResizeKeyDown}
-				className="absolute inset-y-0 left-0 z-20 w-3 cursor-col-resize bg-transparent outline-none"
+				className="absolute inset-y-0 -left-3 z-20 w-6 cursor-col-resize bg-transparent outline-none"
 				data-testid="inspector-resize-handle"
 			>
 				<span
-					className={`absolute inset-y-0 left-[5px] w-px transition-colors ${
+					className={`absolute inset-y-0 left-[17px] w-px transition-colors ${
 						isResizing ? "bg-cyan-400" : "bg-slate-800"
 					}`}
 				/>
 			</div>
 
-			{/* Vitals banner (top, full width) */}
-			<VitalsBanner
-				id={stats.id}
-				rgb={stats.phenotype.rgb}
-				generation={stats.generation}
-				heading={stats.heading}
-				age={stats.age}
-				energy={stats.energy}
-				maxEnergy={stats.maxEnergy}
-				position={stats.position}
-				actionLog={actionLog}
-				phenotype={stats.phenotype}
-				isDead={isDead}
-				onClose={onClose}
-			/>
-
-			{/* Canvas area (full width) + node inspector */}
-			<div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-				<InspectorDiagnosticsCards diagnostics={diagnostics} />
-
-				{/* Controls header */}
-				<MeshControls
-					backendFilter={mesh.backendFilter}
-					focusMode={mesh.focusMode}
-					dimUnreachable={mesh.dimUnreachable}
-					onBackendFilterChange={mesh.setBackendFilter}
-					onFocusModeChange={mesh.setFocusMode}
-					onDimUnreachableChange={mesh.setDimUnreachable}
-					onFitView={mesh.meshController.requestFitView}
-					onResetView={mesh.meshController.requestResetView}
+			<div
+				className="relative flex h-full min-h-0 flex-col overflow-hidden border-l border-slate-800 bg-slate-950 shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]"
+				data-testid="unified-inspector"
+			>
+				<h2 className="sr-only">Creature Inspector</h2>
+				{/* Vitals banner (top, full width) */}
+				<VitalsBanner
+					id={stats.id}
+					rgb={stats.phenotype.rgb}
+					generation={stats.generation}
+					heading={stats.heading}
+					age={stats.age}
+					energy={stats.energy}
+					maxEnergy={stats.maxEnergy}
+					position={stats.position}
+					actionLog={actionLog}
+					phenotype={stats.phenotype}
+					isDead={isDead}
+					onClose={onClose}
 				/>
 
-				{/* Canvas — shrinks to fit, minimum 120px so nodes stay visible */}
-				<div className="flex-1 min-h-[120px]">
-					{mesh.layoutError ? (
-						<InspectorEmptyState
-							title="Layout failed"
-							description="The mesh layout engine could not produce a stable topology for this genome."
-						/>
-					) : (
-						<MeshCanvas
-							analysis={mesh.analysis}
-							semanticsById={mesh.semantics?.nodesById ?? null}
-							layout={mesh.layout}
-							selectedNodeId={mesh.detailNode?.id ?? null}
-							activeNodeId={activeNodeId}
-							activeEdgeId={traceFocus.activeEdgeId}
-							dimmedNodeIds={mesh.dimmedNodeIds}
-							focusMode={mesh.focusMode}
-							viewportCommand={mesh.meshController.viewportCommand}
-							onSelectNode={mesh.handleNodeSelect}
-							complexity={stats.complexity}
-							genomeSize={stats.genomeSize}
-						/>
+				{/* Canvas area (full width) + node inspector */}
+				<div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+					<InspectorDiagnosticsCards diagnostics={diagnostics} />
+
+					{/* Controls header */}
+					<MeshControls
+						focusMode={mesh.focusMode}
+						dimUnreachable={mesh.dimUnreachable}
+						onFocusModeChange={mesh.setFocusMode}
+						onDimUnreachableChange={mesh.setDimUnreachable}
+					/>
+
+					{/* Canvas — shrinks to fit, minimum 120px so nodes stay visible */}
+					<div className="flex-1 min-h-[120px]">
+						{mesh.layoutError ? (
+							<InspectorEmptyState
+								title="Layout failed"
+								description="The mesh layout engine could not produce a stable topology for this genome."
+							/>
+						) : (
+							<MeshCanvas
+								analysis={mesh.analysis}
+								semanticsById={mesh.semantics?.nodesById ?? null}
+								layout={mesh.layout}
+								selectedNodeId={mesh.detailNode?.id ?? null}
+								activeNodeId={activeNodeId}
+								activeEdgeId={traceFocus.activeEdgeId}
+								dimmedNodeIds={mesh.dimmedNodeIds}
+								focusMode={mesh.focusMode}
+								viewportCommand={mesh.meshController.viewportCommand}
+								onSelectNode={mesh.handleNodeSelect}
+								complexity={stats.complexity}
+								genomeSize={stats.genomeSize}
+							/>
+						)}
+					</div>
+
+					{/* Node inspector */}
+					{mesh.detailNode && (
+						<div className="max-h-[65%] shrink-0 overflow-y-auto border-t border-slate-800 bg-slate-950">
+							<NodeInspector
+								node={mesh.detailNode}
+								semantics={mesh.detailSemantics}
+								sharedMemory={sharedMemory}
+								executionHop={executionHop}
+							/>
+						</div>
 					)}
 				</div>
 
-				{/* Node inspector */}
-				{mesh.detailNode && (
-					<div className="max-h-[65%] shrink-0 overflow-y-auto border-t border-slate-800 bg-slate-950">
-						<NodeInspector
-							node={mesh.detailNode}
-							semantics={mesh.detailSemantics}
-							sharedMemory={sharedMemory}
-							executionHop={executionHop}
-						/>
-					</div>
-				)}
+				{/* Sampler bar (bottom, full width) */}
+				<SamplerBar
+					sample={sampler.sample}
+					position={sampler.position}
+					playbackState={sampler.playbackState}
+					playbackSpeed={sampler.playbackSpeed}
+					totalTicks={sampler.totalTicks}
+					totalHops={sampler.totalHops}
+					samplingError={sampler.samplingError}
+					isDead={isDead}
+					meshSemantics={mesh.semantics}
+					onSample={sampler.handleSample}
+					onResample={sampler.handleResample}
+					onClear={sampler.clearSample}
+					onPlay={sampler.setPlaying}
+					onPause={sampler.setPaused}
+					onStepForward={sampler.stepForward}
+					onStepBackward={sampler.stepBackward}
+					onSpeedChange={sampler.setPlaybackSpeed}
+					onTickSelect={sampler.handleTickSelect}
+					onHopSelect={sampler.handleHopSelect}
+				/>
 			</div>
-
-			{/* Sampler bar (bottom, full width) */}
-			<SamplerBar
-				sample={sampler.sample}
-				position={sampler.position}
-				playbackState={sampler.playbackState}
-				playbackSpeed={sampler.playbackSpeed}
-				totalTicks={sampler.totalTicks}
-				totalHops={sampler.totalHops}
-				samplingError={sampler.samplingError}
-				isDead={isDead}
-				meshSemantics={mesh.semantics}
-				onSample={sampler.handleSample}
-				onResample={sampler.handleResample}
-				onClear={sampler.clearSample}
-				onPlay={sampler.setPlaying}
-				onPause={sampler.setPaused}
-				onStepForward={sampler.stepForward}
-				onStepBackward={sampler.stepBackward}
-				onSpeedChange={sampler.setPlaybackSpeed}
-				onTickSelect={sampler.handleTickSelect}
-				onHopSelect={sampler.handleHopSelect}
-			/>
 		</div>
 	);
 }

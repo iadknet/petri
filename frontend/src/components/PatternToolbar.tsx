@@ -126,7 +126,7 @@ export function PatternToolbar({ onApply, onCancel }: PatternToolbarProps) {
 			</div>
 
 			{!hasArea && (
-				<div className="text-[10px] text-slate-500 px-1 text-center">
+				<div className="text-[10px] text-slate-400 px-1 text-center">
 					Click and drag on the canvas to select an area
 				</div>
 			)}

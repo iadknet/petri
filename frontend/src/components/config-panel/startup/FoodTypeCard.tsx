@@ -107,7 +107,7 @@ export function FoodTypeCard({
 			<div className="flex items-start justify-between gap-2">
 				<p className="flex items-baseline gap-2 text-xs font-medium text-slate-200">
 					Food Type {index + 1}
-					<span className="font-mono text-[10px] font-normal text-slate-500">type_idx {index}</span>
+					<span className="font-mono text-[10px] font-normal text-slate-400">type_idx {index}</span>
 				</p>
 				<button
 					type="button"

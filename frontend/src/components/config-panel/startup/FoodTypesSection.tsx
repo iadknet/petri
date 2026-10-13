@@ -20,7 +20,7 @@ export function FoodTypesSection({
 	return (
 		<div className="flex flex-col gap-2 px-3 pt-1">
 			<div className="flex items-center justify-between gap-2 px-1 pb-1">
-				<p className="text-[11px] text-slate-500">
+				<p className="text-[11px] text-slate-400">
 					List order sets each type's <code className="font-mono text-slate-400">type_idx</code> for
 					sensors and fertility targets.
 				</p>

@@ -13,7 +13,7 @@ export const InputsPanel = memo(function InputsPanel({
 }: InputsPanelProps) {
 	return (
 		<div>
-			<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+			<div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">
 				Inputs
 			</div>
 			<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">

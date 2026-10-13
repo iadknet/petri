@@ -72,7 +72,7 @@ export function StatsPanel() {
 							className={`px-3 py-1 text-xs font-medium rounded-t border-b-2 focus-visible:outline-2 focus-visible:outline-sky-400 ${
 								selected
 									? "bg-petri-panel text-slate-200 border-sky-400"
-									: "text-slate-500 hover:text-slate-300 border-transparent"
+									: "text-slate-400 hover:text-slate-300 border-transparent"
 							}`}
 						>
 							{label}

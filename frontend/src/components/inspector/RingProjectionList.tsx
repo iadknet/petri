@@ -20,7 +20,7 @@ export function RingProjectionList({ projections, inputRefs }: RingProjectionLis
 	if (!projections || projections.length === 0) return null;
 	return (
 		<section aria-label="Ring projections" className="mt-2">
-			<h4 className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+			<h4 className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
 				Ring projections ({projections.length})
 			</h4>
 			<ul className="space-y-0.5 font-mono text-[10px] text-slate-300">

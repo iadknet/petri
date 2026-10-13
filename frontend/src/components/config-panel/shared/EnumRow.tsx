@@ -69,7 +69,7 @@ export function EnumRow({
 				))}
 			</select>
 			{showHelp && field.tooltip && (
-				<p className="text-[11px] leading-snug text-slate-500">{field.tooltip}</p>
+				<p className="text-[11px] leading-snug text-slate-400">{field.tooltip}</p>
 			)}
 			{error && (
 				<p
