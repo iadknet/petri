@@ -732,3 +732,34 @@ describe("ControlBar", () => {
 		);
 	});
 });
+
+describe("ControlBar page structure and panel toggles", () => {
+	function renderBar() {
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+	}
+
+	it("names the page with a single level-1 heading", () => {
+		renderBar();
+		expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+		expect(screen.getByRole("heading", { level: 1, name: /petri/i })).toBeInTheDocument();
+	});
+
+	it.each([
+		["toggle-config", true],
+		["toggle-stats", true],
+	])("exposes %s state with aria-pressed and a distinct pressed style", (testId, initial) => {
+		renderBar();
+		const button = screen.getByTestId(testId);
+		expect(button).toHaveAttribute("aria-pressed", String(initial));
+		const initialClass = button.className;
+		fireEvent.click(button);
+		expect(button).toHaveAttribute("aria-pressed", String(!initial));
+		expect(button.className).not.toBe(initialClass);
+		const pressedClass = initial ? initialClass : button.className;
+		expect(pressedClass).toContain("ring-1");
+	});
+});
