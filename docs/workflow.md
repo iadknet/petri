@@ -440,6 +440,16 @@ reason, and picks the cheapest plan that answers the feature's question.
 | `run` | new or changed production logic in `v3-core`, `v3-cli` or `v3-server` whose behavior tests must pin |
 | `not run` | documentation, frontend, telemetry export, lab code, tooling, test-only changes, or a change confined to config values or constants that existing tests already pin |
 
+| Slow tests (`make rust-test-slow`) | Declare for |
+| --- | --- |
+| `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move |
+| `not run` | everything else |
+
+The slow tier holds `#[ignore]` tests marked `slow tier`, kept out of
+`make check` because they cost minutes (user decision, 2026-10-12). When
+declared it runs once at Close, beside `make check`, on the final code. A
+cargo-mutants run does not execute it.
+
 The reviewer checks the plan against the diff. A plan the diff contradicts,
 such as `none` with a trajectory change or `not run` on new production logic,
 is a P1. The user may set either line; the spec records that decision with its
@@ -661,7 +671,8 @@ against the original roadmap goal before closure.
 
 ### Close and integrate
 
-In the worktree: run `make check` once on the final feature code and record
+In the worktree: run `make check` once on the final feature code, plus
+`make rust-test-slow` when the Verification Plan declares it, and record
 that commit as the tested commit. Then set the spec to `Complete`, check the
 feature row, update the track and master rollups only if their own criteria are
 now satisfied, run `make check-docs` (the closure edits are documentation, and

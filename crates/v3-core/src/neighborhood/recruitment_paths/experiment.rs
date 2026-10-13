@@ -1281,6 +1281,7 @@ mod tests {
     /// `[21, 21, 21, 20]` -> `[20, 20, 20, 19]`; the VM rows are unchanged).
     /// The T13.F06 progress record stays historical.
     #[test]
+    #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
@@ -1420,6 +1421,7 @@ mod tests {
     /// `c + 98`): 21/21 graph (censored 10 -> 11) and 23/23 VM retained
     /// discoveries remain useful.
     #[test]
+    #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
@@ -1464,6 +1466,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn paired_lineages_report_each_first_divergence_and_signed_difference() {
         let start = starting_forms()
             .into_iter()

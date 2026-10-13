@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-slow rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,6 +74,9 @@ rust-test-reproducibility: ## Run the v3-core seeded-run and sampled-trajectory 
 
 rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 	@cargo test -p v3-core --test vm_all_opcodes_e2e
+
+rust-test-slow: ## Run the opt-in slow test tier (recruitment-paths experiment pins); a spec's Verification Plan declares it.
+	@cargo test -p v3-core --features telemetry-seams --lib neighborhood::recruitment_paths::experiment:: -- --ignored
 
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli

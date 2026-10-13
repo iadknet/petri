@@ -48,8 +48,8 @@ itself.
   recorded result is implausible given the code (for example, a test file the
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
-- Verification Plan: the spec's declared benchmark profiles and mutation gate
-  fit the diff under the workflow's "Verification plan" table. A plan the diff
+- Verification Plan: the spec's declared benchmark profiles, mutation gate and
+  slow tests fit the diff under the workflow's "Verification plan" table. A plan the diff
   contradicts, such as `none` with a simulation trajectory change or mutation
   `not run` on new production logic in `v3-core`, `v3-cli` or `v3-server`, is a
   P1.

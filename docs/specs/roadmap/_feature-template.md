@@ -83,6 +83,7 @@ loop and the Codex review always run.
 | --- | --- | --- |
 | Benchmark profiles | `none`, `gate`, `gate + goal`, or `gate + goal-long` (`+ goal` if the 2,000-tick series also matters) | one sentence |
 | Mutation gate | `run` or `not run` | one sentence |
+| Slow tests (`make rust-test-slow`) | `run` or `not run` | one sentence |
 
 ## Implementation Tasks
 
