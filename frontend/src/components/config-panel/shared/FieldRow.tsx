@@ -57,7 +57,7 @@ export function RowActions({
 					onClick={onUndo}
 					disabled={disabled}
 					title={`Undo: back to the applied value (${appliedText})`}
-					className="flex h-5 items-center gap-1 rounded px-1 font-mono text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-40"
+					className="relative flex h-5 items-center gap-1 rounded px-1 before:absolute before:inset-x-0 before:-inset-y-0.5 font-mono text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-40"
 				>
 					<span className="sr-only">Undo change, applied value</span>
 					was {appliedText}
@@ -72,7 +72,7 @@ export function RowActions({
 					disabled={disabled}
 					title={`Reset to default (${defaultText})`}
 					aria-label={`Reset to default (${defaultText})`}
-					className="flex size-5 items-center justify-center rounded text-slate-400 opacity-60 hover:bg-slate-800 hover:text-slate-200 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30"
+					className="relative flex size-5 items-center justify-center rounded text-slate-400 opacity-60 before:absolute before:-inset-0.5 hover:bg-slate-800 hover:text-slate-200 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30"
 				>
 					<Icon name="reset" className="size-3" />
 				</button>

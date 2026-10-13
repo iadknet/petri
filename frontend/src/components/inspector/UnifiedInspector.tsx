@@ -172,7 +172,7 @@ export function UnifiedInspector({
 				aria-valuenow={inspectorWidth}
 				onMouseDown={handleResizeStart}
 				onKeyDown={handleResizeKeyDown}
-				className="absolute inset-y-0 left-0 z-20 w-3 cursor-col-resize bg-transparent outline-none"
+				className="absolute inset-y-0 left-0 z-20 w-6 cursor-col-resize bg-transparent outline-none"
 				data-testid="inspector-resize-handle"
 			>
 				<span

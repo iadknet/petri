@@ -59,7 +59,7 @@ export function Tooltip({ text }: TooltipProps) {
 					event.preventDefault();
 					setOpen(true);
 				}}
-				className="inline-flex size-4 items-center justify-center rounded-sm text-slate-400 hover:text-slate-300 focus-visible:text-slate-200 focus-visible:outline-2 focus-visible:outline-sky-400"
+				className="relative inline-flex size-4 items-center justify-center rounded-sm text-slate-400 before:absolute before:-inset-1 hover:text-slate-300 focus-visible:text-slate-200 focus-visible:outline-2 focus-visible:outline-sky-400"
 			>
 				<Icon name="info" className="size-3" />
 			</button>

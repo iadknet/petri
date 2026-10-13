@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
+import { targetSize } from "../../test/targetSize.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
 import { UnifiedInspector } from "./UnifiedInspector.tsx";
 
@@ -160,6 +161,9 @@ describe("UnifiedInspector", () => {
 
 		// Resize handle
 		expect(screen.getByTestId("inspector-resize-handle")).toBeInTheDocument();
+		expect(targetSize(screen.getByTestId("inspector-resize-handle")).width).toBeGreaterThanOrEqual(
+			24,
+		);
 	});
 
 	it("renders close button that calls onClose", () => {
