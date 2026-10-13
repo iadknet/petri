@@ -8,12 +8,15 @@ wired the way ring projections are wired: all of an input's fields added
 together, as a group, with the group evolving as a unit or edge by edge. The
 answer grew into a refactor of the graph genome's edge model. This note records
 the design, the boundaries it draws, the options it rejected, the user's
-decisions, and the feature contracts the spec owner reads. An adversarial
-Codex Astra review (three rounds, 2026-10-13: 24 findings, then 7, then 3
-blocking and 1 advisory with 5 partial confirmations; the round 3 edits
-were not re-reviewed) shaped §3, §4, §7 and §8; the findings and
-dispositions are in
+decisions, and the feature contracts the spec owner reads.
+
+This is version 2. Version 1 (commit `6b43ffca`) went through three Codex
+Astra review rounds; version 2 rewrites §3, §4, §7, §8 and §9 after nine Opus
+facet reviews (decomposition, boundaries, cruft, tests, data model, runtime,
+mutation catalog, accounting, consumers) returned 35 blocking findings. The
+findings, the decisions D1–D14 taken from them and every disposition are in
 [`docs/progress/readings/t25-design-review.md`](../progress/readings/t25-design-review.md).
+Where version 2 reverses a Codex disposition (edit records, D1) it says so.
 
 **Decision (user, 2026-10-13): edges and edge groups become domain objects;
 learning lives on edges and groups; mutation has a group layer and an edge
@@ -27,13 +30,14 @@ layer.** This is the first feature set of program 2 (track T25).
   with a Lamarckian flag) and, inside a group, whether its learning feeds
   only itself or the whole group.
 - Reward source and trace decay are evolvable per edge or group. Credit
-  shared across a group changes every member equally. The plasticity update
-  cost stays 0 for now.
+  shared across a group is one change to the shared scale. The plasticity
+  update cost is 0, and the cost machinery goes (D9).
 - Group creation comes in two forms: every member alike, or learning
   attributes randomized per member. The geometric pattern is never
   randomized.
 - The three nearby-creature families merge into one `NearbyCreature`
-  family. An edge costs one genome unit wherever it lives.
+  family. An edge costs one genome unit wherever it lives; the per-wired-sink
+  unit is dropped and the founder anchor re-pinned.
 
 ## Answer
 
@@ -43,44 +47,44 @@ all of its input edges; the only stored group is the `RingProjection` gene,
 and two other mechanisms infer groups from edge patterns on the fly. The
 refactor:
 
-1. **Edge** gains `group`, `learning` and `scope`. It stays in its container
+1. **Edge** gains `membership` and `plasticity`. It stays in its container
    (input order is semantic for `GreaterThan`, `Select` and the trace
-   payload), so no edge identifiers are needed; a group member is a sink
-   edge whose `group` names a group record on the backend definition and
-   whose source and target fit the group's shape.
-2. **Group** is a record `{shape, scale, inherit_scale}`. A shape fixes the
-   geometric pattern of its members; a member's genomic weight is
-   `scale × pattern(source, target) + edge.weight`, one pure function every
-   reader calls, with a runtime resolver that substitutes learned values.
-   Ring projections become `Ring` groups with eight materialized member
-   edges. A new `DirectionPair` shape fans a sensor's `(x, y)` pair into a
-   kind's eight direction sinks in the fixed compass pattern.
-3. **Learning** moves to the edge: learned state (learned own weight,
-   eligibility trace) is indexed over both surfaces, compute inputs and sink
-   inputs, so vote edges can learn; a member with scope `Group` applies its
-   update to the group's learned scale, which every member feels through the
-   pattern.
-4. **Mutation** has an edge layer and a group layer. Attribute operators pick
-   an edge, then draw whether the change applies to that edge or to every
-   member of its group. Structured refinement's inferred ring groups and the
-   recruitment plan's transient bundles become explicit groups.
+   payload), so no edge identifiers are needed; a member is a sink edge
+   whose membership names a group record on the backend definition and whose
+   source and target fit the group's shape. Its own weight becomes private:
+   every reader chooses the own, genomic or applied weight.
+2. **Group** is a record `{shape, kind, offset, scale, inherit_scale}`. A
+   shape fixes the geometric pattern of its members; a member's genomic
+   weight is `scale × pattern + own`, one pure composition every reader uses,
+   and the runtime resolves the same composition over learned values. Ring
+   projections become `Ring` groups with eight materialized member edges. A
+   new `DirectionPair` shape fans a sensor's `(x, y)` pair into a kind's
+   eight direction sinks in the fixed compass pattern.
+3. **Learning** moves to the edge as today's `PlasticityConfig`, on both
+   surfaces, so vote edges can learn; a member with scope `Group` applies its
+   pattern-weighted update to the group's learned scale.
+4. **Mutation** has an edge layer and a group layer. The nine plasticity
+   operators move from compute nodes to edges one to one; attribute
+   operators draw whether the change applies to the picked edge or to every
+   member of its group. Ring projections' operators become group operators;
+   `RecruitNeutralInput`'s ring case emits a group and gains a pair case.
+   Structured refinement's inferred ring groups are deleted.
 5. **Readers** read explicit membership from the genome; wiring analyses that
-   look for direction-general behavior (ring rules, drive fan-outs) keep
-   their own derived definitions and compute them from members and genomic
-   effective weights.
+   look for direction-general behavior keep their own derived definitions
+   over non-member edges and genomic weights.
 
-Five features, in order: T25.F01 the container API, edit records and birth
-correspondence (behavior-preserving); T25.F02 edge groups replace ring
-projections; T25.F03 direction-pair groups and the `NearbyCreature` family;
-T25.F04 learning per edge and group with the scope draw; T25.F05 group
-creation forms, detach and the catalog. §8 holds the contracts.
+Eight features in a linear chain: F01 container, constructors and birth
+seeds (behavior-preserving); F02 uniform genome size; F03 ring groups replace
+projections; F04 direction-pair groups; F05 the `NearbyCreature` family; F06
+learning per edge; F07 group-scope learning; F08 creation forms, detach and
+the catalog. §8 holds the contracts.
 
 This recommendation is provisional against the repository's research depth
-bar: the local evidence is complete (three code maps, a live probe and one
-adversarial review round), the external precedent rests on one paper
-verified at source and on summaries of the others (§5), and no scratch proof
-has been run. The features' own gate and goal readings are the proof; no lab
-run is planned (user ruling, 2026-10-10).
+bar: the local evidence is complete (three code maps, a live probe, three
+Codex rounds and nine facet reviews), the external precedent rests on one
+paper verified at source and on summaries of the others (§5), and no scratch
+proof has been run. The features' own gate and goal readings are the proof;
+no lab run is planned (user ruling, 2026-10-10).
 
 ## 1. Problem, constraints, criteria
 
@@ -207,340 +211,322 @@ annotations count them.
 
 ## 3. Domain model
 
+Module paths are today's: the genome in `creature/genome/cgp.rs` (split into
+`edge`, `group` and `container` submodules), learning state in
+`runtime/plasticity`, reproduction in `simulation/actions/cgp_reproduction.rs`.
+No type or module is renamed (D11).
+
 ```rust
 /// A heritable connection. Stays in its container's `inputs` list.
-pub struct Edge {
+pub struct GraphEdge {
     pub source: GraphSource,
-    /// Own weight. Inside a group: a correction on top of the group term,
-    /// born 0.
-    pub weight: f32,
-    pub learning: Learning,
-    /// Meaningful only inside a group; validation rejects it elsewhere.
-    pub scope: Scope,
-    /// Index into `CgpGraphBackendDef::groups`, or none.
-    pub group: Option<u16>,
+    /// Private: readers choose `own_weight()`, `def.genomic_weight(occurrence)`
+    /// or the runtime's applied weight. Inside a group it is a correction on
+    /// top of the group term, born 0.
+    own_weight: f32,
+    /// Today's type, moved from the compute node (F06). `None` is static.
+    pub plasticity: Option<PlasticityConfig>,
+    /// Set only on sink edges that fit a group's shape (F03; `scope` in F07).
+    pub membership: Option<Membership>,
 }
 
-pub enum Learning {
-    Static,
-    Hebbian { rule: HebbianRule, rate: f32, clamp: f32, lamarckian: bool },
-    RewardModulated {
-        rule: HebbianRule,
-        rate: f32,
-        clamp: f32,
-        source: OutcomeChannel,
-        trace_decay: f32,
-        lamarckian: bool,
-    },
-}
-
-/// Where a member's learning update lands.
+pub struct Membership { pub group: GroupId, pub scope: Scope }
 pub enum Scope { Edge, Group }
+pub struct GroupId(u16);
 
 pub struct Group {
     pub shape: Shape,
+    pub kind: DirectedVoteKind,
+    /// Rotation, always `< 8`.
+    pub offset: u8,
     /// One shared weight, born 0.
     pub scale: f32,
-    /// Whether a learned scale seeds the child's runtime state.
+    /// Whether a learned scale seeds the child's runtime state (F07).
     pub inherit_scale: bool,
 }
 
 pub enum Shape {
-    /// Members are sink edges from ring cell `c` into `K[(c + offset) mod 8]`;
-    /// pattern 1.
-    Ring { ring_ref: u16, kind: DirectedVoteKind, offset: u8 },
-    /// Members are sink edges from the pair's x or y field into a direction
-    /// sink of `K`; pattern is the compass projection (§4) rotated by `offset`.
-    DirectionPair { x: InputLeafRef, y: InputLeafRef, kind: DirectedVoteKind, offset: u8 },
+    /// Members: ring cell `c` of `input_refs[ring_ref]` into `K[(c + offset) mod 8]`; pattern 1.
+    Ring { ring_ref: u16 },
+    /// Members: the pair's x or y field of `input_refs[ref_idx]` into any
+    /// direction sink of `K`; pattern is the compass projection (§4) rotated
+    /// by `offset`. `pair` indexes the family's declared pairs (§4).
+    DirectionPair { ref_idx: u16, pair: u8 },
 }
 
-/// Genomic composition: what every structural reader uses.
-fn genomic_weight(edge: &Edge, group: Option<&Group>, target: SinkIndex) -> f32 {
-    match group {
-        Some(g) => g.scale * g.shape.pattern(&edge.source, target) + edge.weight,
-        None => edge.weight,
-    }
-}
+/// Pure composition, the only formula: genomic and applied weights both use it.
+fn compose(own: f32, scale: f32, pattern: f32) -> f32 { scale * pattern + own }
 
-/// Runtime resolution: the same composition over learned values where the
-/// runtime holds them, falling back to the genomic ones.
-fn applied_weight(edge, group, target, learned: &LearnedState) -> f32 { ... }
+impl CgpGraphBackendDef {
+    /// Genomic weight of the edge at `occurrence`; resolves the group itself.
+    pub fn genomic_weight(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32;
+}
+// runtime/plasticity: applied_weight(occurrence, &LearnedState) composes learned
+// own weights and learned scales where they exist, genomic values otherwise.
 ```
 
-Decisions behind the shape of this model:
+**Birth seeds (D1).** Birth correspondence stays a draft-carried payload, as
+`birth_weights` is today: `BirthSeeds { compute rows, sink rows, one slot per
+group }`, a `#[serde(skip)]` private field of `CgpGraphBackendDef` that
+exists only on the child draft between reproduction's capture and its
+construction of the child's runtime state. It rolls back with the engine's
+genome snapshot, travels with topology clones, and is realigned by the
+container primitives and nowhere else. The custom `Debug` and `PartialEq`
+impls exclude exactly this field; an exhaustive destructuring test makes any
+other new field a compile error. This reverses the version 1 edit-record
+design (Codex dispositions 1, 27, 28, 34, 35): the code already gives the
+payload every property records would have rebuilt, and records would have
+needed special cases for route operators, splits, appends and mesh-level
+provenance.
 
-- **Edges stay in their containers.** A global edge list with stable
-  identifiers was considered (§6, option D). Input order is semantic, the
-  trace payload is ordered per target, and every reader walks a container; a
-  global list would need that order anyway and would move every walker. A
-  group index on the edge gives explicit membership without identifiers.
-- **Membership is a validated coordinate, not a stored position.** A member
-  is a sink edge whose `group` is set and whose `(source, target)` fits the
-  shape: for `Ring`, source `InputLeaf{ring_ref, c}` into sink `K[(c + offset)
-  mod 8]`; for `DirectionPair`, source `x` or `y` into any direction sink of
-  `K`. The pattern is a function of that coordinate, so nothing else is
-  stored per member. Validation rejects a member that does not fit. Any
-  operation that changes a member's source or target outside a shape
-  operator (retarget, raw-field step, split through a compute node) detaches
-  it first, atomically (§4). Compute-input edges cannot be members while
-  every shape targets direction sinks.
+**Invariants (closed list; the container upholds them, `validate_graph`
+checks them at every deserialization boundary and in the parseability gate
+under a distinct skip reason, D5).**
+
+- I1 Every own weight, scale and plasticity parameter is finite; rates and
+  decays in `[0, 1]`, clamps in `[0.01, 10]`, as the mutation laws bound them.
+- I2 Only a sink edge carries a membership; compute-input edges never do.
+- I3 Every `GroupId` is below `groups.len()`; `groups.len() ≤ u16::MAX`.
+- I4 A member fits its group's shape: `Ring`, source `InputLeaf { ring_ref, c }`
+  with `c < 8` into sink `K[(c + offset) mod 8]`; `DirectionPair`, source the
+  pair's x or y field into a direction sink of `K`.
+- I5 At most one member per `(group, source, target)` coordinate.
+- I6 A group has at least one member; removing the last member removes the
+  group.
+- I7 A shape is well-formed: `input_refs[ring_ref]` is a ring family; `pair`
+  is below the declared pairs of `input_refs[ref_idx]`'s family; `offset < 8`.
+- I8 A member's `sub_idx` is canonical (below its compound width); world
+  compounds wrap today, so `(ring, 8)` would read cell 0.
+- I9 Identity: `Debug`, `PartialEq` and JSON cover every heritable field and
+  nothing else; `BirthSeeds` is the only `#[serde(skip)]` field on any
+  genome type; genome types carry `deny_unknown_fields`.
+
+Decisions behind the model:
+
+- **Edges stay in their containers.** A global edge list with identifiers was
+  considered (§6, option D): input order is semantic, the trace payload is
+  ordered per target, every reader walks a container. A `GroupId` on the
+  edge gives explicit membership without identifiers.
+- **Membership is a validated coordinate** (I4), not a stored position; the
+  pattern is recomputed from `(source, target direction)`, never stored. An
+  operation that changes a member's source outside a shape operator
+  (retarget to a different source, raw-field step, split through a compute
+  node) detaches it first.
 - **Members are materialized.** A `Ring` group is eight member edges plus one
-  group record, not a generator term as today's projection is. That is what
-  lets a mutation delete, retarget or re-weight one member while the group
-  survives, and what lets one member be an exception, the HybrID pattern
-  (§5). The hot path loses the separate projection term and gains one
-  indexed group lookup per member edge (`Option<u16>` into a short `Vec`;
-  no search).
-- **Pattern zeros are not materialized at birth.** A `DirectionPair` member
-  for `x` has pattern 0 toward N and S, so creation makes 12 members, not
-  16. An omitted member is geometrically unnecessary at birth, not
-  impossible: an ordinary `AddGraphEdge` can later add that edge, and if it
-  fits the shape it may join the group through its correction.
-- **Learned state stays in the runtime, as absolute values.** The genome
-  carries the learning configuration; `GraphRuntimeState` carries, per
-  learning edge, a learned own weight and an eligibility trace, indexed
-  `[mesh][surface][edge]`, and per group a learned scale. The genome never
-  absorbs learned values; a Lamarckian edge seeds the child's learned own
-  weight, and a group with `inherit_scale` seeds the child's learned scale,
-  both selected by the child's post-mutation flags, as today.
-- **Identity invariant.** A genome's `Debug`, `PartialEq` and JSON include
-  every heritable attribute (`source`, `weight`, `learning`, `scope`,
-  `group`, and each group record) and exclude learned values, traces and
-  birth payloads, continuing the rule today's custom impls apply to
-  `birth_weights` and `ablated_channels` (`cgp.rs:191-209, 229-252`).
-- **Detach** is a genomic transformation: `edge.weight :=
-  genomic_weight(...)`, `group := None`, `scope := Edge`. Mutation runs only
-  on the child draft at birth, so the only learned state in play is the
-  parent's, and it reaches the child as seeds (§7): a detached edge whose
-  own flag is Lamarckian is seeded with the parent's learned own weight plus
-  the parent's learned scale times its pattern, so the applied weight the
-  parent had is what the child starts from; a static member has no learned
-  slot before or after, so the parent's learned scale contribution ends
-  with the membership and the child starts from the genomic weight. Nothing
-  learned enters the genome. **Remove group** removes the record and every
-  member. **Remove edge** on a member removes only that member; a group
-  whose last member is removed is removed with it.
-- **Accounting contract.** The user accepted "an edge costs one unit
-  wherever it lives, a group record one". Today's `genome_size` also
-  charges one unit per wired sink, so eight members born onto eight unwired
-  sinks would cost 17 units, nine onto already-wired ones. The
-  recommendation is to drop the per-wired-sink unit so the rule is uniform:
-  `genome_size` = mesh nodes + input references + route targets + compute
-  nodes + edges on both surfaces + group records (VM: program length +
-  constants). The founder anchor (`FOUNDER_GENOME_SIZE_UNITS`) is re-pinned
-  to the founder's recomputed size, so the replication multiplier, which is
-  relative to it, leaves the founder's reproduce charge unchanged. For a
-  creature with `P` projections and `S` wired sinks before any other edit,
-  `Δgenome_size = 8P − S`: the live world carries about 0.4 projections and
-  roughly 17 wired sinks per creature, so most creatures get smaller and
-  projection carriers grow by up to 8 per projection. Every reader of
-  `genome_size` moves with it: carrying cost (`1e-4` per unit per tick),
-  mutation supply (`Binomial(size, 0.005)`), the replication multiplier
-  above the anchor, gestation (`ceil(size × rate / anchor)`), and the
-  size-pressure roll at `(size / cap)²` against the 1,200-unit cap
-  (`mutation/engine/mod.rs:128-130`; off by default).
-  Functional complexity is a different measure and keeps its own rules: a
-  wired sink counts one whether its edges are members or not, sink edges are
-  not counted individually, a group record counts one in place of the
-  projection's one, and a consumed reference counts one; a migrated
-  projection whose eight sinks were unwired therefore raises complexity by
-  up to 8, which the action-cost multiplier, the reproduce charge and the
-  predation kill bonus (`kill_complexity_bonus_multiplier × victim
-  complexity`, `simulation/actions/predation.rs:125-127`; default 0) read.
-  F02 predeclares both shifts and its goal reading watches genome size,
-  complexity, births and gestation. Dropping the wired-sink unit reaches
-  beyond the first accepted decision; the user confirmed it on 2026-10-13.
+  record. That is what lets a mutation delete, re-weight or detach one
+  member while the group survives, the HybrID pattern (§5). The hot path
+  loses the projection term and gains one indexed lookup per member edge.
+- **Pattern zeros are not materialized at birth.** A pair member for `x` has
+  pattern 0 toward N and S, so creation makes 12 members, not 16; an omitted
+  member is geometrically unnecessary at birth, not impossible, and a later
+  `AddGraphEdge` on that sink is an ordinary edge, never a member (F08
+  confirms the no-join rule).
+- **Learned state is runtime state**, constructed once from seeds at birth
+  (D8): a learned own weight for every learning edge with scope `Edge`, a
+  trace for every reward-modulated edge, and one learned scale per group
+  with a scope-`Group` learner. There is no lazy initializer. A per-module
+  visited bit keeps phase 2.5's "initialized modules only" semantics. The
+  genome never absorbs learned values.
+- **Detach** is genomic: `own := compose(own, scale, pattern)`, `membership
+  := None`, and the group's seed slot composes into the edge's seed in place
+  when the edge is Lamarckian; a static member keeps no learned state before
+  or after. `RemoveGroup` removes the record and every member; `RemoveGraphEdge`
+  on the last member removes the group (I6).
+- **Accounting contract.** `genome_size` = mesh nodes
+  + input references + route targets + compute nodes + edges on both
+  surfaces + group records (VM: program length + constants); the
+  per-wired-sink unit and the projection unit go. The founder is 97 → **80**
+  (node 0: 20, node 1: 60; ForageFirst profiles 100 → 83), the anchor
+  `FOUNDER_GENOME_SIZE_UNITS` re-pinned so the founder's replication
+  multiplier stays 1.0 and its gestation 1 tick; the founder's carrying cost
+  falls 0.0097 → 0.0080 per tick. For a creature with `P` projections and
+  `S` wired sinks, `Δgenome_size = 8P − S`; a migrated group is +8 relative
+  to non-carriers. Readers that move: carrying cost (`1e-4` per unit per
+  tick), mutation supply (`Binomial(size, rate)`: the per-unit rate becomes
+  `0.485 / 80 = 0.0060625`, option a, user 2026-10-13, so the founder's
+  supply of 0.485 events per birth and its clone fraction are unchanged,
+  while an evolved genome of the same size draws up to 21% more events than
+  under the old rule, less the sink units it no longer carries),
+  the replication multiplier, gestation (`ceil(size × rate / 80)`, larger
+  for every genome above the founder, ×1.21 at depth), the size-pressure
+  roll against the 1,200 cap (off by default, not re-anchored), and the
+  drift-walk and recruitment-paths instruments that draw
+  `Binomial(anchor, rate)`. Functional complexity keeps its rules: a wired
+  sink counts one whether its edges are members or not, sink edges are not
+  counted individually, a group record counts one, a consumed reference one;
+  a migrated projection onto unwired sinks raises complexity by up to 8,
+  which the action-cost multiplier, the reproduce charge and the predation
+  kill bonus read, all off at defaults.
 
 ## 4. Mechanisms
 
-**Compass pattern.** For direction index `d` in `N, NE, E, SE, S, SW, W, NW`,
-`px = [0, .71, 1, .71, 0, −.71, −1, −.71]` and
-`py = [−1, −.71, 0, .71, 1, .71, 0, −.71]` (y grows southward). A pair group's
-member for `x` into sink `K[d]` has pattern `px[(d − offset) mod 8]`; the `y`
-member has `py[...]`. With a positive scale the group votes toward the sensed
-position; offset 4 votes away; the sign of the scale is evolved. This is the
-geometry Petri already builds in for rings (`RingProjection::channel_for`)
-extended to a vector, and it is the one thing the design bakes in.
+**Compass pattern.** The table is derived from `Direction::delta()`
+(`contracts/direction.rs`), not typed by hand: for direction `d`,
+`px[d] = normalized dx`, `py[d] = px[(d − 2) mod 8]`, with the diagonals at
+`std::f32::consts::FRAC_1_SQRT_2` so every row has norm 1 within 1 ulp and
+the axis zeros are exactly `0.0`. A pair member for `x` into `K[d]` has
+pattern `px[(d − offset) mod 8]`; the `y` member `py[...]`. With a positive
+scale the group votes toward the sensed position; offset 4 votes away; the
+sign of the scale is evolved. The applied weight is two rounded operations
+(no `mul_add`) and sums stay sequential, so results are platform-stable.
 
-**Eligible pairs live with the sensor layout.** Which fields of a family form
-an `(x, y)` offset is declared beside the family's field indices in
-`sensors/perception.rs` (`NearbyCreature` slot k `(dx, dy)`;
-`AreaOccupancySummary` `(centerX, centerY)` and `(nearestDx, nearestDy)`;
-`AreaFoodSummary(t)` `(gradX, gradY)` and `(nearestDx, nearestDy)`;
-`AreaBarrierSummary` the same two). The group shape consumes that metadata;
-there is no second table to keep in step. Input references are shared by
-both backends, so the merged family's layout is one contract for Graph
-edges, VM `ReadInput` and every label.
+**Pair metadata lives in `contracts::inputs`** beside `compound_width` (D12):
+each world family declares its width, its field offsets and its direction
+pairs (`NearbyCreature` slot k `(dx, dy)`; `AreaOccupancySummary`
+`(centerX, centerY)` and `(nearestDx, nearestDy)`; `AreaFoodSummary(t)`
+`(gradX, gradY)` and `(nearestDx, nearestDy)`; `AreaBarrierSummary` the same
+two). `sensors::perception` writes against it, the shape validates against
+it, labels, census, lab and frontend read it. Shape eligibility depends on
+the `WorldInputKey` variant only, never on a food type, so `InputRef.Swap`'s
+kind partition preserves it.
 
-**Learning on edges.** The update law for a learning edge is today's
-(`runtime/plasticity/hebbian.rs:138-145`; `reward.rs:27-88`) with the edge's
-own `rule`, `rate`, `clamp`, `source` and `trace_decay`. Contract:
+**Learning on edges (F06, F07).** The update laws are today's
+(`runtime/plasticity/hebbian.rs:138-145`, `reward.rs:27-88`) with the edge's
+own configuration. Contract:
 
-- *Samples, not replays.* Every update uses the pre and post values the
-  evaluation itself used: for a compute-input edge, the source value read in
-  ordered evaluation and the node's committed output; for a sink edge, the
-  source value the sink sum read, in sink order, and the sink's weighted sum
-  (its vote, output or write value). Effects write shared memory as the sink
-  loop proceeds, so a later re-resolve would not reproduce those values; the
-  executor records the per-edge samples during evaluation and the learning
-  step consumes them after effects. One convention for both Hebbian and
-  reward-modulated edges.
+- *Layout at birth.* A per-backend learning layout (a `has_learning` flag,
+  the slot list, precomputed genomic member weights) is built once at
+  creature construction like `cached_complexity`; `execute_graph_impl` is
+  monomorphized on a learner parameter beside `GraphTracer`, so a
+  non-learning graph runs today's loops with no sample branch; phases 0 and
+  2.5 iterate the slot list, never the genome.
+- *Samples.* The executor records, for every learning edge, the pre value
+  the evaluation used (compute inputs: the ordered read; sink inputs: the
+  value the sink sum read, in sink order) and the post value (the node's
+  committed output; the sink's `sanitize_f32(wsum)`). Effects write shared
+  memory as the sink loop proceeds, so a later re-resolve would differ.
+  Recording a sample costs 4 B per learning edge in reused scratch; the two
+  `action_queue` clones the replays needed go. On recurrent compute edges
+  this changes pure-Hebbian semantics (today's replay reads this visit's
+  output for self and higher sources): predeclared, with a self-edge
+  regression.
 - *Order.* Evaluation reads the applied weight in force at visit start;
-  updates run after effects for every edge, so no edge learns from a value
-  its own update changed within the visit. Every Δ, including Oja's
-  normalization term, is computed from the recorded visit-start applied
-  weight (today Oja reads the mutable learned weight,
-  `runtime/plasticity/hebbian.rs:136`, `traces.rs:151`); only then are the
-  contributions applied in genome order with their clamps, so a learned
-  scale several members change in one visit gives the same result as the
-  same samples in any other visit.
-- *What an update targets.* A member with scope `Edge` updates its learned
-  own weight; a member with scope `Group` updates the group's learned
-  scale. Each member computes its own Δ with its own configuration; a group
-  may hold static members, members with different reward sources or decays,
-  and a static member simply contributes nothing. Several members may
-  contribute to the scale in one visit: contributions are summed in genome
-  order, and the scale is clamped by each contributing member's `clamp` as
-  it is applied. The group record owns no learning configuration of its
-  own; `inherit_scale` is its only learning attribute.
-- *Equal credit.* "Changes every member equally" is realized as one change
-  to the shared scale: every member's applied weight moves by the same
-  factor of its pattern, so a `Ring` group moves every member by the same
-  amount, and a `DirectionPair` group moves toward or away as a unit. An
-  equal additive change across a kind's eight directions would be a drive,
-  which the 2026-10-11 decision keeps as a separate gene. (Codex round 1
-  read "equally" as additive; the user confirmed the scale reading on
-  2026-10-13.)
-- *Clamp.* `clamp` bounds the learned quantity an update writes: the learned
-  own weight for scope `Edge`, the learned scale for scope `Group`. Oja's
-  normalization reads the applied weight.
-- *Runaway.* Pure Hebbian learning on a vote edge feeds back on itself (a
-  larger vote strengthens the edge). It is allowed, evolvable, bounded by the
-  clamp, and selection removes it where it hurts. The user chose to make the
-  mode evolvable rather than restrict vote edges to reward modulation.
+  every Δ, Oja's term included, is computed from visit-start values after
+  effects; then contributions apply in canonical `(sink, edge)` order with
+  their clamps. The cost chain is deleted (D9), so no visit is voided by
+  learning.
+- *Scope and credit (D4).* A member with scope `Edge` updates its learned own
+  weight. A member with scope `Group` contributes `p_m × Δ_m` to the group's
+  learned scale, its own rule, rate, source and decay applied, so a
+  negative-pattern member never moves against its rule and `Ring` members
+  (pattern 1) contribute Δ unchanged. Contributions in one event sum, and
+  the scale is bounded once by the group's bound, the smallest clamp among
+  its scope-`Group` learners. A static member contributes nothing. One
+  change to the shared scale is what "every member equally" means: every
+  member's applied weight moves in proportion to its pattern.
+- *Eligibility.* Every wired sink edge is a learning candidate except
+  `ClearSlot` edges, whose sink ignores its sum. Vote edges may run pure
+  Hebbian learning (runaway allowed by decision, clamp-bounded); per-visit
+  sampling is the T19.F02 rule, so credit scales with visits, which F06
+  reads beside clamp occupancy.
+- *Seeds.* A Lamarckian edge's learned own weight seeds the child; a group
+  seeds its learned scale only when `inherit_scale` is set and the child
+  group has a scope-`Group` learner; seeds are clamped at construction; the
+  container's `set_weight`, `set_source` and `set_scale` clear the seed they
+  touch, as a weight step does today; a detached Lamarckian edge is seeded
+  with its own learned weight plus the parent's learned scale times its
+  pattern.
 
-**Shape operators relocate members.** `ShiftGroupOffset` moves every
-surviving member one direction sink clockwise (or counter-clockwise); its
-pattern travels with it, since the pattern is a function of the rotated
-coordinate. `RetargetGroupKind` moves every member to the other kind's sink
-of the same direction. A moved member is removed from its old sink's
-`inputs` and appended to its new sink's, members in genome order; its
-correction, learning configuration, scope and learned state travel with it;
-holes (deleted members) stay holes; nothing is regenerated. Sink edges carry
-no birth correspondence today; F04 extends the seeds to sink edges and
-groups, and a relocation record carries it (§7).
+**Shape operators relocate members in two phases.** `ShiftGroupOffset` and
+`RetargetGroupKind` remove every member from its sink, then append each at
+its new sink after the independent edges in `(group, channel)` order, so a
+shift followed by its inverse returns an equal genome (a proptest). The
+pattern travels with the coordinate; correction, plasticity, scope, learned
+state and seeds travel with the edge; holes stay holes; nothing is
+regenerated.
 
-**Group removal is one atomic operation.** `remove_group(i)` removes the
-record, removes every member edge, and decrements every edge's `group` index
-above `i`. The same operation runs when `reindex_input_refs_after_removal`
-drops a reference a shape names (`ring_ref`, or a pair's `x` or `y`), and
-`InputRef.Prune` counts shape references as consumers so it never prunes
-one. A group with no members is removed. Property tests cover every edge's
-link after any sequence of removals.
+**Removal.** `RemoveGroup` removes the record and every member and renumbers
+every higher `GroupId` in one container operation; `RemoveGraphEdge` on a
+last member does the same. Reference reindexing never removes a group: the
+only production pruner removes references no consumer addresses, and every
+live group's members address its reference, so the reindex is decrement-only
+with a debug assertion (D6).
 
-**Copy operators and members.** `CopyInternalNode`, `CopySubgraph`,
-`CopyEdgeBundle` and `duplicate_compute_nodes_in_place` copy compute-input
-edges only; sink edges and groups are untouched, so a copy never duplicates
-a member. `AddGraphEdge` may land on a sink a group targets; the new edge is
-not a member unless it fits the shape and the operator says so (F05 decides
-whether a fitting edge joins; F02 says no).
+**Edge operators on members.** `RetargetGraphEdge` keeps today's draws (edge,
+then source); a same-source draw changes nothing; a changed source detaches
+first, then clears the seed. A raw-field step always changes the source, so
+it always detaches. A split detaches before rewiring. `AddGraphEdge` never
+joins a group (F08 confirms). Copy operators copy compute-input edges only,
+so they never copy a member.
 
-**Ablation is an observation-only mask.** The lab's `readings::ablate`, the
-core's `input_use::ablated` and the lab's `expressed()` (learning off) stop
-rewriting genome copies. They pass an evaluation-context mask with three
-parts: `(mesh node, input reference index, sub-value or all)` keys whose
-reads return 0 in either backend (a Graph `InputLeaf` edge, a VM
-`ReadInput`, a group shape reference; today's ablation rewrites VM reads
-per sub-value too, `neighborhood/input_use/consumers.rs:289-299`,
-`crates/v3-lab/src/readings.rs:633`); `(mesh node, surface, edge index)`
-triples for masking one Graph edge; and a flag that disables learning. The genome, its membership, input order,
-learned-state correspondence, size and functional complexity are untouched
-by construction. `ablated_channels` is deleted.
+**Recruitment emits groups.** `RecruitNeutralInput` draws the family, then
+the destination; when the family is a ring and the destination a directed
+sink, both arms emit a `Ring` group of eight born-0 members with `offset =
+(d − channel) mod 8` under `SingleChannel` and `offset = d` under
+`WholeFamily`, as today's projection cases do. When the family declares
+pairs and the destination is a directed sink, `WholeFamily` draws one slot
+(`NearbyCreature`) or one pair (area summaries) and emits a `DirectionPair`
+group of twelve born-0 members with `offset = d` plus one born-0 edge into
+`Drive K` per field of that slot in no eligible pair; `SingleChannel` keeps
+today's single-edge plan. Recruitment always creates static groups.
 
-**Recruitment emits groups.** `RecruitNeutralInput` under `WholeFamily`,
-landing on a directed kind `K`:
+**Ablation (D3).** Members are plain sink edges, so today's rewrite ablation
+in `neighborhood/input_use/consumers.rs` and the lab's `readings::ablate`
+covers them; their projection branches and `ablated_channels` are deleted.
+Validation never runs on an observation copy. The lab's `expressed()` stays a
+lab-side rewrite that sets every edge's plasticity to `None` and every
+`inherit_scale` to false, which touches neither size, complexity,
+membership nor order.
 
-- a ring family becomes a `Ring` group of eight born-0 members, as today's
-  projection;
-- a family with an eligible pair becomes one `DirectionPair` group of twelve
-  born-0 members for the drawn pair, plus one born-0 edge per remaining
-  scalar field of the drawn slot into `Drive K` (scalar → drive, the
-  2026-10-11 rule);
-- any other family keeps today's behavior.
+**Draw contracts.** Every operator documents its draw order in code and
+pins it with a parallel-RNG tail test, as today.
 
-For `NearbyCreature` the plan recruits one drawn slot, not all four; four
-slots of twelve members plus drives per event is too heavy a step.
+- *Group operators* (F03): `AddRingGroup` draws ring, kind, offset as
+  `AddRingProjection` does today; `AlterGroupScale` picks a group then steps
+  with `perturb_weight`; `ShiftGroupOffset`, `RetargetGroupKind` and
+  `RemoveGroup` pick a group and apply. `AddDirectionPairGroup` (F04)
+  enumerates `(ref_idx ascending, pair ascending)` over references whose
+  family declares pairs, draws one, then kind, then offset. Applicability:
+  the enumeration is non-empty, the 24 direction sinks exist, and
+  `groups.len() < u16::MAX`.
+- *Plasticity operators* (F06): the nine node operators move to edges with
+  their laws unchanged (`hebbian.rs:195-349`): enable, disable, rule, rate,
+  Lamarckian flag, enable and disable modulation, source, decay; the edge is
+  picked uniformly over both surfaces in canonical order among edges
+  matching the operator's predicate; a `ClearSlot` edge never matches.
+- *Scope coin* (F07): after picking the edge, if it is a member,
+  `gen_bool(0.5)` chooses this edge or every member; the drawn values are
+  drawn once; a parameter step under group scope draws one `u` in `[−1, 1]`
+  and each member applies its own branch of today's law; a member whose
+  variant lacks the field is unchanged and consumes no draw; a non-member
+  draws no coin. `SetScope` picks a member, draws the coin, writes the other
+  scope; no value draw.
+- *Static creation* (F03, F04): shape draws only; members static, scope
+  `Edge`, `inherit_scale` false, scale and corrections 0.
+- *Uniform learned creation* (F07): shape draws, then one mode over
+  `{static, Hebbian, reward-modulated}`, its fields with today's enable
+  laws, one scope coin, then one `inherit_scale` coin after the member
+  loop.
+- *Randomized creation* (F08, separate operators per shape so F07's draws
+  do not move): shape draws, then per member in genome order an independent
+  mode, fields and scope, then one `inherit_scale` coin.
+- *`DetachGraphEdge`* (F08): one member uniformly in canonical edge order;
+  no coin, no value draw; detaching the last member removes the group.
 
-**Draw contracts.** Every operator documents its draw order in code, as
-today.
+**Refinement disposition (D7).** `GroupKey::Ring` and the ring arm of
+`correspondence` are deleted in F03: the explicit group's step is
+`AlterGroupScale`, and an inferred ring beside an explicit one would be two
+mechanisms for one concept. Refinement's private `Group` and `Member` are
+renamed `InferredSet` and `InferredMember`, and its weight writes go through
+the container setter so they clear seeds like every other weight step. The
+`Slots` key is re-keyed on the merged family in F05 (`field = channel mod 9`,
+`slot = channel div 9`) and kept until F08 decides, from refinement
+applications recorded by key on F04's goal-long and F05's goal runs, whether it
+stays, becomes a shape, or goes.
 
-- *Attribute operators* (F04: learning mode, rate, clamp, reward source,
-  trace decay, Lamarckian flag, scope): pick the Graph module as every
-  Graph operator does; pick one eligible edge uniformly over both surfaces
-  in canonical order, eligibility per attribute as today's node-level
-  predicates define it (`hebbian.rs:141-164`, moved to edges); if the edge
-  is a member, `gen_bool(0.5)` chooses this edge or every member; the new
-  value is drawn once and applied through the transition table below to
-  every selected member. No eligible edge is `NoApplicableTarget`, redrawn
-  as today.
-- *Transition table.* `SetLearningMode(m)` draws `m` uniformly over the two
-  modes the picked edge is not in, then draws, once and before the member
-  loop, every field a transition into `m` can need: rule, rate, clamp and
-  Lamarckian flag with today's `EnableHebbian` laws (`hebbian.rs:195-210`)
-  and source and decay with today's `EnableRewardModulation` laws
-  (`:277-291`). Then per selected member: already in `m`, unchanged; from
-  `Static` into a learning mode, the member takes every drawn field it
-  needs; from `Hebbian` into `RewardModulated`, the member keeps its own
-  rule, rate, clamp and flag and takes the drawn source and decay; from
-  `RewardModulated` into `Hebbian`, it keeps its own rule, rate, clamp and
-  flag and drops source and decay; into `Static`, it drops everything.
-  "The same values" means the drawn fields; a member's retained fields stay
-  its own. A parameter operator draws one step before the loop and applies
-  that step to each selected member's own value: `rate`, `clamp` and
-  `trace_decay` use today's multiplicative-or-additive law (`hebbian.rs:246-261`),
-  `clamp` bounded to `[0.01, 10]`; `source` draws one of the other three
-  channels relative to the picked edge and writes it; the Lamarckian flag
-  is set to the picked edge's new value. Members whose variant lacks the
-  field are unchanged and consume no draw. `SetScope` writes the picked
-  edge's new scope (the other value) to every selected member. The table
-  is total: every (operator, variant) pair has one outcome.
-- *Static creation* (F02 for `Ring`, F03 for `DirectionPair`): draw the
-  shape's parameters (ring or pair, kind, offset); every member is
-  `Static` with scope `Edge`; `inherit_scale` is false; no learning draw
-  exists before F04. Members and scale are born 0.
-- *Uniform learned creation* (F04): the shape draws, then one mode drawn
-  uniformly over `Static`, `Hebbian` and `RewardModulated`, its fields
-  drawn once with the laws above, one scope coin (`gen_bool(0.5)`) and one
-  `inherit_scale` coin, written to every member.
-- *Randomized creation* (F05): the shape draws, then per member in genome
-  order an independent mode, fields and scope; one `inherit_scale` coin.
-- *Shape operators* (F02): one projection-equivalent draw each, as
-  `projection.rs:44-46` documents today.
+**The creature-sensor family (F05).** The three families merge into one
+`NearbyCreature` family (4 slots × 9 fields = 36 sub-values) declared in
+`contracts::inputs`. The sampler keeps 27 buckets with indices 10–12 all
+drawing `NearbyCreature` (D13): the family is 36 wide against 7 or 8 for
+others, so three buckets is proportionate, and the draw pins hold.
+Recruitment takes one slot everywhere, which keeps the 30-edge bound.
 
-**Refinement disposition.** `RefineHeritableStructure`'s `GroupKey::Ring`
-inference becomes redundant and, left alone, would double-step materialized
-members. F02 excludes grouped edges from inference. Its `GroupKey::Slots` key
-(one field across the four ranked slots into one sink) is keyed today on the
-three nearby-creature families and their widths; F03 re-keys it on the
-merged family (`field = channel mod 9`, `slot = channel div 9`) so the
-default-on mechanism keeps working across the merge. F05 decides, with a
-reading of how often it fires, whether `Slots` stays an inferred
-correspondence, becomes a shape, or is dropped. Nothing default-on is
-deleted or broken silently.
-
-**The creature-sensor family.** `Nearest1` spans three input references
-today (`Core`, `Vitals`, `Identity`), so "add Nearest1 as one unit" is a
-cross-family bundle. **Decision (user, 2026-10-13): merge** the three into
-one `NearbyCreature` family (4 slots × 9 fields = 36 sub-values; the
-sampler's 27 buckets become 25; labels, census, telemetry gauges and the
-inspector follow). No backward compatibility, one family per thing sensed,
-and a slot's pair and scalars arrive from one declaration. F03 owns the
-merged layout as the shared input contract for both backends.
-
-**Out of scope.** The VM backend (no edges); `Drive` sinks as group targets;
-compute-input edges as members; founder rewiring (its four cardinal taxis
-edges stay independent edges); the unbounded steal amount (carried finding
-5 of the program 1 archive).
+**Non-goals (D11).** The VM backend (no edges); `Drive` sinks as group
+targets; compute-input edges as members; founder rewiring; type and module
+renames; generating the operator enums from a table (a bijection test is
+added instead); the four domain selection loops; the dangling
+`ComputeNode(u16::MAX)` sentinel; tolerance of out-of-range `InputLeaf`
+reads; the unbounded steal amount (program 1 carried finding 5).
 
 ## 5. Evidence
 
@@ -590,7 +576,7 @@ edges stay independent edges); the unbounded steal amount (carried finding
 
 Labeling: "summary" means the claim rests on an abstract or a search summary,
 not a full read. The depth bar asks for full reads before a commitment; the
-spec owner of F04 should read Gerstner 2018 and Miconi 2018 in full.
+spec owner of F06 should read Gerstner 2018 and Miconi 2018 in full.
 
 ## 6. Options
 
@@ -605,224 +591,355 @@ spec owner of F04 should read Gerstner 2018 and Miconi 2018 in full.
 
 ## 7. Boundaries and decomposition
 
-Each boundary owns one thing. Three concerns that today share code are
-separated on purpose: *structural editing* of the genome, *birth
-correspondence* (which child edge descends from which parent edge, used
-once at reproduction), and *learned-state construction* (building the
-child's runtime values). The win the user asked for is concrete: today
-about twelve mutation sites keep the birth payload aligned by hand, three
-readers infer structure the genome will now store, and one hidden field
-exists for one caller. After the refactor each has one owner.
+Each boundary owns one thing, at today's module paths. Three concerns that
+share code today are separated on purpose: *structural editing* of the
+genome, *birth seeds* (which child edge or group descends from which parent
+one, used once at reproduction) and *learned-state construction*. The win
+the user asked for is concrete: today about twelve mutation sites keep the
+birth payload aligned by hand, three readers infer structure the genome will
+store, one hidden field exists for one caller, and three copies of
+"learned value if present, else genomic" exist. After the refactor each has
+one owner.
 
-| Boundary | Responsibility | Today |
+| Boundary (path) | Responsibility | Today |
 | --- | --- | --- |
-| `genome::graph::edge` | `Edge`, `Learning`, `Scope`; validation (finite weight, group index in range, scope only in a group, member fits its shape) | `GraphEdge` in `cgp.rs` |
-| `genome::graph::group` | `Group`, `Shape`, the compass pattern, pair metadata read from the sensor layout, `genomic_weight`, membership validation | `RingProjection` plus inference in `refinement.rs`, `ring_rules.rs`, `drives.rs` |
-| `genome::graph::container` | The only API that adds, copies, removes, relocates, retargets, re-weights or detaches edges and groups; emits **edit records** (below); owns no runtime or birth state | ~12 hand-maintained alignment sites in `operators.rs` and `cgp.rs` |
-| `simulation::reproduction` | Birth correspondence: captures the parent's learned values per edge and group before mutation, folds the published edit records (graph and mesh level) into **seed values** per child edge and group under the child's post-mutation flags, and hands the seeds to the runtime | `cgp_reproduction.rs` and `birth_weights` on the genome |
-| `runtime::graph::learning` | A constructor from seeds; learned own weights, learned scales and traces over both surfaces; evaluation-time samples; Hebbian and reward updates; scope routing; clamps; no knowledge of mutation or edit records | `runtime/plasticity/*` keyed by compute node |
-| `runtime::graph::effects` | Sink sums over applied weights; records per-edge samples; no projection special case | `effects.rs:57-99, 133-171` |
-| `runtime::graph::mask` | The observation-only read and learning mask the lab and the input-use readings pass | genome rewrites and `ablated_channels` |
-| `mutation::graph::edge_ops`, `group_ops` | The two layers and one scope-draw helper; every structural change goes through the container API; the catalog triplet | `operators.rs`, `hebbian.rs`, `projection.rs`, `refinement.rs`, `recruitment.rs` |
-| `analysis` and `census` | Explicit membership read from the genome (plasticity carriers, sensor census "wired" through members); derived wiring analyses (ring rules through edges, bus paths and groups; drive fan-outs) keep their own definitions over members and genomic weights | Inference in three files; `ablated_channels` |
-| Transport and inspector | Serde shape; the creature endpoint adds per-edge applied weights and learned values as derived fields; `types/genome.ts`; an edge-group list replaces `RingProjectionList`; the graph shows genomic and applied weights apart; a per-edge learning badge | Projections drawn as a list, raw `edge.weight` displayed, no plasticity display |
+| `creature::genome::cgp::edge` | `GraphEdge`, `Membership`, `Scope`; field-level validation (I1) | `GraphEdge` |
+| `creature::genome::cgp::group` | `Group`, `Shape`, `GroupId`, the compass pattern from `Direction::delta()`, `compose`, `genomic_weight`, the coordinate checks (I4–I8) | `RingProjection`; inference in `refinement.rs`, `ring_rules.rs`, `drives.rs` |
+| `creature::genome::cgp::container` | The only writer of `inputs`, `compute_nodes`, `output_sinks` and `groups` (private fields): `push_edge`, `remove_edge`, `retain_edges`, `move_edge`, compute-node insert, append, remove and duplicate, reference reindex, `add_group`, `remove_group`, `detach`, an `EdgeMut` handle whose `set_weight` and `set_source` clear the seed (`set_source_keeping_seed` for the split only), `set_scale`; keeps `BirthSeeds` aligned; no RNG, no shape semantics (shift and retarget sit in `group` on top of `move_edge`) | ~12 hand-maintained alignment sites in `operators.rs` and `cgp.rs`; `pub` fields written from `input_ref/mod.rs`, `topology/routing.rs`, `refinement.rs`, the founder, instruments and the lab |
+| `contracts::inputs` | Family widths, field offsets and direction pairs: one layout both backends, the shape, labels, census, lab and frontend read | widths in `contracts/inputs.rs`, offsets in `sensors/perception.rs` |
+| `simulation::actions::cgp_reproduction` | Captures `BirthSeeds` before mutation and hands them to the runtime constructor after, under the child's post-mutation flags; keeps the "parent learned nothing" fast path | `capture_birth_weights`, `build_cgp_child_plasticity_weights` |
+| `runtime::plasticity` | `LearnedState::from_seeds` (the only initializer), `capture()` for reproduction, the learning layout, `applied_weight` (the only resolver), samples, Hebbian and reward updates, scope routing, group bounds, a read-only iterator `(occurrence, genomic, learned, bound, mode, scope)` for census and telemetry; storage `pub(crate)` | three fallbacks, two evaluation paths, lazy init, `pub` storage read by the census and v3-telemetry |
+| `runtime::cgp::effects` | Sink sums over applied weights through a sample sink on the tracer seam, no-op for non-learning graphs; no projection term | `effects.rs:57-99, 133-171` |
+| `mutation::graph` | Edge and group operators, the scope-coin helper, the nine plasticity operators on edges; every structural change through the container; a bijection test over the operator enums | `operators.rs`, `hebbian.rs`, `projection.rs`, `refinement.rs`, `recruitment.rs` |
+| `mutation::engine` | One generic snapshot, validate, commit-or-rollback wrapper (F01) | four near-identical wrappers |
+| `analysis` and `census` | Explicit membership from the genome (plasticity carriers through the runtime iterator; sensor census "wired" through members); derived wiring analyses over non-member edges and genomic weights, with pair groups reported in their own block | inference in three files; `ablated_channels` |
+| v3-lab | Rewrite ablation over plain edges; `expressed()` a lab rewrite; the comparator stays a lab solution built through the plain-edge constructor | projection special cases; the hidden field |
+| Transport and inspector | Serde shape; a top-level `graph_weights` field beside `genome` (own `exclude` token, keyed by node id, sparse: members and learning edges only, genomic and applied values, absent never zero); `mesh_annotations` required with the genome and the frontend's inference deleted; an edge-group list; a per-edge learning badge; sink `weighted_inputs` in the trace | raw `edge.weight` drawn; two sources of truth in `meshSemantics.ts`; no plasticity display |
 
-**Edit records.** Today's inheritance semantics are richer than "what moved
-where": a weight step or retarget drops the edge's inherited value
-(`operators.rs:692-708`), while an identity split keeps correspondence
-although it changes the edge's source (`:402-445`), and topology operators
-copy whole backends, remove mesh nodes and replace a copied node's backend
-(`mutation/topology/structural.rs:75-236`), with inheritance across them
-tested at `simulation/actions/reproduction.rs:981`. The record kinds are
-therefore:
+Dependency direction: `contracts` ← `creature::genome` ← `runtime` ←
+`simulation`; `sensors` reads `contracts` and `creature`; `creature::genome`
+never imports `sensors` or `runtime`. v3-lab, v3-telemetry, v3-cli and the
+server read v3-core through the iterator and the composition functions, never
+through storage.
 
-| Record | Emitted by | Inheritance rule |
-| --- | --- | --- |
-| `Created { occurrence }` | add edge, create group, born-connected edge, recruitment | no seed |
-| `Copied { from, to }` | copy edge bundle, copy or duplicate compute node, subgraph copy, identity split (the moved edge) | seed copied from `from` |
-| `Removed { occurrence }` | remove edge, remove group, reference reindex | seed dropped |
-| `Relocated { from, to }` | shift offset, retarget kind | seed follows the edge |
-| `Invalidated { occurrence }` | weight step, retarget source, raw-field step | seed dropped |
-| `Detached { occurrence, group, pattern }` | detach, with the group's occurrence and the member's pattern value as operands | seed composed as §3 states from the member's and the group's *current* seed state: a component invalidated earlier in the batch uses its genomic fallback; nothing parental is resurrected; the operands make the composition possible when detaching the last member deletes the group |
-| `ComputeInserted { index }`, `ComputeRemoved { index }` | add, split, remove or copy of a compute node | shifts every later compute-input surface; a removal also invalidates every edge sourced from the removed node, as today's dangling `ComputeNode(u16::MAX)` rule does (`cgp.rs:370-398`) |
-| `NodeCopied { from, to }`, `NodeRemoved { node }`, `BackendReplaced { node }` | topology operators | mesh-level correspondence, as the existing tests require |
+**Validation homes (D5).** The container primitives uphold I1–I9 with debug
+assertions and are covered by proptests over random operation sequences.
+`validate_graph(&NodeGenome)` runs at every deserialization boundary (server,
+lab, bench artifacts) and in the parseability gate after every event under
+its own skip reason and counter, so a container defect surfaces as a named
+count, never as a silent rollback.
 
-Two rules today's operators imply are kept: a retarget that draws the
-edge's existing source changes nothing and invalidates nothing
-(`operators.rs:685-689`), and a weight step always invalidates
-(`:699-708`). An occurrence is `(mesh node, surface, index)` for an edge
-and `(mesh node, group index)` for a group. **Addressing is sequential:**
-each record names positions as they stand when it is emitted, and
-reproduction replays the batch in order to carry a parent occurrence to its
-final child position; a relocation of several members is an ordered
-sequence of `Relocated` records, each addressed after the previous one
-applied. Records are event-local: the engine snapshots the genome and
-restores it on operator failure or parseability rejection
-(`mutation/engine/mod.rs:647-661`), so an event's batch is published only
-after the event validates and is discarded with the rollback; a regression
-covers a rejected event followed by an applied one. Reproduction folds the
-published batches into seeds; the runtime's constructor consumes seeds and
-nothing else. The graph container owns no topology: mesh-level records come
-from the topology operators through the same event batch.
+**The three readers that treat projections differently today** get explicit
+post-migration expectations in F03: a motor node whose only votes come from
+members is a voting node in `ladder/track.rs`; member channels are on the
+vote surface in `discovery.rs`; the frontend counts members as action
+writers through the server's annotations. Readers the migration must not
+change are pinned on group-free fixtures.
 
-The three readers that treat projections differently today (§2) get an
-explicit expectation, not a before/after equality: after F02 a motor node
-whose only votes come from a group is a voting node in `ladder/track.rs`, a
-group's channels are on the vote surface in `discovery.rs`, and the frontend
-mesh semantics count members as action writers. Readers the migration
-should not change (sensor census "wired", drive fan-outs on independent
-edges) are pinned separately on fixtures without groups.
-
-**Determinism and pins.** Any field on `Edge` changes the derived `Debug`
-and so every genome identity and fingerprint; any catalog change remaps every
-Graph draw; the lab's `GENOME_FORMAT` bumps. The repo has done this before
-(b20abdff re-pinned 21 files). Each feature predeclares its re-pins.
+**Determinism and pins.** F01 moves no pin; any movement under it is a
+defect. From F02 on every feature predeclares its re-pins, one cause per
+commit, each re-pin naming its mechanism and a restoring check; F01 adds an
+absolute mutation-off digest that stays byte-identical through every later
+feature except F02 with the carrying cost set to 0.
 
 ## 8. Contracts (placed 2026-10-13; the track rows are authoritative)
 
-Order: F01, F02, F03, F04, F05. F03 and F04 are independent after F02; F03
-runs first because it answers the question that started this work. F01 is
-behavior-preserving infrastructure, cut out so that the representation
-change in F02 lands on a container, correspondence and runtime seam that
-already closes with the existing inheritance tests green.
+Order: F01 → F02 → F03 → F04 → F05 → F06 → F07 → F08, a linear chain (D10).
+Every feature: `make check` green at its end, the mutation gate and the slow
+tests run, a "Predeclared re-pins" line, a "Reference specs" line, and a
+"Tests first" list the implementer writes red before code.
 
-- **T25.F01 — Edge Container, Edit Records and Birth Seeds.**
+- **T25.F01 — Edge Container, Constructors and Birth Seeds.**
   - Goal: Development separated from heredity, as a cell's machinery for
     building synapses is separate from what the egg carries: one owner edits
-    the graph, one turns a parent's learned state into what a child is born
-    with, and one builds the running brain from it, with no behavior change.
-  - Scope: `genome::graph::container` as the only edge-editing API, with
-    every mutation operator and `cgp.rs` walker routed through it; the edit
-    record kinds and event-local batches of §7, including the mesh-level
-    records from topology operators; `simulation::reproduction` folding
-    batches into seeds; a runtime constructor from seeds; `birth_weights`
-    removed from the genome. Edges keep `{source, weight}`; no group, no
-    per-edge learning, no accounting change.
-  - Verification: gate (no trajectory change is expected: the deterministic
-    outputs of the gate worlds, the reproducibility test and every
-    inheritance test are identical before and after); mutation gate run;
-    slow tests run. Predeclared re-pins: none; any pin that moves is a
-    defect.
-  - Readings: identical deterministic gate output; the existing Lamarckian
-    inheritance tests (`reproduction.rs:981` and the `cgp_reproduction`
-    tests) pass unchanged; a regression for a rejected event followed by an
-    applied one; the count of hand-maintained alignment sites removed.
-- **T25.F02 — Edge Groups Replace Ring Projections.**
+    the graph, one captures what a child is born with, and one builds the
+    running brain from it, with no behavior change.
+  - Scope: the container module with private fields and the primitives of
+    §7; `GraphEdge::new(source, weight)`, `ComputeNode::new(kind, inputs)` and
+    a def builder, with every struct literal (256 `GraphEdge {`, 183
+    `ComputeNode {`, 70 def literals) and the ~15 local test helpers migrated
+    to them across every crate and the frontend fixtures; `birth_weights`
+    renamed `BirthSeeds` as a private container-kept field; the one generic
+    engine wrapper; `clamp_sub_idx_after_swap` and the dead reindex branches
+    deleted; `connect_declared_input`, routing and refinement writing
+    through the container; the drift-walk dating test rewritten to a
+    constructed lineage. `BirthEdgeClass` stays as it is (non-goal).
+  - Verification: gate; mutation gate run; slow tests run. No pin moves.
+  - Predeclared re-pins: none.
+  - Oracles: a seeded golden corpus recorded on main before any change
+    (Lamarckian plastic genomes with tagged learned values, mutated through
+    `apply_mutations_on_units` at a high rate over all four domains,
+    rollbacks included; a hash of each child genome and its built weights),
+    added to `make check`; an absolute mutation-off trajectory digest; the
+    inheritance tests ported scenario by scenario with identical expected
+    values (`reproduction.rs:1012` as an explicit backend-replacement test);
+    the existing absolute pins (`applied_trajectory`, `baseline_worlds`,
+    recruitment hash, drift, slow tier) unchanged.
+  - Reference specs: `v3-reproduction-spec.md` Lamarckian section (payload
+    name).
+- **T25.F02 — Uniform Genome Size.**
+  - Goal: Every synapse costs the same to carry wherever it sits, as a
+    neuron pays per synapse and not per target: an edge is one unit on both
+    surfaces, a wired sink costs nothing of itself, and the founder is
+    re-anchored.
+  - Depends on: T25.F01.
+  - Scope: the accounting contract (§3); `FOUNDER_GENOME_SIZE_UNITS` 97 → 80
+    and the instrument constant of the drift walk and recruitment paths;
+    the per-unit rate `0.0060625` (option a) as the new default;
+    `REACHABLE_STRUCTURE_VERSION` v2 and the
+    drift-depth version; a `genome_size` definition-change entry in
+    `benchmark-series.json`; the T20.F02 storage-contract table and test;
+    the ~15 doc sites citing 97.
+  - Verification: `cargo test -p v3-core --test viability` first; gate +
+    goal + goal-long (the size question is a long-run one); mutation gate
+    run; slow tests run.
+  - Predeclared re-pins: the founder anchor pin (`state.rs:808-815`,
+    `phase0.rs`; the supply pin at `config/simulation.rs:1362-1369` keeps
+    0.485), the bench config digests (`bench_artifacts.rs:220-321`: a
+    default config value changes), the lifecycle storage test,
+    `drift_depth` and the progress chart, goal readings that carry genome
+    size, carrying cost, gestation, supply and exposure.
+  - Tests first: `genome_size_charges_no_wired_sink_unit`,
+    `a_ring_group_costs_nine_units_on_wired_or_unwired_sinks` (as a plain
+    eight-edge fixture until F03), `founder_is_eighty_units` with the
+    arithmetic in a comment.
+  - Readings: mean genome size, mean wired sinks per creature, births per
+    creature-tick and gestation on the three goal worlds through 40,000
+    ticks against the last `goal_worlds_long` point; mutation events per
+    birth at depth against the old rule, named as a cause.
+  - Reference specs: `v3-genome-spec.md` §3 (wired-sink rule, 97),
+    `v3-runtime-config-spec.md` (`genome_size` definition, cost rows),
+    `v3-reproduction-spec.md` (97), `v3-mutation-spec.md` §4.2 (supply),
+    `v3-graph-backend-spec.md` §6 size table.
+- **T25.F03 — Ring Groups Replace Ring Projections.**
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients,
     central-complex columns): a ring projection is a group of eight real
     synapses with one shared scale, and any one synapse can later be changed
     or lost on its own.
-  - Depends on: T25.F01.
-  - Scope: `Edge {group}` and `Group {shape: Ring, scale}`; membership
-    validation; `genomic_weight` and the runtime resolver (learned values
-    still per node for now); atomic group removal and reindex through the
-    container; migration of `RingProjection` to `Ring` groups with eight
-    born members; the five projection operators become `CreateRingGroup`
-    (static creation, §4), `AlterGroupScale`, `ShiftGroupOffset`,
-    `RetargetGroupKind` and `RemoveGroup`, with member relocation; retarget,
-    raw-field and split operators detach a member first; refinement excludes
-    grouped edges; recruitment's ring path emits a group; the observation-only
-    mask replaces `ablated_channels` and genome rewrites in both ablation
-    paths and `expressed()`; readers (`ring_rules`, `drives`,
-    `sensor_census`, annotations, `live_circuit`, lab track, `discovery.rs`)
-    read members; the identity invariant; the accounting contract (§3) and
-    the founder anchor re-pin; the group operators' catalog, applicability,
-    weight, dispatch and telemetry entries; serde, server derived fields,
-    frontend types and the edge-group list. Learning untouched.
-  - Verification: gate + goal (the change alters production cost and
-    operators, the workflow's `gate + goal` row); mutation gate run; slow
-    tests run. Predeclared re-pins: genome identity, `[Self; 61]` and
-    projection catalog pins, the recruitment hash, lab `GENOME_FORMAT`, the
-    founder size anchor, genome-size and complexity readings.
-  - Readings: a fixed fixture genome with a ring projection and its
-    migrated group produce identical vote vectors on the same inputs; the
-    three readers' post-migration expectations (§7); goal indicators,
-    genome size, functional complexity, births and gestation against the
-    series (`Δgenome_size = 8P − S`, §3).
-- **T25.F03 — Direction-Pair Groups.**
+  - Depends on: T25.F02.
+  - Scope: `Membership`, `GroupId`, `Group`, `Shape::Ring`, `compose`,
+    `genomic_weight`, `own_weight` private, I2–I9 and `validate_graph` with
+    its gate skip reason; derived `Debug`/`PartialEq` apart from the seeds
+    field; migration of `RingProjection` to `Ring` groups; the five group
+    operators (table below) with two-phase relocation; detach on retarget,
+    raw-field and split; `GroupKey::Ring` deleted and refinement's structs
+    renamed; recruitment's ring case under both arms; the projection
+    branches of both ablation paths and `ablated_channels` deleted;
+    `live_barrier_use.rs` deleted; readers (`ring_rules` → ring-rules-v2 with
+    `ring_group_*` fields, `drives` skipping members, `sensor_census`,
+    annotations, `companions`, `live_circuit`, `discovery.rs`, `ladder/track.rs`,
+    `steering::votes_move`); the serde shape (`groups` replaces
+    `projections`, `deny_unknown_fields`) and the lab `GENOME_FORMAT` bump;
+    the server's `graph_weights` field with its `exclude` token and a
+    protocol-version bump; `mesh_annotations` required with the genome and
+    the frontend's `infer*`/`collectNodeBadges` deleted; the edge-group list
+    (one row per group: shape, kind, offset, scale, members present over
+    expected with holes; expandable member rows; member edges dashed in a
+    group tint with opacity from the server's genomic weight; a per-group
+    collapse); `types/genome.ts`; petri-visuals `edgeGroups` and the min
+    build.
+  - Operators: `AddRingProjection` → `AddRingGroup` (2), `AlterRingProjectionWeight`
+    → `AlterGroupScale` (4), `ShiftRingProjectionOffset` → `ShiftGroupOffset`
+    (2), `RetargetRingProjectionKind` → `RetargetGroupKind` (2),
+    `RemoveRingProjection` → `RemoveGroup` (2, `Decreasing`); `ALL` stays 28,
+    the default arm 56, `[Self; 61]`, slots and weights unchanged; only names
+    and keys move.
+  - Verification: gate + goal (operators and the +8-per-group cost change);
+    mutation gate run; slow tests run. Predeclare the gate's
+    `wall_clock_ms_per_creature_tick` delta.
+  - Predeclared re-pins: operator keys in events and telemetry (stored
+    artifacts stay historical, no migration); genome identity and JSON;
+    `GENOME_FORMAT`; `PROTOCOL_VERSION`; `neutral_connection_tests/projection.rs:212`
+    rewritten by hand to the new summation order; goal readings that carry
+    genome size (+8 per group), complexity and `ring_rules`.
+  - Tests first: a `Ring` group (scale w, corrections 0) equals eight
+    ungrouped edges of weight w bitwise, with members appended after
+    incumbents (`eight_edges` oracle, `projection.rs:99,126,155,189` swapped
+    to the group builder); validation rejects an off-ring or out-of-range
+    member; `remove_group` leaves no member and renumbers links;
+    `shift_then_unshift_is_identity`; `detach_preserves_genomic_weight_bitwise`;
+    `refinement_never_steps_a_grouped_member` (RNG tail equal to the genome
+    without members); `a_node_voting_only_through_group_members_is_a_motor_node`;
+    `group_member_channels_are_on_the_vote_surface`; the ring-rules and
+    drives census on a `Ring` group equals the census on eight ungrouped
+    edges of weight `s + c_i`; the catalog bijection test; `ablate` on a
+    group-free genome unchanged and on a ring reference zeroes every member
+    read; proptests I1–I9 after random container operations and
+    `Δgenome_size` per operation equal to its declared change; the
+    identity destructuring test; serde and `Debug` round trip over random
+    valid genomes.
+  - Readings: the three readers' post-migration expectations; members per
+    surviving group and detach or remove events per group over the goal run
+    against the erosion rate the weights predict; goal indicators not down.
+  - Reference specs: `v3-graph-backend-spec.md` §2, §6 (ring projections →
+    groups), §9, §14; `v3-genome-spec.md` §3, §4; `v3-mutation-spec.md`
+    projection and recruitment rows; `v3-server-api-protocol-spec.md` §4.11.
+- **T25.F04 — Direction-Pair Groups.**
   - Goal: The sensory map sits in register with the motor map (superior
     colliculus): a creature's sensed offset to a thing, food, a barrier, a
     crowd or another creature, can reach all eight direction votes of one
     kind as one silent gene, and its plain facts reach that kind's drive.
-  - Depends on: T25.F02.
-  - Scope: `Shape::DirectionPair`, the compass pattern and pair metadata on
-    the sensor layout; `CreateDirectionPairGroup` (static creation);
-    recruitment's pair case with one drawn slot and scalar drive edges; the
-    `NearbyCreature` family merge (user decision) as the shared input
-    contract, with the sampler, labels, census, telemetry gauges and
-    inspector following; the `Slots` refinement key re-keyed on the merged
-    layout; inspector rows; the new operator's catalog, applicability,
-    weight, dispatch and telemetry entries.
-  - Verification: gate + goal-long (40,000 ticks): whether pair groups are
-    retained and whether their scales move off 0 is visible only past
-    20,000 ticks; mutation gate run; slow tests run.
-  - Readings: pair groups present at the final tick that were born at least
-    N ticks earlier (retention across an observation interval, not a count
-    that supply alone can raise), by family and kind, against the number
-    created; the sign and offset distribution of those groups against the
-    recorded creation draws; blocked-move and steal-hit fractions of
-    carriers against non-carriers; harmful-per-birth not up.
-- **T25.F04 — Learning Per Edge and Group.**
+  - Depends on: T25.F03.
+  - Scope: `Shape::DirectionPair`, the compass pattern from
+    `Direction::delta()`, pair metadata in `contracts::inputs` for today's
+    families; `AddDirectionPairGroup`; the five group operators extended to
+    pairs (relocation around holes); recruitment's pair case with one slot
+    or one pair and scalar drive edges; `drives` reporting pair groups in
+    their own block (drives-v2); the inspector rows and petri-visuals.
+  - Operators: `AddDirectionPairGroup` (2, `Increasing`): `ALL` 29, arm 58,
+    `[Self; 62]`.
+  - Verification: gate + goal-long (retention is visible only past 20,000
+    ticks); mutation gate run; slow tests run.
+  - Predeclared re-pins: every Graph draw (a new operator); the catalog pins;
+    drives-v1 → v2; refinement applications recorded by key for F08.
+  - Tests first: the compass table's row norms and exact zeros;
+    `pair_creation_materializes_12_members_not_16`; every declared pair's
+    indices within the family width; shift and retarget on a pair group
+    with holes; recruitment's pair case draw order; `node_fanouts` skips
+    members.
+  - Readings: a versioned bench block of pair-group class counts (family,
+    kind, offset, sign of scale, scale off 0) at tick T−N and at T beside
+    the `AddDirectionPairGroup` applications between them; blocked-move and
+    steal-hit fractions of carriers against non-carriers; harmful-per-birth
+    not up; refinement applications by key.
+  - Reference specs: `v3-graph-backend-spec.md` §6 (shapes),
+    `v3-mutation-spec.md` operator table, `v3-sensor-spec.md` (pair
+    declarations).
+- **T25.F05 — The NearbyCreature Family.**
+  - Goal: One sense of another creature, as an animal reads a neighbor's
+    place, condition and kinship in one glance: the three creature families
+    become one, so a slot's position, vitals and identity arrive from one
+    declaration.
+  - Depends on: T25.F04.
+  - Scope: the merged layout in `contracts::inputs` (4 slots × 9 fields);
+    the sampler (27 buckets, indices 10–12, D13) and its pins; labels,
+    `inputRefUtils.ts`, the sensor census universe, the input-use catalog
+    (input-use-v2), mutation-effects contexts (mutation-effects-v2), the
+    `WorldReads` bit layout, span attributes, the sampler perception payload
+    (protocol bump), telemetry gauge values and dashboards, `MutationAddedNodeInputClass`,
+    annotation classes, the lab's `census_covers`; the `Slots` refinement
+    key re-keyed; recruitment taking one slot everywhere.
+  - Verification: gate + goal; mutation gate run; slow tests run.
+  - Predeclared re-pins: every `InputRef.Add` and recruitment draw (the
+    family universe), the sampler index tests, genome identity of every
+    genome with a creature reference, `PROTOCOL_VERSION`, the sensor gauge
+    series (99 stored feature JSON files carry the old keys; historical).
+  - Tests first: `merged_nearby_creature_equals_core_vitals_identity_per_slot`
+    written while the three families still exist, kept as the layout pin;
+    the `Slots` fixtures rewritten to `field = channel mod 9`.
+  - Readings: declaration share of the merged family against the three old
+    ones; goal indicators not down.
+  - Reference specs: `v3-sensor-spec.md` §5.4–5.6, `v3-mutation-spec.md`
+    sampler table.
+- **T25.F06 — Learning Per Edge.**
   - Goal: Synapse-type-specific plasticity with three-factor traces: each
     synapse carries whether it is fixed, Hebbian or reward-modulated, which
-    reward it listens to and how long its trace lasts; a synapse built by a
-    group program can learn for the whole group or for itself, and a change
-    to such an attribute lands on one synapse or on every synapse its group
-    built.
-  - Depends on: T25.F02.
-  - Scope: `Learning` (with `clamp`) and `Scope` on `Edge`, `inherit_scale`
-    on `Group`; runtime state over both surfaces and learned scales, sparse
-    (allocated only for learning edges and groups); evaluation-time samples
-    and updates after effects; sink edges learn; scope routing and summed
-    scale credit; seeds for sink edges and groups through F01's records;
-    `PlasticityConfig` removed from compute nodes; the nine node operators
-    become the edge attribute operators with the scope draw and the
-    transition table (§4); uniform learned creation for both shapes; the
-    replaced operators' catalog, applicability, weight, dispatch
-    (`mutation/graph/mod.rs:325+`) and telemetry entries;
-    `plasticity_census`, telemetry gauges and the dashboards check follow.
-    Plasticity update cost stays 0.
+    reward it listens to and how long its trace lasts, and a synapse onto a
+    vote can learn like one onto a neuron.
+  - Depends on: T25.F05.
+  - Scope: `plasticity: Option<PlasticityConfig>` on the edge and
+    `ComputeNode.plasticity` removed (36 production files); the learning
+    layout at birth and the monomorphized non-learning path; samples;
+    updates after effects; the cost chain deleted (D9); `LearnedState::from_seeds`
+    over both surfaces with the visited bit, `capture()`, the iterator;
+    `BirthSeeds` sink rows; the nine plasticity operators on edges with the
+    `ClearSlot` exclusion and the split exclusion redefined as "the graph
+    has a learning edge"; `plasticity_census` through the iterator; the
+    telemetry families (`learning_edges` by mode and surface, rule its own
+    family) and the dashboards check; `companions` with "carries learning"
+    defined once; annotations; recruitment-paths records (v2);
+    mutation-effects state records; the serde shape, `types/genome.ts`,
+    `graph_weights` extended with learned values, sink `weighted_inputs` in
+    the trace payload, the learning badge, the config tooltip; the lab's
+    `expressed()`.
+  - Operators: the nine move with their weights (18 of the arm): `ALL` 29,
+    arm 58, `[Self; 62]` unchanged in count; keys renamed.
+  - Verification: viability first; gate + goal; mutation gate run; slow
+    tests run. Predeclare `wall_clock_ms_per_creature_tick`, the
+    `plasticity_updates` shift, phase 0 and 2.5 timings and a dhat heap
+    check on a fixture with N learning sink edges.
+  - Predeclared re-pins: identity of every plastic genome; every plasticity
+    draw; the recurrent-edge Hebbian trajectories; `plasticity/tests.rs:35`
+    and `:212` rewritten by hand to "no charge, effects stand"; the
+    cognitive-class and `has_plasticity` series; `GENOME_FORMAT`;
+    `PROTOCOL_VERSION`.
+  - Tests first: `sink_edge_learns_from_the_recorded_sample_not_a_replay`
+    (a `WriteSlot` earlier in sink order changes memory a later sink edge
+    read); `a_non_learning_graph_allocates_no_learned_state`; the
+    self-edge regression; the migration oracle keeping
+    `plasticity/tests.rs:140-661` expectations with each node's config on
+    its compute-input edges; `clear_slot_edges_are_never_eligible`.
+  - Readings: learning edges by mode and surface; drift and sampled clamp
+    occupancy by surface; visits per tick of learning nodes; goal indicators
+    not down.
+  - Reference specs: `v3-graph-backend-spec.md` §12, §13; `v3-genome-spec.md`
+    §5; `v3-mutation-spec.md` plasticity rows and the split exclusion;
+    `v3-mesh-execution-spec.md`, `v3-tick-orchestration-spec.md`,
+    `v3-evolution-observability-spec.md`, `v3-cli-contract-spec.md`
+    plasticity rows; `v3-runtime-config-spec.md` cost knobs.
+- **T25.F07 — Group-Scope Learning.**
+  - Goal: A synapse built by a group program can learn for the whole group
+    or for itself, and a change to such an attribute lands on one synapse or
+    on every synapse its group built.
+  - Depends on: T25.F06.
+  - Scope: `Scope` in `Membership`, `inherit_scale`, learned scales and
+    bounds, the pattern-weighted credit (D4), the scope coin on every
+    attribute operator, `SetScope`, uniform learned creation for both
+    shapes, group and detach seeds, census rows for scales, the counter
+    rule for group contributions.
+  - Operators: `SetScope` (2, `Neutral`): `ALL` 30, arm 60, `[Self; 63]`.
   - Verification: gate + goal; mutation gate run; slow tests run.
-    Predeclare CPU and memory for the per-tick cost of sample recording and
-    learning over sink edges on learning creatures, and no cost on
-    non-learning graphs (T24 ceiling).
-  - Readings: learning carriers by mode, scope and surface; learned-weight
-    drift by surface; sampled clamp occupancy (the share of learned values
-    at their clamp at the snapshot tick) by surface; goal indicators not
-    down.
-- **T25.F05 — Group Creation Forms, Detach and the Catalog.**
+  - Predeclared re-pins: every Graph draw; identity of every grouped
+    genome; the creation draws of F03 and F04 (now learned).
+  - Tests first: `oja_group_members_use_visit_start_applied_weight`;
+    `group_scale_credit_is_pattern_weighted_and_bounded_once`;
+    `a_static_member_contributes_nothing`; `a_scale_seeds_only_with_a_group_scope_learner`;
+    the scope-coin draw-order tails ("a non-member draws no coin", "a member
+    lacking the field consumes no draw"); proptest: a scale change `Δs`
+    moves each member's applied weight by `Δs × pattern`.
+  - Readings: learning edges by scope; learned-scale drift and clamp
+    occupancy; goal indicators not down.
+  - Reference specs: `v3-graph-backend-spec.md` §13 (scope), `v3-mutation-spec.md`
+    operator table.
+- **T25.F08 — Creation Forms, Detach and the Catalog.**
   - Goal: A mutation in a developmental gene changes every synapse it builds;
     a mutation at one synapse changes only that one. Group creation is
     uniform or randomized, a member can be detached, and the catalog is one
     consistent set of edge and group operators.
-  - Depends on: T25.F03, T25.F04.
-  - Scope: randomized creation for both shapes; `DetachEdge`; whether a
-    fitting `AddGraphEdge` joins a group; the `Slots` refinement disposition
-    with its reading; its own operators' catalog, applicability, weight,
-    dispatch and telemetry entries, and a final reconciliation of the
-    catalog triplet's weights and tests across the track (each earlier
-    feature integrates the operators it introduces).
-  - Verification: gate + goal (operator changes, the workflow's `gate +
-    goal` row); mutation gate run; slow tests run.
-  - Readings: operator funnel by layer; share of attribute changes applied at
-    group scope; harmful-per-birth not up.
+  - Depends on: T25.F07.
+  - Scope: `AddRandomizedRingGroup` and `AddRandomizedDirectionPairGroup`;
+    `DetachGraphEdge`; the no-join rule for `AddGraphEdge` pinned; the
+    `Slots` disposition from the recorded readings; `GraphOperator::layer()`
+    for the funnel reading; the catalog tables and tests.
+  - Operators: three new at 2 each (`Increasing`, `Increasing`, `Neutral`):
+    `ALL` 33, arm 66, `[Self; 66]`.
+  - Verification: gate + goal; mutation gate run; slow tests run.
+  - Predeclared re-pins: every Graph draw; the catalog pins.
+  - Tests first: randomized creation draw order; a detached Lamarckian
+    member's seed and a detached static member's; the last-member detach
+    removes the group; `add_graph_edge_never_joins_a_group`.
+  - Readings: operator funnel by layer; share of attribute changes applied
+    at group scope; harmful-per-birth not up; the `Slots` firing rate.
+  - Reference specs: `v3-mutation-spec.md` operator table.
 
 ## 9. Remaining uncertainty
 
-- Whether evolution picks up pair groups at all; the goal-long reading of
-  F03 is the test, and failure returns the question to sector rings
-  (option F) or to a learning route.
-- Size and complexity accounting: the uniform rule (§3) touches every
-  genome's carrying cost, supply and gestation and the founder anchor;
-  F02's goal reading watches the consequences.
-- Vote-edge Hebbian runaway, allowed by decision; F04 reads clamp
-  occupancy.
-- Hot path: F02 moves projection evaluation into edge traversal with one
-  indexed lookup per member; F04 adds sample recording and sink-edge
-  learning. Each predeclares its own CPU and memory.
-- The `Slots` refinement key is an open decision for F05.
-- Whether F01's behavior-preserving cut holds exactly: any pin that moves
-  under F01 is a defect, not a re-pin.
+- Whether evolution picks up pair groups at all; F04's goal-long reading is
+  the test, and failure returns the question to sector rings (option F) or
+  to a learning route.
+- The supply rate under uniform size (D14, option a): an evolved genome
+  draws up to 21% more mutation events at equal size, where genome bloat is
+  the carried finding; F02's goal-long reading watches genome size, births
+  and the event rate.
+- Vote-edge Hebbian runaway, allowed by decision; F06 reads clamp occupancy
+  and visits per tick.
+- Hot path: F03 moves projection evaluation into edge traversal and widens
+  the edge struct (12 → ~32 bytes once F06 lands; predeclared per feature);
+  F06 adds sample recording on learning graphs only.
+- The `Slots` refinement key is an open decision for F08.
+- The version 2 edits were not re-reviewed by Codex or the facet reviewers;
+  each feature's spec runs its own three-round Codex challenge against this
+  note and the code.
 
 ## Sources
 
@@ -835,4 +952,4 @@ already closes with the existing inheritance tests green.
 - Soltoggio, Stanley & Risi 2018, Neural Networks 108:48 (summary)
 - Clune, Stanley, Pennock & Ofria 2011; Huizinga, Mouret & Clune 2014; Stanley, D'Ambrosio & Gauci 2009: read in full for the factored motor output note
 - Live probe 2026-10-12: 1,478 creature dumps from `GET /v3/simulation/creature/:id` across all 64 tiles of the running world at tick 51,351 (scratch scripts, not committed)
-- Codex Astra adversarial review, rounds 1 and 2, 2026-10-13: `docs/progress/readings/t25-design-review.md`
+- Codex Astra adversarial review (three rounds) and nine Opus facet reviews, 2026-10-13: `docs/progress/readings/t25-design-review.md`
