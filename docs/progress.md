@@ -8,7 +8,9 @@ calling checkout stores concise summaries with exact raw hashes and recorded
 local verification times. Existing historical reports remain unchanged.
 
 [progress/index.html](progress/index.html) reads the `goal-worlds-v1`
-reports listed below as a long-term field record (redesigned 2026-10-10; the
+reports listed below as a long-term field record. Its run-length picker
+switches to the 40,000-tick `goal-worlds-long-v1` series, which starts with
+the first feature whose Verification Plan declares the long goal profile (redesigned 2026-10-10; the
 rationale is in the [progress page design note](strategy/progress-page-design-2026-10-10.md)).
 
 - The three worlds are plots numbered by seed: 11 Orchards, 22 Canyon,
