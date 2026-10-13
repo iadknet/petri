@@ -7,9 +7,9 @@ Claude and Codex share the per-feature contract below. Codex uses the
 Claude uses the original instructions. Do not mix their session controls.
 Both may run concurrently on different eligible features. Claude's agent
 definitions, hooks, settings, and goal command remain active.
-Lab experiments on the T22 harness (exploration and why-not diagnosis) are not
-roadmap features and do not use this contract; the T22 track's exploration
-contract governs them.
+Lab experiments on the capability lab (exploration and why-not diagnosis) are
+not roadmap features and do not use this contract; the
+[lab contract](lab.md) governs them.
 
 ## Roles
 
@@ -433,8 +433,8 @@ touches `v3-core`, `v3-cli`, `v3-server` or the frontend loses the exemption
 for that closure, and so does one whose manifest or lock change does more than
 register the crate: existing dependency versions, features and shared build
 settings stay unchanged, and the reviewer verifies that with the scope claim.
-The exemption covers T22 features only; a feature in another track that uses
-the lab still runs its profiles. An exempt closure adds no benchmark summary
+The exemption covers features that build the lab itself; a feature that only
+uses the lab still runs its profiles. An exempt closure adds no benchmark summary
 and no series entry, so later comparisons reference the last measured closure,
 and the ordinary benchmark tests inside `make check` still run.
 

@@ -9,6 +9,12 @@ and reproduce less often per tick than grass eaters. The net fitness gain is mar
 the habit drifts in and out. One episode that started at tick ~37,000 is still growing and
 is 20 times larger than any earlier one.
 
+> Status note, 2026-10-12: written before T02.F08 closed and before the roadmap
+> reset that archived the program 1 rows. T02.F08 (option 2) is now closed, and
+> T17.F04 (option 3) and the T03 rows named in option 4 were dropped at the
+> reset; see the [program 1 archive](../archive/program-1/README.md). The
+> option text below is kept as written.
+
 Scope: run `eec8aa1c56b1abc2dc6748426a5bf57c` on the live server (port 3000), ticks 0–40,000,
 main at 94d80322. Readings come from Prometheus through the stack's Grafana proxy and from
 creature dumps (`GET /v3/simulation/creature/:id`) paged over the full 1600² grid in 200²
@@ -71,8 +77,9 @@ The last two rows share node 0's fruit sensor and node 1's reproduce gate (`Upst
   fruit eaters and ~1.1 for same-genotype non-eaters. This is a proxy, not a measured
   lifespan.
 
-Reading: fruit is a survival windfall that the evolved reproduction circuits cannot convert
-into births. A trait with near-zero net fitness, reached through a fragile route (a rewired
+Reading: fruit is a survival windfall that these creatures did not convert into births.
+Whether the evolved reproduction circuits ignore energy is a hypothesis: the slots read in
+place of slot 1 were not traced. A trait with near-zero net fitness, reached through a fragile route (a rewired
 sensor plus a heading-coupled scalar), is gained and lost by drift and mutation; earlier
 episodes went extinct. The current episode grows because fruit eaters live long enough for
 a lower birth rate to still add up. Standing counts overstate its fitness: long-lived
@@ -95,8 +102,9 @@ being wasted, not a fruit-specific aid.
    reserves buy offspring. In nature, reproductive output tracks condition: poorly fed
    animals breed later, skip events or produce fewer eggs, and stored reserves raise egg
    production (capital and income breeding; Varpe 2009, Sainmont 2014, Stephens 2014).
-   Petri's evolved genomes decouple the reproduce decision from energy (88 % rewired), so
-   no rich food niche can pay off. This is the lever that matches the diagnosis; it needs
+   In the sample, 88 % of evolved genomes no longer read the founder's energy-and-age slot;
+   if what they read instead ignores condition, no rich food niche can pay off. Tracing
+   those slots is the first check. This is the lever that matches the diagnosis; it needs
    its own research note and spec, and production goal evidence before any default changes.
 
 Recommendation: watch whether the current episode holds before acting. If it collapses,

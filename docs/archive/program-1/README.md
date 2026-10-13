@@ -66,7 +66,10 @@ The user's judgment on 2026-10-12, with the evidence each claim rests on.
      record the born edge's effect on Canyon seeds 1022 and 2022.
    - The [vote-margin read](../../strategy/vote-margin-read-run-2026-10.md)
      found 38 of 89 executed input channels vote-causal on Confluence at tick
-     50,000, every consumer a vote sink, the born-edge shape.
+     50,000. Among the exposed consumers of those reads, 44 were vote sinks
+     and one a router gate. The note treats the born edge as a hypothesis for
+     that shape, not a measured cause, because edge provenance was not
+     recorded.
 3. **Structured refinement, possibly.** [T20.F05](specs/roadmap/t20-f05-structured-heritable-refinement.md)
    adds bounded semantic input-to-vote refinement. It is off by default and in
    every committed world file, and no reading attributes a live result to it.
@@ -101,10 +104,13 @@ Open problems measured on the live world, not yet owned by any row.
    size grew from 121 to about 3,000 units, and three size-scaled costs choked
    births. The genome size cap is inert while `genome_size_pressure_enabled`
    is false, the default.
-2. **Reproduction decoupled from condition.** The [fruit episodes
-   note](../../strategy/fruit-episodes-2026-10-12.md) found only 12% of
-   creatures still gate reproduction on energy and age. Rich food cannot become
-   offspring, so a food niche cannot pay off.
+2. **Reproduction may be decoupled from condition.** The [fruit episodes
+   note](../../strategy/fruit-episodes-2026-10-12.md) found 32 of 272 sampled
+   creatures still reading the founder's reproduce slot, which carries energy
+   and age. The other slots they read were not traced. Fruit eaters held
+   300 to 440 energy yet bred at less than half the sampled world's rate per
+   creature-tick. That reproduction ignores condition, so a rich niche cannot
+   pay off, is the note's hypothesis, not a measured result.
 3. **Edge and VM barrier avoiders fail live.** They are perfect on the lab's
    wall arena but show no live benefit. The cause is not known.
 4. **Memory appears only at long horizons.** The output-wiring run read memory
@@ -124,8 +130,12 @@ them from current evidence.
   (held after the effort-cost defaults landed; a partial spec draft was left in
   the `worktree-t19-f07` worktree), T18.F01 and T18.F02 specialized founder
   (on hold since T19).
-- **Lab qualification chains.** T20.F09 to T20.F15 and T20.F03, T13.F08 to
+- **Lab qualification chains.** T20.F09 to T20.F13 and T20.F03, T13.F08 to
   T13.F10, T11.F12 and T11.F13, T08.F02 and T08.F05.
+- **Conditional learning mechanisms.** T20.F06 to T20.F08, T20.F14 and
+  T20.F15: applied action credit, action-conditioned and shared lifetime
+  learning, and their qualification, each conditional on T20.F13 finding a
+  real within-life need.
 - **Deletion-rate feature.** On 2026-10-09 the user chose to build it without
   supporting evidence; no row was written. The prototype is on branch
   `worktree-deletion-rate` and the evidence in the

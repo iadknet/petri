@@ -18,8 +18,8 @@ assays under `.bench-artifacts/lab/` (user decision, 2026-09-28; the
 [workflow's telemetry commit rule](workflow.md#benchmark-gate)): commit the
 minimum summary that regenerates the report (a versioned keep-list keyed to
 named consumers), cap the raw archive at the producing command, and write no
-per-tick traces unless a spec predeclares them with a projected size; T22
-forbids them outright.
+per-tick traces unless a spec predeclares them with a projected size; the
+[lab contract](lab.md) forbids them outright.
 
 | Profile | Full report in the main checkout | Summary in the calling checkout |
 | --- | --- | --- |
