@@ -11,14 +11,27 @@ const VICTIM_R = 255;
 const VICTIM_G = 255;
 const VICTIM_B = 255;
 
-/** Number of render frames a flash persists (~100ms at 60fps) */
-const FLASH_FRAMES = 6;
+/** How long a flash persists, in milliseconds, independent of refresh rate. */
+export const FLASH_DURATION_MS = 100;
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 interface FlashEntry {
 	r: number;
 	g: number;
 	b: number;
-	framesLeft: number;
+	expiresAt: number;
+}
+
+export interface FlashOverlayOptions {
+	/** Whether to draw a static mark instead of a fading flash. */
+	reducedMotion?: () => boolean;
+}
+
+function systemReducedMotion(): () => boolean {
+	if (typeof matchMedia !== "function") return () => false;
+	const query = matchMedia(REDUCED_MOTION_QUERY);
+	return () => query.matches;
 }
 
 /**
@@ -28,18 +41,26 @@ interface FlashEntry {
 export class FlashOverlay {
 	private flashMap = new Map<number, FlashEntry>();
 	private worldWidth = 0;
+	private now = 0;
+	private readonly reducedMotion: () => boolean;
 
-	/** Ingest new predation events and decay existing flashes. */
-	update(events: PredationEvent[], worldWidth: number): void {
+	constructor(options: FlashOverlayOptions = {}) {
+		this.reducedMotion = options.reducedMotion ?? systemReducedMotion();
+	}
+
+	/** Ingest new predation events and expire flashes older than the duration. */
+	update(events: PredationEvent[], worldWidth: number, now: number): void {
 		this.worldWidth = worldWidth;
+		this.now = now;
 
-		// Decay existing flashes
+		// Expire existing flashes
 		for (const [key, entry] of this.flashMap) {
-			entry.framesLeft--;
-			if (entry.framesLeft <= 0) {
+			if (entry.expiresAt <= now) {
 				this.flashMap.delete(key);
 			}
 		}
+
+		const expiresAt = now + FLASH_DURATION_MS;
 
 		// Add new flashes from events (reuse existing entries to reduce GC pressure)
 		for (const e of events) {
@@ -49,13 +70,13 @@ export class FlashOverlay {
 				existingAttacker.r = ATTACKER_R;
 				existingAttacker.g = ATTACKER_G;
 				existingAttacker.b = ATTACKER_B;
-				existingAttacker.framesLeft = FLASH_FRAMES;
+				existingAttacker.expiresAt = expiresAt;
 			} else {
 				this.flashMap.set(attackerKey, {
 					r: ATTACKER_R,
 					g: ATTACKER_G,
 					b: ATTACKER_B,
-					framesLeft: FLASH_FRAMES,
+					expiresAt,
 				});
 			}
 
@@ -65,16 +86,22 @@ export class FlashOverlay {
 				existingVictim.r = VICTIM_R;
 				existingVictim.g = VICTIM_G;
 				existingVictim.b = VICTIM_B;
-				existingVictim.framesLeft = FLASH_FRAMES;
+				existingVictim.expiresAt = expiresAt;
 			} else {
 				this.flashMap.set(victimKey, {
 					r: VICTIM_R,
 					g: VICTIM_G,
 					b: VICTIM_B,
-					framesLeft: FLASH_FRAMES,
+					expiresAt,
 				});
 			}
 		}
+	}
+
+	/** Flash opacity: fades linearly over the duration, constant under reduced motion. */
+	private alphaOf(entry: FlashEntry): number {
+		if (this.reducedMotion()) return 1;
+		return Math.max(0, Math.min(1, (entry.expiresAt - this.now) / FLASH_DURATION_MS));
 	}
 
 	/** Apply flash colors to ImageData (pixel mode). */
@@ -82,7 +109,7 @@ export class FlashOverlay {
 		for (const [key, entry] of this.flashMap) {
 			const idx = key * 4;
 			if (idx >= 0 && idx + 3 < data.length) {
-				const alpha = entry.framesLeft / FLASH_FRAMES;
+				const alpha = this.alphaOf(entry);
 				data[idx] = Math.round(data[idx]! * (1 - alpha) + entry.r * alpha);
 				data[idx + 1] = Math.round(data[idx + 1]! * (1 - alpha) + entry.g * alpha);
 				data[idx + 2] = Math.round(data[idx + 2]! * (1 - alpha) + entry.b * alpha);
@@ -93,11 +120,13 @@ export class FlashOverlay {
 	/** Draw flash rects on canvas context (rect mode). */
 	drawRects(ctx: CanvasRenderingContext2D, camera: CameraState): void {
 		const { x: cx, y: cy, zoom } = camera;
+		const reducedMotion = this.reducedMotion();
 		for (const [key, entry] of this.flashMap) {
 			const cellX = key % this.worldWidth;
 			const cellY = Math.floor(key / this.worldWidth);
-			const alpha = entry.framesLeft / FLASH_FRAMES;
-			ctx.fillStyle = `rgba(${entry.r},${entry.g},${entry.b},${alpha.toFixed(2)})`;
+			ctx.fillStyle = reducedMotion
+				? `rgb(${entry.r},${entry.g},${entry.b})`
+				: `rgba(${entry.r},${entry.g},${entry.b},${this.alphaOf(entry).toFixed(2)})`;
 			ctx.fillRect(cx + cellX * zoom, cy + cellY * zoom, zoom, zoom);
 		}
 	}

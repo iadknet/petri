@@ -1,0 +1,267 @@
+import { describe, expect, it } from "vitest";
+import type { Frame } from "../types/api.ts";
+import type { CameraState } from "./camera.ts";
+import type { RenderModel } from "./renderModel.ts";
+import {
+	BARRIER_RGB,
+	FERT_BARREN_RGB,
+	WorldRenderer,
+	energyBarFraction,
+	visibleCellBounds,
+} from "./renderer.ts";
+
+interface FillCall {
+	style: string;
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+}
+
+interface Recorder {
+	fills: FillCall[];
+	strokes: number;
+	transforms: number[][];
+	ctx: CanvasRenderingContext2D;
+}
+
+function recordingContext(): Recorder {
+	const recorder: Recorder = {
+		fills: [],
+		strokes: 0,
+		transforms: [],
+		ctx: null as unknown as CanvasRenderingContext2D,
+	};
+	let fillStyle = "";
+	const target: Record<string, unknown> = {
+		fillRect(x: number, y: number, w: number, h: number) {
+			recorder.fills.push({ style: fillStyle, x, y, w, h });
+		},
+		setTransform(...args: number[]) {
+			recorder.transforms.push(args);
+		},
+		stroke() {
+			recorder.strokes++;
+		},
+		strokeRect() {
+			recorder.strokes++;
+		},
+	};
+	recorder.ctx = new Proxy(target, {
+		get(obj, key: string) {
+			if (key === "fillStyle") return fillStyle;
+			if (key in obj) return obj[key];
+			return () => {};
+		},
+		set(obj, key: string, value) {
+			if (key === "fillStyle") fillStyle = value as string;
+			else obj[key] = value;
+			return true;
+		},
+	}) as unknown as CanvasRenderingContext2D;
+	return recorder;
+}
+
+function fakeCanvas(recorder: Recorder, cssWidth: number, cssHeight: number): HTMLCanvasElement {
+	return {
+		width: cssWidth,
+		height: cssHeight,
+		getContext: () => recorder.ctx,
+		getBoundingClientRect: () => ({
+			left: 0,
+			top: 0,
+			width: cssWidth,
+			height: cssHeight,
+			right: cssWidth,
+			bottom: cssHeight,
+			x: 0,
+			y: 0,
+		}),
+	} as unknown as HTMLCanvasElement;
+}
+
+function model(frame: Frame, camera: CameraState, extra: Partial<RenderModel> = {}): RenderModel {
+	return {
+		frame,
+		foodTypes: [{ type_idx: 0, name: "a", color: "#22c55e", growth_inhibitor: 0 }],
+		overview: null,
+		tick: 1,
+		predationEvents: [],
+		camera,
+		fertilityOverlay: null,
+		...extra,
+	};
+}
+
+function emptyFrame(width: number, height: number): Frame {
+	return { width, height, creatures: [], food: [], barriers: [] };
+}
+
+describe("energyBarFraction", () => {
+	it("scales by the configured max energy", () => {
+		expect(energyBarFraction(100, 200)).toBe(0.5);
+		expect(energyBarFraction(300, 200)).toBe(1);
+		expect(energyBarFraction(-5, 200)).toBe(0);
+	});
+
+	it("reports no fraction when max energy is unknown", () => {
+		expect(energyBarFraction(100, null)).toBeNull();
+		expect(energyBarFraction(100, undefined)).toBeNull();
+		expect(energyBarFraction(100, 0)).toBeNull();
+	});
+});
+
+describe("visibleCellBounds", () => {
+	it("limits cells to the viewport and the world", () => {
+		expect(
+			visibleCellBounds(
+				{ x: -25, y: 0, zoom: 10 },
+				{ width: 50, height: 30 },
+				{ width: 100, height: 100 },
+			),
+		).toEqual({ startX: 2, startY: 0, endX: 8, endY: 3 });
+	});
+
+	it("is empty when the world is off screen", () => {
+		const bounds = visibleCellBounds(
+			{ x: 500, y: 0, zoom: 10 },
+			{ width: 50, height: 30 },
+			{ width: 10, height: 10 },
+		);
+		expect(bounds.startX).toBeGreaterThanOrEqual(bounds.endX);
+	});
+});
+
+describe("WorldRenderer rect mode", () => {
+	it("draws only cells inside the viewport", () => {
+		// Arrange
+		const recorder = recordingContext();
+		const frame: Frame = {
+			width: 100,
+			height: 100,
+			creatures: [
+				{ id: 1, x: 1, y: 1, energy: 10, generation: 0, phenotype_rgb: [1, 2, 3] },
+				{ id: 2, x: 80, y: 80, energy: 10, generation: 0, phenotype_rgb: [4, 5, 6] },
+			],
+			food: [
+				{ x: 2, y: 2, type_idx: 0, density: 0.5 },
+				{ x: 60, y: 60, type_idx: 0, density: 0.5 },
+			],
+			barriers: [
+				{ x: 3, y: 3 },
+				{ x: 70, y: 70 },
+			],
+		};
+		const renderer = new WorldRenderer(fakeCanvas(recorder, 50, 50), () =>
+			model(frame, { x: 0, y: 0, zoom: 5 }),
+		);
+		renderer.resize(50, 50, 1);
+
+		// Act
+		renderer.render(0);
+
+		// Assert: background + one food + one barrier + one creature.
+		const cellFills = recorder.fills.filter((fill) => fill.w < 50);
+		expect(cellFills).toHaveLength(3);
+		for (const fill of cellFills) {
+			expect(fill.x).toBeLessThan(50);
+			expect(fill.y).toBeLessThan(50);
+		}
+	});
+
+	it("scales creature energy bars by the configured max energy", () => {
+		// Arrange
+		const recorder = recordingContext();
+		const frame: Frame = {
+			...emptyFrame(4, 4),
+			creatures: [{ id: 1, x: 0, y: 0, energy: 100, generation: 0, phenotype_rgb: [1, 2, 3] }],
+		};
+		const renderer = new WorldRenderer(fakeCanvas(recorder, 40, 40), () =>
+			model(frame, { x: 0, y: 0, zoom: 10 }, { maxEnergy: 200 }),
+		);
+		renderer.resize(40, 40, 1);
+
+		// Act
+		renderer.render(0);
+
+		// Assert: bar width is cellSize - 1 = 9, half filled.
+		const bar = recorder.fills.find((fill) => fill.style === "#10b981");
+		expect(bar?.w).toBeCloseTo(4.5);
+	});
+
+	it("draws no energy bar when max energy is unknown", () => {
+		// Arrange
+		const recorder = recordingContext();
+		const frame: Frame = {
+			...emptyFrame(4, 4),
+			creatures: [{ id: 1, x: 0, y: 0, energy: 100, generation: 0, phenotype_rgb: [1, 2, 3] }],
+		};
+		const renderer = new WorldRenderer(fakeCanvas(recorder, 40, 40), () =>
+			model(frame, { x: 0, y: 0, zoom: 10 }),
+		);
+		renderer.resize(40, 40, 1);
+
+		// Act
+		renderer.render(0);
+
+		// Assert
+		expect(recorder.fills.some((fill) => fill.style === "#10b981")).toBe(false);
+		expect(recorder.fills.some((fill) => fill.style === "#ef4444")).toBe(false);
+	});
+
+	it("keeps barriers distinct from barren ground under the fertility overlay", () => {
+		// Arrange
+		const recorder = recordingContext();
+		const frame: Frame = { ...emptyFrame(2, 1), barriers: [{ x: 1, y: 0 }] };
+		const grid = new Uint8Array([0, 0]);
+		const renderer = new WorldRenderer(fakeCanvas(recorder, 20, 10), () =>
+			model(
+				frame,
+				{ x: 0, y: 0, zoom: 10 },
+				{
+					fertilityOverlay: {
+						worldGrid: grid,
+						worldWidth: 2,
+						worldHeight: 1,
+						worldStaticRevision: 1,
+					},
+				},
+			),
+		);
+		renderer.resize(20, 10, 1);
+
+		// Act
+		renderer.render(0);
+
+		// Assert: colours differ, and the barrier carries a non-colour cue (a stroke).
+		expect(BARRIER_RGB).not.toEqual(FERT_BARREN_RGB);
+		const barrenFill = recorder.fills.find((fill) => fill.x === 0 && fill.w === 10);
+		const barrierFill = recorder.fills.findLast((fill) => fill.x === 10 && fill.w === 10);
+		expect(barrenFill).toBeDefined();
+		expect(barrierFill).toBeDefined();
+		expect(barrierFill!.style).not.toBe(barrenFill!.style);
+		expect(recorder.strokes).toBeGreaterThan(0);
+	});
+});
+
+describe("WorldRenderer devicePixelRatio sizing", () => {
+	it("sizes the backing store by devicePixelRatio and keeps CSS-pixel geometry", () => {
+		// Arrange
+		const recorder = recordingContext();
+		const canvas = fakeCanvas(recorder, 300, 150);
+		const renderer = new WorldRenderer(canvas, () =>
+			model(emptyFrame(30, 15), { x: 0, y: 0, zoom: 10 }),
+		);
+
+		// Act
+		renderer.resize(300, 150, 2);
+		renderer.render(0);
+
+		// Assert
+		expect(canvas.width).toBe(600);
+		expect(canvas.height).toBe(300);
+		expect(renderer.fitToWorld(30, 15)).toEqual({ x: 0, y: 0, zoom: 10 });
+		expect(renderer.canvasToWorld({ x: 0, y: 0, zoom: 10 }, 155, 75)).toEqual({ x: 15, y: 7 });
+		expect(recorder.transforms.at(-1)).toEqual([2, 0, 0, 2, 0, 0]);
+	});
+});
