@@ -72,6 +72,16 @@ export function buildMeshFlowScene({
 		const dimmed = dimmedNodeIds.has(layoutNode.id);
 		const active = activeNodeId === layoutNode.id;
 		const inputPreview = semantics?.inputTexts.slice(0, 2).join(" · ") ?? "";
+		const label = semantics?.label ?? `Node ${layoutNode.id}`;
+		const ariaLabel = [
+			label,
+			`${tone.label} node`,
+			analysisNode.isEntry ? "entry" : null,
+			analysisNode.reachable ? null : "unreachable",
+			selectedNodeId === layoutNode.id ? "selected" : null,
+		]
+			.filter((part) => part !== null)
+			.join(", ");
 
 		nodes.push({
 			id: String(layoutNode.id),
@@ -83,13 +93,17 @@ export function buildMeshFlowScene({
 			connectable: false,
 			selectable: false,
 			selected: selectedNodeId === layoutNode.id,
+			ariaLabel,
+			ariaRole: "button",
+			className:
+				"rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400",
 			style: {
 				width: layoutNode.width,
 				height: layoutNode.height,
 			},
 			data: {
 				nodeId: layoutNode.id,
-				label: semantics?.label ?? `Node ${layoutNode.id}`,
+				label,
 				shortLabel: semantics?.shortLabel ?? `Node ${layoutNode.id}`,
 				backendLabel: tone.label,
 				backendAccent: tone.accent,
