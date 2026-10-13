@@ -10,7 +10,7 @@ export interface GraphFlowScene {
 	edges: Edge<WeightEdgeData>[];
 }
 
-const EDGE_TINTS: Record<string, { r: number; g: number; b: number }> = {
+export const EDGE_TINTS: Record<string, { r: number; g: number; b: number }> = {
 	input_to_compute: { r: 16, g: 185, b: 129 },
 	input_to_output: { r: 251, g: 191, b: 36 },
 	compute_to_output: { r: 251, g: 191, b: 36 },

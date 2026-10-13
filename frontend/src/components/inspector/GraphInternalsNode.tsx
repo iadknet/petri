@@ -26,7 +26,7 @@ export interface GraphInternalsNodeData extends Record<string, unknown> {
 	applied: boolean | null;
 }
 
-const CATEGORY_COLORS: Record<
+export const CATEGORY_COLORS: Record<
 	NodeCategory,
 	{ r: number; g: number; b: number; bgAlpha: number; borderAlpha: number; text: string }
 > = {
