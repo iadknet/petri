@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
+import { currentDevicePixelRatio, watchDevicePixelRatio } from "../canvas/dpr.ts";
 import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
 import { usePatternInteraction } from "../hooks/usePatternInteraction.ts";
 import { usePatternPreview } from "../hooks/usePatternPreview.ts";
+import { useConfigStore } from "../stores/config.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
@@ -67,6 +69,7 @@ export function WorldViewport() {
 				fertilityGrid: worldView.worldStatic?.food_fertility_u8 ?? null,
 				fertilityRevision: worldView.worldStaticRevision,
 				showFertilityOverlay: viewport.showFertilityOverlay,
+				maxEnergy: useConfigStore.getState().serverConfig?.energy.lifecycle.max_energy ?? null,
 			});
 		});
 
@@ -84,11 +87,13 @@ export function WorldViewport() {
 		const container = containerRef.current;
 		if (!container) return;
 
+		let cssSize: { width: number; height: number } | null = null;
 		const observer = new ResizeObserver((entries) => {
 			const entry = entries[0];
 			if (!entry) return;
 			const { width, height } = entry.contentRect;
-			renderer.resize(Math.floor(width), Math.floor(height));
+			cssSize = { width: Math.floor(width), height: Math.floor(height) };
+			renderer.resize(cssSize.width, cssSize.height, currentDevicePixelRatio());
 			setCanvasSize(Math.floor(width), Math.floor(height));
 
 			const frame = useWorldViewStore.getState().frame;
@@ -99,9 +104,16 @@ export function WorldViewport() {
 		});
 		observer.observe(container);
 
+		// Browser zoom or a move to another display changes the ratio without a resize.
+		const stopWatchingRatio = watchDevicePixelRatio((ratio) => {
+			if (!cssSize) return;
+			renderer.resize(cssSize.width, cssSize.height, ratio);
+		});
+
 		return () => {
 			renderer.stop();
 			observer.disconnect();
+			stopWatchingRatio();
 		};
 	}, [initRenderer, setCamera, setCanvasSize]);
 
@@ -138,6 +150,18 @@ export function WorldViewport() {
 				state.camera.y !== prev.camera.y ||
 				state.camera.zoom !== prev.camera.zoom ||
 				state.showFertilityOverlay !== prev.showFertilityOverlay
+			) {
+				rendererRef.current?.invalidate();
+			}
+		});
+	}, []);
+
+	// Re-render when the configured max energy (energy bar scale) changes
+	useEffect(() => {
+		return useConfigStore.subscribe((state, prev) => {
+			if (
+				state.serverConfig?.energy.lifecycle.max_energy !==
+				prev.serverConfig?.energy.lifecycle.max_energy
 			) {
 				rendererRef.current?.invalidate();
 			}

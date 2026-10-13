@@ -34,6 +34,8 @@ export interface RenderModel {
 	predationEvents: PredationEvent[];
 	camera: CameraState;
 	fertilityOverlay: FertilityOverlay | null;
+	/** Configured max creature energy from the server config; null when not yet known. */
+	maxEnergy?: number | null;
 }
 
 export function buildRenderModel(input: {
@@ -46,6 +48,7 @@ export function buildRenderModel(input: {
 	fertilityGrid: ByteArrayLike | null;
 	fertilityRevision: number;
 	showFertilityOverlay: boolean;
+	maxEnergy?: number | null;
 }): RenderModel | null {
 	if (!input.frame) {
 		return null;
@@ -76,5 +79,6 @@ export function buildRenderModel(input: {
 						worldStaticRevision: input.fertilityRevision,
 					}
 				: null,
+		maxEnergy: input.maxEnergy ?? null,
 	};
 }

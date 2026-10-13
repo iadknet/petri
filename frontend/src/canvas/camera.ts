@@ -82,10 +82,12 @@ export function canvasToWorldPoint(
 	camera: CameraState,
 	clientX: number,
 	clientY: number,
+	/** Coordinate-space size of the canvas; defaults to its backing-store size. */
+	size: CanvasSize = canvas,
 ): WorldPoint {
 	const rect = canvas.getBoundingClientRect();
-	const scaleX = canvas.width / rect.width;
-	const scaleY = canvas.height / rect.height;
+	const scaleX = size.width / rect.width;
+	const scaleY = size.height / rect.height;
 	const mx = (clientX - rect.left) * scaleX;
 	const my = (clientY - rect.top) * scaleY;
 
@@ -98,11 +100,13 @@ export function canvasToWorldPoint(
 export function canvasToViewportPoint(
 	canvas: HTMLCanvasElement,
 	canvasPoint: WorldPoint,
+	/** Coordinate-space size of the canvas; defaults to its backing-store size. */
+	size: CanvasSize = canvas,
 ): WorldPoint {
 	const rect = canvas.getBoundingClientRect();
 
 	return {
-		x: rect.left + canvasPoint.x * (rect.width / canvas.width),
-		y: rect.top + canvasPoint.y * (rect.height / canvas.height),
+		x: rect.left + canvasPoint.x * (rect.width / size.width),
+		y: rect.top + canvasPoint.y * (rect.height / size.height),
 	};
 }
