@@ -62,22 +62,23 @@ function recordingContext(): Recorder {
 	return recorder;
 }
 
+/**
+ * A canvas whose displayed size follows the browser rule for a replaced element:
+ * an explicit CSS width/height wins, otherwise it shows at its backing-store size.
+ */
 function fakeCanvas(recorder: Recorder, cssWidth: number, cssHeight: number): HTMLCanvasElement {
-	return {
+	const canvas = {
 		width: cssWidth,
 		height: cssHeight,
+		style: { width: "", height: "" },
 		getContext: () => recorder.ctx,
-		getBoundingClientRect: () => ({
-			left: 0,
-			top: 0,
-			width: cssWidth,
-			height: cssHeight,
-			right: cssWidth,
-			bottom: cssHeight,
-			x: 0,
-			y: 0,
-		}),
-	} as unknown as HTMLCanvasElement;
+		getBoundingClientRect: () => {
+			const width = Number.parseFloat(canvas.style.width) || canvas.width;
+			const height = Number.parseFloat(canvas.style.height) || canvas.height;
+			return { left: 0, top: 0, width, height, right: width, bottom: height, x: 0, y: 0 };
+		},
+	};
+	return canvas as unknown as HTMLCanvasElement;
 }
 
 function model(frame: Frame, camera: CameraState, extra: Partial<RenderModel> = {}): RenderModel {
@@ -260,6 +261,8 @@ describe("WorldRenderer devicePixelRatio sizing", () => {
 		// Assert
 		expect(canvas.width).toBe(600);
 		expect(canvas.height).toBe(300);
+		expect(canvas.getBoundingClientRect().width).toBe(300);
+		expect(canvas.getBoundingClientRect().height).toBe(150);
 		expect(renderer.fitToWorld(30, 15)).toEqual({ x: 0, y: 0, zoom: 10 });
 		expect(renderer.canvasToWorld({ x: 0, y: 0, zoom: 10 }, 155, 75)).toEqual({ x: 15, y: 7 });
 		expect(recorder.transforms.at(-1)).toEqual([2, 0, 0, 2, 0, 0]);

@@ -447,7 +447,7 @@ export function WorldViewport() {
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className={`absolute inset-0 ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400`}
+				className={`absolute inset-0 h-full w-full ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400`}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
