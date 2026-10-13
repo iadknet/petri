@@ -284,7 +284,10 @@ same day added the long goal profile, the goal worlds at 40,000 ticks in their
 own series: long live runs had shown barrier avoidance, recovery from early
 troughs and memory use that a 2,000-tick reading could not see, and the user
 chose to keep 2,000 ticks as the ordinary goal horizon rather than pay an hour
-or more per closure.
+or more per closure. A timing pass the same day found `make check` at about
+15 minutes on a loaded host, a third of it three recruitment-paths experiment
+pins that ran twice and were re-pinned by most features; the user moved them to
+an opt-in slow tier (`make rust-test-slow`) that the Verification Plan declares.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
