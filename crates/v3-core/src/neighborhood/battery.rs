@@ -80,6 +80,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
     let neighbor_food = neighbor_food_by_type.first().copied().unwrap_or([0.0; 8]);
     let lifecycle = EnergyLifecycleConfig::default();
     let sensors = SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here,
             neighbor_food,

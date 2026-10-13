@@ -24,6 +24,9 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::plasticity_census::{PlasticEdges, PlasticityCensus, PlasticityKind};
+use v3_core::creature::sensor_census::{
+    sensor_use_census, world_input_key_label, world_input_key_universe, SensorUseRow,
+};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
@@ -116,7 +119,7 @@ pub(crate) fn stamp(now_ns: u64, previous_ns: Option<u64>) -> u64 {
 }
 
 /// The population census, with the CLI `tick_sample`'s expressions.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Census {
     pub population: usize,
     pub mean_energy: f32,
@@ -131,14 +134,37 @@ pub struct Census {
     pub drive_fanout_creatures: [u64; DirectedVoteKind::ALL.len()],
     /// Plastic carriers, edges, drift and clamped edges over reachable nodes.
     pub plasticity: PlasticityCensus,
+    /// Per world input key of the world's catalog: creatures declaring,
+    /// wiring and reading it. Every catalog key has a row, even at extinction.
+    pub sensors: Vec<SensorUseRow>,
 }
 
 impl Census {
     /// All means are `0.0` for an empty population.
     pub fn of(sim: &Simulation) -> Self {
         let population = sim.creatures.len();
+        let catalog = world_input_key_universe(
+            sim.world
+                .food()
+                .food_types()
+                .iter()
+                .map(|food_type| food_type.id),
+        );
+        let sensors = sensor_use_census(
+            &catalog,
+            sim.creatures.values().map(|c| {
+                [
+                    &c.cached_declared_world_inputs,
+                    &c.cached_wired_world_inputs,
+                    &c.last_mesh_world_reads,
+                ]
+            }),
+        );
         if population == 0 {
-            return Self::default();
+            return Self {
+                sensors,
+                ..Self::default()
+            };
         }
         let mean = |total: u64| total as f64 / population as f64;
         let drives = DriveCensus::observe(
@@ -155,6 +181,7 @@ impl Census {
         }));
         Self {
             plasticity,
+            sensors,
             drive_carriers: drives.kinds.map(|kind| kind.drive_carriers),
             drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
@@ -965,6 +992,25 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
                         count.into(),
                     )
                 }),
+        );
+    }
+    type SensorCount = fn(&SensorUseRow) -> u64;
+    let sensor_fields: [(&str, SensorCount); 3] = [
+        ("sensor_declared", |row| row.declared),
+        ("sensor_wired", |row| row.wired),
+        ("sensor_read", |row| row.read),
+    ];
+    for (name, count) in sensor_fields {
+        f.push(
+            format!("petri.tick.{name}"),
+            sampled,
+            "",
+            census.sensors.iter().map(|row| {
+                (
+                    vec![("petri.world_input", world_input_key_label(row.key))],
+                    count(row).into(),
+                )
+            }),
         );
     }
     let plasticity = &census.plasticity;

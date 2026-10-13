@@ -1316,6 +1316,7 @@ fn e4_trace_visited_twice_per_tick_adds_twice() {
 
 fn empty_sensor_snapshot() -> SensorSnapshot {
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: 0.0,
             neighbor_food: [0.0; 8],

@@ -50,6 +50,7 @@ fn probe_cases() -> [ProbeCase; 4] {
         ProbeCase {
             energy: 100.0,
             sensors: SensorSnapshot {
+                world_reads: Default::default(),
                 local: StaticInputs {
                     food_here: 1.0,
                     neighbor_food: [0.9, 0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4],
@@ -69,6 +70,7 @@ fn probe_cases() -> [ProbeCase; 4] {
         ProbeCase {
             energy: 24.0,
             sensors: SensorSnapshot {
+                world_reads: Default::default(),
                 local: StaticInputs {
                     food_here: 0.0,
                     neighbor_food: [1.0, 0.0, 0.8, 0.0, 0.6, 0.0, 0.4, 0.0],
@@ -88,6 +90,7 @@ fn probe_cases() -> [ProbeCase; 4] {
         ProbeCase {
             energy: 8.0,
             sensors: SensorSnapshot {
+                world_reads: Default::default(),
                 local: StaticInputs {
                     food_here: 0.2,
                     neighbor_food: [0.0, 0.4, 0.0, 0.6, 0.0, 0.8, 0.0, 1.0],
@@ -107,6 +110,7 @@ fn probe_cases() -> [ProbeCase; 4] {
         ProbeCase {
             energy: 100.0,
             sensors: SensorSnapshot {
+                world_reads: Default::default(),
                 local: StaticInputs {
                     food_here: 0.0,
                     neighbor_food: [0.0; 8],

@@ -29,6 +29,7 @@ fn genome(backend_def: BackendDef) -> CreatureGenome {
 
 fn sensors() -> SensorSnapshot {
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: 0.0,
             neighbor_food: [0.0; 8],

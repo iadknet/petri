@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use proptest::prelude::*;
 use prost::Message as _;
 use v3_core::config::OrdinaryFoodTypeId;
-use v3_core::creature::sensor_census::world_input_key_universe;
+use v3_core::creature::sensor_census::{
+    world_input_key_label, world_input_key_universe, SensorUseRow,
+};
 use v3_core::mutation::{
     BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
     MutationOperatorFunnel, MutationSkipReason,
@@ -661,6 +663,19 @@ fn tick_families(families: &mut Vec<Family>) {
             )],
         ));
     }
+    for field in ["sensor_declared", "sensor_wired", "sensor_read"] {
+        families.push((
+            format!("petri.tick.{field}"),
+            Gauge,
+            vec![(
+                "petri.world_input",
+                sensor_rows()
+                    .iter()
+                    .map(|row| world_input_key_label(row.key))
+                    .collect(),
+            )],
+        ));
+    }
     for field in [
         "plastic_edges",
         "plastic_edge_drift",
@@ -705,13 +720,31 @@ fn label_sets(attributes: &[(&'static str, Vec<String>)]) -> BTreeSet<BTreeMap<S
     sets
 }
 
+/// One row per key of a two-food-type catalog, with distinct counts: the
+/// `i`-th key is declared by `3i + 3`, wired by `2i + 2` and read by `i`.
+fn sensor_rows() -> Vec<SensorUseRow> {
+    world_input_key_universe([OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1)])
+        .into_iter()
+        .zip(0u64..)
+        .map(|(key, i)| SensorUseRow {
+            key,
+            declared: 3 * i + 3,
+            wired: 2 * i + 2,
+            read: i,
+        })
+        .collect()
+}
+
 fn encoded(stats: &SimStats) -> ReceivedSnapshot {
     let resource = [string_value("service.name", "v3-cli".to_owned())];
     let request = encode(
         &resource,
         "0123456789abcdef0123456789abcdef",
         stats,
-        &Census::default(),
+        &Census {
+            sensors: sensor_rows(),
+            ..Census::default()
+        },
         Moment {
             tick: 42,
             elapsed: Duration::from_millis(2_500),
@@ -753,6 +786,34 @@ fn every_family_is_encoded_with_its_name_kind_attributes_and_keys_and_nothing_el
     for (name, family) in &expected {
         assert_eq!(&received[name], family, "{name}");
     }
+}
+
+#[test]
+fn sensor_families_carry_each_rows_counts_per_food_typed_label() {
+    let snapshot = encoded(&populated());
+    for row in sensor_rows() {
+        let label = world_input_key_label(row.key);
+        for (name, count) in [
+            ("petri.tick.sensor_declared", row.declared),
+            ("petri.tick.sensor_wired", row.wired),
+            ("petri.tick.sensor_read", row.read),
+        ] {
+            assert_eq!(
+                snapshot.value(name, &[("petri.world_input", &label)]),
+                Some(PointValue::Int(count as i64)),
+                "{name} {label}"
+            );
+        }
+    }
+    assert!(
+        snapshot
+            .value(
+                "petri.tick.sensor_read",
+                &[("petri.world_input", "FoodHere:1")]
+            )
+            .is_some(),
+        "food types stay distinct labels"
+    );
 }
 
 #[test]

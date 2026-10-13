@@ -206,6 +206,9 @@ petri_tick_plasticity_carriers
 petri_tick_plastic_edges
 petri_tick_plastic_edge_drift
 petri_tick_plastic_edges_at_clamp
+petri_tick_sensor_declared
+petri_tick_sensor_wired
+petri_tick_sensor_read
 '
 
 # Families over maps that hold only the keys a run met: those the workload

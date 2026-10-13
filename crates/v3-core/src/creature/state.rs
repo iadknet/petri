@@ -12,7 +12,9 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmInstruction, OUTCOME_CHANNEL_COUNT,
 };
 use crate::creature::identity::CreatureIdentityState;
+use crate::creature::sensor_census::{creature_declared_world_inputs, creature_sensor_census};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
+use crate::sensors::reads::WorldKeySet;
 
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
 pub const SHARED_MEMORY_SLOTS: usize = 16;
@@ -227,6 +229,14 @@ pub struct CreatureState {
     /// The litter this creature carries (T03.F12); `None` when not
     /// gestating. A gestating creature commits no action.
     pub pending_birth: Option<PendingBirth>,
+    /// The world keys this creature's most recent mesh run resolved
+    /// (observation only, for the sensor census telemetry); empty at birth.
+    pub last_mesh_world_reads: WorldKeySet,
+    /// World keys a reachable node's `input_refs` holds, cached at birth.
+    pub cached_declared_world_inputs: WorldKeySet,
+    /// World keys the sensor census wires (live read, wired edge or ring
+    /// projection), cached at birth.
+    pub cached_wired_world_inputs: WorldKeySet,
     /// The direction of this creature's last committed `Move` (T11.F30); at
     /// birth the direction from its parent to its cell, at seeding a drawn
     /// direction, `N` at every other construction. The pass end breaks a tie
@@ -234,7 +244,30 @@ pub struct CreatureState {
     pub heading: Direction,
 }
 
+/// The declared and wired world-key sets the sensor census telemetry reads,
+/// cached at birth because the genome does not change after it.
+fn sensor_caches(genome: &CreatureGenome, reachable: &[usize]) -> (WorldKeySet, WorldKeySet) {
+    (
+        creature_declared_world_inputs(genome, reachable)
+            .into_iter()
+            .collect(),
+        creature_sensor_census(genome, reachable)
+            .world_inputs
+            .into_iter()
+            .collect(),
+    )
+}
+
 impl CreatureState {
+    /// Recompute the birth-time sensor caches after the genome was edited in
+    /// place (seeding fixtures only; production genomes never change).
+    pub fn refresh_sensor_caches(&mut self) {
+        (
+            self.cached_declared_world_inputs,
+            self.cached_wired_world_inputs,
+        ) = sensor_caches(&self.genome, &self.cached_reachable_nodes);
+    }
+
     /// Count one Phase 2 action attempt in both the lifetime total and its
     /// per-type slot, so the two can never disagree.
     pub(crate) fn record_action_attempt(&mut self, action: ActionType) {
@@ -290,6 +323,8 @@ impl CreatureState {
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         let cached_live_vm_world_inputs =
             compute_live_vm_world_inputs(&genome, cached_reachable_nodes.as_ref());
+        let (cached_declared_world_inputs, cached_wired_world_inputs) =
+            sensor_caches(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -310,6 +345,9 @@ impl CreatureState {
             cached_reachable_nodes,
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
+            last_mesh_world_reads: WorldKeySet::default(),
+            cached_declared_world_inputs,
+            cached_wired_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             birth_edge_class: None,
             offspring_spawned_count: 0,
@@ -351,6 +389,8 @@ impl CreatureState {
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         let cached_live_vm_world_inputs =
             compute_live_vm_world_inputs(&genome, cached_reachable_nodes.as_ref());
+        let (cached_declared_world_inputs, cached_wired_world_inputs) =
+            sensor_caches(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -371,6 +411,9 @@ impl CreatureState {
             cached_reachable_nodes,
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
+            last_mesh_world_reads: WorldKeySet::default(),
+            cached_declared_world_inputs,
+            cached_wired_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             birth_edge_class: None,
             offspring_spawned_count: 0,

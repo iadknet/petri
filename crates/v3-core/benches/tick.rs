@@ -89,6 +89,7 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                     let typed_local_food =
                         assemble_typed_food_local_snapshot(&sim.world, sim.creatures[id].position);
                     let ss = SensorSnapshot {
+                        world_reads: Default::default(),
                         local,
                         perception: PerceptionSnapshot::zero(),
                         typed_local_food,

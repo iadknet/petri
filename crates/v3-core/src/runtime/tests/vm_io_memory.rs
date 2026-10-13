@@ -543,6 +543,7 @@ fn vm_eats_when_food_here() {
     // food_here should be > 0.0
     assert!(local.food_here > 0.0);
     let ss = SensorSnapshot {
+        world_reads: Default::default(),
         local,
         typed_local_food: assemble_typed_food_local_snapshot(&world, creature.position),
         perception: PerceptionSnapshot::zeroed(1),
@@ -633,6 +634,7 @@ fn vm_noop_when_no_food() {
     let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
     assert_eq!(local.food_here, 0.0);
     let ss = SensorSnapshot {
+        world_reads: Default::default(),
         local,
         typed_local_food: assemble_typed_food_local_snapshot(&world, creature.position),
         perception: PerceptionSnapshot::zeroed(1),

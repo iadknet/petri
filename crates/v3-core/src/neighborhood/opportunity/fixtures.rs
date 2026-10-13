@@ -107,6 +107,7 @@ impl Context {
         let energy = if self.eligible { 80.0 } else { 20.0 };
         Scenario {
             sensors: SensorSnapshot {
+                world_reads: Default::default(),
                 local: StaticInputs {
                     food_here: grass,
                     neighbor_food: ring,
