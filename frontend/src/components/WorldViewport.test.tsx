@@ -213,7 +213,7 @@ describe("WorldViewport keyboard access", () => {
 		expect(useViewportStore.getState().camera).toEqual(userCamera);
 	});
 
-	it("Home on a focused stats tab selects the first tab without resetting the camera", () => {
+	it("Home on the focused stats resize handle resizes the dock without resetting the camera", () => {
 		// Arrange
 		render(
 			<>
@@ -228,15 +228,14 @@ describe("WorldViewport keyboard access", () => {
 		act(() => {
 			useViewportStore.getState().setCamera(userCamera);
 		});
-		const predation = screen.getByRole("tab", { name: "Predation" });
-		fireEvent.click(predation);
-		predation.focus();
+		const handle = screen.getByRole("separator", { name: "Resize statistics" });
+		handle.focus();
 
 		// Act
-		fireEvent.keyDown(predation, { key: "Home" });
+		fireEvent.keyDown(handle, { key: "Home" });
 
 		// Assert
-		expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Overview");
+		expect(handle).toHaveAttribute("aria-valuenow", "160");
 		expect(rendererSpies.resetView).not.toHaveBeenCalled();
 		expect(useViewportStore.getState().camera).toEqual(userCamera);
 	});

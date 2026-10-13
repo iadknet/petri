@@ -25,6 +25,11 @@ export function rejectionReason(key: string): { label: string; hint: string } {
 }
 
 /** Split `CamelCase` or `snake_case` into lower-case words. */
+export function keyWords(text: string): string {
+	const w = words(text);
+	return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
 function words(text: string): string {
 	return text
 		.replace(/_/g, " ")
@@ -49,4 +54,29 @@ export function mutationOperatorLabel(key: string): string {
 	const name = key.slice(dot + 1);
 	const bare = name.startsWith(domain) ? name.slice(domain.length) : name;
 	return `${DOMAIN_NAMES[domain] ?? domain} · ${words(bare)}`;
+}
+
+const DEATH_CAUSES: Record<string, string> = {
+	lifecycle_decay: "Ageing upkeep",
+	genome_carrying: "Genome upkeep",
+	vm_compute: "VM compute",
+	graph_compute: "Graph compute",
+	mesh_ramp: "Mesh ramp cost",
+	hebbian_learning: "Hebbian learning cost",
+	reward_learning: "Reward learning cost",
+	priority_bid: "Priority bid",
+	action_noop: "Idling",
+	action_eat: "Eating",
+	action_move: "Moving",
+	action_reproduce: "Reproducing",
+	action_steal_energy: "Stealing",
+	parental_transfer: "Litter handed over",
+	predation: "Killed by a predator",
+	external_removal: "Removed by hand",
+	unattributed: "Unattributed",
+};
+
+/** The energy sink that drained a creature to zero, as words; unknown keys pass through. */
+export function deathCauseLabel(key: string): string {
+	return DEATH_CAUSES[key] ?? words(key);
 }

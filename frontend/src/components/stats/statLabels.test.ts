@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mutationOperatorLabel, rejectionReason } from "./statLabels.ts";
+import { deathCauseLabel, keyWords, mutationOperatorLabel, rejectionReason } from "./statLabels.ts";
 
 describe("stat labels", () => {
 	it("names reproduction rejections in words, passing unknown keys through", () => {
@@ -13,5 +13,16 @@ describe("stat labels", () => {
 		expect(mutationOperatorLabel("Topology.AddNode")).toBe("Mesh · add node");
 		expect(mutationOperatorLabel("Vm.CopyGeneBackwardSlice")).toBe("VM · copy gene backward slice");
 		expect(mutationOperatorLabel("mutate_edge")).toBe("mutate edge");
+	});
+
+	it("names the energy sink behind a death, passing unknown keys through as words", () => {
+		expect(deathCauseLabel("action_move")).toBe("Moving");
+		expect(deathCauseLabel("predation")).toBe("Killed by a predator");
+		expect(deathCauseLabel("brand_new_sink")).toBe("brand new sink");
+	});
+
+	it("turns raw counter keys into sentence-case words", () => {
+		expect(keyWords("RejectedNoVictim")).toBe("Rejected no victim");
+		expect(keyWords("barrier_edge")).toBe("Barrier edge");
 	});
 });

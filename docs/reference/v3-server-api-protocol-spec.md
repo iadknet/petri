@@ -862,9 +862,33 @@ Payload mapping:
   },
   "genome_complexity_mean": 21.4,
   "genome_complexity_min": 3,
-  "genome_complexity_max": 91
+  "genome_complexity_max": 91,
+  "deaths_total": 81,
+  "deaths_total_by_cause": { "lifecycle_decay": 30, "action_move": 51 },
+  "food_total_density_by_type": [412.5, 88.0],
+  "generation_mean": 3.4,
+  "generation_max": 9,
+  "genome_size_mean": 101.2,
+  "lineages_alive": 17,
+  "lineages_effective": 11.3,
+  "world_inputs_read_mean": 4.6,
+  "plasticity_changes_total": 20311,
+  "shared_memory_writes_changed_total": 812,
+  "creature_ticks_total": 96000
 }
 ```
+
+Census fields in `health`:
+- `deaths_total` and `deaths_total_by_cause` are cumulative; cause keys are
+  `DeathCause` keys and only causes with at least one death appear.
+- `food_total_density_by_type` is the summed density per ordinary food type
+  after the last tick, indexed by food type.
+- `generation_*`, `genome_size_mean`, `lineages_*` and
+  `world_inputs_read_mean` describe living creatures at the frame tick.
+  `lineages_effective` is `exp` of the Shannon entropy over founder lineages.
+- `plasticity_changes_total`, `shared_memory_writes_changed_total` and
+  `creature_ticks_total` are cumulative work counters; divide deltas by the
+  `creature_ticks_total` delta for a per-creature-tick rate.
 
 Mutation map-key rules:
 - Domain map keys use stable domain strings (`Topology`, `Vm`, `Graph`,

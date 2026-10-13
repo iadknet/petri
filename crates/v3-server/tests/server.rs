@@ -1617,6 +1617,84 @@ async fn status_and_health_include_food_occupancy_depletion_summaries() {
     );
 }
 
+#[tokio::test]
+async fn health_carries_population_census_and_cumulative_vitals() {
+    use std::collections::HashMap;
+    use v3_core::simulation::{run_tick, seed_simulation};
+    use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::build_ws_frame;
+    use v3_server::state::{SimHandle, SimulationStatus};
+
+    let mut sim = seed_simulation(test_config(), 21);
+    for _ in 0..30 {
+        run_tick(&mut sim, &mut None);
+    }
+    let creatures: Vec<_> = sim.creatures.values().collect();
+    let count = creatures.len() as f64;
+    assert!(count > 0.0, "fixture needs living creatures");
+    let generation_mean = creatures.iter().map(|c| c.generation as f64).sum::<f64>() / count;
+    let generation_max = creatures.iter().map(|c| c.generation).max().unwrap_or(0);
+    let genome_size_mean = creatures
+        .iter()
+        .map(|c| f64::from(c.cached_genome_size))
+        .sum::<f64>()
+        / count;
+    let reads_mean = creatures
+        .iter()
+        .map(|c| c.last_mesh_world_reads.len() as f64)
+        .sum::<f64>()
+        / count;
+    let mut lineages: HashMap<u32, f64> = HashMap::new();
+    for c in &creatures {
+        *lineages.entry(c.identity.lineage_id).or_insert(0.0) += 1.0;
+    }
+    let entropy: f64 = lineages
+        .values()
+        .map(|n| {
+            let p = n / count;
+            -p * p.ln()
+        })
+        .sum();
+    let stats = sim.stats.clone();
+    let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
+    let handle = SimHandle {
+        sim,
+        status: SimulationStatus::Paused,
+        active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
+        cached_fertility_u8,
+    };
+
+    let health = build_ws_frame(&handle).health;
+
+    assert!((f64::from(health.generation_mean) - generation_mean).abs() < 1e-3);
+    assert_eq!(health.generation_max, generation_max);
+    assert!((f64::from(health.genome_size_mean) - genome_size_mean).abs() < 1e-3);
+    assert!((f64::from(health.world_inputs_read_mean) - reads_mean).abs() < 1e-3);
+    assert_eq!(health.lineages_alive as usize, lineages.len());
+    assert!((f64::from(health.lineages_effective) - entropy.exp()).abs() < 1e-2);
+    assert_eq!(health.deaths_total, stats.mortality.deaths_total);
+    assert_eq!(
+        health.deaths_total_by_cause.values().sum::<u64>(),
+        stats.mortality.deaths_total
+    );
+    assert!(health.deaths_total_by_cause.values().all(|&n| n > 0));
+    assert_eq!(
+        health.food_total_density_by_type,
+        stats.last_tick_food_total_density_by_type
+    );
+    assert_eq!(
+        health.plasticity_changes_total,
+        stats.plasticity_changes_total
+    );
+    assert_eq!(
+        health.shared_memory_writes_changed_total,
+        stats.shared_memory_writes_changed_total
+    );
+    assert_eq!(health.creature_ticks_total, stats.creature_ticks_total);
+}
+
 // ── 16. ws_frame_msgpack_roundtrip ──────────────────────────────────────────
 
 #[tokio::test]

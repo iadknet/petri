@@ -15,12 +15,6 @@ import type {
 	StatusPayload,
 } from "../types/api.ts";
 
-const EMPTY_MUTATION_TARGET_REACHABILITY = {
-	reachable: 0,
-	unreachable: 0,
-	notApplicable: 0,
-};
-
 function applyStatusToStores(
 	projectionRevision: number,
 	tick: number,
@@ -28,7 +22,6 @@ function applyStatusToStores(
 	options?: { recordHistory?: boolean },
 ): void {
 	const sim = useSimulationStore.getState();
-	const stats = useStatsHistoryStore.getState();
 	const isStaleProjection = projectionRevision < sim.projectionRevision;
 	const isStaleTick = projectionRevision === sim.projectionRevision && tick < sim.tick;
 	if (isStaleProjection || isStaleTick) {
@@ -39,16 +32,9 @@ function applyStatusToStores(
 	if (options?.recordHistory === false) {
 		return;
 	}
-	stats.pushStats(tick, status.population, status.mean_energy);
-	stats.pushActions(tick, status.last_tick_actions);
-	stats.pushCompute(
-		tick,
-		status.last_tick_compute_energy_total_mean,
-		status.last_tick_compute_energy_total_min,
-		status.last_tick_compute_energy_total_max,
-		status.last_tick_compute_energy_vm_mean,
-		status.last_tick_compute_energy_graph_mean,
-	);
+	useStatsHistoryStore
+		.getState()
+		.recordStatus(status.last_tick_actions, status.last_tick_compute_energy_total_mean);
 }
 
 function applyHealthToStores(
@@ -58,7 +44,6 @@ function applyHealthToStores(
 	options?: { recordHistory?: boolean },
 ): void {
 	const sim = useSimulationStore.getState();
-	const stats = useStatsHistoryStore.getState();
 	const isStaleProjection = projectionRevision < sim.projectionRevision;
 	const isStaleTick = projectionRevision === sim.projectionRevision && tick < sim.tick;
 	if (isStaleProjection || isStaleTick) {
@@ -66,43 +51,7 @@ function applyHealthToStores(
 	}
 
 	sim.setHealth(projectionRevision, tick, health);
-	stats.setReproStats(
-		health.reproduction_actions_attempted_total,
-		health.reproduction_actions_spawned_total,
-		health.reproduction_actions_rejected_total,
-		health.reproduction_actions_rejected_total_by_reason,
-	);
-	stats.setMutationStats(
-		health.mutation_events_attempted_total,
-		health.mutation_events_applied_total,
-		health.mutation_events_skipped_total,
-		health.mutation_events_skipped_total_by_operator ?? {},
-		health.mutation_target_reachability_total
-			? {
-					reachable: health.mutation_target_reachability_total.reachable,
-					unreachable: health.mutation_target_reachability_total.unreachable,
-					notApplicable: health.mutation_target_reachability_total.not_applicable,
-				}
-			: EMPTY_MUTATION_TARGET_REACHABILITY,
-		health.move_actions_blocked_total_by_cause ?? {},
-		health.reproduction_actions_rejected_invalid_target_total_by_cause ?? {},
-	);
-	stats.setPredationStats(
-		health.predation_actions_attempted_total,
-		health.predation_actions_transferred_total,
-		health.predation_actions_rejected_total,
-		health.predation_kills_total,
-		health.predation_actions_by_result,
-	);
-	if (options?.recordHistory === false) {
-		return;
-	}
-	stats.pushComplexity(
-		tick,
-		health.genome_complexity_mean,
-		health.genome_complexity_min,
-		health.genome_complexity_max,
-	);
+	useStatsHistoryStore.getState().recordHealth(tick, health, options);
 }
 
 export function defaultRequestFromSnapshot(snapshot: SnapshotResponse): ViewRequest {

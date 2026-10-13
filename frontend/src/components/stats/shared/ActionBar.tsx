@@ -10,7 +10,6 @@ export function ActionBar({
 
 	return (
 		<div className="flex flex-col gap-1">
-			<span className="text-[11px] text-slate-400">Actions last tick</span>
 			<div className="flex h-3 rounded overflow-hidden">
 				<div className="bg-blue-500" style={{ width: pct(move) }} title={`Move: ${move}`} />
 				<div className="bg-emerald-500" style={{ width: pct(eat) }} title={`Eat: ${eat}`} />

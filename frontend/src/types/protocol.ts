@@ -77,6 +77,14 @@ export interface MutationTargetReachabilityTotalPayload {
 	not_applicable: number;
 }
 
+/** Subset of the server's mutation value totals the stats dock reads. */
+export interface MutationOutcomeSummaryPayload {
+	carriers_observed_total: number;
+	helpful_total: number;
+	neutral_total: number;
+	detrimental_total: number;
+}
+
 export interface StatusPayload {
 	state: SimState;
 	population: number;
@@ -142,6 +150,23 @@ export interface HealthPayload {
 	genome_complexity_mean: number;
 	genome_complexity_min: number;
 	genome_complexity_max: number;
+	/** Mutant carriers judged at death against the viability baseline. */
+	mutation_outcome_summary: MutationOutcomeSummaryPayload;
+	deaths_total: number;
+	/** Deaths by the energy sink that killed the creature; only causes seen so far. */
+	deaths_total_by_cause: Record<string, number>;
+	/** Summed food density per ordinary food type after the last tick, by type index. */
+	food_total_density_by_type: number[];
+	generation_mean: number;
+	generation_max: number;
+	genome_size_mean: number;
+	lineages_alive: number;
+	/** exp(Shannon entropy) of living creatures over founder lineages. */
+	lineages_effective: number;
+	world_inputs_read_mean: number;
+	plasticity_changes_total: number;
+	shared_memory_writes_changed_total: number;
+	creature_ticks_total: number;
 }
 
 export interface PredationEvent {

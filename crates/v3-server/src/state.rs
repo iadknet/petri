@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use slotmap::Key;
 use tokio::sync::{broadcast, Mutex};
 use v3_core::config::SimulationConfig;
+use v3_core::creature::state::CreatureState;
 use v3_core::mutation::phenotype::channels_to_rgb;
+use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::{seed_simulation, Simulation};
 
 use crate::query::projection::ProjectionStore;
@@ -225,6 +227,75 @@ pub struct HealthPayload {
     pub genome_complexity_mean: f32,
     pub genome_complexity_min: u32,
     pub genome_complexity_max: u32,
+    /// Creatures removed since startup, and by the energy sink that killed them.
+    pub deaths_total: u64,
+    pub deaths_total_by_cause: HashMap<String, u64>,
+    /// Summed food density per ordinary food type after the last tick.
+    pub food_total_density_by_type: Vec<f32>,
+    pub generation_mean: f32,
+    pub generation_max: u64,
+    pub genome_size_mean: f32,
+    /// Founder lineages with at least one living descendant.
+    pub lineages_alive: u32,
+    /// `exp` of the Shannon entropy of living creatures over lineages: the
+    /// number of equally common lineages that would give the same diversity.
+    pub lineages_effective: f32,
+    /// Distinct world inputs each living creature's last mesh run read, averaged.
+    pub world_inputs_read_mean: f32,
+    pub plasticity_changes_total: u64,
+    pub shared_memory_writes_changed_total: u64,
+    pub creature_ticks_total: u64,
+}
+
+/// Per-frame population census gathered in one pass over living creatures.
+#[derive(Default)]
+struct PopulationCensus {
+    count: u64,
+    generation_sum: u64,
+    generation_max: u64,
+    genome_size_sum: u64,
+    world_inputs_read_sum: u64,
+    lineage_counts: HashMap<u32, u64>,
+}
+
+impl PopulationCensus {
+    fn observe(&mut self, creature: &CreatureState) {
+        self.count += 1;
+        self.generation_sum += creature.generation;
+        self.generation_max = self.generation_max.max(creature.generation);
+        self.genome_size_sum += u64::from(creature.cached_genome_size);
+        self.world_inputs_read_sum += creature.last_mesh_world_reads.len() as u64;
+        *self
+            .lineage_counts
+            .entry(creature.identity.lineage_id)
+            .or_insert(0) += 1;
+    }
+
+    fn mean(&self, sum: u64) -> f32 {
+        if self.count == 0 {
+            0.0
+        } else {
+            (sum as f64 / self.count as f64) as f32
+        }
+    }
+
+    fn lineages_effective(&self) -> f32 {
+        if self.count == 0 {
+            return 0.0;
+        }
+        // Sorted so the float sum, and the wire value, never depend on hash order.
+        let mut counts: Vec<u64> = self.lineage_counts.values().copied().collect();
+        counts.sort_unstable();
+        let total = self.count as f64;
+        let entropy: f64 = counts
+            .iter()
+            .map(|&n| {
+                let share = n as f64 / total;
+                -share * share.ln()
+            })
+            .sum();
+        entropy.exp() as f32
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -344,7 +415,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let mut complexity_min: u32 = u32::MAX;
     let mut complexity_max: u32 = 0;
     let mut vm_live_read_world_inputs_current = std::collections::HashMap::new();
+    let mut census = PopulationCensus::default();
     for (id, creature) in &sim.creatures {
+        census.observe(creature);
         let c = creature.cached_complexity;
         complexity_sum += c as u64;
         complexity_min = complexity_min.min(c);
@@ -623,6 +696,22 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         genome_complexity_mean: complexity_mean,
         genome_complexity_min: complexity_min,
         genome_complexity_max: complexity_max,
+        deaths_total: stats.mortality.deaths_total,
+        deaths_total_by_cause: DeathCause::ALL
+            .iter()
+            .filter(|&&cause| stats.mortality.count(cause) > 0)
+            .map(|&cause| (cause.as_key().to_string(), stats.mortality.count(cause)))
+            .collect(),
+        food_total_density_by_type: stats.last_tick_food_total_density_by_type.clone(),
+        generation_mean: census.mean(census.generation_sum),
+        generation_max: census.generation_max,
+        genome_size_mean: census.mean(census.genome_size_sum),
+        lineages_alive: u32::try_from(census.lineage_counts.len()).unwrap_or(u32::MAX),
+        lineages_effective: census.lineages_effective(),
+        world_inputs_read_mean: census.mean(census.world_inputs_read_sum),
+        plasticity_changes_total: stats.plasticity_changes_total,
+        shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
+        creature_ticks_total: stats.creature_ticks_total,
     };
 
     let predation_events: Vec<PredationEventSnapshot> = stats

@@ -1,4 +1,4 @@
-import type { SimulationConfig } from "../types/api.ts";
+import type { HealthPayload, SimulationConfig } from "../types/api.ts";
 
 /** Shared mock config matching production defaults for most fields. */
 export const MOCK_CONFIG: SimulationConfig = {
@@ -129,3 +129,25 @@ export const MOCK_CONFIG: SimulationConfig = {
 		decay_rate: 0.0,
 	},
 };
+
+/** Health census fields at a fresh world's values; spread into health fixtures. */
+export const MOCK_HEALTH_CENSUS = {
+	mutation_outcome_summary: {
+		carriers_observed_total: 0,
+		helpful_total: 0,
+		neutral_total: 0,
+		detrimental_total: 0,
+	},
+	deaths_total: 0,
+	deaths_total_by_cause: {},
+	food_total_density_by_type: [],
+	generation_mean: 0,
+	generation_max: 0,
+	genome_size_mean: 0,
+	lineages_alive: 0,
+	lineages_effective: 0,
+	world_inputs_read_mean: 0,
+	plasticity_changes_total: 0,
+	shared_memory_writes_changed_total: 0,
+	creature_ticks_total: 0,
+} satisfies Partial<HealthPayload>;
