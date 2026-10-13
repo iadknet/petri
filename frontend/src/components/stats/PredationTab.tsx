@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStatsHistoryStore } from "../../stores/stats.ts";
 import { Gauge } from "./shared/Gauge.tsx";
 import { MiniChart } from "./shared/MiniChart.tsx";
@@ -7,6 +8,14 @@ export function PredationTab() {
 	const predationAttempted = useStatsHistoryStore((s) => s.predationAttempted);
 	const predationTransferred = useStatsHistoryStore((s) => s.predationTransferred);
 	const predationKills = useStatsHistoryStore((s) => s.predationKills);
+	const stealSeries = useMemo(
+		() => actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.steal })),
+		[actionsHistory],
+	);
+	const killSeries = useMemo(
+		() => actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.predation_kills })),
+		[actionsHistory],
+	);
 
 	const successRate =
 		predationAttempted > 0 ? ((predationTransferred / predationAttempted) * 100).toFixed(1) : "0.0";
@@ -15,20 +24,11 @@ export function PredationTab() {
 		<div className="flex flex-col gap-3 p-3">
 			<div>
 				<span className="text-[11px] text-slate-400">Steals per tick</span>
-				<MiniChart
-					data={actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.steal }))}
-					color="#ef4444"
-				/>
+				<MiniChart data={stealSeries} color="#ef4444" />
 			</div>
 			<div>
 				<span className="text-[11px] text-slate-400">Kills per tick</span>
-				<MiniChart
-					data={actionsHistory.map((a) => ({
-						tick: a.tick,
-						value: a.actions.predation_kills,
-					}))}
-					color="#f97316"
-				/>
+				<MiniChart data={killSeries} color="#f97316" />
 			</div>
 			<div className="flex gap-4">
 				<Gauge
