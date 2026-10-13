@@ -4,22 +4,60 @@ import elkWorkerUrl from "elkjs/lib/elk-worker.min.js?url";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
 
 let elkInstance: Promise<ElkInstance> | null = null;
+/** Set once the layout worker has failed; later instances run on the main thread. */
+let workerFailed = false;
 
 /**
  * Runs ELK in a Web Worker so layout never blocks the main thread. Without
- * Worker support (jsdom, old runtimes) it falls back to the bundled
- * main-thread build, loaded on demand so it stays out of the main chunk.
+ * Worker support (jsdom, old runtimes), or after the worker has failed, it
+ * falls back to the bundled main-thread build, loaded on demand so it stays
+ * out of the main chunk.
  */
-export async function createElk(): Promise<ElkInstance> {
-	if (typeof Worker !== "undefined") {
-		return new ELK({ workerUrl: elkWorkerUrl });
+export async function createElk(onWorkerFailure?: () => void): Promise<ElkInstance> {
+	if (typeof Worker !== "undefined" && !workerFailed) {
+		return createWorkerElk(onWorkerFailure);
 	}
 	const { default: BundledElk } = await import("elkjs/lib/elk.bundled.js");
 	return new BundledElk();
 }
 
+/**
+ * ELK's worker wrapper only listens for messages, so a worker that fails to
+ * load would leave every layout pending forever. Reject in-flight and later
+ * layouts on worker error and terminate the worker.
+ */
+function createWorkerElk(onFailure?: () => void): ElkInstance {
+	const worker = new Worker(elkWorkerUrl);
+	const elk = new ELK({ workerUrl: elkWorkerUrl, workerFactory: () => worker });
+	let rejectFailure: (error: Error) => void = () => {};
+	const failure = new Promise<never>((_resolve, reject) => {
+		rejectFailure = reject;
+	});
+	failure.catch(() => {});
+	let failed = false;
+	const fail = () => {
+		if (failed) return;
+		failed = true;
+		workerFailed = true;
+		elk.terminateWorker();
+		rejectFailure(new Error("The ELK layout worker failed"));
+		onFailure?.();
+	};
+	worker.addEventListener("error", fail);
+	worker.addEventListener("messageerror", fail);
+	const layout = elk.layout.bind(elk);
+	elk.layout = ((graph, args) =>
+		Promise.race([layout(graph, args), failure])) as ElkInstance["layout"];
+	return elk;
+}
+
 function getElk(): Promise<ElkInstance> {
-	elkInstance ??= createElk();
+	if (!elkInstance) {
+		const created: Promise<ElkInstance> = createElk(() => {
+			if (elkInstance === created) elkInstance = null;
+		});
+		elkInstance = created;
+	}
 	return elkInstance;
 }
 
