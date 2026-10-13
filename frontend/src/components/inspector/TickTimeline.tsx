@@ -15,7 +15,7 @@ export const TickTimeline = memo(function TickTimeline({
 }: TickTimelineProps) {
 	return (
 		<div className="px-3 py-2">
-			<div className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1.5">
+			<div className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1.5">
 				Tick Timeline
 			</div>
 			<div className="flex gap-1 overflow-x-auto pb-1">

@@ -55,7 +55,7 @@ export const VmExecutionView = memo(function VmExecutionView({
 			<InputsPanel inputRefs={inputRefs} upstreamSlots={upstreamSlots} />
 
 			<div>
-				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
 					Registers ({trace.register_count})
 				</div>
 				<div className="grid max-h-[120px] grid-cols-4 gap-x-2 gap-y-0.5 overflow-y-auto text-[10px] font-mono">
@@ -73,18 +73,18 @@ export const VmExecutionView = memo(function VmExecutionView({
 			<div className="grid gap-2 md:grid-cols-2">
 				<div className="rounded border border-white/5 bg-white/[0.02] px-2 py-2 text-[10px] font-mono text-slate-400">
 					<div>
-						<span className="text-slate-600">gates:</span>{" "}
+						<span className="text-slate-400">gates:</span>{" "}
 						{trace.final_registers.length > 0 ? "see mesh route" : "—"}
 					</div>
 					<div>
-						<span className="text-slate-600">payload:</span>{" "}
+						<span className="text-slate-400">payload:</span>{" "}
 						{trace.final_payload.length > 0
 							? trace.final_payload.map((value) => value.toFixed(2)).join(" ")
 							: "—"}
 					</div>
 				</div>
 				<div className="rounded border border-white/5 bg-white/[0.02] px-2 py-2 text-[10px] font-mono text-slate-400">
-					<div className="mb-1 text-slate-600">slot writes</div>
+					<div className="mb-1 text-slate-400">slot writes</div>
 					{trace.slot_writes.length > 0 ? (
 						<div className="space-y-1 [content-visibility:auto]">
 							{trace.slot_writes.map((write, index) => (
@@ -94,7 +94,7 @@ export const VmExecutionView = memo(function VmExecutionView({
 							))}
 						</div>
 					) : (
-						<div className="text-slate-600">none</div>
+						<div className="text-slate-400">none</div>
 					)}
 				</div>
 			</div>

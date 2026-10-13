@@ -21,7 +21,7 @@ export const PhenotypeDetail = memo(function PhenotypeDetail({ phenotype }: Phen
 
 	return (
 		<div className="px-4 py-3 space-y-3">
-			<span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Phenotype</span>
+			<span className="text-xs text-slate-400 uppercase tracking-wider font-medium">Phenotype</span>
 
 			{/* Channel bars */}
 			<div className="space-y-1.5">
@@ -94,7 +94,7 @@ function ChannelBar({
 			</div>
 			<span className="w-7 text-right font-mono text-slate-400 shrink-0">{value}</span>
 			<span
-				className={`w-3 text-center shrink-0 ${isActive ? "text-slate-200" : "text-slate-600"}`}
+				className={`w-3 text-center shrink-0 ${isActive ? "text-slate-200" : "text-slate-400"}`}
 				title={polarity ? "Adding" : "Subtracting"}
 			>
 				{polarity ? "\u2191" : "\u2193"}

@@ -53,7 +53,7 @@ function KindRows({ pass }: { pass: MeshPassTrace }) {
 	if (shown.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-1 mt-0.5">
-			<span className="text-[10px] font-mono text-slate-500">effective</span>
+			<span className="text-[10px] font-mono text-slate-400">effective</span>
 			{shown.map(({ kind, bar, best, bestVote, drive, effective }) => (
 				<span
 					key={kind}
@@ -90,12 +90,12 @@ function PassRow({ pass, endsTerminateVotedTick }: PassRowProps) {
 		<div className="mb-1.5" data-testid={`pass-detail-${pass.pass_index}`}>
 			<div className="text-[10px] font-mono text-slate-400">
 				Pass {pass.pass_index} · {pass.end_reason} · {pass.hops} hops ·{" "}
-				<span className={pass.committed ? "text-orange-300" : "text-slate-500"}>
+				<span className={pass.committed ? "text-orange-300" : "text-slate-400"}>
 					{pass.committed ? `commit ${formatAction(pass.committed)}` : "no commit"}
 				</span>
 			</div>
 			{kindVotes.length === 0 ? (
-				<div className="text-[10px] font-mono text-slate-500">no kind votes this pass</div>
+				<div className="text-[10px] font-mono text-slate-400">no kind votes this pass</div>
 			) : (
 				<div className="flex flex-wrap gap-1">
 					{kindVotes.map((entry) => (
@@ -140,14 +140,14 @@ export const VoteSurfaceBlock = memo(function VoteSurfaceBlock({ tick }: VoteSur
 	const lastPass = tick.passes.length - 1;
 	return (
 		<div className="px-3 py-2 border-t border-white/[0.06]">
-			<div className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1.5">
+			<div className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1.5">
 				Action Selection · {tick.termination_reason}
 			</div>
 			<div data-testid="tick-heading" className="text-[10px] font-mono text-slate-400 mb-1">
 				heading at tick start {tick.heading}
 			</div>
 			{tick.passes.length === 0 ? (
-				<div className="text-[10px] font-mono text-slate-500 mb-1.5">no passes this tick</div>
+				<div className="text-[10px] font-mono text-slate-400 mb-1.5">no passes this tick</div>
 			) : (
 				tick.passes.map((pass, index) => (
 					<PassRow
@@ -161,7 +161,7 @@ export const VoteSurfaceBlock = memo(function VoteSurfaceBlock({ tick }: VoteSur
 			)}
 			<div className="flex flex-wrap gap-1">
 				{VOTE_KINDS.map((kind, index) => (
-					<span key={kind} className="text-[10px] font-mono text-slate-500">
+					<span key={kind} className="text-[10px] font-mono text-slate-400">
 						{kind}: {tick.commit_counts[index] ?? 0}
 					</span>
 				))}

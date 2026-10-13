@@ -28,10 +28,10 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 
 			{/* Pass selector */}
 			<div>
-				<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+				<div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">
 					Evaluation {detailIndex + 1}/{trace.passes.length}
 					{currentPass && (
-						<span className="ml-2 text-slate-600">
+						<span className="ml-2 text-slate-400">
 							Δ={currentPass.max_delta.toFixed(4)} cost=
 							{currentPass.energy_cost.toFixed(4)}e
 						</span>
@@ -51,13 +51,13 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 									key={node.node_index}
 									className="flex items-baseline gap-2 px-1.5 py-0.5 text-[10px] font-mono"
 								>
-									<span className="text-slate-600 w-4 text-right flex-shrink-0">
+									<span className="text-slate-400 w-4 text-right flex-shrink-0">
 										{node.node_index}
 									</span>
 									<span className="text-slate-300 w-20 flex-shrink-0 truncate">
 										{presentation.label}
 									</span>
-									<span className="text-slate-500 text-[9px] w-14 flex-shrink-0">
+									<span className="text-slate-400 text-[9px] w-14 flex-shrink-0">
 										Σ={node.weighted_sum.toFixed(2)}
 									</span>
 									{presentation.badges.length > 0 ? (
@@ -67,7 +67,7 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 									) : null}
 									{isStateful ? (
 										<span
-											className={`text-[9px] flex-shrink-0 ${stateChanged ? "text-amber-400" : "text-slate-600"}`}
+											className={`text-[9px] flex-shrink-0 ${stateChanged ? "text-amber-400" : "text-slate-400"}`}
 										>
 											{node.state_before.toFixed(2)}→{node.state_after.toFixed(2)}
 										</span>
@@ -76,7 +76,7 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 										→{node.output.toFixed(3)}
 									</span>
 									{node.weighted_inputs.length > 0 ? (
-										<span className="text-slate-600 text-[9px] truncate flex-1">
+										<span className="text-slate-400 text-[9px] truncate flex-1">
 											{node.weighted_inputs.map((value) => value.toFixed(2)).join(" · ")}
 										</span>
 									) : null}
@@ -92,7 +92,7 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 				<span className={trace.temporal_committed ? "text-emerald-400" : "text-amber-400"}>
 					{trace.temporal_committed ? "Temporal state committed" : "Candidate state not committed"}
 				</span>
-				<span className="text-slate-600">{trace.passes.length} entered evaluations</span>
+				<span className="text-slate-400">{trace.passes.length} entered evaluations</span>
 			</div>
 		</div>
 	);

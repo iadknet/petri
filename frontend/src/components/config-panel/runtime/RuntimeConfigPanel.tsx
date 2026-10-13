@@ -42,7 +42,7 @@ export function RuntimeConfigPanel({ localDraft, serverConfig, ...rest }: Runtim
 	const filter = useConfigFilter();
 	if (!localDraft || !serverConfig) {
 		return (
-			<p className="px-3 py-6 text-center text-xs text-slate-500">
+			<p className="px-3 py-6 text-center text-xs text-slate-400">
 				Runtime config unavailable. Restart to initialize the simulation.
 			</p>
 		);

@@ -118,7 +118,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 	if (!layout || !scene) {
 		return (
 			<div className="flex items-center justify-center py-4">
-				<p className="text-[10px] font-mono text-slate-500">Computing layout{"\u2026"}</p>
+				<p className="text-[10px] font-mono text-slate-400">Computing layout{"\u2026"}</p>
 			</div>
 		);
 	}
@@ -134,17 +134,17 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 		<div className="px-3 py-2">
 			{trace ? (
 				<div className="mb-1 flex items-baseline gap-2 text-[10px] font-mono">
-					<span className="text-slate-500 uppercase tracking-wider font-medium">
+					<span className="text-slate-400 uppercase tracking-wider font-medium">
 						Pass {detailIndex + 1}/{trace.passes.length}
 					</span>
 					{currentPass ? (
-						<span className="text-slate-600">
+						<span className="text-slate-400">
 							{"\u0394"}={currentPass.max_delta.toFixed(4)}
 						</span>
 					) : null}
 				</div>
 			) : (
-				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
 					Graph ({inputCount} in {"\u00b7"} {computeCount} compute {"\u00b7"} {outputCount} out)
 				</div>
 			)}

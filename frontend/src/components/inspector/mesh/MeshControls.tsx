@@ -25,7 +25,7 @@ export function MeshControls({
 }: MeshControlsProps) {
 	return (
 		<div className="flex items-center gap-2 border-b border-white/6 px-3 py-1">
-			<span className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-500">Focus</span>
+			<span className="text-[9px] font-mono uppercase tracking-[0.16em] text-slate-400">Focus</span>
 			<div className="flex items-center gap-px rounded-md bg-white/[0.03] p-0.5">
 				{FOCUS_MODES.map((mode) => (
 					<button
@@ -36,7 +36,7 @@ export function MeshControls({
 						className={`rounded px-2 py-0.5 text-[10px] font-mono transition-colors ${
 							focusMode === mode.id
 								? "bg-cyan-400/14 text-cyan-200"
-								: "text-slate-500 hover:text-slate-300"
+								: "text-slate-400 hover:text-slate-300"
 						}`}
 					>
 						{mode.label}
@@ -49,7 +49,7 @@ export function MeshControls({
 				aria-pressed={dimUnreachable}
 				onClick={() => onDimUnreachableChange(!dimUnreachable)}
 				className={`rounded px-2 py-0.5 text-[10px] font-mono transition-colors ${
-					dimUnreachable ? "bg-white/[0.04] text-slate-300" : "text-slate-500 hover:text-slate-300"
+					dimUnreachable ? "bg-white/[0.04] text-slate-300" : "text-slate-400 hover:text-slate-300"
 				}`}
 			>
 				Dim junk

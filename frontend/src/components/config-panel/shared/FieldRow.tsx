@@ -72,7 +72,7 @@ export function RowActions({
 					disabled={disabled}
 					title={`Reset to default (${defaultText})`}
 					aria-label={`Reset to default (${defaultText})`}
-					className="flex size-5 items-center justify-center rounded text-slate-500 opacity-60 hover:bg-slate-800 hover:text-slate-200 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30"
+					className="flex size-5 items-center justify-center rounded text-slate-400 opacity-60 hover:bg-slate-800 hover:text-slate-200 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30"
 				>
 					<Icon name="reset" className="size-3" />
 				</button>
@@ -195,7 +195,7 @@ export function FieldRow({
 				)}
 			</div>
 			{showHelp && field.tooltip && (
-				<p className="text-[11px] leading-snug text-slate-500">{field.tooltip}</p>
+				<p className="text-[11px] leading-snug text-slate-400">{field.tooltip}</p>
 			)}
 			{error && (
 				<p

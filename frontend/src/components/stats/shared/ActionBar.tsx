@@ -22,7 +22,7 @@ export function ActionBar({
 				<div className="bg-red-500" style={{ width: pct(steal) }} title={`Steal: ${steal}`} />
 				<div className="bg-slate-600" style={{ width: pct(noop) }} title={`Noop: ${noop}`} />
 			</div>
-			<div className="flex gap-3 text-[10px] text-slate-500">
+			<div className="flex gap-3 text-[10px] text-slate-400">
 				<span className="flex items-center gap-1">
 					<span className="w-2 h-2 bg-blue-500 rounded-sm" />
 					Move {move}

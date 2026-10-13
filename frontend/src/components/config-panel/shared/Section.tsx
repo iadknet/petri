@@ -35,7 +35,7 @@ export function Section({
 							<h3 className="text-xs font-semibold uppercase tracking-wide text-slate-200">
 								{title}
 							</h3>
-							<p className="mt-1 text-[11px] text-slate-500">{description}</p>
+							<p className="mt-1 text-[11px] text-slate-400">{description}</p>
 						</div>
 						<span
 							aria-hidden="true"
@@ -48,7 +48,7 @@ export function Section({
 			) : (
 				<div className={`px-3 pt-3 pb-2 ${headerClassName ?? ""}`}>
 					<h3 className="text-xs font-semibold uppercase tracking-wide text-slate-200">{title}</h3>
-					<p className="mt-1 text-[11px] text-slate-500">{description}</p>
+					<p className="mt-1 text-[11px] text-slate-400">{description}</p>
 				</div>
 			)}
 			{(!collapsible || open) && children}
