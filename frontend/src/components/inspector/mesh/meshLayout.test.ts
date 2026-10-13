@@ -133,6 +133,7 @@ describe("ELK worker failure", () => {
 
 	afterEach(() => {
 		FailingWorker.instances = [];
+		ReplyingWorker.instances = [];
 		vi.unstubAllGlobals();
 	});
 
@@ -167,5 +168,58 @@ describe("ELK worker failure", () => {
 		// Assert: the cached failed instance was dropped and layout completes.
 		expect(layout.nodesById.get(1)).toBeDefined();
 		expect(layout.width).toBeGreaterThan(0);
+	});
+
+	/** A worker that answers each layout request, holding replies while `hold` is set. */
+	class ReplyingWorker extends EventTarget {
+		static instances: ReplyingWorker[] = [];
+		onmessage: ((event: MessageEvent) => void) | null = null;
+		hold = false;
+		held: number[] = [];
+		constructor(_url: string | URL) {
+			super();
+			ReplyingWorker.instances.push(this);
+		}
+		postMessage(message: { id: number; cmd: string }) {
+			if (message.cmd === "layout" && this.hold) {
+				this.held.push(message.id);
+				return;
+			}
+			this.reply(message.id);
+		}
+		reply(id: number) {
+			queueMicrotask(() =>
+				this.onmessage?.(
+					new MessageEvent("message", { data: { id, data: { id: "root", width: 1, height: 1 } } }),
+				),
+			);
+		}
+		terminate() {}
+		fail() {
+			this.dispatchEvent(new Event("error"));
+		}
+	}
+
+	it("releases failure handlers once layouts settle and only rejects in-flight work", async () => {
+		// Arrange
+		vi.stubGlobal("Worker", ReplyingWorker);
+		const { createElk: freshCreateElk, pendingWorkerLayoutCount } = await freshModule();
+		const elk = await freshCreateElk();
+		const graph = { id: "root", children: [], edges: [] };
+		const settled = await Promise.all([elk.layout(graph), elk.layout(graph), elk.layout(graph)]);
+		const worker = ReplyingWorker.instances[0]!;
+		worker.hold = true;
+		const inFlight = elk.layout(graph);
+		const countWhileInFlight = pendingWorkerLayoutCount(elk);
+		worker.hold = false;
+
+		// Act
+		worker.fail();
+
+		// Assert: settled layouts left no handlers behind; only the in-flight one is rejected.
+		expect(settled).toHaveLength(3);
+		expect(countWhileInFlight).toBe(1);
+		await expect(inFlight).rejects.toThrow(/worker/i);
+		expect(pendingWorkerLayoutCount(elk)).toBe(0);
 	});
 });
