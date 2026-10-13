@@ -257,6 +257,9 @@ export class WorldRenderer {
 		this.pixelRatio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
 		this.canvas.width = backing.width;
 		this.canvas.height = backing.height;
+		// A canvas displays at its backing-store size unless given an explicit CSS size.
+		this.canvas.style.width = `${width}px`;
+		this.canvas.style.height = `${height}px`;
 		this.invalidate();
 	}
 
