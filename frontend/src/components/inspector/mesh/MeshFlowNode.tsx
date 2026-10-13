@@ -54,20 +54,20 @@ export const MeshFlowNode = memo(function MeshFlowNode(props: NodeProps) {
 			) : null}
 			<div className="flex h-full flex-col justify-center gap-0.5 px-3 py-2">
 				<div className="flex items-baseline gap-1.5 overflow-hidden whitespace-nowrap">
-					<span className="text-[10px] font-mono text-slate-500">#{data.nodeId}</span>
+					<span className="text-[10px] font-mono text-slate-400">#{data.nodeId}</span>
 					<span className="text-[10px] font-mono uppercase" style={{ color: data.backendMuted }}>
 						{data.backendLabel}
 					</span>
 					{data.isEntry ? (
 						<span className="text-[9px] font-mono text-emerald-400">entry</span>
 					) : null}
-					<span className="text-[9px] font-mono text-slate-600">{data.summaryDetail}</span>
+					<span className="text-[9px] font-mono text-slate-400">{data.summaryDetail}</span>
 				</div>
 				<p className="text-xs font-medium text-slate-100 leading-tight line-clamp-2">
 					{data.shortLabel}
 				</p>
 				{data.inputPreview ? (
-					<p className="text-[9px] font-mono text-slate-500 line-clamp-1 mt-0.5">
+					<p className="text-[9px] font-mono text-slate-400 line-clamp-1 mt-0.5">
 						{data.inputPreview}
 					</p>
 				) : null}

@@ -45,7 +45,7 @@ export function InspectorDiagnosticsCards({ diagnostics }: InspectorDiagnosticsC
 			>
 				{toggle}
 				{expanded && (
-					<div className="mt-1 text-[11px] text-slate-500">
+					<div className="mt-1 text-[11px] text-slate-400">
 						Diagnostics unavailable for this creature response.
 					</div>
 				)}
@@ -149,7 +149,7 @@ export function InspectorDiagnosticsCards({ diagnostics }: InspectorDiagnosticsC
 					<div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-400">
 						<div className="rounded border border-slate-800 bg-slate-950/60 p-2">
 							<div className="font-medium text-slate-300">Reachable Read Classes</div>
-							{readClassEntries.length === 0 && <div className="mt-1 text-slate-500">none</div>}
+							{readClassEntries.length === 0 && <div className="mt-1 text-slate-400">none</div>}
 							{readClassEntries.map(([kind, count]) => (
 								<div key={kind} className="mt-1 flex justify-between">
 									<span>{kind}</span>
@@ -159,7 +159,7 @@ export function InspectorDiagnosticsCards({ diagnostics }: InspectorDiagnosticsC
 						</div>
 						<div className="rounded border border-slate-800 bg-slate-950/60 p-2">
 							<div className="font-medium text-slate-300">Reachable Write Classes</div>
-							{writeClassEntries.length === 0 && <div className="mt-1 text-slate-500">none</div>}
+							{writeClassEntries.length === 0 && <div className="mt-1 text-slate-400">none</div>}
 							{writeClassEntries.map(([kind, count]) => (
 								<div key={kind} className="mt-1 flex justify-between">
 									<span>{kind}</span>
@@ -169,7 +169,7 @@ export function InspectorDiagnosticsCards({ diagnostics }: InspectorDiagnosticsC
 						</div>
 						<div className="rounded border border-slate-800 bg-slate-950/60 p-2">
 							<div className="font-medium text-slate-300">Recent Outcomes</div>
-							{recentActionEntries.length === 0 && <div className="mt-1 text-slate-500">none</div>}
+							{recentActionEntries.length === 0 && <div className="mt-1 text-slate-400">none</div>}
 							{recentActionEntries.map(([kind, count]) => (
 								<div key={kind} className="mt-1 flex justify-between">
 									<span>{kind}</span>

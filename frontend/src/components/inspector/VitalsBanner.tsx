@@ -139,7 +139,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 					type="button"
 					onClick={onClose}
 					aria-label="Close"
-					className="ml-auto shrink-0 text-slate-500 hover:text-slate-300 transition-colors px-1"
+					className="ml-auto shrink-0 text-slate-400 hover:text-slate-300 transition-colors px-1"
 				>
 					[X]
 				</button>
@@ -230,7 +230,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 												{amountLabel}: {entry.amount.toFixed(amountDigits)}
 											</div>
 										)}
-										<div className="text-slate-500">Bid: {entry.priority_bid.toFixed(2)}</div>
+										<div className="text-slate-400">Bid: {entry.priority_bid.toFixed(2)}</div>
 									</div>
 								);
 							})()}

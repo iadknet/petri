@@ -30,10 +30,10 @@ export function NodeIdentity({
 				</span>
 				{semanticLabel ? <span className="text-xs text-cyan-200">{semanticLabel}</span> : null}
 			</div>
-			<div className="mt-0.5 flex items-center gap-2 text-[10px] font-mono text-slate-500">
+			<div className="mt-0.5 flex items-center gap-2 text-[10px] font-mono text-slate-400">
 				<span>{backendSummary.detail}</span>
 				{isEntry ? <span className="text-emerald-400">entry</span> : null}
-				{!reachable ? <span className="text-slate-500">unreachable</span> : null}
+				{!reachable ? <span className="text-slate-400">unreachable</span> : null}
 				{badges.map((badge) => (
 					<span key={badge} className="text-cyan-400/70">
 						{badge}

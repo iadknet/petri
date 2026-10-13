@@ -67,14 +67,14 @@ function HopButton({ hop, index, isActive, semanticsLabel, onHopSelect }: HopBut
 				<span style={{ color }} className="font-medium text-[9px]">
 					{type}
 				</span>
-				<span className="text-slate-500">#{hop.node_id}</span>
+				<span className="text-slate-400">#{hop.node_id}</span>
 			</div>
 			{semanticsLabel ? (
 				<div className="mt-0.5 max-w-[11rem] truncate text-[9px] text-slate-300">
 					{semanticsLabel}
 				</div>
 			) : null}
-			<div className="text-[9px] text-slate-500">{hopSummary(hop)}</div>
+			<div className="text-[9px] text-slate-400">{hopSummary(hop)}</div>
 			{hop.route ? (
 				<div className="text-[9px] text-cyan-400/80">→ #{hop.route.selected_target_id}</div>
 			) : null}
@@ -101,7 +101,7 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 	const indexed = hops.map((hop, index) => ({ hop, index }));
 	return (
 		<div className="px-3 py-2">
-			<div className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-1.5">
+			<div className="text-xs text-slate-400 uppercase tracking-wider font-medium mb-1.5">
 				Passes
 			</div>
 			<div className="flex flex-col gap-1.5">
@@ -111,17 +111,17 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 						<div key={pass.pass_index} data-testid={`pass-group-${pass.pass_index}`}>
 							<div className="text-[10px] font-mono text-slate-400 mb-0.5">
 								Pass {pass.pass_index} · {pass.end_reason} · {pass.hops} hops ·{" "}
-								<span className={pass.committed ? "text-orange-300" : "text-slate-500"}>
+								<span className={pass.committed ? "text-orange-300" : "text-slate-400"}>
 									{pass.committed ? `commit ${formatAction(pass.committed)}` : "no commit"}
 								</span>
 							</div>
 							{passHops.length === 0 ? (
-								<div className="text-[9px] font-mono text-slate-600">no recorded hop</div>
+								<div className="text-[9px] font-mono text-slate-400">no recorded hop</div>
 							) : (
 								<div className="flex items-center gap-1 overflow-x-auto pb-1">
 									{passHops.map(({ hop, index }, position) => (
 										<div key={hop.hop_index} className="flex items-center gap-1 flex-shrink-0">
-											{position > 0 && <span className="text-slate-600 text-xs">→</span>}
+											{position > 0 && <span className="text-slate-400 text-xs">→</span>}
 											<HopButton
 												hop={hop}
 												index={index}
@@ -137,7 +137,7 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 					);
 				})}
 			</div>
-			<div data-testid="tick-end" className="mt-1.5 text-[10px] font-mono text-slate-500">
+			<div data-testid="tick-end" className="mt-1.5 text-[10px] font-mono text-slate-400">
 				{terminationReason} · queue{" "}
 				{finalActions.length === 0 ? "empty" : finalActions.map(formatAction).join(", ")}
 			</div>
