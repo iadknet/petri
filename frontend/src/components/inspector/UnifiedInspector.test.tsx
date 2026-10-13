@@ -124,6 +124,13 @@ describe("UnifiedInspector", () => {
 		useInspectorWorkspaceStore.getState().reset();
 	});
 
+	it("labels the inspector region with a level-2 heading", () => {
+		render(<UnifiedInspector {...defaultProps} />);
+		const region = screen.getByRole("complementary", { name: "Creature Inspector" });
+		const heading = screen.getByRole("heading", { level: 2, name: "Creature Inspector" });
+		expect(region).toContainElement(heading);
+	});
+
 	it("renders the unified layout with vitals, canvas, node inspector, and sampler bar", () => {
 		render(<UnifiedInspector {...defaultProps} />);
 
