@@ -29,8 +29,9 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Work in the feature worktree the orchestrator entered, under
   `.claude/worktrees/`. Read `AGENTS.md` and the roadmap contract
   (`docs/roadmaps/README.md`). From `docs/workflow.md` read only the "Codex channel"
-  paragraph, and the "Plan", "Review", and "Environmental pressures in the
-  standard baseline" sections.
+  paragraph, the "Plan", "Review", and "Environmental pressures in the
+  standard baseline" sections, and the "Verification plan" table under
+  "Benchmark gate".
 - From the owning track read only the feature's own row, the rows of its
   dependencies, and the entries in the track's "Notes for AI Agents" that name
   this feature or one of its dependencies — not the whole track. From each
@@ -43,8 +44,10 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Use the `research-first-planning`, `spec-writing`, and `spec-review` skills
   (via the Skill tool) to write the spec at
   `docs/specs/roadmap/tnn-fnn-<slug>.md` from `_feature-template.md` and
-  perform one readiness review. Your self-review is not independent
-  validation; the Codex challenge loop is.
+  perform one readiness review. Declare the spec's Verification Plan: the
+  cheapest benchmark profiles and mutation-gate line that answer the
+  feature's question, each with a one-sentence reason. Your self-review is not
+  independent validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
   defines it: up to three rounds, each a fresh read-only Codex Sol `high`
   `codex exec` job started in the background, with the

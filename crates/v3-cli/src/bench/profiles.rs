@@ -177,6 +177,33 @@ pub fn goal_profile_params() -> ProfileParams {
 
 pub const GOAL_WORLD_SET: &str = "goal-worlds-v1";
 
+/// The long goal profile's world set: the same three recipes and seeds as
+/// [`GOAL_WORLD_SET`], run to [`GOAL_LONG_TICKS`]. A spec declares it when its
+/// question is about long-run evolution, which a 2,000-tick reading cannot
+/// see (user decision, 2026-10-12). It is a separate series, never compared
+/// with the 2,000-tick one.
+pub const GOAL_LONG_WORLD_SET: &str = "goal-worlds-long-v1";
+
+/// The long goal profile's horizon.
+pub const GOAL_LONG_TICKS: u64 = 40_000;
+
+/// Whether a profile name is one of the goal world sets, which run one
+/// checked-in recipe per seed and carry per-case blocks.
+#[must_use]
+pub fn is_goal_world_set(name: &str) -> bool {
+    name == GOAL_WORLD_SET || name == GOAL_LONG_WORLD_SET
+}
+
+/// Predeclared long goal profile constants: the goal profile at
+/// [`GOAL_LONG_TICKS`] under its own world-set name.
+pub fn goal_long_profile_params() -> ProfileParams {
+    ProfileParams {
+        name: GOAL_LONG_WORLD_SET.to_string(),
+        ticks: GOAL_LONG_TICKS,
+        ..goal_profile_params()
+    }
+}
+
 /// One checked-in baseline world: the recipe the world-set profile runs and
 /// the seed it runs it at. Adding a world to the set is one entry here — the
 /// profile's seed list is derived from these seeds, and a profile that names
@@ -215,7 +242,7 @@ pub(super) fn goal_recipe_seeds() -> Vec<u64> {
 }
 
 /// The recipe each of a profile's seeds runs: the checked-in world set for
-/// [`GOAL_WORLD_SET`], and nothing at all for every other profile, whose seeds
+/// a goal world set, and nothing at all for every other profile, whose seeds
 /// are replicates of one config.
 ///
 /// # Errors
@@ -225,15 +252,15 @@ pub(super) fn goal_recipe_seeds() -> Vec<u64> {
 /// another world's recipe, drop a world the set gained, or index past the
 /// recipe list, so this is a hard error before any run starts.
 pub(super) fn goal_recipes_for(params: &ProfileParams) -> Result<&'static [GoalRecipe], String> {
-    if params.name != GOAL_WORLD_SET {
+    if !is_goal_world_set(&params.name) {
         return Ok(&[]);
     }
     let seeds = goal_recipe_seeds();
     if params.seeds != seeds {
         return Err(format!(
-            "profile {GOAL_WORLD_SET} runs one checked-in recipe per seed and must name their \
+            "profile {} runs one checked-in recipe per seed and must name their \
              seeds in order {seeds:?}, not {:?}",
-            params.seeds
+            params.name, params.seeds
         ));
     }
     Ok(&GOAL_RECIPES)
@@ -294,7 +321,8 @@ const DEFAULT_FOOD_COVERAGE: &str = "default";
 /// runs; `None` for the goal world set, whose cases carry their own digests.
 #[must_use]
 pub fn effective_config_digest(params: &ProfileParams) -> Option<String> {
-    (params.name != GOAL_WORLD_SET).then(|| v3_core::config::config_digest(&build_config(params)))
+    (!is_goal_world_set(&params.name))
+        .then(|| v3_core::config::config_digest(&build_config(params)))
 }
 
 pub fn build_config(params: &ProfileParams) -> SimulationConfig {
@@ -337,7 +365,7 @@ pub(super) fn profile_block(
         ticks: params.ticks,
         food_coverage: params.food_coverage.map_or_else(
             || {
-                if params.name == GOAL_WORLD_SET {
+                if is_goal_world_set(&params.name) {
                     "per-case recipe".to_string()
                 } else if params.recipe.is_some() {
                     "recipe".to_string()

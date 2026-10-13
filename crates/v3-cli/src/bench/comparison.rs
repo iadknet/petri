@@ -1,7 +1,9 @@
 //! Report comparison, reference selection, and the series index.
 
 use super::artifacts;
-use super::profiles::{ADDITIVE_COUNTER_NAMES, COUNTER_NAMES, GOAL_WORLD_SET};
+use super::profiles::{
+    is_goal_world_set, ADDITIVE_COUNTER_NAMES, COUNTER_NAMES, GOAL_LONG_WORLD_SET, GOAL_WORLD_SET,
+};
 use super::schema::{
     ByReaderState, CaseComparison, CaseReadingComparison, ComparisonLevel, CounterComparison,
     GoalIndicators, Host, MemorySensitivitySeed, MovesBlockedByCause, PerCreatureTick, PerSeed,
@@ -355,7 +357,7 @@ pub(super) fn compare_cases(
     current: &ComparisonInputs,
     reference: &ComparisonInputs,
 ) -> Vec<CaseComparison> {
-    if current.profile.name != GOAL_WORLD_SET {
+    if !is_goal_world_set(&current.profile.name) {
         return Vec::new();
     }
     current
@@ -609,7 +611,7 @@ fn compare_inputs(
 /// founder count, seeds, ticks, and food coverage still have to match.
 fn comparable_profile(profile: &ProfileBlock) -> ProfileBlock {
     let mut profile = profile.clone();
-    if profile.name == GOAL_WORLD_SET {
+    if is_goal_world_set(&profile.name) {
         profile.cases.clear();
     }
     profile
@@ -741,6 +743,9 @@ pub struct BenchmarkSeriesIndex {
     pub goal: SeriesIndex,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_worlds: Option<SeriesIndex>,
+    /// The long goal profile's series (`goal-worlds-long-v1`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_worlds_long: Option<SeriesIndex>,
 }
 
 /// Resolve the gate profile's default comparison references from the series
@@ -760,15 +765,34 @@ pub fn default_gate_references(series_index_path: &Path) -> Result<ReferenceSele
 /// Its initial baseline does not exist until that first goal report is written,
 /// so the first invocation deliberately has no comparison and says so.
 pub fn default_goal_references(series_index_path: &Path) -> Result<ReferenceSelection, String> {
+    world_set_references(series_index_path, GOAL_WORLD_SET, |index| {
+        index.goal_worlds.as_ref()
+    })
+}
+
+/// Resolve the long goal profile's comparison references from its own
+/// series. Like the goal series, its first report has nothing to compare
+/// against and says so; it is never compared with the 2,000-tick series.
+pub fn default_goal_long_references(
+    series_index_path: &Path,
+) -> Result<ReferenceSelection, String> {
+    world_set_references(series_index_path, GOAL_LONG_WORLD_SET, |index| {
+        index.goal_worlds_long.as_ref()
+    })
+}
+
+fn world_set_references(
+    series_index_path: &Path,
+    world_set: &str,
+    series_of: impl Fn(&BenchmarkSeriesIndex) -> Option<&SeriesIndex>,
+) -> Result<ReferenceSelection, String> {
     let Some(index) = read_series_index(series_index_path)? else {
         return Ok(ReferenceSelection::absent(no_series_index(
             series_index_path,
         )));
     };
-    let Some(series) = index.goal_worlds.as_ref() else {
-        return Ok(ReferenceSelection::absent(no_epoch_baseline(
-            GOAL_WORLD_SET,
-        )));
+    let Some(series) = series_of(&index) else {
+        return Ok(ReferenceSelection::absent(no_epoch_baseline(world_set)));
     };
     if !Path::new(&series.epoch_baseline).exists() {
         return Ok(ReferenceSelection::absent(no_epoch_baseline(

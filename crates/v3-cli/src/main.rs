@@ -127,6 +127,8 @@ struct InspectArgs {
 enum BenchProfile {
     Gate,
     Goal,
+    /// The goal world set at 40,000 ticks, for specs that declare it.
+    GoalLong,
     Sweep,
 }
 
@@ -388,7 +390,12 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 .ok_or("--feature is required for --profile gate")?;
             Ok((bench::gate_profile_params(), feature))
         }
-        BenchProfile::Goal => {
+        BenchProfile::Goal | BenchProfile::GoalLong => {
+            let name = if args.profile == BenchProfile::Goal {
+                "goal"
+            } else {
+                "goal-long"
+            };
             for (flag, supplied) in [
                 ("--width", args.width.is_some()),
                 ("--height", args.height.is_some()),
@@ -399,15 +406,21 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
             ] {
                 if supplied {
                     return Err(format!(
-                        "{flag} is not accepted for --profile goal; the goal profile is predeclared"
+                        "{flag} is not accepted for --profile {name}; the {name} profile is \
+                         predeclared"
                     ));
                 }
             }
             let feature = args
                 .feature
                 .clone()
-                .ok_or("--feature is required for --profile goal")?;
-            Ok((bench::goal_profile_params(), feature))
+                .ok_or_else(|| format!("--feature is required for --profile {name}"))?;
+            let params = if args.profile == BenchProfile::Goal {
+                bench::goal_profile_params()
+            } else {
+                bench::goal_long_profile_params()
+            };
+            Ok((params, feature))
         }
         BenchProfile::Sweep => {
             let recipe = args
@@ -651,6 +664,7 @@ fn prepare_bench(args: &BenchArgs) -> Result<PreparedBench, String> {
     let profile = match args.profile {
         BenchProfile::Gate => "gate",
         BenchProfile::Goal => "goal",
+        BenchProfile::GoalLong => "goal-long",
         BenchProfile::Sweep => "sweep",
     };
     let paths = artifacts::output_paths(
@@ -673,6 +687,7 @@ fn prepare_bench(args: &BenchArgs) -> Result<PreparedBench, String> {
         match args.profile {
             BenchProfile::Gate => bench::default_gate_references(series_path),
             BenchProfile::Goal => bench::default_goal_references(series_path),
+            BenchProfile::GoalLong => bench::default_goal_long_references(series_path),
             BenchProfile::Sweep => Ok(bench::ReferenceSelection::default()),
         }
     };
@@ -1340,6 +1355,29 @@ mod tests {
     }
 
     #[test]
+    fn goal_long_profile_is_the_goal_world_set_at_forty_thousand_ticks() {
+        let resolved = resolve_bench_profile(&bench_args(BenchProfile::GoalLong))
+            .expect("the goal-long profile needs only --feature and optional --threads");
+        assert_eq!(resolved.params, bench::goal_long_profile_params());
+        assert_eq!(resolved.params.ticks, 40_000);
+        assert_eq!(resolved.params.name, "goal-worlds-long-v1");
+        let goal = bench::goal_profile_params();
+        assert_eq!(goal.ticks, 2_000);
+        assert_eq!(
+            (resolved.params.seeds, resolved.params.founders),
+            (goal.seeds, goal.founders)
+        );
+        assert!(bench::is_goal_world_set(&resolved.params.name));
+
+        let error = resolve_bench_profile(&BenchArgs {
+            ticks: Some(1),
+            ..bench_args(BenchProfile::GoalLong)
+        })
+        .expect_err("goal-long parameters must be predeclared");
+        assert!(error.contains("--ticks is not accepted for --profile goal-long"));
+    }
+
+    #[test]
     fn a_zero_thread_count_is_rejected_for_either_profile() {
         for profile in [BenchProfile::Gate, BenchProfile::Sweep] {
             let args = BenchArgs {
@@ -1429,7 +1467,11 @@ mod tests {
             .types
             .iter()
             .all(|food| food.initial_coverage == 0.25));
-        for profile in [BenchProfile::Gate, BenchProfile::Goal] {
+        for profile in [
+            BenchProfile::Gate,
+            BenchProfile::Goal,
+            BenchProfile::GoalLong,
+        ] {
             args.profile = profile;
             assert!(resolve_bench_profile(&args)
                 .unwrap_err()

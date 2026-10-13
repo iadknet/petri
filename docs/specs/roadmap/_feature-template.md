@@ -72,6 +72,18 @@ the thing.
 | Default and tests | Telemetry is on by default in every binary. Every test that spawns a binary passes `--telemetry off`; a telemetry fixture passes `on` and scrubs `PETRI_TELEMETRY*` and the endpoint from the spawned environment. Closure benchmarks export and still write their stored reports. A benchmark, assay or lab command captures only at region boundaries and exports after its last timed region. | F05 inv. 2, F06 inv. 2–3 |
 | Not closure evidence | Nothing the stack stores is an indicator, a default or closure evidence; `Not applicable: <reason>` is the form for a feature that changes nothing a run does. | track |
 
+## Verification Plan
+
+Declared at Plan time from the workflow's
+[verification plan](../../workflow.md#verification-plan) table: the cheapest
+plan that answers this feature's question. `make check`, the spec challenge
+loop and the Codex review always run.
+
+| Check | Declared | Reason |
+| --- | --- | --- |
+| Benchmark profiles | `none`, `gate`, `gate + goal`, or `gate + goal-long` (`+ goal` if the 2,000-tick series also matters) | one sentence |
+| Mutation gate | `run` or `not run` | one sentence |
+
 ## Implementation Tasks
 
 - [ ] Implement the feature.
@@ -83,15 +95,16 @@ name, a report path, or a link. Do not prescribe test design in prose — the
 implementer chooses the design and records what it actually ran.
 
 - [ ] Focused tests or checks: `<command>` -> `<result>`.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
+- [ ] When the Verification Plan declares the mutation gate: fresh
+      `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-      A T21 feature under the workflow's observability exemption records
-      `Not applicable: observability feature`.
-- [ ] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
-      hash/byte count and verification time checked, series entry points to the
-      summary, and no new full report staged; or
-      `Not applicable: <reason>`.
+      Otherwise `Not run: Verification Plan`.
+- [ ] For each declared benchmark profile: summary stored at
+      `docs/progress/features/<id>.json` (gate), `<id>-goal.json` or
+      `<id>-goal-long.json`, local raw hash/byte count and verification time
+      checked, series entry points to the summary, and no new full report
+      staged. Otherwise `Not run: Verification Plan`.
 
 Keep this section under about 3 KB excluding the survivor list. Pass-by-pass
 logs, transcripts, and raw test output go to `docs/progress/readings/<id>.md`,
@@ -114,8 +127,9 @@ remains `Undefined` and why.
 statuses with their sources, the `severe` flag,
 whether any threshold was crossed, and whether the epoch was re-pinned.
 
-- Summaries: [gate](../../progress/features/<id>.json),
-  [goal](../../progress/features/<id>-goal.json).
+- Summaries of the declared profiles: [gate](../../progress/features/<id>.json),
+  [goal](../../progress/features/<id>-goal.json),
+  [goal-long](../../progress/features/<id>-goal-long.json).
 - Full readings: [`docs/progress/readings/<id>.md`](../../progress/readings/<id>.md).
 
 Raw paths, hashes, raw/summary byte counts, comparison tables and concise
@@ -124,14 +138,13 @@ file, not here. A user decision that accepts a measured cost, grants an
 exception, or re-pins a baseline stays in this section verbatim: it is a
 contract, not evidence.
 
-The benchmark Verification item above is `Not applicable` only for a feature that
-closes before T10.F10 is checked or that cannot change simulation cost, including
-a lab feature under the workflow's Benchmark gate exemption (record
-`Not applicable: lab feature` with the diff scope). A T21 feature under the
-observability exemption records `Not applicable: observability feature`, then
-its parent comparison and overhead check: the predeclared method, the
-measured ratio with the stack up against the ceiling in force, telemetry's
-self-timed cost per tick, and the reviewed no-behavior-change claim.
+When the Verification Plan declares no profile, this section records
+`Not run: Verification Plan` in place of the verdict. A lab feature also
+records its diff scope. A telemetry feature records
+`Not applicable: telemetry feature`, then its parent comparison and overhead
+check: the predeclared method, the measured ratio with the stack up against
+the ceiling in force, telemetry's self-timed cost per tick, and the reviewed
+no-behavior-change claim.
 
 ## Success Criteria
 

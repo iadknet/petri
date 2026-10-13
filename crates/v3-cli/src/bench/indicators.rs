@@ -1,6 +1,6 @@
 //! Indicator computations over a finished simulation.
 
-use super::profiles::{NeighborhoodSizes, ProfileParams, GOAL_WORLD_SET};
+use super::profiles::{is_goal_world_set, NeighborhoodSizes, ProfileParams};
 use super::run::millis;
 use super::schema::{
     cohort_ladder, undefined_drift_depth, undefined_evolved_neighborhood,
@@ -267,7 +267,7 @@ pub(super) fn timed_drift_depth(
     Option<f64>,
     Option<DriftCohortInputs>,
 ) {
-    if params.name != "goal" && params.name != GOAL_WORLD_SET {
+    if params.name != "goal" && !is_goal_world_set(&params.name) {
         return (undefined_drift_depth(), None, None);
     }
     let started = Instant::now();
@@ -964,7 +964,7 @@ pub(super) fn assemble_goal_indicators(
         drift_depth,
         case_observations,
     } = inputs;
-    let world_set = params.name == GOAL_WORLD_SET;
+    let world_set = is_goal_world_set(&params.name);
     let observe_goal_indicators = params.name == "goal" || world_set;
     let population_persistence = PopulationPersistence {
         per_seed: population_persistence_per_seed,

@@ -78,11 +78,11 @@ rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli
 
-bench: ## Run gate/goal/sweep. FEATURE labels the run; OUT overrides local raw output, SUMMARY_OUT overrides its summary; BENCH_ARGS supplies sweep parameters or --threads.
+bench: ## Run gate/goal/goal-long/sweep. FEATURE labels the run; OUT overrides local raw output, SUMMARY_OUT overrides its summary; BENCH_ARGS supplies sweep parameters or --threads.
 	@case "$(PROFILE)" in \
-		gate|goal) if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=$(PROFILE)" >&2; exit 1; fi ;; \
+		gate|goal|goal-long) if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=$(PROFILE)" >&2; exit 1; fi ;; \
 		sweep) if [ -z "$(FEATURE)" ] && [ -z "$(OUT)" ]; then echo "error: FEATURE or OUT is required for PROFILE=sweep" >&2; exit 1; fi ;; \
-		*) echo "error: set PROFILE=gate, goal, or sweep" >&2; exit 1 ;; \
+		*) echo "error: set PROFILE=gate, goal, goal-long, or sweep" >&2; exit 1 ;; \
 	esac; \
 	set -- --profile "$(PROFILE)"; \
 	if [ -n "$(FEATURE)" ]; then set -- "$$@" --feature "$(FEATURE)"; fi; \

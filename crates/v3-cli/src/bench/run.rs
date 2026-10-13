@@ -14,8 +14,8 @@ use super::mutation_effects::{
     observe_world, undefined_mutation_effects, MutationEffects, WorldObservation,
 };
 use super::profiles::{
-    build_config, goal_case, goal_recipes_for, profile_block, GoalCase, GoalRecipe,
-    NeighborhoodSizes, ProfileParams, GOAL_WORLD_SET, SCHEMA_VERSION,
+    build_config, goal_case, goal_recipes_for, is_goal_world_set, profile_block, GoalCase,
+    GoalRecipe, NeighborhoodSizes, ProfileParams, SCHEMA_VERSION,
 };
 use super::ring_rules::{undefined_ring_rules, RingRules};
 use super::schema::{
@@ -465,7 +465,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     let mut neighborhood_read_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let mut mutation_effects_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let mut input_use_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
-    let world_set = params.name == GOAL_WORLD_SET;
+    let world_set = is_goal_world_set(&params.name);
     let observe_goal_indicators = params.name == "goal" || world_set;
     let mut case_observations = Vec::new();
 
