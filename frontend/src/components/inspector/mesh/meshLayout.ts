@@ -21,33 +21,55 @@ export async function createElk(onWorkerFailure?: () => void): Promise<ElkInstan
 	return new BundledElk();
 }
 
+/** Rejecters of each worker instance's in-flight layouts, exposed for tests. */
+const pendingLayouts = new WeakMap<ElkInstance, ReadonlySet<unknown>>();
+
+/** Number of layouts on a worker-backed instance still waiting for an answer. */
+export function pendingWorkerLayoutCount(elk: ElkInstance): number {
+	return pendingLayouts.get(elk)?.size ?? 0;
+}
+
 /**
  * ELK's worker wrapper only listens for messages, so a worker that fails to
  * load would leave every layout pending forever. Reject in-flight and later
- * layouts on worker error and terminate the worker.
+ * layouts on worker error and terminate the worker. Each layout registers its
+ * rejecter only while it is in flight, so settled layouts are not retained.
  */
 function createWorkerElk(onFailure?: () => void): ElkInstance {
 	const worker = new Worker(elkWorkerUrl);
 	const elk = new ELK({ workerUrl: elkWorkerUrl, workerFactory: () => worker });
-	let rejectFailure: (error: Error) => void = () => {};
-	const failure = new Promise<never>((_resolve, reject) => {
-		rejectFailure = reject;
-	});
-	failure.catch(() => {});
+	const pending = new Set<(error: Error) => void>();
+	pendingLayouts.set(elk, pending);
+	const failureError = () => new Error("The ELK layout worker failed");
 	let failed = false;
 	const fail = () => {
 		if (failed) return;
 		failed = true;
 		workerFailed = true;
 		elk.terminateWorker();
-		rejectFailure(new Error("The ELK layout worker failed"));
+		for (const reject of pending) reject(failureError());
+		pending.clear();
 		onFailure?.();
 	};
 	worker.addEventListener("error", fail);
 	worker.addEventListener("messageerror", fail);
 	const layout = elk.layout.bind(elk);
-	elk.layout = ((graph, args) =>
-		Promise.race([layout(graph, args), failure])) as ElkInstance["layout"];
+	elk.layout = ((graph, args) => {
+		if (failed) return Promise.reject(failureError());
+		return new Promise<ElkNode>((resolve, reject) => {
+			pending.add(reject);
+			layout(graph, args).then(
+				(result) => {
+					pending.delete(reject);
+					resolve(result);
+				},
+				(error: unknown) => {
+					pending.delete(reject);
+					reject(error);
+				},
+			);
+		});
+	}) as ElkInstance["layout"];
 	return elk;
 }
 
