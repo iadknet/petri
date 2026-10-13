@@ -101,7 +101,7 @@ export function ControlBar() {
 	const population = useSimulationStore((s) => s.status?.population ?? 0);
 	const ticksPerSecond = useSimulationStore((s) => s.ticksPerSecond);
 	const connectionStatus = useSimulationStore((s) => s.connectionStatus);
-	const { toggleConfig, toggleStats } = usePanelLayout();
+	const { configOpen, statsOpen, toggleConfig, toggleStats } = usePanelLayout();
 	const showFertilityOverlay = useViewportStore((s) => s.showFertilityOverlay);
 	const toggleFertilityOverlay = useViewportStore((s) => s.toggleFertilityOverlay);
 	const [restarting, setRestarting] = useState(false);
@@ -191,7 +191,7 @@ export function ControlBar() {
 	return (
 		<header className="flex items-center gap-3 px-4 h-12 bg-petri-panel border-b border-petri-border">
 			{/* Brand */}
-			<span className="font-semibold text-slate-200 tracking-tight text-sm mr-2">PETRI</span>
+			<h1 className="font-semibold text-slate-200 tracking-tight text-sm mr-2">PETRI</h1>
 
 			{/* Divider */}
 			<div className="w-px h-6 bg-petri-border" />
@@ -289,7 +289,12 @@ export function ControlBar() {
 				type="button"
 				data-testid="toggle-config"
 				onClick={toggleConfig}
-				className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+				aria-pressed={configOpen}
+				className={`px-2 py-1 text-xs rounded transition-colors ${
+					configOpen
+						? "bg-slate-600 text-slate-100 ring-1 ring-inset ring-slate-300 hover:bg-slate-500"
+						: "text-slate-400 hover:text-slate-200 bg-slate-800"
+				}`}
 			>
 				Config
 			</button>
@@ -297,7 +302,12 @@ export function ControlBar() {
 				type="button"
 				data-testid="toggle-stats"
 				onClick={toggleStats}
-				className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+				aria-pressed={statsOpen}
+				className={`px-2 py-1 text-xs rounded transition-colors ${
+					statsOpen
+						? "bg-slate-600 text-slate-100 ring-1 ring-inset ring-slate-300 hover:bg-slate-500"
+						: "text-slate-400 hover:text-slate-200 bg-slate-800"
+				}`}
 			>
 				Stats
 			</button>
