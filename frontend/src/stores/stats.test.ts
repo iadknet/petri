@@ -36,6 +36,42 @@ describe("StatsHistoryStore", () => {
 		expect(history[499]!.tick).toBe(509);
 	});
 
+	it("gives the pushed series a new array and leaves the other series untouched", () => {
+		const store = useStatsHistoryStore.getState();
+		store.pushStats(1, 50, 37.4);
+		store.pushActions(1, { move: 1, eat: 2, reproduce: 0, noop: 0, steal: 0 });
+		store.pushCompute(1, 3, 1, 5, 2, 1);
+		store.pushComplexity(1, 10, 5, 20);
+		const before = useStatsHistoryStore.getState();
+
+		store.pushStats(2, 51, 37.8);
+		const after = useStatsHistoryStore.getState();
+
+		expect(after.statsHistory).not.toBe(before.statsHistory);
+		expect(before.statsHistory).toHaveLength(1);
+		expect(after.statsHistory.map((p) => p.tick)).toEqual([1, 2]);
+		expect(after.actionsHistory).toBe(before.actionsHistory);
+		expect(after.computeHistory).toBe(before.computeHistory);
+		expect(after.complexityHistory).toBe(before.complexityHistory);
+	});
+
+	it("keeps earlier snapshots intact once the ring is full", () => {
+		const store = useStatsHistoryStore.getState();
+		for (let i = 0; i < 500; i++) {
+			store.pushComplexity(i, i, i, i);
+		}
+		const full = useStatsHistoryStore.getState().complexityHistory;
+		store.pushComplexity(500, 500, 500, 500);
+		const next = useStatsHistoryStore.getState().complexityHistory;
+
+		expect(next).not.toBe(full);
+		expect(next).toHaveLength(500);
+		expect(next[0]!.tick).toBe(1);
+		expect(next[499]!.tick).toBe(500);
+		expect(full[0]!.tick).toBe(0);
+		expect(full[499]!.tick).toBe(499);
+	});
+
 	it("tracks reproduction stats", () => {
 		useStatsHistoryStore.getState().setReproStats(100, 20, 80, {
 			RejectedInvalidTarget: 60,
