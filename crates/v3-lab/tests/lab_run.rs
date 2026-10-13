@@ -149,6 +149,7 @@ fn child_run_for_the_determinism_test() {
 }
 
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     let scratch = Scratch::new("determinism");
     let overlay = scratch.lab.join("hot.json");
@@ -389,6 +390,7 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
 }
 
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn timing_counts_gate_and_campaign_creature_ticks() {
     let scratch = Scratch::new("timing");
     let mut gate_only = tiny(&scratch.lab.join("gate"));
@@ -776,6 +778,7 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
 }
 
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn an_arm_with_its_own_genome_file_labels_its_verdict_with_that_start() {
     let scratch = Scratch::new("arm-verdict-start");
     let (overlay, genome_path, _) = hot_arm_files(&scratch);
@@ -1030,6 +1033,7 @@ fn a_v3_summary_renders_without_the_ladder() {
 }
 
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn a_v2_summary_renders_without_readings_and_a_v4_summary_renders_readings_and_the_ladder() {
     // The T22.F02 wall summary as committed at df2ddbe3 (summary_version 2).
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/summary-v2-wall.json");
@@ -1107,6 +1111,7 @@ fn tiny_argv(subcommand: &str, out: &Path) -> Vec<String> {
 /// T21.F06: `run` and `why-not` return the plain measurement of the
 /// `summary.json` they wrote; `report` returns none.
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn execute_returns_the_measurement_of_the_written_summary() {
     use v3_lab::cli::{execute_with_root, Cli};
     use v3_lab::output::SUMMARY;
@@ -1148,6 +1153,7 @@ fn execute_returns_the_measurement_of_the_written_summary() {
 /// off, `timing` aside.
 #[cfg(feature = "telemetry")]
 #[test]
+#[ignore = "slow tier: lab end-to-end run; run with make rust-test-slow"]
 fn the_lab_command_records_one_measurement_after_its_run() {
     use v3_telemetry::testing::Receiver;
 

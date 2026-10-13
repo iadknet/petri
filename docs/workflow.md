@@ -442,7 +442,7 @@ reason, and picks the cheapest plan that answers the feature's question.
 
 | Slow tests (`make rust-test-slow`) | Declare for |
 | --- | --- |
-| `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move |
+| `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move; or a change to `crates/v3-lab`: the tier holds the lab's end-to-end runs |
 | `not run` | everything else |
 
 The slow tier holds `#[ignore]` tests marked `slow tier`, kept out of
