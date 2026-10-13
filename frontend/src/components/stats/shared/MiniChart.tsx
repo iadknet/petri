@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { currentDevicePixelRatio, watchDevicePixelRatio } from "../../../canvas/dpr.ts";
 
 const INSET = 2;
 
@@ -34,6 +35,7 @@ export const MiniChart = memo(function MiniChart({
 }: { data: { tick: number; value: number }[]; color: string; height?: number }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [width, setWidth] = useState(0);
+	const [dpr, setDpr] = useState(currentDevicePixelRatio);
 
 	const summary = useMemo(() => {
 		if (data.length < 2) return null;
@@ -61,10 +63,12 @@ export const MiniChart = memo(function MiniChart({
 		return () => ro.disconnect();
 	}, []);
 
+	// Browser zoom or a move to another display changes the ratio without a resize.
+	useEffect(() => watchDevicePixelRatio(setDpr), []);
+
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || width <= 0) return;
-		const dpr = window.devicePixelRatio || 1;
 		canvas.width = Math.round(width * dpr);
 		canvas.height = Math.round(height * dpr);
 
@@ -84,7 +88,7 @@ export const MiniChart = memo(function MiniChart({
 			else ctx.lineTo(p.x, p.y);
 		}
 		ctx.stroke();
-	}, [summary, color, width, height]);
+	}, [summary, color, width, height, dpr]);
 
 	const label = summary
 		? summary.constant
