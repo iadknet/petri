@@ -204,14 +204,10 @@ export function UnifiedInspector({
 
 				{/* Controls header */}
 				<MeshControls
-					backendFilter={mesh.backendFilter}
 					focusMode={mesh.focusMode}
 					dimUnreachable={mesh.dimUnreachable}
-					onBackendFilterChange={mesh.setBackendFilter}
 					onFocusModeChange={mesh.setFocusMode}
 					onDimUnreachableChange={mesh.setDimUnreachable}
-					onFitView={mesh.meshController.requestFitView}
-					onResetView={mesh.meshController.requestResetView}
 				/>
 
 				{/* Canvas — shrinks to fit, minimum 120px so nodes stay visible */}

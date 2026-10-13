@@ -56,7 +56,6 @@ export function PaintToolbar() {
 						onClick={() => setTool(t.id)}
 						title={t.title}
 						aria-pressed={tool === t.id}
-						aria-label={t.title}
 						className={`px-2 py-1 text-xs rounded transition-colors ${
 							tool === t.id
 								? "bg-emerald-600 text-white"
