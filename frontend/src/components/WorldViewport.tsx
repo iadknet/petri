@@ -200,6 +200,8 @@ export function WorldViewport() {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (isEditableTarget(e.target)) return;
+			// Leave keys a focused widget already handled, and browser/system shortcuts, alone.
+			if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
 			if (e.key === "Home" && rendererRef.current) {
 				const frame = useWorldViewStore.getState().frame;
 				if (frame) {
