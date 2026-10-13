@@ -116,7 +116,25 @@ describe("buildRenderModel", () => {
 			predationEvents: [],
 			camera: { x: 8, y: 4, zoom: 3 },
 			fertilityOverlay: null,
+			maxEnergy: null,
 		});
+	});
+
+	it("passes the configured max energy through for energy bars", () => {
+		const result = buildRenderModel({
+			frame: { width: 2, height: 2, creatures: [], food: [], barriers: [] },
+			overviewView: null,
+			worldStatic: null,
+			tick: 1,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 1 },
+			fertilityGrid: null,
+			fertilityRevision: 0,
+			showFertilityOverlay: false,
+			maxEnergy: 200,
+		});
+
+		expect(result?.maxEnergy).toBe(200);
 	});
 
 	it("includes fertility overlay when enabled and grid is present", () => {

@@ -1,6 +1,7 @@
 import type { Creature, FoodTypeMetadata, Frame, PaintTool } from "../types/api.ts";
 import {
 	type CameraState,
+	type CanvasSize,
 	canvasToViewportPoint,
 	canvasToWorldPoint,
 	centerCameraOnWorldPoint,
@@ -9,6 +10,7 @@ import {
 	zoomCameraAtCanvasPoint,
 	zoomCameraFromCenter,
 } from "./camera.ts";
+import { backingStoreSize } from "./dpr.ts";
 import { FlashOverlay } from "./flash-overlay.ts";
 import type { FertilityOverlay, OverviewRenderLayer, RenderModel } from "./renderModel.ts";
 
@@ -22,10 +24,21 @@ const BARRIER_R = 139;
 const BARRIER_G = 69;
 const BARRIER_B = 19;
 
-/** Fertility overlay: barren color (reddish-brown) */
+/** Barrier hatch color: darker rust, drawn as a texture so walls do not rely on hue alone */
+const BARRIER_HATCH_R = 66;
+const BARRIER_HATCH_G = 30;
+const BARRIER_HATCH_B = 6;
+
+/** Fertility overlay: barren color (violet), distinct from the rust barrier color */
 const FERT_BARREN_R = 139;
-const FERT_BARREN_G = 69;
-const FERT_BARREN_B = 19;
+const FERT_BARREN_G = 92;
+const FERT_BARREN_B = 246;
+
+export const BARRIER_RGB = [BARRIER_R, BARRIER_G, BARRIER_B] as const;
+export const FERT_BARREN_RGB = [FERT_BARREN_R, FERT_BARREN_G, FERT_BARREN_B] as const;
+
+const BARRIER_FILL = `rgb(${BARRIER_R},${BARRIER_G},${BARRIER_B})`;
+const BARRIER_HATCH = `rgb(${BARRIER_HATCH_R},${BARRIER_HATCH_G},${BARRIER_HATCH_B})`;
 
 /** Fertility overlay: fertile color (green) */
 const FERT_FERTILE_R = 34;
@@ -34,6 +47,56 @@ const FERT_FERTILE_B = 94;
 
 /** Fertility overlay alpha (0-1). Semi-transparent so terrain shows through. */
 const FERT_ALPHA = 0.35;
+
+/** Precomputed fillStyle per u8 fertility value; null where the overlay is transparent. */
+const FERTILITY_FILL_STYLES: (string | null)[] = Array.from({ length: 256 }, (_, value) => {
+	if (value === 128) return null;
+	const [r, g, b, a] = fertilityColor(value);
+	return a > 0 ? `rgba(${r},${g},${b},${a})` : null;
+});
+
+/** Food density steps used to share fillStyle strings between cells. */
+const FOOD_DENSITY_STEPS = 64;
+/** Bound on cached creature colour strings before the cache is reset. */
+const MAX_CREATURE_STYLE_CACHE = 4096;
+
+/**
+ * Fraction of the energy bar to fill, scaled by the configured max energy.
+ * Returns null when the max is unknown, so no bar is drawn rather than a guessed one.
+ */
+export function energyBarFraction(
+	energy: number,
+	maxEnergy: number | null | undefined,
+): number | null {
+	if (maxEnergy == null || !Number.isFinite(maxEnergy) || maxEnergy <= 0) return null;
+	return Math.max(0, Math.min(1, energy / maxEnergy));
+}
+
+export interface CellBounds {
+	startX: number;
+	startY: number;
+	endX: number;
+	endY: number;
+}
+
+/** World cells intersecting the viewport, as half-open ranges clamped to the world. */
+export function visibleCellBounds(
+	camera: CameraState,
+	view: CanvasSize,
+	world: CanvasSize,
+): CellBounds {
+	const { x: cx, y: cy, zoom } = camera;
+	return {
+		startX: Math.max(0, Math.floor(-cx / zoom)),
+		startY: Math.max(0, Math.floor(-cy / zoom)),
+		endX: Math.min(world.width, Math.ceil((view.width - cx) / zoom)),
+		endY: Math.min(world.height, Math.ceil((view.height - cy) / zoom)),
+	};
+}
+
+function inBounds(bounds: CellBounds, x: number, y: number): boolean {
+	return x >= bounds.startX && x < bounds.endX && y >= bounds.startY && y < bounds.endY;
+}
 
 /**
  * Map a u8 fertility value to an RGBA color.
@@ -154,17 +217,27 @@ export class WorldRenderer {
 	private selectedCreatureId: number | null = null;
 	private fertilityBlendCache: FertilityBlendCache | null = null;
 	private overviewFoodCache: OverviewFoodCache | null = null;
+	/** Canvas size in CSS pixels; camera coordinates live in this space. */
+	private viewWidth: number;
+	private viewHeight: number;
+	private pixelRatio = 1;
+	private foodTypeColorsRef: FoodTypeMetadata[] | null = null;
+	private foodTypeColors = new Map<number, [number, number, number]>();
+	private foodStyleCache = new Map<number, string>();
+	private creatureStyleCache = new Map<number, string>();
 
 	constructor(canvas: HTMLCanvasElement, getRenderModel: () => RenderModel | null) {
 		this.canvas = canvas;
 		this.ctx = canvas.getContext("2d", { alpha: false })!;
 		this.getRenderModel = getRenderModel;
+		this.viewWidth = canvas.width;
+		this.viewHeight = canvas.height;
 	}
 
 	start(): void {
-		const loop = () => {
+		const loop = (timestamp: number) => {
 			this.rafId = requestAnimationFrame(loop);
-			this.render();
+			this.render(timestamp);
 		};
 		this.rafId = requestAnimationFrame(loop);
 	}
@@ -173,22 +246,32 @@ export class WorldRenderer {
 		cancelAnimationFrame(this.rafId);
 	}
 
-	resize(width: number, height: number): void {
-		this.canvas.width = width;
-		this.canvas.height = height;
+	/**
+	 * Resize to a CSS-pixel size. The backing store is scaled by devicePixelRatio
+	 * so the map renders crisp; drawing and camera math stay in CSS pixels.
+	 */
+	resize(width: number, height: number, pixelRatio = 1): void {
+		const backing = backingStoreSize(width, height, pixelRatio);
+		this.viewWidth = width;
+		this.viewHeight = height;
+		this.pixelRatio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
+		this.canvas.width = backing.width;
+		this.canvas.height = backing.height;
+		this.invalidate();
+	}
+
+	private get viewSize(): CanvasSize {
+		return { width: this.viewWidth, height: this.viewHeight };
 	}
 
 	fitToWorld(worldWidth: number, worldHeight: number): CameraState {
-		return fitCameraToWorld(
-			{ width: this.canvas.width, height: this.canvas.height },
-			{ width: worldWidth, height: worldHeight },
-		);
+		return fitCameraToWorld(this.viewSize, { width: worldWidth, height: worldHeight });
 	}
 
 	zoomAt(camera: CameraState, clientX: number, clientY: number, delta: number): CameraState {
 		const rect = this.canvas.getBoundingClientRect();
-		const scaleX = this.canvas.width / rect.width;
-		const scaleY = this.canvas.height / rect.height;
+		const scaleX = this.viewWidth / rect.width;
+		const scaleY = this.viewHeight / rect.height;
 		const canvasPoint = {
 			x: (clientX - rect.left) * scaleX,
 			y: (clientY - rect.top) * scaleY,
@@ -198,11 +281,7 @@ export class WorldRenderer {
 	}
 
 	zoomCenter(camera: CameraState, delta: number): CameraState {
-		return zoomCameraFromCenter(
-			camera,
-			{ width: this.canvas.width, height: this.canvas.height },
-			delta,
-		);
+		return zoomCameraFromCenter(camera, this.viewSize, delta);
 	}
 
 	pan(camera: CameraState, dx: number, dy: number): CameraState {
@@ -210,11 +289,7 @@ export class WorldRenderer {
 	}
 
 	centerOn(worldX: number, worldY: number, zoom?: number): CameraState {
-		return centerCameraOnWorldPoint(
-			{ width: this.canvas.width, height: this.canvas.height },
-			{ x: worldX, y: worldY },
-			zoom,
-		);
+		return centerCameraOnWorldPoint(this.viewSize, { x: worldX, y: worldY }, zoom);
 	}
 
 	resetView(frame: Frame): CameraState {
@@ -222,11 +297,11 @@ export class WorldRenderer {
 	}
 
 	canvasToWorld(camera: CameraState, clientX: number, clientY: number): { x: number; y: number } {
-		return canvasToWorldPoint(this.canvas, camera, clientX, clientY);
+		return canvasToWorldPoint(this.canvas, camera, clientX, clientY, this.viewSize);
 	}
 
 	canvasToViewport(canvasX: number, canvasY: number): { x: number; y: number } {
-		return canvasToViewportPoint(this.canvas, { x: canvasX, y: canvasY });
+		return canvasToViewportPoint(this.canvas, { x: canvasX, y: canvasY }, this.viewSize);
 	}
 
 	/** Force re-render on next frame (e.g. after camera change) */
@@ -262,16 +337,17 @@ export class WorldRenderer {
 		return this.offscreenCtx!;
 	}
 
-	private render(): void {
+	/** Draw one frame. `now` is a performance.now()-based timestamp (rAF passes one). */
+	render(now: number = performance.now()): void {
 		const model = this.getRenderModel();
 		if (!model) return;
 
 		const { frame, overview, tick, predationEvents, camera, fertilityOverlay } = model;
 
 		if (tick !== this.lastRenderedTick) {
-			this.flashOverlay.update(predationEvents, frame.width);
+			this.flashOverlay.update(predationEvents, frame.width, now);
 		} else {
-			this.flashOverlay.update([], frame.width);
+			this.flashOverlay.update([], frame.width, now);
 		}
 
 		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
@@ -280,20 +356,22 @@ export class WorldRenderer {
 		}
 		this.lastRenderedTick = tick;
 
-		const { ctx, canvas } = this;
+		const { ctx } = this;
 		const { zoom } = camera;
+		ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
 		if (zoom < RECT_MODE_THRESHOLD) {
 			this.renderPixelMode(frame, model.foodTypes, camera, overview, fertilityOverlay);
 		} else {
 			ctx.fillStyle = "#020617";
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
+			ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
 			this.renderRectMode(
 				frame,
 				model.foodTypes,
 				camera,
 				zoom >= DETAIL_MODE_THRESHOLD,
 				fertilityOverlay,
+				model.maxEnergy ?? null,
 			);
 		}
 	}
@@ -305,11 +383,11 @@ export class WorldRenderer {
 		overview: OverviewRenderLayer | null,
 		fertilityOverlay: FertilityOverlay | null,
 	): void {
-		const { ctx, canvas } = this;
+		const { ctx } = this;
 		const { width, height } = frame;
 
 		ctx.fillStyle = "#020617";
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
 
 		const img = this.ensureImageData(width, height);
 		const data = img.data;
@@ -325,7 +403,7 @@ export class WorldRenderer {
 		if (overview) {
 			this.drawOverviewPixels(data, width, height, overview);
 		} else {
-			const foodTypeColors = buildFoodTypeColorMap(foodTypes);
+			const foodTypeColors = this.ensureFoodTypeColors(foodTypes);
 			for (const food of frame.food) {
 				const density = Math.max(0, Math.min(1, food.density));
 				const alpha = foodOpacity(density);
@@ -344,9 +422,11 @@ export class WorldRenderer {
 
 		for (const barrier of frame.barriers) {
 			const idx = (barrier.y * width + barrier.x) * 4;
-			data[idx] = BARRIER_R;
-			data[idx + 1] = BARRIER_G;
-			data[idx + 2] = BARRIER_B;
+			// Checkered texture: walls read as a pattern, not only as a hue.
+			const hatch = ((barrier.x + barrier.y) & 1) === 1;
+			data[idx] = hatch ? BARRIER_HATCH_R : BARRIER_R;
+			data[idx + 1] = hatch ? BARRIER_HATCH_G : BARRIER_G;
+			data[idx + 2] = hatch ? BARRIER_HATCH_B : BARRIER_B;
 			data[idx + 3] = 255;
 		}
 
@@ -522,18 +602,21 @@ export class WorldRenderer {
 		camera: CameraState,
 		detailed: boolean,
 		fertilityOverlay: FertilityOverlay | null,
+		maxEnergy: number | null,
 	): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
-		const foodTypeColors = buildFoodTypeColorMap(foodTypes);
+		const bounds = visibleCellBounds(camera, this.viewSize, frame);
+		if (bounds.startX >= bounds.endX || bounds.startY >= bounds.endY) {
+			return;
+		}
+		this.ensureFoodTypeColors(foodTypes);
 
 		for (const food of frame.food) {
-			const density = Math.max(0, Math.min(1, food.density));
-			const alpha = foodOpacity(density);
-			if (alpha <= 0) continue;
-			const [baseR, baseG, baseB] = resolveFoodTypeColor(foodTypeColors, food.type_idx);
-			const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, density);
-			ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+			if (!inBounds(bounds, food.x, food.y)) continue;
+			const style = this.foodFillStyle(food.type_idx, food.density);
+			if (style === null) continue;
+			ctx.fillStyle = style;
 			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
 		}
 
@@ -541,25 +624,37 @@ export class WorldRenderer {
 			this.drawFertilityRects(fertilityOverlay, camera);
 		}
 
-		ctx.fillStyle = `rgb(${BARRIER_R},${BARRIER_G},${BARRIER_B})`;
+		ctx.fillStyle = BARRIER_FILL;
+		let visibleBarriers = 0;
 		for (const barrier of frame.barriers) {
+			if (!inBounds(bounds, barrier.x, barrier.y)) continue;
 			ctx.fillRect(cx + barrier.x * zoom, cy + barrier.y * zoom, zoom, zoom);
+			visibleBarriers++;
+		}
+		if (visibleBarriers > 0) {
+			this.drawBarrierHatch(frame, bounds, camera);
 		}
 
 		for (const creature of frame.creatures) {
-			const [r, g, b] = creature.phenotype_rgb;
-			ctx.fillStyle = `rgb(${r},${g},${b})`;
+			if (!inBounds(bounds, creature.x, creature.y)) continue;
+			ctx.fillStyle = this.creatureFillStyle(creature.phenotype_rgb);
 			ctx.fillRect(cx + creature.x * zoom + 0.5, cy + creature.y * zoom + 0.5, zoom - 1, zoom - 1);
 
 			if (detailed) {
-				this.drawCreatureDetail(creature, cx + creature.x * zoom, cy + creature.y * zoom, zoom);
+				this.drawCreatureDetail(
+					creature,
+					cx + creature.x * zoom,
+					cy + creature.y * zoom,
+					zoom,
+					maxEnergy,
+				);
 			}
 		}
 
 		this.flashOverlay.drawRects(ctx, camera);
 
 		if (detailed) {
-			this.drawGrid(frame.width, frame.height, camera);
+			this.drawGrid(bounds, camera);
 		}
 
 		if (this.previewCells && this.previewTool) {
@@ -569,6 +664,7 @@ export class WorldRenderer {
 				const sep = key.indexOf(",");
 				const px = Number.parseInt(key.substring(0, sep), 10);
 				const py = Number.parseInt(key.substring(sep + 1), 10);
+				if (!inBounds(bounds, px, py)) continue;
 				ctx.fillRect(cx + px * zoom, cy + py * zoom, zoom, zoom);
 			}
 		}
@@ -583,11 +679,18 @@ export class WorldRenderer {
 		}
 	}
 
-	private drawCreatureDetail(creature: Creature, px: number, py: number, cellSize: number): void {
+	private drawCreatureDetail(
+		creature: Creature,
+		px: number,
+		py: number,
+		cellSize: number,
+		maxEnergy: number | null,
+	): void {
 		const { ctx } = this;
+		const energyRatio = energyBarFraction(creature.energy, maxEnergy);
+		if (energyRatio === null) return;
 		const barHeight = Math.max(2, cellSize * 0.15);
 		const barWidth = cellSize - 1;
-		const energyRatio = Math.min(1, creature.energy / 100);
 
 		ctx.fillStyle = "rgba(0,0,0,0.6)";
 		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth, barHeight);
@@ -596,24 +699,94 @@ export class WorldRenderer {
 		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth * energyRatio, barHeight);
 	}
 
-	private drawGrid(worldWidth: number, worldHeight: number, camera: CameraState): void {
+	private drawGrid(bounds: CellBounds, camera: CameraState): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
+		const top = cy + bounds.startY * zoom;
+		const bottom = cy + bounds.endY * zoom;
+		const left = cx + bounds.startX * zoom;
+		const right = cx + bounds.endX * zoom;
 
 		ctx.strokeStyle = "rgba(148,163,184,0.1)";
 		ctx.lineWidth = 0.5;
 		ctx.beginPath();
-		for (let x = 0; x <= worldWidth; x++) {
+		for (let x = bounds.startX; x <= bounds.endX; x++) {
 			const px = cx + x * zoom;
-			ctx.moveTo(px, cy);
-			ctx.lineTo(px, cy + worldHeight * zoom);
+			ctx.moveTo(px, top);
+			ctx.lineTo(px, bottom);
 		}
-		for (let y = 0; y <= worldHeight; y++) {
+		for (let y = bounds.startY; y <= bounds.endY; y++) {
 			const py = cy + y * zoom;
-			ctx.moveTo(cx, py);
-			ctx.lineTo(cx + worldWidth * zoom, py);
+			ctx.moveTo(left, py);
+			ctx.lineTo(right, py);
 		}
 		ctx.stroke();
+	}
+
+	/** Diagonal hatch on visible barrier cells: a non-colour cue that separates walls from barren ground. */
+	private drawBarrierHatch(frame: Frame, bounds: CellBounds, camera: CameraState): void {
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+		ctx.strokeStyle = BARRIER_HATCH;
+		ctx.lineWidth = Math.max(1, zoom * 0.12);
+		ctx.beginPath();
+		for (const barrier of frame.barriers) {
+			if (!inBounds(bounds, barrier.x, barrier.y)) continue;
+			const left = cx + barrier.x * zoom;
+			const top = cy + barrier.y * zoom;
+			ctx.moveTo(left, top + zoom);
+			ctx.lineTo(left + zoom, top);
+			ctx.moveTo(left, top + zoom / 2);
+			ctx.lineTo(left + zoom / 2, top);
+			ctx.moveTo(left + zoom / 2, top + zoom);
+			ctx.lineTo(left + zoom, top + zoom / 2);
+		}
+		ctx.stroke();
+	}
+
+	/** Food type colours, rebuilt only when the food type list changes. */
+	private ensureFoodTypeColors(
+		foodTypes: FoodTypeMetadata[],
+	): Map<number, [number, number, number]> {
+		if (this.foodTypeColorsRef !== foodTypes) {
+			this.foodTypeColorsRef = foodTypes;
+			this.foodTypeColors = buildFoodTypeColorMap(foodTypes);
+			this.foodStyleCache.clear();
+		}
+		return this.foodTypeColors;
+	}
+
+	/** Cached fillStyle for a food cell, with density quantised so strings are shared. */
+	private foodFillStyle(typeIdx: number, rawDensity: number): string | null {
+		const density = Math.max(0, Math.min(1, rawDensity));
+		const step = Math.round(density * FOOD_DENSITY_STEPS);
+		if (step <= 0) return null;
+		const key = typeIdx * (FOOD_DENSITY_STEPS + 1) + step;
+		let style = this.foodStyleCache.get(key);
+		if (style === undefined) {
+			const quantised = step / FOOD_DENSITY_STEPS;
+			const alpha = foodOpacity(quantised);
+			const [baseR, baseG, baseB] = resolveFoodTypeColor(this.foodTypeColors, typeIdx);
+			const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, quantised);
+			style = `rgba(${r},${g},${b},${alpha})`;
+			this.foodStyleCache.set(key, style);
+		}
+		return style;
+	}
+
+	/** Cached fillStyle for a creature phenotype colour. */
+	private creatureFillStyle(rgb: [number, number, number]): string {
+		const [r, g, b] = rgb;
+		const key = (r << 16) | (g << 8) | b;
+		let style = this.creatureStyleCache.get(key);
+		if (style === undefined) {
+			if (this.creatureStyleCache.size >= MAX_CREATURE_STYLE_CACHE) {
+				this.creatureStyleCache.clear();
+			}
+			style = `rgb(${r},${g},${b})`;
+			this.creatureStyleCache.set(key, style);
+		}
+		return style;
 	}
 
 	private blendFertilityPixels(data: Uint8ClampedArray, overlay: FertilityOverlay): void {
@@ -683,23 +856,22 @@ export class WorldRenderer {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
 		const { worldGrid, worldWidth, worldHeight } = overlay;
-		const viewportStartX = Math.max(0, Math.floor(-cx / zoom));
-		const viewportStartY = Math.max(0, Math.floor(-cy / zoom));
-		const viewportEndX = Math.min(worldWidth, Math.ceil((this.canvas.width - cx) / zoom));
-		const viewportEndY = Math.min(worldHeight, Math.ceil((this.canvas.height - cy) / zoom));
+		const {
+			startX: viewportStartX,
+			startY: viewportStartY,
+			endX: viewportEndX,
+			endY: viewportEndY,
+		} = visibleCellBounds(camera, this.viewSize, { width: worldWidth, height: worldHeight });
 		if (viewportStartX >= viewportEndX || viewportStartY >= viewportEndY) {
 			return;
 		}
 
-		// PERF: fillStyle string parsing is expensive per-cell. Consider batching
-		// by alpha bucket or using an offscreen canvas for large worlds.
 		for (let y = viewportStartY; y < viewportEndY; y++) {
 			for (let x = viewportStartX; x < viewportEndX; x++) {
 				const value = worldGrid[y * worldWidth + x] ?? 128;
-				if (value === 128) continue;
-				const [r, g, b, a] = fertilityColor(value);
-				if (a <= 0) continue;
-				ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+				const style = FERTILITY_FILL_STYLES[value];
+				if (!style) continue;
+				ctx.fillStyle = style;
 				ctx.fillRect(cx + x * zoom, cy + y * zoom, zoom, zoom);
 			}
 		}
