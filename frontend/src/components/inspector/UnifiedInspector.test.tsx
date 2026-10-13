@@ -132,6 +132,17 @@ describe("UnifiedInspector", () => {
 		expect(region).toContainElement(heading);
 	});
 
+	it("straddles the inspector border with a 24px resize handle that covers no content", () => {
+		render(<UnifiedInspector {...defaultProps} />);
+		const handle = screen.getByRole("separator", { name: "Resize inspector" });
+		expect(targetSize(handle).width).toBeGreaterThanOrEqual(24);
+		expect(handle.className).toMatch(/(^|\s)-left-3(\s|$)/);
+		expect(screen.getByRole("complementary", { name: "Creature Inspector" })).toContainElement(
+			handle,
+		);
+		expect(screen.getByTestId("unified-inspector")).not.toContainElement(handle);
+	});
+
 	it("renders the unified layout with vitals, canvas, node inspector, and sampler bar", () => {
 		render(<UnifiedInspector {...defaultProps} />);
 
