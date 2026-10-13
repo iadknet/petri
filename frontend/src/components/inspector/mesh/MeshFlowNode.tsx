@@ -44,7 +44,7 @@ export const MeshFlowNode = memo(function MeshFlowNode(props: NodeProps) {
 				/>
 			) : null}
 			{data.active ? (
-				<div className="pointer-events-none absolute inset-[-4px] rounded-[10px] border border-amber-400/60 animate-[pulse_1.5s_ease-in-out_infinite] shadow-[0_0_12px_rgba(250,204,21,0.25)]" />
+				<div className="pointer-events-none absolute inset-[-4px] rounded-[10px] border border-amber-400/60 animate-[pulse_1.5s_ease-in-out_infinite] motion-reduce:animate-none shadow-[0_0_12px_rgba(250,204,21,0.25)]" />
 			) : null}
 			{data.hasSharedMemory ? (
 				<div

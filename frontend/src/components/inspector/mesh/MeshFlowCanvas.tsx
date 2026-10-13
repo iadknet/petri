@@ -9,6 +9,7 @@ import {
 	useReactFlow,
 } from "@xyflow/react";
 import { memo, useEffect, useMemo } from "react";
+import { prefersReducedMotion } from "../../../hooks/usePrefersReducedMotion.ts";
 import type { MeshFocusMode } from "../../../stores/inspectorWorkspace.ts";
 import { MeshFlowEdge } from "./MeshFlowEdge.tsx";
 import { MeshFlowNode } from "./MeshFlowNode.tsx";
@@ -29,6 +30,10 @@ const NODE_TYPES = {
 const EDGE_TYPES = {
 	meshEdge: MeshFlowEdge,
 } satisfies EdgeTypes;
+
+function viewportDuration(): number {
+	return prefersReducedMotion() ? 0 : 180;
+}
 
 interface MeshFlowCanvasProps {
 	analysis: MeshAnalysis;
@@ -87,7 +92,7 @@ const MeshFlowScene = memo(function MeshFlowScene({
 		}
 
 		requestAnimationFrame(() => {
-			reactFlow.fitView({ duration: 180, padding: 0.18 });
+			reactFlow.fitView({ duration: viewportDuration(), padding: 0.18 });
 		});
 	}, [layout.topologyKey, reactFlow]);
 
@@ -99,7 +104,7 @@ const MeshFlowScene = memo(function MeshFlowScene({
 		requestAnimationFrame(() => {
 			if (viewportCommand.kind === "reset") {
 				reactFlow.setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 0 });
-				reactFlow.fitView({ duration: 180, padding: 0.18 });
+				reactFlow.fitView({ duration: viewportDuration(), padding: 0.18 });
 				return;
 			}
 			if (viewportCommand.kind === "center-node") {
@@ -112,12 +117,12 @@ const MeshFlowScene = memo(function MeshFlowScene({
 					targetNode.y + targetNode.height / 2,
 					{
 						zoom: Math.max(reactFlow.getZoom(), 0.9),
-						duration: 180,
+						duration: viewportDuration(),
 					},
 				);
 				return;
 			}
-			reactFlow.fitView({ duration: 180, padding: 0.18 });
+			reactFlow.fitView({ duration: viewportDuration(), padding: 0.18 });
 		});
 	}, [layout.nodesById, reactFlow, viewportCommand]);
 
