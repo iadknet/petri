@@ -33,18 +33,19 @@ fn fixture(weight: f32) -> CreatureGenome {
 }
 
 #[test]
-fn refinement_configuration_is_opt_in_and_omission_is_false() {
+fn refinement_configuration_defaults_on_and_off_skips_without_a_draw() {
     let mut value = serde_json::to_value(MutationConfig::default()).unwrap();
-    assert_eq!(value["structured_heritable_refinement"], false);
+    assert_eq!(value["structured_heritable_refinement"], true);
     value
         .as_object_mut()
         .unwrap()
         .remove("structured_heritable_refinement");
     let omitted: MutationConfig = serde_json::from_value(value.clone()).unwrap();
-    assert!(!omitted.structured_heritable_refinement);
-    value["structured_heritable_refinement"] = serde_json::json!(true);
-    let enabled: MutationConfig = serde_json::from_value(value).unwrap();
-    assert!(GraphOperator::RefineHeritableStructure.enabled(&enabled));
+    assert!(omitted.structured_heritable_refinement);
+    assert!(GraphOperator::RefineHeritableStructure.enabled(&omitted));
+    value["structured_heritable_refinement"] = serde_json::json!(false);
+    let disabled: MutationConfig = serde_json::from_value(value).unwrap();
+    assert!(!GraphOperator::RefineHeritableStructure.enabled(&disabled));
     let original = fixture(0.0);
     let mut genome = original.clone();
     let mut rng = SmallRng::seed_from_u64(3);
@@ -55,7 +56,7 @@ fn refinement_configuration_is_opt_in_and_omission_is_false() {
             GraphOperator::RefineHeritableStructure,
             &mut TargetSelector::reachable_only(&[0], 0.0),
             &mut rng,
-            &omitted
+            &disabled
         ),
         Err(MutationSkipReason::NoApplicableTarget)
     );

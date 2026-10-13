@@ -4,7 +4,13 @@ use rand::{rngs::SmallRng, SeedableRng};
 
 #[test]
 fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
-    let config = MutationConfig::default();
+    // Both T20 input mechanisms are on by default since 2026-10-12; this pin
+    // keeps reading the path with them off, which must add no draw.
+    let config = MutationConfig {
+        neutral_input_recruitment: crate::config::NeutralInputRecruitment::Off,
+        structured_heritable_refinement: false,
+        ..MutationConfig::default()
+    };
     let mut hash = 0xcbf29ce484222325u64;
     for seed in 0..256 {
         let mut genome = v3alpha1_founder_genome();
@@ -42,12 +48,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // (11747062888261140569 -> 13078250158860285847).
     assert_eq!(
         hash, 13078250158860285847,
-        "pin of the recruitment-Off production path"
+        "pin of the recruitment-Off path"
     );
 }
 
 #[test]
-fn recruitment_configuration_accepts_opt_in_and_defaults_to_off() {
+fn recruitment_configuration_accepts_every_arm_and_defaults_to_whole_family() {
     let original = serde_json::to_value(MutationConfig::default()).unwrap();
     for arm in ["Off", "SingleChannel", "WholeFamily"] {
         let mut json = original.clone();
@@ -66,7 +72,11 @@ fn recruitment_configuration_accepts_opt_in_and_defaults_to_off() {
     let decoded: MutationConfig = serde_json::from_value(omitted).unwrap();
     assert_eq!(
         serde_json::to_value(decoded).unwrap()["neutral_input_recruitment"],
-        "Off"
+        "WholeFamily"
+    );
+    assert_eq!(
+        MutationConfig::default().neutral_input_recruitment,
+        crate::config::NeutralInputRecruitment::WholeFamily
     );
 }
 

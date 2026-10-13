@@ -212,6 +212,10 @@ fn value_digest(value: &serde_json::Value) -> String {
 /// The effort-cost defaults (2026-10-10) re-pinned all three after two
 /// agreeing runs: `noop_cost` 0.4, `reproduce_attempt_cost` 1.0 and
 /// `move_cost` 1.6; restoring 0.05, 0.05 and 0.2 recovers the T16.F02 digests.
+/// The input-mechanism defaults (2026-10-12) re-pinned all three after two
+/// agreeing runs: `mutation.structured_heritable_refinement` true and
+/// `mutation.neutral_input_recruitment` WholeFamily; restoring false and Off
+/// recovers the effort-cost digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -227,6 +231,29 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:896d889fe6c01f65db02a96d38d6d8caa55622b68fb28e1e6132b78f49ecac2d",
+            "sha256:9044de717582124cab29ae2968dfc9f4347628a28c6d052a628de06ef9201c80",
+            "sha256:c0f2746541353555fd285c95b41407833d4b272da67cf64c96d6e4350329bf30",
+        ]
+    );
+
+    // Undoing the input-mechanism defaults recovers the effort-cost digests.
+    let effort_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        let mutation = value["mutation"].as_object_mut().unwrap();
+        assert_eq!(
+            mutation.insert("structured_heritable_refinement".into(), json!(false)),
+            Some(json!(true))
+        );
+        assert_eq!(
+            mutation.insert("neutral_input_recruitment".into(), json!("Off")),
+            Some(json!("WholeFamily"))
+        );
+        value
+    });
+    assert_eq!(
+        effort_values.each_ref().map(value_digest),
+        [
             "sha256:ff17c388774137ca48df2e21e7e0949f648c1aa6e04799f439cdae7772022a4b",
             "sha256:ece666508c5c6886b80afb723d4651e8092dad5bfcb40650d6873da798193210",
             "sha256:f1752c872a0e45ae9cd74787940be0b29bd38ae7f8c870a0c14c17d563f8c420",
@@ -234,8 +261,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     );
 
     // Undoing the effort-cost defaults recovers the T16.F02 digests.
-    let t16_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let t16_values = effort_values.map(|mut value| {
         let costs = value["energy"]["costs"].as_object_mut().unwrap();
         for (key, now, before) in [
             ("noop_cost", 0.4_f32, 0.05_f32),

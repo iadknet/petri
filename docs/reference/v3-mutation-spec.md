@@ -465,8 +465,9 @@ added/removed/retyped — only their edges are evolvable.
 - `DisableRewardModulation` (remove reward modulation from a modulated node)
 - `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
 - `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
-- `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled only by
-  `mutation.structured_heritable_refinement = true` (omitted means false).
+- `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled by
+  `mutation.structured_heritable_refinement`, true by default since
+  2026-10-12 (omitted means true).
   Select an eligible Graph node with the existing target selector, then one
   semantic group uniformly. The groups contain only existing direct
   `InputLeaf` edges to valid `ActionVote` sinks:
@@ -509,8 +510,9 @@ added/removed/retyped — only their edges are evolvable.
   The two supported engineering layouts do not establish inherited discovery
   or general biological usefulness; T20.F09 owns that qualification.
 
-- `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled only by
-  `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`.
+- `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled by
+  `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`;
+  `"WholeFamily"` is the default since 2026-10-12.
   Select one Graph node through the existing applicable-node and target-bias
   rules, then one admissible source family and one present valid `ActionVote`
   sink occurrence, empty or wired. SingleChannel appends one ordinary edge of

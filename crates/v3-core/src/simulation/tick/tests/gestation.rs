@@ -257,7 +257,11 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // energy above the lowered cap at tick 50, the precondition of the
     // lowered-cap case. Re-seeded by T11.F30 (328 -> 433): the founder
     // heading draws shift every later draw of the run, with the same miss.
-    let mut sim = seed_simulation(cfg, 433);
+    // Re-seeded 2026-10-12 (433 -> 740) when T20.F04 whole-family recruitment
+    // and T20.F05 refinement became defaults and changed every Graph draw;
+    // 740 is the first seed from 433 whose tick-50 state meets the
+    // precondition.
+    let mut sim = seed_simulation(cfg, 740);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {
