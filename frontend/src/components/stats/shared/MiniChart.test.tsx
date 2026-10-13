@@ -58,6 +58,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	globalThis.ResizeObserver = originalRO;
 	Object.defineProperty(window, "devicePixelRatio", { value: originalDpr, configurable: true });
 });
@@ -104,6 +105,33 @@ describe("MiniChart", () => {
 		expect(canvas.width).toBe(800);
 		expect(canvas.height).toBe(120);
 		expect(canvas.style.height).toBe("60px");
+	});
+
+	it("redraws at the new device pixel ratio when only the ratio changes", () => {
+		// Arrange: capture the resolution media-query listener.
+		let fireRatioChange = () => {};
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			media: query,
+			matches: true,
+			addEventListener: (_type: string, listener: () => void) => {
+				fireRatioChange = listener;
+			},
+			removeEventListener: () => {},
+		}));
+		Object.defineProperty(window, "devicePixelRatio", { value: 1, configurable: true });
+		const data = series([1, 2, 3]);
+		render(<MiniChart data={data} color="#fff" height={60} />);
+		resizeTo(400);
+		const canvas = screen.getByRole("img") as HTMLCanvasElement;
+		expect(canvas.width).toBe(400);
+
+		// Act: the window moves to a 2x display; series and width are unchanged.
+		Object.defineProperty(window, "devicePixelRatio", { value: 2, configurable: true });
+		act(() => fireRatioChange());
+
+		// Assert
+		expect(canvas.width).toBe(800);
+		expect(canvas.height).toBe(120);
 	});
 
 	it("draws in CSS pixels across the full measured width, centring a constant series", () => {
