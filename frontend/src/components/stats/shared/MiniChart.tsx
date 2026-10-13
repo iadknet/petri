@@ -105,7 +105,7 @@ export const MiniChart = memo(function MiniChart({
 				{summary && (
 					<div
 						aria-hidden="true"
-						className={`flex shrink-0 flex-col text-right text-[10px] tabular-nums text-slate-400 ${summary.constant ? "justify-center" : "justify-between"}`}
+						className={`flex min-w-16 shrink-0 flex-col text-right text-[10px] tabular-nums text-slate-400 ${summary.constant ? "justify-center" : "justify-between"}`}
 						style={{ height: `${height}px` }}
 					>
 						{summary.constant ? (
