@@ -87,6 +87,7 @@ fn apply(
 
 fn empty_sensor_snapshot() -> SensorSnapshot {
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: 0.0,
             neighbor_food: [0.0; 8],

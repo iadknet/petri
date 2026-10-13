@@ -21,6 +21,7 @@ use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
 use crate::creature::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::sensors::reads::WorldKeySet;
 
 /// One decision-state input (T19.F05), in catalog order: the census key of
 /// the four decision references and `DynamicIntrospection(HopsThisTick)`.
@@ -133,6 +134,69 @@ pub fn creature_sensor_census(
         }
     }
     census
+}
+
+/// The world input keys a creature carries: every `World` reference in a
+/// reachable node's `input_refs`, wired or not. It is a superset of
+/// [`creature_sensor_census`]'s `world_inputs`, since every live read resolves
+/// through a reachable node's own references. Out-of-range indices are skipped.
+#[must_use]
+pub fn creature_declared_world_inputs(
+    genome: &CreatureGenome,
+    reachable_indices: &[usize],
+) -> BTreeSet<WorldInputKey> {
+    reachable_indices
+        .iter()
+        .filter_map(|&node_idx| genome.nodes.get(node_idx))
+        .flat_map(|node| &node.input_refs)
+        .filter_map(|reference| match reference {
+            InputReference::World(key) => Some(*key),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Per world input key of a world's catalog, how many creatures carry it,
+/// wire it and read it (the live sensor census telemetry exports).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SensorUseRow {
+    pub key: WorldInputKey,
+    /// A reachable node's `input_refs` holds the key.
+    pub declared: u64,
+    /// [`creature_sensor_census`] reaches the key: structurally wired, which
+    /// a zero-weight or never-routed wire still is.
+    pub wired: u64,
+    /// The creature's most recent mesh run resolved the key.
+    pub read: u64,
+}
+
+/// Count each catalog key over the creatures' declared, wired and read sets
+/// (in that order per creature), every catalog key present (zeros included)
+/// in `WorldInputKey` order. A key outside the catalog (a food type the world
+/// does not have) is not counted anywhere.
+#[must_use]
+pub fn sensor_use_census<'a>(
+    catalog: &BTreeSet<WorldInputKey>,
+    creatures: impl IntoIterator<Item = [&'a WorldKeySet; 3]>,
+) -> Vec<SensorUseRow> {
+    let keys: Vec<WorldInputKey> = catalog.iter().copied().collect();
+    let mut counts = vec![[0u64; 3]; keys.len()];
+    for sets in creatures {
+        for (key, count) in keys.iter().zip(&mut counts) {
+            for (set, slot) in sets.iter().zip(count.iter_mut()) {
+                *slot += u64::from(set.contains(*key));
+            }
+        }
+    }
+    keys.into_iter()
+        .zip(counts)
+        .map(|(key, [declared, wired, read])| SensorUseRow {
+            key,
+            declared,
+            wired,
+            read,
+        })
+        .collect()
 }
 
 fn census_graph(
@@ -736,6 +800,75 @@ mod tests {
         assert_eq!(labels.len(), two.len(), "no two keys share a label");
     }
 
+    #[test]
+    fn the_founder_declares_the_occupied_ring_without_wiring_it() {
+        let founder = v3alpha1_founder_genome();
+        let reachable = mesh_reachable_nodes(&founder);
+        let declared = creature_declared_world_inputs(&founder, &reachable);
+
+        assert!(
+            declared.contains(&WorldInputKey::NeighborOccupiedRing),
+            "the founder's node 0 lists the occupied ring: {declared:?}"
+        );
+        assert!(
+            !census_of(&founder)
+                .world_inputs
+                .contains(&WorldInputKey::NeighborOccupiedRing),
+            "no founder edge or projection reads it"
+        );
+    }
+
+    #[test]
+    fn declared_inputs_are_the_world_refs_of_reachable_nodes_only_once_each() {
+        let refs = vec![
+            InputReference::World(WorldInputKey::NearbyCreatureCore),
+            InputReference::World(WorldInputKey::NearbyCreatureCore),
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+            InputReference::ActionVotes,
+        ];
+        let genome = graph_node(empty_graph(), refs);
+
+        assert_eq!(
+            creature_declared_world_inputs(&genome, &mesh_reachable_nodes(&genome)),
+            BTreeSet::from([WorldInputKey::NearbyCreatureCore]),
+            "an unwired reference is declared; a non-world reference is not"
+        );
+        assert!(
+            creature_declared_world_inputs(&genome, &[]).is_empty(),
+            "an unreachable node declares nothing"
+        );
+        assert!(
+            creature_declared_world_inputs(&genome, &[7]).is_empty(),
+            "an out-of-range reachable index is skipped"
+        );
+    }
+
+    #[test]
+    fn a_projection_on_a_non_ring_or_missing_reference_wires_nothing() {
+        use crate::creature::genome::cgp::RingProjection;
+        use crate::creature::genome::vote::DirectedVoteKind;
+        let mut graph = empty_graph();
+        graph.projections.push(RingProjection::new(
+            0,
+            DirectedVoteKind::StealEnergy,
+            0,
+            1.0,
+        ));
+        graph
+            .projections
+            .push(RingProjection::new(9, DirectedVoteKind::Move, 0, 1.0));
+        let genome = graph_node(
+            graph,
+            vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+        );
+
+        assert!(census_of(&genome).world_inputs.is_empty());
+        assert_eq!(
+            creature_declared_world_inputs(&genome, &mesh_reachable_nodes(&genome)),
+            BTreeSet::from([WorldInputKey::NearbyCreatureCore])
+        );
+    }
+
     fn world_key_strategy() -> impl Strategy<Value = WorldInputKey> {
         prop_oneof![
             (0u16..3).prop_map(|i| WorldInputKey::food_here(OrdinaryFoodTypeId::new(i))),
@@ -761,6 +894,9 @@ mod tests {
         });
         graph_node(graph, refs.to_vec())
     }
+
+    /// One proptest creature: genome, reachable nodes and read set.
+    type Built = (CreatureGenome, Vec<usize>, WorldKeySet);
 
     proptest! {
         /// The census is the set of world keys the drawn live references
@@ -806,6 +942,134 @@ mod tests {
             let doubled_census = census_of(&graph_reading_refs(&refs, &doubled));
             prop_assert_eq!(&doubled_census.world_inputs, &expected);
             prop_assert!(!census.reads_any_stateful());
+        }
+
+        /// Whatever a creature wires it also declares: a graph leaf, a VM
+        /// read and a ring projection each resolve through the node's own
+        /// `input_refs`. The declared set is exactly the world references of
+        /// the reachable nodes, the oracle built here from the refs alone.
+        #[test]
+        fn wired_inputs_are_always_declared(
+            graph_refs in proptest::collection::vec(
+                prop_oneof![
+                    world_key_strategy().prop_map(InputReference::World),
+                    Just(InputReference::ActionVotes),
+                ],
+                0..6usize,
+            ),
+            vm_refs in proptest::collection::vec(
+                world_key_strategy().prop_map(InputReference::World),
+                0..4usize,
+            ),
+            leaves in proptest::collection::vec(0u16..8, 0..8usize),
+            projections in proptest::collection::vec((0u16..8, 0u8..8), 0..4usize),
+            reads in proptest::collection::vec(0u16..6, 0..6usize),
+        ) {
+            use crate::creature::genome::cgp::RingProjection;
+            use crate::creature::genome::vote::DirectedVoteKind;
+            let mut genome = graph_reading_refs(&graph_refs, &leaves);
+            if let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def {
+                for &(ref_idx, offset) in &projections {
+                    graph.projections.push(RingProjection::new(
+                        ref_idx,
+                        DirectedVoteKind::Move,
+                        offset,
+                        1.0,
+                    ));
+                }
+            }
+            let mut program = Vec::new();
+            for &ref_idx in &reads {
+                program.push(VmInstruction::ReadInput { ref_idx, sub_idx: 0, dst: 1 });
+                program.push(VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 });
+            }
+            program.push(VmInstruction::Halt);
+            let mut vm = vm_node(program, vm_refs.clone());
+            vm.nodes[0].node_id = NodeId::new(1);
+            genome.nodes[0].targets = vec![crate::contracts::RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 0.0,
+            }];
+            genome.nodes.push(vm.nodes.remove(0));
+
+            let reachable = mesh_reachable_nodes(&genome);
+            let declared = creature_declared_world_inputs(&genome, &reachable);
+            let oracle: BTreeSet<WorldInputKey> = graph_refs
+                .iter()
+                .chain(vm_refs.iter())
+                .filter_map(|reference| match reference {
+                    InputReference::World(key) => Some(*key),
+                    _ => None,
+                })
+                .collect();
+
+            prop_assert_eq!(&declared, &oracle);
+            let wired = creature_sensor_census(&genome, &reachable).world_inputs;
+            prop_assert!(wired.is_subset(&declared), "{:?} not within {:?}", wired, declared);
+        }
+
+        /// Each row counts exactly the creatures whose declared set, census
+        /// and read set hold its key; keys outside the catalog are dropped
+        /// and every catalog key has a row.
+        #[test]
+        fn the_sensor_use_census_counts_each_catalog_key_per_creature(
+            creatures in proptest::collection::vec(
+                (
+                    proptest::collection::vec(world_key_strategy().prop_map(InputReference::World), 0..5usize),
+                    proptest::collection::vec(0u16..6, 0..6usize),
+                    proptest::collection::vec(world_key_strategy(), 0..4usize),
+                ),
+                0..6usize,
+            ),
+        ) {
+            use crate::sensors::reads::WorldReads;
+            let catalog = world_input_key_universe([FOOD_0, FOOD_1]);
+            let built: Vec<Built> = creatures
+                .iter()
+                .map(|(refs, leaves, read_keys)| {
+                    let genome = graph_reading_refs(refs, leaves);
+                    let reachable = mesh_reachable_nodes(&genome);
+                    let reads = WorldReads::default();
+                    for key in read_keys {
+                        reads.mark(*key);
+                    }
+                    (genome, reachable, reads.set())
+                })
+                .collect();
+
+            let sets: Vec<[WorldKeySet; 3]> = built
+                .iter()
+                .map(|(g, r, reads)| {
+                    [
+                        creature_declared_world_inputs(g, r).into_iter().collect(),
+                        creature_sensor_census(g, r).world_inputs.into_iter().collect(),
+                        reads.clone(),
+                    ]
+                })
+                .collect();
+            let rows = sensor_use_census(
+                &catalog,
+                sets.iter().map(|[declared, wired, read]| [declared, wired, read]),
+            );
+
+            prop_assert_eq!(
+                rows.iter().map(|row| row.key).collect::<BTreeSet<_>>(),
+                catalog.clone()
+            );
+            for row in &rows {
+                let count = |hit: &dyn Fn(&Built) -> bool| {
+                    built.iter().filter(|c| hit(c)).count() as u64
+                };
+                prop_assert_eq!(row.declared, count(&|(g, r, _)| {
+                    creature_declared_world_inputs(g, r).contains(&row.key)
+                }));
+                prop_assert_eq!(row.wired, count(&|(g, r, _)| {
+                    creature_sensor_census(g, r).world_inputs.contains(&row.key)
+                }));
+                prop_assert_eq!(row.read, count(&|(_, _, reads)| reads.contains(row.key)));
+                prop_assert!(row.wired <= row.declared);
+            }
         }
 
         /// The key universe holds every key the label map distinguishes, and

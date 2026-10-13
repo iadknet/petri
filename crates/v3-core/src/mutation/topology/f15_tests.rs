@@ -872,6 +872,7 @@ fn sensors(input: f32) -> crate::sensors::perception::SensorSnapshot {
         typed_food::TypedFoodLocalSnapshot,
     };
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: input,
             neighbor_food: [0.0; 8],

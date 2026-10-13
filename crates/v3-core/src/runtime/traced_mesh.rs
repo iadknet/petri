@@ -422,6 +422,7 @@ mod tests {
 
     fn empty_ss() -> SensorSnapshot {
         SensorSnapshot {
+            world_reads: Default::default(),
             local: StaticInputs {
                 food_here: 0.0,
                 neighbor_food: [0.0; 8],

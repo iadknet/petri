@@ -1,4 +1,5 @@
 use crate::contracts::WorldInputKey;
+use crate::sensors::reads::WorldReads;
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
@@ -142,6 +143,9 @@ pub struct SensorSnapshot {
     pub typed_local_food: TypedFoodLocalSnapshot,
     /// Extended perception summaries and nearby-creature banks.
     pub perception: PerceptionSnapshot,
+    /// The world keys this creature's mesh run has resolved so far
+    /// (observation only; `resolve_input` marks it).
+    pub world_reads: WorldReads,
 }
 
 impl SensorSnapshot {

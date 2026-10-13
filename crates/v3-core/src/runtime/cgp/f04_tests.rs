@@ -31,6 +31,7 @@ const BASE_COST: f32 = 0.25;
 
 fn sensors() -> SensorSnapshot {
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: 0.0,
             neighbor_food: [0.0; 8],

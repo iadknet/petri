@@ -407,6 +407,7 @@ mod tests {
             ring[i * 2] = value;
         }
         let sensors = SensorSnapshot {
+            world_reads: Default::default(),
             local: StaticInputs {
                 food_here: food,
                 neighbor_food: ring,

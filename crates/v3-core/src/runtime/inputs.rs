@@ -73,10 +73,14 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
         }
         // Compound world keys: use sub_idx for multi-field addressing.
         InputReference::World(key) if key.compound_width() > 1 => {
+            ctx.sensors.world_reads.mark(*key);
             ctx.sensors.resolve_compound(key, sub_idx)
         }
         // Scalar world keys: sub_idx is ignored.
-        InputReference::World(key) => ctx.sensors.resolve_world(key),
+        InputReference::World(key) => {
+            ctx.sensors.world_reads.mark(*key);
+            ctx.sensors.resolve_world(key)
+        }
         InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => {
@@ -111,6 +115,7 @@ mod tests {
 
     fn make_sensor_snapshot(food_here: f32) -> SensorSnapshot {
         SensorSnapshot {
+            world_reads: Default::default(),
             local: StaticInputs {
                 food_here,
                 neighbor_food: [0.5; 8],

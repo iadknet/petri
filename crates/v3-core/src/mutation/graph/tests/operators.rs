@@ -38,6 +38,7 @@ use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 /// wired surface without the cost of the full battery per proptest case.
 pub(super) fn scenarios() -> Vec<SensorSnapshot> {
     let base = |food_here: f32, neighbor_food: [f32; 8], age: f32| SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here,
             neighbor_food,

@@ -1262,6 +1262,118 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
     );
 }
 
+/// Founders list the occupied ring on their entry node but nothing reads it;
+/// a ring projection on it makes one founder wire it and, after a tick, read it.
+#[test]
+fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
+    use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::RingProjection;
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::creature::genome::BackendDef;
+
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
+    let config = small_config();
+    let mut sim = simulation(&config);
+    let (id, creature) = sim.creatures.iter_mut().next().unwrap();
+    let entry = creature.cached_reachable_nodes[0];
+    let node = &mut creature.genome.nodes[entry];
+    let ring = node
+        .input_refs
+        .iter()
+        .position(|r| *r == InputReference::World(WorldInputKey::NeighborOccupiedRing))
+        .expect("the founder's entry node lists the occupied ring");
+    let BackendDef::Graph(def) = &mut node.backend_def else {
+        panic!("the default founder's entry node is a Graph node");
+    };
+    def.projections.push(RingProjection::new(
+        u16::try_from(ring).unwrap(),
+        DirectedVoteKind::StealEnergy,
+        0,
+        0.5,
+    ));
+    // The declared and wired sets are cached at birth.
+    creature.refresh_sensor_caches();
+    v3_core::simulation::run_tick(&mut sim, &mut None);
+    assert!(
+        sim.creatures.contains_key(id),
+        "the edited founder survives one tick"
+    );
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+    telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
+
+    let snapshot = &receiver.snapshots()[0];
+    let value = |name: &str, input: &str| {
+        snapshot
+            .value(name, &[("petri.world_input", input)])
+            .unwrap()
+            .as_f64()
+    };
+    let thinkers = sim
+        .creatures
+        .values()
+        .filter(|c| !c.last_mesh_world_reads.is_empty())
+        .count() as f64;
+    let population = sim.creatures.len() as f64;
+    assert_eq!(
+        value("petri.tick.sensor_declared", "NeighborOccupiedRing"),
+        population
+    );
+    assert_eq!(
+        value("petri.tick.sensor_wired", "NeighborOccupiedRing"),
+        1.0
+    );
+    assert_eq!(value("petri.tick.sensor_read", "NeighborOccupiedRing"), 1.0);
+    assert_eq!(value("petri.tick.sensor_wired", "FoodHere:0"), population);
+    assert_eq!(value("petri.tick.sensor_read", "FoodHere:0"), thinkers);
+    assert!(thinkers > 0.0);
+    assert_eq!(
+        value("petri.tick.sensor_declared", "NearbyCreatureCore"),
+        0.0
+    );
+}
+
+#[test]
+fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
+    use v3_core::creature::sensor_census::{world_input_key_label, world_input_key_universe};
+
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
+    let config = small_config();
+    let mut sim = simulation(&config);
+    sim.creatures.clear();
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+    telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
+
+    let snapshot = &receiver.snapshots()[0];
+    let catalog = world_input_key_universe(
+        sim.world
+            .food()
+            .food_types()
+            .iter()
+            .map(|food_type| food_type.id),
+    );
+    assert!(!catalog.is_empty());
+    for key in catalog {
+        let label = world_input_key_label(key);
+        for name in [
+            "petri.tick.sensor_declared",
+            "petri.tick.sensor_wired",
+            "petri.tick.sensor_read",
+        ] {
+            assert_eq!(
+                snapshot
+                    .value(name, &[("petri.world_input", &label)])
+                    .map(|v| v.as_f64()),
+                Some(0.0),
+                "{name} {label}"
+            );
+        }
+    }
+}
+
 #[test]
 fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     use v3_core::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};

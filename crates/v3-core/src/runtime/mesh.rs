@@ -591,7 +591,7 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{NodeId, RouteTarget, WorldAction};
+    use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction, WorldInputKey};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -933,6 +933,7 @@ mod tests {
 
     fn empty_sensor_snapshot() -> SensorSnapshot {
         SensorSnapshot {
+            world_reads: Default::default(),
             local: StaticInputs {
                 food_here: 0.0,
                 neighbor_food: [0.0; 8],
@@ -2046,6 +2047,201 @@ mod tests {
             assert_eq!(plain_energy, observed_energy);
             assert_eq!(plain_energy, traced_energy);
             assert!(plain.cost_report.mesh_ramp_cost > 0.0);
+        }
+    }
+    // ── World reads (sensor census telemetry) ────────────────────────────────
+
+    fn reads_after_run(genome: &CreatureGenome) -> crate::sensors::reads::WorldKeySet {
+        let ss = empty_sensor_snapshot();
+        let _ = execute_creature_mesh(
+            genome,
+            &ss,
+            &mut 100.0,
+            &mut [0.0; 16],
+            &[0.0; 16],
+            &mut GraphRuntimeState::new(),
+            &default_config(),
+            Direction::N,
+        );
+        ss.world_reads.set()
+    }
+
+    fn graph_reading(node_id: NodeId, key: WorldInputKey) -> NodeGenome {
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+        };
+        NodeGenome {
+            node_id,
+            input_refs: vec![InputReference::World(key)],
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                projections: Vec::new(),
+                birth_weights: None,
+                compute_nodes: Vec::new(),
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::InputLeaf {
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        weight: 1.0,
+                    }],
+                }],
+            }),
+            targets: vec![],
+        }
+    }
+
+    #[test]
+    fn an_executed_vm_read_is_recorded_and_one_past_halt_is_not() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![
+                    InputReference::World(WorldInputKey::NearbyCreatureCore),
+                    InputReference::World(WorldInputKey::NearbyCreatureVitals),
+                ],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            ref_idx: 0,
+                            sub_idx: 0,
+                            dst: 0,
+                        },
+                        VmInstruction::Halt,
+                        VmInstruction::ReadInput {
+                            ref_idx: 1,
+                            sub_idx: 0,
+                            dst: 1,
+                        },
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let reads = reads_after_run(&genome);
+
+        assert!(reads.contains(WorldInputKey::NearbyCreatureCore));
+        assert!(!reads.contains(WorldInputKey::NearbyCreatureVitals));
+    }
+
+    #[test]
+    fn a_graph_node_is_recorded_only_when_the_mesh_visits_it() {
+        let key = WorldInputKey::AreaOccupancySummary;
+        let unvisited = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                vm_emit_node(NodeId::new(0), 0, vec![]),
+                graph_reading(NodeId::new(1), key),
+            ],
+        };
+        assert!(reads_after_run(&unvisited).is_empty());
+
+        let visited = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]),
+                graph_reading(NodeId::new(1), key),
+            ],
+        };
+        assert!(reads_after_run(&visited).contains(key));
+    }
+
+    #[test]
+    fn a_ring_projection_records_its_ring() {
+        use crate::creature::genome::cgp::{CgpGraphBackendDef, RingProjection};
+        use crate::creature::genome::vote::DirectedVoteKind;
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: vec![RingProjection::new(
+                        0,
+                        DirectedVoteKind::StealEnergy,
+                        0,
+                        0.5,
+                    )],
+                    birth_weights: None,
+                    compute_nodes: Vec::new(),
+                    output_sinks: Vec::new(),
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let reads = reads_after_run(&genome);
+
+        assert!(reads.contains(WorldInputKey::NeighborOccupiedRing));
+        assert!(!reads.contains(WorldInputKey::NeighborBarrierRing));
+    }
+    /// `read` is not a subset of `wired`: a VM read whose register no output
+    /// consumes still executes, and a graph node evaluates its dead compute
+    /// nodes too, so both resolve a key the structural census calls unwired.
+    #[test]
+    fn a_dead_read_still_executes_so_read_can_exceed_wired() {
+        use crate::creature::genome::analysis::mesh_reachable_nodes;
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        };
+        use crate::creature::sensor_census::creature_sensor_census;
+        let key = WorldInputKey::NearbyCreatureIdentity;
+        let vm = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(key)],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            ref_idx: 0,
+                            sub_idx: 0,
+                            dst: 1,
+                        },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let graph = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(key)],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    projections: Vec::new(),
+                    birth_weights: None,
+                    // CN0 feeds no sink: dead to the census, evaluated anyway.
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Add,
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::InputLeaf {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            weight: 1.0,
+                        }],
+                        plasticity: None,
+                    }],
+                    output_sinks: Vec::new(),
+                }),
+                targets: vec![],
+            }],
+        };
+        for genome in [vm, graph] {
+            let reachable = mesh_reachable_nodes(&genome);
+            assert!(!creature_sensor_census(&genome, &reachable)
+                .world_inputs
+                .contains(&key));
+            assert!(reads_after_run(&genome).contains(key));
         }
     }
 }

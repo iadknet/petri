@@ -186,6 +186,7 @@ pub(crate) struct Senses {
 impl Senses {
     pub(crate) fn snapshot(self) -> SensorSnapshot {
         SensorSnapshot {
+            world_reads: Default::default(),
             local: StaticInputs {
                 food_here: self.food_here,
                 neighbor_food: self.food,

@@ -40,6 +40,7 @@ fn ramp<const N: usize>(offset: f32) -> [f32; N] {
 
 fn sensors() -> SensorSnapshot {
     SensorSnapshot {
+        world_reads: Default::default(),
         local: StaticInputs {
             food_here: 0.25,
             neighbor_food: ramp(0.0),

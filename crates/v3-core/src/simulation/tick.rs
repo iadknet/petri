@@ -312,6 +312,7 @@ fn assemble_sensor_inputs_with(
                 PerceptionSnapshot::zero()
             };
             let ss = SensorSnapshot {
+                world_reads: Default::default(),
                 local,
                 typed_local_food,
                 perception,
@@ -529,6 +530,7 @@ fn run_cognition(
             );
             creature.pending_death_cause = output.energy_observation.pending_cause;
             creature.heading = output.heading;
+            creature.last_mesh_world_reads = ss.world_reads.set();
             (*id, output)
         })
         .collect();
@@ -572,6 +574,7 @@ fn run_cognition(
             );
             creature.pending_death_cause = output.energy_observation.pending_cause;
             creature.heading = output.heading;
+            creature.last_mesh_world_reads = ss.world_reads.set();
 
             // Record tick trace.
             if let Some(ref mut active) = trace {
@@ -1576,6 +1579,30 @@ mod final_action_observation_tests {
             },
             energy_transfer_fraction: value,
         }]
+    }
+
+    #[test]
+    fn a_tick_copies_the_world_keys_the_mesh_read_onto_the_creature() {
+        use crate::contracts::{OrdinaryFoodTypeId, WorldInputKey};
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 1;
+        let mut sim = seed_simulation(config, 11);
+        let id = sim.creatures.keys().next().expect("one founder");
+        assert!(sim.creatures[id].last_mesh_world_reads.is_empty());
+
+        run_tick(&mut sim, &mut None);
+
+        let reads = &sim.creatures[id].last_mesh_world_reads;
+        assert!(
+            reads.contains(WorldInputKey::food_here(OrdinaryFoodTypeId::new(0))),
+            "the founder's entry node reads food on its cell"
+        );
+        assert!(
+            !reads.contains(WorldInputKey::NeighborOccupiedRing),
+            "the founder declares the occupied ring but never reads it"
+        );
     }
 
     #[test]

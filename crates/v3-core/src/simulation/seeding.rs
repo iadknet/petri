@@ -166,6 +166,7 @@ pub fn seed_simulation_with_perception_mix(
     let mut sim = seed_simulation(config, seed);
     for (_, creature) in sim.creatures.iter_mut().take(perception_creatures) {
         inject_extended_perception_input(&mut creature.genome);
+        creature.refresh_sensor_caches();
     }
     sim
 }
@@ -347,6 +348,27 @@ mod tests {
                 type_idx: OrdinaryFoodTypeId::default(),
             })
         );
+    }
+
+    #[test]
+    fn perception_mix_refreshes_the_birth_sensor_caches() {
+        use crate::creature::sensor_census::{
+            creature_declared_world_inputs, creature_sensor_census,
+        };
+        use crate::sensors::reads::WorldKeySet;
+        let sim = seed_simulation_with_perception_mix(small_config(), 42, 2);
+        for creature in sim.creatures.values() {
+            let reachable = &creature.cached_reachable_nodes;
+            let declared: WorldKeySet = creature_declared_world_inputs(&creature.genome, reachable)
+                .into_iter()
+                .collect();
+            let wired: WorldKeySet = creature_sensor_census(&creature.genome, reachable)
+                .world_inputs
+                .into_iter()
+                .collect();
+            assert_eq!(creature.cached_declared_world_inputs, declared);
+            assert_eq!(creature.cached_wired_world_inputs, wired);
+        }
     }
 
     #[test]
