@@ -28,8 +28,9 @@ Summaries: [gate](../features/input-mechanism-defaults.json),
 [goal](../features/input-mechanism-defaults-goal.json). Raw reports are in the
 main checkout's ignored `.bench-artifacts/input-mechanism-defaults/`.
 
-The series index is not updated: the severe goal reading and the Canyon
-extinction below await the user's decision.
+The user chose to compare Canyon over more seeds before landing (below), and
+the change landed with both summaries appended to the series as ordinary
+closed entries; no epoch was re-pinned.
 
 ## Goal readings against T11.F30
 
@@ -52,6 +53,36 @@ extinction below await the user's decision.
   VM steps remain a small share of creature energy.
 - Temporal memory sensitivity (operator state, creatures that differ from
   both perturbations): Orchards 8 to 1, Canyon 0 to 0, Confluence 39 to 188.
+
+## Canyon over eight seeds
+
+The Canyon recipe at 2,000 ticks, seeds 22, 122, 222, 322, 422, 522, 622 and
+722, with `bench --profile sweep` on the tested binary. The old arm overlays
+`neutral_input_recruitment: Off` and `structured_heritable_refinement: false`.
+Its config digest is the effort-cost-defaults Canyon digest, and the new arm's
+is this change's, so each arm is the production Canyon config of its side. The
+new arm reproduces the goal run's seed 22 extinction at tick 290. The old arm
+runs on this binary, so it includes T02.F08 partial bites, which the T11.F30
+goal reading predates.
+
+| Seed | Old final | Old extinct at | New final | New extinct at |
+| ---: | ---: | ---: | ---: | ---: |
+| 22 | 1,471 | — | 0 | 290 |
+| 122 | 1,765 | — | 957 | — |
+| 222 | 361 | — | 679 | — |
+| 322 | 0 | 629 | 738 | — |
+| 422 | 1,552 | — | 301 | — |
+| 522 | 1,423 | — | 0 | 313 |
+| 622 | 1,274 | — | 1,190 | — |
+| 722 | 339 | — | 1,536 | — |
+
+- Extinctions: 1 of 8 old, 2 of 8 new, both new ones in the founding crash.
+- Final population: median 1,349 old against 709 new, mean 1,023 against
+  675. An exact two-sided rank test over the 16 runs gives p = 0.23, so the
+  difference is within seed spread at this horizon.
+- Births per creature-tick: 0.0217 to 0.0231 old, 0.0221 to 0.0229 new.
+
+Raw sweep reports stayed in the session scratchpad and are not kept.
 
 ## Re-pinned values
 
