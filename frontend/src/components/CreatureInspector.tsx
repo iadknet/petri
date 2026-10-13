@@ -86,7 +86,7 @@ function CreatureInspector() {
 
 function LoadingSkeleton() {
 	return (
-		<div className="animate-pulse space-y-3 px-4 py-4">
+		<div className="animate-pulse motion-reduce:animate-none space-y-3 px-4 py-4">
 			<div className="flex gap-3">
 				<div className="h-10 w-10 rounded-md bg-slate-800" />
 				<div className="flex-1 space-y-2">

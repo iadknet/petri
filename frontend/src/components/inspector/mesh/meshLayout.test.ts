@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CreatureGenome } from "../../../types/genome.ts";
 import { analyzeMesh } from "./meshAnalysis.ts";
-import { layoutMesh } from "./meshLayout.ts";
+import { createElk, layoutMesh } from "./meshLayout.ts";
 
 function makeCyclicGenome(): CreatureGenome {
 	return {
@@ -66,5 +66,42 @@ describe("layoutMesh", () => {
 
 		expect(layout.edges.some((edge) => edge.toId === 42)).toBe(false);
 		expect(layout.edges.some((edge) => edge.fromId === 1 && edge.toId === 2)).toBe(true);
+	});
+});
+
+describe("createElk", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("runs ELK in a Web Worker when the browser provides one", async () => {
+		const workerUrls: string[] = [];
+		class FakeWorker {
+			onmessage: ((event: MessageEvent) => void) | null = null;
+			constructor(url: string | URL) {
+				workerUrls.push(String(url));
+			}
+			postMessage() {}
+			terminate() {}
+		}
+		vi.stubGlobal("Worker", FakeWorker);
+
+		await createElk();
+
+		expect(workerUrls).toHaveLength(1);
+		expect(workerUrls[0]).toContain("elk-worker");
+	});
+
+	it("falls back to main-thread ELK when Worker is unavailable", async () => {
+		vi.stubGlobal("Worker", undefined);
+
+		const elk = await createElk();
+		const result = await elk.layout({
+			id: "root",
+			children: [{ id: "a", width: 10, height: 10 }],
+			edges: [],
+		});
+
+		expect(result.children?.[0]?.x).toBeDefined();
 	});
 });

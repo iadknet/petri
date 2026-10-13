@@ -1,8 +1,27 @@
-import type { ElkExtendedEdge, ElkNode, ElkPoint } from "elkjs/lib/elk-api";
-import ELK from "elkjs/lib/elk.bundled.js";
+import type { ElkExtendedEdge, ELK as ElkInstance, ElkNode, ElkPoint } from "elkjs/lib/elk-api";
+import ELK from "elkjs/lib/elk-api.js";
+import elkWorkerUrl from "elkjs/lib/elk-worker.min.js?url";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
 
-const elk = new ELK();
+let elkInstance: Promise<ElkInstance> | null = null;
+
+/**
+ * Runs ELK in a Web Worker so layout never blocks the main thread. Without
+ * Worker support (jsdom, old runtimes) it falls back to the bundled
+ * main-thread build, loaded on demand so it stays out of the main chunk.
+ */
+export async function createElk(): Promise<ElkInstance> {
+	if (typeof Worker !== "undefined") {
+		return new ELK({ workerUrl: elkWorkerUrl });
+	}
+	const { default: BundledElk } = await import("elkjs/lib/elk.bundled.js");
+	return new BundledElk();
+}
+
+function getElk(): Promise<ElkInstance> {
+	elkInstance ??= createElk();
+	return elkInstance;
+}
 
 export const MESH_NODE_WIDTH = 192;
 export const MESH_NODE_HEIGHT = 64;
@@ -120,7 +139,7 @@ async function layoutRegion(
 			),
 	};
 
-	const layoutResult = await elk.layout(elkGraph);
+	const layoutResult = await (await getElk()).layout(elkGraph);
 	const nodes = (layoutResult.children ?? []).map((child) => ({
 		id: Number(child.id),
 		x: (child.x ?? 0) + xOffset,

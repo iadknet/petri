@@ -82,7 +82,9 @@ export const SamplerBar = memo(function SamplerBar({
 	if (playbackState === "sampling") {
 		return (
 			<div className="border-t border-white/[0.06] bg-slate-950/80 px-3 py-2 flex items-center gap-2">
-				<span className="text-cyan-400 text-xs animate-spin">&#x25CC;</span>
+				<span className="text-cyan-400 text-xs animate-spin motion-reduce:animate-none">
+					&#x25CC;
+				</span>
 				<span className="text-xs text-slate-400">Sampling...</span>
 			</div>
 		);

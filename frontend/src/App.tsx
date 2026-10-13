@@ -88,7 +88,7 @@ function Dashboard() {
 
 function InspectorFallback() {
 	return (
-		<div className="h-full bg-slate-900 border-l border-slate-800 animate-pulse">
+		<div className="h-full bg-slate-900 border-l border-slate-800 animate-pulse motion-reduce:animate-none">
 			<div className="px-4 py-4 space-y-3">
 				<div className="flex gap-3">
 					<div className="w-10 h-10 rounded-md bg-slate-800" />

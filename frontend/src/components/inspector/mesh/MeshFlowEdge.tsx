@@ -1,9 +1,11 @@
 import { BaseEdge, type EdgeProps } from "@xyflow/react";
 import { memo } from "react";
+import { usePrefersReducedMotion } from "../../../hooks/usePrefersReducedMotion.ts";
 import type { MeshFlowEdgeData } from "./meshFlowAdapter.ts";
 
 export const MeshFlowEdge = memo(function MeshFlowEdge(props: EdgeProps) {
 	const data = props.data as MeshFlowEdgeData | undefined;
+	const reducedMotion = usePrefersReducedMotion();
 	const points = data?.points ?? [];
 	if (points.length < 2) {
 		return null;
@@ -29,7 +31,7 @@ export const MeshFlowEdge = memo(function MeshFlowEdge(props: EdgeProps) {
 						: "rgba(148,163,184,0.68)",
 				strokeWidth: isActive ? 2.5 : data?.dimmed ? 1.25 : 1.7,
 				strokeDasharray: isActive ? "8 4" : undefined,
-				animation: isActive ? "meshEdgeDash 0.6s linear infinite" : undefined,
+				animation: isActive && !reducedMotion ? "meshEdgeDash 0.6s linear infinite" : undefined,
 			}}
 		/>
 	);
