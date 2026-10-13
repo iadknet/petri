@@ -1,11 +1,13 @@
 # Petri documentation
 
+- [Program roadmap](roadmap.md) (program 2 master: success definition, standing rules, priority order)
 - [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
 - [Codex adapter](workflow-codex.md) (Codex model, tool, and worktree substitutions for that contract)
 - [Roadmap contract](roadmaps/README.md)
 - [Capability lab contract](lab.md) (standing rules for `crates/v3-lab` and lab exploration runs)
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
+- [Edge groups and per-edge learning design, 2026-10-13](strategy/edge-groups-and-learning-design-2026-10-13.md) (companion to the T25 track: edges and edge groups as domain objects, learning per edge and group, the two mutation layers, boundaries and feature contracts)
 - [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
 - [Mesh evolvability research, 2026-09-06](strategy/mesh-evolvability-research-2026-09-06.md) (companion to the T11 track; mesh-layer follow-up to the audit)
 - [Depth research, 2026-09-07](strategy/mesh-depth-research-2026-09-07.md) (companion to the T11 track; why a 281,405-tick run stalled, and the evidence for T11.F16 and T11.F17)
