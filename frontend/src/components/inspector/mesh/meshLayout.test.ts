@@ -76,9 +76,10 @@ describe("createElk", () => {
 
 	it("runs ELK in a Web Worker when the browser provides one", async () => {
 		const workerUrls: string[] = [];
-		class FakeWorker {
+		class FakeWorker extends EventTarget {
 			onmessage: ((event: MessageEvent) => void) | null = null;
 			constructor(url: string | URL) {
+				super();
 				workerUrls.push(String(url));
 			}
 			postMessage() {}
@@ -103,5 +104,68 @@ describe("createElk", () => {
 		});
 
 		expect(result.children?.[0]?.x).toBeDefined();
+	});
+});
+
+describe("ELK worker failure", () => {
+	/** A worker that never answers and reports a load failure on demand. */
+	class FailingWorker extends EventTarget {
+		static instances: FailingWorker[] = [];
+		onmessage: ((event: MessageEvent) => void) | null = null;
+		terminated = false;
+		constructor(_url: string | URL) {
+			super();
+			FailingWorker.instances.push(this);
+		}
+		postMessage() {}
+		terminate() {
+			this.terminated = true;
+		}
+		fail() {
+			this.dispatchEvent(new Event("error"));
+		}
+	}
+
+	async function freshModule() {
+		vi.resetModules();
+		return import("./meshLayout.ts");
+	}
+
+	afterEach(() => {
+		FailingWorker.instances = [];
+		vi.unstubAllGlobals();
+	});
+
+	it("rejects pending layout work and terminates the worker when it fails to load", async () => {
+		// Arrange
+		vi.stubGlobal("Worker", FailingWorker);
+		const { createElk: freshCreateElk } = await freshModule();
+		const elk = await freshCreateElk();
+		const pending = elk.layout({ id: "root", children: [], edges: [] });
+
+		// Act
+		FailingWorker.instances[0]!.fail();
+
+		// Assert
+		await expect(pending).rejects.toThrow(/worker/i);
+		expect(FailingWorker.instances[0]!.terminated).toBe(true);
+	});
+
+	it("recovers on the next layout after the worker fails", async () => {
+		// Arrange
+		vi.stubGlobal("Worker", FailingWorker);
+		const { layoutMesh: freshLayoutMesh } = await freshModule();
+		const analysis = analyzeMesh(makeCyclicGenome());
+		const first = freshLayoutMesh(analysis);
+		await vi.waitFor(() => expect(FailingWorker.instances).toHaveLength(1));
+
+		// Act
+		FailingWorker.instances[0]!.fail();
+		await expect(first).rejects.toThrow(/worker/i);
+		const layout = await freshLayoutMesh(analysis);
+
+		// Assert: the cached failed instance was dropped and layout completes.
+		expect(layout.nodesById.get(1)).toBeDefined();
+		expect(layout.width).toBeGreaterThan(0);
 	});
 });
