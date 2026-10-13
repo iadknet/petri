@@ -298,7 +298,7 @@ export function ConfigPanel() {
 								setQuery("");
 								searchInput.current?.focus();
 							}}
-							className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+							className="absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded text-slate-400 before:absolute before:-inset-0.5 hover:bg-slate-800 hover:text-slate-200"
 						>
 							<Icon name="close" className="size-3" />
 						</button>

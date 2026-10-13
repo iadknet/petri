@@ -55,6 +55,16 @@
 	cursor: pointer;
 	transition: background-color 140ms ease-out;
 }
+/* Invisible hit area: grows the 26x15 (sm 22x13) track to WCAG 2.5.8's 24px. */
+.config-switch::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: max(100%, 24px);
+	height: max(100%, 24px);
+	transform: translate(-50%, -50%);
+}
 .config-switch::after {
 	content: "";
 	position: absolute;
