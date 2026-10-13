@@ -159,6 +159,7 @@ export function UnifiedInspector({
 			className="relative flex h-full min-h-0 flex-col overflow-hidden border-l border-slate-800 bg-slate-950 shadow-[inset_1px_0_0_rgba(255,255,255,0.03)]"
 			data-testid="unified-inspector"
 		>
+			<h2 className="sr-only">Creature Inspector</h2>
 			{/* Resize handle */}
 			{/* biome-ignore lint/a11y/useSemanticElements: interactive resize handle cannot use <hr> */}
 			<div
