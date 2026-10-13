@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useId, useRef } from "react";
 import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
@@ -16,6 +16,16 @@ import { useWorldViewStore } from "../stores/worldView.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
 import { PatternToolbar } from "./PatternToolbar.tsx";
 import { ZoomControls } from "./ZoomControls.tsx";
+
+const KEYBOARD_PAN_STEP = 48;
+
+function isEditableTarget(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	const tag = target.tagName;
+	if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+	const editable = target.getAttribute("contenteditable");
+	return target.isContentEditable || (editable !== null && editable !== "false");
+}
 
 export function WorldViewport() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -165,6 +175,7 @@ export function WorldViewport() {
 	// Keyboard shortcut: Home to reset view, Escape to clear selection
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			if (isEditableTarget(e.target)) return;
 			if (e.key === "Home" && rendererRef.current) {
 				const frame = useWorldViewStore.getState().frame;
 				if (frame) {
@@ -348,16 +359,71 @@ export function WorldViewport() {
 		renderer.invalidate();
 	}, [setCamera]);
 
+	// Keyboard equivalents for the mouse map controls (Home and Escape are
+	// handled by the window listener above).
+	const handleCanvasKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (e.metaKey || e.ctrlKey || e.altKey) return;
+			const renderer = rendererRef.current;
+			if (!renderer) return;
+			const camera = useViewportStore.getState().camera;
+			const panBy: Record<string, [number, number]> = {
+				ArrowLeft: [KEYBOARD_PAN_STEP, 0],
+				ArrowRight: [-KEYBOARD_PAN_STEP, 0],
+				ArrowUp: [0, KEYBOARD_PAN_STEP],
+				ArrowDown: [0, -KEYBOARD_PAN_STEP],
+			};
+			const pan = panBy[e.key];
+			if (pan) {
+				setCamera(renderer.pan(camera, pan[0], pan[1]));
+				renderer.invalidate();
+			} else if (e.key === "+" || e.key === "=") {
+				handleZoomIn();
+			} else if (e.key === "-" || e.key === "_") {
+				handleZoomOut();
+			} else if (e.key === "0") {
+				handleFitToWorld();
+			} else if (e.key === "n" || e.key === "N" || e.key === "p" || e.key === "P") {
+				const frame = useWorldViewStore.getState().frame;
+				if (!frame || frame.creatures.length === 0) return;
+				const creatures = [...frame.creatures].sort((a, b) => a.id - b.id);
+				const selected = creatureInspectorSelectors.selectedCreatureId(
+					useCreatureInspectorStore.getState(),
+				);
+				const forward = e.key === "n" || e.key === "N";
+				let next: (typeof creatures)[number] | undefined;
+				if (forward) {
+					next = creatures.find((c) => selected === null || c.id > selected) ?? creatures[0];
+				} else {
+					next =
+						[...creatures].reverse().find((c) => selected === null || c.id < selected) ??
+						creatures[creatures.length - 1];
+				}
+				if (!next) return;
+				useCreatureInspectorStore.getState().selectCreature(next.id);
+				setCamera(renderer.centerOn(next.x, next.y, camera.zoom));
+				renderer.invalidate();
+			} else {
+				return;
+			}
+			e.preventDefault();
+		},
+		[setCamera, handleZoomIn, handleZoomOut, handleFitToWorld],
+	);
+
+	const keyboardHelpId = useId();
+
 	const canTogglePaint = simState === "idle" || simState === "paused";
 	const togglePaintMode = usePaintStore((s) => s.togglePaintMode);
 	const paintSubMode = usePaintStore((s) => s.mode);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
+			{/* biome-ignore lint/a11y/noInteractiveElementToNoninteractiveRole: the keyboard-operated map is an application widget */}
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className={`absolute inset-0 ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"}`}
+				className={`absolute inset-0 ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400`}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
@@ -365,7 +431,16 @@ export function WorldViewport() {
 				onMouseLeave={handleMouseLeave}
 				onDoubleClick={handleDoubleClick}
 				onContextMenu={handleContextMenu}
+				onKeyDown={handleCanvasKeyDown}
+				tabIndex={0}
+				role="application"
+				aria-label="World map"
+				aria-describedby={keyboardHelpId}
 			/>
+			<p id={keyboardHelpId} className="sr-only">
+				Arrow keys pan, plus and minus zoom, 0 or Home fits the world, N and P select the next or
+				previous creature, Escape clears the selection.
+			</p>
 			{/* Brush overlay — positioned via direct DOM manipulation in the hook */}
 			{paintMode && paintSubMode === "brush" && (
 				<div

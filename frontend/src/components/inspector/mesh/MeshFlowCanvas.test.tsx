@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MeshFlowCanvas } from "./MeshFlowCanvas.tsx";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
@@ -11,7 +11,17 @@ const reactFlowSpy = vi.hoisted(() => {
 		getLastProps: () => lastProps,
 		ReactFlow: (props: Record<string, unknown>) => {
 			lastProps = props;
-			return <div data-testid="mesh-flow-canvas">{props.children as React.ReactNode}</div>;
+			return (
+				<div
+					data-testid="mesh-flow-canvas"
+					onKeyDown={props.onKeyDown as React.KeyboardEventHandler<HTMLDivElement>}
+				>
+					<div className="react-flow__node" data-id="1" data-testid="rf-node-1">
+						<span data-testid="rf-node-1-inner">node</span>
+					</div>
+					{props.children as React.ReactNode}
+				</div>
+			);
 		},
 	};
 });
@@ -121,5 +131,35 @@ describe("MeshFlowCanvas", () => {
 		expect(props.panOnScroll).toBe(false);
 		expect(props.zoomOnScroll).toBe(false);
 		expect(props.preventScrolling).toBe(false);
+	});
+
+	it("makes mesh nodes keyboard focusable and selectable with Enter or Space", () => {
+		const onSelectNode = vi.fn();
+		render(
+			<MeshFlowCanvas
+				analysis={makeAnalysis()}
+				semanticsById={null}
+				layout={makeLayout()}
+				selectedNodeId={null}
+				activeNodeId={null}
+				activeEdgeId={null}
+				dimmedNodeIds={new Set<number>()}
+				focusMode="none"
+				viewportCommand={null}
+				onSelectNode={onSelectNode}
+			/>,
+		);
+
+		const props = reactFlowSpy.getLastProps() as Record<string, unknown>;
+		expect(props.nodesFocusable).toBe(true);
+
+		fireEvent.keyDown(screen.getByTestId("rf-node-1"), { key: "Enter" });
+		fireEvent.keyDown(screen.getByTestId("rf-node-1-inner"), { key: " " });
+		fireEvent.keyDown(screen.getByTestId("rf-node-1"), { key: "a" });
+		fireEvent.keyDown(screen.getByTestId("mesh-flow-canvas"), { key: "Enter" });
+
+		expect(onSelectNode).toHaveBeenCalledTimes(2);
+		expect(onSelectNode).toHaveBeenNthCalledWith(1, 1);
+		expect(onSelectNode).toHaveBeenNthCalledWith(2, 1);
 	});
 });
