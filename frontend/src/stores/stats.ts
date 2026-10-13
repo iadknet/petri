@@ -36,14 +36,20 @@ export interface MutationTargetReachabilityTotal {
 	notApplicable: number;
 }
 
-/** Fixed-size ring buffer that overwrites oldest entries */
+/**
+ * Append to a capped, oldest-first history, dropping the oldest entry when full.
+ * Builds the next array in one exact-size allocation and never mutates `buf`, so
+ * zustand selectors see a new reference only for the series that changed.
+ */
 function pushRing<T>(buf: T[], item: T, maxSize: number): T[] {
-	if (buf.length >= maxSize) {
-		const next = buf.slice(1);
-		next.push(item);
-		return next;
+	const drop = buf.length >= maxSize ? buf.length - maxSize + 1 : 0;
+	const len = buf.length - drop;
+	const next = new Array<T>(len + 1);
+	for (let i = 0; i < len; i++) {
+		next[i] = buf[i + drop]!;
 	}
-	return [...buf, item];
+	next[len] = item;
+	return next;
 }
 
 export interface StatsHistoryState {
