@@ -75,8 +75,9 @@ rust-test-reproducibility: ## Run the v3-core seeded-run and sampled-trajectory 
 rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 	@cargo test -p v3-core --test vm_all_opcodes_e2e
 
-rust-test-slow: ## Run the opt-in slow test tier (recruitment-paths experiment pins); a spec's Verification Plan declares it.
+rust-test-slow: ## Run the opt-in slow test tier (recruitment-paths experiment pins, lab end-to-end runs); a spec's Verification Plan declares it.
 	@cargo test -p v3-core --features telemetry-seams --lib neighborhood::recruitment_paths::experiment:: -- --ignored
+	@cargo test -p v3-lab --test lab_run -- --ignored --exact same_seed_rows_are_byte_identical_across_threads_and_processes the_lab_command_records_one_measurement_after_its_run execute_returns_the_measurement_of_the_written_summary timing_counts_gate_and_campaign_creature_ticks an_arm_with_its_own_genome_file_labels_its_verdict_with_that_start a_v2_summary_renders_without_readings_and_a_v4_summary_renders_readings_and_the_ladder
 
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli

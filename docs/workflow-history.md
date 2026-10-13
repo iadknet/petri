@@ -288,6 +288,8 @@ or more per closure. A timing pass the same day found `make check` at about
 15 minutes on a loaded host, a third of it three recruitment-paths experiment
 pins that ran twice and were re-pinned by most features; the user moved them to
 an opt-in slow tier (`make rust-test-slow`) that the Verification Plan declares.
+A per-test pass then moved six lab end-to-end tests (about 108 s of serial time)
+into the same tier; the v3-cli suite has no dominant test, so it stayed.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
