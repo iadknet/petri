@@ -75,9 +75,14 @@ the thing.
 ## Verification Plan
 
 Declared at Plan time from the workflow's
-[verification plan](../../workflow.md#verification-plan) table: the cheapest
-plan that answers this feature's question. `make check`, the spec challenge
-loop and the Codex review always run.
+[verification plan](../../workflow.md#verification-plan) table and its worked
+examples: the cheapest plan that answers this feature's question. When a change
+spans rows, the most demanding row wins; a feature that adds an environmental
+pressure declares at least `gate + goal`. `make check`, the spec challenge loop
+and the Codex review always run.
+
+**Question.** One sentence: what this feature claims, and which reading would
+show it wrong.
 
 | Check | Declared | Reason |
 | --- | --- | --- |

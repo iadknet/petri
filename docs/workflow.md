@@ -428,6 +428,16 @@ decision (user decision, 2026-10-12). The spec owner declares them in the
 spec's Verification Plan at Plan time, one line each with a one-sentence
 reason, and picks the cheapest plan that answers the feature's question.
 
+Start from that question: one sentence naming what the feature claims and
+which reading would show it wrong. A check whose result could not change a
+decision is not run. When a change spans several rows, the most demanding
+row it touches wins. When two benchmark rows both seem to fit, take the
+cheaper one unless the question names a reading only the costlier profile
+takes. A feature that adds an environmental pressure declares at least
+`gate + goal`, because the
+[standard baseline contract](#environmental-pressures-in-the-standard-baseline)
+reads it in the goal worlds.
+
 | Benchmark profiles | Declare for | Cost |
 | --- | --- | --- |
 | `none` | a change that cannot alter a simulation trajectory or its cost: documentation, frontend, telemetry export, lab code, tooling | none |
@@ -444,6 +454,19 @@ reason, and picks the cheapest plan that answers the feature's question.
 | --- | --- |
 | `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move; or a change to `crates/v3-lab`: the tier holds the lab's end-to-end runs |
 | `not run` | everything else |
+
+**Worked examples**: closed program 1 features, classified under these rules:
+
+| Feature | What it changed | Benchmark | Mutation | Slow tests |
+| --- | --- | --- | --- | --- |
+| T23.F10 thinned creature window store | telemetry export and a stack job; no simulation behavior | `none` | `not run` | `not run` |
+| T14.F11 progress page design | a static page in `docs/progress/` | `none` | `not run` | `not run` |
+| T22.F02 barrier-navigation assay | lab code in `crates/v3-lab` only | `none` | `not run` | `run` (lab) |
+| T24.F03 food growth phase timing | timing spans inside the tick loop; seeded output byte-identical | `gate` | `not run` | `not run` |
+| T16.F02 effort-priced actions | action costs: early ecology moves | `gate + goal` | `run` | `not run` |
+| Effort-cost defaults, 2026-10-10 | three cost values only | `gate + goal` | `not run` | `not run` |
+| T02.F08 partial bites | a new action sink and its decoding | `gate + goal` | `run` | `run` (sink catalog) |
+| T11.F31 ring projection motif | a mutation operator whose claim, avoidance evolving, shows only in long runs | `gate + goal-long` | `run` | `run` (draws) |
 
 The slow tier holds `#[ignore]` tests marked `slow tier`, kept out of
 `make check` because they cost minutes (user decision, 2026-10-12). When
