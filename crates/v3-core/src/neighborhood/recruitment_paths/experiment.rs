@@ -1279,21 +1279,28 @@ mod tests {
     /// T11.F30: three drive sinks remap every sink and surface draw (Graph
     /// Drift `[21, 18, 16, 7]` -> `[20, 17, 15, 7]`, Selection
     /// `[21, 21, 21, 20]` -> `[20, 20, 20, 19]`; the VM rows are unchanged).
-    /// The T13.F06 progress record stays historical.
+    /// The T13.F06 progress record stays historical. Re-pinned 2026-10-12
+    /// when T20.F04 whole-family recruitment and T20.F05 refinement became
+    /// production defaults: two more Graph operators change every
+    /// Graph-domain draw, and the VM-prepared start's Graph nodes move its
+    /// rows too (Graph Drift `[20, 17, 15, 7]` -> `[22, 17, 16, 5]`,
+    /// Selection `[20, 20, 20, 19]` -> `[22, 22, 22, 21]`; VM Drift
+    /// `[24, 18, 18, 11]` -> `[25, 19, 19, 11]`, Selection
+    /// `[24, 24, 24, 23]` -> `[25, 25, 25, 24]`).
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [20, 17, 15, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [22, 17, 16, 5], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [20, 20, 20, 19],
+                [22, 22, 22, 21],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [24, 18, 18, 11], [0, 0]),
-            ("vm_prepared", Policy::Selection, [24, 24, 24, 23], [0, 0]),
+            ("vm_prepared", Policy::Drift, [25, 19, 19, 11], [0, 0]),
+            ("vm_prepared", Policy::Selection, [25, 25, 25, 24], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1419,14 +1426,17 @@ mod tests {
     /// 9 -> 10) and 23/23 VM retained discoveries remain useful. Re-pinned
     /// by T02.F08 (the `EatLeaveShare` sink widens the surface draw to
     /// `c + 98`): 21/21 graph (censored 10 -> 11) and 23/23 VM retained
-    /// discoveries remain useful.
+    /// discoveries remain useful. Re-pinned 2026-10-12 when T20.F04
+    /// whole-family recruitment and T20.F05 refinement became production
+    /// defaults: 23/23 graph (censored 11 -> 9) and 24/24 VM (censored
+    /// 9 -> 8) retained discoveries remain useful.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [21, 21, 21, 21], 11),
-            ("vm_prepared", [23, 23, 23, 23], 9),
+            ("graph_prepared", [23, 23, 23, 23], 9),
+            ("vm_prepared", [24, 24, 24, 24], 8),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);

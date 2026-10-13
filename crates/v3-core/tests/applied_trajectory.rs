@@ -44,6 +44,10 @@
 //! the `EatLeaveShare` sink, the surface and opcode-25 draws widen, and the
 //! ±1 field nudge lands on a field of a different meaning, which moves the
 //! two sampled digests; the applied-behavior guard digests hold.
+//! Re-pinned 2026-10-12 after two agreeing runs, when T20.F04 whole-family
+//! recruitment and T20.F05 refinement became production defaults: two more
+//! Graph operators change every Graph-domain draw, which moves all four
+//! digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -55,11 +59,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "08bcb284eea2b2b86d0fe522a4a78693ee4ab25385cb2a01b2fcea6007e8387b"
+        "1d2ecdf77c7c1bbf7c1d5d76554ebf23c4995464191c9830eafcbd8d54644328"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "b7d16c677cdc867dd25e0757d5d4d04d57a8c208b2af2e08f7bae51150980221"
+        "1e29f9644763f614b42f49bfd6fe4bacb7b8b3f89feaceb652bf45e2285603e9"
     );
 }
 
@@ -132,11 +136,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "fce2603114d41a9eea3c03dbf844bee3ccb392954eff29d69cf3526d59654135"
+        "8d8a3874e0ca4e382c8f0ff6f01a68b48e1c72048c6b9f9622fb66971c8f321b"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "876245cea60b9fbf7f95f2ff435b57e2ae147c1a56c3f5add3de871a3af03673"
+        "fb71cb3b886bedc7e7d226d8f8123a723856e25916db1e916f8176f60cb24e98"
     );
 }
 

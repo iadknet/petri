@@ -871,16 +871,19 @@ mod tests {
         // change reached 3 -> 1). Re-pinned by T11.F31: five ring projection
         // operators change every Graph-domain draw (created 7 -> 6,
         // dispatched 5 -> 3, dispatch censored present 2 -> 3, internal
-        // change censored present 6 -> 5).
-        assert_eq!(reading.cohort.created, 6);
-        assert_eq!(reading.cohort.dispatched(), 3);
-        // Three cohort modules reached dispatch, the median six generations
+        // change censored present 6 -> 5). Re-pinned 2026-10-12 when T20.F04
+        // whole-family recruitment and T20.F05 refinement became defaults:
+        // two more Graph operators change every Graph-domain draw (created
+        // 6 -> 7, dispatched 3 -> 4, internal change censored present 5 -> 6).
+        assert_eq!(reading.cohort.created, 7);
+        assert_eq!(reading.cohort.dispatched(), 4);
+        // Four cohort modules reached dispatch, the median six generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 3,
+                reached: 4,
                 median_generations: Some(6),
                 censored_deleted: 0,
                 censored_present: 3,
@@ -895,14 +898,14 @@ mod tests {
         // median. On the T11.F20 walk three do, a median one generation
         // after birth; on the T20.F16 walk three do, a median nine; on the
         // T11.F29 walk one does, nine generations after birth, as on the
-        // T11.F31 walk.
+        // T11.F31 walk and the 2026-10-12 default-mechanisms walk.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
                 reached: 1,
                 median_generations: Some(9),
                 censored_deleted: 0,
-                censored_present: 5,
+                censored_present: 6,
             },
         );
     }

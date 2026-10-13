@@ -150,8 +150,8 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 		path: "mutation.structured_heritable_refinement",
 		label: "Structured Refinement",
 		testId: "config-field-mutation-structured-heritable-refinement",
-		defaultValue: false,
-		tooltip: "Experimental: bounded semantic input-to-vote refinement at birth",
+		defaultValue: true,
+		tooltip: "Bounded semantic input-to-vote refinement at birth",
 	},
 	{
 		path: "mutation.genome_size_pressure_enabled",
@@ -162,20 +162,20 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	},
 ];
 
-/** Experimental arms that pick one mode rather than a number. */
+/** Mutation settings that pick one mode rather than a number. */
 export const MUTATION_ENUMS: EnumFieldDef[] = [
 	{
 		path: "mutation.neutral_input_recruitment",
 		label: "Neutral Input Recruitment",
 		testId: "config-field-mutation-neutral-input-recruitment",
-		defaultValue: "Off",
+		defaultValue: "WholeFamily",
 		options: [
 			{ value: "Off", label: "Off" },
 			{ value: "SingleChannel", label: "Single channel" },
 			{ value: "WholeFamily", label: "Whole family" },
 		],
 		tooltip:
-			"Experimental: grows new input-to-vote links that start silent (weight 0), one sensor channel or a whole sensor family at a time",
+			"Grows new input-to-vote links that start silent (weight 0), one sensor channel or a whole sensor family at a time",
 	},
 ];
 

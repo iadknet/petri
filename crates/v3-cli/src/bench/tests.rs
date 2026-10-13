@@ -114,8 +114,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // 14, 50, 67, 73, 78, 80 and 151 of 0..=200 survive. T11.F30 moved it
     // from 14 to 207: the heading tie sends seed 14 extinct at tick 194, no
     // seed of 0..=200 survives the horizon, and seeds 207, 281, 289, 499,
-    // 597, 729, 730 and 1184 of 201..=1200 do.
-    const SEED: u64 = 207;
+    // 597, 729, 730 and 1184 of 201..=1200 do. Moved from 207 to 6 on
+    // 2026-10-12, when T20.F04 whole-family recruitment and T20.F05
+    // refinement became defaults and seed 207 went extinct at tick 127;
+    // seeds 6, 55, 208, 634, 729, 815, 982 and 1010 of 0..=1010 survive.
+    const SEED: u64 = 6;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -187,7 +190,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // seed 22 survives the horizon. T11.F31: seed 22 goes extinct at tick
     // 151 and seed 14 survives (see the post-tick-state test). T11.F30: seed
     // 14 goes extinct at tick 194 and seed 207 survives.
-    const SEED: u64 = 207;
+    const SEED: u64 = 6;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -315,7 +318,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // moved it from 22 to 14: seed 22 goes extinct at tick 151. T11.F30 moved
     // it from 14 to 207: seed 14 goes extinct at tick 194; seed 207 keeps 5
     // creatures over 5 cells.
-    const SEED: u64 = 207;
+    const SEED: u64 = 6;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

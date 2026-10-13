@@ -133,10 +133,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// opcode-25 draws widen (default 5792368611610278395 ->
 /// 11106923287936488614, rate 0.0 467545077909000578 ->
 /// 11416820348583511793).
+/// Re-pinned 2026-10-12 after two agreeing runs, when T20.F04 whole-family
+/// recruitment and T20.F05 refinement became production defaults and changed
+/// every Graph-domain draw (default 11106923287936488614 ->
+/// 1518722661182035271, rate 0.0 11416820348583511793 ->
+/// 1085458628830102075).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 11106923287936488614);
-    assert_eq!(short_run_identity(Some(0.0)), 11416820348583511793);
+    assert_eq!(short_run_identity(None), 1518722661182035271);
+    assert_eq!(short_run_identity(Some(0.0)), 1085458628830102075);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

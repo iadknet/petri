@@ -692,12 +692,12 @@ describe("ConfigPanel", () => {
 		it("applies an enum change", async () => {
 			render(<ConfigPanel />);
 			fireEvent.change(screen.getByTestId("config-field-mutation-neutral-input-recruitment"), {
-				target: { value: "WholeFamily" },
+				target: { value: "Off" },
 			});
 			fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
 			await waitFor(() =>
 				expect(api.patchConfig).toHaveBeenCalledWith({
-					mutation: { neutral_input_recruitment: "WholeFamily" },
+					mutation: { neutral_input_recruitment: "Off" },
 				}),
 			);
 		});

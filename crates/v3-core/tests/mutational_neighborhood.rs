@@ -19,7 +19,16 @@ const REDUCED_OPERATOR_TRIALS: u32 = 10;
 const REDUCED_BIRTHS: u32 = 100;
 
 fn founder_evaluation(threads: usize) -> GenomeEvaluation {
-    let config = SimulationConfig::default();
+    founder_evaluation_with(threads, |_| {})
+}
+
+/// [`founder_evaluation`] with the default config adjusted by `adjust` first.
+fn founder_evaluation_with(
+    threads: usize,
+    adjust: impl FnOnce(&mut SimulationConfig),
+) -> GenomeEvaluation {
+    let mut config = SimulationConfig::default();
+    adjust(&mut config);
     let subject = founder_genome(config.population.founder_profile);
     let battery = Battery::generate(config.world.food.types.len());
     let context = EvalContext::from_config(&config);
@@ -88,8 +97,10 @@ fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
 }
 
 /// Every operator in the four `ALL` lists produces a row. Enabled operators
-/// record every trial, whether they apply or skip, while an operator disabled
-/// by configuration retains its catalog row with no attempted trials.
+/// record every trial, whether they apply or skip; every operator is enabled
+/// at production defaults (the T20.F04 and T20.F05 input mechanisms since
+/// 2026-10-12). An operator disabled by configuration retains its catalog
+/// row with no attempted trials.
 #[test]
 fn every_operator_in_the_four_domains_produces_a_row() {
     let evaluation = founder_evaluation(1);
@@ -98,6 +109,22 @@ fn every_operator_in_the_four_domains_produces_a_row() {
         v3_core::neighborhood::operator_catalog().len()
     );
     for row in &evaluation.operator_rows {
+        assert_eq!(
+            row.tally.trials, REDUCED_OPERATOR_TRIALS,
+            "{} runs every trial at defaults",
+            row.operator
+        );
+    }
+
+    let disabled = founder_evaluation_with(1, |config| {
+        config.mutation.neutral_input_recruitment = v3_core::config::NeutralInputRecruitment::Off;
+        config.mutation.structured_heritable_refinement = false;
+    });
+    assert_eq!(
+        disabled.operator_rows.len(),
+        v3_core::neighborhood::operator_catalog().len()
+    );
+    for row in &disabled.operator_rows {
         assert_eq!(
             row.tally.trials,
             if matches!(

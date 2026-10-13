@@ -218,7 +218,7 @@ export interface ReachableBiasConfig {
 	input_ref: number;
 }
 
-/** Experimental native Graph input-recruitment arm (T20.F04). */
+/** Native Graph input recruitment (T20.F04); `WholeFamily` is the default. */
 export type NeutralInputRecruitment = "Off" | "SingleChannel" | "WholeFamily";
 
 export interface MutationConfig {

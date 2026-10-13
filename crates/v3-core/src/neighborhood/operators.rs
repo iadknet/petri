@@ -280,18 +280,10 @@ mod tests {
             "the same trial count and seed offset always yield the same rows"
         );
         assert_eq!(a.len(), operator_catalog().len());
+        // Every operator is enabled at production defaults, the two T20 input
+        // mechanisms included since 2026-10-12, so each row runs every trial.
         for row in &a {
-            assert_eq!(
-                row.tally.trials,
-                if matches!(
-                    row.operator.as_str(),
-                    "RecruitNeutralInput" | "RefineHeritableStructure"
-                ) {
-                    0
-                } else {
-                    5
-                }
-            );
+            assert_eq!(row.tally.trials, 5, "{} runs every trial", row.operator);
         }
     }
 

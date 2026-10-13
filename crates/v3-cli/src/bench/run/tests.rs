@@ -571,7 +571,9 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // 15 is the lowest of 0..=40 that survives the run (15 and 33 do).
     // T11.F30 (founder heading draws): seed 15 goes extinct at tick 83; seed
     // 1 is the lowest of 0..=40 that survives (1, 3, 19, 26, 33, 37 do).
-    params.seeds = vec![1];
+    // T20.F04/F05 as defaults, 2026-10-12: seed 1 goes extinct at tick 99;
+    // seed 4 is the lowest of 0..=40 that survives (4 and 18 do).
+    params.seeds = vec![4];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];
