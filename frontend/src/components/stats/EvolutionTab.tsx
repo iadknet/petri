@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStatsHistoryStore } from "../../stores/stats.ts";
 import { Gauge } from "./shared/Gauge.tsx";
 import { MiniChart } from "./shared/MiniChart.tsx";
@@ -16,6 +17,11 @@ export function EvolutionTab() {
 		(s) => s.mutationTargetReachabilityTotal,
 	);
 	const complexityHistory = useStatsHistoryStore((s) => s.complexityHistory);
+
+	const complexitySeries = useMemo(
+		() => complexityHistory.map((c) => ({ tick: c.tick, value: c.mean })),
+		[complexityHistory],
+	);
 
 	const latestComplexity = complexityHistory[complexityHistory.length - 1];
 	const complexityMean = latestComplexity?.mean ?? 0;
@@ -147,10 +153,7 @@ export function EvolutionTab() {
 				</div>
 				<div>
 					<span className="text-[11px] text-slate-400">Mean complexity over time</span>
-					<MiniChart
-						data={complexityHistory.map((c) => ({ tick: c.tick, value: c.mean }))}
-						color="#f59e0b"
-					/>
+					<MiniChart data={complexitySeries} color="#f59e0b" />
 				</div>
 			</div>
 		</div>

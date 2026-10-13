@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStatsHistoryStore } from "../../stores/stats.ts";
 import { Gauge } from "./shared/Gauge.tsx";
 import { MiniChart } from "./shared/MiniChart.tsx";
@@ -6,6 +7,14 @@ export function ActionsTab() {
 	const actionsHistory = useStatsHistoryStore((s) => s.actionsHistory);
 	const reproAttempted = useStatsHistoryStore((s) => s.reproAttempted);
 	const reproSpawned = useStatsHistoryStore((s) => s.reproSpawned);
+	const moveSeries = useMemo(
+		() => actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.move })),
+		[actionsHistory],
+	);
+	const eatSeries = useMemo(
+		() => actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.eat })),
+		[actionsHistory],
+	);
 
 	const successRate =
 		reproAttempted > 0 ? ((reproSpawned / reproAttempted) * 100).toFixed(1) : "0.0";
@@ -14,17 +23,11 @@ export function ActionsTab() {
 		<div className="flex flex-col gap-3 p-3">
 			<div>
 				<span className="text-[11px] text-slate-400">Moves per tick</span>
-				<MiniChart
-					data={actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.move }))}
-					color="#3b82f6"
-				/>
+				<MiniChart data={moveSeries} color="#3b82f6" />
 			</div>
 			<div>
 				<span className="text-[11px] text-slate-400">Eats per tick</span>
-				<MiniChart
-					data={actionsHistory.map((a) => ({ tick: a.tick, value: a.actions.eat }))}
-					color="#10b981"
-				/>
+				<MiniChart data={eatSeries} color="#10b981" />
 			</div>
 			<div className="flex gap-4">
 				<Gauge

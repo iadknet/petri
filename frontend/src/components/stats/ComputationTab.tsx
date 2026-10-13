@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStatsHistoryStore } from "../../stores/stats.ts";
 import { Gauge } from "./shared/Gauge.tsx";
 import { MiniChart } from "./shared/MiniChart.tsx";
@@ -8,6 +9,10 @@ const COMPUTE_HINT =
 export function ComputationTab() {
 	const computeHistory = useStatsHistoryStore((s) => s.computeHistory);
 	const latest = computeHistory[computeHistory.length - 1];
+	const totalSeries = useMemo(
+		() => computeHistory.map((c) => ({ tick: c.tick, value: c.totalMean })),
+		[computeHistory],
+	);
 
 	const totalMean = latest?.totalMean ?? 0;
 	const totalMin = latest?.totalMin ?? 0;
@@ -54,10 +59,7 @@ export function ComputationTab() {
 			</div>
 			<div>
 				<span className="text-[11px] text-slate-400">Mean brain energy over time</span>
-				<MiniChart
-					data={computeHistory.map((c) => ({ tick: c.tick, value: c.totalMean }))}
-					color="#a78bfa"
-				/>
+				<MiniChart data={totalSeries} color="#a78bfa" />
 			</div>
 		</div>
 	);
