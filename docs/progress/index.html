@@ -51,7 +51,9 @@
   .title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; }
   .title-row h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
   .title-row p { margin: 4px 0 0; color: var(--ink-2); }
+  .pickers { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
   .picker { display: flex; align-items: center; gap: 10px; }
+  .picker select.short { min-width: 0; }
   .picker label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .picker select {
     font: inherit; font-size: 13px; color: var(--ink); background: var(--sheet-2);
@@ -284,7 +286,10 @@
       <h1>Petri long-term record</h1>
       <p>Cognition and evolvability, counted in three plots after every closure.</p>
     </div>
-    <div class="picker"><label for="pick">Reading closure</label><select id="pick"></select></div>
+    <div class="pickers">
+      <div class="picker"><label for="horizon">Run length</label><select id="horizon" class="short"><option value="goal_worlds">2,000 ticks</option><option value="goal_worlds_long">40,000 ticks</option></select></div>
+      <div class="picker"><label for="pick">Reading closure</label><select id="pick"></select></div>
+    </div>
   </div>
   <div class="fields" id="fields"></div>
   <div class="bar-status" id="status">Loading the stored reports…</div>
@@ -425,6 +430,10 @@
     const worldEpoch = get(index, 'goal_worlds.epoch_baseline');
     if (worldEpoch) add(worldEpoch, 'goal_worlds');
     (get(index, 'goal_worlds.closed') || []).forEach((p) => add(p, 'goal_worlds'));
+    // The long goal profile (40,000 ticks) is its own series, never mixed with the 2,000-tick one.
+    const longEpoch = get(index, 'goal_worlds_long.epoch_baseline');
+    if (longEpoch) add(longEpoch, 'goal_worlds_long');
+    (get(index, 'goal_worlds_long.closed') || []).forEach((p) => add(p, 'goal_worlds_long'));
     // A listed report may not be stored yet — a series whose epoch baseline is
     // the measurement a feature is still taking. Skip it and say so rather than
     // failing the whole page.
@@ -440,7 +449,7 @@
     // Group by feature slug, preserving gate closure order, then any goal-only features.
     const bySlug = new Map();
     for (const r of reports) {
-      const slug = r.report.feature || rel(r.path).replace(/^features\//, '').replace(/(-goal)?\.json$/, '');
+      const slug = r.report.feature || rel(r.path).replace(/^features\//, '').replace(/(-goal-long|-goal)?\.json$/, '');
       const prof = r.profile;
       if (!bySlug.has(slug)) bySlug.set(slug, { slug, id: featureId(slug), gate: null, goal: null, paths: {} });
       const f = bySlug.get(slug);
@@ -688,22 +697,23 @@
   }
 
   // ── Model ────────────────────────────────────────────────────────────────
-  // One point per three-world closure (goal-worlds-v1), plus a gap where a
-  // closure's report is not stored. The selected closure drives every view.
-  function buildModel(data) {
+  // One point per three-world closure of the chosen series (`goal_worlds` at
+  // 2,000 ticks or `goal_worlds_long` at 40,000), plus a gap where a closure's
+  // report is not stored. The selected closure drives every view.
+  function buildModel(data, seriesKey = 'goal_worlds') {
     const byPath = new Map();
     data.features.forEach((f) => Object.entries(f.paths).forEach(([prof, p]) => byPath.set(p, { f, prof })));
-    const closedWorlds = get(data.index, 'goal_worlds.closed') || [];
+    const closedWorlds = get(data.index, `${seriesKey}.closed`) || [];
     const closedGate = get(data.index, 'gate.closed') || [];
-    const omissions = (get(data.index, 'report_omissions') || []).filter((o) => o.series === 'goal-worlds-v1');
+    const omissions = (get(data.index, 'report_omissions') || []).filter((o) => o.series === get(data.index, `${seriesKey}.series`));
     const points = [];
     closedWorlds.forEach((p) => {
       const e = byPath.get(p);
-      if (!e || !e.f.goal_worlds) {
+      if (!e || !e.f[seriesKey]) {
         const s = slugOfPath(p);
         points.push({ kind: 'gap', loadFailed: true, slug: s, id: featureId(s) || s, name: featureName(s), title: `${titleOfPath(p)} (report could not be loaded)`, reason: 'Listed in benchmark-series.json but could not be loaded.', date: '' });
       } else {
-        const rep = e.f.goal_worlds;
+        const rep = e.f[seriesKey];
         const id = featureId(e.f.slug), name = featureName(e.f.slug);
         points.push({
           kind: 'world', f: e.f, rep, path: p, slug: e.f.slug, id, name,
@@ -2089,8 +2099,24 @@
   }
 
   // ── Page ─────────────────────────────────────────────────────────────────
+  const hashParam = (key) => {
+    const m = new RegExp(`(?:^#|&)${key}=([^&]+)`).exec(location.hash);
+    try { return m ? decodeURIComponent(m[1]) : ''; } catch (e) { return ''; }
+  };
+  const setHash = (params) => {
+    const parts = Object.entries(params).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`);
+    history.replaceState(null, '', parts.length ? `#${parts.join('&')}` : location.pathname + location.search);
+  };
+
   function start(data) {
-    const M = buildModel(data);
+    const seriesKey = hashParam('horizon') === 'long' ? 'goal_worlds_long' : 'goal_worlds';
+    const horizon = document.getElementById('horizon');
+    horizon.value = seriesKey;
+    horizon.addEventListener('change', () => {
+      setHash({ horizon: horizon.value === 'goal_worlds_long' ? 'long' : '' });
+      location.reload();
+    });
+    const M = buildModel(data, seriesKey);
     M.open = new Set();
     M.focus = null;
     M.unfold = false;
@@ -2099,7 +2125,13 @@
     const status = document.getElementById('status');
     const worldN = M.points.filter((p) => p.kind === 'world').length;
     const missing = (data.missing || []).length ? ` · ${data.missing.length} listed but could not be loaded` : '';
-    if (!M.latest) { app.replaceChildren(el('p', 'small', 'No three-plot report is stored yet. The series starts at T12.F04.')); status.textContent = ''; return; }
+    if (!M.latest) {
+      app.replaceChildren(el('p', 'small', seriesKey === 'goal_worlds_long'
+        ? 'No 40,000-tick run is stored yet. The long series starts with the first feature whose Verification Plan declares the goal-long profile.'
+        : 'No three-plot report is stored yet. The series starts at T12.F04.'));
+      status.textContent = '';
+      return;
+    }
     status.textContent = missing ? `${worldN} closures loaded${missing}.` : '';
     const pick = document.getElementById('pick');
     for (let i = M.points.length - 1; i >= 0; i--) {
@@ -2110,9 +2142,7 @@
       pick.appendChild(o);
     }
     const fromHash = () => {
-      const m = /closure=([^&]+)/.exec(location.hash);
-      let slug = '';
-      try { slug = m ? decodeURIComponent(m[1]) : ''; } catch (e) { slug = ''; }
+      const slug = hashParam('closure');
       const k = slug ? M.points.findIndex((p) => p.kind === 'world' && p.slug === slug) : -1;
       return k >= 0 ? k : M.points.indexOf(M.latest);
     };
@@ -2134,7 +2164,7 @@
     M.pick = (i) => {
       if (!M.points[i] || M.points[i].kind !== 'world' || i === M.sel) return;
       M.sel = i;
-      history.replaceState(null, '', `#closure=${encodeURIComponent(M.points[i].slug)}`);
+      setHash({ horizon: seriesKey === 'goal_worlds_long' ? 'long' : '', closure: M.points[i].slug });
       M.render();
     };
     pick.addEventListener('change', () => { const k = M.points.findIndex((p) => p.kind === 'world' && p.slug === pick.value); if (k >= 0) M.pick(k); });
@@ -2142,7 +2172,7 @@
     M.sel = fromHash();
     M.render();
     document.getElementById('foot').replaceChildren(
-      el('p', null, `Source: benchmark-series.json (${get(data.index, 'goal_worlds.series') || 'goal-worlds-v1'}; ${get(data.index, 'gate.series') || 'gate-v1'} for the quick run). Single-world readings before T12.F04 are in docs/progress.md.`),
+      el('p', null, `Source: benchmark-series.json (${get(data.index, `${seriesKey}.series`) || seriesKey}; ${get(data.index, 'gate.series') || 'gate-v1'} for the quick run). Single-world readings before T12.F04 are in docs/progress.md.`),
       el('p', null, 'No combined score. Plots are compared side by side, never averaged. Charts: Observable Plot 0.6.17 and d3 7.9.0, vendored in vendor/.'),
       el('p', null, M.latest.rep.kind === 'petri-benchmark-summary' ? `Latest closure: ${artifactNotice(M.latest.rep)}` : ''),
     );
