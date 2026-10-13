@@ -1,20 +1,16 @@
-import type { MeshBackendFilter, MeshFocusMode } from "../../../stores/inspectorWorkspace.ts";
+import type { MeshFocusMode } from "../../../stores/inspectorWorkspace.ts";
 
 interface MeshControlsProps {
-	backendFilter: MeshBackendFilter;
 	focusMode: MeshFocusMode;
 	dimUnreachable: boolean;
-	onBackendFilterChange: (filter: MeshBackendFilter) => void;
 	onFocusModeChange: (mode: MeshFocusMode) => void;
 	onDimUnreachableChange: (dim: boolean) => void;
-	onFitView: () => void;
-	onResetView: () => void;
 }
 
-const FOCUS_MODES: Array<{ id: MeshFocusMode; label: string }> = [
-	{ id: "none", label: "—" },
-	{ id: "upstream", label: "↑ Up" },
-	{ id: "downstream", label: "↓ Down" },
+const FOCUS_MODES: Array<{ id: MeshFocusMode; arrow?: string; label: string }> = [
+	{ id: "none", label: "None" },
+	{ id: "upstream", arrow: "↑", label: "Up" },
+	{ id: "downstream", arrow: "↓", label: "Down" },
 ];
 
 export function MeshControls({
@@ -39,6 +35,7 @@ export function MeshControls({
 								: "text-slate-400 hover:text-slate-300"
 						}`}
 					>
+						{mode.arrow ? <span aria-hidden="true">{mode.arrow} </span> : null}
 						{mode.label}
 					</button>
 				))}

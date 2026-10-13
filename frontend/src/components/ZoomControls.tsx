@@ -16,8 +16,9 @@ export function ZoomControls({ onZoomIn, onZoomOut, onFitToWorld }: ZoomControls
 				onClick={onZoomIn}
 				className={btnClass}
 				title="Zoom in"
+				aria-label="Zoom in"
 			>
-				+
+				<span aria-hidden="true">+</span>
 			</button>
 			<button
 				type="button"
@@ -25,8 +26,9 @@ export function ZoomControls({ onZoomIn, onZoomOut, onFitToWorld }: ZoomControls
 				onClick={onZoomOut}
 				className={btnClass}
 				title="Zoom out"
+				aria-label="Zoom out"
 			>
-				&minus;
+				<span aria-hidden="true">&minus;</span>
 			</button>
 			<button
 				type="button"
@@ -34,8 +36,10 @@ export function ZoomControls({ onZoomIn, onZoomOut, onFitToWorld }: ZoomControls
 				onClick={onFitToWorld}
 				className={btnClass}
 				title="Fit to world (Home)"
+				aria-label="Fit to world"
+				aria-keyshortcuts="Home"
 			>
-				&#x2B1C;
+				<span aria-hidden="true">&#x2B1C;</span>
 			</button>
 		</div>
 	);
