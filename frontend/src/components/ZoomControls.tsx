@@ -37,7 +37,6 @@ export function ZoomControls({ onZoomIn, onZoomOut, onFitToWorld }: ZoomControls
 				className={btnClass}
 				title="Fit to world (Home)"
 				aria-label="Fit to world"
-				aria-keyshortcuts="Home"
 			>
 				<span aria-hidden="true">&#x2B1C;</span>
 			</button>
