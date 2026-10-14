@@ -1,0 +1,281 @@
+# T25.F02 — Uniform Genome Size
+
+**Status**: In Progress
+**Last updated**: 2026-10-14
+**Feature**: T25.F02
+**Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
+
+## Goal
+
+Every synapse costs the same to carry wherever it sits, as a neuron pays per
+synapse and not per target. After this feature `genome_size()` charges one
+unit per edge on both graph surfaces and nothing for a wired sink itself, a
+ring projection costs its eight implied synapses plus its record (nine
+units), and the founder anchor `FOUNDER_GENOME_SIZE_UNITS` is 80 so the
+canonical founder's replication multiplier stays exactly 1.0 and its
+gestation 1 tick. The per-unit mutation rate default is `0.0060625`
+(`0.485 / 80`), so the founder still requests 0.485 events per birth. The
+plasticity update cost chain, inert at its default 0 since it was added, is
+deleted. The feature lands as three commits, one cause each, with every
+re-pin predeclared below.
+
+## Non-Goals
+
+- Ring groups, group records and any change to what a projection is or how
+  mutation addresses it (T25.F03). A `RingProjection` keeps its struct, its
+  serde shape, its `ablated_channels` skip and its five operators.
+- The functional-complexity rule (`cgp_analysis.rs`): a wired sink still
+  counts one, sink edges are not counted individually, a projection's ring
+  is still a consumed reference. Readers of `complexity()` do not move.
+- Re-anchoring the size-pressure cap (`genome_size_cap` 1,200, off by
+  default) or any carrying, replication or gestation rate.
+- A new bench profile, config override or CLI flag for the rate-0.005 arm:
+  it runs through the existing `sweep` profile with recipe copies.
+- Any change to genome JSON, `Debug` text, `PartialEq`, draw order inside
+  an operator, or the operator catalog. F03's text-only commit is F03's.
+- Learning semantics: Hebbian and reward-modulated updates still run; only
+  their energy charge and its machinery go.
+
+## Inputs and Invariants
+
+| Input | Where | What F02 takes from it |
+| --- | --- | --- |
+| Track row and Notes | `docs/roadmaps/t25-edge-groups-and-learning.md` | The goal; the user decisions of 2026-10-13: one unit per edge wherever it lives, the per-wired-sink unit dropped, anchor 97 → 80, rate `0.485 / 80 = 0.0060625` (D14 option a), F02 as three commits with one extra goal-long arm at rate 0.005 (D25); re-pins predeclared one cause per commit; verification gate + goal + goal-long plus the rate arm, viability first, mutation gate and slow tests run. |
+| Design note | `docs/strategy/edge-groups-and-learning-design-2026-10-13.md` §2 "Size", §4 "Accounting contract" and D9, §7 "Determinism and pins", §8 F02 contract, §9 | The unit rule, the nine-unit projection, the founder arithmetic, `Δgenome_size = 8P − S`, the readers that move, the cost-chain deletion list, the re-pin list, the tests-first list and the readings. |
+| Size rule today | `creature/genome/mod.rs:263-292` `genome_size` | Mesh node 1, each input reference 1, each route target 1; VM program length + constants; Graph: compute nodes + their inputs, `1 + inputs` per wired sink, 1 per projection. |
+| Founder | `creature/founder.rs:16` (`FOUNDER_GENOME_SIZE_UNITS = 97`), `cgp_founder.rs:35-128` (node 0: 3 compute nodes, 4 compute edges, 6 wired `CustomOutput` sinks with 1 edge each), `:152-252` (node 1: 10 compute nodes, 13 compute edges, 11 wired sinks, 29 sink edges; ForageFirst adds one 2-input node) | Today node 0 = 1 + 5 refs + 1 target + 3 + 4 + 12 = 26 and node 1 = 1 + 7 refs + 10 + 13 + 40 = 71, total 97. Under the unit rule node 0 = 20, node 1 = 60, total **80**; ForageFirst 83. |
+| Anchor readers | `simulation/actions/reproduction.rs:18-48` (replication multiplier, gestation), `neighborhood/drift.rs:143-201`, `recruitment_paths/experiment.rs:1130`, `mutation/engine/mod.rs:95-115` (`apply_mutations_on_units`), `v3-cli/src/bench/mutation_effects.rs:284` | The multiplier is 1.0 at or below the anchor; gestation is `ceil(size × rate / anchor)`; the drift walk and recruitment paths draw `Binomial(anchor, rate)`; the bench row string `pinned {anchor} units (drift chart)` is in the deterministic block. |
+| Supply | `mutation/engine/mod.rs:25-29` `requested_event_count` | One `gen_bool(per_unit_rate)` draw per unit, so the draw stream changes with the unit count at any rate. |
+| Rate sites | `config/simulation.rs:871-875` (default fn), `:1060`-area normalization, `:1358` doc, `:1460` test; `frontend/src/components/config-panel/runtime/MutationSection.tsx:11`; `experiments/worlds/blobs-and-fruit-substrate.json:46` (the only world file pinning `per_unit_rate`; `canyon-country.json:9` and `confluence.json:146` carry an unrelated `frequency: 0.005`); `v3-server/tests/server.rs:3818`; `bench/run/tests.rs:223`, `drift.rs:813-819` (`supply_rule` strings); `bench/mutation_effects/tests.rs:75`; `frontend/src/components/ConfigPanel.test.tsx:69`, `frontend/src/test/fixtures.ts:102` | Every site that states 0.005 or 97 as the default or the founder's size. |
+| Cost chain | `config/simulation.rs:718-722, :758-759, :1060-1061, :1456, :1927` (`plasticity_update_cost` with alias `hebbian_update_cost`, `reward_learning_cost`); `runtime/plasticity/hebbian.rs:70-80` and `reward.rs:27-35` (`cost_per_update`, returned cost); `runtime/cgp/execute.rs:251-291` (the deduction, the `HebbianLearning` observation and the post-deduction `exhausted()` return); `simulation/tick.rs:1273, :1304-1332` (the reward deduction, `RewardLearning` observation and the zero floor); `simulation/energy_accounting.rs:7-8, :28-29, :50-51, :122, :159, :244, :258` (`DeathCause::{HebbianLearning, RewardLearning}`, the `hebbian_learning` and `reward_learning` flows); `v3-telemetry/src/metrics.rs:612-613`, `trace.rs:245-246, :322-323`; `v3-cli/src/bench/tracking.rs` (flow fields); `frontend/src/types/config.ts:246-247`, `config-panel/runtime/RuntimeSection.tsx:89-98`, `groups.ts:198`, `test/fixtures.ts`, `ControlBar.test.tsx`; `telemetry/grafana/dashboards/petri-run.json:2304`; `mutation/graph/operators.rs:378` `is_excluded_introspection_split` and `graph/tests/f08.rs:478`; tests at `tick/tests/energy_accounting.rs:415-426`, `runtime/plasticity/tests.rs:43-48, :193, :214, :576`, `runtime/traced_mesh.rs:867`, `runtime/cgp/neutral_connection_tests.rs:438`, `runtime/cgp/execute.rs:536, :660, :695` | Everything the deletion removes or rewrites. |
+| Pins that move | `tests/viability.rs:1113-1160` (both `founder_only_trajectory` siblings), `tests/applied_trajectory.rs:59-66, :136-143`, `tests/baseline_worlds.rs:142-145`, `mutation/engine/recruitment_tests.rs:49`, `tests/reproducibility.rs` digests, the slow-tier recruitment-paths rows; `creature/state.rs:815-828`, `tick/tests/phase0.rs:227-232`, `genome/tests/projection_tests.rs:73-81`; `v3-cli/tests/bench_artifacts.rs:195-340` (config digests with an undo chain) | The predeclared re-pins (Performance section), each with its cause and restoring check. |
+| Readings carriers | `v3-cli/src/bench/tracking.rs:767-800` `PersistenceSample` (`mean_genome_size`, `mean_mesh_nodes`), `v3-cli/src/lib.rs:173` `structure_means`, `v3-cli/src/bench/artifacts.rs:557-600` keep-list; `docs/progress/benchmark-series.json` (`counter_definition_changes`, `goal_worlds`; no `goal_worlds_long` yet); `v3-cli/src/bench/profiles.rs:185-240` (`goal-worlds-long-v1`, 40,000 ticks, Orchards seed 11, Canyon 22, Confluence 33; the goal recipes pin no mutation rate) | Where the new persistence fields and the series entry go; how the goal-long profile and the rate arm run. |
+| Instrument tokens | `neighborhood/recruitment_paths/mod.rs:26` `recruitment-paths-v1`, `records.rs:188` `recruitment-transitions-s0-v1`, `neighborhood/mod.rs:53` `neighborhood-v1` (the battery draws the production supply at `battery.rs:634`) | Instruments whose recorded readings draw on the anchor or the production supply. |
+| Reference specs | `docs/reference/v3-genome-spec.md:68-69`, `v3-graph-backend-spec.md:243-292` (T20.F02 size table) and `:323`, `v3-runtime-config-spec.md:96, :124-125, :161, :193-223, :303` and its cost rows, `v3-reproduction-spec.md:83-86, :228, :243`, `v3-mutation-spec.md:390-402` (split exclusion), `:725-733`, `v3-server-api-protocol-spec.md:217`, `v3-startup-seeding-spec.md:170` | Every sentence that states the wired-sink unit, 97, 0.005 or a cost knob. |
+
+Invariants:
+
+1. **Unit rule (§3 accounting contract).** `genome_size()` = mesh nodes +
+   input references + route targets + compute nodes + edges on both
+   surfaces + 9 × projections (VM: program length + constants). A wired
+   sink adds nothing of itself: a sink with two edges goes 3 → 2, an
+   unwired sink stays 0. For a Graph genome with `P` projections and `S`
+   wired sinks, `Δgenome_size = 8P − S` against today. One unit per
+   projection record plus eight for its implied members, so F03's
+   replacement of projections by eight-member groups is size-neutral.
+2. **Founder arithmetic.** `founder_genome(V3Alpha1).genome_size() == 80`
+   (node 0: 20, node 1: 60, Inputs table), `FOUNDER_GENOME_SIZE_UNITS ==
+   80`, ForageFirst profiles 83. `genome_replication_cost_multiplier` is
+   exactly 1.0 for every size ≤ 80, `gestation_ticks(80, 1.0) == 1`, and
+   the founder pays `80 × genome_carry_cost_per_unit` (0.0080 per tick at
+   the default `1e-4`).
+3. **Supply unchanged for the founder.** `MutationConfig::per_unit_rate`
+   defaults to the literal `0.0060625`; the NaN/infinite fallback, the
+   frontend default, the world file and every doc state the same literal.
+   `0.0060625 × 80 = 0.485` requested events per birth, so the founder's
+   expected supply is that of main; the distribution is not identical
+   (`Binomial(80, 0.0060625)` against `Binomial(97, 0.005)`: the
+   zero-event probability moves from 0.61495 to 0.61479). An evolved genome
+   of `x` old units with `S` wired sinks and `P` projections requests
+   `1.2125 (x − S + 8P) / x` of its old events. The drift walk and
+   recruitment paths draw `Binomial(80, rate)`.
+4. **Cost chain deleted (D9).** `RuntimeConfig` has no
+   `plasticity_update_cost`, no `reward_learning_cost` and no
+   `hebbian_update_cost` alias; a config carrying one fails to load as an
+   unknown field, as the retired per-birth keys do. `apply_hebbian_updates`
+   and `apply_reward_modulated_updates` take no cost and return counts only.
+   No energy is deducted for learning anywhere; `DeathCause::HebbianLearning`
+   and `DeathCause::RewardLearning`, the `hebbian_learning` and
+   `reward_learning` energy flows, their metrics rows, the two trace config
+   attributes, the bench tracking fields, the frontend fields and the
+   dashboard sentence are gone. The post-deduction `exhausted()` return in
+   `execute.rs:275-291` is removed: nothing changes `energy` between the
+   pass-cost check at `:135` and it, so at cost 0 it never fires. The zero
+   floor at `tick.rs:1329-1332` stays as its own step, applied to exactly
+   the creatures today's block reaches (an outcome bank and at least one
+   reward-modulated node), crediting `zero_floor_credit` as today, pinned
+   by a test. The T11.F08 split
+   exclusion (`is_excluded_introspection_split`) goes with the deduction it
+   guarded: the effects `ResolveCtx` now carries the evaluation energy, so
+   every `EnergyCurrent` sink edge is splittable; the mutation spec rows
+   say so.
+5. **Commit discipline.** Three commits in this order, each with a
+   restoring check: (1) the unit rule, the nine-unit projection, the
+   anchor 80 and the instrument constant, with `mean_wired_sinks` and
+   `mean_projections`; (2) the rate `0.0060625` at every site in the
+   Inputs table, with the founder-supply assertion
+   (`config/simulation.rs:1362-1367`) restored to 0.485 after commit 1
+   rewrote it to the intermediate `80 × 0.005 = 0.4`; (3) the cost-chain
+   deletion. Commit 3 moves no founder-only pin (the founder carries no
+   plasticity), and an identical genome executed under it has the energy
+   trajectory it has today at cost 0; in a mutation-on run the enlarged
+   splittable set can change an `AddComputeNode` draw, so descendants and
+   their trajectories may differ, which the commit-3 re-pin row enumerates.
+   Each commit's re-pin names its mechanism and its restoring check.
+6. **Identity.** Genome JSON, `Debug` text and `PartialEq` are unchanged,
+   so the world-set `genome_identity` string and the corpus hashes are
+   unchanged; `cached_genome_size` equals `genome_size()` after every
+   construction and mutation as today.
+7. **Readers that move, by construction.** Carrying cost, supply, the
+   replication multiplier (and through it the reproduce charge's size
+   surcharge), gestation, the size-pressure roll (cap unchanged),
+   `drift_depth` readings and the progress chart, and every persistence
+   sample's `mean_genome_size`. Functional complexity and its readers (the
+   action-cost multiplier, the reproduce charge's complexity term, the
+   predation bonus) do not move.
+8. **Hot path.** No new per-visit or per-birth work: the size rule is one
+   fewer addition per wired sink and one multiplication per projection; the
+   deletion removes a branch and two subtractions per visit.
+9. **Determinism.** No new RNG draw; the draw stream changes only through
+   the unit count (one draw per unit) and the rate, and in commit 3 only
+   through the splittable set.
+
+Options weighed and the founder arithmetic:
+[the readings file](../../progress/readings/t25-f02.md).
+
+## Telemetry
+
+| Signal | Kind | Source | Context carried |
+| --- | --- | --- | --- |
+| `mean_wired_sinks`, `mean_projections` | per-checkpoint fields on `PersistenceSample` (bench report; keep-list; `null` at extinction, absent in older reports) | the living population's `output_sinks()` with at least one edge and `projections.len()`, counted with `structure_means` | world, seed, tick |
+| `mean_genome_size` | existing persistence field, definition changed | `cached_genome_size` under the unit rule | a `genome_size` entry in `benchmark-series.json` `counter_definition_changes`: before "wired sink 1 + edges, projection 1", after "edges only, projection 9" |
+| `petri.run.energy_flow{hebbian_learning, reward_learning}`, `petri.run.deaths_by_cause{hebbian_learning, reward_learning}` | removed series (absent, never zero) | the deleted deductions | the `run.started` body no longer carries the two cost knobs; `cognition` and `reward_learning` phase spans drop `runtime.plasticity_update_cost` and `runtime.reward_learning_cost` |
+| `mutation.per_unit_rate` | recorded configuration, default changed | `run.started` body, unchanged wiring | — |
+
+## Verification Plan
+
+**Question.** F02 claims the accounting of Invariants 1-4: an edge costs
+one unit wherever it sits, the founder is 80 units with multiplier 1.0,
+gestation 1 tick and 0.485 expected events per birth, and the cost
+deletion changes no energy reading of an identical genome. The readings
+that would show it wrong are a focused accounting test failing, a
+founder-only pin moving under commit 3, or an unlisted pin moving under
+any commit. The goal and goal-long runs answer a second question the
+accounting does not: whether the changed size and supply regress the
+standard worlds, read by the workflow's thresholds and `severe` flag
+against the merge base, with the rate arm as the measurement that
+separates the rate's share from the unit rule's.
+
+| Check | Declared | Reason |
+| --- | --- | --- |
+| Benchmark profiles | `gate + goal + goal-long`, plus one rate-0.005 arm: three `sweep` runs on the goal recipes at 40,000 ticks | The track Notes declare gate + goal + goal-long plus the rate arm; the size and rate questions are long-run ones (genome growth), the 2,000-tick series carries the early-dynamics readings, and the arm isolates the rate from the unit rule (D25). |
+| Mutation gate | `run` | Changed production logic in `v3-core`: the size rule, the anchor, the deleted cost chain and the splittable set are behavior tests must pin. |
+| Slow tests (`make rust-test-slow`) | `run` | The recruitment-paths rows draw `Binomial(anchor, rate)` and the splittable set changes a mutation operator's draw; the tier pins both; track Notes declare it on all eight. |
+
+Viability first: `cargo test -p v3-core --test viability` before any other
+test, after each commit.
+
+## Implementation Tasks
+
+Tests first, then the change, then the re-pins of the commit's row in the
+re-pin table, each test comment carrying its cause and restoring check.
+
+| Commit | Tests first | Then |
+| --- | --- | --- |
+| 1, unit rule | `genome_size_charges_no_wired_sink_unit` (a sink with two edges 3 → 2, unwired stays 0); `a_ring_projection_costs_nine_units` (rewrites `every_projection_is_one_size_unit`); `founder_is_eighty_units` with the node arithmetic in a comment (rewrites `the_canonical_founder_genome_is_ninety_seven_units`) and ForageFirst at 83; a VM-node and a mixed-backend genome unchanged; a proptest over generated Graph defs: `genome_size` equals the unit rule's sum; `config/simulation.rs:1362-1367` rewritten to the intermediate `80 × 0.005 = 0.4` with a comment naming commit 2 | `genome_size`; `FOUNDER_GENOME_SIZE_UNITS = 80`; the drift and recruitment-paths strings; `mean_wired_sinks` and `mean_projections` on `PersistenceSample`, `structure_means`, the keep-list; the three instrument tokens; the `benchmark-series.json` definition entry; the T20.F02 size table and every 97 in the reference specs |
+| 2, rate | the founder-supply assertion back at 0.485 | `0.0060625` at every rate site in the Inputs table: config default and fallback, frontend default, the world file, the `supply_rule` strings, tests, reference specs; `baseline_worlds.rs` and the bench config digests re-pinned with an undo link |
+| 3, cost chain | the zero floor as its own step (a creature with an outcome bank and a reward-modulated node is floored and credits `zero_floor_credit`; one without is untouched); a config carrying `plasticity_update_cost`, `reward_learning_cost` or `hebbian_update_cost` fails to load; the formerly excluded shape (a sink reading `DynamicIntrospection(EnergyCurrent)` directly on a graph carrying plasticity) splits and the sink's committed value is unchanged by the split at matched evaluation energy, replacing `f08.rs:478` and `split_skips_a_live_introspection_edge_into_a_non_compute_consumer_under_plasticity` | delete the knobs, the alias, the cost parameters, the deduction sites, the two death causes, the two flows, the metrics rows, the trace attributes, the bench and frontend fields, the dashboard sentence and the split exclusion; tests asserting a learning charge assert none; the two keys dropped from `blobs-and-fruit-substrate.json`, `hebbian_learning` from `reproducibility.rs`'s fingerprint; the runtime-config and mutation spec rows; the bench config digests re-pinned with an undo link and the enumerated mutation-on pins |
+
+- [ ] Commit 1, unit rule.
+- [ ] Commit 2, rate.
+- [ ] Commit 3, cost chain.
+
+## Verification
+
+| Check | Where the result lives |
+| --- | --- |
+| `cargo test -p v3-core --test viability` after each commit | readings file |
+| Focused tests: `cargo test -p v3-core genome_size`, `founder_is_eighty_units`, the `reproduction::` multiplier and gestation tests, the zero-floor test, `cargo test -p v3-cli`, `cargo test -p v3-server`, `make frontend-test` | readings file |
+| Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants` | summary line, output path and every survivor resolved as killed, equivalent or deferred, listed below |
+| Slow tier: `make rust-test-slow` | result and the re-pinned recruitment-paths rows in the readings file |
+| Gate, goal | `docs/progress/features/t25-f02-uniform-genome-size.json`, `-goal.json`; local raw hash and byte count checked, no full report staged |
+| Goal-long, first in its series (`docs/workflow.md`, "The long goal profile"): the merge base built from `main` in a detached scratch worktree runs `make bench PROFILE=goal-long FEATURE=t25-f02-uniform-genome-size-base` with `SUMMARY_OUT` in the feature worktree, recorded as `goal_worlds_long.epoch_baseline`; then the feature run | `docs/progress/features/t25-f02-uniform-genome-size-base-goal-long.json` (baseline) and `t25-f02-uniform-genome-size-goal-long.json` (feature, compared against it) |
+| Rate arm: three `make bench PROFILE=sweep FEATURE=t25-f02-uniform-genome-size-rate-0005-<world> BENCH_ARGS="--config <recipe copy> --ticks 40000 --seeds <world seed>"` runs, each recipe copy the goal world's file plus `mutation.per_unit_rate: 0.005` | `docs/progress/features/t25-f02-uniform-genome-size-rate-0005-<world>-sweep.json`; the copies' config digests in the readings file |
+| Readings table: mean genome size, mean wired sinks, mean projections, births per creature-tick and gestation per goal world at 2,000 and 40,000 ticks against the merge base and the arm; the same-population counterfactual expectations `E_old = 0.005 (x̄' + S̄ − 8P̄)`, `E_size = 0.005 x̄'`, `E_new = 0.0060625 x̄'` from the living population's checkpoint means, beside the observed requested events per birth from the report's mutation counters | readings file |
+
+- [ ] Every row above ran on the final build and its result is recorded.
+- [ ] Mutation survivors: pending.
+
+## Performance and Goal Impact
+
+**Predeclaration — written before the run.** Natural analog: a neuron pays
+per synapse, not per target, so the carrying charge, the replication
+surcharge, gestation and mutation supply all read a size in which a synapse
+is one unit wherever it sits; it reaches creatures through the energy
+budget (carry, reproduce charge, gestation delay) and through the number of
+mutation events a birth draws. The rate re-pin is a calibration inside that
+mechanism, not a mechanism of its own: it keeps the founder's per-birth
+supply where every supply reading since T11.F19 was taken. Free learning
+is the user's accounting decision that a synapse is paid for by being
+carried, not by changing (track Notes, 2026-10-13); the cost knobs it
+retires never left their default 0.
+
+Compute: no cost expected; the gate's wall-clock is compared against the
+current epoch under the ordinary thresholds; a `severe` flag is a defect
+to find, not a cost to accept. The gate's deterministic block changes by
+construction (the supply row string `pinned 80 units (drift chart)`, the
+drift and neighborhood readings under the new draw stream): predeclared,
+and the epoch is re-pinned in the closing commit.
+
+Goal and goal-long, direction for every indicator the feature can move:
+`mean_genome_size` falls by `S − 8P` per creature at tick 0 (the founder
+97 → 80) and thereafter tracks the new rule; the counterfactual
+decomposition is expected to show `E_new ≈ E_old` for founder-like genomes
+and `E_new > E_old` wherever `8P > S`. Births per creature-tick,
+gestation, persistence, clade count and entropy have no predeclared
+direction: the founder's multiplier and gestation are pinned and its
+carrying cost falls 17%, but an evolved genome's size correction `8P − S`
+has either sign and re-anchored gestation is a ceiling. The rate arm is a
+measurement with no predeclared ordering. No new indicator; `drift_depth`
+readings move with the draw stream and are compared at the re-pinned
+epoch. A `severe` flag or
+threshold crossing on goal or goal-long is reported with its reading and
+goes to the user, who decides whether to accept it; the goal-long
+comparison is against the merge-base run that opens the series.
+
+Predeclared re-pins, one cause per commit, each restorable by reverting the
+named value:
+
+| Commit | Pins | Mechanism | Restoring check |
+| --- | --- | --- | --- |
+| 1 | `viability.rs` both `founder_only_trajectory` siblings | draw count per birth (the production supply draws one per `genome_size()` unit) and carrying cost; the anchor keeps the founder's multiplier 1.0 and gestation 1 | the old size rule and anchor 97 together restore both digests |
+| 1 | `applied_trajectory.rs` four digests (`:59-66` at rate 0.03, `:136-143` at the default rate), `baseline_worlds.rs:142-145` (default rate), `recruitment_tests.rs:49` (default rate) | draw count through `genome_size()`; replication and gestation through the anchor | the old size rule and anchor 97 together restore |
+| 1 | slow-tier recruitment-paths rows, the drift `supply_rule` strings (`drift.rs:813-819`, `bench/run/tests.rs:223`), `mutation_effects/tests.rs:75`, `recruitment_paths/experiment.rs:1130` | instrument draws `Binomial(anchor, rate)` | anchor 97 alone restores |
+| 1 | `state.rs` founder size, `phase0.rs:228`, `v3-cli/tests/cli.rs:223` (`mean_genome_size` 97.0 → 80.0), `projection_tests.rs:73-81`, `reproduction.rs` anchor tests, `config/simulation.rs:1362-1367` (0.485 → 0.4) | unit rule and anchor | the old rule and 97 restore |
+| 2 | `config/simulation.rs:1362-1367` (back to 0.485), `:1460`, `server.rs:3818`, `ConfigPanel.test.tsx:69`, `fixtures.ts:102`, the `supply_rule` strings, the default-rate trajectory pins `baseline_worlds.rs:142-145`, `applied_trajectory.rs:136-143` and `recruitment_tests.rs:49`, the slow-tier recruitment-paths rows (`experiment.rs:960` draws `MutationConfig::default()`), `bench_artifacts.rs` digests (undo link) | rate | 0.005 restores the commit-1 values |
+| 3 | `bench_artifacts.rs` digests (undo link); `reproducibility.rs` fingerprint (field removed, still a live two-run comparison); energy-accounting and plasticity tests that assert a charge; the split tests named in Implementation Tasks; mutation-on pins susceptible through the splittable set: all four `applied_trajectory.rs` digests (`:59-66`, `:136-143`), `baseline_worlds.rs:142-145`, `recruitment_tests.rs:49`, the slow-tier recruitment-paths rows, the gate and world-set deterministic blocks | config shape; deleted charge; splittable set | restoring the two keys recovers the commit-2 digests; restoring `is_excluded_introspection_split` recovers every commit-2 pin value; no founder-only pin moves |
+
+**Measured verdict.** Pending.
+
+- Summaries of the declared profiles:
+  [gate](../../progress/features/t25-f02-uniform-genome-size.json),
+  [goal](../../progress/features/t25-f02-uniform-genome-size-goal.json),
+  [goal-long baseline](../../progress/features/t25-f02-uniform-genome-size-base-goal-long.json),
+  [goal-long](../../progress/features/t25-f02-uniform-genome-size-goal-long.json),
+  rate arm `t25-f02-uniform-genome-size-rate-0005-<world>-sweep.json`.
+- Full readings: [`docs/progress/readings/t25-f02.md`](../../progress/readings/t25-f02.md).
+
+## Success Criteria
+
+- [ ] An edge costs one genome unit on either surface, a wired sink costs
+      nothing of itself, a projection costs nine; the founder is 80 units
+      and `FOUNDER_GENOME_SIZE_UNITS` is 80 with multiplier 1.0 and
+      gestation 1 tick.
+- [ ] The per-unit rate default is `0.0060625` at every site, and the
+      founder requests 0.485 events per birth.
+- [ ] No learning cost knob, parameter, deduction, death cause, flow,
+      metric row, trace attribute, bench or frontend field remains; the
+      zero floor is its own pinned step; the split exclusion is gone.
+- [ ] Every moved pin is in the predeclared table with its cause and
+      restoring check; no unlisted pin moved.
+- [ ] `make check`, the mutation gate, the slow tier, gate, goal, goal-long
+      and the rate arm ran and their readings are recorded.
+
+## Notes for AI Agents
+
+- Decision: (user, 2026-10-13, track Notes) an edge costs one unit wherever
+  it lives, the per-wired-sink unit is dropped, the anchor is 97 → 80 and
+  the rate is `0.485 / 80 = 0.0060625` (D14 option a); F02 is three commits
+  with one extra goal-long arm at rate 0.005 (D25).
+- Decision: (design note, facet 8) a surviving `RingProjection` costs nine
+  units in F02 so that F03's replacement is size-neutral.
