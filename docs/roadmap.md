@@ -72,5 +72,6 @@ T25.F06, T25.F07, T25.F08.
   after a live probe found that only the ring-shaped creature input became
   behavior while the multi-field creature sensors and whole-family bundles
   did not. The note's §8 contracts are what each spec owner reads; the track
-  rows are authoritative. Version 2 of the note (eight features) followed
-  three Codex review rounds and nine Opus facet reviews on 2026-10-13.
+  rows are authoritative. Version 3 of the note (eight features) followed
+  three Codex review rounds and two rounds of nine Opus facet reviews on
+  2026-10-13.
