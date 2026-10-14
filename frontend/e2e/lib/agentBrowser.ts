@@ -76,6 +76,23 @@ export function unwrapAgentBrowserEvalResult<T>(data: unknown): T {
 	return data as T;
 }
 
+export type AgentBrowserDialogType = "alert" | "beforeunload" | "confirm" | "prompt";
+
+export interface AgentBrowserDialogStatus {
+	hasDialog: boolean;
+	type?: string;
+	message?: string;
+	defaultPrompt?: string;
+}
+
+export function isPendingDialog(
+	status: AgentBrowserDialogStatus,
+	type: AgentBrowserDialogType,
+	message: string,
+): boolean {
+	return status.hasDialog && status.type === type && status.message === message;
+}
+
 interface AgentBrowserOptions {
 	session: string;
 	headed: boolean;
@@ -199,6 +216,14 @@ export class AgentBrowserClient {
 		return this.run<{ result: T } | T>(["eval", script]).then((data) =>
 			unwrapAgentBrowserEvalResult<T>(data),
 		);
+	}
+
+	dialogStatus(): Promise<AgentBrowserDialogStatus> {
+		return this.run(["dialog", "status"]);
+	}
+
+	dialogAccept(): Promise<unknown> {
+		return this.run(["dialog", "accept"]);
 	}
 
 	isEnabled(selector: string): Promise<{ enabled: boolean }> {

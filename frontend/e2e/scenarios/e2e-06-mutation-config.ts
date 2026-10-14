@@ -4,22 +4,17 @@ import { initializePausedSimulation, selectors } from "./common.ts";
 
 export const scenarioMutationConfig: ScenarioDefinition = {
 	id: "E2E-06",
-	description: "Validates mutation config fields are populated and can be applied",
+	description: "Validates the mutation rate field is populated and can be applied",
 	run: async (ctx) => {
 		await initializePausedSimulation(ctx, 97531, 40);
 
-		const rawMutationProbability = (
-			await ctx.browser.getValue(selectors.configMutationProbabilityField)
-		).value;
-		assert(
-			rawMutationProbability.trim().length > 0,
-			"mutation probability field should have an initial value",
-		);
+		const rawMutationRate = (await ctx.browser.getValue(selectors.configMutationRateField)).value;
+		assert(rawMutationRate.trim().length > 0, "mutation rate field should have an initial value");
 
-		const currentValue = Number(rawMutationProbability);
-		const updatedValue = Math.min(1, currentValue + 0.01).toFixed(3);
+		const currentValue = Number(rawMutationRate);
+		const updatedValue = Math.min(0.1, currentValue + 0.001).toFixed(4);
 
-		await ctx.browser.fill(selectors.configMutationProbabilityField, updatedValue);
+		await ctx.browser.fill(selectors.configMutationRateField, updatedValue);
 		await waitForCondition(async () => {
 			return (await ctx.browser.isEnabled(selectors.configApply)).enabled;
 		}, "apply button enabled after mutation edit", 10_000);
@@ -30,11 +25,11 @@ export const scenarioMutationConfig: ScenarioDefinition = {
 		}, "apply button disabled after mutation config apply", 10_000);
 
 		const persistedValue = Number(
-			(await ctx.browser.getValue(selectors.configMutationProbabilityField)).value,
+			(await ctx.browser.getValue(selectors.configMutationRateField)).value,
 		);
 		assert(
-			Math.abs(persistedValue - Number(updatedValue)) < 0.0001,
-			"mutation probability value should persist after apply",
+			Math.abs(persistedValue - Number(updatedValue)) < 0.00001,
+			"mutation rate value should persist after apply",
 		);
 	},
 };
