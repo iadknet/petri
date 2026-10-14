@@ -3,6 +3,7 @@ import type { ScenarioDefinition } from "../types.ts";
 import {
 	DEFAULT_E2E_WORLD_SIZE,
 	openDashboardAndWaitConnection,
+	openRestartSettings,
 	restartAndWaitForBusyCycle,
 	selectors,
 } from "./common.ts";
@@ -22,6 +23,7 @@ export const scenarioFertilityStartupConfig: ScenarioDefinition = {
 	description: "Validates fertility startup controls apply values and persist across restart",
 	run: async (ctx) => {
 		await openDashboardAndWaitConnection(ctx);
+		await openRestartSettings(ctx);
 
 		const fertilityVisibleBeforeToggle = (
 			await ctx.browser.isVisible(selectors.startupFertilityMin)

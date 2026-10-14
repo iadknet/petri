@@ -1,3 +1,4 @@
+import { isPendingDialog } from "../lib/agentBrowser.ts";
 import { assert, parseTickValue, waitForCondition } from "../lib/assertions.ts";
 import type { RuntimeContext } from "../types.ts";
 
@@ -55,6 +56,8 @@ export const selectors = {
 	controlPause: '[data-testid="control-pause"]',
 	controlStep: '[data-testid="control-step"]',
 	toggleConfig: '[data-testid="toggle-config"]',
+	configTabLive: '[data-testid="config-tab-live"]',
+	configTabRestart: '[data-testid="config-tab-restart"]',
 	toggleStats: '[data-testid="toggle-stats"]',
 	connectionStatus: '[data-testid="connection-status"]',
 	tickValue: '[data-testid="tick-value"]',
@@ -89,7 +92,7 @@ export const selectors = {
 	configApply: '[data-testid="config-apply"]',
 	configReset: '[data-testid="config-reset"]',
 	configMoveCostField: '[data-testid="config-field-energy-costs-move-cost"]',
-	configMutationProbabilityField: '[data-testid="config-field-mutation-mutation-probability"]',
+	configMutationRateField: '[data-testid="config-field-mutation-per-unit-rate"]',
 	paintToggle: '[data-testid="paint-toggle"]',
 	paintToolbar: '[data-testid="paint-toolbar"]',
 	paintToolBarrier: '[data-testid="paint-tool-barrier"]',
@@ -111,8 +114,34 @@ export async function openDashboardAndWaitConnection(ctx: RuntimeContext): Promi
 	}, "websocket connection status=connected", ctx.startupTimeoutMs);
 }
 
+// Startup fields render only on the config panel's On Restart tab.
+export async function openRestartSettings(ctx: RuntimeContext): Promise<void> {
+	await ctx.browser.click(selectors.configTabRestart);
+	await waitForCondition(async () => {
+		return (await ctx.browser.isVisible(selectors.startupSeed)).visible;
+	}, "On Restart settings tab visible", 10_000);
+}
+
+export async function openLiveSettings(ctx: RuntimeContext): Promise<void> {
+	await ctx.browser.click(selectors.configTabLive);
+	await waitForCondition(async () => {
+		return (await ctx.browser.getCount(selectors.configApply)).count > 0;
+	}, "Live settings tab visible", 10_000);
+}
+
+// ControlBar asks before restarting a running or paused simulation.
+export const RESTART_CONFIRM_MESSAGE = "Restart the simulation with the current startup settings?";
+
 export async function restartAndWaitForBusyCycle(ctx: RuntimeContext): Promise<void> {
 	await ctx.browser.click(selectors.controlRestart);
+	const dialog = await ctx.browser.dialogStatus();
+	if (dialog.hasDialog) {
+		assert(
+			isPendingDialog(dialog, "confirm", RESTART_CONFIRM_MESSAGE),
+			`unexpected dialog after restart click: ${JSON.stringify(dialog)}`,
+		);
+		await ctx.browser.dialogAccept();
+	}
 	await waitForCondition(async () => {
 		return (await ctx.browser.getText(selectors.controlRestart)).text === "Restarting...";
 	}, "restart reports busy state", ctx.startupTimeoutMs);
@@ -156,6 +185,7 @@ export async function initializePausedSimulation(
 	worldSize: number = DEFAULT_E2E_WORLD_SIZE,
 ): Promise<void> {
 	await openDashboardAndWaitConnection(ctx);
+	await openRestartSettings(ctx);
 
 	await ctx.browser.fill(selectors.startupSeed, String(seed));
 	await ctx.browser.fill(selectors.startupPopulation, String(population));
@@ -163,6 +193,7 @@ export async function initializePausedSimulation(
 	await ctx.browser.fill(selectors.startupWorldHeight, String(worldSize));
 	await restartAndWaitForBusyCycle(ctx);
 	await waitForRestartedWorld(ctx, worldSize);
+	await openLiveSettings(ctx);
 
 	await waitForCondition(async () => {
 		return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;

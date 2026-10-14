@@ -3,6 +3,7 @@ import type { ScenarioDefinition } from "../types.ts";
 import {
 	DEFAULT_E2E_WORLD_SIZE,
 	openDashboardAndWaitConnection,
+	openRestartSettings,
 	readTick,
 	restartAndWaitForBusyCycle,
 	selectors,
@@ -14,6 +15,7 @@ export const scenarioStartupLifecycleStep: ScenarioDefinition = {
 	description: "Runs restart, start/pause lifecycle, and validates deterministic step increment",
 	run: async (ctx) => {
 		await openDashboardAndWaitConnection(ctx);
+		await openRestartSettings(ctx);
 
 		await ctx.browser.fill(selectors.startupSeed, "424242");
 		await ctx.browser.fill(selectors.startupPopulation, "64");
