@@ -248,7 +248,7 @@ Its hashes are pinned as constants recorded on main.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> all pass, both existing
-      digests and the carrying-cost-0 sibling unchanged (`e33b4861`).
+      digests and the carrying-cost-0 sibling unchanged (`2ecbbb10`).
 - [x] Corpus: hashes recorded on main equal the hashes after every
       production commit; recorded in the readings.
 - [x] Seeded births through both constructors: a Lamarckian parent with
