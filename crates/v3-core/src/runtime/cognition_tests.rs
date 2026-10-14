@@ -130,33 +130,26 @@ fn vm_writes(values: &[f32], clear: bool) -> CreatureGenome {
 }
 
 fn graph_writes(values: &[f32], clear: bool) -> CreatureGenome {
-    let edge = |weight| GraphEdge {
-        source: GraphSource::ComputeNode(0),
-        weight,
-    };
+    let edge = |weight| GraphEdge::new(GraphSource::ComputeNode(0), weight);
     let mut output_sinks: Vec<_> = values
         .iter()
-        .map(|&value| OutputSink {
-            kind: OutputSinkKind::WriteSlot(0),
-            inputs: vec![edge(value)],
-        })
+        .map(|&value| OutputSink::new(OutputSinkKind::WriteSlot(0), vec![edge(value)]))
         .collect();
     if clear {
-        output_sinks.push(OutputSink {
-            kind: OutputSinkKind::ClearSlot(0),
-            inputs: vec![edge(1.0)],
-        });
+        output_sinks.push(OutputSink::new(
+            OutputSinkKind::ClearSlot(0),
+            vec![edge(1.0)],
+        ));
     }
-    genome(BackendDef::Graph(CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: vec![],
-            plasticity: None,
-        }],
-        output_sinks,
-    }))
+    genome(BackendDef::Graph(
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::Constant(1.0),
+                vec![],
+                None,
+            )])
+            .with_output_sinks(output_sinks),
+    ))
 }
 
 #[test]
@@ -206,28 +199,13 @@ fn graph_invalid_and_unwired_sinks_do_not_count_as_writes() {
     let BackendDef::Graph(def) = &mut g.nodes[0].backend_def else {
         unreachable!()
     };
-    let edge = GraphEdge {
-        source: GraphSource::ComputeNode(0),
-        weight: 1.0,
-    };
-    def.output_sinks = vec![
-        OutputSink {
-            kind: OutputSinkKind::WriteSlot(16),
-            inputs: vec![edge],
-        },
-        OutputSink {
-            kind: OutputSinkKind::ClearSlot(16),
-            inputs: vec![edge],
-        },
-        OutputSink {
-            kind: OutputSinkKind::WriteSlot(0),
-            inputs: vec![],
-        },
-        OutputSink {
-            kind: OutputSinkKind::ClearSlot(0),
-            inputs: vec![],
-        },
-    ];
+    let edge = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
+    *def = def.clone().with_output_sinks(vec![
+        OutputSink::new(OutputSinkKind::WriteSlot(16), vec![edge]),
+        OutputSink::new(OutputSinkKind::ClearSlot(16), vec![edge]),
+        OutputSink::new(OutputSinkKind::WriteSlot(0), vec![]),
+        OutputSink::new(OutputSinkKind::ClearSlot(0), vec![]),
+    ]);
     let (output, final_value) = run_both(&g, 3.0, 100.0, &RuntimeConfig::default());
     assert_eq!(output.work_counters.shared_memory_writes_changed, 0);
     assert_eq!(final_value, 3.0);

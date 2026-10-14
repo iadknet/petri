@@ -62,7 +62,7 @@ fn motor_sink(sink: VoteSink) -> bool {
 #[must_use]
 pub fn motor_node(node: &NodeGenome) -> bool {
     match &node.backend_def {
-        BackendDef::Graph(graph) => graph.output_sinks.iter().any(|sink| {
+        BackendDef::Graph(graph) => graph.output_sinks().iter().any(|sink| {
             matches!(sink.kind, OutputSinkKind::ActionVote(vote) if motor_sink(vote))
                 && !sink.inputs.is_empty()
         }),

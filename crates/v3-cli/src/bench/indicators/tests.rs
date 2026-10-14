@@ -33,28 +33,27 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
             VmInstruction::ClearSlot { slot_idx: 0 },
         ],
     }));
-    let stateful_plastic = make(BackendDef::Graph(CgpGraphBackendDef {
-        projections: Vec::new(),
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
-                    slot: 0,
-                    previous: true,
-                },
-                weight: 1.0,
-            }],
-            plasticity: Some(PlasticityConfig {
-                rule: HebbianRule::Classic,
-                learning_rate: 0.1,
-                weight_clamp: 1.0,
-                lamarckian: false,
-                modulation: None,
-            }),
-        }],
-        birth_weights: None,
-        output_sinks: vec![],
-    }));
+    let stateful_plastic = make(BackendDef::Graph(
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::DecayIntegrator(0.5),
+                vec![GraphEdge::new(
+                    GraphSource::SharedMemory {
+                        slot: 0,
+                        previous: true,
+                    },
+                    1.0,
+                )],
+                Some(PlasticityConfig {
+                    rule: HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 1.0,
+                    lamarckian: false,
+                    modulation: None,
+                }),
+            )])
+            .with_output_sinks(vec![]),
+    ));
     let mut inert = make(BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![],
@@ -443,34 +442,33 @@ fn temporal_report_keeps_substrate_counts_separate() {
     config.population.initial_creatures = 1;
     let mut sim = seed_simulation(config, 11);
     let id = sim.creatures.keys().next().unwrap();
-    let edge = GraphEdge {
-        source: GraphSource::SharedMemory {
+    let edge = GraphEdge::new(
+        GraphSource::SharedMemory {
             slot: 0,
             previous: true,
         },
-        weight: 1.0,
-    };
+        1.0,
+    );
     sim.creatures[id].genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
             targets: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(0.0),
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-                output_sinks: vec![v3_core::creature::genome::cgp::OutputSink {
-                    kind: v3_core::creature::genome::cgp::OutputSinkKind::ActionVote(
-                        v3_core::creature::genome::vote::VoteSink::Eat,
-                    ),
-                    inputs: vec![edge],
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![ComputeNode::new(
+                        ComputeNodeKind::Constant(0.0),
+                        vec![],
+                        None,
+                    )])
+                    .with_output_sinks(vec![v3_core::creature::genome::cgp::OutputSink::new(
+                        v3_core::creature::genome::cgp::OutputSinkKind::ActionVote(
+                            v3_core::creature::genome::vote::VoteSink::Eat,
+                        ),
+                        vec![edge],
+                    )]),
+            ),
         }],
     };
     sim.creatures[id].prev_shared_memory[0] = 1.0;

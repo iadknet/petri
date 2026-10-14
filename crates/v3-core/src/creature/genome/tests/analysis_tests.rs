@@ -699,35 +699,27 @@ fn functional_complexity_excludes_dead_graph_nodes() {
             input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: crate::config::OrdinaryFoodTypeId::default(),
             })],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![
-                    ComputeNode {
-                        kind: ComputeNodeKind::Add,
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::InputLeaf {
-                                ref_idx: 0,
-                                sub_idx: 0,
-                            },
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                    ComputeNode {
-                        kind: ComputeNodeKind::Sigmoid,
-                        inputs: vec![], // DEAD — disconnected from output
-                        plasticity: None,
-                    },
-                ],
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![
+                        ComputeNode::new(
+                            ComputeNodeKind::Add,
+                            vec![GraphEdge::new(
+                                GraphSource::InputLeaf {
+                                    ref_idx: 0,
+                                    sub_idx: 0,
+                                },
+                                1.0,
+                            )],
+                            None,
+                        ),
+                        ComputeNode::new(ComputeNodeKind::Sigmoid, vec![], None),
+                    ])
+                    .with_output_sinks(vec![OutputSink::new(
+                        OutputSinkKind::CustomOutput(0),
+                        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                    )]),
+            ),
             targets: vec![],
         }],
     };

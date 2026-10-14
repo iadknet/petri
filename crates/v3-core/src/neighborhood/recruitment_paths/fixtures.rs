@@ -3,8 +3,8 @@ use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, RouteTarget, WorldInputKey};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
@@ -85,7 +85,7 @@ fn sites(genome: &CreatureGenome) -> MutableSites {
                 sites.vm_constants += vm.constants.len();
             }
             BackendDef::Graph(graph) => {
-                sites.graph_compute_nodes += graph.compute_nodes.len();
+                sites.graph_compute_nodes += graph.compute_nodes().len();
                 sites.graph_edges += graph.edges().count();
             }
         }
@@ -105,7 +105,7 @@ pub(super) fn cue(task: Task) -> InputReference {
 }
 
 fn edge(source: GraphSource, weight: f32) -> GraphEdge {
-    GraphEdge { source, weight }
+    GraphEdge::new(source, weight)
 }
 
 fn blank(backend: ModuleBackend) -> BackendDef {
@@ -158,21 +158,20 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
         }
         ModuleBackend::Graph => {
             let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-            graph.compute_nodes = vec![ComputeNode {
-                kind: ComputeNodeKind::WeightedSum,
-                inputs: vec![edge(
+            graph = graph.with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::WeightedSum,
+                vec![edge(
                     GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
                     1.0,
                 )],
-                plasticity: None,
-            }];
+                None,
+            )]);
             if live {
-                move_sink_mut(&mut graph, EAST)
-                    .inputs
-                    .push(edge(GraphSource::ComputeNode(0), 1.0));
+                let east = move_surface(&graph, EAST);
+                graph.push_edge(east, edge(GraphSource::ComputeNode(0), 1.0));
             }
             BackendDef::Graph(graph)
         }
@@ -192,9 +191,9 @@ pub(super) fn move_sink(graph: &CgpGraphBackendDef, d: u8) -> &OutputSink {
         .expect("the fixed catalog holds every Move sink")
 }
 
-fn move_sink_mut(graph: &mut CgpGraphBackendDef, d: u8) -> &mut OutputSink {
+fn move_surface(graph: &CgpGraphBackendDef, d: u8) -> EdgeSurface {
     graph
-        .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(d)))
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(d)))
         .expect("the fixed catalog holds every Move sink")
 }
 
@@ -439,10 +438,12 @@ pub(super) fn starts_from_paths(paths: &[ConstructedPath]) -> Vec<Start> {
                 };
             }
             BackendDef::Graph(graph) => {
-                graph.compute_nodes[0].inputs[0].source = GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 2,
-                };
+                graph
+                    .edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
+                    .set_source(GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 2,
+                    });
             }
         }
         direction(&mut prepared.nodes[2], EAST);
@@ -502,13 +503,27 @@ fn direction(node: &mut NodeGenome, d: u8) {
             }
         }
         BackendDef::Graph(graph) => {
-            let edges: Vec<GraphEdge> = graph
-                .output_sinks
-                .iter_mut()
-                .filter(|sink| matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_))))
-                .flat_map(|sink| std::mem::take(&mut sink.inputs))
+            // Every Move edge, in catalog order, lands on the `Move(d)` sink.
+            let is_move = |sink: &OutputSink| {
+                matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
+            };
+            let mut edges: Vec<GraphEdge> = graph
+                .output_sinks()
+                .iter()
+                .filter(|sink| is_move(sink))
+                .flat_map(|sink| sink.inputs.iter().copied())
                 .collect();
-            move_sink_mut(graph, d).inputs = edges;
+            let target = OutputSinkKind::ActionVote(target);
+            let sinks = graph
+                .output_sinks()
+                .iter()
+                .map(|sink| match sink.kind {
+                    kind if kind == target => OutputSink::new(kind, std::mem::take(&mut edges)),
+                    kind if is_move(sink) => OutputSink::new(kind, Vec::new()),
+                    _ => sink.clone(),
+                })
+                .collect();
+            *graph = graph.clone().with_output_sinks(sinks);
         }
     }
 }

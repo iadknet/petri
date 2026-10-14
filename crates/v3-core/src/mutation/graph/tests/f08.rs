@@ -15,8 +15,8 @@ use super::operators::{
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::PlasticityConfig;
@@ -118,7 +118,7 @@ fn placement(sources: &[usize], i: usize) -> (usize, usize) {
     (sources[i] + i, sources[i] + i + 1)
 }
 
-/// Activate the copies made by `duplicate_compute_nodes_in_place(sources)`:
+/// Activate the copies made by `duplicate_compute_nodes(sources)`:
 /// every edge outside the duplicated set that read a member now reads that
 /// member's copy. Edges belonging to a member or to a copy are untouched, so
 /// the duplicated set keeps its own internal wiring.
@@ -131,20 +131,24 @@ fn activate_copies(def: &mut CgpGraphBackendDef, sources: &[usize]) {
         duplicated.push(original);
         duplicated.push(copy);
     }
-    let remap = |edge: &mut GraphEdge| {
-        if let GraphSource::ComputeNode(idx) = &mut edge.source {
-            if let Some(&(_, copy)) = retarget.iter().find(|(original, _)| original == idx) {
-                *idx = copy;
-            }
-        }
-    };
-    for (i, node) in def.compute_nodes.iter_mut().enumerate() {
-        if !duplicated.contains(&i) {
-            node.inputs.iter_mut().for_each(remap);
-        }
-    }
-    for sink in &mut def.output_sinks {
-        sink.inputs.iter_mut().for_each(remap);
+    let rewired: Vec<(EdgeOccurrence, u16)> = def
+        .edge_sites()
+        .filter(|occurrence| {
+            !matches!(occurrence.surface, EdgeSurface::ComputeInput(i) if duplicated.contains(&i))
+        })
+        .filter_map(|occurrence| {
+            let GraphSource::ComputeNode(idx) = def.edge_at(occurrence).source() else {
+                return None;
+            };
+            retarget
+                .iter()
+                .find(|(original, _)| *original == idx)
+                .map(|&(_, copy)| (occurrence, copy))
+        })
+        .collect();
+    for (occurrence, copy) in rewired {
+        def.edge_mut(occurrence)
+            .set_source(GraphSource::ComputeNode(copy));
     }
 }
 
@@ -154,83 +158,54 @@ fn activate_copies(def: &mut CgpGraphBackendDef, sources: &[usize]) {
 /// node 1 anywhere but immediately after itself changes what the copy reads,
 /// what a consumer of the copy reads, or both.
 pub(super) fn phase_def() -> CgpGraphBackendDef {
-    CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![
-            ComputeNode {
-                kind: ComputeNodeKind::WeightedSum,
-                inputs: vec![
-                    GraphEdge {
-                        source: GraphSource::InputLeaf {
+    CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::WeightedSum,
+                vec![
+                    GraphEdge::new(
+                        GraphSource::InputLeaf {
                             ref_idx: 0,
                             sub_idx: 3,
                         },
-                        weight: 0.5,
-                    },
-                    // Backward external edge onto the copy target.
-                    GraphEdge {
-                        source: GraphSource::ComputeNode(1),
-                        weight: 0.7,
-                    },
+                        0.5,
+                    ),
+                    GraphEdge::new(GraphSource::ComputeNode(1), 0.7),
                 ],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::WeightedSum,
-                inputs: vec![
-                    GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 0.6,
-                    },
-                    // Backward input: read from the frozen tick-start outputs.
-                    GraphEdge {
-                        source: GraphSource::ComputeNode(2),
-                        weight: 0.9,
-                    },
+                None,
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::WeightedSum,
+                vec![
+                    GraphEdge::new(GraphSource::ComputeNode(0), 0.6),
+                    GraphEdge::new(GraphSource::ComputeNode(2), 0.9),
                 ],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::DecayIntegrator(0.4),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            },
-        ],
-        output_sinks: vec![
-            OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(2),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            },
-        ],
-    }
+                None,
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::DecayIntegrator(0.4),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+                None,
+            ),
+        ])
+        .with_output_sinks(vec![
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            ),
+        ])
 }
 
 fn activation_fixtures() -> [(&'static str, CgpGraphBackendDef, Vec<InputReference>); 3] {
@@ -252,18 +227,21 @@ fn copy_internal_node_inserts_the_copy_directly_after_its_source() {
     for seed in 0u64..48 {
         let mut child = parent.clone();
         copy_compute_node(&mut child, &mut SmallRng::seed_from_u64(seed)).unwrap();
-        assert_eq!(child.compute_nodes.len(), parent.compute_nodes.len() + 1);
-        let source = (0..parent.compute_nodes.len())
-            .find(|&i| child.compute_nodes[i + 1].kind == parent.compute_nodes[i].kind)
+        assert_eq!(
+            child.compute_nodes().len(),
+            parent.compute_nodes().len() + 1
+        );
+        let source = (0..parent.compute_nodes().len())
+            .find(|&i| child.compute_nodes()[i + 1].kind == parent.compute_nodes()[i].kind)
             .expect("the copy sits directly after one of the original nodes");
         seen[source] = true;
         assert_eq!(
-            child.compute_nodes[source + 1].kind,
-            parent.compute_nodes[source].kind,
+            child.compute_nodes()[source + 1].kind,
+            parent.compute_nodes()[source].kind,
         );
         assert_eq!(
-            child.compute_nodes[source + 1].plasticity,
-            parent.compute_nodes[source].plasticity,
+            child.compute_nodes()[source + 1].plasticity,
+            parent.compute_nodes()[source].plasticity,
         );
     }
     assert!(seen.iter().all(|&s| s), "every source index is reachable");
@@ -273,27 +251,27 @@ fn copy_internal_node_inserts_the_copy_directly_after_its_source() {
 fn copy_internal_node_shifts_the_copied_inputs_and_follows_a_self_edge() {
     let mut child = base_def();
     // Node 2 carries a self-loop and node 1 reads the lower-index node 0.
-    child.duplicate_compute_nodes_in_place(&[1]);
+    child.duplicate_compute_nodes(&[1]);
     assert_eq!(
-        child.compute_nodes[2].inputs[0].source,
+        child.compute_nodes()[2].inputs[0].source(),
         GraphSource::ComputeNode(0),
         "a source below the original stays below the copy"
     );
     assert_eq!(
-        child.compute_nodes[3].inputs[0].source,
+        child.compute_nodes()[3].inputs[0].source(),
         GraphSource::ComputeNode(3),
         "the self-loop node itself shifted with the insertion"
     );
 
     let mut self_child = base_def();
-    self_child.duplicate_compute_nodes_in_place(&[2]);
+    self_child.duplicate_compute_nodes(&[2]);
     assert_eq!(
-        self_child.compute_nodes[3].inputs[0].source,
+        self_child.compute_nodes()[3].inputs[0].source(),
         GraphSource::ComputeNode(3),
         "a self-edge on the copy reads the copy, not the original"
     );
     assert_eq!(
-        self_child.compute_nodes[2].inputs[0].source,
+        self_child.compute_nodes()[2].inputs[0].source(),
         GraphSource::ComputeNode(2),
         "the original keeps reading itself"
     );
@@ -302,39 +280,39 @@ fn copy_internal_node_shifts_the_copied_inputs_and_follows_a_self_edge() {
 #[test]
 fn copy_subgraph_inserts_every_copy_directly_after_its_member() {
     let mut child = phase_def();
-    child.duplicate_compute_nodes_in_place(&[0, 2]);
-    let kinds: Vec<ComputeNodeKind> = child.compute_nodes.iter().map(|n| n.kind).collect();
+    child.duplicate_compute_nodes(&[0, 2]);
+    let kinds: Vec<ComputeNodeKind> = child.compute_nodes().iter().map(|n| n.kind).collect();
     let parent = phase_def();
     assert_eq!(
         kinds,
         vec![
-            parent.compute_nodes[0].kind,
-            parent.compute_nodes[0].kind,
-            parent.compute_nodes[1].kind,
-            parent.compute_nodes[2].kind,
-            parent.compute_nodes[2].kind,
+            parent.compute_nodes()[0].kind,
+            parent.compute_nodes()[0].kind,
+            parent.compute_nodes()[1].kind,
+            parent.compute_nodes()[2].kind,
+            parent.compute_nodes()[2].kind,
         ],
         "each copy sits at c_i + i + 1"
     );
     // Node 1 (now index 2) still reads node 0 (index 0) and node 2 (index 3).
     assert_eq!(
-        child.compute_nodes[2].inputs[0].source,
+        child.compute_nodes()[2].inputs[0].source(),
         GraphSource::ComputeNode(0)
     );
     assert_eq!(
-        child.compute_nodes[2].inputs[1].source,
+        child.compute_nodes()[2].inputs[1].source(),
         GraphSource::ComputeNode(3)
     );
     // The copy of node 2 (index 4) reads the copy of node 0's consumer chain
     // through the surviving external source, shifted to its final index.
     assert_eq!(
-        child.compute_nodes[4].inputs[0].source,
+        child.compute_nodes()[4].inputs[0].source(),
         GraphSource::ComputeNode(2)
     );
     // The copy of node 0 (index 1) keeps its intra-cluster external read of
     // node 1 at its shifted index.
     assert_eq!(
-        child.compute_nodes[1].inputs[1].source,
+        child.compute_nodes()[1].inputs[1].source(),
         GraphSource::ComputeNode(2)
     );
 }
@@ -342,26 +320,19 @@ fn copy_subgraph_inserts_every_copy_directly_after_its_member() {
 #[test]
 fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
     // One below the limit: the copy lands at index `u16::MAX - 1`, the
-    // highest index that is not `remove_compute_node_at`'s sentinel, so it
+    // highest index that is not `remove_compute_node`'s sentinel, so it
     // still applies.
-    let mut def = CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![
-            ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: Vec::new(),
-                plasticity: None,
-            };
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![
+            ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None);
             u16::MAX as usize - 1
-        ],
-        output_sinks: Vec::new(),
-    };
+        ])
+        .with_output_sinks(Vec::new());
     assert_eq!(
         copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
         Ok(())
     );
-    assert_eq!(def.compute_nodes.len(), u16::MAX as usize);
+    assert_eq!(def.compute_nodes().len(), u16::MAX as usize);
     // At the limit, both copy operators skip rather than address the sentinel.
     assert_eq!(
         copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
@@ -371,7 +342,7 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
         copy_cgp_subgraph(&mut def, &mut SmallRng::seed_from_u64(1)),
         Err(MutationSkipReason::NoApplicableTarget)
     );
-    assert_eq!(def.compute_nodes.len(), u16::MAX as usize);
+    assert_eq!(def.compute_nodes().len(), u16::MAX as usize);
 }
 
 // ── Activation equivalence ─────────────────────────────────────────────────
@@ -381,7 +352,7 @@ fn activating_a_copy_read_by_a_backward_edge_reproduces_the_original() {
     let parent = phase_def();
     let refs = base_input_refs();
     let mut child = parent.clone();
-    child.duplicate_compute_nodes_in_place(&[1]);
+    child.duplicate_compute_nodes(&[1]);
     activate_copies(&mut child, &[1]);
     assert_sequences_equivalent(
         "phase_backward_edge",
@@ -414,11 +385,11 @@ proptest! {
     fn copy_activation_is_equivalent_over_fixtures_and_seeds(seed in any::<u64>()) {
         for (label, parent, refs) in activation_fixtures() {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let len = parent.compute_nodes.len();
+            let len = parent.compute_nodes().len();
             let single = vec![rng.gen_range(0..len)];
             for sources in [single, random_cluster(len, &mut rng)] {
                 let mut child = parent.clone();
-                child.duplicate_compute_nodes_in_place(&sources);
+                child.duplicate_compute_nodes(&sources);
                 assert_neutral(
                     &format!("duplicate[{label}]{sources:?}"),
                     &parent,
@@ -446,40 +417,37 @@ proptest! {
 /// A graph whose only splittable edge is one live introspection reference
 /// read directly by an `ActionParam` sink.
 fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphBackendDef {
-    let edge = GraphEdge {
-        source: GraphSource::InputLeaf {
+    let edge = GraphEdge::new(
+        GraphSource::InputLeaf {
             ref_idx: 0,
             sub_idx: 0,
         },
-        weight: 1.0,
-    };
-    CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::WeightedSum,
-            inputs: if on_compute_input {
+        1.0,
+    );
+    CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::WeightedSum,
+            if on_compute_input {
                 vec![edge]
             } else {
                 Vec::new()
             },
-            plasticity: plasticity.then_some(PlasticityConfig {
+            plasticity.then_some(PlasticityConfig {
                 rule: crate::creature::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: false,
                 modulation: None,
             }),
-        }],
-        output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-            inputs: if on_compute_input {
+        )])
+        .with_output_sinks(vec![OutputSink::new(
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+            if on_compute_input {
                 Vec::new()
             } else {
                 vec![edge]
             },
-        }],
-    }
+        )])
 }
 
 fn introspection_refs() -> Vec<InputReference> {
@@ -543,6 +511,6 @@ fn split_exclusion_is_scoped_to_each_of_its_conditions() {
             Ok(()),
             "{label}: outside the exclusion, the split still applies"
         );
-        assert_eq!(child.compute_nodes.len(), def.compute_nodes.len() + 1);
+        assert_eq!(child.compute_nodes().len(), def.compute_nodes().len() + 1);
     }
 }

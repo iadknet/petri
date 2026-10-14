@@ -336,22 +336,22 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
 /// `SharedMemory { slot: 0, previous: true }` and is wired to `WriteSlot(1)`.
 fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(0.6),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![GraphEdge {
-            source: GraphSource::SharedMemory {
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(0.6),
+        Vec::new(),
+        None,
+    ));
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
                 slot: 0,
                 previous: true,
             },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+            1.0,
+        )],
+        None,
+    ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 0);
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(1), 1);
     CreatureGenome {
@@ -367,32 +367,27 @@ fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
 
 fn wire_custom_write_slot(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, source_node: u16) {
     let sink = def
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == kind)
+        .sink_surface(kind)
         .expect("sink kind must exist in the fixed catalog");
-    sink.inputs.push(GraphEdge {
-        source: GraphSource::ComputeNode(source_node),
-        weight: 1.0,
-    });
+    def.push_edge(
+        sink,
+        GraphEdge::new(GraphSource::ComputeNode(source_node), 1.0),
+    );
 }
 
 /// D1's genome: `Constant(1.0)` feeding a `DecayIntegrator(0.5)`.
 fn decay_integrator_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(1.0),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::DecayIntegrator(0.5),
-        inputs: vec![GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(1.0),
+        Vec::new(),
+        None,
+    ));
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::DecayIntegrator(0.5),
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        None,
+    ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -411,11 +406,11 @@ fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenom
     let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
         unreachable!("constructed as a graph backend");
     };
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Oscillator(0.25),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Oscillator(0.25),
+        Vec::new(),
+        None,
+    ));
     genome
 }
 
@@ -424,25 +419,19 @@ fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenom
 /// `WriteSlot(0)`.
 fn backward_edge_recurrence_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(1.0),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![
-            GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            },
-            GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            },
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(1.0),
+        Vec::new(),
+        None,
+    ));
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![
+            GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
+            GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        plasticity: None,
-    });
+        None,
+    ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 1);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -481,18 +470,15 @@ fn reward_modulated_node_genome_impl(
     wire_action: bool,
 ) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(1.0),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        }],
-        plasticity: Some(PlasticityConfig {
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(1.0),
+        Vec::new(),
+        None,
+    ));
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        Some(PlasticityConfig {
             rule: HebbianRule::Classic,
             learning_rate: 0.5,
             weight_clamp: 10.0,
@@ -502,17 +488,12 @@ fn reward_modulated_node_genome_impl(
                 trace_decay: 0.5,
             }),
         }),
-    });
+    ));
     if wire_action {
-        def.output_sinks
-            .iter_mut()
-            .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
-            .expect("catalog Eat vote sink")
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            });
+        let surface = def
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+            .expect("catalog Eat vote sink");
+        def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
     }
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -1336,19 +1317,16 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
 /// (no `Simulation` needed — this is a pure, in-process mesh invocation).
 fn one_step_stateful_genome(node1_kind: ComputeNodeKind, input: f32) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(input),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
-    def.compute_nodes.push(ComputeNode {
-        kind: node1_kind,
-        inputs: vec![GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(input),
+        Vec::new(),
+        None,
+    ));
+    def.append_compute_node(ComputeNode::new(
+        node1_kind,
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        None,
+    ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {

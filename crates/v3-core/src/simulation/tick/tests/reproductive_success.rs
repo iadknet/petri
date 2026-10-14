@@ -27,23 +27,23 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
         }
         CognitiveClass::Stateful | CognitiveClass::Plasticity => {
             let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-            graph.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::DecayIntegrator(0.5),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::SharedMemory {
+            graph.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::DecayIntegrator(0.5),
+                vec![GraphEdge::new(
+                    GraphSource::SharedMemory {
                         slot: 0,
                         previous: true,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: (class == CognitiveClass::Plasticity).then_some(PlasticityConfig {
+                    1.0,
+                )],
+                (class == CognitiveClass::Plasticity).then_some(PlasticityConfig {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 1.0,
                     lamarckian: false,
                     modulation: None,
                 }),
-            });
+            ));
             genome.nodes[0].backend_def = BackendDef::Graph(graph);
         }
     }

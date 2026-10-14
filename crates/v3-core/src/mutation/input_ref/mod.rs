@@ -104,7 +104,7 @@ fn referenced_indices(node: &NodeGenome) -> BTreeSet<u16> {
     match &node.backend_def {
         BackendDef::Graph(def) => def
             .edges()
-            .filter_map(|edge| match edge.source {
+            .filter_map(|edge| match edge.source() {
                 GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
                 GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
             })
@@ -370,11 +370,11 @@ pub(crate) fn connect_declared_input(
     let (Some(ref_idx), Some(vote)) = (ref_idx, sink) else {
         return None;
     };
-    let sink = def.sink_mut(OutputSinkKind::ActionVote(vote))?;
-    sink.inputs.push(GraphEdge {
-        source: GraphSource::InputLeaf { ref_idx, sub_idx },
-        weight,
-    });
+    let surface = def.sink_surface(OutputSinkKind::ActionVote(vote))?;
+    def.push_edge(
+        surface,
+        GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, weight),
+    );
     BirthEdgeClass::of_sink(vote)
 }
 
@@ -394,8 +394,7 @@ fn apply_prune(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), Mutation
 
 /// Replace one entry, drawn uniformly among the node's swappable entries,
 /// with another member of its kind drawn uniformly from the others. The
-/// width is unchanged by construction, so no edge falls out of range and
-/// `clamp_sub_idx_after_swap` has nothing to remove.
+/// width is unchanged by construction, so no edge falls out of range.
 fn apply_swap(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
@@ -412,7 +411,7 @@ fn apply_swap(
     debug_assert_eq!(
         sub_value_count(&new_ref),
         sub_value_count(old_ref),
-        "a within-kind swap keeps the width, so clamp_sub_idx_after_swap removes nothing"
+        "a within-kind swap keeps the width, so every edge stays in range"
     );
     node.input_refs[ref_idx] = new_ref;
     Ok(())

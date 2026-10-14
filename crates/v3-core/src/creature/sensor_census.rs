@@ -207,9 +207,9 @@ fn census_graph(
     let live = cgp_live_compute_indices(graph);
     census.holds_stateful_node |= live
         .iter()
-        .any(|&idx| graph.compute_nodes[idx].kind.class() == NodeClass::Stateful);
+        .any(|&idx| graph.compute_nodes()[idx].kind.class() == NodeClass::Stateful);
     for edge in wired_surface_edges(graph, &live) {
-        match edge.source {
+        match edge.source() {
             GraphSource::InputLeaf { ref_idx, .. } => {
                 census.insert_input(input_refs.get(ref_idx as usize));
             }
@@ -287,6 +287,7 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, NodeId};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
+    use crate::creature::genome::cgp::test_support::push_sink;
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
@@ -327,19 +328,13 @@ mod tests {
     }
 
     fn empty_graph() -> CgpGraphBackendDef {
-        CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-        }
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(Vec::new())
     }
 
     fn edge(source: GraphSource) -> GraphEdge {
-        GraphEdge {
-            source,
-            weight: 1.0,
-        }
+        GraphEdge::new(source, 1.0)
     }
 
     fn leaf(ref_idx: u16) -> GraphEdge {
@@ -380,15 +375,18 @@ mod tests {
         let key = WorldInputKey::NeighborOccupiedRing;
         let graph = {
             let mut graph = empty_graph();
-            graph.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![leaf(0), leaf(0)],
-                plasticity: None,
-            });
-            graph.output_sinks.push(OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![edge(GraphSource::ComputeNode(0)), leaf(0)],
-            });
+            graph.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![leaf(0), leaf(0)],
+                None,
+            ));
+            push_sink(
+                &mut graph,
+                OutputSink::new(
+                    OutputSinkKind::CustomOutput(0),
+                    vec![edge(GraphSource::ComputeNode(0)), leaf(0)],
+                ),
+            );
             graph
         };
         let census = census_of(&graph_node(graph, vec![InputReference::World(key)]));
@@ -425,11 +423,7 @@ mod tests {
         let graph = {
             let mut graph = empty_graph();
             // CN0 feeds nothing: no sink wires it.
-            graph.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![leaf(0)],
-                plasticity: None,
-            });
+            graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)], None));
             graph
         };
         let census = census_of(&graph_node(
@@ -479,10 +473,10 @@ mod tests {
         let genome = graph_node(
             {
                 let mut graph = empty_graph();
-                graph.output_sinks.push(OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![leaf(0)],
-                });
+                push_sink(
+                    &mut graph,
+                    OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(0)]),
+                );
                 graph
             },
             vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
@@ -554,10 +548,13 @@ mod tests {
     fn a_shared_memory_edge_is_a_stateful_read_for_either_previous_flag() {
         for previous in [false, true] {
             let mut graph = empty_graph();
-            graph.output_sinks.push(OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![edge(GraphSource::SharedMemory { slot: 0, previous })],
-            });
+            push_sink(
+                &mut graph,
+                OutputSink::new(
+                    OutputSinkKind::CustomOutput(0),
+                    vec![edge(GraphSource::SharedMemory { slot: 0, previous })],
+                ),
+            );
             let census = census_of(&graph_node(graph, vec![]));
 
             assert!(
@@ -578,15 +575,14 @@ mod tests {
         ];
         for kind in stateful_kinds {
             let mut graph = empty_graph();
-            graph.compute_nodes.push(ComputeNode {
-                kind,
-                inputs: vec![],
-                plasticity: None,
-            });
-            graph.output_sinks.push(OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![edge(GraphSource::ComputeNode(0))],
-            });
+            graph.append_compute_node(ComputeNode::new(kind, vec![], None));
+            push_sink(
+                &mut graph,
+                OutputSink::new(
+                    OutputSinkKind::CustomOutput(0),
+                    vec![edge(GraphSource::ComputeNode(0))],
+                ),
+            );
             let census = census_of(&graph_node(graph, vec![]));
 
             assert!(census.holds_stateful_node, "{kind:?} persists node state");
@@ -595,21 +591,24 @@ mod tests {
         }
 
         let mut graph = empty_graph();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![],
-            plasticity: Some(PlasticityConfig {
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 1.0,
                 lamarckian: false,
                 modulation: None,
             }),
-        });
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![edge(GraphSource::ComputeNode(0))],
-        });
+        ));
+        push_sink(
+            &mut graph,
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![edge(GraphSource::ComputeNode(0))],
+            ),
+        );
         let census = census_of(&graph_node(graph, vec![]));
 
         assert!(
@@ -621,11 +620,11 @@ mod tests {
     #[test]
     fn an_unreachable_stateful_compute_node_is_not_counted() {
         let mut graph = empty_graph();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![],
-            plasticity: None,
-        });
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![],
+            None,
+        ));
         let census = census_of(&graph_node(graph, vec![]));
 
         assert!(!census.reads_any_stateful(), "{census:?}");
@@ -636,14 +635,17 @@ mod tests {
         use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
         use crate::creature::genome::vote::VoteSink;
         let mut graph = empty_graph();
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::ActionVote(VoteSink::Move(0)),
-            inputs: vec![leaf(0)],
-        });
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-            inputs: vec![leaf(1)],
-        });
+        push_sink(
+            &mut graph,
+            OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Move(0)), vec![leaf(0)]),
+        );
+        push_sink(
+            &mut graph,
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![leaf(1)],
+            ),
+        );
         let census = census_of(&graph_node(
             graph,
             vec![
@@ -695,10 +697,13 @@ mod tests {
         assert!(census.world_inputs.is_empty());
 
         let mut graph = empty_graph();
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![leaf(2), leaf(2), leaf(4)],
-        });
+        push_sink(
+            &mut graph,
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![leaf(2), leaf(2), leaf(4)],
+            ),
+        );
         let census = census_of(&graph_node(graph, refs.clone()));
         assert_eq!(
             census.decision_inputs,
@@ -765,10 +770,10 @@ mod tests {
     #[test]
     fn a_non_world_reference_is_not_a_world_input() {
         let mut graph = empty_graph();
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![leaf(0)],
-        });
+        push_sink(
+            &mut graph,
+            OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(0)]),
+        );
         let census = census_of(&graph_node(
             graph,
             vec![InputReference::DynamicIntrospection(
@@ -888,10 +893,13 @@ mod tests {
     /// set of world keys behind the drawn indices, whatever was drawn.
     fn graph_reading_refs(refs: &[InputReference], indices: &[u16]) -> CreatureGenome {
         let mut graph = empty_graph();
-        graph.output_sinks.push(OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: indices.iter().copied().map(leaf).collect(),
-        });
+        push_sink(
+            &mut graph,
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                indices.iter().copied().map(leaf).collect(),
+            ),
+        );
         graph_node(graph, refs.to_vec())
     }
 

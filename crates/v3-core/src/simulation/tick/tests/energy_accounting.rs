@@ -381,31 +381,30 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
             node_id: NodeId::new(0),
             input_refs: vec![],
             targets: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(1.0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::SharedMemory {
-                            slot: 0,
-                            previous: false,
-                        },
-                        weight: 0.5,
-                    }],
-                    plasticity: Some(PlasticityConfig {
-                        rule: HebbianRule::Classic,
-                        learning_rate: 0.5,
-                        weight_clamp: 2.0,
-                        lamarckian: false,
-                        modulation: Some(RewardModulationConfig {
-                            reward_source: OutcomeChannel::EnergyDelta,
-                            trace_decay: 0.5,
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![ComputeNode::new(
+                        ComputeNodeKind::Constant(1.0),
+                        vec![GraphEdge::new(
+                            GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            0.5,
+                        )],
+                        Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 2.0,
+                            lamarckian: false,
+                            modulation: Some(RewardModulationConfig {
+                                reward_source: OutcomeChannel::EnergyDelta,
+                                trace_decay: 0.5,
+                            }),
                         }),
-                    }),
-                }],
-                output_sinks: vec![],
-            }),
+                    )])
+                    .with_output_sinks(vec![]),
+            ),
         }],
     };
     let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);

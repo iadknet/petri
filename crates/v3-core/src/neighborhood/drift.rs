@@ -390,15 +390,17 @@ mod tests {
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
         for node in &mut dead.nodes {
             if let BackendDef::Graph(graph) = &mut node.backend_def {
-                for sink in &mut graph.output_sinks {
-                    if matches!(
-                        sink.kind,
-                        crate::creature::genome::cgp::OutputSinkKind::ActionVote(_)
-                            | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_)
-                    ) {
-                        sink.inputs.clear();
+                crate::creature::genome::cgp::test_support::edit_sinks(graph, |sinks| {
+                    for sink in sinks {
+                        if matches!(
+                            sink.kind,
+                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(_)
+                                | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_)
+                        ) {
+                            sink.inputs.clear();
+                        }
                     }
-                }
+                });
             }
         }
         let base = battery.signature(&dead, context.runtime, context.shared_memory_decay_rate);
@@ -821,92 +823,69 @@ mod tests {
 
     /// The walk dates a module from the generation its birth produced, and it
     /// folds every executed-set refresh into the module table rather than
-    /// waiting for the next checkpoint. Both show up in the cohort's
-    /// time-to-first medians, which this deterministic walk pins.
+    /// waiting for the next checkpoint. A constructed lineage shows both
+    /// without pinning any draw history: a module born at generation 3 and
+    /// first dispatched at the depth-10 refresh dates its dispatch seven
+    /// generations after its birth; without the refresh fold the date waits
+    /// for the depth-20 checkpoint.
     #[test]
     fn the_walk_dates_modules_from_their_birth_and_from_every_refresh() {
-        use crate::neighborhood::recruitment::{CohortFact, TimeToFirst};
-        let config = SimulationConfig::default();
-        let context = EvalContext::from_config(&config);
-        let battery = Battery::generate(context.food_type_count);
+        use crate::contracts::RouteTarget;
+        use crate::mutation::types::MutationSummary;
+        use crate::neighborhood::recruitment::{
+            BirthObservation, CohortFact, RecruitmentTracker, TimeToFirst,
+        };
+        const BORN: u64 = 3;
+        const CHECKPOINT: u64 = 2 * EXECUTED_REFRESH_INTERVAL;
         let founder = founder_genome(FounderProfile::V3Alpha1);
-        let walk = observe(
-            &founder,
-            &battery,
-            &config.mutation,
-            &context,
-            DriftSizes {
-                lineages: 8,
-                birth_lineages: 2,
-                births: 2,
-                // Past the depth-10 refresh, so a dispatch date can predate
-                // the closing checkpoint.
-                checkpoints: &[1, 20],
-            },
-        );
-        let reading = &walk.recruitment[1];
-        assert_eq!(reading.depth, 20);
-        // T13.F03 re-pin: applicability-first selection changes which
-        // operator applies at each node-internal event, so this walk's
-        // lineages differ from the pre-repair ones; the dating properties
-        // the test exists for are asserted on the new walk. Re-pinned again
-        // 2026-09-18 when the topology weight table was scaled ten-fold
-        // around `ChangeEntryNode` (weight 1 of 211): every topology draw
-        // shifts, so the walk's lineages diverge at their first topology
-        // event. Re-pinned 2026-09-19 for the 25% large-copy weight default,
-        // which again changes topology draws and downstream RNG history.
-        // Re-pinned by T19.F04: the 97-unit vote founder draws fewer events
-        // per birth and its graph decision node changes every
-        // node-internal draw. Re-pinned by T19.F05: the input-reference draw
-        // grows from 22 to 27 entries, so every input-reference event draws
-        // differently. Re-pinned by T11.F20 (drift-depth-v4): every walk
-        // birth draws Binomial(97, 0.005) instead of the retired per-birth
-        // rule, so the lineages and their module dates change. Re-pinned by
-        // T20.F16: Graph-node `Add` draws three more numbers and appends a
-        // vote edge, so the walk's lineages diverge at their first Graph-node
-        // `Add` (dispatched 7 -> 4; dispatch reached 7 -> 5, median 7 -> 6;
-        // internal change median 1 -> 9). Re-pinned by T11.F29: the
-        // `AddFeedbackRoute` entry remaps every topology draw (created 9 -> 7,
-        // dispatched 4 -> 5, dispatch censored present 4 -> 2, internal
-        // change reached 3 -> 1). Re-pinned by T11.F31: five ring projection
-        // operators change every Graph-domain draw (created 7 -> 6,
-        // dispatched 5 -> 3, dispatch censored present 2 -> 3, internal
-        // change censored present 6 -> 5). Re-pinned 2026-10-12 when T20.F04
-        // whole-family recruitment and T20.F05 refinement became defaults:
-        // two more Graph operators change every Graph-domain draw (created
-        // 6 -> 7, dispatched 3 -> 4, internal change censored present 5 -> 6).
-        assert_eq!(reading.cohort.created, 7);
-        assert_eq!(reading.cohort.dispatched(), 4);
-        // Four cohort modules reached dispatch, the median six generations
-        // after the birth that created them: later births, or a dispatch date
-        // taken only at the closing checkpoint, would both read higher.
-        assert_eq!(
-            reading.time_to_first(CohortFact::Dispatch),
-            &TimeToFirst {
-                reached: 4,
-                median_generations: Some(6),
-                censored_deleted: 0,
-                censored_present: 3,
-            },
-        );
-        // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
-        // `Prune` draw differently from the old `Swap`/`Remove`, so the walk's
-        // lineages diverge at their first input-reference event; two cohort
-        // modules reached an internal change. With the 25% copy default,
-        // three reach an internal change, still a median five generations
-        // after birth; on the T19.F04 vote founder six do, at the same
-        // median. On the T11.F20 walk three do, a median one generation
-        // after birth; on the T20.F16 walk three do, a median nine; on the
-        // T11.F29 walk one does, nine generations after birth, as on the
-        // T11.F31 walk and the 2026-10-12 default-mechanisms walk.
-        assert_eq!(
-            reading.time_to_first(CohortFact::InternalChange),
-            &TimeToFirst {
-                reached: 1,
-                median_generations: Some(9),
-                censored_deleted: 0,
-                censored_present: 6,
-            },
-        );
+        // The child adds one module: a copy of node 1 that node 1 routes to.
+        let mut child = founder.clone();
+        let added = NodeId::new(2);
+        let mut module = child.nodes[1].clone();
+        module.node_id = added;
+        child.nodes[1].targets.push(RouteTarget {
+            target_id: added,
+            slot: 0,
+            gate_bias: 0.0,
+        });
+        child.nodes.push(module);
+        let all: BTreeSet<NodeId> = child.nodes.iter().map(|node| node.node_id).collect();
+        let founders: BTreeSet<NodeId> = founder.nodes.iter().map(|node| node.node_id).collect();
+
+        let dispatch_date = |refresh: bool| {
+            let mut tracker = RecruitmentTracker::new(1);
+            tracker.seed_founder(0, &founder.nodes);
+            record_dispatch(&mut tracker, std::slice::from_ref(&founders), 0);
+            tracker.record_birth(BirthObservation {
+                lineage: 0,
+                depth: BORN,
+                after: &child.nodes,
+                summary: &MutationSummary::zero(),
+            });
+            let module = tracker
+                .modules()
+                .find(|module| module.node == added)
+                .expect("the birth created the module");
+            assert_eq!(module.created_depth, BORN, "dated from its birth");
+            if refresh {
+                record_dispatch(
+                    &mut tracker,
+                    std::slice::from_ref(&all),
+                    EXECUTED_REFRESH_INTERVAL,
+                );
+            }
+            tracker.record_reading(0, CHECKPOINT, &all, Some(&BTreeSet::new()));
+            *tracker
+                .checkpoint(CHECKPOINT)
+                .time_to_first(CohortFact::Dispatch)
+        };
+        let dated = |generations| TimeToFirst {
+            reached: 1,
+            median_generations: Some(generations),
+            censored_deleted: 0,
+            censored_present: 0,
+        };
+        assert_eq!(dispatch_date(true), dated(EXECUTED_REFRESH_INTERVAL - BORN));
+        assert_eq!(dispatch_date(false), dated(CHECKPOINT - BORN));
     }
 }

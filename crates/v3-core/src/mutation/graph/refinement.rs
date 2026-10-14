@@ -3,7 +3,9 @@ use rand::Rng;
 use std::collections::HashMap;
 
 use crate::contracts::{Direction, InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, OutputSinkKind};
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind,
+};
 use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, NodeGenome};
 use crate::mutation::types::MutationSkipReason;
@@ -86,12 +88,12 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
     // The map is lookup-only: first genomic occurrence fixes selection order.
     let mut indices = HashMap::new();
     let mut candidates: Vec<(Group, bool)> = Vec::new();
-    for (sink_index, sink) in def.output_sinks.iter().enumerate() {
+    for (sink_index, sink) in def.output_sinks().iter().enumerate() {
         let OutputSinkKind::ActionVote(vote) = sink.kind else {
             continue;
         };
         for (edge_index, edge) in sink.inputs.iter().enumerate() {
-            let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source else {
+            let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() else {
                 continue;
             };
             let Some(InputReference::World(family)) = references.get(usize::from(ref_idx)) else {
@@ -111,7 +113,7 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
                 candidates.len() - 1
             });
             let (group, valid) = &mut candidates[index];
-            if !edge.weight.is_finite()
+            if !edge.weight().is_finite()
                 || group
                     .members
                     .iter()
@@ -158,7 +160,7 @@ fn apply_step(
     let mut proposed = [0.0f32; 8];
     let mut norm_squared = 0.0f64;
     for (member, proposed) in group.members.iter().zip(&mut proposed) {
-        let old = def.output_sinks[member.sink].inputs[member.edge].weight;
+        let old = def.output_sinks()[member.sink].inputs[member.edge].weight();
         *proposed = old + increment;
         if !proposed.is_finite() {
             return Err(MutationSkipReason::NumericProposalRejected);
@@ -170,7 +172,11 @@ fn apply_step(
     }
     // No writes occur until every coefficient and the actual vector pass.
     for (member, proposed) in group.members.iter().zip(proposed) {
-        def.output_sinks[member.sink].inputs[member.edge].weight = proposed;
+        def.edge_mut(EdgeOccurrence::new(
+            EdgeSurface::SinkInput(member.sink),
+            member.edge,
+        ))
+        .set_weight(proposed);
     }
     Ok(())
 }

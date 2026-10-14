@@ -71,58 +71,58 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // CN0: FoodHere
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: 0,
                 },
-                weight: 1.0,
-            }],
-            plasticity: None,
-        });
+                1.0,
+            )],
+            None,
+        ));
         // CN1..=8: NeighborFoodRing per direction
         for dir_idx in 0u16..8 {
-            def.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+            def.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 1,
                         sub_idx: dir_idx,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            });
+                    1.0,
+                )],
+                None,
+            ));
         }
         // CN9..=16: NeighborBarrierRing per direction
         for dir_idx in 0u16..8 {
-            def.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+            def.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 2,
                         sub_idx: dir_idx,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            });
+                    1.0,
+                )],
+                None,
+            ));
         }
         // CN17..=24: NeighborOccupiedRing per direction
         for dir_idx in 0u16..8 {
-            def.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+            def.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 3,
                         sub_idx: dir_idx,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            });
+                    1.0,
+                )],
+                None,
+            ));
         }
         def
     };
@@ -239,28 +239,24 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
 
         for (i, &sub_idx) in sub_indices.iter().enumerate().take(input_refs.len()) {
             // Add compute node reading InputLeaf(ref_idx=i, sub_idx)
-            def.compute_nodes.push(ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+            def.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: i as u16,
                         sub_idx,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            });
+                    1.0,
+                )],
+                None,
+            ));
             // Wire CustomOutput(i) sink to the compute node we just added
-            let cn_idx = def.compute_nodes.len() - 1;
-            if let Some(sink) = def
-                .output_sinks
-                .iter_mut()
-                .find(|s| s.kind == OutputSinkKind::CustomOutput(i as u8))
-            {
-                sink.inputs.push(GraphEdge {
-                    source: GraphSource::ComputeNode(cn_idx as u16),
-                    weight: 1.0,
-                });
+            let cn_idx = def.compute_nodes().len() - 1;
+            if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(i as u8)) {
+                def.push_edge(
+                    sink,
+                    GraphEdge::new(GraphSource::ComputeNode(cn_idx as u16), 1.0),
+                );
             }
         }
         def

@@ -265,31 +265,26 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
         }
     }
     fn sink(source: GraphSource) -> OutputSink {
-        OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![GraphEdge {
-                source,
-                weight: 1.0,
-            }],
-        }
+        OutputSink::new(
+            OutputSinkKind::CustomOutput(0),
+            vec![GraphEdge::new(source, 1.0)],
+        )
     }
-    let inert = CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::Constant(0.0),
-            inputs: vec![],
-            plasticity: None,
-        }],
-        output_sinks: vec![sink(GraphSource::ComputeNode(0))],
-    };
+    let inert = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Constant(0.0),
+            vec![],
+            None,
+        )])
+        .with_output_sinks(vec![sink(GraphSource::ComputeNode(0))]);
     let mut shared_memory_reader = inert.clone();
-    shared_memory_reader.output_sinks = vec![sink(GraphSource::SharedMemory {
-        slot: 0,
-        previous: false,
-    })];
+    shared_memory_reader =
+        shared_memory_reader.with_output_sinks(vec![sink(GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        })]);
     let mut stateful_node_holder = inert.clone();
-    stateful_node_holder.compute_nodes[0].kind = ComputeNodeKind::DecayIntegrator(0.5);
+    stateful_node_holder.set_compute_kind(0, ComputeNodeKind::DecayIntegrator(0.5));
 
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 3;

@@ -22,21 +22,14 @@ use crate::support::{
 /// is wired to the specified CustomOutput sink.
 fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(value),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(value),
+        Vec::new(),
+        None,
+    ));
     // Wire the CustomOutput(custom_slot) sink to CN0
-    if let Some(sink) = def
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::CustomOutput(custom_slot))
-    {
-        sink.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+    if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {
+        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     }
     def
 }
@@ -50,24 +43,17 @@ fn cgp_passthrough_input_to_custom_output(
 ) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // CN0: Add with single InputLeaf edge (acts as passthrough)
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![GraphEdge {
-            source: GraphSource::InputLeaf { ref_idx, sub_idx },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(
+            GraphSource::InputLeaf { ref_idx, sub_idx },
+            1.0,
+        )],
+        None,
+    ));
     // Wire CustomOutput(custom_slot) to CN0
-    if let Some(sink) = def
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::CustomOutput(custom_slot))
-    {
-        sink.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+    if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {
+        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     }
     def
 }

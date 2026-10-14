@@ -24,10 +24,8 @@ fn memory(slot: u8) -> GraphSource {
 }
 
 fn wire(def: &mut CgpGraphBackendDef, sink: VoteSink, source: GraphSource, weight: f32) {
-    def.sink_mut(OutputSinkKind::ActionVote(sink))
-        .unwrap()
-        .inputs
-        .push(GraphEdge { source, weight });
+    let surface = def.sink_surface(OutputSinkKind::ActionVote(sink)).unwrap();
+    def.push_edge(surface, GraphEdge::new(source, weight));
 }
 
 fn graph_genome(def: CgpGraphBackendDef) -> CreatureGenome {

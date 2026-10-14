@@ -32,7 +32,7 @@ fn edges_wsum(
     buf.clear();
     buf.extend(edges.iter().map(|edge| {
         let v = resolve_source_post_convergence(
-            &edge.source,
+            &edge.source(),
             compute_count,
             curr_outputs,
             input_refs,
@@ -40,7 +40,7 @@ fn edges_wsum(
             shared_memory,
             prev_shared_memory,
         );
-        v * edge.weight
+        v * edge.weight()
     }));
     buf.iter().copied().sum()
 }
@@ -113,9 +113,9 @@ pub(crate) fn apply_cgp_graph_effects(
 ) -> (NodeResult, CgpEffectsTrace) {
     let mut output_slots = *upstream_slots;
     let mut route_gates = RouteGateMap::default();
-    let compute_count = def.compute_nodes.len();
+    let compute_count = def.compute_nodes().len();
     let mut buf = Vec::with_capacity(8);
-    let mut output_sink_traces = Vec::with_capacity(def.output_sinks.len());
+    let mut output_sink_traces = Vec::with_capacity(def.output_sinks().len());
     // This visit's vote contribution (T19.F03): the sanitized weighted sum of
     // each wired `ActionVote` sink, 0 for an unwired one. Staged at the end of
     // the effects, which only run when the visit commits.
@@ -130,7 +130,7 @@ pub(crate) fn apply_cgp_graph_effects(
         prev_shared_memory,
     );
 
-    for sink in &def.output_sinks {
+    for sink in def.output_sinks() {
         // A directed vote sink's projection term (T11.F31), added to its edge
         // sum; the sink is applied when it has edges or a projection.
         let projection = match sink.kind {

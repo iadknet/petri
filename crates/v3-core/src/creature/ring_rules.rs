@@ -126,20 +126,22 @@ fn bus(
 ) -> BTreeMap<u8, Vec<(WorldInputKey, u8, bool)>> {
     let mut bus: BTreeMap<u8, Vec<(WorldInputKey, u8, bool)>> = BTreeMap::new();
     for (def, refs) in graphs(genome, reachable) {
-        for sink in &def.output_sinks {
+        for sink in def.output_sinks() {
             let OutputSinkKind::CustomOutput(slot) = sink.kind else {
                 continue;
             };
-            for edge in sink.inputs.iter().filter(|edge| carries(edge.weight)) {
-                if let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source {
+            for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+                if let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() {
                     if let (Some(family), Ok(channel)) = (
                         ring_of(refs.get(usize::from(ref_idx))),
                         u8::try_from(sub_idx),
                     ) {
                         if channel < DIRECTIONS {
-                            bus.entry(slot)
-                                .or_default()
-                                .push((family, channel, edge.weight > 0.0));
+                            bus.entry(slot).or_default().push((
+                                family,
+                                channel,
+                                edge.weight() > 0.0,
+                            ));
                         }
                     }
                 }
@@ -167,7 +169,7 @@ impl RingRuleCensus {
         let mut coverage = Coverage::default();
         let mut carried = 0u64;
         for (def, refs) in graphs(genome, reachable) {
-            for sink in &def.output_sinks {
+            for sink in def.output_sinks() {
                 let OutputSinkKind::ActionVote(vote) = sink.kind else {
                     continue;
                 };
@@ -177,8 +179,8 @@ impl RingRuleCensus {
                 if d >= DIRECTIONS {
                     continue;
                 }
-                for edge in sink.inputs.iter().filter(|edge| carries(edge.weight)) {
-                    let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source else {
+                for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+                    let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() else {
                         continue;
                     };
                     let reference = refs.get(usize::from(ref_idx));
@@ -188,7 +190,7 @@ impl RingRuleCensus {
                                 family,
                                 kind,
                                 offset: RingProjection::offset_for(d, channel),
-                                positive: edge.weight > 0.0,
+                                positive: edge.weight() > 0.0,
                             };
                             coverage.add(rule, d, true);
                         }
@@ -202,7 +204,7 @@ impl RingRuleCensus {
                                 family,
                                 kind,
                                 offset: RingProjection::offset_for(d, channel),
-                                positive: positive == (edge.weight > 0.0),
+                                positive: positive == (edge.weight() > 0.0),
                             };
                             coverage.add(rule, d, true);
                         }

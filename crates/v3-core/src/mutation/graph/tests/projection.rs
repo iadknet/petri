@@ -257,8 +257,8 @@ fn add_and_refinement_are_unchanged_by_projections() {
         assert_eq!(a.gen::<u64>(), b.gen::<u64>(), "seed {seed}");
         assert_eq!(plain.nodes[idx].input_refs, projected.nodes[idx].input_refs);
         let (p, q) = (graph(&plain.nodes[idx]), graph(&projected.nodes[idx]));
-        assert_eq!(p.output_sinks, q.output_sinks);
-        assert_eq!(p.compute_nodes, q.compute_nodes);
+        assert_eq!(p.output_sinks(), q.output_sinks());
+        assert_eq!(p.compute_nodes(), q.compute_nodes());
         assert_eq!(q.projections, three());
     }
 }

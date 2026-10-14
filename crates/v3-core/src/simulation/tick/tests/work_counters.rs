@@ -92,31 +92,30 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
         nodes: vec![NodeGenome {
             node_id,
             input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(1.0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::SharedMemory {
-                            slot: 0,
-                            previous: false,
-                        },
-                        weight: 1.0,
-                    }],
-                    plasticity: Some(PlasticityConfig {
-                        rule: HebbianRule::Classic,
-                        learning_rate: 0.5,
-                        weight_clamp: 1.0,
-                        lamarckian: false,
-                        modulation: Some(RewardModulationConfig {
-                            reward_source: OutcomeChannel::EnergyDelta,
-                            trace_decay: 0.9,
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![ComputeNode::new(
+                        ComputeNodeKind::Constant(1.0),
+                        vec![GraphEdge::new(
+                            GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            1.0,
+                        )],
+                        Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 1.0,
+                            lamarckian: false,
+                            modulation: Some(RewardModulationConfig {
+                                reward_source: OutcomeChannel::EnergyDelta,
+                                trace_decay: 0.9,
+                            }),
                         }),
-                    }),
-                }],
-                output_sinks: vec![],
-            }),
+                    )])
+                    .with_output_sinks(vec![]),
+            ),
             targets: vec![],
         }],
     };
@@ -209,23 +208,22 @@ fn cognition_totals(stats: &crate::simulation::stats::SimStats) -> [u64; 7] {
 
 fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureGenome {
     use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
-    let edge = GraphEdge {
-        source: GraphSource::ComputeNode(0),
-        weight: 0.5,
-    };
-    let node = |edges, modulated: bool| ComputeNode {
-        kind: ComputeNodeKind::Constant(1.0),
-        inputs: vec![edge; edges],
-        plasticity: Some(PlasticityConfig {
-            rule: HebbianRule::Classic,
-            learning_rate: 0.5,
-            weight_clamp: 2.0,
-            lamarckian: false,
-            modulation: modulated.then_some(RewardModulationConfig {
-                reward_source: OutcomeChannel::ActionSuccess,
-                trace_decay: 0.0,
+    let edge = GraphEdge::new(GraphSource::ComputeNode(0), 0.5);
+    let node = |edges, modulated: bool| {
+        ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            vec![edge; edges],
+            Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.5,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: modulated.then_some(RewardModulationConfig {
+                    reward_source: OutcomeChannel::ActionSuccess,
+                    trace_decay: 0.0,
+                }),
             }),
-        }),
+        )
     };
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -233,29 +231,18 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
             node_id: NodeId::new(0),
             input_refs: vec![],
             targets: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![
-                    ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    node(hebbian_edges, false),
-                    node(reward_edges, true),
-                ],
-                output_sinks: vec![
-                    OutputSink {
-                        kind: OutputSinkKind::WriteSlot(0),
-                        inputs: vec![edge],
-                    },
-                    OutputSink {
-                        kind: OutputSinkKind::ClearSlot(0),
-                        inputs: vec![edge],
-                    },
-                ],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+                        node(hebbian_edges, false),
+                        node(reward_edges, true),
+                    ])
+                    .with_output_sinks(vec![
+                        OutputSink::new(OutputSinkKind::WriteSlot(0), vec![edge]),
+                        OutputSink::new(OutputSinkKind::ClearSlot(0), vec![edge]),
+                    ]),
+            ),
         }],
     }
 }

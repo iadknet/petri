@@ -21,12 +21,11 @@ fn graph_node(id: u32) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(id),
         input_refs: vec![InputReference::ActionQueue],
-        backend_def: BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-        }),
+        backend_def: BackendDef::Graph(
+            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
+                .with_compute_nodes(Vec::new())
+                .with_output_sinks(Vec::new()),
+        ),
         targets: vec![RouteTarget {
             target_id: NodeId::new(0),
             slot: 0,

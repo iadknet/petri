@@ -143,8 +143,10 @@ Constraints:
   preserve lazy initialization. Never borrow another edge's value from a short
   parent slice; parallel equal edges remain separate occurrences.
 - Inherited storage is independent. Birth adds no clamping and never writes
-  learned values into the child genome or changes the parent's state. Temporary
-  correspondence is consumed before spawn; runtime arrays do not define homology.
+  learned values into the child genome or changes the parent's state. The temporary
+  correspondence is the draft's `BirthSeeds`: reproduction captures them on the
+  child draft before mutation and the newborn's constructor consumes them, so a
+  built creature's genome carries none; runtime arrays do not define homology.
 
 ### Phenotype
 

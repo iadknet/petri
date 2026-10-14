@@ -23,7 +23,7 @@ pub(crate) fn decay_eligibility_traces(
         let BackendDef::Graph(def) = &node.backend_def else {
             continue;
         };
-        for (compute, traces) in def.compute_nodes.iter().zip(module_traces) {
+        for (compute, traces) in def.compute_nodes().iter().zip(module_traces) {
             if let Some(modulation) = compute
                 .plasticity
                 .as_ref()
@@ -54,7 +54,7 @@ pub(crate) fn ensure_eligibility_traces(
     }
 
     let node_traces = &mut eligibility_traces[node_idx];
-    let node_count = def.compute_nodes.len();
+    let node_count = def.compute_nodes().len();
 
     // Ensure inner vec covers all compute nodes.
     if node_traces.len() < node_count {
@@ -62,7 +62,7 @@ pub(crate) fn ensure_eligibility_traces(
     }
 
     // Lazily initialize traces for reward-modulated nodes (all zeros).
-    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+    for (i, cnode) in def.compute_nodes().iter().enumerate() {
         let is_reward_modulated = cnode
             .plasticity
             .as_ref()
@@ -91,9 +91,9 @@ pub(crate) fn update_eligibility_traces(
     shared_memory: &[f32; 16],
     prev_shared_memory: &[f32; 16],
 ) {
-    let compute_count = def.compute_nodes.len();
+    let compute_count = def.compute_nodes().len();
 
-    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+    for (i, cnode) in def.compute_nodes().iter().enumerate() {
         let cfg = match &cnode.plasticity {
             Some(c) => c,
             None => continue,
@@ -137,7 +137,7 @@ pub(crate) fn update_eligibility_traces(
             }
 
             let pre = resolve_source(
-                &edge.source,
+                &edge.source(),
                 i,
                 compute_count,
                 prev_outputs,
@@ -151,7 +151,7 @@ pub(crate) fn update_eligibility_traces(
             let w = if edge_idx < weights.len() {
                 weights[edge_idx]
             } else {
-                edge.weight // fall back to genome weight
+                edge.weight() // fall back to genome weight
             };
 
             // Compute activity only; reward applies the learning rate.
@@ -171,7 +171,7 @@ pub(crate) fn update_eligibility_traces(
 /// Returns `true` if any internal node has reward-modulated plasticity.
 #[inline]
 pub(crate) fn has_any_reward_modulated(def: &CgpGraphBackendDef) -> bool {
-    def.compute_nodes.iter().any(|n| {
+    def.compute_nodes().iter().any(|n| {
         n.plasticity
             .as_ref()
             .is_some_and(|p| p.modulation.is_some())

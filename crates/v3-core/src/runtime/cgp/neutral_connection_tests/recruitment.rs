@@ -71,9 +71,9 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                 let mut refined = node.clone();
                 alter_edge_weight_in_def(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                     .unwrap();
-                let weights: Vec<_> = graph(&refined).edges().map(|edge| edge.weight).collect();
+                let weights: Vec<_> = graph(&refined).edges().map(|edge| edge.weight()).collect();
                 assert_eq!(weights.iter().filter(|&&weight| weight != 0.0).count(), 1);
-                assert!(graph(&node).edges().all(|edge| edge.weight == 0.0));
+                assert!(graph(&node).edges().all(|edge| edge.weight() == 0.0));
                 let votes = effects(graph(&refined), &refined.input_refs, 0.5)
                     .side
                     .dispatch_effects()
@@ -121,7 +121,7 @@ fn recruitment_reuses_references_appends_duplicates_and_copies_then_prunes_witho
     alter_edge_weight_in_def(graph_mut(&mut genome.nodes[2]), &mut rng).unwrap();
     assert!(graph(&genome.nodes[1])
         .edges()
-        .all(|edge| edge.weight == 0.0));
+        .all(|edge| edge.weight() == 0.0));
     for _ in 0..2 {
         remove_edge(graph_mut(&mut genome.nodes[2]), &mut rng).unwrap();
     }

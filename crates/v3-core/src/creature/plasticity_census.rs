@@ -150,7 +150,7 @@ impl PlasticityCensus {
             else {
                 continue;
             };
-            for (compute_idx, compute) in def.compute_nodes.iter().enumerate() {
+            for (compute_idx, compute) in def.compute_nodes().iter().enumerate() {
                 let Some(config) = &compute.plasticity else {
                     continue;
                 };
@@ -167,7 +167,7 @@ impl PlasticityCensus {
                     let Some(&weight) = weights.get(edge) else {
                         continue;
                     };
-                    let drift = f64::from((weight - genomic.weight).abs());
+                    let drift = f64::from((weight - genomic.weight()).abs());
                     // A non-finite weight would poison the population sum.
                     if drift.is_finite() {
                         row.drift_sum += drift;

@@ -54,7 +54,7 @@ pub fn structural_companions(genome: &CreatureGenome) -> StructuralCompanions {
                 }
             }
             BackendDef::Graph(graph) => {
-                for compute_node in &graph.compute_nodes {
+                for compute_node in graph.compute_nodes() {
                     if compute_node.plasticity.is_some() {
                         has_plasticity = true;
                     }
@@ -62,12 +62,12 @@ pub fn structural_companions(genome: &CreatureGenome) -> StructuralCompanions {
                         has_stateful_compute_node = true;
                     }
                     for edge in &compute_node.inputs {
-                        if matches!(edge.source, GraphSource::SharedMemory { .. }) {
+                        if matches!(edge.source(), GraphSource::SharedMemory { .. }) {
                             reads_shared_memory = true;
                         }
                     }
                 }
-                for sink in &graph.output_sinks {
+                for sink in graph.output_sinks() {
                     if sink.inputs.is_empty() {
                         continue;
                     }
@@ -249,11 +249,11 @@ mod tests {
     #[test]
     fn a_stateful_compute_node_kind_is_reported() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![],
-            plasticity: None,
-        });
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![],
+            None,
+        ));
         let genome = graph_genome(graph);
         let companions = structural_companions(&genome);
         assert!(companions.has_stateful_compute_node);
@@ -263,17 +263,17 @@ mod tests {
     #[test]
     fn a_plastic_compute_node_is_reported() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![],
-            plasticity: Some(PlasticityConfig {
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 1.0,
                 lamarckian: false,
                 modulation: None,
             }),
-        });
+        ));
         let genome = graph_genome(graph);
         let companions = structural_companions(&genome);
         assert!(companions.has_plasticity);
@@ -283,17 +283,17 @@ mod tests {
     #[test]
     fn a_shared_memory_input_edge_reads_shared_memory() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 1.0,
-            }],
-            plasticity: None,
-        });
+                1.0,
+            )],
+            None,
+        ));
         let genome = graph_genome(graph);
         assert!(structural_companions(&genome).reads_shared_memory);
     }
@@ -301,20 +301,11 @@ mod tests {
     #[test]
     fn a_wired_write_slot_sink_writes_shared_memory_but_an_unwired_one_does_not() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![],
-            plasticity: None,
-        });
+        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![], None));
         let sink = graph
-            .output_sinks
-            .iter_mut()
-            .find(|sink| matches!(sink.kind, OutputSinkKind::WriteSlot(0)))
+            .sink_surface(OutputSinkKind::WriteSlot(0))
             .expect("the fixed catalog always has a WriteSlot(0) sink");
-        sink.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+        graph.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         let genome = graph_genome(graph);
         assert!(structural_companions(&genome).writes_shared_memory);
 

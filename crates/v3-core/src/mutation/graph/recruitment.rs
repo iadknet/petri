@@ -6,7 +6,7 @@ use rand::{seq::SliceRandom, Rng};
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, RingProjection,
+    CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, RingProjection,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, NodeGenome};
@@ -40,7 +40,7 @@ impl Plan {
             unreachable!("admission requires a Graph backend")
         };
         node.input_refs.extend(self.declarations);
-        let directed = match def.output_sinks[destination].kind {
+        let directed = match def.output_sinks()[destination].kind {
             OutputSinkKind::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
             _ => None,
         };
@@ -55,12 +55,12 @@ impl Plan {
             ));
             return;
         }
-        def.output_sinks[destination]
-            .inputs
-            .extend(self.sources.into_iter().map(|source| GraphEdge {
-                source,
-                weight: 0.0,
-            }));
+        for source in self.sources {
+            def.push_edge(
+                EdgeSurface::SinkInput(destination),
+                GraphEdge::new(source, 0.0),
+            );
+        }
     }
 }
 
@@ -83,7 +83,7 @@ impl<'a> Admission<'a> {
         // A dangling projection reference is a dangling leaf (T11.F31).
         let append_end = def
             .edges()
-            .filter_map(|edge| match edge.source {
+            .filter_map(|edge| match edge.source() {
                 GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
                 _ => None,
             })
@@ -200,7 +200,7 @@ impl<'a> Admission<'a> {
 }
 
 pub(super) fn destinations(def: &CgpGraphBackendDef) -> Vec<usize> {
-    def.output_sinks
+    def.output_sinks()
         .iter()
         .enumerate()
         .filter_map(|(index, sink)| match sink.kind {
@@ -266,7 +266,7 @@ pub(crate) fn recruit_source(
     };
     let destination = destinations(def)
         .into_iter()
-        .find(|&i| def.output_sinks[i].kind == OutputSinkKind::ActionVote(vote))
+        .find(|&i| def.output_sinks()[i].kind == OutputSinkKind::ActionVote(vote))
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let plan = Admission::new(&node.input_refs, def)
         .plan(family, arm, channel)

@@ -12,6 +12,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmInstruction, OUTCOME_CHANNEL_COUNT,
 };
 use crate::creature::identity::CreatureIdentityState;
+use crate::creature::newborn::take_plasticity_weights;
 use crate::creature::sensor_census::{creature_declared_world_inputs, creature_sensor_census};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
 use crate::sensors::reads::WorldKeySet;
@@ -301,12 +302,15 @@ impl CreatureState {
         applied_debit(before, self.energy)
     }
 
-    /// Create a new creature with empty graph runtime state and zeroed prev_shared_memory.
+    /// Create a new creature with zeroed prev_shared_memory and graph runtime
+    /// state that is empty apart from `plasticity_weights`, which the
+    /// constructor builds from the birth seeds it takes out of `genome`
+    /// (`creature::newborn`; empty for a seedless genome).
     /// Computes `cached_complexity` and `cached_genome_size` from the genome.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: CreatureId,
-        genome: CreatureGenome,
+        mut genome: CreatureGenome,
         position: Position,
         energy: f32,
         generation: u64,
@@ -316,6 +320,7 @@ impl CreatureState {
         identity: CreatureIdentityState,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
+        let plasticity_weights = take_plasticity_weights(&mut genome);
         let cached_complexity = genome.complexity();
         let cached_genome_size = genome.genome_size();
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
@@ -335,7 +340,10 @@ impl CreatureState {
             generation,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
-            graph_runtime: GraphRuntimeState::new(),
+            graph_runtime: GraphRuntimeState {
+                plasticity_weights,
+                ..GraphRuntimeState::new()
+            },
             identity,
             phenotype_channels,
             phenotype_active_channel,
@@ -368,11 +376,12 @@ impl CreatureState {
 
     /// Create a new creature with pre-computed cached fields.
     /// Used in the no-mutation reproduction fast path where the offspring
-    /// genome is identical to the parent's.
+    /// genome is identical to the parent's. Builds `plasticity_weights` from
+    /// the birth seeds it takes out of `genome`, as [`Self::new`] does.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_cached_fields(
         id: CreatureId,
-        genome: CreatureGenome,
+        mut genome: CreatureGenome,
         position: Position,
         energy: f32,
         generation: u64,
@@ -385,6 +394,7 @@ impl CreatureState {
         cached_genome_size: u32,
         cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
+        let plasticity_weights = take_plasticity_weights(&mut genome);
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         let cached_live_vm_world_inputs =
@@ -401,7 +411,10 @@ impl CreatureState {
             generation,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
-            graph_runtime: GraphRuntimeState::new(),
+            graph_runtime: GraphRuntimeState {
+                plasticity_weights,
+                ..GraphRuntimeState::new()
+            },
             identity,
             phenotype_channels,
             phenotype_active_channel,

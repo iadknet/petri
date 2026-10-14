@@ -482,22 +482,18 @@ mod tests {
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(0.0),
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterGate(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![ComputeNode::new(
+                        ComputeNodeKind::Constant(0.0),
+                        vec![],
+                        None,
+                    )])
+                    .with_output_sinks(vec![OutputSink::new(
+                        OutputSinkKind::RouterGate(0),
+                        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                    )]),
+            ),
             targets: wrap_targets(vec![id_vm]),
         };
 
@@ -577,28 +573,21 @@ mod tests {
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(9.0),
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-                output_sinks: vec![
-                    OutputSink {
-                        kind: OutputSinkKind::CustomOutput(5),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                    },
-                    OutputSink {
-                        kind: OutputSinkKind::RouterGate(0),
-                        inputs: vec![], // unwired = default route
-                    },
-                ],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![ComputeNode::new(
+                        ComputeNodeKind::Constant(9.0),
+                        vec![],
+                        None,
+                    )])
+                    .with_output_sinks(vec![
+                        OutputSink::new(
+                            OutputSinkKind::CustomOutput(5),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                        ),
+                        OutputSink::new(OutputSinkKind::RouterGate(0), vec![]),
+                    ]),
+            ),
             targets: wrap_targets(vec![id_vm]),
         };
 
@@ -667,49 +656,33 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![
-                        OutputSink {
-                            kind: OutputSinkKind::CustomOutput(0),
-                            inputs: vec![GraphEdge {
-                                source: GraphSource::ComputeNode(0),
-                                weight: 1.0,
-                            }],
-                        },
-                        OutputSink {
-                            kind: OutputSinkKind::RouterGate(0),
-                            inputs: vec![],
-                        },
-                        OutputSink {
-                            kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-                            inputs: vec![GraphEdge {
-                                source: GraphSource::ComputeNode(0),
-                                weight: 1.0,
-                            }],
-                        },
-                        OutputSink {
-                            kind: OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
-                            inputs: vec![GraphEdge {
-                                source: GraphSource::ComputeNode(0),
-                                weight: f32::INFINITY,
-                            }],
-                        },
-                        OutputSink {
-                            kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                            inputs: vec![GraphEdge {
-                                source: GraphSource::ComputeNode(0),
-                                weight: f32::NAN,
-                            }],
-                        },
-                    ],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![],
+                            None,
+                        )])
+                        .with_output_sinks(vec![
+                            OutputSink::new(
+                                OutputSinkKind::CustomOutput(0),
+                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                            ),
+                            OutputSink::new(OutputSinkKind::RouterGate(0), vec![]),
+                            OutputSink::new(
+                                OutputSinkKind::ActionVote(VoteSink::Eat),
+                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                            ),
+                            OutputSink::new(
+                                OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
+                                vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::INFINITY)],
+                            ),
+                            OutputSink::new(
+                                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                                vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::NAN)],
+                            ),
+                        ]),
+                ),
                 targets: vec![],
             }],
         };
@@ -810,16 +783,15 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![],
+                            None,
+                        )])
+                        .with_output_sinks(vec![]),
+                ),
                 targets: vec![],
             }],
         };
@@ -861,34 +833,30 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::SharedMemory {
-                                slot: 0,
-                                previous: false,
-                            },
-                            weight: 1.0,
-                        }],
-                        plasticity: Some(PlasticityConfig {
-                            rule: HebbianRule::Classic,
-                            learning_rate: 0.5,
-                            weight_clamp: 1.0,
-                            lamarckian: false,
-                            modulation: None,
-                        }),
-                    }],
-                    output_sinks: vec![OutputSink {
-                        kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                    }],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![GraphEdge::new(
+                                GraphSource::SharedMemory {
+                                    slot: 0,
+                                    previous: false,
+                                },
+                                1.0,
+                            )],
+                            Some(PlasticityConfig {
+                                rule: HebbianRule::Classic,
+                                learning_rate: 0.5,
+                                weight_clamp: 1.0,
+                                lamarckian: false,
+                                modulation: None,
+                            }),
+                        )])
+                        .with_output_sinks(vec![OutputSink::new(
+                            OutputSinkKind::ActionVote(VoteSink::Eat),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                        )]),
+                ),
                 targets: vec![],
             }],
         };

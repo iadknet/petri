@@ -12,7 +12,8 @@
 //! exactly the queue the VM decision node emitted before votes existed.
 
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
+    OutputSinkKind,
 };
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 
@@ -39,75 +40,75 @@ pub(crate) fn build_cgp_founder_graph_with_thresholds(
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
     // CN0: energy threshold gate.
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Threshold(reproduce_energy_threshold),
-        inputs: vec![GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 1, // EnergyCurrent
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Threshold(reproduce_energy_threshold),
+        vec![GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 1,
                 sub_idx: 0,
             },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+            1.0,
+        )],
+        None,
+    ));
 
     // CN1: age threshold gate.
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Threshold(age_gate_threshold(
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Threshold(age_gate_threshold(
             min_reproduce_age_ticks,
             age_reference_ticks,
         )),
-        inputs: vec![GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 2, // AgeTicks
+        vec![GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 2,
                 sub_idx: 0,
             },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+            1.0,
+        )],
+        None,
+    ));
 
     // CN2: can_reproduce = energy_gate * age_gate.
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Multiply,
-        inputs: vec![
-            GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            },
-            GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            },
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Multiply,
+        vec![
+            GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
+            GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        plasticity: None,
-    });
+        None,
+    ));
 
     // Wire CustomOutput(0) ← primary food on the current cell.
-    def.output_sinks[0].inputs.push(GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx: 0,
-            sub_idx: 0,
-        },
-        weight: 1.0,
-    });
+    def.push_edge(
+        EdgeSurface::SinkInput(0),
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
+            1.0,
+        ),
+    );
 
     // Wire CustomOutput(1) ← can_reproduce gate (CN2 = energy/age gates)
-    def.output_sinks[1].inputs.push(GraphEdge {
-        source: GraphSource::ComputeNode(2),
-        weight: 1.0,
-    });
+    def.push_edge(
+        EdgeSurface::SinkInput(1),
+        GraphEdge::new(GraphSource::ComputeNode(2), 1.0),
+    );
 
     // Wire CustomOutput(2..5) ← neighbor food N/E/S/W
     // Direction::to_index(): N=0, E=2, S=4, W=6
     for (slot, sub_idx) in [(2u8, 0u16), (3, 2), (4, 4), (5, 6)] {
-        def.output_sinks[slot as usize].inputs.push(GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 3, // NeighborFoodRing
-                sub_idx,
-            },
-            weight: 1.0,
-        });
+        def.push_edge(
+            EdgeSurface::SinkInput(slot as usize),
+            GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 3,
+                    sub_idx,
+                },
+                1.0,
+            ),
+        );
     }
 
     def
@@ -126,7 +127,7 @@ const QUEUE_SLOT0_TYPE: u16 = 0;
 const CARDINALS: [(u16, u8); 4] = [(2, 0), (3, 2), (4, 4), (5, 6)];
 
 fn edge(source: GraphSource, weight: f32) -> GraphEdge {
-    GraphEdge { source, weight }
+    GraphEdge::new(source, weight)
 }
 
 fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
@@ -134,11 +135,7 @@ fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
 }
 
 fn compute(kind: ComputeNodeKind, inputs: Vec<GraphEdge>) -> ComputeNode {
-    ComputeNode {
-        kind,
-        inputs,
-        plasticity: None,
-    }
+    ComputeNode::new(kind, inputs, None)
 }
 
 /// Build the founder's decision graph (T19.F04 invariant 9). With
@@ -164,23 +161,22 @@ pub(crate) fn build_cgp_founder_decision_graph(
     let queue_type = leaf(FOUNDER_QUEUE_REF, QUEUE_SLOT0_TYPE);
 
     // CN0: the bias constant; edge weights carry the 0.5 and 1.0 terms.
-    def.compute_nodes
-        .push(compute(ComputeNodeKind::Constant(1.0), Vec::new()));
+    def.append_compute_node(compute(ComputeNodeKind::Constant(1.0), Vec::new()));
     // CN1: f = [food_here > 0].
-    def.compute_nodes.push(compute(
+    def.append_compute_node(compute(
         ComputeNodeKind::Threshold(0.0),
         vec![edge(leaf(0, 0), 1.0)],
     ));
     // CN2, CN3: queue slot 0's type above 2.5 and above 3.5; action type 3
     // is `Reproduce` and 4 `StealEnergy`.
     for threshold in [2.5, 3.5] {
-        def.compute_nodes.push(compute(
+        def.append_compute_node(compute(
             ComputeNodeKind::Threshold(threshold),
             vec![edge(queue_type, 1.0)],
         ));
     }
     // CN4: q = [type > 2.5] - [type > 3.5], exactly [type == Reproduce].
-    def.compute_nodes.push(compute(
+    def.append_compute_node(compute(
         ComputeNodeKind::WeightedSum,
         vec![
             edge(GraphSource::ComputeNode(2), 1.0),
@@ -190,7 +186,7 @@ pub(crate) fn build_cgp_founder_decision_graph(
     // The reproduce gate. ForageFirst: CN5 = [can - f > 0.5], which is
     // `can · (1 - f)` on the 0/1 values both carry.
     let gate = if forage_first {
-        def.compute_nodes.push(compute(
+        def.append_compute_node(compute(
             ComputeNodeKind::Threshold(0.5),
             vec![edge(can, 1.0), edge(food, -1.0)],
         ));
@@ -201,15 +197,15 @@ pub(crate) fn build_cgp_founder_decision_graph(
     // One `g · ring[d]` product per cardinal direction.
     let mut gated_ring = Vec::with_capacity(CARDINALS.len());
     for (slot, _) in CARDINALS {
-        gated_ring.push(GraphSource::ComputeNode(def.compute_nodes.len() as u16));
-        def.compute_nodes.push(compute(
+        gated_ring.push(GraphSource::ComputeNode(def.compute_nodes().len() as u16));
+        def.append_compute_node(compute(
             ComputeNodeKind::Multiply,
             vec![edge(gate, 1.0), edge(leaf(slot, 0), 1.0)],
         ));
     }
     // The transfer fraction, bit-identical to the profile constant.
-    let fraction = GraphSource::ComputeNode(def.compute_nodes.len() as u16);
-    def.compute_nodes.push(compute(
+    let fraction = GraphSource::ComputeNode(def.compute_nodes().len() as u16);
+    def.append_compute_node(compute(
         ComputeNodeKind::Constant(transfer_fraction),
         Vec::new(),
     ));
@@ -256,8 +252,10 @@ pub(crate) fn build_cgp_founder_decision_graph(
 
 /// Append `edges` to the catalog sink of `kind`.
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edges: Vec<GraphEdge>) {
-    def.sink_mut(kind)
-        .expect("the fixed catalog holds every vote and parameter sink")
-        .inputs
-        .extend(edges);
+    let surface = def
+        .sink_surface(kind)
+        .expect("the fixed catalog holds every vote and parameter sink");
+    for edge in edges {
+        def.push_edge(surface, edge);
+    }
 }

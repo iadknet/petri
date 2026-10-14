@@ -71,8 +71,10 @@ fn neutral_recruitment_engineering_panel() {
                     else {
                         panic!("recruitment changed backend");
                     };
-                    for (old_sink, new_sink) in
-                        old_graph.output_sinks.iter().zip(&new_graph.output_sinks)
+                    for (old_sink, new_sink) in old_graph
+                        .output_sinks()
+                        .iter()
+                        .zip(new_graph.output_sinks())
                     {
                         if old_sink.inputs.len() == new_sink.inputs.len() {
                             continue;
@@ -82,9 +84,9 @@ fn neutral_recruitment_engineering_panel() {
                         };
                         *sinks.entry(format!("{vote:?}")).or_default() += 1;
                         for edge in &new_sink.inputs[old_sink.inputs.len()..] {
-                            assert_eq!(edge.weight, 0.0);
+                            assert_eq!(edge.weight(), 0.0);
                             edges += 1;
-                            let channel = match edge.source {
+                            let channel = match edge.source() {
                                 GraphSource::InputLeaf { ref_idx, sub_idx } => {
                                     let Addressed::Channel(channel) =
                                         addressed(&new.input_refs[usize::from(ref_idx)], sub_idx)

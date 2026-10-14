@@ -20,7 +20,7 @@ fn enqueue_compute_sources<'a>(
     queue: &mut VecDeque<usize>,
 ) {
     for edge in edges {
-        if let GraphSource::ComputeNode(idx) = edge.source {
+        if let GraphSource::ComputeNode(idx) = edge.source() {
             let i = idx as usize;
             if i < compute_count && !visited[i] {
                 visited[i] = true;
@@ -37,7 +37,7 @@ fn enqueue_compute_sources<'a>(
 /// Returns compute node indices that are backward-reachable from any wired surface.
 #[must_use]
 pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
-    let n = def.compute_nodes.len();
+    let n = def.compute_nodes().len();
     if n == 0 {
         return Vec::new();
     }
@@ -45,7 +45,7 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
     let mut queue = VecDeque::with_capacity(n);
 
     // Anchor: wired output sinks
-    for sink in &def.output_sinks {
+    for sink in def.output_sinks() {
         if !sink.inputs.is_empty() {
             enqueue_compute_sources(&sink.inputs, n, &mut visited, &mut queue);
         }
@@ -53,7 +53,12 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
 
     // BFS through compute node inputs
     while let Some(idx) = queue.pop_front() {
-        enqueue_compute_sources(&def.compute_nodes[idx].inputs, n, &mut visited, &mut queue);
+        enqueue_compute_sources(
+            &def.compute_nodes()[idx].inputs,
+            n,
+            &mut visited,
+            &mut queue,
+        );
     }
 
     visited
@@ -78,8 +83,8 @@ pub(crate) fn wired_surface_edges<'a>(
     live: &'a [usize],
 ) -> impl Iterator<Item = &'a GraphEdge> {
     live.iter()
-        .flat_map(|&idx| &def.compute_nodes[idx].inputs)
-        .chain(def.output_sinks.iter().flat_map(|sink| &sink.inputs))
+        .flat_map(|&idx| &def.compute_nodes()[idx].inputs)
+        .chain(def.output_sinks().iter().flat_map(|sink| &sink.inputs))
 }
 
 // ── Functional complexity ───────────────────────────────────────────────────
@@ -89,7 +94,7 @@ pub(crate) fn wired_surface_edges<'a>(
 /// A ring projection's ring is consumed too (T11.F31).
 fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &[usize]) -> HashSet<u16> {
     wired_surface_edges(def, live)
-        .filter_map(|edge| match edge.source {
+        .filter_map(|edge| match edge.source() {
             GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
             GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
         })
@@ -113,7 +118,7 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
     let mut score: u32 = 0;
 
     // Count wired output sinks
-    for sink in &def.output_sinks {
+    for sink in def.output_sinks() {
         if !sink.inputs.is_empty() {
             score += 1;
         }
@@ -124,7 +129,7 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 
     for &idx in &live_indices {
         score += 1; // the compute node
-        score += def.compute_nodes[idx].inputs.len() as u32;
+        score += def.compute_nodes()[idx].inputs.len() as u32;
     }
 
     score += def.projections.len() as u32;
@@ -143,12 +148,9 @@ mod tests {
     use crate::creature::genome::vote::VoteSink;
 
     fn empty_def() -> CgpGraphBackendDef {
-        CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-        }
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(Vec::new())
     }
 
     fn wired_def() -> CgpGraphBackendDef {
@@ -157,62 +159,39 @@ mod tests {
         // Sink(CustomOutput(0)) wired to CN0
         // Sink(ActionVote(Eat)) wired to CN1
         // Sink(ActionVote(Terminate)) wired to CN0
-        CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![
-                ComputeNode {
-                    kind: ComputeNodeKind::Add,
-                    inputs: vec![
-                        GraphEdge {
-                            source: GraphSource::ComputeNode(1),
-                            weight: 1.0,
-                        },
-                        GraphEdge {
-                            source: GraphSource::InputLeaf {
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![
+                ComputeNode::new(
+                    ComputeNodeKind::Add,
+                    vec![
+                        GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
+                        GraphEdge::new(
+                            GraphSource::InputLeaf {
                                 ref_idx: 0,
                                 sub_idx: 0,
                             },
-                            weight: 0.5,
-                        },
+                            0.5,
+                        ),
                     ],
-                    plasticity: None,
-                },
-                ComputeNode {
-                    kind: ComputeNodeKind::Constant(1.0),
-                    inputs: Vec::new(),
-                    plasticity: None,
-                },
-                ComputeNode {
-                    kind: ComputeNodeKind::Sigmoid,
-                    inputs: Vec::new(), // isolated — not reachable
-                    plasticity: None,
-                },
-            ],
-            output_sinks: vec![
-                OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                },
-                OutputSink {
-                    kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(1),
-                        weight: 1.0,
-                    }],
-                },
-                OutputSink {
-                    kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                },
-            ],
-        }
+                    None,
+                ),
+                ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new(), None),
+            ])
+            .with_output_sinks(vec![
+                OutputSink::new(
+                    OutputSinkKind::CustomOutput(0),
+                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                ),
+                OutputSink::new(
+                    OutputSinkKind::ActionVote(VoteSink::Eat),
+                    vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+                ),
+                OutputSink::new(
+                    OutputSinkKind::ActionVote(VoteSink::Terminate),
+                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                ),
+            ])
     }
 
     // ── Live compute indices ────────────────────────────────────────────────

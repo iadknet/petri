@@ -99,7 +99,7 @@ pub(crate) fn collect_cgp_weighted_inputs(
     buf.clear();
     buf.extend(edges.iter().map(|edge| {
         let source_value = resolve_source(
-            &edge.source,
+            &edge.source(),
             current_idx,
             node_count,
             prev_outputs,
@@ -109,6 +109,6 @@ pub(crate) fn collect_cgp_weighted_inputs(
             shared_memory,
             prev_shared_memory,
         );
-        source_value * edge.weight
+        source_value * edge.weight()
     }));
 }

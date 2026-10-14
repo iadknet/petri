@@ -19,7 +19,7 @@ use crate::config::{FounderProfile, MutationConfig};
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::founder_genome;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind,
+    BirthSeeds, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig};
@@ -36,26 +36,13 @@ type Seeds = Vec<Option<Vec<Vec<Option<f32>>>>>;
 
 /// Capture `parent` on every graph node of the draft, as reproduction does.
 fn capture(genome: &mut CreatureGenome, parent: &Weights) {
-    for (idx, node) in genome.nodes.iter_mut().enumerate() {
-        if let BackendDef::Graph(def) = &mut node.backend_def {
-            cgp_reproduction::capture_birth_weights(
-                def,
-                parent.get(idx).map_or(&[], Vec::as_slice),
-            );
-        }
-    }
+    cgp_reproduction::capture_birth_seeds(genome, parent);
 }
 
-/// Consume the draft's payload into the newborn's weights.
+/// Consume the draft's payload into the newborn's weights, as the creature
+/// constructors do.
 fn build(genome: &mut CreatureGenome) -> Weights {
-    let mut result = Vec::new();
-    for (idx, node) in genome.nodes.iter_mut().enumerate() {
-        if let BackendDef::Graph(def) = &mut node.backend_def {
-            result.resize_with(idx + 1, Vec::new);
-            result[idx] = cgp_reproduction::build_cgp_child_plasticity_weights(def);
-        }
-    }
-    result
+    crate::creature::newborn::take_plasticity_weights(genome)
 }
 
 /// The payload rows of every graph node, `None` where a node carries none.
@@ -64,7 +51,11 @@ fn seeds(genome: &CreatureGenome) -> Seeds {
         .nodes
         .iter()
         .filter_map(|node| match &node.backend_def {
-            BackendDef::Graph(def) => Some(def.birth_weights.clone()),
+            BackendDef::Graph(def) => Some(
+                def.birth_seeds()
+                    .and_then(BirthSeeds::rows)
+                    .map(<[_]>::to_vec),
+            ),
             BackendDef::Vm(_) => None,
         })
         .collect()
@@ -91,7 +82,7 @@ fn plasticity(compute: usize) -> Option<PlasticityConfig> {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 5.0,
-        lamarckian: compute % 3 == 0,
+        lamarckian: compute.is_multiple_of(3),
         modulation: None,
     })
 }
@@ -108,16 +99,7 @@ fn fixture() -> CreatureGenome {
         .insert(0, InputReference::World(WorldInputKey::NeighborBarrierRing));
     {
         let def = graph_mut(&mut genome, 0);
-        let edges = def
-            .compute_nodes
-            .iter_mut()
-            .flat_map(|node| node.inputs.iter_mut())
-            .chain(def.output_sinks.iter_mut().flat_map(|sink| sink.inputs.iter_mut()));
-        for edge in edges {
-            if let GraphSource::InputLeaf { ref_idx, .. } = &mut edge.source {
-                *ref_idx += 1;
-            }
-        }
+        def.redirect_leaf_reads(|ref_idx, _| Some(ref_idx + 1));
         for projection in &mut def.projections {
             projection.ref_idx += 1;
         }
@@ -129,29 +111,35 @@ fn fixture() -> CreatureGenome {
     {
         let def = graph_mut(&mut genome, 1);
         for direction in [0u8, 2] {
-            def.sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(direction)))
-                .unwrap()
-                .inputs
-                .push(GraphEdge {
-                    source: GraphSource::InputLeaf {
+            let surface = def
+                .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(direction)))
+                .unwrap();
+            def.push_edge(
+                surface,
+                GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: ring,
                         sub_idx: u16::from(direction),
                     },
-                    weight: 0.3,
-                });
+                    0.3,
+                ),
+            );
         }
-        def.compute_nodes[1].inputs.push(GraphEdge {
-            source: GraphSource::SharedMemory {
-                slot: 3,
-                previous: false,
-            },
-            weight: 0.25,
-        });
+        def.push_edge(
+            EdgeSurface::ComputeInput(1),
+            GraphEdge::new(
+                GraphSource::SharedMemory {
+                    slot: 3,
+                    previous: false,
+                },
+                0.25,
+            ),
+        );
     }
     for node in 0..2 {
         let def = graph_mut(&mut genome, node);
-        for compute in 0..def.compute_nodes.len() {
-            def.compute_nodes[compute].plasticity = plasticity(compute);
+        for compute in 0..def.compute_nodes().len() {
+            def.set_node_plasticity(compute, plasticity(compute));
         }
     }
     // A third node, a copy of node 1 that node 1 routes to, so a middle node
@@ -173,7 +161,7 @@ fn parent(genome: &CreatureGenome) -> Weights {
     (0..genome.nodes.len())
         .map(|node| {
             graph(genome, node)
-                .compute_nodes
+                .compute_nodes()
                 .iter()
                 .enumerate()
                 .map(|(compute, cn)| {
@@ -196,15 +184,21 @@ fn parent(genome: &CreatureGenome) -> Weights {
 // ── Branch observations ─────────────────────────────────────────────────────
 
 fn compute_edges(def: &CgpGraphBackendDef) -> usize {
-    def.compute_nodes.iter().map(|node| node.inputs.len()).sum()
+    def.compute_nodes()
+        .iter()
+        .map(|node| node.inputs.len())
+        .sum()
 }
 
 fn sink_edges(def: &CgpGraphBackendDef) -> usize {
-    def.output_sinks.iter().map(|sink| sink.inputs.len()).sum()
+    def.output_sinks()
+        .iter()
+        .map(|sink| sink.inputs.len())
+        .sum()
 }
 
 fn router_gate_edges(def: &CgpGraphBackendDef) -> usize {
-    def.output_sinks
+    def.output_sinks()
         .iter()
         .filter(|sink| matches!(sink.kind, OutputSinkKind::RouterGate(_)))
         .map(|sink| sink.inputs.len())
@@ -212,18 +206,21 @@ fn router_gate_edges(def: &CgpGraphBackendDef) -> usize {
 }
 
 fn all_sources(def: &CgpGraphBackendDef) -> Vec<GraphSource> {
-    def.edges().map(|edge| edge.source).collect()
+    def.edges().map(|edge| edge.source()).collect()
 }
 
 /// How many edges, on either surface, read compute node `idx`.
 fn readers(def: &CgpGraphBackendDef, idx: usize) -> usize {
     def.edges()
-        .filter(|edge| edge.source == GraphSource::ComputeNode(idx as u16))
+        .filter(|edge| edge.source() == GraphSource::ComputeNode(idx as u16))
         .count()
 }
 
 /// The one edge whose source changed, when the shapes agree.
-fn changed_source(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Option<(GraphSource, GraphSource)> {
+fn changed_source(
+    before: &CgpGraphBackendDef,
+    after: &CgpGraphBackendDef,
+) -> Option<(GraphSource, GraphSource)> {
     let (b, a) = (all_sources(before), all_sources(after));
     if b.len() != a.len() {
         return None;
@@ -234,10 +231,15 @@ fn changed_source(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Op
 
 /// The compute-node count grew by one and the new last node is (`appended`)
 /// or is not a fresh append, with `inputs` inputs and `read` readers.
-fn added_node(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef, inputs: usize, read: bool) -> bool {
-    let len = after.compute_nodes.len();
-    len == before.compute_nodes.len() + 1
-        && after.compute_nodes[len - 1].inputs.len() == inputs
+fn added_node(
+    before: &CgpGraphBackendDef,
+    after: &CgpGraphBackendDef,
+    inputs: usize,
+    read: bool,
+) -> bool {
+    let len = after.compute_nodes().len();
+    len == before.compute_nodes().len() + 1
+        && after.compute_nodes()[len - 1].inputs.len() == inputs
         && (readers(after, len - 1) > 0) == read
 }
 
@@ -255,66 +257,208 @@ fn any(_: &CgpGraphBackendDef, _: &CgpGraphBackendDef) -> bool {
 }
 
 const SCENARIOS: &[(&str, Event)] = &[
-    ("remove compute node, readers cleared", Event::Graph(GraphOperator::RemoveInternalGraphNode, 1, |b, a| {
-        a.compute_nodes.len() + 1 == b.compute_nodes.len()
-            && all_sources(a).contains(&GraphSource::ComputeNode(u16::MAX))
-    })),
+    (
+        "remove compute node, readers cleared",
+        Event::Graph(GraphOperator::RemoveInternalGraphNode, 1, |b, a| {
+            a.compute_nodes().len() + 1 == b.compute_nodes().len()
+                && all_sources(a).contains(&GraphSource::ComputeNode(u16::MAX))
+        }),
+    ),
     // Node 1's last compute node is the transfer constant, read by its
     // parameter sink: an append makes an unread last node, a split onto a
     // sink an `Add` read by the sink, a split onto a compute input leaves the
     // constant last.
-    ("append: disconnected form", Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| added_node(b, a, 0, false))),
-    ("append: bootstrap form", Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| added_node(b, a, 1, false))),
-    ("split: sink consumer (append)", Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| added_node(b, a, 1, true))),
-    ("split: compute-input consumer (insert)", Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| added_node(b, a, 0, true))),
-    ("duplicate: copy internal node", Event::Graph(GraphOperator::CopyInternalNode, 1, any)),
-    ("duplicate: copy subgraph", Event::Graph(GraphOperator::CopySubgraph, 1, any)),
-    ("push edge: compute surface", Event::Graph(GraphOperator::AddGraphEdge, 1, |b, a| compute_edges(a) == compute_edges(b) + 1)),
-    ("push edge: sink surface", Event::Graph(GraphOperator::AddGraphEdge, 1, |b, a| sink_edges(a) == sink_edges(b) + 1)),
-    ("remove edge: compute surface", Event::Graph(GraphOperator::RemoveGraphEdge, 1, |b, a| compute_edges(a) + 1 == compute_edges(b))),
-    ("remove edge: sink surface", Event::Graph(GraphOperator::RemoveGraphEdge, 1, |b, a| sink_edges(a) + 1 == sink_edges(b))),
-    ("retarget: source changed", Event::Graph(GraphOperator::RetargetGraphEdge, 1, |b, a| b != a)),
-    ("retarget: same source drawn", Event::Graph(GraphOperator::RetargetGraphEdge, 1, |b, a| b == a)),
-    ("raw field: InputLeaf ref", Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| matches!(
-        changed_source(b, a),
-        Some((GraphSource::InputLeaf { ref_idx: r0, sub_idx: s0 }, GraphSource::InputLeaf { ref_idx: r1, sub_idx: s1 })) if r0 != r1 && s0 == s1
-    ))),
-    ("raw field: InputLeaf sub", Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| matches!(
-        changed_source(b, a),
-        Some((GraphSource::InputLeaf { ref_idx: r0, sub_idx: s0 }, GraphSource::InputLeaf { ref_idx: r1, sub_idx: s1 })) if r0 == r1 && s0 != s1
-    ))),
-    ("raw field: SharedMemory slot", Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| matches!(
-        changed_source(b, a),
-        Some((GraphSource::SharedMemory { slot: s0, .. }, GraphSource::SharedMemory { slot: s1, .. })) if s0 != s1
-    ))),
-    ("raw field: SharedMemory previous flag", Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| matches!(
-        changed_source(b, a),
-        Some((GraphSource::SharedMemory { previous: p0, .. }, GraphSource::SharedMemory { previous: p1, .. })) if p0 != p1
-    ))),
-    ("raw field: ComputeNode index", Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| matches!(
-        changed_source(b, a),
-        Some((GraphSource::ComputeNode(_), GraphSource::ComputeNode(_)))
-    ))),
-    ("alter weight", Event::Graph(GraphOperator::AlterGraphEdgeWeight, 1, |b, a| b != a)),
-    ("refinement weight write", Event::Graph(GraphOperator::RefineHeritableStructure, 1, |b, a| b != a)),
-    ("copy edge bundle", Event::Graph(GraphOperator::CopyEdgeBundle, 1, any)),
-    ("compute kind: swap operator", Event::Graph(GraphOperator::SwapGraphOperator, 1, any)),
-    ("compute kind: operator param", Event::Graph(GraphOperator::MutateGraphOperatorParam, 1, any)),
-    ("plasticity: enable", Event::Graph(GraphOperator::EnableHebbian, 1, any)),
-    ("plasticity: disable", Event::Graph(GraphOperator::DisableHebbian, 1, any)),
-    ("plasticity: rule", Event::Graph(GraphOperator::MutateHebbianRule, 1, any)),
-    ("plasticity: rate", Event::Graph(GraphOperator::MutateHebbianRate, 1, any)),
-    ("plasticity: Lamarckian toggle", Event::Graph(GraphOperator::ToggleHebbianLamarckian, 1, any)),
-    ("plasticity: enable modulation", Event::Graph(GraphOperator::EnableRewardModulation, 1, any)),
-    ("recruitment: neutral input", Event::Graph(GraphOperator::RecruitNeutralInput, 1, |b, a| b != a)),
-    ("Prune reindex", Event::InputRef(InputRefOperator::Prune, 0, |b, a| b != a)),
-    ("recruitment: declared input sink push", Event::InputRef(InputRefOperator::Add, 1, |b, a| sink_edges(a) == sink_edges(b) + 1)),
-    ("routing: gate sink push", Event::Topology(TopologyOperator::AddRouteTarget)),
-    ("topology: CopyNode", Event::Topology(TopologyOperator::CopyNode)),
-    ("topology: CopyMeshBackwardSlice", Event::Topology(TopologyOperator::CopyMeshBackwardSlice)),
-    ("topology: CopyMeshForwardSlice", Event::Topology(TopologyOperator::CopyMeshForwardSlice)),
-    ("topology: RemoveNode", Event::Topology(TopologyOperator::RemoveNode)),
-    ("topology: Swap", Event::Topology(TopologyOperator::SwapNodeBackend)),
+    (
+        "append: disconnected form",
+        Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| {
+            added_node(b, a, 0, false)
+        }),
+    ),
+    (
+        "append: bootstrap form",
+        Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| {
+            added_node(b, a, 1, false)
+        }),
+    ),
+    (
+        "split: sink consumer (append)",
+        Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| {
+            added_node(b, a, 1, true)
+        }),
+    ),
+    (
+        "split: compute-input consumer (insert)",
+        Event::Graph(GraphOperator::AddInternalGraphNode, 1, |b, a| {
+            added_node(b, a, 0, true)
+        }),
+    ),
+    (
+        "duplicate: copy internal node",
+        Event::Graph(GraphOperator::CopyInternalNode, 1, any),
+    ),
+    (
+        "duplicate: copy subgraph",
+        Event::Graph(GraphOperator::CopySubgraph, 1, any),
+    ),
+    (
+        "push edge: compute surface",
+        Event::Graph(GraphOperator::AddGraphEdge, 1, |b, a| {
+            compute_edges(a) == compute_edges(b) + 1
+        }),
+    ),
+    (
+        "push edge: sink surface",
+        Event::Graph(GraphOperator::AddGraphEdge, 1, |b, a| {
+            sink_edges(a) == sink_edges(b) + 1
+        }),
+    ),
+    (
+        "remove edge: compute surface",
+        Event::Graph(GraphOperator::RemoveGraphEdge, 1, |b, a| {
+            compute_edges(a) + 1 == compute_edges(b)
+        }),
+    ),
+    (
+        "remove edge: sink surface",
+        Event::Graph(GraphOperator::RemoveGraphEdge, 1, |b, a| {
+            sink_edges(a) + 1 == sink_edges(b)
+        }),
+    ),
+    (
+        "retarget: source changed",
+        Event::Graph(GraphOperator::RetargetGraphEdge, 1, |b, a| b != a),
+    ),
+    (
+        "retarget: same source drawn",
+        Event::Graph(GraphOperator::RetargetGraphEdge, 1, |b, a| b == a),
+    ),
+    (
+        "raw field: InputLeaf ref",
+        Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| {
+            matches!(
+                changed_source(b, a),
+                Some((GraphSource::InputLeaf { ref_idx: r0, sub_idx: s0 }, GraphSource::InputLeaf { ref_idx: r1, sub_idx: s1 })) if r0 != r1 && s0 == s1
+            )
+        }),
+    ),
+    (
+        "raw field: InputLeaf sub",
+        Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| {
+            matches!(
+                changed_source(b, a),
+                Some((GraphSource::InputLeaf { ref_idx: r0, sub_idx: s0 }, GraphSource::InputLeaf { ref_idx: r1, sub_idx: s1 })) if r0 == r1 && s0 != s1
+            )
+        }),
+    ),
+    (
+        "raw field: SharedMemory slot",
+        Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| {
+            matches!(
+                changed_source(b, a),
+                Some((GraphSource::SharedMemory { slot: s0, .. }, GraphSource::SharedMemory { slot: s1, .. })) if s0 != s1
+            )
+        }),
+    ),
+    (
+        "raw field: SharedMemory previous flag",
+        Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| {
+            matches!(
+                changed_source(b, a),
+                Some((GraphSource::SharedMemory { previous: p0, .. }, GraphSource::SharedMemory { previous: p1, .. })) if p0 != p1
+            )
+        }),
+    ),
+    (
+        "raw field: ComputeNode index",
+        Event::Graph(GraphOperator::GraphRawFieldMutation, 1, |b, a| {
+            matches!(
+                changed_source(b, a),
+                Some((GraphSource::ComputeNode(_), GraphSource::ComputeNode(_)))
+            )
+        }),
+    ),
+    (
+        "alter weight",
+        Event::Graph(GraphOperator::AlterGraphEdgeWeight, 1, |b, a| b != a),
+    ),
+    (
+        "refinement weight write",
+        Event::Graph(GraphOperator::RefineHeritableStructure, 1, |b, a| b != a),
+    ),
+    (
+        "copy edge bundle",
+        Event::Graph(GraphOperator::CopyEdgeBundle, 1, any),
+    ),
+    (
+        "compute kind: swap operator",
+        Event::Graph(GraphOperator::SwapGraphOperator, 1, any),
+    ),
+    (
+        "compute kind: operator param",
+        Event::Graph(GraphOperator::MutateGraphOperatorParam, 1, any),
+    ),
+    (
+        "plasticity: enable",
+        Event::Graph(GraphOperator::EnableHebbian, 1, any),
+    ),
+    (
+        "plasticity: disable",
+        Event::Graph(GraphOperator::DisableHebbian, 1, any),
+    ),
+    (
+        "plasticity: rule",
+        Event::Graph(GraphOperator::MutateHebbianRule, 1, any),
+    ),
+    (
+        "plasticity: rate",
+        Event::Graph(GraphOperator::MutateHebbianRate, 1, any),
+    ),
+    (
+        "plasticity: Lamarckian toggle",
+        Event::Graph(GraphOperator::ToggleHebbianLamarckian, 1, any),
+    ),
+    (
+        "plasticity: enable modulation",
+        Event::Graph(GraphOperator::EnableRewardModulation, 1, any),
+    ),
+    (
+        "recruitment: neutral input",
+        Event::Graph(GraphOperator::RecruitNeutralInput, 1, |b, a| b != a),
+    ),
+    (
+        "Prune reindex",
+        Event::InputRef(InputRefOperator::Prune, 0, |b, a| b != a),
+    ),
+    (
+        "recruitment: declared input sink push",
+        Event::InputRef(InputRefOperator::Add, 1, |b, a| {
+            sink_edges(a) == sink_edges(b) + 1
+        }),
+    ),
+    (
+        "routing: gate sink push",
+        Event::Topology(TopologyOperator::AddRouteTarget),
+    ),
+    (
+        "topology: CopyNode",
+        Event::Topology(TopologyOperator::CopyNode),
+    ),
+    (
+        "topology: CopyMeshBackwardSlice",
+        Event::Topology(TopologyOperator::CopyMeshBackwardSlice),
+    ),
+    (
+        "topology: CopyMeshForwardSlice",
+        Event::Topology(TopologyOperator::CopyMeshForwardSlice),
+    ),
+    (
+        "topology: RemoveNode",
+        Event::Topology(TopologyOperator::RemoveNode),
+    ),
+    (
+        "topology: Swap",
+        Event::Topology(TopologyOperator::SwapNodeBackend),
+    ),
 ];
 
 /// Recorded on main before the refactor; scenario order as in [`SCENARIOS`],
@@ -417,7 +561,11 @@ fn scenario_digest(name: &str, event: Event, base: &CreatureGenome, parent: &Wei
         if apply(event, &mut child, &mut SmallRng::seed_from_u64(seed)) {
             let weights = build(&mut child);
             assert!(
-                weights.iter().flatten().flat_map(|row| row.iter()).any(|&v| v >= 10.0),
+                weights
+                    .iter()
+                    .flatten()
+                    .flat_map(|row| row.iter())
+                    .any(|&v| v >= 10.0),
                 "{name}: the child inherits learned values"
             );
             return digest(seed, &child, &weights);
@@ -427,8 +575,10 @@ fn scenario_digest(name: &str, event: Event, base: &CreatureGenome, parent: &Wei
 }
 
 fn rollback_digest(base: &CreatureGenome, parent: &Weights) -> String {
-    let mut config = MutationConfig::default();
-    config.per_unit_rate = 1.0;
+    let config = MutationConfig {
+        per_unit_rate: 1.0,
+        ..MutationConfig::default()
+    };
     let mut broken = base.clone();
     broken.nodes.push(broken.nodes[0].clone());
     let mut parent = parent.clone();

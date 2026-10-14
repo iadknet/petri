@@ -1,6 +1,7 @@
 //! Structured mutation uses the same inherited edges, input resolver and votes.
 use super::*;
 use crate::config::MutationConfig;
+use crate::creature::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface};
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::graph::refinement::refine;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -39,7 +40,7 @@ fn fixture(ring: bool) -> CreatureGenome {
 fn weights(genome: &CreatureGenome) -> Vec<f32> {
     graph(&genome.nodes[0])
         .edges()
-        .map(|edge| edge.weight)
+        .map(|edge| edge.weight())
         .collect()
 }
 
@@ -76,12 +77,12 @@ fn native_run(
     side.commit_vote_contribution(0);
     assert_eq!(side.votes, staged);
     let mut expected = [0.0; VOTE_SINK_COUNT];
-    for sink in &graph(node).output_sinks {
+    for sink in graph(node).output_sinks() {
         let OutputSinkKind::ActionVote(vote) = sink.kind else {
             continue;
         };
         for edge in &sink.inputs {
-            let GraphSource::InputLeaf { sub_idx, .. } = edge.source else {
+            let GraphSource::InputLeaf { sub_idx, .. } = edge.source() else {
                 panic!("fixture leaf")
             };
             let input = if ring {
@@ -90,7 +91,7 @@ fn native_run(
                 snapshot.perception.nearby_core[usize::from(sub_idx)]
             };
             assert!(input > 0.0);
-            expected[vote.index()] += edge.weight * input;
+            expected[vote.index()] += edge.weight() * input;
         }
     }
     assert_eq!(
@@ -315,16 +316,19 @@ fn proposal(genome: &mut CreatureGenome, arm: Arm, seed: u64) -> (f64, Vec<usize
         assert_eq!(rng.gen::<u64>(), replay.gen::<u64>());
     } else {
         let increment = d.abs() / (weights(genome).len() as f32).sqrt();
-        for edge in graph_mut(&mut genome.nodes[0])
-            .output_sinks
-            .iter_mut()
-            .flat_map(|s| &mut s.inputs)
-        {
-            edge.weight += if replay.gen_bool(0.5) {
+        let def = graph_mut(&mut genome.nodes[0]);
+        let sink_edges: Vec<EdgeOccurrence> = def
+            .edge_sites()
+            .filter(|occurrence| matches!(occurrence.surface, EdgeSurface::SinkInput(_)))
+            .collect();
+        for occurrence in sink_edges {
+            let weight = def.edge_at(occurrence).weight();
+            let step = if replay.gen_bool(0.5) {
                 increment
             } else {
                 -increment
             };
+            def.edge_mut(occurrence).set_weight(weight + step);
         }
     }
     (f64::from(d.abs()), (0..weights(genome).len()).collect())
@@ -421,26 +425,20 @@ fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
     let mut genome = fixture(true);
     let active = active_graph();
     let graph = graph_mut(&mut genome.nodes[0]);
-    graph.compute_nodes = active.compute_nodes;
-    graph.birth_weights = Some(vec![vec![Some(0.75)], vec![Some(-0.5)]]);
-    graph
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::CustomOutput(0))
-        .unwrap()
-        .inputs
-        .push(edge(leaf(0, 0), 0.5));
+    *graph = graph
+        .clone()
+        .with_compute_nodes(active.compute_nodes().to_vec());
+    graph.seed_birth(BirthSeeds::Rows(vec![vec![Some(0.75)], vec![Some(-0.5)]]));
+    let custom = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
+    graph.push_edge(custom, edge(leaf(0, 0), 0.5));
     // Ring-like compute inputs and a shared-memory vote edge are not members.
-    graph.compute_nodes[0]
-        .inputs
-        .extend([edge(leaf(0, 0), 0.5), edge(leaf(0, 1), 0.5)]);
-    graph
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap()
-        .inputs
-        .push(edge(memory(0, false), 0.5));
+    for compute in [edge(leaf(0, 0), 0.5), edge(leaf(0, 1), 0.5)] {
+        graph.push_edge(EdgeSurface::ComputeInput(0), compute);
+    }
+    let eat = graph
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+        .unwrap();
+    graph.push_edge(eat, edge(memory(0, false), 0.5));
     genome.nodes[0].targets.push(RouteTarget {
         target_id: NodeId::new(0),
         slot: 0,
@@ -452,10 +450,11 @@ fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
         super::graph(&before.nodes[0]),
         super::graph(&genome.nodes[0]),
     );
-    assert_eq!(old.compute_nodes, new.compute_nodes);
-    assert_eq!(old.birth_weights, new.birth_weights);
+    assert_eq!(old.compute_nodes(), new.compute_nodes());
+    assert!(new.birth_seeds().is_some());
+    assert_eq!(old.birth_seeds(), new.birth_seeds());
     assert_eq!(before.nodes[0].targets, genome.nodes[0].targets);
-    for (old, new) in old.output_sinks.iter().zip(&new.output_sinks) {
+    for (old, new) in old.output_sinks().iter().zip(new.output_sinks()) {
         if !matches!(old.kind, OutputSinkKind::ActionVote(VoteSink::Move(_))) {
             assert_eq!(old, new);
         }

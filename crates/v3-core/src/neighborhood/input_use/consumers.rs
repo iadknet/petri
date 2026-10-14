@@ -68,7 +68,7 @@ pub(super) struct Inventory {
 }
 
 fn edge_target(node: &NodeGenome, edge: &GraphEdge) -> Option<Target> {
-    match edge.source {
+    match edge.source() {
         GraphSource::InputLeaf { ref_idx, sub_idx } => node
             .input_refs
             .get(usize::from(ref_idx))
@@ -119,7 +119,7 @@ fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsume
         reachable: false,
         vm: Vec::new(),
         compute: graph
-            .compute_nodes
+            .compute_nodes()
             .iter()
             .enumerate()
             .map(|(index, compute)| consumers(&compute.inputs, live.contains(&index)))
@@ -128,7 +128,7 @@ fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsume
         // A ring projection reads all eight channels of its ring in the same
         // effects pass (T11.F31).
         sinks: graph
-            .output_sinks
+            .output_sinks()
             .iter()
             .flat_map(|sink| consumers(&sink.inputs, true))
             .chain(graph.projections.iter().flat_map(|projection| {
@@ -268,23 +268,9 @@ pub(in crate::neighborhood) fn ablated(
                         }
                     }
                 }
-                let edges = graph
-                    .compute_nodes
-                    .iter_mut()
-                    .flat_map(|compute| compute.inputs.iter_mut())
-                    .chain(
-                        graph
-                            .output_sinks
-                            .iter_mut()
-                            .flat_map(|sink| sink.inputs.iter_mut()),
-                    );
-                for edge in edges {
-                    if let GraphSource::InputLeaf { ref_idx, sub_idx } = &mut edge.source {
-                        if hit(*ref_idx, *sub_idx) {
-                            *ref_idx = u16::MAX;
-                        }
-                    }
-                }
+                graph.redirect_leaf_reads(|ref_idx, sub_idx| {
+                    hit(ref_idx, sub_idx).then_some(u16::MAX)
+                });
             }
             BackendDef::Vm(vm) => {
                 for instruction in &mut vm.program {

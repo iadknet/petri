@@ -1,7 +1,8 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    GraphSource,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
@@ -35,7 +36,7 @@ fn sensors() -> SensorSnapshot {
 fn applied_graph_accounting_separates_base_and_hebbian_exhaustion() {
     use crate::simulation::energy_accounting::DeathCause;
     let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
-    def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None;
+    def.node_plasticity_mut(0).unwrap().modulation = None;
     let runtime = RuntimeConfig {
         graph_node_base_cost: 2.0,
         plasticity_update_cost: 3.0,
@@ -70,22 +71,19 @@ fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
 }
 
 fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
-    CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+    CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 0.5,
-            }],
-            plasticity: Some(config(rule, eta, lambda)),
-        }],
-        output_sinks: vec![],
-    }
+                0.5,
+            )],
+            Some(config(rule, eta, lambda)),
+        )])
+        .with_output_sinks(vec![])
 }
 
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
@@ -157,24 +155,19 @@ fn repeated_visits_add_activity_on_the_decayed_base() {
 #[test]
 fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
-    def.compute_nodes[0].inputs = vec![
-        GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 0.5,
-        },
-        GraphEdge {
-            source: GraphSource::ComputeNode(1),
-            weight: 0.5,
-        },
-    ];
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Constant(3.0),
-        inputs: vec![GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 0.5,
-        }],
-        plasticity: Some(config(HebbianRule::Classic, 1.0, 0.0)),
-    });
+    crate::creature::genome::cgp::test_support::set_compute_inputs(
+        &mut def,
+        0,
+        vec![
+            GraphEdge::new(GraphSource::ComputeNode(0), 0.5),
+            GraphEdge::new(GraphSource::ComputeNode(1), 0.5),
+        ],
+    );
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Constant(3.0),
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
+        Some(config(HebbianRule::Classic, 1.0, 0.0)),
+    ));
     let mut state = GraphRuntimeState::new();
     state.node_outputs = vec![vec![2.0, 4.0]];
     begin(&mut state, &def);
@@ -186,13 +179,14 @@ fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources()
 #[test]
 fn activity_uses_evaluation_energy_before_pure_hebbian_cost() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
-    def.compute_nodes[0].inputs[0].source = GraphSource::InputLeaf {
-        ref_idx: 0,
-        sub_idx: 0,
-    };
-    let mut pure = def.compute_nodes[0].clone();
+    def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
+        .set_source(GraphSource::InputLeaf {
+            ref_idx: 0,
+            sub_idx: 0,
+        });
+    let mut pure = def.compute_nodes()[0].clone();
     pure.plasticity.as_mut().unwrap().modulation = None;
-    def.compute_nodes.push(pure);
+    def.append_compute_node(pure);
     let runtime = RuntimeConfig {
         graph_node_base_cost: 1.0,
         plasticity_update_cost: 2.0,
@@ -211,9 +205,9 @@ fn activity_uses_evaluation_energy_before_pure_hebbian_cost() {
 #[test]
 fn failed_visits_preserve_decay_and_last_successful_activity() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
-    let mut pure = def.compute_nodes[0].clone();
+    let mut pure = def.compute_nodes()[0].clone();
     pure.plasticity.as_mut().unwrap().modulation = None;
-    def.compute_nodes.push(pure);
+    def.append_compute_node(pure);
     let runtime = RuntimeConfig {
         graph_node_base_cost: 1.0,
         plasticity_update_cost: 1.0,
@@ -262,7 +256,7 @@ fn exact_rules_rewards_rates_and_hebbian_equivalence() {
         for eta in [0.0, 0.4, 1.0] {
             for signal in [-0.75, 0.0, 1.0] {
                 let mut def = graph(rule, eta, 0.0);
-                def.compute_nodes[0].kind = ComputeNodeKind::Constant(post);
+                def.set_compute_kind(0, ComputeNodeKind::Constant(post));
                 let mut state = GraphRuntimeState::new();
                 begin(&mut state, &def);
                 visit(&def, &mut state, pre, &mut 100.0, &RuntimeConfig::default());
@@ -272,11 +266,7 @@ fn exact_rules_rewards_rates_and_hebbian_equivalence() {
                 assert!((state.plasticity_weights[0][0][0] - expected).abs() < 1e-7);
                 if signal == 1.0 {
                     let mut pure = def.clone();
-                    pure.compute_nodes[0]
-                        .plasticity
-                        .as_mut()
-                        .unwrap()
-                        .modulation = None;
+                    pure.node_plasticity_mut(0).unwrap().modulation = None;
                     let mut pure_state = GraphRuntimeState::new();
                     begin(&mut pure_state, &pure);
                     visit(
@@ -344,16 +334,15 @@ fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
 #[test]
 fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
     let mut def = graph(HebbianRule::Oja, 0.4, 0.7);
-    def.output_sinks
-        .push(crate::creature::genome::cgp::OutputSink {
-            kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+    crate::creature::genome::cgp::test_support::push_sink(
+        &mut def,
+        crate::creature::genome::cgp::OutputSink::new(
+            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
                 crate::creature::genome::vote::VoteSink::Eat,
             ),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-        });
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        ),
+    );
     let runtime = RuntimeConfig::default();
     let mut ordinary = GraphRuntimeState::new();
     let mut traced = ordinary.clone();
@@ -422,7 +411,7 @@ proptest! {
     ) {
         let def = graph(HebbianRule::Classic, 0.5, lambda);
         let mut bigger = def.clone();
-        bigger.compute_nodes.extend((0..extras).map(|_| ComputeNode { kind: ComputeNodeKind::Oscillator(0.25), inputs: vec![], plasticity: None }));
+        for _ in 0..extras { bigger.append_compute_node(ComputeNode::new(ComputeNodeKind::Oscillator(0.25), vec![], None)); }
         let mut once = GraphRuntimeState::new(); let mut repeated = GraphRuntimeState::new();
         let runtime = RuntimeConfig::default();
         let trace = |state: &GraphRuntimeState| state.eligibility_traces.first().and_then(|m| m.first()).and_then(|e| e.first()).copied().unwrap_or(0.0);
@@ -443,8 +432,8 @@ proptest! {
         eta in -1.0f32..2.0, clamp in -1.0f32..12.0,
     ) {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
-        def.compute_nodes[0].inputs[0].weight = weight;
-        def.compute_nodes[0].plasticity.as_mut().unwrap().weight_clamp = clamp;
+        def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0)).set_weight(weight);
+        def.node_plasticity_mut(0).unwrap().weight_clamp = clamp;
         let mut state = GraphRuntimeState::new(); begin(&mut state, &def);
         visit(&def, &mut state, pulse, &mut 100.0, &RuntimeConfig::default());
         reward(&def, &mut state, signal);
@@ -462,29 +451,23 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
     use crate::runtime::mesh::execute_creature_mesh;
     let started = std::time::Instant::now();
     let mut def = graph(HebbianRule::Classic, 0.5, 0.0);
-    def.compute_nodes[0].kind = ComputeNodeKind::Constant(1.0);
-    def.compute_nodes[0].inputs.clear();
-    def.compute_nodes[0].plasticity = None;
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Threshold(0.0),
-        inputs: vec![GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 0.5,
-        }],
-        plasticity: Some(config(HebbianRule::Classic, 0.5, 0.0)),
-    });
-    let edge = |index, weight| GraphEdge {
-        source: GraphSource::ComputeNode(index),
-        weight,
-    };
+    def.set_compute_kind(0, ComputeNodeKind::Constant(1.0));
+    crate::creature::genome::cgp::test_support::set_compute_inputs(&mut def, 0, Vec::new());
+    def.set_node_plasticity(0, None);
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Threshold(0.0),
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
+        Some(config(HebbianRule::Classic, 0.5, 0.0)),
+    ));
+    let edge = |index, weight| GraphEdge::new(GraphSource::ComputeNode(index), weight);
     // Eat when the learned gate fires; otherwise nothing is voted and the
     // tick is `NoOp`.
-    def.output_sinks = vec![crate::creature::genome::cgp::OutputSink {
-        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+    def = def.with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
+        crate::creature::genome::cgp::OutputSinkKind::ActionVote(
             crate::creature::genome::vote::VoteSink::Eat,
         ),
-        inputs: vec![edge(1, 1.0)],
-    }];
+        vec![edge(1, 1.0)],
+    )]);
     let genome = genome(&def);
     let run = |state: &mut GraphRuntimeState, acquisition: bool, frozen: bool| {
         let mut correct = Vec::new();
@@ -552,17 +535,16 @@ fn explicit_reward_clamp_bounds_and_decay_normalization() {
 
 #[test]
 fn birth_aligned_weights_drive_first_execution_and_reward_without_parent_credit() {
-    use crate::simulation::actions::cgp_reproduction::{
-        build_cgp_child_plasticity_weights, capture_birth_weights,
-    };
+    use crate::creature::newborn::take_graph_plasticity_weights;
+    use crate::simulation::actions::cgp_reproduction::capture_def_seeds;
     let mut def = graph(HebbianRule::Classic, 0.1, 0.5);
-    def.compute_nodes[0].kind = ComputeNodeKind::Add;
-    def.compute_nodes[0].plasticity.as_mut().unwrap().lamarckian = true;
-    capture_birth_weights(&mut def, &[Box::new([0.75])]);
-    def.duplicate_compute_nodes_in_place(&[0]);
-    def.remove_compute_node_at(0);
+    def.set_compute_kind(0, ComputeNodeKind::Add);
+    def.node_plasticity_mut(0).unwrap().lamarckian = true;
+    capture_def_seeds(&mut def, &[Box::new([0.75])]);
+    def.duplicate_compute_nodes(&[0]);
+    def.remove_compute_node(0);
     let mut child = GraphRuntimeState::new();
-    child.plasticity_weights = vec![build_cgp_child_plasticity_weights(&mut def)];
+    child.plasticity_weights = vec![take_graph_plasticity_weights(&mut def)];
     assert!(child.eligibility_traces.is_empty());
     assert_eq!(reward(&def, &mut child, 1.0), (0.0, 0));
     begin(&mut child, &def);
@@ -585,9 +567,10 @@ fn learning_counts_assignments_separately_from_final_weight_changes() {
     ] {
         for modulated in [false, true] {
             let mut def = graph(HebbianRule::Classic, eta, 0.0);
-            def.compute_nodes[0].inputs[0].weight = weight;
+            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
+                .set_weight(weight);
             if !modulated {
-                def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None;
+                def.node_plasticity_mut(0).unwrap().modulation = None;
             }
             let mut state = GraphRuntimeState::new();
             begin(&mut state, &def);
@@ -636,9 +619,9 @@ proptest! {
         modulated in any::<bool>(),
     ) {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
-        let edge = def.compute_nodes[0].inputs[0];
-        def.compute_nodes[0].inputs = weights.iter().map(|&weight| GraphEdge { weight, ..edge }).collect();
-        if !modulated { def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None; }
+        let edge = def.compute_nodes()[0].inputs[0];
+        crate::creature::genome::cgp::test_support::set_compute_inputs(&mut def, 0, weights.iter().map(|&weight| GraphEdge::new(edge.source(), weight)).collect());
+        if !modulated { def.node_plasticity_mut(0).unwrap().modulation = None; }
         let mut state = GraphRuntimeState::new();
         begin(&mut state, &def);
         let side = visit(&def, &mut state, input, &mut 100.0, &RuntimeConfig::default());

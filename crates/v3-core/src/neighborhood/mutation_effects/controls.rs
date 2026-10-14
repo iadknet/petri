@@ -16,11 +16,13 @@ pub(super) fn graph_genome(
     compute_nodes: Vec<ComputeNode>,
     eat_votes: Vec<GraphEdge>,
 ) -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes = compute_nodes;
-    def.sink_mut(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .expect("the fixed catalog carries every vote sink")
-        .inputs = eat_votes;
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(compute_nodes);
+    let eat = def
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+        .expect("the fixed catalog carries every vote sink");
+    for edge in eat_votes {
+        def.push_edge(eat, edge);
+    }
     let id = NodeId::new(0);
     CreatureGenome {
         entry_node_id: id,
@@ -38,12 +40,14 @@ pub(super) fn graph_genome(
 pub(super) fn barrier_pair() -> (CreatureGenome, CreatureGenome) {
     let refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
     let votes = (0..8)
-        .map(|direction| GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 0,
-                sub_idx: direction,
-            },
-            weight: 1.0,
+        .map(|direction| {
+            GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: direction,
+                },
+                1.0,
+            )
         })
         .collect();
     (
@@ -61,26 +65,19 @@ const INTEGRATOR_THRESHOLD: f32 = 0.38;
 /// A slow integrator crossing its threshold after tick 4: the child votes
 /// `Eat` from the threshold; the parent computes the same and votes nothing.
 pub(super) fn integrator_pair() -> (CreatureGenome, CreatureGenome) {
-    let edge = |source: u16| GraphEdge {
-        source: GraphSource::ComputeNode(source),
-        weight: 1.0,
-    };
+    let edge = |source: u16| GraphEdge::new(GraphSource::ComputeNode(source), 1.0);
     let nodes = vec![
-        ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: Vec::new(),
-            plasticity: None,
-        },
-        ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(INTEGRATOR_RATE),
-            inputs: vec![edge(0)],
-            plasticity: None,
-        },
-        ComputeNode {
-            kind: ComputeNodeKind::Threshold(INTEGRATOR_THRESHOLD),
-            inputs: vec![edge(1)],
-            plasticity: None,
-        },
+        ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new(), None),
+        ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(INTEGRATOR_RATE),
+            vec![edge(0)],
+            None,
+        ),
+        ComputeNode::new(
+            ComputeNodeKind::Threshold(INTEGRATOR_THRESHOLD),
+            vec![edge(1)],
+            None,
+        ),
     ];
     (
         graph_genome(Vec::new(), nodes.clone(), Vec::new()),

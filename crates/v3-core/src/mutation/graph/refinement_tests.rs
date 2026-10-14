@@ -1,6 +1,7 @@
 use super::*;
 use crate::contracts::{NodeId, OrdinaryFoodTypeId};
-use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSink, OutputSinkKind};
+use crate::creature::genome::cgp::test_support::{edit_sinks, reweighted, SinkDraft};
+use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::BackendDef;
 use proptest::prelude::*;
@@ -28,18 +29,18 @@ fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
     def
 }
 fn wire(node: &mut NodeGenome, vote: VoteSink, reference: u16, channel: u16, weight: f32) {
-    let sink = graph_mut(node)
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(vote))
-        .unwrap();
-    sink.inputs.push(GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx: reference,
-            sub_idx: channel,
-        },
-        weight,
-    });
+    let def = graph_mut(node);
+    let sink = def.sink_surface(OutputSinkKind::ActionVote(vote)).unwrap();
+    def.push_edge(
+        sink,
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: reference,
+                sub_idx: channel,
+            },
+            weight,
+        ),
+    );
 }
 fn directed(kind: VoteKind, d: u8) -> VoteSink {
     match kind {
@@ -143,64 +144,66 @@ fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_group()
     let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 255);
     node.input_refs.push(node.input_refs[0].clone());
     // A duplicate declaration with a unique edge is still the same semantic group.
-    graph_mut(&mut node)
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
-        .unwrap()
-        .inputs[0]
-        .source = GraphSource::InputLeaf {
-        ref_idx: 1,
-        sub_idx: 0,
-    };
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        let sink = sinks
+            .iter_mut()
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .unwrap();
+        sink.inputs[0] = GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 1,
+                sub_idx: 0,
+            },
+            sink.inputs[0].weight(),
+        );
+    });
     assert_eq!(all_groups(&node).len(), 1);
     wire(&mut node, VoteSink::Move(0), 0, 0, 0.0);
     assert!(all_groups(&node).is_empty());
     wire(&mut node, VoteSink::Reproduce(0), 0, 0, 0.0);
     wire(&mut node, VoteSink::Reproduce(1), 0, 1, 0.0);
     assert_eq!(all_groups(&node).len(), 1);
-    graph_mut(&mut node)
-        .output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Reproduce(0)))
-        .unwrap()
-        .inputs[0]
-        .weight = f32::NAN;
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        let sink = sinks
+            .iter_mut()
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Reproduce(0)))
+            .unwrap();
+        sink.inputs[0] = reweighted(sink.inputs[0], f32::NAN);
+    });
     assert!(all_groups(&node).is_empty());
 }
 
 #[test]
 fn ring_repeated_sink_occurrences_are_ambiguous_but_slot_occurrences_are_independent() {
     let mut node = ring(WorldInputKey::NeighborOccupiedRing, VoteKind::Move, 0, 255);
-    let duplicate = graph(&node)
-        .output_sinks
-        .iter()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
-        .unwrap()
-        .clone();
-    graph_mut(&mut node).output_sinks.push(duplicate);
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        let duplicate = sinks
+            .iter()
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .unwrap()
+            .clone();
+        sinks.push(duplicate);
+    });
     assert!(all_groups(&node).is_empty());
     let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
-    let duplicate = graph(&node)
-        .output_sinks
-        .iter()
-        .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap()
-        .clone();
-    graph_mut(&mut node).output_sinks.push(duplicate);
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        let duplicate = sinks
+            .iter()
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
+            .unwrap()
+            .clone();
+        sinks.push(duplicate);
+    });
     assert_eq!(all_groups(&node).len(), 2);
-    graph_mut(&mut node)
-        .output_sinks
-        .last_mut()
-        .unwrap()
-        .inputs
-        .push(GraphEdge {
-            source: GraphSource::InputLeaf {
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        sinks.last_mut().unwrap().inputs.push(GraphEdge::new(
+            GraphSource::InputLeaf {
                 ref_idx: 0,
                 sub_idx: 0,
             },
-            weight: 0.0,
-        });
+            0.0,
+        ));
+    });
     assert_eq!(all_groups(&node).len(), 1);
 }
 
@@ -238,24 +241,26 @@ fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_groups() {
         wire(&mut node, vote, reference, channel, 0.0);
     }
     for d in [8, 9] {
-        graph_mut(&mut node).output_sinks.push(OutputSink {
-            kind: OutputSinkKind::ActionVote(VoteSink::Move(d)),
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: u16::from(d - 8),
-                },
-                weight: 0.0,
-            }],
+        edit_sinks(graph_mut(&mut node), |sinks| {
+            sinks.push(SinkDraft {
+                kind: OutputSinkKind::ActionVote(VoteSink::Move(d)),
+                inputs: vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: u16::from(d - 8),
+                    },
+                    0.0,
+                )],
+            });
         });
     }
     assert!(all_groups(&node).is_empty());
     let mut node = slots(WorldInputKey::NearbyCreatureVitals, 2, 0, VoteSink::Eat);
-    for sink in &mut graph_mut(&mut node).output_sinks {
-        if !sink.inputs.is_empty() {
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        for sink in sinks.iter_mut().filter(|sink| !sink.inputs.is_empty()) {
             sink.kind = OutputSinkKind::CustomOutput(0);
         }
-    }
+    });
     assert!(all_groups(&node).is_empty());
 }
 
@@ -269,13 +274,14 @@ proptest! {
         if count < 2 { prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget)); prop_assert_eq!(node, before); }
         else {
             prop_assert!(result.is_ok());
-            let old: Vec<_> = graph(&before).edges().map(|e| e.weight).collect();
-            let new: Vec<_> = graph(&node).edges().map(|e| e.weight).collect();
+            let old: Vec<_> = graph(&before).edges().map(|e| e.weight()).collect();
+            let new: Vec<_> = graph(&node).edges().map(|e| e.weight()).collect();
             prop_assert_eq!(old.len(), new.len());
             let norm = old.iter().zip(&new).map(|(a,b)| (f64::from(*b) - f64::from(*a)).powi(2)).sum::<f64>().sqrt();
             prop_assert!(norm <= 0.100001);
             for i in 1..count { prop_assert!(((new[i]-new[0]) - (old[i]-old[0])).abs() < 1e-7); }
-            for (sink_before,sink_after) in graph(&before).output_sinks.iter().zip(&mut graph_mut(&mut node).output_sinks) { for (a,b) in sink_before.inputs.iter().zip(&mut sink_after.inputs) { b.weight=a.weight; } }
+            let weights: Vec<f32> = graph(&before).edges().map(|e| e.weight()).collect();
+            edit_sinks(graph_mut(&mut node), |sinks| { let mut weights = weights.into_iter(); for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) { *edge = reweighted(*edge, weights.next().unwrap()); } });
             prop_assert_eq!(node,before);
         }
     }
@@ -284,13 +290,11 @@ proptest! {
 #[test]
 fn numeric_preflight_rejects_atomically_and_rounding_is_not_an_extra_touch() {
     let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 3);
-    for edge in graph_mut(&mut node)
-        .output_sinks
-        .iter_mut()
-        .flat_map(|s| &mut s.inputs)
-    {
-        edge.weight = 1_048_576.0;
-    }
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) {
+            *edge = reweighted(*edge, 1_048_576.0);
+        }
+    });
     let before = node.clone();
     let group = all_groups(&node).remove(0);
     assert_eq!(
@@ -386,16 +390,18 @@ proptest! {
     #[test]
     fn any_finite_weight_proposal_is_bounded_or_rejected_unchanged(weights in prop::collection::vec(any::<u32>(), 2..9), scalar in -0.1f32..=0.1) {
         let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 255);
-        for (sink, bits) in graph_mut(&mut node).output_sinks.iter_mut().filter(|s| !s.inputs.is_empty()).zip(weights.iter().cycle()) {
-            let weight = f32::from_bits(*bits); sink.inputs[0].weight = if weight.is_finite() { weight } else { 0.0 };
-        }
+        edit_sinks(graph_mut(&mut node), |sinks| {
+            for (sink, bits) in sinks.iter_mut().filter(|s| !s.inputs.is_empty()).zip(weights.iter().cycle()) {
+                let weight = f32::from_bits(*bits); sink.inputs[0] = reweighted(sink.inputs[0], if weight.is_finite() { weight } else { 0.0 });
+            }
+        });
         let before = node.clone(); let group = all_groups(&node).remove(0);
         let result = apply_step(graph_mut(&mut node), &group, scalar);
         if result.is_err() { prop_assert_eq!(result, Err(MutationSkipReason::NumericProposalRejected)); prop_assert_eq!(node, before); }
         else {
-            let actual = graph(&node).edges().zip(graph(&before).edges()).map(|(a,b)| (f64::from(a.weight)-f64::from(b.weight)).powi(2)).sum::<f64>().sqrt();
+            let actual = graph(&node).edges().zip(graph(&before).edges()).map(|(a,b)| (f64::from(a.weight())-f64::from(b.weight())).powi(2)).sum::<f64>().sqrt();
             prop_assert!(actual <= 0.100001);
-            prop_assert!(graph(&node).edges().all(|e| e.weight.is_finite()));
+            prop_assert!(graph(&node).edges().all(|e| e.weight().is_finite()));
         }
     }
 }
@@ -404,11 +410,11 @@ proptest! {
 fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
     for scalar in [-0.1, 0.1] {
         let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
-        let old: Vec<_> = graph(&node).edges().map(|e| e.weight).collect();
+        let old: Vec<_> = graph(&node).edges().map(|e| e.weight()).collect();
         let group = all_groups(&node).remove(0);
         apply_step(graph_mut(&mut node), &group, scalar).unwrap();
         for (edge, old) in graph(&node).edges().zip(old) {
-            assert_eq!(edge.weight, old + scalar / 2.0);
+            assert_eq!(edge.weight(), old + scalar / 2.0);
         }
         // The normalization's maximum is accepted at every permitted ring size,
         // including the tiny rounding excess covered by the numeric tolerance.
@@ -419,16 +425,16 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
                 0,
                 ((1u16 << count) - 1) as u8,
             );
-            for sink in &mut graph_mut(&mut node).output_sinks {
-                for edge in &mut sink.inputs {
-                    edge.weight = 0.0;
+            edit_sinks(graph_mut(&mut node), |sinks| {
+                for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) {
+                    *edge = reweighted(*edge, 0.0);
                 }
-            }
+            });
             let group = all_groups(&node).remove(0);
             apply_step(graph_mut(&mut node), &group, scalar).unwrap();
             let norm = graph(&node)
                 .edges()
-                .map(|e| f64::from(e.weight).powi(2))
+                .map(|e| f64::from(e.weight()).powi(2))
                 .sum::<f64>()
                 .sqrt();
             assert!((norm - 0.1).abs() < 1e-7, "m={count}: {norm}");
@@ -452,21 +458,22 @@ fn native_sampler_accepts_the_exact_numeric_tolerance_boundary() {
         0xb06d_84ba,
         0xa504_0000,
     ];
-    for (edge, bits) in graph_mut(&mut node)
-        .output_sinks
-        .iter_mut()
-        .flat_map(|sink| &mut sink.inputs)
-        .zip(weight_bits)
-    {
-        edge.weight = f32::from_bits(bits);
-    }
-    let before: Vec<_> = graph(&node).edges().map(|edge| edge.weight).collect();
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        for (edge, bits) in sinks
+            .iter_mut()
+            .flat_map(|sink| sink.inputs.iter_mut())
+            .zip(weight_bits)
+        {
+            *edge = reweighted(*edge, f32::from_bits(bits));
+        }
+    });
+    let before: Vec<_> = graph(&node).edges().map(|edge| edge.weight()).collect();
     let scalar = f32::from_bits(0x3dcc_cb75);
     let increment = scalar / (before.len() as f32).sqrt();
 
     refine(&mut node, &mut StepRng::new(0xffff_2600, 0)).unwrap();
 
-    let after: Vec<_> = graph(&node).edges().map(|edge| edge.weight).collect();
+    let after: Vec<_> = graph(&node).edges().map(|edge| edge.weight()).collect();
     let norm = before
         .iter()
         .zip(&after)
@@ -486,7 +493,7 @@ proptest! {
         let (family,width)=[(WorldInputKey::NearbyCreatureCore,4),(WorldInputKey::NearbyCreatureVitals,2),(WorldInputKey::NearbyCreatureIdentity,3)][bank];
         let field=field % width;
         let mut node=slots(family,width,field,VoteSink::from_index(vote).unwrap());
-        for sink in &mut graph_mut(&mut node).output_sinks { sink.inputs.retain(|edge| matches!(edge.source,GraphSource::InputLeaf {sub_idx,..} if mask & (1 << (sub_idx/width)) != 0)); }
+        edit_sinks(graph_mut(&mut node), |sinks| { for sink in sinks.iter_mut() { sink.inputs.retain(|edge| matches!(edge.source(),GraphSource::InputLeaf {sub_idx,..} if mask & (1 << (sub_idx/width)) != 0)); } });
         let before=node.clone(); let count=mask.count_ones() as usize;
         let groups=all_groups(&node);
         prop_assert_eq!(groups.len(),usize::from(count>=2));
@@ -498,8 +505,8 @@ proptest! {
             let mut rng=SmallRng::seed_from_u64(seed); let _selection=rng.gen_range(0..1usize);
             let increment=rng.gen_range(-0.1f32..=0.1)/(count as f32).sqrt();
             for (old,new) in graph(&before).edges().zip(graph(&node).edges()) {
-                prop_assert_eq!(old.source,new.source);
-                prop_assert_eq!(new.weight,old.weight+increment);
+                prop_assert_eq!(old.source(),new.source());
+                prop_assert_eq!(new.weight(),old.weight()+increment);
             }
             prop_assert_eq!(graph(&node).edges().count(),count);
         }

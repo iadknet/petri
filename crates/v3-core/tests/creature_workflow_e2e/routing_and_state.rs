@@ -33,21 +33,14 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     // CGP graph: Constant(-1.0) → RouterGate(0) sink
     let entry_def = {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Constant(-1.0),
-            inputs: Vec::new(),
-            plasticity: None,
-        });
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Constant(-1.0),
+            Vec::new(),
+            None,
+        ));
         // Wire RouterGate(0) sink to CN0
-        if let Some(sink) = def
-            .output_sinks
-            .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::RouterGate(0))
-        {
-            sink.inputs.push(GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            });
+        if let Some(sink) = def.sink_surface(OutputSinkKind::RouterGate(0)) {
+            def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         }
         def
     };
@@ -146,30 +139,20 @@ fn graph_state_persists_across_ticks_e2e() {
     let state_def = {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         // CN0: Constant(1.0)
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: Vec::new(),
-            plasticity: None,
-        });
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            Vec::new(),
+            None,
+        ));
         // CN1: DecayIntegrator(0.5) with input from CN0
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            plasticity: None,
-        });
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            None,
+        ));
         // Wire CustomOutput(0) sink to CN1
-        if let Some(sink) = def
-            .output_sinks
-            .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::CustomOutput(0))
-        {
-            sink.inputs.push(GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            });
+        if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(0)) {
+            def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
         }
         def
     };

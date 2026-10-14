@@ -8,18 +8,19 @@ use rand::{rngs::SmallRng, SeedableRng};
 fn fixture(weight: f32) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     for d in 0..2 {
-        def.output_sinks
-            .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(d)))
-            .unwrap()
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::InputLeaf {
+        let surface = def
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(d)))
+            .unwrap();
+        def.push_edge(
+            surface,
+            GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: u16::from(d),
                 },
                 weight,
-            });
+            ),
+        );
     }
     CreatureGenome {
         entry_node_id: NodeId::new(7),

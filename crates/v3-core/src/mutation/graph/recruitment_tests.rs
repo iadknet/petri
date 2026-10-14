@@ -1,7 +1,10 @@
 use super::*;
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::NodeId;
-use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSink, OutputSinkKind};
+use crate::creature::genome::cgp::test_support::{edit_sinks, push_sink};
+use crate::creature::genome::cgp::{
+    EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+};
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
@@ -132,15 +135,16 @@ fn reference_capacity_and_dangling_incumbents_are_preflighted() {
         .is_none());
     assert_eq!(fixture, before);
     fixture.input_refs.clear();
-    graph_mut(&mut fixture).output_sinks[0]
-        .inputs
-        .push(GraphEdge {
-            source: GraphSource::InputLeaf {
+    graph_mut(&mut fixture).push_edge(
+        EdgeSurface::SinkInput(0),
+        GraphEdge::new(
+            GraphSource::InputLeaf {
                 ref_idx: 1,
                 sub_idx: 0,
             },
-            weight: 3.0,
-        });
+            3.0,
+        ),
+    );
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
     assert!(admission
         .plan(
@@ -174,23 +178,23 @@ fn reference_capacity_and_dangling_incumbents_are_preflighted() {
 fn every_valid_vote_occurrence_and_only_valid_votes_are_destinations() {
     let mut fixture = node();
     let graph = graph_mut(&mut fixture);
-    graph.output_sinks.push(OutputSink {
-        kind: OutputSinkKind::ActionVote(VoteSink::Move(8)),
-        inputs: vec![],
-    });
-    graph.output_sinks.push(OutputSink {
-        kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-        inputs: vec![],
-    });
+    push_sink(
+        graph,
+        OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Move(8)), vec![]),
+    );
+    push_sink(
+        graph,
+        OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Eat), vec![]),
+    );
     let sites = destinations(graph);
     assert_eq!(sites.len(), 31);
     for vote in VoteSink::all() {
         assert!(sites
             .iter()
-            .any(|&i| graph.output_sinks[i].kind == OutputSinkKind::ActionVote(vote)));
+            .any(|&i| graph.output_sinks()[i].kind == OutputSinkKind::ActionVote(vote)));
     }
-    assert!(!sites.contains(&(graph.output_sinks.len() - 2)));
-    assert!(sites.contains(&(graph.output_sinks.len() - 1)));
+    assert!(!sites.contains(&(graph.output_sinks().len() - 2)));
+    assert!(sites.contains(&(graph.output_sinks().len() - 1)));
 }
 
 proptest! {
@@ -198,7 +202,7 @@ proptest! {
     fn recruitment_preserves_incumbents_and_obeys_bounds(seed in any::<u64>(), whole in any::<bool>(), declarations in 0usize..8, weight in -100f32..100f32) {
         let mut fixture = node();
         fixture.input_refs = vec![InputReference::ActionVotes; declarations];
-        graph_mut(&mut fixture).output_sinks[64].inputs = vec![GraphEdge { source: GraphSource::SharedMemory { slot: 3, previous: true }, weight }; 2];
+        edit_sinks(graph_mut(&mut fixture), |sinks| sinks[64].inputs = vec![GraphEdge::new(GraphSource::SharedMemory { slot: 3, previous: true }, weight); 2]);
         let before = fixture.clone();
         let arm = if whole { Arm::WholeFamily } else { Arm::SingleChannel };
         recruit(&mut fixture, arm, 2, &mut SmallRng::seed_from_u64(seed)).unwrap();
@@ -208,12 +212,12 @@ proptest! {
         let after_graph = graph(&fixture);
         let mut changed = 0;
         let mut added = 0;
-        for (old, new) in before_graph.output_sinks.iter().zip(&after_graph.output_sinks) {
+        for (old, new) in before_graph.output_sinks().iter().zip(after_graph.output_sinks()) {
             prop_assert_eq!(old.kind, new.kind);
-            prop_assert_eq!(&new.inputs[..old.inputs.len()], &old.inputs);
+            prop_assert_eq!(&new.inputs[..old.inputs.len()], &old.inputs[..]);
             if new.inputs.len() != old.inputs.len() { changed += 1; }
             added += new.inputs.len() - old.inputs.len();
-            prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.weight == 0.0));
+            prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.weight() == 0.0));
         }
         // A ring family landing on a directed vote sink becomes one silent
         // projection in place of its edges (T11.F31).
@@ -227,7 +231,7 @@ proptest! {
         } else {
             prop_assert_eq!(added, 0);
         }
-        prop_assert_eq!(&after_graph.compute_nodes, &before_graph.compute_nodes);
+        prop_assert_eq!(after_graph.compute_nodes(), before_graph.compute_nodes());
         prop_assert_eq!(&fixture.targets, &before.targets);
         prop_assert_eq!(fixture.node_id, before.node_id);
     }
@@ -236,7 +240,7 @@ proptest! {
     fn full_or_dangling_tables_still_apply_without_retry(seed in any::<u64>(), whole in any::<bool>(), full in any::<bool>()) {
         let mut fixture = node();
         if full { fixture.input_refs = vec![InputReference::ActionVotes; 65537]; }
-        else { graph_mut(&mut fixture).output_sinks[0].inputs.push(GraphEdge { source: GraphSource::InputLeaf { ref_idx: 0, sub_idx: 0 }, weight: 1.0 }); }
+        else { graph_mut(&mut fixture).push_edge(EdgeSurface::SinkInput(0), GraphEdge::new(GraphSource::InputLeaf { ref_idx: 0, sub_idx: 0 }, 1.0)); }
         let before = fixture.input_refs.clone();
         recruit(&mut fixture, if whole { Arm::WholeFamily } else { Arm::SingleChannel }, 2, &mut SmallRng::seed_from_u64(seed)).unwrap();
         prop_assert_eq!(&fixture.input_refs, &before);
@@ -281,7 +285,7 @@ fn last_representable_index_is_usable_and_unrepresentable_matches_are_not() {
     .unwrap();
     assert_eq!(fixture.input_refs.len(), 65536);
     assert_eq!(
-        graph(&fixture).edges().next().unwrap().source,
+        graph(&fixture).edges().next().unwrap().source(),
         GraphSource::InputLeaf {
             ref_idx: u16::MAX,
             sub_idx: 26
@@ -299,10 +303,9 @@ fn last_representable_index_is_usable_and_unrepresentable_matches_are_not() {
     .is_err());
     assert_eq!(fixture, before);
     fixture.input_refs = vec![InputReference::ActionVotes; 65512];
-    graph_mut(&mut fixture)
-        .output_sinks
-        .iter_mut()
-        .for_each(|sink| sink.inputs.clear());
+    edit_sinks(graph_mut(&mut fixture), |sinks| {
+        sinks.iter_mut().for_each(|sink| sink.inputs.clear());
+    });
     recruit_source(
         &mut fixture,
         &SourceFamily::Upstream,
@@ -313,7 +316,7 @@ fn last_representable_index_is_usable_and_unrepresentable_matches_are_not() {
     .unwrap();
     assert_eq!(fixture.input_refs.len(), 65536);
     assert_eq!(
-        graph(&fixture).edges().last().unwrap().source,
+        graph(&fixture).edges().last().unwrap().source(),
         GraphSource::InputLeaf {
             ref_idx: u16::MAX,
             sub_idx: 0
@@ -324,15 +327,16 @@ fn last_representable_index_is_usable_and_unrepresentable_matches_are_not() {
 #[test]
 fn rejected_explicit_bundle_leaves_every_incumbent_unchanged() {
     let mut fixture = node();
-    graph_mut(&mut fixture).output_sinks[0]
-        .inputs
-        .push(GraphEdge {
-            source: GraphSource::InputLeaf {
+    graph_mut(&mut fixture).push_edge(
+        EdgeSurface::SinkInput(0),
+        GraphEdge::new(
+            GraphSource::InputLeaf {
                 ref_idx: 12,
                 sub_idx: 4,
             },
-            weight: 1.5,
-        });
+            1.5,
+        ),
+    );
     let before = fixture.clone();
     assert!(recruit_source(
         &mut fixture,

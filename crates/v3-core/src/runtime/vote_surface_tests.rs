@@ -83,25 +83,25 @@ fn voting_graph_node(
     NodeGenome {
         node_id: NodeId::new(id),
         input_refs: vec![],
-        backend_def: BackendDef::Graph(CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Constant(value),
-                inputs: vec![],
-                plasticity: None,
-            }],
-            output_sinks: sinks
-                .iter()
-                .map(|kind| OutputSink {
-                    kind: *kind,
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                })
-                .collect(),
-        }),
+        backend_def: BackendDef::Graph(
+            CgpGraphBackendDef::new_with_fixed_outputs()
+                .with_compute_nodes(vec![ComputeNode::new(
+                    ComputeNodeKind::Constant(value),
+                    vec![],
+                    None,
+                )])
+                .with_output_sinks(
+                    sinks
+                        .iter()
+                        .map(|kind| {
+                            OutputSink::new(
+                                *kind,
+                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                            )
+                        })
+                        .collect(),
+                ),
+        ),
         targets: targets(target_ids),
     }
 }

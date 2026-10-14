@@ -93,7 +93,7 @@ fn vote_surface_channels(node: &NodeGenome) -> BTreeSet<Channel> {
     match &node.backend_def {
         BackendDef::Graph(graph) => graph_vote_edges(graph)
             .into_iter()
-            .filter_map(|edge| match edge.source {
+            .filter_map(|edge| match edge.source() {
                 GraphSource::InputLeaf { ref_idx, sub_idx } => channel(ref_idx, sub_idx),
                 _ => None,
             })
@@ -122,7 +122,7 @@ fn vote_surface_channels(node: &NodeGenome) -> BTreeSet<Channel> {
 
 fn graph_vote_edges(graph: &CgpGraphBackendDef) -> Vec<&GraphEdge> {
     let mut edges: Vec<&GraphEdge> = graph
-        .output_sinks
+        .output_sinks()
         .iter()
         .filter(|sink| {
             matches!(
@@ -132,12 +132,12 @@ fn graph_vote_edges(graph: &CgpGraphBackendDef) -> Vec<&GraphEdge> {
         })
         .flat_map(|sink| &sink.inputs)
         .collect();
-    let mut seen = vec![false; graph.compute_nodes.len()];
+    let mut seen = vec![false; graph.compute_nodes().len()];
     let mut queue: Vec<usize> = Vec::new();
     let mut cursor = 0;
     loop {
         while cursor < edges.len() {
-            if let GraphSource::ComputeNode(index) = edges[cursor].source {
+            if let GraphSource::ComputeNode(index) = edges[cursor].source() {
                 let index = usize::from(index);
                 if index < seen.len() && !seen[index] {
                     seen[index] = true;
@@ -149,7 +149,7 @@ fn graph_vote_edges(graph: &CgpGraphBackendDef) -> Vec<&GraphEdge> {
         let Some(index) = queue.pop() else {
             break;
         };
-        edges.extend(&graph.compute_nodes[index].inputs);
+        edges.extend(&graph.compute_nodes()[index].inputs);
     }
     edges
 }
@@ -341,9 +341,9 @@ pub fn feasibility(
         panic!("a controller keeps the vote node a Graph node");
     };
     let sinks_ok = before
-        .output_sinks
+        .output_sinks()
         .iter()
-        .zip(&after.output_sinks)
+        .zip(after.output_sinks())
         .all(|(b, a)| {
             b.inputs == a.inputs
                 || matches!(

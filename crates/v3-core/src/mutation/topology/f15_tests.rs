@@ -125,9 +125,9 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
             }
             _ => {
                 let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-                graph
-                    .output_sinks
-                    .retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
+                crate::creature::genome::cgp::test_support::edit_sinks(&mut graph, |sinks| {
+                    sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
+                });
                 g.nodes[0].backend_def = BackendDef::Graph(graph);
             }
         }
@@ -312,32 +312,30 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
     })];
     if graph {
         let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
-        backend
-            .compute_nodes
-            .push(crate::creature::genome::cgp::ComputeNode {
-                kind: crate::creature::genome::cgp::ComputeNodeKind::WeightedSum,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            });
-        backend
-            .output_sinks
-            .iter_mut()
-            .find(|s| matches!(s.kind, OutputSinkKind::CustomOutput(0)))
-            .unwrap()
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::SharedMemory {
+        backend.append_compute_node(crate::creature::genome::cgp::ComputeNode::new(
+            crate::creature::genome::cgp::ComputeNodeKind::WeightedSum,
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                1.0,
+            )],
+            None,
+        ));
+        let surface = backend
+            .sink_surface(OutputSinkKind::CustomOutput(0))
+            .unwrap();
+        backend.push_edge(
+            surface,
+            GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 3,
                     previous: false,
                 },
-                weight: 1.0,
-            });
+                1.0,
+            ),
+        );
         g.nodes[0].backend_def = BackendDef::Graph(backend);
     } else {
         g.nodes[0].backend_def = BackendDef::Vm(VmBackendDef {
@@ -500,13 +498,13 @@ fn one_production_addition_is_conditional_silent_and_can_diverge_on_both_backend
         grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
         if let BackendDef::Graph(g) = &grown.nodes[0].backend_def {
             let sink = g
-                .output_sinks
+                .output_sinks()
                 .iter()
                 .find(|s| matches!(s.kind, OutputSinkKind::RouterGate(1)))
                 .unwrap();
             assert!(
                 matches!(
-                    sink.inputs.last().unwrap().source,
+                    sink.inputs.last().unwrap().source(),
                     GraphSource::ComputeNode(0)
                 ),
                 "seed 7 graph gate {:?}",
@@ -624,15 +622,15 @@ fn paired_graph_gates_reach_all_sensor_subvalues_without_resampling() {
             panic!()
         };
         let edge = graph
-            .output_sinks
+            .output_sinks()
             .iter()
             .find(|s| matches!(s.kind, OutputSinkKind::RouterGate(1)))
             .unwrap()
             .inputs
             .last()
             .unwrap();
-        assert_eq!(edge.weight, 1.0);
-        match edge.source {
+        assert_eq!(edge.weight(), 1.0);
+        match edge.source() {
             GraphSource::InputLeaf {
                 ref_idx: 0,
                 sub_idx,

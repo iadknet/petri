@@ -343,7 +343,7 @@ pub fn project(
             effects::SELECTED_SEED_BASE
         ),
         genome_identity: "equal Debug rendering: distinguishes -0.0, ignores NaN payloads, \
-                          omits birth_weights"
+                          omits birth seeds"
             .to_string(),
         count_fields: count_fields(),
         queue_buckets: QUEUE_BUCKETS.map(str::to_string).to_vec(),

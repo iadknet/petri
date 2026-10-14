@@ -72,7 +72,7 @@ fn resolved_consumers(node: &NodeGenome) -> Vec<Option<InputReference>> {
     match &node.backend_def {
         BackendDef::Graph(def) => def
             .edges()
-            .filter_map(|edge| match edge.source {
+            .filter_map(|edge| match edge.source() {
                 GraphSource::InputLeaf { ref_idx, .. } => Some(resolve(ref_idx)),
                 _ => None,
             })
@@ -343,40 +343,33 @@ fn swap_input_ref_changes_value() {
 #[test]
 fn swap_on_the_graph_backend_keeps_every_edge() {
     let config = default_config();
-    let leaf = |sub_idx: u16| GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx: 0,
-            sub_idx,
-        },
-        weight: 1.0,
+    let leaf = |sub_idx: u16| {
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx,
+            },
+            1.0,
+        )
     };
-    let def = CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![leaf(3), leaf(0)],
-            plasticity: None,
-        }],
-        output_sinks: vec![
-            OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![leaf(2)],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-                inputs: vec![leaf(4)],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
-                inputs: vec![leaf(0)],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                inputs: vec![leaf(7)],
-            },
-        ],
-    };
+    let def = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![leaf(3), leaf(0)],
+            None,
+        )])
+        .with_output_sinks(vec![
+            OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(2)]),
+            OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Eat), vec![leaf(4)]),
+            OutputSink::new(
+                OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
+                vec![leaf(0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![leaf(7)],
+            ),
+        ]);
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -759,7 +752,7 @@ fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
     let BackendDef::Graph(def) = &node.backend_def else {
         return Vec::new();
     };
-    def.output_sinks
+    def.output_sinks()
         .iter()
         .filter_map(|sink| match sink.kind {
             OutputSinkKind::ActionVote(vote) => Some((vote, sink)),
@@ -768,7 +761,7 @@ fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
         .flat_map(|(vote, sink)| {
             sink.inputs
                 .iter()
-                .map(move |edge| (vote, edge.source, edge.weight))
+                .map(move |edge| (vote, edge.source(), edge.weight()))
         })
         .collect()
 }
@@ -848,7 +841,7 @@ fn add_input_ref_to_graph_node_wires_one_vote_edge() {
     }
 }
 
-/// A populated founder decision node with plasticity and `birth_weights`:
+/// A populated founder decision node with plasticity and birth seeds:
 /// every incumbent compute node, plasticity entry, sink, edge and weight is
 /// kept, and the one new edge is the last input of one vote sink.
 #[test]
@@ -858,27 +851,30 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
             panic!("the founder decision node is a Graph node");
         };
-        def.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
-            rule: crate::creature::genome::HebbianRule::Classic,
-            learning_rate: 0.1,
-            weight_clamp: 5.0,
-            lamarckian: false,
-            modulation: None,
-        });
-        def.birth_weights = Some(
-            def.compute_nodes
-                .iter()
-                .map(|node| vec![Some(0.25); node.inputs.len()])
-                .collect(),
+        def.set_node_plasticity(
+            0,
+            Some(crate::creature::genome::PlasticityConfig {
+                rule: crate::creature::genome::HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: false,
+                modulation: None,
+            }),
         );
+        let rows = def
+            .compute_nodes()
+            .iter()
+            .map(|node| vec![Some(0.25); node.inputs.len()])
+            .collect();
+        def.seed_birth(crate::creature::genome::cgp::BirthSeeds::Rows(rows));
     }
     let before_def = graph_def(&base.nodes[1]).clone();
-    assert_eq!(before_def.output_sinks.len(), 98, "a full sink catalog");
+    assert_eq!(before_def.output_sinks().len(), 98, "a full sink catalog");
     assert!(
         before_def
-            .compute_nodes
+            .compute_nodes()
             .iter()
-            .any(|node| node.inputs.iter().any(|edge| edge.weight != 0.0)),
+            .any(|node| node.inputs.iter().any(|edge| edge.weight() != 0.0)),
         "the fixture carries weighted compute edges"
     );
     assert!(
@@ -892,16 +888,24 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
         let after_def = graph_def(&genome.nodes[1]);
         assert_eq!(
-            after_def.compute_nodes, before_def.compute_nodes,
+            after_def.compute_nodes(),
+            before_def.compute_nodes(),
             "seed {seed}"
         );
         assert_eq!(
-            after_def.birth_weights, before_def.birth_weights,
+            after_def.birth_seeds(),
+            before_def.birth_seeds(),
             "seed {seed}"
         );
-        assert_eq!(after_def.output_sinks.len(), before_def.output_sinks.len());
+        assert_eq!(
+            after_def.output_sinks().len(),
+            before_def.output_sinks().len()
+        );
         let mut grown = 0;
-        for (after_sink, before_sink) in after_def.output_sinks.iter().zip(&before_def.output_sinks)
+        for (after_sink, before_sink) in after_def
+            .output_sinks()
+            .iter()
+            .zip(before_def.output_sinks())
         {
             assert_eq!(after_sink.kind, before_sink.kind, "seed {seed}");
             let kept = before_sink.inputs.len();
@@ -1000,8 +1004,9 @@ fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
         let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
             unreachable!()
         };
-        def.output_sinks
-            .retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
+        crate::creature::genome::cgp::test_support::edit_sinks(def, |sinks| {
+            sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
+        });
         let before = genome.clone();
         let mut r = rng(seed);
         apply_add_to_node(&mut genome, 0, &mut r, 1);
@@ -1077,7 +1082,7 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
         let mut r = rng(seed);
         connect_declared_input(&mut def, Some(7), width, &mut r);
         let mut edges = def
-            .output_sinks
+            .output_sinks()
             .iter()
             .flat_map(|sink| sink.inputs.iter().map(move |edge| (sink.kind, *edge)));
         let (kind, edge) = edges.next().expect("one edge");
@@ -1089,12 +1094,12 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
         let GraphSource::InputLeaf {
             ref_idx: 7,
             sub_idx,
-        } = edge.source
+        } = edge.source()
         else {
-            panic!("seed {seed}: {:?}", edge.source);
+            panic!("seed {seed}: {:?}", edge.source());
         };
         subs.insert(sub_idx);
-        if edge.weight < 0.0 {
+        if edge.weight() < 0.0 {
             negative += 1;
         } else {
             positive += 1;
@@ -1144,9 +1149,9 @@ proptest! {
             match (&before.backend_def, &after.backend_def) {
                 (BackendDef::Vm(b), BackendDef::Vm(a)) => prop_assert_eq!(a, b),
                 (BackendDef::Graph(b), BackendDef::Graph(a)) => {
-                    prop_assert_eq!(&a.compute_nodes, &b.compute_nodes);
+                    prop_assert_eq!(a.compute_nodes(), b.compute_nodes());
                     let vote_sinks = b
-                        .output_sinks
+                        .output_sinks()
                         .iter()
                         .filter(|sink| matches!(sink.kind, OutputSinkKind::ActionVote(_)))
                         .count();

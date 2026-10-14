@@ -83,7 +83,7 @@ fn side() -> MeshSideOutputs {
 }
 
 fn edge(source: GraphSource, weight: f32) -> GraphEdge {
-    GraphEdge { source, weight }
+    GraphEdge::new(source, weight)
 }
 
 fn memory(slot: u8, previous: bool) -> GraphSource {
@@ -95,12 +95,10 @@ fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
-    def.output_sinks
-        .iter_mut()
-        .find(|sink| sink.kind == kind)
-        .expect("destination must already exist")
-        .inputs
-        .push(edge);
+    let surface = def
+        .sink_surface(kind)
+        .expect("destination must already exist");
+    def.push_edge(surface, edge);
 }
 
 fn graph_node(def: CgpGraphBackendDef, refs: Vec<InputReference>) -> NodeGenome {
@@ -282,7 +280,9 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
                 assert_ne!(*expected, 0.0, "authored channels are excited");
                 let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
                 // Rotate the catalog: eligibility comes from identity, never position.
-                base.output_sinks.rotate_left(vote.index());
+                crate::creature::genome::cgp::test_support::edit_sinks(&mut base, |sinks| {
+                    sinks.rotate_left(vote.index());
+                });
                 if wired {
                     wire(
                         &mut base,
@@ -306,16 +306,16 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
                 assert_eq!(before.result, after.result);
                 assert_eq!(before.memory, after.memory);
                 assert_eq!(before.side.work_counters, after.side.work_counters);
-                let sink = silent
-                    .output_sinks
-                    .iter_mut()
-                    .find(|s| s.kind == OutputSinkKind::ActionVote(vote))
-                    .unwrap();
+                let kind = OutputSinkKind::ActionVote(vote);
+                let sink = silent.sink_surface(kind).unwrap();
+                let inputs = silent.surface_edges(sink);
                 assert_eq!(
-                    &sink.inputs[..sink.inputs.len() - 1],
-                    base.sink(sink.kind).unwrap().inputs
+                    &inputs[..inputs.len() - 1],
+                    &base.sink(kind).unwrap().inputs[..]
                 );
-                sink.inputs.last_mut().unwrap().weight = 0.5;
+                let last =
+                    crate::creature::genome::cgp::EdgeOccurrence::new(sink, inputs.len() - 1);
+                silent.edge_mut(last).set_weight(0.5);
                 let refined = effects(&silent, refs, ramp::<16>(0.0)[15]);
                 let mut expected_votes = before.side.dispatch_effects().0;
                 expected_votes[vote.index()] += expected * 0.5;
@@ -357,17 +357,17 @@ fn active_graph() -> CgpGraphBackendDef {
             trace_decay: 0.5,
         }),
     ] {
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![edge(memory(0, false), 0.5)],
-            plasticity: Some(PlasticityConfig {
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![edge(memory(0, false), 0.5)],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.125,
                 weight_clamp: 2.0,
                 lamarckian: false,
                 modulation,
             }),
-        });
+        ));
     }
     for (kind, source, weight) in [
         (

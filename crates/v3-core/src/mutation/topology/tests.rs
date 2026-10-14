@@ -1285,7 +1285,7 @@ fn f15_branch_addition_pairs_a_gate_write_with_tied_detour() {
     assert_eq!(branch.target_id, genome.nodes[2].node_id);
     assert_eq!(genome.nodes[2].targets[0].target_id, old.target_id);
     match &genome.nodes[0].backend_def {
-        BackendDef::Graph(g) => assert!(g.output_sinks.iter().any(
+        BackendDef::Graph(g) => assert!(g.output_sinks().iter().any(
             |s| matches!(s.kind, OutputSinkKind::RouterGate(slot) if slot == branch.slot)
                 && !s.inputs.is_empty()
         )),

@@ -106,7 +106,7 @@ pub(crate) fn execute_graph_node_traced(
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
 ) -> (NodeResult, GraphTrace) {
-    let node_count = def.compute_nodes.len();
+    let node_count = def.compute_nodes().len();
 
     // Neither compute nodes nor a wired effect surface: no work, no charge.
     if !def.enters_visit() {

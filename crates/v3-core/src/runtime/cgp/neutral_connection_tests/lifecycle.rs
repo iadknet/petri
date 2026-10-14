@@ -31,7 +31,7 @@ fn existing_weight_mutation_refines_one_zero_duplicate_without_touching_the_orig
     let before: Vec<_> = graph(&original).edges().cloned().collect();
     let after: Vec<_> = graph(&copy).edges().cloned().collect();
     assert_eq!(after.iter().zip(&before).filter(|(a, b)| a != b).count(), 1);
-    assert!(before.iter().all(|e| e.weight == 0.0));
+    assert!(before.iter().all(|e| e.weight() == 0.0));
     let votes = effects(graph(&copy), &copy.input_refs, 0.25)
         .side
         .dispatch_effects()
@@ -53,15 +53,17 @@ proptest! {
         let selected = replay.gen_range(0usize..3);
         let delta = replay.gen_range(-0.1f32..=0.1);
         alter_edge_weight_in_def(graph_mut(&mut mutated), &mut rng).unwrap();
-        let weights: Vec<_> = graph(&mutated).edges().map(|e| e.weight).collect();
+        let weights: Vec<_> = graph(&mutated).edges().map(|e| e.weight()).collect();
         for (index, weight) in weights.iter().enumerate() {
             prop_assert_eq!(*weight, if index == selected { delta } else { 0.0 });
         }
         prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>());
         // Distinct weights expose which occurrence deletion removed.
-        for (index, e) in graph_mut(&mut mutated).output_sinks.iter_mut().flat_map(|s| &mut s.inputs).enumerate() {
-            e.weight = index as f32 + 0.25;
-        }
+        crate::creature::genome::cgp::test_support::edit_sinks(graph_mut(&mut mutated), |sinks| {
+            for (index, e) in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()).enumerate() {
+                *e = crate::creature::genome::cgp::test_support::reweighted(*e, index as f32 + 0.25);
+            }
+        });
         let before: Vec<_> = graph(&mutated).edges().cloned().collect();
         let mut replay = rng.clone();
         let removed = replay.gen_range(0usize..3);
@@ -93,7 +95,7 @@ proptest! {
         let node = &genome.nodes[0];
         prop_assert_eq!(&node.input_refs[unused - 1], &source_ref);
         for edge in graph(node).edges() {
-            prop_assert_eq!(edge.source, leaf((unused - 1) as u16, channel));
+            prop_assert_eq!(edge.source(), leaf((unused - 1) as u16, channel));
         }
         prop_assert_eq!(effects(graph(node), &node.input_refs, 0.25).side.dispatch_effects(), before);
         prop_assert!(!prunable_indices(node).contains(&(unused - 1)));

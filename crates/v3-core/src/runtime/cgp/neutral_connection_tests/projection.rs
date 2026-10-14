@@ -341,7 +341,7 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
         applied = trace
             .output_sinks
             .iter()
-            .zip(&def.output_sinks)
+            .zip(def.output_sinks())
             .filter(|(_, sink)| matches!(sink.kind, OutputSinkKind::ActionVote(_)))
             .map(|(record, _)| record.applied_value)
             .collect();

@@ -114,7 +114,7 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
             }),
             BackendDef::Graph(graph) => {
                 graph.projects_kind(DirectedVoteKind::Move)
-                    || graph.output_sinks.iter().any(|sink| {
+                    || graph.output_sinks().iter().any(|sink| {
                         !sink.inputs.is_empty()
                             && matches!(sink.kind, OutputSinkKind::ActionVote(vote) if is_move(Some(vote)))
                     })
@@ -277,16 +277,19 @@ mod tests {
         };
         let graph_into = |kind: DirectedVoteKind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.sink_mut(OutputSinkKind::ActionVote(kind.drive()))
-                .unwrap()
-                .inputs
-                .push(GraphEdge {
-                    source: GraphSource::SharedMemory {
+            let surface = def
+                .sink_surface(OutputSinkKind::ActionVote(kind.drive()))
+                .unwrap();
+            def.push_edge(
+                surface,
+                GraphEdge::new(
+                    GraphSource::SharedMemory {
                         slot: 0,
                         previous: false,
                     },
-                    weight: 1.0,
-                });
+                    1.0,
+                ),
+            );
             node(BackendDef::Graph(def))
         };
         let vm_into = |kind: DirectedVoteKind| {
@@ -403,7 +406,7 @@ mod tests {
     const BARRIER_RING: InputReference = InputReference::World(WorldInputKey::NeighborBarrierRing);
 
     fn vote_edge(source: GraphSource, weight: f32) -> GraphEdge {
-        GraphEdge { source, weight }
+        GraphEdge::new(source, weight)
     }
 
     /// A one-node graph genome that votes `Move(scalar)` 0.5 from a constant,
@@ -411,11 +414,11 @@ mod tests {
     /// founder-equivalent for the one-edge fixtures.
     fn graph_mover(scalar: u8) -> CreatureGenome {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: Vec::new(),
-            plasticity: None,
-        });
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            Vec::new(),
+            None,
+        ));
         wire(
             &mut graph,
             VoteSink::Move(scalar),
@@ -433,11 +436,10 @@ mod tests {
     }
 
     fn wire(graph: &mut CgpGraphBackendDef, sink: VoteSink, edge: GraphEdge) {
-        graph
-            .sink_mut(OutputSinkKind::ActionVote(sink))
-            .expect("catalog sink")
-            .inputs
-            .push(edge);
+        let surface = graph
+            .sink_surface(OutputSinkKind::ActionVote(sink))
+            .expect("catalog sink");
+        graph.push_edge(surface, edge);
     }
 
     /// `graph_mover` with one edge `ring[d] * weight -> Move(d)`.
@@ -564,12 +566,9 @@ mod tests {
         let BackendDef::Graph(graph) = &mut eater.nodes[0].backend_def else {
             unreachable!()
         };
-        let edges = std::mem::take(
-            &mut graph
-                .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(2)))
-                .unwrap()
-                .inputs,
-        );
+        let mover = OutputSinkKind::ActionVote(VoteSink::Move(2));
+        let edges = graph.sink(mover).unwrap().inputs.to_vec();
+        crate::creature::genome::cgp::test_support::set_sink_inputs(graph, mover, Vec::new());
         wire(graph, VoteSink::Eat, edges[0]);
         assert!(!votes_move(&eater, &node0));
         // A VM `AddVote` on a `Move` sink does; one on `Eat` or past the

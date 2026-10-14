@@ -273,12 +273,12 @@ impl CreatureGenome {
                 }
                 BackendDef::Graph(graph) => {
                     // Count compute nodes + their edges
-                    score += graph.compute_nodes.len() as u32;
-                    for cn in &graph.compute_nodes {
+                    score += graph.compute_nodes().len() as u32;
+                    for cn in graph.compute_nodes() {
                         score += cn.inputs.len() as u32;
                     }
                     // Count wired output sinks (unwired are structural scaffolding)
-                    for sink in &graph.output_sinks {
+                    for sink in graph.output_sinks() {
                         if !sink.inputs.is_empty() {
                             score += 1 + sink.inputs.len() as u32;
                         }
@@ -587,36 +587,33 @@ mod tests {
         // 1 node + 1 input_ref + 0 targets + 2 compute_nodes + (1 + 2) compute edges = 7
         // (unwired sinks add 0)
         let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
-        cgp.compute_nodes = vec![
-            ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+        cgp = cgp.with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::Sigmoid,
-                inputs: vec![
-                    GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 0.5,
-                    },
-                    GraphEdge {
-                        source: GraphSource::InputLeaf {
+                    1.0,
+                )],
+                None,
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::Sigmoid,
+                vec![
+                    GraphEdge::new(GraphSource::ComputeNode(0), 0.5),
+                    GraphEdge::new(
+                        GraphSource::InputLeaf {
                             ref_idx: 0,
                             sub_idx: 0,
                         },
-                        weight: -0.3,
-                    },
+                        -0.3,
+                    ),
                 ],
-                plasticity: None,
-            },
-        ];
+                None,
+            ),
+        ]);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
@@ -638,11 +635,11 @@ mod tests {
         // Node 1 (Graph): 1 + 1 input + 0 targets + 1 compute_node + 0 edges = 3
         // Total = 6
         let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
-        cgp.compute_nodes = vec![ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: vec![],
-            plasticity: None,
-        }];
+        cgp = cgp.with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            vec![],
+            None,
+        )]);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
@@ -816,17 +813,19 @@ mod tests {
         use crate::creature::genome::vote::ActionParamField;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         for (i, field) in ActionParamField::ALL.into_iter().enumerate() {
-            graph
-                .sink_mut(OutputSinkKind::ActionParam(field))
-                .expect("fixed catalog carries every field")
-                .inputs
-                .push(GraphEdge {
-                    source: GraphSource::InputLeaf {
+            let surface = graph
+                .sink_surface(OutputSinkKind::ActionParam(field))
+                .expect("fixed catalog carries every field");
+            graph.push_edge(
+                surface,
+                GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    weight: 0.5 + i as f32,
-                });
+                    0.5 + i as f32,
+                ),
+            );
         }
         CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -974,74 +973,37 @@ mod tests {
 
     #[test]
     fn reindex_input_refs_after_removal_graph() {
-        // CGP Graph backend with InputLeaf edges at ref_idx 0, 1, 2.
-        // Remove input_ref at index 1:
+        // CGP Graph backend with InputLeaf edges at ref_idx 0 and 2; `Prune`
+        // removes the unaddressed index 1:
         // - ref_idx 0 → unchanged
-        // - ref_idx 1 → removed (edge dropped)
         // - ref_idx 2 → 1 (decremented)
+        // - no edge is removed
 
         use crate::creature::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
-        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
-        cgp.compute_nodes = vec![ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![
-                GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                },
-                GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 1,
-                        sub_idx: 3,
-                    },
-                    weight: 1.0,
-                },
-                GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 2,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                },
-                GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 0.5,
-                },
-            ],
-            plasticity: None,
-        }];
+        let leaf = |ref_idx, sub_idx| GraphSource::InputLeaf { ref_idx, sub_idx };
+        let cgp = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![
+                    GraphEdge::new(leaf(0, 0), 1.0),
+                    GraphEdge::new(leaf(2, 3), 1.0),
+                    GraphEdge::new(GraphSource::ComputeNode(0), 0.5),
+                ],
+                None,
+            ),
+        ]);
         let mut backend = BackendDef::Graph(cgp);
         backend.reindex_input_refs_after_removal(1);
-        if let BackendDef::Graph(ref g) = backend {
-            let edges = &g.compute_nodes[0].inputs;
-            // ref_idx 1 edge removed, 3 edges remain (0, 2→1, ComputeNode)
-            assert_eq!(edges.len(), 3, "edge at ref_idx 1 must be removed");
-            // ref_idx 0 → unchanged
-            assert_eq!(
-                edges[0].source,
-                GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 0,
-                }
-            );
-            // ref_idx 2 → decremented to 1
-            assert_eq!(
-                edges[1].source,
-                GraphSource::InputLeaf {
-                    ref_idx: 1,
-                    sub_idx: 0,
-                }
-            );
-            // Non-InputLeaf edge unchanged
-            assert_eq!(edges[2].source, GraphSource::ComputeNode(0));
-        } else {
+        let BackendDef::Graph(g) = backend else {
             panic!("expected Graph");
-        }
+        };
+        let sources: Vec<GraphSource> = g.edges().map(GraphEdge::source).collect();
+        assert_eq!(
+            sources,
+            vec![leaf(0, 0), leaf(1, 3), GraphSource::ComputeNode(0)]
+        );
     }
 
     #[test]

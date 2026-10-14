@@ -268,35 +268,27 @@ mod tests {
             node_id: NodeId::new(1),
             input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
             targets: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![
-                    ComputeNode {
-                        kind: ComputeNodeKind::AdaptiveGain,
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::InputLeaf {
-                                ref_idx: 0,
-                                sub_idx: 0,
-                            },
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                    ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![], // DEAD — disconnected
-                        plasticity: None,
-                    },
-                ],
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterGate(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(vec![
+                        ComputeNode::new(
+                            ComputeNodeKind::AdaptiveGain,
+                            vec![GraphEdge::new(
+                                GraphSource::InputLeaf {
+                                    ref_idx: 0,
+                                    sub_idx: 0,
+                                },
+                                1.0,
+                            )],
+                            None,
+                        ),
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+                    ])
+                    .with_output_sinks(vec![OutputSink::new(
+                        OutputSinkKind::RouterGate(0),
+                        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                    )]),
+            ),
         };
 
         let unreachable_vm = NodeGenome {

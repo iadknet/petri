@@ -65,32 +65,30 @@ fn blank() -> CgpGraphBackendDef {
 }
 
 fn leaf(weight: f32) -> GraphEdge {
-    GraphEdge {
-        source: GraphSource::InputLeaf {
+    GraphEdge::new(
+        GraphSource::InputLeaf {
             ref_idx: 0,
             sub_idx: 0,
         },
         weight,
-    }
+    )
 }
 
 fn memory(slot: u8, weight: f32) -> GraphEdge {
-    GraphEdge {
-        source: GraphSource::SharedMemory {
+    GraphEdge::new(
+        GraphSource::SharedMemory {
             slot,
             previous: false,
         },
         weight,
-    }
+    )
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
     let sink = def
-        .output_sinks
-        .iter_mut()
-        .find(|sink| sink.kind == kind)
+        .sink_surface(kind)
         .expect("fixed output catalog contains every sink kind");
-    sink.inputs.push(edge);
+    def.push_edge(sink, edge);
 }
 
 struct Visit {
@@ -356,18 +354,15 @@ fn unwired_blank_visit_is_free_and_passes_its_bus_through() {
 #[test]
 fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
     let mut stateful = blank();
-    stateful.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::DecayIntegrator(0.5),
-        inputs: vec![leaf(1.0)],
-        plasticity: None,
-    });
+    stateful.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::DecayIntegrator(0.5),
+        vec![leaf(1.0)],
+        None,
+    ));
     wire(
         &mut stateful,
         OutputSinkKind::WriteSlot(1),
-        GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        },
+        GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
     );
     let mut wired_blank = blank();
     wire(&mut wired_blank, OutputSinkKind::WriteSlot(2), leaf(1.0));
@@ -499,8 +494,8 @@ fn wired_detour_chain_terminates_on_the_hop_budget() {
 
 /// Any wired surface built from the drawn parameters, on a zero-compute def.
 fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendDef {
-    let edge = GraphEdge {
-        source: match source {
+    let edge = GraphEdge::new(
+        match source {
             0 => GraphSource::InputLeaf {
                 ref_idx: 0,
                 sub_idx: 0,
@@ -509,12 +504,11 @@ fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendD
                 slot: slot % 16,
                 previous: false,
             },
-            // `slot % 2` draws both the dummy node's own index and an
-            // out-of-range one; both resolve to 0.0 in either arm.
+
             _ => GraphSource::ComputeNode(u16::from(slot % 2)),
         },
         weight,
-    };
+    );
     let mut def = blank();
     match surface {
         0 => wire(&mut def, OutputSinkKind::CustomOutput(slot % 24), edge),
@@ -553,11 +547,7 @@ proptest! {
     ) {
         let def = wired_def(surface, source, slot, weight);
         let mut with_dummy = def.clone();
-        with_dummy.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Constant(0.0),
-            inputs: vec![],
-            plasticity: None,
-        });
+        with_dummy.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![], None));
         let mut memory_in = [0.0; 16];
         memory_in[(slot % 16) as usize] = memory_value;
         let upstream = [1.0; OUTPUT_SLOT_COUNT];

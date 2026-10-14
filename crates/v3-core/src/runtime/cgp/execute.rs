@@ -79,7 +79,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
 ) -> NodeResult {
-    let node_count = def.compute_nodes.len();
+    let node_count = def.compute_nodes().len();
 
     // Neither compute nodes nor a wired effect surface: no work, no charge.
     if !def.enters_visit() {
@@ -172,7 +172,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     };
 
     for current_idx in 0..node_count {
-        let node = &def.compute_nodes[current_idx];
+        let node = &def.compute_nodes()[current_idx];
 
         if use_plasticity && node.plasticity.is_some() {
             let learned = &graph_runtime.plasticity_weights[node_idx][current_idx];
@@ -453,16 +453,15 @@ mod work_counter_tests {
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![],
+                            None,
+                        )])
+                        .with_output_sinks(vec![]),
+                ),
                 targets: vec![],
             }],
         };
@@ -501,36 +500,32 @@ mod work_counter_tests {
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::SharedMemory {
-                                slot: 0,
-                                previous: false,
-                            },
-                            weight: 1.0,
-                        }],
-                        plasticity: Some(PlasticityConfig {
-                            rule: HebbianRule::Classic,
-                            learning_rate: 0.5,
-                            weight_clamp: 1.0,
-                            lamarckian: false,
-                            modulation: None,
-                        }),
-                    }],
-                    output_sinks: vec![crate::creature::genome::cgp::OutputSink {
-                        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                            crate::creature::genome::vote::VoteSink::Terminate,
-                        ),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                    }],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![GraphEdge::new(
+                                GraphSource::SharedMemory {
+                                    slot: 0,
+                                    previous: false,
+                                },
+                                1.0,
+                            )],
+                            Some(PlasticityConfig {
+                                rule: HebbianRule::Classic,
+                                learning_rate: 0.5,
+                                weight_clamp: 1.0,
+                                lamarckian: false,
+                                modulation: None,
+                            }),
+                        )])
+                        .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
+                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                                crate::creature::genome::vote::VoteSink::Terminate,
+                            ),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                        )]),
+                ),
                 targets: vec![],
             }],
         };
@@ -572,34 +567,27 @@ mod clock_tests {
     use proptest::prelude::*;
 
     fn graph(kind: ComputeNodeKind, disconnected: usize) -> CgpGraphBackendDef {
-        let mut nodes = vec![ComputeNode {
+        let mut nodes = vec![ComputeNode::new(
             kind,
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 1.0,
-            }],
-            plasticity: None,
-        }];
-        nodes.extend((0..disconnected).map(|_| ComputeNode {
-            kind: ComputeNodeKind::Oscillator(0.25),
-            inputs: vec![],
-            plasticity: None,
-        }));
-        CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: nodes,
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::WriteSlot(1),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-        }
+                1.0,
+            )],
+            None,
+        )];
+        nodes.extend(
+            (0..disconnected)
+                .map(|_| ComputeNode::new(ComputeNodeKind::Oscillator(0.25), vec![], None)),
+        );
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(nodes)
+            .with_output_sinks(vec![OutputSink::new(
+                OutputSinkKind::WriteSlot(1),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )])
     }
 
     fn visit(
@@ -657,13 +645,16 @@ mod clock_tests {
     #[test]
     fn failed_revisits_preserve_temporal_commit_and_emit_no_effects() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        def.compute_nodes[0].plasticity = Some(PlasticityConfig {
-            rule: HebbianRule::Classic,
-            learning_rate: 0.1,
-            weight_clamp: 2.0,
-            lamarckian: false,
-            modulation: None,
-        });
+        def.set_node_plasticity(
+            0,
+            Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: None,
+            }),
+        );
         let config = RuntimeConfig {
             graph_node_base_cost: 1.0,
             plasticity_update_cost: 1.0,
@@ -689,13 +680,16 @@ mod clock_tests {
     #[test]
     fn exhausted_trace_reports_committed_outputs_and_candidate_status() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        def.compute_nodes[0].plasticity = Some(PlasticityConfig {
-            rule: HebbianRule::Classic,
-            learning_rate: 0.1,
-            weight_clamp: 2.0,
-            lamarckian: false,
-            modulation: None,
-        });
+        def.set_node_plasticity(
+            0,
+            Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: None,
+            }),
+        );
         let config = RuntimeConfig {
             graph_node_base_cost: 1.0,
             plasticity_update_cost: 1.0,
@@ -734,15 +728,16 @@ mod clock_tests {
     #[test]
     fn ordered_combinational_path_and_traced_temporal_state_match() {
         let mut def = graph(ComputeNodeKind::Add, 0);
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 2.0,
-            }],
-            plasticity: None,
-        });
-        def.output_sinks[0].inputs[0].source = GraphSource::ComputeNode(1);
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
+            None,
+        ));
+        def.edge_mut(crate::creature::genome::cgp::EdgeOccurrence::new(
+            crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
+            0,
+        ))
+        .set_source(GraphSource::ComputeNode(1));
         let mut ordinary = GraphRuntimeState::new();
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {
