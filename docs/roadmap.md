@@ -1,6 +1,6 @@
 # Diverse Ecosystems and Complex Cognition
 
-**Status**: Planning
+**Status**: Active
 **Last updated**: 2026-10-13
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
