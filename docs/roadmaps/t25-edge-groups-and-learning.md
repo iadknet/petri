@@ -1,6 +1,6 @@
 # T25 — Edge Groups and Per-Edge Learning
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-10-13
 **Master**: [Program Roadmap](../roadmap.md)
 
