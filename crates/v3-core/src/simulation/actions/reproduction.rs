@@ -895,6 +895,68 @@ mod tests {
         // VM nodes produce no Hebbian weight entries
         assert!(child_hw.is_empty());
     }
+
+    /// A Graph node the batch creates on a VM-only parent's draft carries the
+    /// empty seed form, so the newborn still gets today's scaffold.
+    #[test]
+    fn birth_graph_created_on_a_vm_only_draft_builds_the_empty_scaffold() {
+        use crate::contracts::{NodeId, RouteTarget};
+        use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+        use crate::mutation::reachability::TargetSelector;
+        use crate::mutation::topology::{TopologyMutator, TopologyOperator};
+        use rand::SeedableRng;
+
+        let vm = |id: u32, targets: Vec<RouteTarget>| NodeGenome {
+            node_id: NodeId::new(id),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![VmInstruction::Halt],
+            }),
+            targets,
+        };
+        let mut child = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                vm(
+                    0,
+                    vec![RouteTarget {
+                        target_id: NodeId::new(1),
+                        slot: 0,
+                        gate_bias: 0.0,
+                    }],
+                ),
+                vm(1, vec![]),
+            ],
+        };
+        cgp_reproduction::capture_birth_seeds(&mut child, &[]);
+        TopologyMutator::apply(
+            &mut child,
+            TopologyOperator::SwapNodeBackend,
+            &mut TargetSelector::reachable_only(&[0, 1], 0.0),
+            &mut rand::rngs::SmallRng::seed_from_u64(5),
+            &MutationConfig::default(),
+        )
+        .unwrap();
+        let BackendDef::Graph(created) = &child.nodes[2].backend_def else {
+            panic!("a swapped VM copy is a Graph node");
+        };
+        let compute_count = created.compute_nodes().len();
+
+        let result = crate::creature::newborn::take_plasticity_weights(&mut child);
+
+        let scaffold: Vec<Vec<Box<[f32]>>> = vec![
+            Vec::new(),
+            Vec::new(),
+            vec![Box::default(); compute_count],
+        ];
+        assert_eq!(result, scaffold);
+        let BackendDef::Graph(created) = &child.nodes[2].backend_def else {
+            unreachable!()
+        };
+        assert!(created.birth_seeds().is_none());
+    }
     #[test]
     fn birth_mesh_copies_removal_and_backend_replacement_keep_their_own_values() {
         use crate::contracts::{NodeId, RouteTarget};
