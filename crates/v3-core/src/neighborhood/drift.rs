@@ -823,11 +823,12 @@ mod tests {
 
     /// The walk dates a module from the generation its birth produced, and it
     /// folds every executed-set refresh into the module table rather than
-    /// waiting for the next checkpoint. A constructed lineage shows both
+    /// waiting for the next checkpoint. A constructed lineage shows the dates
     /// without pinning any draw history: a module born at generation 3 and
     /// first dispatched at the depth-10 refresh dates its dispatch seven
-    /// generations after its birth; without the refresh fold the date waits
-    /// for the depth-20 checkpoint.
+    /// generations after its birth (without the fold, at the depth-20
+    /// checkpoint), and a content change at generation 5 dates its internal
+    /// change two generations after its birth.
     #[test]
     fn the_walk_dates_modules_from_their_birth_and_from_every_refresh() {
         use crate::contracts::RouteTarget;
@@ -836,6 +837,7 @@ mod tests {
             BirthObservation, CohortFact, RecruitmentTracker, TimeToFirst,
         };
         const BORN: u64 = 3;
+        const CHANGED: u64 = 5;
         const CHECKPOINT: u64 = 2 * EXECUTED_REFRESH_INTERVAL;
         let founder = founder_genome(FounderProfile::V3Alpha1);
         // The child adds one module: a copy of node 1 that node 1 routes to.
@@ -849,24 +851,34 @@ mod tests {
             gate_bias: 0.0,
         });
         child.nodes.push(module);
+        // The grandchild changes the module's content: it routes back to node 1.
+        let mut grandchild = child.clone();
+        grandchild.nodes[2].targets.push(RouteTarget {
+            target_id: NodeId::new(1),
+            slot: 0,
+            gate_bias: 0.0,
+        });
         let all: BTreeSet<NodeId> = child.nodes.iter().map(|node| node.node_id).collect();
         let founders: BTreeSet<NodeId> = founder.nodes.iter().map(|node| node.node_id).collect();
 
-        let dispatch_date = |refresh: bool| {
+        let reading = |refresh: bool| {
             let mut tracker = RecruitmentTracker::new(1);
             tracker.seed_founder(0, &founder.nodes);
             record_dispatch(&mut tracker, std::slice::from_ref(&founders), 0);
-            tracker.record_birth(BirthObservation {
-                lineage: 0,
-                depth: BORN,
-                after: &child.nodes,
-                summary: &MutationSummary::zero(),
-            });
+            for (depth, genome) in [(BORN, &child), (CHANGED, &grandchild)] {
+                tracker.record_birth(BirthObservation {
+                    lineage: 0,
+                    depth,
+                    after: &genome.nodes,
+                    summary: &MutationSummary::zero(),
+                });
+            }
             let module = tracker
                 .modules()
                 .find(|module| module.node == added)
                 .expect("the birth created the module");
             assert_eq!(module.created_depth, BORN, "dated from its birth");
+            assert_eq!(module.first(CohortFact::InternalChange), Some(CHANGED));
             if refresh {
                 record_dispatch(
                     &mut tracker,
@@ -875,9 +887,7 @@ mod tests {
                 );
             }
             tracker.record_reading(0, CHECKPOINT, &all, Some(&BTreeSet::new()));
-            *tracker
-                .checkpoint(CHECKPOINT)
-                .time_to_first(CohortFact::Dispatch)
+            tracker.checkpoint(CHECKPOINT)
         };
         let dated = |generations| TimeToFirst {
             reached: 1,
@@ -885,7 +895,75 @@ mod tests {
             censored_deleted: 0,
             censored_present: 0,
         };
-        assert_eq!(dispatch_date(true), dated(EXECUTED_REFRESH_INTERVAL - BORN));
-        assert_eq!(dispatch_date(false), dated(CHECKPOINT - BORN));
+        let folded = reading(true);
+        assert_eq!(
+            folded.time_to_first(CohortFact::Dispatch),
+            &dated(EXECUTED_REFRESH_INTERVAL - BORN)
+        );
+        assert_eq!(
+            folded.time_to_first(CohortFact::InternalChange),
+            &dated(CHANGED - BORN)
+        );
+        assert_eq!(
+            reading(false).time_to_first(CohortFact::Dispatch),
+            &dated(CHECKPOINT - BORN)
+        );
+    }
+
+    /// `observe` itself dates modules from their births and folds every
+    /// mid-walk refresh. Checkpoint placement never changes the walk's
+    /// lineages, and a checkpoint reading dates dispatch as a refresh does, so
+    /// a walk with a checkpoint at every refresh and one without date every
+    /// first dispatch and internal change identically. Without the fold the
+    /// second walk would date the mid-walk dispatches at its closing
+    /// checkpoint; a mid-walk checkpoint that already reads a dispatched cohort
+    /// module shows the walk has such dispatches.
+    #[test]
+    fn observe_folds_every_mid_walk_refresh_into_the_module_dates() {
+        use crate::neighborhood::recruitment::{CohortFact, RecruitmentCheckpoint};
+        const CLOSING: u64 = 3 * EXECUTED_REFRESH_INTERVAL;
+        let config = SimulationConfig::default();
+        let context = EvalContext::from_config(&config);
+        let battery = Battery::generate(context.food_type_count);
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let walk = |checkpoints: &'static [u64]| -> Vec<RecruitmentCheckpoint> {
+            observe(
+                &founder,
+                &battery,
+                &config.mutation,
+                &context,
+                DriftSizes {
+                    lineages: 8,
+                    birth_lineages: 0,
+                    births: 1,
+                    checkpoints,
+                },
+            )
+            .recruitment
+        };
+        let at_refreshes = walk(&[
+            1,
+            EXECUTED_REFRESH_INTERVAL,
+            2 * EXECUTED_REFRESH_INTERVAL,
+            CLOSING,
+        ]);
+        let closing_only = walk(&[1, CLOSING]);
+        let (mid, closing) = at_refreshes.split_at(at_refreshes.len() - 1);
+        let (closing, plain) = (&closing[0], &closing_only[1]);
+        assert_eq!((closing.depth, plain.depth), (CLOSING, CLOSING));
+        assert!(
+            mid[1..]
+                .iter()
+                .any(|reading| reading.time_to_first(CohortFact::Dispatch).reached > 0),
+            "a cohort module is dispatched before the closing checkpoint"
+        );
+        assert_eq!(closing.cohort, plain.cohort, "the same lineages");
+        for fact in [CohortFact::Dispatch, CohortFact::InternalChange] {
+            assert_eq!(
+                closing.time_to_first(fact),
+                plain.time_to_first(fact),
+                "{fact:?} dated as at a checkpoint"
+            );
+        }
     }
 }
