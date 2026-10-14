@@ -171,7 +171,7 @@ pub fn run_simulation<W: std::io::Write>(
 /// genome size (junk included), mesh node count, generation, wired output
 /// sinks (sinks with at least one edge) and ring projections. All `0.0` for an
 /// empty population, like `Simulation::mean_energy`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct StructureMeans {
     pub(crate) genome_size: f64,
     pub(crate) mesh_nodes: f64,
@@ -186,35 +186,33 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
     use v3_core::creature::genome::BackendDef;
 
     let population = sim.creatures.len();
-    let mut totals = [0u64; 5];
+    if population == 0 {
+        return StructureMeans::default();
+    }
+    let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut projections] =
+        [0u64; 5];
     for creature in sim.creatures.values() {
-        totals[0] += u64::from(creature.cached_genome_size);
-        totals[1] += creature.genome.nodes.len() as u64;
-        totals[2] += creature.generation;
+        genome_size += u64::from(creature.cached_genome_size);
+        mesh_nodes += creature.genome.nodes.len() as u64;
+        generation += creature.generation;
         for node in &creature.genome.nodes {
             if let BackendDef::Graph(graph) = &node.backend_def {
-                totals[3] += graph
+                wired_sinks += graph
                     .output_sinks()
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count() as u64;
-                totals[4] += graph.projections.len() as u64;
+                projections += graph.projections.len() as u64;
             }
         }
     }
-    let mean = |total: u64| {
-        if population == 0 {
-            0.0
-        } else {
-            total as f64 / population as f64
-        }
-    };
+    let mean = |total: u64| total as f64 / population as f64;
     StructureMeans {
-        genome_size: mean(totals[0]),
-        mesh_nodes: mean(totals[1]),
-        generation: mean(totals[2]),
-        wired_sinks: mean(totals[3]),
-        projections: mean(totals[4]),
+        genome_size: mean(genome_size),
+        mesh_nodes: mean(mesh_nodes),
+        generation: mean(generation),
+        wired_sinks: mean(wired_sinks),
+        projections: mean(projections),
     }
 }
 
