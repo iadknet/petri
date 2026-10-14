@@ -219,9 +219,10 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
     );
     assert_eq!(
         drift.supply_rule,
-        // T25.F02 commit 1: the instrument anchor is 80 (97 restores).
+        // T25.F02: the instrument anchor is 80 (commit 1; 97 restores) and the
+        // rate 0.0060625 (commit 2; 0.005 restores).
         "per-unit draw on the canonical V3Alpha1 founder's genome_size() 80 at \
-         per_unit_rate 0.005: Binomial(80, 0.005) events per walk and checkpoint birth"
+         per_unit_rate 0.0060625: Binomial(80, 0.0060625) events per walk and checkpoint birth"
     );
     assert_eq!(
         (
@@ -576,8 +577,10 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // seed 4 is the lowest of 0..=40 that survives (4 and 18 do).
     // T25.F02 (uniform size rule), 2026-10-14: seed 4 goes extinct at tick
     // 86; seed 11 is the lowest of 0..=40 that passes. The old size rule and
-    // anchor 97 restore seed 4.
-    params.seeds = vec![11];
+    // anchor 97 restore seed 4. T25.F02 commit 2 (default rate 0.005 ->
+    // 0.0060625): seed 11 goes extinct at tick 91; seed 9 is the lowest of
+    // 0..=60 that survives (9, 37, 45 and 50 do). Rate 0.005 restores seed 11.
+    params.seeds = vec![9];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

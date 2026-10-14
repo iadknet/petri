@@ -722,15 +722,15 @@ Selection randomization rules (internal to `MutationEngine`):
   continuation. Every production birth and reading uses the parent's own
   `genome_size()`, so a genome pays its size in exposure. Rate 0.0 requests
   nothing (every birth is a clone); rate 1.0 requests one event per unit. The
-  default 0.005 keeps the 80-unit V3Alpha1 founder at about 0.4 requested
-  events per birth. Natural analog: per-base copy error. If the count is
+  default 0.0060625 (`0.485 / 80`, T25.F02) keeps the 80-unit V3Alpha1
+  founder at 0.485 requested events per birth. Natural analog: per-base copy error. If the count is
   zero, `MutationEngine` returns `MutationSummary { attempted_events: 0,
   applied_events: 0, skipped_events: 0, ... }` immediately.
 - The two instruments, the drift walk and the recruitment-paths legacy
   panel, draw the same rule on a fixed unit count: the canonical V3Alpha1
   founder's `genome_size()` (`FOUNDER_GENOME_SIZE_UNITS`, 80), whatever the
   walked genome's size, so their exposure is an instrument constant
-  (`Binomial(80, per_unit_rate)`, about 0.4 requested events per birth at
+  (`Binomial(80, per_unit_rate)`, 0.485 requested events per birth at
   the default rate). The recruitment-paths S0 panel draws on the child's own
   size, as production does.
 - Every requested event becomes one attempted event; a skip does not cause an

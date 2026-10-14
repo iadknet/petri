@@ -122,8 +122,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // moves the carrying cost and the mutation draw count, and seed 6 goes
     // extinct at tick 112; seed 19 is the lowest of 0..=19 that survives the
     // horizon (0 to 18 go extinct between ticks 112 and 187). The old size
-    // rule and anchor 97 restore seed 6.
-    const SEED: u64 = 19;
+    // rule and anchor 97 restore seed 6. Moved from 19 to 59 by T25.F02
+    // commit 2 (default rate 0.005 -> 0.0060625): seed 19 goes extinct at
+    // tick 159; seed 59 is the only one of 0..=60 that survives the horizon.
+    // Rate 0.005 restores seed 19.
+    const SEED: u64 = 59;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -195,9 +198,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // seed 22 survives the horizon. T11.F31: seed 22 goes extinct at tick
     // 151 and seed 14 survives (see the post-tick-state test). T11.F30: seed
     // 14 goes extinct at tick 194 and seed 207 survives. T25.F02: seed 6
-    // goes extinct at tick 112 and seed 19 survives (see the post-tick-state
-    // test).
-    const SEED: u64 = 19;
+    // goes extinct at tick 112 and seed 19 survives; at the T25.F02 rate
+    // seed 19 goes extinct at tick 159 and seed 59 survives (see the
+    // post-tick-state test).
+    const SEED: u64 = 59;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -327,8 +331,10 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // creatures over 5 cells. T25.F02 moved it from 6 to 19: seed 6 goes
     // extinct at tick 112, and seed 19 is the lowest of 0..=19 that survives
     // the horizon over more than one cell; the old size rule and anchor 97
-    // restore seed 6.
-    const SEED: u64 = 19;
+    // restore seed 6. The T25.F02 rate moved it from 19 to 59: seed 19 goes
+    // extinct at tick 159, and seed 59 is the only one of 0..=60 that
+    // survives the horizon; rate 0.005 restores seed 19.
+    const SEED: u64 = 59;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

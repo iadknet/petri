@@ -815,8 +815,8 @@ mod tests {
             supply_rule(&SimulationConfig::default().mutation),
             format!(
                 "per-unit draw on the canonical V3Alpha1 founder's genome_size() \
-                 {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate 0.005: \
-                 Binomial({FOUNDER_GENOME_SIZE_UNITS}, 0.005) events per walk and checkpoint birth"
+                 {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate 0.0060625: \
+                 Binomial({FOUNDER_GENOME_SIZE_UNITS}, 0.0060625) events per walk and checkpoint birth"
             )
         );
     }

@@ -43,7 +43,7 @@
     "large_copy_weight_percent": 25,
     "mesh_layer_probability": 0.2,
     "neutral_input_recruitment": "WholeFamily",
-    "per_unit_rate": 0.005,
+    "per_unit_rate": 0.0060625,
     "phenotype": {
       "channel_change_chance": 0.0010000000474974513,
       "channel_step": 1,

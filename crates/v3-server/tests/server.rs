@@ -3815,7 +3815,7 @@ async fn patch_config_applies_the_per_unit_rate() {
         .unwrap();
 
     let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
-    assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.005);
+    assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.006_062_5);
 
     let patch = r#"{"mutation":{"per_unit_rate":0.02}}"#;
     let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;

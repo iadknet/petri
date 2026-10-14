@@ -143,10 +143,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// the replication multiplier and gestation of every genome above it (default
 /// 1518722661182035271 -> 8319452125048910825, rate 0.0 1085458628830102075
 /// -> 3061059511661688014); the old size rule and anchor 97 together restore.
+/// Re-pinned by T25.F02 commit 2 after two agreeing runs: the default rate
+/// 0.005 -> 0.0060625 moves both digests (default 8319452125048910825 ->
+/// 15444665604557976202, rate 0.0 3061059511661688014 ->
+/// 17948922656767329856); rate 0.005 restores them.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 8319452125048910825);
-    assert_eq!(short_run_identity(Some(0.0)), 3061059511661688014);
+    assert_eq!(short_run_identity(None), 15444665604557976202);
+    assert_eq!(short_run_identity(Some(0.0)), 17948922656767329856);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

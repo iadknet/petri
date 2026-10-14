@@ -6,11 +6,11 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		label: "Rate per Genome Unit",
 		min: 0,
 		max: 0.1,
-		step: 0.0001,
+		step: 0.0000625,
 		testId: "config-field-mutation-per-unit-rate",
-		defaultValue: 0.005,
+		defaultValue: 0.0060625,
 		tooltip:
-			"Chance that each genome unit requests one mutation event at birth; the founder's 97 units expect about 0.49 events. This field caps at 0.1; the runtime accepts up to 1.",
+			"Chance that each genome unit requests one mutation event at birth; the founder's 80 units expect about 0.49 events. This field caps at 0.1; the runtime accepts up to 1.",
 	},
 	{
 		path: "mutation.mesh_layer_probability",
