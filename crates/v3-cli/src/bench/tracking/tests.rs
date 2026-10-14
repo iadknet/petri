@@ -953,7 +953,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     };
     let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let mortality = tracking.mortality.unwrap();
-    assert_eq!(mortality.definition, "applied-mortality-v2");
+    assert_eq!(mortality.definition, "applied-mortality-v3");
     assert_eq!(mortality.deaths_total, 1);
     let expected_keys = [
         "lifecycle_decay",
@@ -979,7 +979,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     assert_eq!(
         serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
         serde_json::json!({
-            "definition": "applied-energy-flows-v2",
+            "definition": "applied-energy-flows-v3",
             "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
             "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
             "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
