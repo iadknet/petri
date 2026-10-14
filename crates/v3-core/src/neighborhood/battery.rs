@@ -1,4 +1,4 @@
-//! Battery `neighborhood-v1`: the fixed sensor scenarios and genome-execution
+//! Battery `neighborhood-v2`: the fixed sensor scenarios and genome-execution
 //! signature that every mutational-neighborhood reading (T11.F01) is taken
 //! against.
 //!
@@ -106,7 +106,7 @@ pub(super) fn draw_scenarios(seed: u64, count: usize, food_type_count: usize) ->
         .collect()
 }
 
-/// The complete `neighborhood-v1` battery: the fixed snapshot and sequence
+/// The complete `neighborhood-v2` battery: the fixed snapshot and sequence
 /// scenarios, generated once and shared across every subject evaluated in a
 /// report run.
 #[derive(Debug, Clone, PartialEq)]
@@ -117,7 +117,7 @@ pub struct Battery {
 }
 
 impl Battery {
-    /// Generate the fixed `neighborhood-v1` battery for a world configured
+    /// Generate the fixed `neighborhood-v2` battery for a world configured
     /// with `food_type_count` ordinary food types.
     #[must_use]
     pub fn generate(food_type_count: usize) -> Self {
@@ -409,7 +409,7 @@ pub(super) fn first_action_difference(
 
 /// One tick of `genome` against `scenario` from zeroed shared memory, zeroed
 /// previous memory, and fresh graph state: the footing every single-tick
-/// battery reading (`neighborhood-v1` snapshots, `steering-v1`) shares.
+/// battery reading (`neighborhood-v2` snapshots, `steering-v1`) shares.
 pub(super) fn execute_scenario_tick<M: MeshExecutionMode>(
     genome: &CreatureGenome,
     scenario: &Scenario,

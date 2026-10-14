@@ -1116,12 +1116,17 @@ fn founder_only_trajectory_digest_is_pinned() {
     // docs/progress/readings/effort-cost-defaults.md). Measured on macOS aarch64.
     // T11.F30 (founder heading draws, heading tie): default 99 -> 97 births,
     // rate 0.0 94 -> 94; old digests in docs/progress/readings/t11-f30.md.
+    // T25.F02 commit 1 (unit rule, anchor 97 -> 80): the founder's carrying
+    // cost falls 97 -> 80 units per tick, multiplier and gestation stay 1.0
+    // and 1 tick; default 97 -> 91 births (old digest 0d6295a9...), rate 0.0
+    // 94 -> 94 births (old digest 4cd55a73...). The old size rule and anchor
+    // 97 together restore both digests.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            97,
+            91,
             0,
-            "0d6295a965261b6fb1f1e54484bdb585c824572f377c2375123dd550174f0f50".to_owned()
+            "63650331ad3dfb2b0b6ef85079a86671fb014f5be0ef2dfd445c719c369e85b7".to_owned()
         )
     );
     assert_eq!(
@@ -1129,7 +1134,7 @@ fn founder_only_trajectory_digest_is_pinned() {
         (
             94,
             0,
-            "4cd55a734ddc8b36b061bd5a8559026250d3a2fb2f916c80ffb9462ab24f35f0".to_owned()
+            "3a9d028b4fa039161ab47fc719c957cd0fff9c4ddaa88b9c58265a13695b75b8".to_owned()
         )
     );
 }

@@ -12,8 +12,8 @@ use super::cgp_founder::{
 /// `genome_size()` of the canonical V3Alpha1 founder. The genome replication
 /// cost (T03.F11) charges only the units above this anchor, so the founder's
 /// reproduce charge is unchanged; `creature::state` tests pin the founder's
-/// measured size to this constant.
-pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 97;
+/// measured size to this constant (80 under the T25.F02 unit rule).
+pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 80;
 
 /// Return the canonical v3alpha1 founder genome.
 ///

@@ -2,7 +2,7 @@
 //!
 //! Lifts the brain evolvability audit's Appendix A probe
 //! (`docs/strategy/brain-evolvability-audit-2026-09-04.md`) into the
-//! permanent suite: it runs the founder half of the `neighborhood-v1`
+//! permanent suite: it runs the founder half of the `neighborhood-v2`
 //! battery at reduced sizes (fast enough for `make check`), asserts
 //! determinism across thread counts, and asserts the audit's structural
 //! facts about specific operators. It asserts no floor — the T11 track

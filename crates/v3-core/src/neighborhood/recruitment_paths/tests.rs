@@ -761,8 +761,10 @@ fn recruitment_paths_fixture_sites_and_preparation_are_exact() {
         ("graph_blank", [1, 2, 1, 0, 1, 1], 9),
         ("graph_copy", [2, 2, 1, 0, 2, 2], 12),
         ("graph_split", [2, 2, 1, 0, 3, 3], 14),
-        ("graph_unprepared", [2, 2, 1, 1, 2, 4], 17),
-        ("graph_prepared", [2, 2, 1, 1, 2, 4], 17),
+        // T25.F02: 15 (was 17) because a wired sink costs no unit; the old
+        // size rule restores 17.
+        ("graph_unprepared", [2, 2, 1, 1, 2, 4], 15),
+        ("graph_prepared", [2, 2, 1, 1, 2, 4], 15),
         ("vm_blank", [1, 2, 7, 1, 0, 0], 14),
         ("vm_copy", [2, 2, 11, 2, 0, 0], 20),
         ("vm_unprepared", [2, 2, 9, 3, 0, 0], 19),
@@ -2694,16 +2696,21 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
     assert_eq!(lineage.classification, LineageClass::CensoredAt64);
 }
 
-/// S0 arm 12 (`graph_prepared` / Drift) batch 2 lineage 2 retains its F06
-/// discovery (module 2) at generation 9 and deletes that module at depth 51
-/// on the T19.F04 vote founder (`docs/progress/readings/t19-f04.md`), so the
-/// T13.F06 retention reading at +256 is `Deleted` with no score loss even
-/// though the founder modules at the same creation depth are still present.
+/// S0 arm 12 (`graph_prepared` / Drift) batch 7 lineage 7 retains its F06
+/// discovery (module 2) at generation 2 and deletes that module at depth
+/// 187, so the T13.F06 retention reading at +256 is `Deleted` with no score
+/// loss even though the founder modules at the same creation depth are
+/// still present. Fixture re-pinned at T25.F02 commit 1 (draw count through
+/// `genome_size()` moved batch 2 lineage 2 to no retention); the first
+/// `Deleted` lineage of the bounded search in
+/// `docs/progress/readings/t25-f02.md`. The batch lies past the S0 panel's
+/// four batches: `lineage` seeds by position and `batches` only bounds the
+/// panel. The old size rule restores batch 2 lineage 2.
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
     let sizes = Sizes {
-        batches: 3,
-        lineages: 3,
+        batches: 4,
+        lineages: 8,
         discovery: 9,
         followup: 256,
     };
@@ -2714,12 +2721,12 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         ("graph_prepared", Policy::Drift)
     );
 
-    let lineage = assay.lineage(12, 2, 2);
+    let lineage = assay.lineage(12, 7, 7);
 
     let retention = lineage.retention.as_ref().unwrap();
-    assert_eq!(retention.discovery.generation, 9);
+    assert_eq!(retention.discovery.generation, 2);
     assert_eq!(retention.discovery.module.node, NodeId::new(2));
-    assert_eq!(retention.at_generation, 265);
+    assert_eq!(retention.at_generation, 258);
     assert_eq!(
         (retention.outcome, retention.score_loss),
         (RetentionOutcome::Deleted, None)
@@ -2730,7 +2737,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .iter()
         .find(|module| module.module.node == NodeId::new(2))
         .unwrap();
-    assert_eq!(module.module.deleted_depth, Some(51));
+    assert_eq!(module.module.deleted_depth, Some(187));
     assert!(!module.module.is_present());
     assert!(last
         .modules

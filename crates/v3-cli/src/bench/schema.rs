@@ -397,7 +397,7 @@ pub(super) fn undefined_evolved_neighborhood() -> Indicator<EvolvedNeighborhoodH
 }
 
 pub(super) fn undefined_recruitment_paths() -> Indicator<neighborhood::recruitment_paths::Report> {
-    Indicator::Undefined("unmeasured; recruitment-paths-v1 is goal-only".into())
+    Indicator::Undefined("unmeasured; recruitment-paths-v2 is goal-only".into())
 }
 
 pub(super) fn timed_recruitment_paths(
@@ -427,7 +427,7 @@ pub const NEIGHBORHOOD_READ_VERSION: &str = "neighborhood-read-v1";
 
 /// The neighborhood read (T14.F12): a seeded sample of the id-sorted living
 /// population at the end of a goal-profile world, each genome's production
-/// births classified by the `neighborhood-v1` battery, pooled over the
+/// births classified by the `neighborhood-v2` battery, pooled over the
 /// sample. Every fraction divides by `births.births_total`, all births, as
 /// the drift checkpoint's do.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -817,7 +817,7 @@ pub struct NeighborhoodCompanions {
     pub has_plasticity: bool,
 }
 
-/// The predeclared `neighborhood-v1` battery: version, seeds, sizes, and the
+/// The predeclared `neighborhood-v2` battery: version, seeds, sizes, and the
 /// battery's total execution count per genome (48 snapshots + 32 sequence
 /// ticks at the predeclared sizes), recorded here rather than restated.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

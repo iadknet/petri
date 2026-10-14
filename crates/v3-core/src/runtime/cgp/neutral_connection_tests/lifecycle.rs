@@ -103,7 +103,7 @@ proptest! {
     }
 
     #[test]
-    fn zero_connection_storage_units_count_edge_sink_and_optional_declaration(
+    fn zero_connection_storage_units_count_edge_and_optional_declaration(
         incumbent_edges in 0usize..10,
         add_declaration in any::<bool>(),
         vote_index in 0usize..27,
@@ -118,7 +118,9 @@ proptest! {
             leaf(0, 7)
         } else { memory(15, true) };
         wire(graph_mut(&mut genome.nodes[0]), kind, edge(source, 0.0));
-        prop_assert_eq!(genome.genome_size() - before, 1 + u32::from(incumbent_edges == 0) + u32::from(add_declaration));
+        // T25.F02: an edge is one unit wherever it lands; wiring an empty sink
+        // adds none. The old size rule restores the `incumbent_edges == 0` term.
+        prop_assert_eq!(genome.genome_size() - before, 1 + u32::from(add_declaration));
         let roundtrip: CreatureGenome = serde_json::from_str(&serde_json::to_string(&genome).unwrap()).unwrap();
         prop_assert_eq!(&roundtrip, &genome);
         prop_assert_eq!(roundtrip.genome_size(), genome.genome_size());

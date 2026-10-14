@@ -259,10 +259,12 @@ fn the_event_appends_a_losing_branch_with_its_own_gate_write_on_both_backends() 
                 assert_eq!(sink.inputs[0].weight(), 1.0);
             }
         }
+        // T25.F02: +2 on both backends (Graph was +3, the newly wired sink's
+        // unit); the old size rule restores +3.
         assert_eq!(
             g.genome_size(),
-            base.genome_size() + if graph { 3 } else { 2 },
-            "one target unit plus one instruction, or one edge and its newly wired sink"
+            base.genome_size() + 2,
+            "one target unit plus one instruction, or one target unit plus one edge (T25.F02: a wired sink costs no unit)"
         );
     }
 }

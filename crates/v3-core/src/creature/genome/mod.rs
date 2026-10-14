@@ -256,10 +256,14 @@ impl CreatureGenome {
 
     /// Total structural size: sum of all discrete genome components.
     ///
-    /// Counts every node, input ref, target, instruction, constant, and
-    /// graph internal node (plus its inputs). Equal weights, includes junk DNA,
-    /// no reachability analysis. Used for the mutation pressure gate
-    /// (`genome_size_cap`).
+    /// Counts every mesh node, input ref, route target, VM instruction and
+    /// constant, graph compute node, and edge on both graph surfaces (compute
+    /// inputs and sink inputs), plus nine units per ring projection: its
+    /// record and its eight implied synapses (T25.F02). A wired sink adds
+    /// nothing of itself; a synapse is one unit wherever it sits. Equal
+    /// weights, includes junk DNA, no reachability analysis. Read by the
+    /// carrying cost, the per-unit mutation supply, the replication cost,
+    /// gestation and the size-pressure gate (`genome_size_cap`).
     pub fn genome_size(&self) -> u32 {
         let mut score: u32 = 0;
         for node in &self.nodes {
@@ -277,14 +281,13 @@ impl CreatureGenome {
                     for cn in graph.compute_nodes() {
                         score += cn.inputs.len() as u32;
                     }
-                    // Count wired output sinks (unwired are structural scaffolding)
+                    // Sink edges only: a sink itself is scaffolding.
                     for sink in graph.output_sinks() {
-                        if !sink.inputs.is_empty() {
-                            score += 1 + sink.inputs.len() as u32;
-                        }
+                        score += sink.inputs.len() as u32;
                     }
-                    // One unit per ring projection (T11.F31): it wires no sink.
-                    score += graph.projections.len() as u32;
+                    // A ring projection (T11.F31) is its record plus its
+                    // eight implied synapses.
+                    score += 9 * graph.projections.len() as u32;
                 }
             }
         }
@@ -305,6 +308,10 @@ impl CreatureGenome {
 #[cfg(test)]
 #[path = "tests/projection_tests.rs"]
 mod projection_tests;
+
+#[cfg(test)]
+#[path = "tests/size_tests.rs"]
+mod size_tests;
 
 #[cfg(test)]
 mod tests {

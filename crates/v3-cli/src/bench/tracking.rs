@@ -782,6 +782,16 @@ pub struct PersistenceSample {
     /// absent in reports stored before T14.F04.
     #[serde(default)]
     pub mean_generation: Option<String>,
+    /// Mean count of wired output sinks (at least one edge) per living
+    /// creature: the per-sink unit T25.F02 stopped charging. `null` at
+    /// extinction and absent in reports stored before T25.F02.
+    #[serde(default)]
+    pub mean_wired_sinks: Option<String>,
+    /// Mean ring projection count per living creature, each nine genome units
+    /// since T25.F02. `null` at extinction and absent in reports stored before
+    /// T25.F02.
+    #[serde(default)]
+    pub mean_projections: Option<String>,
     /// Founder clades with at least one living creature — a true `0` at
     /// extinction, absent in reports stored before T14.F04.
     #[serde(default)]
@@ -951,6 +961,8 @@ pub(super) struct PopulationReadings {
     pub(super) mean_genome_size: f64,
     pub(super) mean_mesh_nodes: f64,
     pub(super) mean_generation: f64,
+    pub(super) mean_wired_sinks: f64,
+    pub(super) mean_projections: f64,
     pub(super) surviving_founder_clade_count: u64,
     pub(super) shannon_entropy_nats: String,
     sensor_census: SensorCensus,
@@ -959,13 +971,15 @@ pub(super) struct PopulationReadings {
 
 impl PopulationReadings {
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        let (mean_genome_size, mean_mesh_nodes, mean_generation) = crate::structure_means(sim);
+        let means = crate::structure_means(sim);
         let (surviving_founder_clade_count, shannon_entropy_nats) =
             clade_diversity(sim.creatures.values().map(|c| c.identity.lineage_id));
         Self {
-            mean_genome_size,
-            mean_mesh_nodes,
-            mean_generation,
+            mean_genome_size: means.genome_size,
+            mean_mesh_nodes: means.mesh_nodes,
+            mean_generation: means.generation,
+            mean_wired_sinks: means.wired_sinks,
+            mean_projections: means.projections,
             surviving_founder_clade_count,
             shannon_entropy_nats,
             sensor_census: SensorCensus::observe(sim),
@@ -1058,6 +1072,8 @@ impl PersistenceAccumulator {
                 mean_genome_size: alive.then(|| six(readings.mean_genome_size)),
                 mean_mesh_nodes: alive.then(|| six(readings.mean_mesh_nodes)),
                 mean_generation: alive.then(|| six(readings.mean_generation)),
+                mean_wired_sinks: alive.then(|| six(readings.mean_wired_sinks)),
+                mean_projections: alive.then(|| six(readings.mean_projections)),
                 surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 sensor_census: Some(readings.sensor_census),

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8dd3565cc0179b64159b6e8d53e2b21fd3351a3cc2692e997945d3ba909b9d22 # shrinks to def = CgpGraphBackendDef { compute_nodes: [], output_sinks: [], projections: [RingProjection { ref_idx: 0, kind: Move, offset: 0, weight: 0.0 }] }, refs = 0, targets = 0

@@ -167,7 +167,7 @@ Founder identity state semantics remain owned by
 
 The founder genome is a 2-node mesh of two Graph nodes (T19.F04; node 1 was a
 VM before), using the CGP-style layered model (see
-`v3-graph-backend-spec.md`). Its `genome_size()` is 97 units
+`v3-graph-backend-spec.md`). Its `genome_size()` is 80 units
 (`FOUNDER_GENOME_SIZE_UNITS`). The founder reproduction gate is derived from
 runtime config `energy.lifecycle.min_reproduce_age` (default `20` ticks).
 

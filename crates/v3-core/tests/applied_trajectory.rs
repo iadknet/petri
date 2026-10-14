@@ -48,6 +48,12 @@
 //! recruitment and T20.F05 refinement became production defaults: two more
 //! Graph operators change every Graph-domain draw, which moves all four
 //! digests.
+//! Re-pinned by T25.F02 commit 1 after two agreeing runs: the unit rule
+//! changes the per-birth draw count through `genome_size()`, and the anchor
+//! 80 the replication multiplier and gestation, which moves all four digests
+//! (sampled 1d2ecdf7... -> 2f255722..., rate 0.0 1e29f964... -> a44c5736...;
+//! guard 8d8a3874... -> d04ad654..., rate 0.0 fb71cb3b... -> b97baeec...);
+//! the old size rule and anchor 97 together restore.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -59,11 +65,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "1d2ecdf77c7c1bbf7c1d5d76554ebf23c4995464191c9830eafcbd8d54644328"
+        "2f25572287f41c0b6c6cabd9a3babc6c3c0ab778a4151ef9b40c27f702f7f6a0"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "1e29f9644763f614b42f49bfd6fe4bacb7b8b3f89feaceb652bf45e2285603e9"
+        "a44c5736d0b50fbfc2005ca5b1220de27cb50c5cc1f5ca989095659db291b6d8"
     );
 }
 
@@ -136,11 +142,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "8d8a3874e0ca4e382c8f0ff6f01a68b48e1c72048c6b9f9622fb66971c8f321b"
+        "d04ad65470b26d4421020a5fb6d661dada5a295a1e8f3bbf904942179bb62e7b"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "fb71cb3b886bedc7e7d226d8f8123a723856e25916db1e916f8176f60cb24e98"
+        "b97baeec48e02e704d757dc0a3d3b130f2df565dacd586a8ebe9315482a439e7"
     );
 }
 

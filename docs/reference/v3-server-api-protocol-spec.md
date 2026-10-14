@@ -214,7 +214,7 @@ Request rules:
   (not under `runtime.*`). `mutation.per_unit_rate` is the only mutation-count
   field: each birth requests `Binomial(genome_size(), per_unit_rate)` events,
   and the drift walk and recruitment-paths instruments draw the same rule on
-  the canonical founder's 97 units. The keys of the retired per-birth rule
+  the canonical founder's 80 units. The keys of the retired per-birth rule
   are unknown fields and are rejected (T11.F20).
 - `population.initial_creatures` and `population.founder_profile` are
   restart-only (Section 4.8).

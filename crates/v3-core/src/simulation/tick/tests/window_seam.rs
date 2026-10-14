@@ -204,9 +204,13 @@ fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // creature's action log, the oracle, is removed with it. Kind drives
     // (T11.F30), 2026-10-12: seed 14 to 16. At seed 14 a traced target dies
     // of a move at tick 32, inside its window; seed 15 also loses one.
+    // Uniform genome size (T25.F02), 2026-10-14: seed 16 to 21. At seed 16 a
+    // traced target dies of a move at tick 49, inside its window; seeds 17 to
+    // 20 also lose a target inside its window. The old size rule and anchor
+    // 97 restore seed 16.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 16));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 16));
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 21));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 21));
         assert_equivalent(traced, plain, budget);
     }
 }

@@ -95,6 +95,8 @@ fn empty_readings() -> PopulationReadings {
         mean_genome_size: 0.0,
         mean_mesh_nodes: 0.0,
         mean_generation: 0.0,
+        mean_wired_sinks: 0.0,
+        mean_projections: 0.0,
         surviving_founder_clade_count: 0,
         shannon_entropy_nats: UNDEFINED.to_string(),
         sensor_census: census_for(0),
@@ -114,6 +116,8 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         mean_genome_size: tick as f64,
         mean_mesh_nodes: tick as f64 * 2.0,
         mean_generation: tick as f64 * 3.0,
+        mean_wired_sinks: tick as f64 * 5.0,
+        mean_projections: tick as f64 * 7.0,
         surviving_founder_clade_count: population,
         shannon_entropy_nats: six(tick as f64 / 4.0),
         sensor_census: census_for(population),
@@ -224,6 +228,14 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
         assert_eq!(
             sample.mean_generation.as_deref(),
             Some(six(expected.mean_generation).as_str())
+        );
+        assert_eq!(
+            sample.mean_wired_sinks.as_deref(),
+            Some(six(expected.mean_wired_sinks).as_str())
+        );
+        assert_eq!(
+            sample.mean_projections.as_deref(),
+            Some(six(expected.mean_projections).as_str())
         );
         assert_eq!(sample.surviving_founder_clade_count, Some(6));
         assert_eq!(
@@ -438,6 +450,8 @@ proptest! {
         mean_genome_size in proptest::option::of(0.0f64..1e6),
         mean_mesh_nodes in proptest::option::of(0.0f64..1e6),
         mean_generation in proptest::option::of(0.0f64..1e6),
+        mean_wired_sinks in proptest::option::of(0.0f64..1e3),
+        mean_projections in proptest::option::of(0.0f64..1e3),
         surviving_founder_clade_count in proptest::option::of(0u64..10_000),
         shannon_entropy_nats in proptest::option::of(0.0f64..20.0),
         population in 0u64..1000,
@@ -450,6 +464,8 @@ proptest! {
             mean_genome_size: mean_genome_size.map(six),
             mean_mesh_nodes: mean_mesh_nodes.map(six),
             mean_generation: mean_generation.map(six),
+            mean_wired_sinks: mean_wired_sinks.map(six),
+            mean_projections: mean_projections.map(six),
             surviving_founder_clade_count,
             shannon_entropy_nats: shannon_entropy_nats.map(six),
             sensor_census: Some(census_for(population)),
@@ -464,6 +480,8 @@ proptest! {
         prop_assert_eq!(&decoded.mean_genome_size, &sample.mean_genome_size);
         prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
         prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
+        prop_assert_eq!(&decoded.mean_wired_sinks, &sample.mean_wired_sinks);
+        prop_assert_eq!(&decoded.mean_projections, &sample.mean_projections);
         prop_assert_eq!(
             decoded.surviving_founder_clade_count,
             sample.surviving_founder_clade_count
@@ -480,6 +498,8 @@ proptest! {
             "mean_genome_size",
             "mean_mesh_nodes",
             "mean_generation",
+            "mean_wired_sinks",
+            "mean_projections",
             "surviving_founder_clade_count",
             "shannon_entropy_nats",
             "sensor_census",
@@ -492,6 +512,8 @@ proptest! {
         prop_assert_eq!(historical.mean_genome_size, None);
         prop_assert_eq!(historical.mean_mesh_nodes, None);
         prop_assert_eq!(historical.mean_generation, None);
+        prop_assert_eq!(historical.mean_wired_sinks, None);
+        prop_assert_eq!(historical.mean_projections, None);
         prop_assert_eq!(historical.surviving_founder_clade_count, None);
         prop_assert_eq!(historical.shannon_entropy_nats, None);
         prop_assert_eq!(historical.sensor_census, None);
@@ -1238,6 +1260,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
     assert_eq!(legacy.mean_genome_size, None);
     assert_eq!(legacy.mean_mesh_nodes, None);
     assert_eq!(legacy.mean_generation, None);
+    assert_eq!(legacy.mean_wired_sinks, None);
+    assert_eq!(legacy.mean_projections, None);
     assert_eq!(legacy.surviving_founder_clade_count, None);
     assert_eq!(legacy.shannon_entropy_nats, None);
     assert_eq!(legacy.sensor_census, None);
@@ -1251,6 +1275,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         mean_genome_size: Some(six(111.0)),
         mean_mesh_nodes: Some(six(8.0)),
         mean_generation: Some(six(3.5)),
+        mean_wired_sinks: Some(six(17.0)),
+        mean_projections: Some(six(0.5)),
         surviving_founder_clade_count: Some(4),
         shannon_entropy_nats: Some(six(1.25)),
         sensor_census: Some(census_for(5)),

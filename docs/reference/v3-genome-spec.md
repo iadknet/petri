@@ -65,8 +65,9 @@ and fixed structural outputs (the sinks). The fixed catalog holds 98 sinks: 24 `
 `RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 30 `ActionVote` (three kind drives included, T11.F30), and 4
 `ActionParam`, one per decoded parameter field (T11.F27, T02.F08); the vote and parameter sinks are how a graph acts
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
-`genome_size` counts wired sinks only, so unwired sinks add nothing to it;
-the founder is 97 units.
+`genome_size` charges one unit per edge on both graph surfaces and nothing
+for a sink itself, so unwired sinks add nothing to it (T25.F02); the founder
+is 80 units.
 A serialized genome from before T11.F27 that carries an old parameter sink
 (`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam { slot_idx, .. }`
 fails to deserialize; there is no conversion path. A pre-T11.F27 genome with

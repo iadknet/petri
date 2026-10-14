@@ -641,7 +641,8 @@ mod tests {
 
     #[test]
     fn replication_multiplier_is_exactly_one_below_the_founder_anchor() {
-        for size in [0, 1, 7, 96] {
+        // T25.F02: the anchor is 80 (was 97); the old rule and 97 restore 96.
+        for size in [0, 1, 7, 79] {
             assert_eq!(genome_replication_cost_multiplier(0.1, size), 1.0);
         }
     }
@@ -654,11 +655,12 @@ mod tests {
     }
 
     #[test]
-    fn replication_multiplier_charges_the_reference_genome_29_9_times() {
-        // The T03.F08 cost arm's 386-unit genome: 289 units above the 97-unit
-        // founder (T19.F04).
+    fn replication_multiplier_charges_the_reference_genome_31_6_times() {
+        // The T03.F08 cost arm's 386-unit genome: 306 units above the 80-unit
+        // founder (T25.F02 unit rule; 289 above the 97-unit anchor gave 29.9,
+        // which the old rule and anchor 97 restore).
         let factor = genome_replication_cost_multiplier(0.1, 386);
-        assert!((factor - 29.9).abs() < 1e-4, "factor {factor}");
+        assert!((factor - 31.6).abs() < 1e-4, "factor {factor}");
     }
 
     proptest::proptest! {
@@ -722,9 +724,10 @@ mod tests {
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 1.0), 1);
         assert_eq!(gestation_ticks(1, 1.0), 1);
         assert_eq!(gestation_ticks(0, 1.0), 0);
-        assert_eq!(gestation_ticks(98, 1.0), 2);
-        assert_eq!(gestation_ticks(194, 1.0), 2);
-        assert_eq!(gestation_ticks(195, 1.0), 3);
+        // T25.F02 anchor 80 (97 restores 98 / 194 / 195).
+        assert_eq!(gestation_ticks(81, 1.0), 2);
+        assert_eq!(gestation_ticks(160, 1.0), 2);
+        assert_eq!(gestation_ticks(161, 1.0), 3);
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 2.0), 2);
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 0.5), 1);
         assert_eq!(gestation_ticks(u32::MAX, f32::MAX), u64::MAX);

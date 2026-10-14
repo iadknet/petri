@@ -49,7 +49,7 @@ pub const VERSION: &str = "input-use-v1";
 /// Children read for retention per parent with a causal channel.
 pub const RETENTION_CHILDREN: u32 = 10;
 
-/// The scenes every stage is read on: `neighborhood-v1` (the original
+/// The scenes every stage is read on: `neighborhood-v2` (the original
 /// battery), then the T11.F26 extension (recorded and authored contexts and
 /// the long sequences), in [`run_panel`] order.
 struct Scenes<'a> {

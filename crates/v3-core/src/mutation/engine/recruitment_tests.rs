@@ -46,10 +46,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Re-pinned by T02.F08: every graph genome carries the `EatLeaveShare`
     // sink and the surface draw covers `c + 98`
     // (11747062888261140569 -> 13078250158860285847).
-    assert_eq!(
-        hash, 13078250158860285847,
-        "pin of the recruitment-Off path"
-    );
+    // Re-pinned by T25.F02 commit 1 (unit rule): the production supply draws
+    // one `gen_bool` per `genome_size()` unit, and the founder falls 97 -> 80
+    // (13078250158860285847 -> 4353978680418239853); the old size rule and
+    // anchor 97 together restore.
+    assert_eq!(hash, 4353978680418239853, "pin of the recruitment-Off path");
 }
 
 #[test]

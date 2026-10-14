@@ -1,10 +1,10 @@
 //! Battery `steering-v1` (T11.F21): does a genome's movement follow food and
 //! avoid barriers, and does its executed mesh vote on a `Move` sink?
 //!
-//! Separate from `neighborhood-v1`, which is not edited. Six base scenarios
+//! Separate from `neighborhood-v2`, which is not edited. Six base scenarios
 //! (seed 9) are drawn by the same generator; every reading executes one tick
 //! from zeroed shared memory and fresh graph state, exactly as the
-//! `neighborhood-v1` snapshots run. Three readings per genome:
+//! `neighborhood-v2` snapshots run. Three readings per genome:
 //!
 //! (a) seeking: for each base and each direction `d`, no food here, the
 //!     primary ring one-hot at `d`, every other ring zero; a move is a queue
@@ -486,7 +486,7 @@ mod tests {
         genome
     }
 
-    /// On the `neighborhood-v1` snapshots, `with` differs from `without` only
+    /// On the `neighborhood-v2` snapshots, `with` differs from `without` only
     /// where the base's `ring[d]` is nonzero, and there every move of the
     /// steered queue is `Move(d)`.
     fn assert_only_ring_scenarios_differ(
@@ -656,7 +656,7 @@ mod tests {
             };
             assert_eq!(reading.avoided, expected, "d={d}");
         }
-        // The neighborhood-v1 battery carries no barriers, so the queue is
+        // The neighborhood-v2 battery carries no barriers, so the queue is
         // byte-identical to the plain mover on every scenario.
         let neighborhood = Battery::generate(config.world.food.types.len());
         let decay = config.shared_memory.decay_rate;
@@ -737,7 +737,7 @@ mod tests {
             assert_eq!(
                 neighborhood.signature(&genome, &config.runtime, decay),
                 founder_signature,
-                "d={d}: no barrier in neighborhood-v1, so nothing changes"
+                "d={d}: no barrier in neighborhood-v2, so nothing changes"
             );
         }
         assert_eq!(

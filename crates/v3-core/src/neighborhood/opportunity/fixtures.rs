@@ -1,7 +1,7 @@
 //! Adequacy fixtures and competence checks of the authored controllers:
 //! does competent authored use behave as intended, and does it leave every
 //! other founder decision alone? Each is a fixed set of single-tick contexts
-//! run from fresh cognition state, exactly as `neighborhood-v1` snapshots.
+//! run from fresh cognition state, exactly as `neighborhood-v2` snapshots.
 
 use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{Direction, WorldAction};
@@ -257,7 +257,7 @@ fn intended(
 /// One controller pair's competence and adequacy reading.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Competence {
-    /// `neighborhood-v1` executions whose authored channels read zero, and
+    /// `neighborhood-v2` executions whose authored channels read zero, and
     /// how many of them `A_k` or `Z_k` acts differently on from the founder.
     pub battery_zero_signal: u32,
     pub battery_violations: u32,

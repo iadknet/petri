@@ -118,7 +118,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // 2026-10-12, when T20.F04 whole-family recruitment and T20.F05
     // refinement became defaults and seed 207 went extinct at tick 127;
     // seeds 6, 55, 208, 634, 729, 815, 982 and 1010 of 0..=1010 survive.
-    const SEED: u64 = 6;
+    // Moved from 6 to 19 on 2026-10-14 (T25.F02): the uniform size rule
+    // moves the carrying cost and the mutation draw count, and seed 6 goes
+    // extinct at tick 112; seed 19 is the lowest of 0..=19 that survives the
+    // horizon (0 to 18 go extinct between ticks 112 and 187). The old size
+    // rule and anchor 97 restore seed 6.
+    const SEED: u64 = 19;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -189,8 +194,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // Effort-cost defaults, 2026-10-10: seed 16 goes extinct at tick 150;
     // seed 22 survives the horizon. T11.F31: seed 22 goes extinct at tick
     // 151 and seed 14 survives (see the post-tick-state test). T11.F30: seed
-    // 14 goes extinct at tick 194 and seed 207 survives.
-    const SEED: u64 = 6;
+    // 14 goes extinct at tick 194 and seed 207 survives. T25.F02: seed 6
+    // goes extinct at tick 112 and seed 19 survives (see the post-tick-state
+    // test).
+    const SEED: u64 = 19;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -317,8 +324,11 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // from 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18. T11.F31
     // moved it from 22 to 14: seed 22 goes extinct at tick 151. T11.F30 moved
     // it from 14 to 207: seed 14 goes extinct at tick 194; seed 207 keeps 5
-    // creatures over 5 cells.
-    const SEED: u64 = 6;
+    // creatures over 5 cells. T25.F02 moved it from 6 to 19: seed 6 goes
+    // extinct at tick 112, and seed 19 is the lowest of 0..=19 that survives
+    // the horizon over more than one cell; the old size rule and anchor 97
+    // restore seed 6.
+    const SEED: u64 = 19;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

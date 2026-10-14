@@ -1522,9 +1522,10 @@ fn world_mutation_effects_keeps_page_reads() {
     let founder = &kept["cohorts"][0];
     assert_eq!(founder["totals"], block["cohorts"][0]["totals"]);
     assert_eq!(founder["operators"], block["cohorts"][0]["operators"]);
+    // T25.F02: the founder is 80 units (was 97); the old size rule restores 97.
     assert_eq!(
         founder["parents"],
-        json!([{"depth_or_generation": 0, "genome_size": 97}])
+        json!([{"depth_or_generation": 0, "genome_size": 80}])
     );
     assert!(founder["coverage"].get("parents_evaluated").is_none());
     // An Undefined cohort stays its reason string.
