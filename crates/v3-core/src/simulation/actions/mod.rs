@@ -1,4 +1,6 @@
 pub(crate) mod cgp_reproduction;
+#[cfg(test)]
+mod lamarckian_corpus_tests;
 mod predation;
 mod reproduction;
 
