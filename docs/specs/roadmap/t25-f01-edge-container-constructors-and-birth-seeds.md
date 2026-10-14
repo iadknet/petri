@@ -28,9 +28,8 @@ and pin is identical to main.
   onward; per-edge plasticity, `LearnedState`, sink-edge seeds and the
   removal of lazy initialization are F06.
 - No size, cost or rate change (F02). No `RingProjection` change: the
-  `projections` list, its five operators and the observation-only
-  `#[serde(skip)]` field `ablated_channels` (`cgp.rs:150-160`) stay as they
-  are until F03 deletes them.
+  `projections` list, its operators and the observation-only
+  `#[serde(skip)]` field `ablated_channels` stay until F03 deletes them.
 - No genome text change: JSON keys, `Debug` rendering and `PartialEq` of
   every genome type are unchanged (`own_weight` is F03's text-only
   commit). No frontend change: the wire shape is unchanged and the
@@ -54,7 +53,7 @@ and pin is identical to main.
 | Literals and whole-list writes | `grep -rn 'GraphEdge {' crates` = 256; `'ComputeNode {'` = 184; `'CgpGraphBackendDef {'` = 108 (literals and destructuring patterns); about 15 local test helpers (`edge`, `leaf`, `memory`, `vote_edge`, `from_node`, `compute`, `node`, ...); 15 fixture sites assign `def.compute_nodes = ...`, `def.output_sinks = ...` or `node.inputs = ...` (`cgp_reproduction.rs:219, :406`, `cognition_tests.rs:213`, `mutation_effects/controls.rs:20`, `reproduction.rs:610`, `tick.rs:1740`, `genome/mod.rs:590, :641, :987`, `plasticity/tests.rs:160, :482, :640`, `applicability_tests.rs:119`, `recruitment_tests.rs:201`, `mesh_execution.rs:1105`, `recruitment_paths/fixtures.rs:161`, `neutral_connection_tests/refinement.rs:424`); fixtures build sink catalogs that are not the fixed one: repeated kinds (`cognition_tests.rs:137`), out-of-range kinds (`:213`), no sinks (`operators.rs:2314`) | Every literal migrates to `GraphEdge::new`, `ComputeNode::new` and the def builder; every whole-list write becomes a builder call. |
 | Tests of the deleted reindex branches | `cgp.rs:999` `reindex_input_refs_removes_matching_and_decrements_higher`, `:1072` `reindex_across_vote_and_param_sinks`, `:1135` and `:1189` (clamp), `cgp_reproduction.rs:267` `birth_source_deletion_and_input_pruning_keep_occurrence_alignment`, `genome/tests/projection_tests.rs:86` `reindex_keeps_each_projection_on_its_reference`, `genome/mod.rs:976` `reindex_input_refs_after_removal_graph` | Test contracts that change (not pins): rewritten to the decrement-only contract below. The VM reindex tests (`input_ref/tests.rs:1210, :1280`) are untouched. |
 | Runtime layouts | `state.rs:338, :404` (empty outer vector for every non-reproduction construction), `reproduction.rs:30-40` and `cgp_reproduction.rs:42-66` (every birth: one row per graph node, one slice per compute node, empty unless inherited), `reproduction.rs:885` `lamarckian_with_no_parent_weights_returns_empty`; `tests/applied_trajectory.rs:104` hashes the nested shape | Both layouts are pins: a birth gets the scaffold whether or not anything was inherited, a founder gets none. |
-| Pins that hash genome text or draw streams | `tests/baseline_worlds.rs:142`, `mutation/engine/recruitment_tests.rs:49`, `tests/applied_trajectory.rs`, `neighborhood/drift.rs` (`the_walk_dates_modules_from_their_birth_and_from_every_refresh`), `tests/viability.rs:1113` (`founder_only_trajectory_digest_is_pinned`), the slow tier, every parallel-RNG tail test | Oracles: all unchanged. `neighborhood/mutation_effects/mod.rs:58` `genome_identity` is the `Debug` rendering. |
+| Pins that hash genome text or draw streams | `tests/baseline_worlds.rs:142`, `mutation/engine/recruitment_tests.rs:49`, `tests/applied_trajectory.rs`, `tests/viability.rs:1113` (`founder_only_trajectory_digest_is_pinned`), the slow tier, every parallel-RNG tail test | Oracles: all unchanged. `neighborhood/mutation_effects/mod.rs:58` `genome_identity` is the `Debug` rendering. The drift walk's dating test (`neighborhood/drift.rs`) is not a pin after F01: it passed unchanged before its rewrite to a constructed lineage (Implementation Tasks). |
 | Reference spec | `docs/reference/v3-reproduction-spec.md` §4 "Graph state" | The inheritance rules F01 preserves verbatim; its payload name becomes `BirthSeeds`. |
 
 Invariants:
@@ -68,10 +67,9 @@ Invariants:
    skip until F03 deletes it; the def's hand-written `Debug`/`PartialEq`
    skip exactly `BirthSeeds`; an exhaustive destructuring test makes a new
    def field a compile error.
-2. **Seed shape (I11).** When `BirthSeeds` is present it has one row per
-   compute node, each sized to that node's `inputs`. Every container exit
-   asserts it (`debug_assert`); sink rows and group slots arrive in F06 and
-   F07.
+2. **Seed shape (I11).** Seed rows, when present, are one per compute
+   node, each sized to that node's `inputs`; every container exit
+   `debug_assert`s it. Sink rows and group slots arrive in F06 and F07.
 3. **One writer.** The compute-node list, the sink list and both `inputs`
    lists are newtypes with `Deref<Target = [T]>`, no `DerefMut`, no public
    constructor and no `From<Vec>`; the def's `compute_nodes` and
@@ -146,8 +144,8 @@ Seed rules, today's site → the container primitive that owns it:
 
 Read API: `compute_nodes()`, `output_sinks()`, `edges()`,
 `edge_at(EdgeOccurrence)`, `sink(kind)`, the canonical enumeration
-(today's `edge_sites`, compute inputs then sink inputs) defining
-`EdgeOccurrence { surface: EdgeSurface, index }`, and `birth_seeds()`.
+(compute inputs then sink inputs) defining `EdgeOccurrence { surface:
+EdgeSurface, index }`, and `birth_seeds()`.
 Constructors: `GraphEdge::new(source, weight)`, `ComputeNode::new(kind,
 inputs, plasticity)`, `CgpGraphBackendDef::new_with_fixed_outputs()`
 unchanged, and a seedless builder (`with_compute_nodes`,
@@ -161,8 +159,7 @@ Options weighed: [the readings file](../../progress/readings/t25-f01.md).
 
 ## Telemetry
 
-Not applicable: a behavior-preserving refactor that adds no counter, config
-value, mechanism switch or span.
+Not applicable: a refactor adding no counter, config value, switch or span.
 
 ## Verification Plan
 
@@ -208,11 +205,10 @@ wrong.
       `BirthSeeds` as the temporary correspondence.
 - [x] Engine: one generic snapshot, validate, commit-or-rollback wrapper;
       `engine/tests.rs:1757` ported to the seed accessor.
-- [x] `the_walk_dates_modules_from_their_birth_and_from_every_refresh`
-      rewritten to a constructed lineage asserting the dating properties
-      (birth date, refresh folding, internal-change dating) without
-      pinning draw history, beside an `observe` test that fails without
-      the refresh fold; the old pins are in the readings.
+- [x] The drift walk's dating test rewritten to a constructed lineage
+      asserting birth date, refresh folding and internal-change dating
+      without pinning draw history, beside an `observe` test that fails
+      without the refresh fold; the old pins are in the readings.
 - [x] Closing commit: the corpus test retired, its hashes kept in
       `docs/progress/readings/t25-f01.md`.
 
@@ -243,21 +239,19 @@ line is a seedless capture followed by a build):
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> all pass, both existing
-      digests and the carrying-cost-0 sibling unchanged (`2ecbbb10`).
+      digests and the carrying-cost-0 sibling unchanged (`aa4e81da`).
 - [x] Corpus: hashes recorded on main equal the hashes after every
       production commit; recorded in the readings.
 - [x] Seeded births through both constructors: a Lamarckian parent with
       learned weights reproduces on the mutated branch (`CreatureState::new`)
-      and on the fast path (`new_with_cached_fields`, `applied_events ==
-      0`); each child carries no seeds, holds the inherited weights in its
-      own storage, starts with empty traces, node state, outputs and
-      dispatch record, and leaves the parent's genome and runtime state
-      unchanged (`birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit`
-      ported, with a fast-path twin); a parent with nothing learned gives
-      a child whose `plasticity_weights` before its first visit is today's
-      scaffold (one row per graph node, one empty slice per compute node),
-      so does a child of a VM-only parent whose batch created a Graph
-      node, and a seeded founder's stays empty.
+      and the fast path (`new_with_cached_fields`); each child carries no
+      seeds, holds the inherited weights in its own storage, starts with
+      empty traces, node state, outputs and dispatch record, and leaves
+      the parent unchanged (`reproduction.rs:1019` ported, with a
+      fast-path twin); a parent with nothing learned, and a VM-only parent
+      whose batch created a Graph node, give a child whose
+      `plasticity_weights` before its first visit is today's scaffold; a
+      seeded founder's stays empty.
 - [ ] `cargo test --workspace` -> every existing pin unchanged (Inputs
       table).
 - [x] `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
@@ -310,5 +304,11 @@ none.
 
 - Decision: (user, track Notes 2026-10-13) F01 is behavior-preserving; any
   pin that moves under it is a defect, never a re-pin.
+- Deferred: (review P2, remediated at `aa4e81da`) the drift walk's `+1`
+  birth date (`born = depth + 1` into `record_birth`) is unchecked through
+  `observe`, since both walks of the refresh-fold test shift equally;
+  covering it needs a seam or a pinned walk, which the drift bullet rules
+  out.
+- Deferred: (review P3, fixed at `71325268`) `GraphEdge` is 12 bytes, not 8.
 - Decision: (design note D11) no type or module is renamed; `cgp.rs` splits
   into submodules with its public paths re-exported.
