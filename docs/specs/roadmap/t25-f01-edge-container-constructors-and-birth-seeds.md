@@ -1,7 +1,7 @@
 # T25.F01 — Edge Container, Constructors and Birth Seeds
 
 **Status**: In Progress
-**Last updated**: 2026-10-13
+**Last updated**: 2026-10-14
 **Feature**: T25.F01
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
 
@@ -179,26 +179,26 @@ draw-stream tail or a corpus hash mismatch would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Oracles first, on main's behavior before any production change, in
+- [x] Oracles first, on main's behavior before any production change, in
       one commit: the golden Lamarckian corpus (below); the carrying-cost-0
       sibling of `founder_only_trajectory` (`genome_carry_cost_per_unit =
       0`, same digest fields: id, position, energy bits, age, generation,
       food); run `cargo test -p v3-core --test viability` first.
-- [ ] `edge` module: private `GraphEdge` fields, `new`, getters;
+- [x] `edge` module: private `GraphEdge` fields, `new`, getters;
       `ComputeNode::new`; the def builder; every literal and local helper
       migrated across `v3-core`, `v3-cli`, `v3-lab`, `v3-telemetry`.
-- [ ] `container` module: the newtypes and private list fields, the
+- [x] `container` module: the newtypes and private list fields, the
       seedless builder, `BirthSeeds` as the private seed field, the read
       API, the primitives of the seed-rule table, `EdgeOccurrence` and the
       canonical enumeration, the decrement-only reindex with its tests
       rewritten and `clamp_sub_idx_after_swap` deleted,
       `redirect_leaf_reads`, the I11 assertion, the exhaustive
       destructuring test.
-- [ ] Writers moved: graph operators, hebbian, projection (edge-free),
+- [x] Writers moved: graph operators, hebbian, projection (edge-free),
       recruitment, refinement, routing, `connect_declared_input`, the
       founder, instruments, `consumers::ablated`, the lab's `ablate` and
       comparator.
-- [ ] Reproduction: `cgp_reproduction` captures through `seed_birth`;
+- [x] Reproduction: `cgp_reproduction` captures through `seed_birth`;
       `CreatureState::new` and `new_with_cached_fields` take seeds out and
       build `plasticity_weights` with today's rule; `reproduction.rs:567`
       deleted; `reproduction.rs:806-1016` and `plasticity/tests.rs:554`
@@ -207,14 +207,14 @@ draw-stream tail or a corpus hash mismatch would show it wrong.
       as an explicit backend-replacement test, same-source retargets
       included; `docs/reference/v3-reproduction-spec.md` §4 "Graph state"
       names `BirthSeeds` as the temporary correspondence.
-- [ ] Engine: one generic snapshot, validate, commit-or-rollback wrapper;
+- [x] Engine: one generic snapshot, validate, commit-or-rollback wrapper;
       `engine/tests.rs:1757` ported to the seed accessor.
-- [ ] `the_walk_dates_modules_from_their_birth_and_from_every_refresh`
+- [x] `the_walk_dates_modules_from_their_birth_and_from_every_refresh`
       rewritten to a constructed lineage asserting the dating properties
       (birth date, refresh folding) without pinning draw history; its
       pinned numbers pass unchanged before the rewrite and are recorded in
       the readings.
-- [ ] Closing commit: the corpus test retired, its hashes kept in
+- [x] Closing commit: the corpus test retired, its hashes kept in
       `docs/progress/readings/t25-f01.md`.
 
 **Golden Lamarckian corpus.** A `v3-core` unit test with a seeded RNG over
@@ -248,11 +248,11 @@ Its hashes are pinned as constants recorded on main.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> all pass, both existing
-      digests and the carrying-cost-0 sibling unchanged.
-- [ ] Corpus: hashes recorded on main equal the hashes after every
+- [x] `cargo test -p v3-core --test viability` -> all pass, both existing
+      digests and the carrying-cost-0 sibling unchanged (`e33b4861`).
+- [x] Corpus: hashes recorded on main equal the hashes after every
       production commit; recorded in the readings.
-- [ ] Seeded births through both constructors: a Lamarckian parent with
+- [x] Seeded births through both constructors: a Lamarckian parent with
       learned weights reproduces on the mutated branch (`CreatureState::new`)
       and on the fast path (`new_with_cached_fields`, `applied_events ==
       0`); each child carries no seeds, holds the inherited weights in its
@@ -263,7 +263,7 @@ Its hashes are pinned as constants recorded on main.
       a child whose `plasticity_weights` before its first visit is today's
       scaffold (one row per graph node, one empty slice per compute node),
       and a seeded founder's stays empty.
-- [ ] `cargo test --workspace` -> every existing pin unchanged (Inputs
+- [x] `cargo test --workspace` -> every existing pin unchanged (Inputs
       table); `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
       constructors and destructuring patterns; `grep -rn birth_weights
       crates frontend` -> none; `grep -rn 'compute_nodes = \|output_sinks =
@@ -296,13 +296,13 @@ none.
 
 ## Success Criteria
 
-- [ ] One owner edits the graph: every write to compute nodes and edges in
+- [x] One owner edits the graph: every write to compute nodes and edges in
       every crate goes through the container; no `&mut GraphEdge` or `&mut
       ComputeNode` escapes it; no operator touches the birth payload.
-- [ ] One owner captures: `cgp_reproduction` writes seeds before mutation
+- [x] One owner captures: `cgp_reproduction` writes seeds before mutation
       and no runtime field; one owner builds: the creature constructors
       consume the seeds.
-- [ ] No struct literal builds an edge, a compute node or a def outside the
+- [x] No struct literal builds an edge, a compute node or a def outside the
       constructors, in any crate or test.
 - [ ] No behavior change: every pin, draw-stream tail, corpus hash and
       gate deterministic block is unchanged.
