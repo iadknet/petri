@@ -1,23 +1,52 @@
-import type { Creature, FoodTypeMetadata, Frame, PaintTool } from "../types/api.ts";
+import type { Creature, FoodTypeMetadata, Frame, PaintTool, ViewRect } from "../types/api.ts";
 import {
 	type CameraState,
 	type CanvasSize,
+	camerasEqual,
 	canvasToViewportPoint,
 	canvasToWorldPoint,
 	centerCameraOnWorldPoint,
+	easeCamera,
 	fitCameraToWorld,
 	panCamera,
-	zoomCameraAtCanvasPoint,
-	zoomCameraFromCenter,
+	zoomCameraByFactor,
 } from "./camera.ts";
-import { backingStoreSize } from "./dpr.ts";
+import { backingStoreSize, currentDevicePixelRatio } from "./dpr.ts";
 import { FlashOverlay } from "./flash-overlay.ts";
+import {
+	type Fillet,
+	type Occupancy,
+	createOccupancy,
+	tileCornerRadii,
+	tileFillets,
+} from "./foodTiles.ts";
+import {
+	type CellPoint,
+	type CellRect,
+	type CreatureMotion,
+	birthPop,
+	glideProgress,
+	nextGlideDuration,
+	oozeRect,
+	planCreatureMotion,
+	sampleMotion,
+} from "./motion.ts";
 import type { FertilityOverlay, OverviewRenderLayer, RenderModel } from "./renderModel.ts";
 
-/** Background color: slate-950 (#020617) */
-const BG_R = 2;
-const BG_G = 6;
-const BG_B = 23;
+/** Page behind the world: slate-950, the incumbent petri-bg. */
+const PAGE_BG = "#020617";
+/** The world's own ground sits one step above the page so its edge reads. */
+const GROUND_R = 7;
+const GROUND_G = 13;
+const GROUND_B = 31;
+const WORLD_GROUND = `rgb(${GROUND_R},${GROUND_G},${GROUND_B})`;
+type Rgb = readonly [number, number, number];
+/** Colours the canvas paints where there is no world content. */
+export const CANVAS_BACKGROUND_RGB: readonly Rgb[] = [
+	[2, 6, 23],
+	[GROUND_R, GROUND_G, GROUND_B],
+];
+const WORLD_EDGE = "rgba(148,163,184,0.18)";
 
 /** Barrier color: dark rust (#8B4513) */
 const BARRIER_R = 139;
@@ -28,95 +57,44 @@ const BARRIER_B = 19;
 const BARRIER_HATCH_R = 66;
 const BARRIER_HATCH_G = 30;
 const BARRIER_HATCH_B = 6;
-
-/** Fertility overlay: barren color (violet), distinct from the rust barrier color */
-const FERT_BARREN_R = 139;
-const FERT_BARREN_G = 92;
-const FERT_BARREN_B = 246;
-
-export const BARRIER_RGB = [BARRIER_R, BARRIER_G, BARRIER_B] as const;
-export const FERT_BARREN_RGB = [FERT_BARREN_R, FERT_BARREN_G, FERT_BARREN_B] as const;
-
-const BARRIER_FILL = `rgb(${BARRIER_R},${BARRIER_G},${BARRIER_B})`;
 const BARRIER_HATCH = `rgb(${BARRIER_HATCH_R},${BARRIER_HATCH_G},${BARRIER_HATCH_B})`;
 
-/** Fertility overlay: fertile color (green) */
-const FERT_FERTILE_R = 34;
-const FERT_FERTILE_G = 197;
-const FERT_FERTILE_B = 94;
+/** Fertility overlay: barren color (violet), distinct from the rust barrier color */
+const FERT_BARREN: Rgb = [139, 92, 246];
 
+export const BARRIER_RGB = [BARRIER_R, BARRIER_G, BARRIER_B] as const;
+export const FERT_BARREN_RGB = FERT_BARREN;
+/** Fertility overlay: fertile color (green) */
+const FERT_FERTILE: Rgb = [34, 197, 94];
 /** Fertility overlay alpha (0-1). Semi-transparent so terrain shows through. */
 const FERT_ALPHA = 0.35;
 
-/** Precomputed fillStyle per u8 fertility value; null where the overlay is transparent. */
-const FERTILITY_FILL_STYLES: (string | null)[] = Array.from({ length: 256 }, (_, value) => {
-	if (value === 128) return null;
-	const [r, g, b, a] = fertilityColor(value);
-	return a > 0 ? `rgba(${r},${g},${b},${a})` : null;
-});
+/** Overview creature density warms toward orange-300. */
+const HEAT_R = 253;
+const HEAT_G = 186;
+const HEAT_B = 116;
 
-/** Food density steps used to share fillStyle strings between cells. */
-const FOOD_DENSITY_STEPS = 64;
-/** Bound on cached creature colour strings before the cache is reset. */
-const MAX_CREATURE_STYLE_CACHE = 4096;
+/** Selection: emerald-400, the incumbent highlight. */
+const SELECTION_RGB = "52,211,153";
 
-/**
- * Fraction of the energy bar to fill, scaled by the configured max energy.
- * Returns null when the max is unknown, so no bar is drawn rather than a guessed one.
- */
-export function energyBarFraction(
-	energy: number,
-	maxEnergy: number | null | undefined,
-): number | null {
-	if (maxEnergy == null || !Number.isFinite(maxEnergy) || maxEnergy <= 0) return null;
-	return Math.max(0, Math.min(1, energy / maxEnergy));
-}
+/** Energy ring tones: the dock's good / bad convention. */
+const ENERGY_GOOD = "#34d399";
+const ENERGY_LOW = "#fb7185";
 
-export interface CellBounds {
-	startX: number;
-	startY: number;
-	endX: number;
-	endY: number;
-}
-
-/** World cells intersecting the viewport, as half-open ranges clamped to the world. */
-export function visibleCellBounds(
-	camera: CameraState,
-	view: CanvasSize,
-	world: CanvasSize,
-): CellBounds {
-	const { x: cx, y: cy, zoom } = camera;
-	return {
-		startX: Math.max(0, Math.floor(-cx / zoom)),
-		startY: Math.max(0, Math.floor(-cy / zoom)),
-		endX: Math.min(world.width, Math.ceil((view.width - cx) / zoom)),
-		endY: Math.min(world.height, Math.ceil((view.height - cy) / zoom)),
-	};
-}
-
-function inBounds(bounds: CellBounds, x: number, y: number): boolean {
-	return x >= bounds.startX && x < bounds.endX && y >= bounds.startY && y < bounds.endY;
-}
-
-/**
- * Map a u8 fertility value to an RGBA color.
- * 0 = barren (reddish-brown, full alpha)
- * 128 = neutral (transparent)
- * 255 = fertile (green, full alpha)
- *
- * Note: green fertility overlay may visually blend with green food cells.
- * Consider alternative color schemes if readability becomes an issue.
- */
-function fertilityColor(value: number): [number, number, number, number] {
-	// Normalise: 0 → -1, 128 → 0, 255 → +1
-	const t = (value - 128) / 127;
-	const absT = Math.abs(t);
-	// Below neutral → blend toward barren; above → blend toward fertile
-	if (t < 0) {
-		return [FERT_BARREN_R, FERT_BARREN_G, FERT_BARREN_B, absT * FERT_ALPHA];
-	}
-	return [FERT_FERTILE_R, FERT_FERTILE_G, FERT_FERTILE_B, absT * FERT_ALPHA];
-}
+/** At and above this zoom creatures carry an energy ring (inspect tier). */
+const DETAIL_MODE_THRESHOLD = 6;
+/** Cell-corner dots fade in from here so deep zoom keeps a sense of the lattice. */
+const LATTICE_ZOOM = 10;
+const BIRTH_MS = 560;
+/** Body size, as a share of the cell, when an energy frame wraps it. */
+const CREATURE_FRAMED_SIZE = 0.7;
+/** Energy frame centre line, as a share of the cell in from its edge. */
+const CREATURE_FRAME_INSET = 0.07;
+const SELECTION_PULSE_MS = 1800;
+/** Food tiles are pre-drawn at this many device pixels per cell at most. */
+const MAX_FOOD_SPRITE_PX = 48;
+const MAX_LAYER_PX = 4096;
+const FOOD_DENSITY_BUCKETS = 6;
 
 export function parseHexColor(color: string): [number, number, number] {
 	const normalized = color.startsWith("#") ? color.slice(1) : color;
@@ -135,19 +113,6 @@ export const MAX_FOOD_ALPHA = 0.8;
 export function foodOpacity(density: number): number {
 	const clampedDensity = Math.max(0, Math.min(1, density));
 	return Math.min(MAX_FOOD_ALPHA, clampedDensity);
-}
-
-function blendPixel(
-	data: Uint8ClampedArray,
-	index: number,
-	r: number,
-	g: number,
-	b: number,
-	alpha: number,
-): void {
-	data[index] = Math.round(data[index]! * (1 - alpha) + r * alpha);
-	data[index + 1] = Math.round(data[index + 1]! * (1 - alpha) + g * alpha);
-	data[index + 2] = Math.round(data[index + 2]! * (1 - alpha) + b * alpha);
 }
 
 function shadeFoodRgb(
@@ -172,72 +137,274 @@ function buildFoodTypeColorMap(
 	return new Map(foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]));
 }
 
-function resolveFoodTypeColor(
-	foodTypeColors: Map<number, [number, number, number]>,
+/**
+ * Fraction of the energy gauge to fill, scaled by the configured max energy.
+ * Returns null when the max is unknown, so no gauge is drawn rather than a guessed one.
+ */
+export function energyBarFraction(
+	energy: number,
+	maxEnergy: number | null | undefined,
+): number | null {
+	if (maxEnergy == null || !Number.isFinite(maxEnergy) || maxEnergy <= 0) return null;
+	return Math.max(0, Math.min(1, energy / maxEnergy));
+}
+
+export interface CellBounds {
+	startX: number;
+	startY: number;
+	endX: number;
+	endY: number;
+}
+
+/** World cells at least partly inside the view, clamped to the world. */
+export function visibleCellBounds(
+	camera: CameraState,
+	view: CanvasSize,
+	world: CanvasSize,
+): CellBounds {
+	const { x: cx, y: cy, zoom } = camera;
+	return {
+		startX: Math.max(0, Math.floor(-cx / zoom)),
+		startY: Math.max(0, Math.floor(-cy / zoom)),
+		endX: Math.min(world.width, Math.ceil((view.width - cx) / zoom)),
+		endY: Math.min(world.height, Math.ceil((view.height - cy) / zoom)),
+	};
+}
+
+function inBounds(bounds: CellBounds, x: number, y: number): boolean {
+	return x >= bounds.startX && x < bounds.endX && y >= bounds.startY && y < bounds.endY;
+}
+
+type LayerCanvas = OffscreenCanvas | HTMLCanvasElement;
+type LayerContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
+
+interface Layer {
+	canvas: LayerCanvas;
+	ctx: LayerContext;
+}
+
+function createLayer(width: number, height: number): Layer {
+	const w = Math.max(1, Math.round(width));
+	const h = Math.max(1, Math.round(height));
+	if (typeof OffscreenCanvas !== "undefined") {
+		const canvas = new OffscreenCanvas(w, h);
+		return { canvas, ctx: canvas.getContext("2d")! };
+	}
+	const canvas = document.createElement("canvas");
+	canvas.width = w;
+	canvas.height = h;
+	return { canvas, ctx: canvas.getContext("2d")! };
+}
+
+/** Group a food tile by (type, density bucket) so each group is one fill. */
+function pushTile(
+	groups: Map<number, number[]>,
+	occupancy: Occupancy,
 	typeIdx: number,
-): [number, number, number] {
-	return foodTypeColors.get(typeIdx) ?? [34, 197, 94];
+	rawDensity: number,
+	x: number,
+	y: number,
+): void {
+	const density = Math.max(0, Math.min(1, rawDensity));
+	if (density <= 0) return;
+	const bucket = Math.min(FOOD_DENSITY_BUCKETS - 1, Math.floor(density * FOOD_DENSITY_BUCKETS));
+	const key = typeIdx * FOOD_DENSITY_BUCKETS + bucket;
+	let cells = groups.get(key);
+	if (!cells) {
+		cells = [];
+		groups.set(key, cells);
+	}
+	cells.push(x, y);
+	occupancy.cells[y * occupancy.width + x] = 1;
 }
 
-/** Zoom threshold for switching from pixel to rect mode */
-const RECT_MODE_THRESHOLD = 4;
-/** Zoom threshold for detailed mode (energy bars, grid lines) */
-const DETAIL_MODE_THRESHOLD = 6;
-
-interface FertilityBlendCache {
-	worldStaticRevision: number;
-	worldWidth: number;
-	worldHeight: number;
-	indices: Uint32Array;
-	colors: Uint8Array;
+/**
+ * Fill the concave corner of an empty cell: the corner square minus a quarter
+ * circle, so food flows around inner corners and across diagonal joins.
+ */
+function addFillet(ctx: LayerContext, fillet: Fillet, px: number, radius: number): void {
+	const cornerX = fillet.x * px;
+	const cornerY = fillet.y * px;
+	const centerX = cornerX + fillet.dx * radius;
+	const centerY = cornerY + fillet.dy * radius;
+	const start = Math.atan2(-fillet.dy, 0);
+	const end = Math.atan2(0, -fillet.dx);
+	let sweep = end - start;
+	if (sweep > Math.PI) sweep -= Math.PI * 2;
+	if (sweep < -Math.PI) sweep += Math.PI * 2;
+	ctx.moveTo(cornerX, cornerY);
+	ctx.lineTo(centerX, cornerY);
+	ctx.arc(centerX, centerY, radius, start, end, sweep < 0);
+	ctx.closePath();
 }
 
-interface OverviewFoodCache {
-	foodRef: OverviewRenderLayer["food"];
-	foodTypesRef: OverviewRenderLayer["foodTypes"];
+/**
+ * Food as liquid patches lit by density (brighter and richer where food is
+ * dense). Neighbouring cells join, outer corners round, inner corners and
+ * diagonal joins fill with fillets, so lone cells read as seeds and patches
+ * as blobs. Tiles sit on whole device pixels, so shared edges never seam.
+ */
+function drawFoodTiles(
+	ctx: LayerContext,
+	groups: Map<number, number[]>,
+	occupancy: Occupancy,
+	foodTypeColors: Map<number, [number, number, number]>,
+	px: number,
+): void {
+	const round = px >= 4;
+	const radius = px / 2;
+	for (const [key, cells] of groups) {
+		const typeIdx = Math.floor(key / FOOD_DENSITY_BUCKETS);
+		const density = ((key % FOOD_DENSITY_BUCKETS) + 0.5) / FOOD_DENSITY_BUCKETS;
+		const [baseR, baseG, baseB] = foodTypeColors.get(typeIdx) ?? [34, 197, 94];
+		const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, density);
+		ctx.fillStyle = `rgba(${r},${g},${b},${Math.max(0.28, foodOpacity(density))})`;
+		ctx.beginPath();
+		for (let i = 0; i < cells.length; i += 2) {
+			const x = cells[i]!;
+			const y = cells[i + 1]!;
+			if (round) {
+				ctx.roundRect(x * px, y * px, px, px, tileCornerRadii(occupancy, x, y, radius));
+				for (const fillet of tileFillets(occupancy, x, y)) {
+					addFillet(ctx, fillet, px, radius);
+				}
+			} else {
+				ctx.rect(x * px, y * px, px, px);
+			}
+		}
+		ctx.fill();
+	}
+}
+
+/** Trace `ratio` of a rectangle's perimeter clockwise from the middle of its top edge. */
+function addFrameProgress(path: Path2D, rect: CellRect, ratio: number): void {
+	const { x, y, width, height } = rect;
+	const corners: [number, number][] = [
+		[x + width, y],
+		[x + width, y + height],
+		[x, y + height],
+		[x, y],
+		[x + width / 2, y],
+	];
+	let remaining = ratio * (width + height) * 2;
+	let [px, py] = [x + width / 2, y];
+	path.moveTo(px, py);
+	for (const [nx, ny] of corners) {
+		const length = Math.abs(nx - px) + Math.abs(ny - py);
+		if (remaining <= length) {
+			const share = length > 0 ? remaining / length : 0;
+			path.lineTo(px + (nx - px) * share, py + (ny - py) * share);
+			return;
+		}
+		path.lineTo(nx, ny);
+		remaining -= length;
+		[px, py] = [nx, ny];
+	}
+}
+
+interface FertilityLayerCache {
+	layer: Layer;
+	grid: FertilityOverlay["worldGrid"];
+	revision: number;
+	width: number;
+	height: number;
+}
+
+interface BarrierLayerCache {
+	layer: Layer | null;
+	barriers: Frame["barriers"];
+	width: number;
+	height: number;
+}
+
+interface OverviewLayerCache {
+	layer: Layer;
+	food: OverviewRenderLayer["food"];
+	foodTypes: OverviewRenderLayer["foodTypes"];
+	counts: OverviewRenderLayer["creatureCounts"];
 	gridWidth: number;
 	gridHeight: number;
-	bucketColors: Map<number, [number, number, number]>;
+	pxPerBucket: number;
 }
 
+interface FoodLayerCache {
+	layer: Layer;
+	food: Frame["food"];
+	foodTypes: FoodTypeMetadata[];
+	rect: ViewRect;
+	pxPerCell: number;
+}
+
+interface CreatureLook {
+	fill: string;
+}
+
+function creatureLook(creature: Creature): CreatureLook {
+	const [r, g, b] = creature.phenotype_rgb;
+	return { fill: `rgb(${r},${g},${b})` };
+}
+
+function prefersReducedMotion(): boolean {
+	return (
+		typeof window !== "undefined" &&
+		typeof window.matchMedia === "function" &&
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches
+	);
+}
+
+/**
+ * Draws the world. World content (food, fertility, barriers) is composited
+ * into cached layers that rebuild only when their data changes; camera moves
+ * just redraw those layers at a new transform, so panning and zooming stay
+ * cheap. Creatures are drawn live each frame so they can glide between ticks.
+ */
 export class WorldRenderer {
 	private readonly canvas: HTMLCanvasElement;
 	private readonly ctx: CanvasRenderingContext2D;
-	private imageData: ImageData | null = null;
-	private imageDataWidth = 0;
-	private imageDataHeight = 0;
-	private offscreen: OffscreenCanvas | null = null;
-	private offscreenCtx: OffscreenCanvasRenderingContext2D | null = null;
-	private lastRenderedTick = -1;
-	private rafId = 0;
 	private readonly getRenderModel: () => RenderModel | null;
 	private readonly flashOverlay = new FlashOverlay();
+	private rafId = 0;
+	private dpr = 1;
+	private cssWidth = 0;
+	private cssHeight = 0;
+	private dirty = true;
+	private animatedLastFrame = false;
+	private lastNow: number | null = null;
+	private displayCamera: CameraState | null = null;
+	private reducedMotion = prefersReducedMotion();
+
 	private previewCells: Set<string> | null = null;
 	private previewTool: PaintTool | null = null;
 	private selectedCreatureId: number | null = null;
-	private fertilityBlendCache: FertilityBlendCache | null = null;
-	private overviewFoodCache: OverviewFoodCache | null = null;
-	/** Canvas size in CSS pixels; camera coordinates live in this space. */
-	private viewWidth: number;
-	private viewHeight: number;
-	private pixelRatio = 1;
-	private foodTypeColorsRef: FoodTypeMetadata[] | null = null;
-	private foodTypeColors = new Map<number, [number, number, number]>();
-	private foodStyleCache = new Map<number, string>();
-	private creatureStyleCache = new Map<number, string>();
+
+	private fertilityCache: FertilityLayerCache | null = null;
+	private barrierCache: BarrierLayerCache | null = null;
+	private overviewCache: OverviewLayerCache | null = null;
+	private foodCache: FoodLayerCache | null = null;
+
+	private motionFrame: Frame | null = null;
+	private motionRect: ViewRect | null = null;
+	private motionTick = -1;
+	private motions = new Map<number, CreatureMotion>();
+	private looks = new Map<number, CreatureLook>();
+	private creaturesById = new Map<number, Creature>();
+	private hasBirths = false;
+	private glideStart = 0;
+	private glideDuration: number | null = null;
+	private lastTickAt: number | null = null;
+	private lastPredationEvents: RenderModel["predationEvents"] | null = null;
+	private maxEnergy: number | null = null;
 
 	constructor(canvas: HTMLCanvasElement, getRenderModel: () => RenderModel | null) {
 		this.canvas = canvas;
 		this.ctx = canvas.getContext("2d", { alpha: false })!;
 		this.getRenderModel = getRenderModel;
-		this.viewWidth = canvas.width;
-		this.viewHeight = canvas.height;
 	}
 
 	start(): void {
-		const loop = (timestamp: number) => {
+		const loop = (now: number) => {
 			this.rafId = requestAnimationFrame(loop);
-			this.render(timestamp);
+			this.render(now);
 		};
 		this.rafId = requestAnimationFrame(loop);
 	}
@@ -247,44 +414,42 @@ export class WorldRenderer {
 	}
 
 	/**
-	 * Resize to a CSS-pixel size. The backing store is scaled by devicePixelRatio
-	 * so the map renders crisp; drawing and camera math stay in CSS pixels.
+	 * Size in CSS pixels; the backing store follows the device pixel ratio.
+	 * Camera and hit-testing stay in CSS pixels.
 	 */
-	resize(width: number, height: number, pixelRatio = 1): void {
-		const backing = backingStoreSize(width, height, pixelRatio);
-		this.viewWidth = width;
-		this.viewHeight = height;
-		this.pixelRatio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
+	resize(width: number, height: number, ratio = currentDevicePixelRatio()): void {
+		this.cssWidth = width;
+		this.cssHeight = height;
+		this.dpr = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+		const backing = backingStoreSize(width, height, this.dpr);
 		this.canvas.width = backing.width;
 		this.canvas.height = backing.height;
-		// A canvas displays at its backing-store size unless given an explicit CSS size.
-		this.canvas.style.width = `${width}px`;
-		this.canvas.style.height = `${height}px`;
-		this.invalidate();
+		this.dirty = true;
 	}
 
-	private get viewSize(): CanvasSize {
-		return { width: this.viewWidth, height: this.viewHeight };
+	setReducedMotion(reduced: boolean): void {
+		this.reducedMotion = reduced;
+		this.dirty = true;
 	}
 
 	fitToWorld(worldWidth: number, worldHeight: number): CameraState {
-		return fitCameraToWorld(this.viewSize, { width: worldWidth, height: worldHeight });
+		return fitCameraToWorld(
+			{ width: this.cssWidth, height: this.cssHeight },
+			{ width: worldWidth, height: worldHeight },
+		);
 	}
 
-	zoomAt(camera: CameraState, clientX: number, clientY: number, delta: number): CameraState {
-		const rect = this.canvas.getBoundingClientRect();
-		const scaleX = this.viewWidth / rect.width;
-		const scaleY = this.viewHeight / rect.height;
-		const canvasPoint = {
-			x: (clientX - rect.left) * scaleX,
-			y: (clientY - rect.top) * scaleY,
-		};
-
-		return zoomCameraAtCanvasPoint(camera, canvasPoint, delta);
+	zoomAtByFactor(
+		camera: CameraState,
+		clientX: number,
+		clientY: number,
+		factor: number,
+	): CameraState {
+		return zoomCameraByFactor(camera, this.clientToCanvas(clientX, clientY), factor);
 	}
 
-	zoomCenter(camera: CameraState, delta: number): CameraState {
-		return zoomCameraFromCenter(camera, this.viewSize, delta);
+	zoomCenterByFactor(camera: CameraState, factor: number): CameraState {
+		return zoomCameraByFactor(camera, { x: this.cssWidth / 2, y: this.cssHeight / 2 }, factor);
 	}
 
 	pan(camera: CameraState, dx: number, dy: number): CameraState {
@@ -292,7 +457,11 @@ export class WorldRenderer {
 	}
 
 	centerOn(worldX: number, worldY: number, zoom?: number): CameraState {
-		return centerCameraOnWorldPoint(this.viewSize, { x: worldX, y: worldY }, zoom);
+		return centerCameraOnWorldPoint(
+			{ width: this.cssWidth, height: this.cssHeight },
+			{ x: worldX, y: worldY },
+			zoom,
+		);
 	}
 
 	resetView(frame: Frame): CameraState {
@@ -300,437 +469,533 @@ export class WorldRenderer {
 	}
 
 	canvasToWorld(camera: CameraState, clientX: number, clientY: number): { x: number; y: number } {
-		return canvasToWorldPoint(this.canvas, camera, clientX, clientY, this.viewSize);
+		return canvasToWorldPoint(this.canvas, camera, clientX, clientY);
 	}
 
 	canvasToViewport(canvasX: number, canvasY: number): { x: number; y: number } {
-		return canvasToViewportPoint(this.canvas, { x: canvasX, y: canvasY }, this.viewSize);
+		return canvasToViewportPoint(this.canvas, { x: canvasX, y: canvasY });
 	}
 
-	/** Force re-render on next frame (e.g. after camera change) */
+	/** Redraw on the next animation frame (camera, data or overlay change). */
 	invalidate(): void {
-		this.lastRenderedTick = -1;
+		this.dirty = true;
 	}
 
 	/** Update paint preview overlay. Pass null to clear. */
 	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
 		this.previewCells = cells;
 		this.previewTool = tool;
+		this.dirty = true;
 	}
 
 	setSelectedCreature(id: number | null): void {
 		this.selectedCreatureId = id;
-		this.invalidate();
+		this.dirty = true;
 	}
 
-	private ensureImageData(w: number, h: number): ImageData {
-		if (!this.imageData || this.imageDataWidth !== w || this.imageDataHeight !== h) {
-			this.imageData = new ImageData(w, h);
-			this.imageDataWidth = w;
-			this.imageDataHeight = h;
-		}
-		return this.imageData;
+	private clientToCanvas(clientX: number, clientY: number): { x: number; y: number } {
+		const rect = this.canvas.getBoundingClientRect();
+		return { x: clientX - rect.left, y: clientY - rect.top };
 	}
 
-	private ensureOffscreen(w: number, h: number): OffscreenCanvasRenderingContext2D {
-		if (!this.offscreen || this.offscreen.width !== w || this.offscreen.height !== h) {
-			this.offscreen = new OffscreenCanvas(w, h);
-			this.offscreenCtx = this.offscreen.getContext("2d")!;
-		}
-		return this.offscreenCtx!;
-	}
+	/** Draw one frame if anything changed or is animating; called every animation frame. */
+	render(now: number): void {
+		const dt = this.lastNow === null ? 16 : Math.min(64, now - this.lastNow);
+		this.lastNow = now;
 
-	/** Draw one frame. `now` is a performance.now()-based timestamp (rAF passes one). */
-	render(now: number = performance.now()): void {
 		const model = this.getRenderModel();
-		if (!model) return;
-
-		const { frame, overview, tick, predationEvents, camera, fertilityOverlay } = model;
-
-		const hadFlashes = this.flashOverlay.hasActiveFlashes;
-		if (tick !== this.lastRenderedTick) {
-			this.flashOverlay.update(predationEvents, frame.width, now);
-		} else {
-			this.flashOverlay.update([], frame.width, now);
-		}
-
-		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
-		// Flashes that just expired still need one repaint to erase their last mark.
-		const flashesActive = hadFlashes || this.flashOverlay.hasActiveFlashes;
-		if (tick === this.lastRenderedTick && !hasPreview && !flashesActive) {
+		const { ctx } = this;
+		if (!model) {
+			if (this.dirty) {
+				ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+				ctx.fillStyle = PAGE_BG;
+				ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
+				this.dirty = false;
+			}
 			return;
 		}
-		this.lastRenderedTick = tick;
 
-		const { ctx } = this;
-		const { zoom } = camera;
-		ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+		this.maxEnergy = model.maxEnergy ?? null;
+		const camera = this.advanceCamera(model.camera, dt);
+		const cameraMoving = !camerasEqual(camera, model.camera);
 
-		if (zoom < RECT_MODE_THRESHOLD) {
-			this.renderPixelMode(frame, model.foodTypes, camera, overview, fertilityOverlay);
-		} else {
-			ctx.fillStyle = "#020617";
-			ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
-			this.renderRectMode(
-				frame,
-				model.foodTypes,
-				camera,
-				zoom >= DETAIL_MODE_THRESHOLD,
-				fertilityOverlay,
-				model.maxEnergy ?? null,
-			);
+		if (model.frame !== this.motionFrame) {
+			this.planMotion(model, now);
+			this.dirty = true;
 		}
+		if (model.predationEvents !== this.lastPredationEvents) {
+			this.lastPredationEvents = model.predationEvents;
+			this.flashOverlay.ingest(model.predationEvents, now);
+		}
+
+		const flashing = this.flashOverlay.prune(now);
+		const glideWindow = Math.max(this.glideDuration ?? 0, this.hasBirths ? BIRTH_MS : 0);
+		const gliding = now - this.glideStart < glideWindow;
+		const pulsing =
+			!this.reducedMotion &&
+			this.selectedCreatureId !== null &&
+			this.motions.has(this.selectedCreatureId);
+		const animating = cameraMoving || flashing || gliding || pulsing;
+
+		if (!this.dirty && !animating && !this.animatedLastFrame) return;
+		this.dirty = false;
+		this.animatedLastFrame = animating;
+
+		this.draw(model, camera, now);
 	}
 
-	private renderPixelMode(
-		frame: Frame,
-		foodTypes: FoodTypeMetadata[],
-		camera: CameraState,
-		overview: OverviewRenderLayer | null,
-		fertilityOverlay: FertilityOverlay | null,
-	): void {
-		const { ctx } = this;
-		const { width, height } = frame;
-
-		ctx.fillStyle = "#020617";
-		ctx.fillRect(0, 0, this.viewWidth, this.viewHeight);
-
-		const img = this.ensureImageData(width, height);
-		const data = img.data;
-
-		for (let i = 0; i < width * height; i++) {
-			const offset = i * 4;
-			data[offset] = BG_R;
-			data[offset + 1] = BG_G;
-			data[offset + 2] = BG_B;
-			data[offset + 3] = 255;
-		}
-
-		if (overview) {
-			this.drawOverviewPixels(data, width, height, overview);
+	/** Pans land immediately; zoom changes (wheel, buttons, fit) glide in. */
+	private advanceCamera(target: CameraState, dt: number): CameraState {
+		const current = this.displayCamera;
+		let next: CameraState;
+		if (!current || this.reducedMotion || current.zoom === target.zoom) {
+			next = target;
 		} else {
-			const foodTypeColors = this.ensureFoodTypeColors(foodTypes);
-			for (const food of frame.food) {
-				const density = Math.max(0, Math.min(1, food.density));
-				const alpha = foodOpacity(density);
-				if (alpha <= 0) continue;
-				const idx = (food.y * width + food.x) * 4;
-				const [baseR, baseG, baseB] = resolveFoodTypeColor(foodTypeColors, food.type_idx);
-				const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, density);
-				blendPixel(data, idx, r, g, b, alpha);
-				data[idx + 3] = 255;
-			}
+			next = easeCamera(current, target, dt);
 		}
-
-		if (fertilityOverlay) {
-			this.blendFertilityPixels(data, fertilityOverlay);
-		}
-
-		for (const barrier of frame.barriers) {
-			const idx = (barrier.y * width + barrier.x) * 4;
-			// Checkered texture: walls read as a pattern, not only as a hue.
-			const hatch = ((barrier.x + barrier.y) & 1) === 1;
-			data[idx] = hatch ? BARRIER_HATCH_R : BARRIER_R;
-			data[idx + 1] = hatch ? BARRIER_HATCH_G : BARRIER_G;
-			data[idx + 2] = hatch ? BARRIER_HATCH_B : BARRIER_B;
-			data[idx + 3] = 255;
-		}
-
-		for (const creature of frame.creatures) {
-			const idx = (creature.y * width + creature.x) * 4;
-			data[idx] = creature.phenotype_rgb[0];
-			data[idx + 1] = creature.phenotype_rgb[1];
-			data[idx + 2] = creature.phenotype_rgb[2];
-			data[idx + 3] = 255;
-		}
-
-		this.flashOverlay.applyToImageData(data);
-
-		if (this.previewCells && this.previewTool) {
-			const [pr, pg, pb] = this.previewColor(this.previewTool);
-			for (const key of this.previewCells) {
-				const sep = key.indexOf(",");
-				const px = Number.parseInt(key.substring(0, sep), 10);
-				const py = Number.parseInt(key.substring(sep + 1), 10);
-				if (px < 0 || py < 0 || px >= width || py >= height) continue;
-				const idx = (py * width + px) * 4;
-				const alpha = 0.4;
-				data[idx] = Math.round(data[idx]! * (1 - alpha) + pr * alpha);
-				data[idx + 1] = Math.round(data[idx + 1]! * (1 - alpha) + pg * alpha);
-				data[idx + 2] = Math.round(data[idx + 2]! * (1 - alpha) + pb * alpha);
-			}
-		}
-
-		if (this.selectedCreatureId !== null) {
-			const selected = frame.creatures.find((creature) => creature.id === this.selectedCreatureId);
-			if (selected) {
-				const idx = (selected.y * width + selected.x) * 4;
-				data[idx] = 52;
-				data[idx + 1] = 211;
-				data[idx + 2] = 153;
-				data[idx + 3] = 255;
-			}
-		}
-
-		const offCtx = this.ensureOffscreen(width, height);
-		offCtx.putImageData(img, 0, 0);
-
-		ctx.imageSmoothingEnabled = false;
-		ctx.drawImage(this.offscreen!, camera.x, camera.y, width * camera.zoom, height * camera.zoom);
+		if (!current || !camerasEqual(current, next)) this.dirty = true;
+		this.displayCamera = next;
+		return next;
 	}
 
-	private drawOverviewPixels(
-		data: Uint8ClampedArray,
-		worldWidth: number,
-		worldHeight: number,
-		overview: OverviewRenderLayer,
-	): void {
-		const cachedFood = this.ensureOverviewFoodCache(overview);
+	private planMotion(model: RenderModel, now: number): void {
+		const creatures = model.frame.creatures;
+		const sameTick = this.motionFrame !== null && model.tick === this.motionTick;
 
-		const maxCreatureCount = overview.creatureCounts.reduce(
-			(max, count) => Math.max(max, count),
-			0,
-		);
-
-		for (let gridY = 0; gridY < overview.gridHeight; gridY++) {
-			const y0 = Math.floor(overview.rect.y + (gridY * overview.rect.height) / overview.gridHeight);
-			const y1 = Math.floor(
-				overview.rect.y + ((gridY + 1) * overview.rect.height) / overview.gridHeight,
-			);
-			const bucketTop = Math.max(0, Math.min(worldHeight, y0));
-			const bucketBottom = Math.max(bucketTop + 1, Math.min(worldHeight, Math.max(y1, y0 + 1)));
-
-			for (let gridX = 0; gridX < overview.gridWidth; gridX++) {
-				const index = gridY * overview.gridWidth + gridX;
-				const bucketColor = cachedFood.bucketColors.get(index);
-				const creatureCount = overview.creatureCounts[index] ?? 0;
-				if (!bucketColor && creatureCount <= 0) {
-					continue;
-				}
-
-				const x0 = Math.floor(overview.rect.x + (gridX * overview.rect.width) / overview.gridWidth);
-				const x1 = Math.floor(
-					overview.rect.x + ((gridX + 1) * overview.rect.width) / overview.gridWidth,
+		if (sameTick) {
+			// A re-subscription (pan, resize) re-sent the same tick: keep running
+			// glides untouched and let creatures new to the view appear in place.
+			const motions = new Map<number, CreatureMotion>();
+			for (const creature of creatures) {
+				const running = this.motions.get(creature.id);
+				motions.set(
+					creature.id,
+					running && running.toX === creature.x && running.toY === creature.y
+						? running
+						: {
+								fromX: creature.x,
+								fromY: creature.y,
+								toX: creature.x,
+								toY: creature.y,
+								born: false,
+							},
 				);
-				const bucketLeft = Math.max(0, Math.min(worldWidth, x0));
-				const bucketRight = Math.max(bucketLeft + 1, Math.min(worldWidth, Math.max(x1, x0 + 1)));
-				const creatureRatio = maxCreatureCount > 0 ? creatureCount / maxCreatureCount : 0;
-				let [red, green, blue] = bucketColor ?? [BG_R, BG_G, BG_B];
-				if (creatureCount > 0) {
-					red = Math.max(red, Math.round(40 + creatureRatio * 180));
-					green = Math.max(green, Math.round(creatureRatio * 110));
-				}
-
-				for (let y = bucketTop; y < bucketBottom; y++) {
-					for (let x = bucketLeft; x < bucketRight; x++) {
-						const pixelIndex = (y * worldWidth + x) * 4;
-						data[pixelIndex] = red;
-						data[pixelIndex + 1] = green;
-						data[pixelIndex + 2] = blue;
-						data[pixelIndex + 3] = 255;
-					}
+			}
+			this.motions = motions;
+		} else {
+			const drawn = this.motionFrame ? this.sampleDrawnPositions(now) : null;
+			if (this.lastTickAt !== null) {
+				this.glideDuration = nextGlideDuration(this.glideDuration, now - this.lastTickAt);
+			}
+			this.lastTickAt = now;
+			this.motionTick = model.tick;
+			this.motions = planCreatureMotion(
+				this.reducedMotion ? null : drawn,
+				creatures,
+				this.motionRect,
+			);
+			this.hasBirths = false;
+			for (const motion of this.motions.values()) {
+				if (motion.born) {
+					this.hasBirths = true;
+					break;
 				}
 			}
+			this.glideStart = now;
 		}
+
+		const looks = new Map<number, CreatureLook>();
+		const byId = new Map<number, Creature>();
+		for (const creature of creatures) {
+			looks.set(creature.id, this.looks.get(creature.id) ?? creatureLook(creature));
+			byId.set(creature.id, creature);
+		}
+		this.looks = looks;
+		this.creaturesById = byId;
+		this.motionFrame = model.frame;
+		this.motionRect = model.detailRect;
 	}
 
-	private ensureOverviewFoodCache(overview: OverviewRenderLayer): OverviewFoodCache {
-		const cached = this.overviewFoodCache;
+	private sampleDrawnPositions(now: number): Map<number, CellPoint> {
+		const eased = glideProgress(now - this.glideStart, this.glideDuration ?? 0);
+		const drawn = new Map<number, CellPoint>();
+		for (const [id, motion] of this.motions) {
+			drawn.set(id, sampleMotion(motion, eased));
+		}
+		return drawn;
+	}
+
+	private draw(model: RenderModel, camera: CameraState, now: number): void {
+		const { ctx, cssWidth, cssHeight } = this;
+		const { frame } = model;
+		const { x: cx, y: cy, zoom } = camera;
+		const worldW = frame.width * zoom;
+		const worldH = frame.height * zoom;
+
+		ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+		ctx.fillStyle = PAGE_BG;
+		ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+		// The world sits on the page like a dish on a bench: lifted ground, soft
+		// shadow below, hairline rim drawn last.
+		ctx.save();
+		ctx.shadowColor = "rgba(0,0,0,0.55)";
+		ctx.shadowBlur = 28;
+		ctx.shadowOffsetY = 8;
+		ctx.fillStyle = WORLD_GROUND;
+		ctx.fillRect(cx, cy, worldW, worldH);
+		ctx.restore();
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(cx, cy, worldW, worldH);
+		ctx.clip();
+
+		if (model.overview) {
+			this.drawOverviewLayer(model.overview, camera);
+		}
+		if (frame.food.length > 0) {
+			this.drawFoodLayer(frame, model.foodTypes, model.detailRect, camera);
+		}
+		if (model.fertilityOverlay) {
+			this.drawFertilityLayer(model.fertilityOverlay, camera);
+		}
+		this.drawBarrierLayer(frame, camera);
+		if (zoom >= 4 && frame.barriers.length > 0) {
+			this.drawBarrierHatch(frame, camera);
+		}
+		if (zoom >= LATTICE_ZOOM) {
+			this.drawLattice(frame, camera);
+		}
+		this.drawCreatures(camera, now);
+		this.flashOverlay.draw(ctx, camera, now, this.reducedMotion);
+		this.drawPreview(camera);
+		this.drawSelection(camera, now);
+		ctx.restore();
+
+		ctx.strokeStyle = WORLD_EDGE;
+		ctx.lineWidth = 1;
+		ctx.strokeRect(cx - 0.5, cy - 0.5, worldW + 1, worldH + 1);
+	}
+
+	private drawOverviewLayer(overview: OverviewRenderLayer, camera: CameraState): void {
+		const { x: cx, y: cy, zoom } = camera;
+		const cache = this.ensureOverviewLayer(overview, zoom);
+		const { ctx } = this;
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = "high";
+		ctx.drawImage(
+			cache.layer.canvas,
+			cx + overview.rect.x * zoom,
+			cy + overview.rect.y * zoom,
+			overview.rect.width * zoom,
+			overview.rect.height * zoom,
+		);
+	}
+
+	/** Device pixels per overview bucket, so blobs are drawn near screen size. */
+	private overviewBucketScale(overview: OverviewRenderLayer, zoom: number): number {
+		const bucketPx = (overview.rect.width / Math.max(1, overview.gridWidth)) * zoom * this.dpr;
+		const fit = Math.floor(MAX_LAYER_PX / Math.max(1, overview.gridWidth, overview.gridHeight));
+		return Math.max(2, Math.min(Math.round(bucketPx), fit, 32));
+	}
+
+	/**
+	 * The coarse overview grid drawn as soft overlapping blobs rather than hard
+	 * squares, so the whole-world view reads as colonies on agar. Food blobs
+	 * grow with density; creature presence glows warm on top.
+	 */
+	private ensureOverviewLayer(overview: OverviewRenderLayer, zoom: number): OverviewLayerCache {
+		const wanted = this.overviewBucketScale(overview, zoom);
+		const cached = this.overviewCache;
 		if (
 			cached &&
-			cached.foodRef === overview.food &&
-			cached.foodTypesRef === overview.foodTypes &&
+			cached.food === overview.food &&
+			cached.foodTypes === overview.foodTypes &&
+			cached.counts === overview.creatureCounts &&
 			cached.gridWidth === overview.gridWidth &&
-			cached.gridHeight === overview.gridHeight
+			cached.gridHeight === overview.gridHeight &&
+			wanted / cached.pxPerBucket < 1.4 &&
+			cached.pxPerBucket / wanted < 1.4
 		) {
 			return cached;
 		}
 
-		const foodTypeColors = new Map<number, [number, number, number]>(
-			overview.foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]),
-		);
-		const buckets = new Map<number, Map<number, number>>();
+		const { gridWidth, gridHeight } = overview;
+		const px = wanted;
+		const width = gridWidth * px;
+		const height = gridHeight * px;
+		const layer =
+			cached && cached.layer.canvas.width === width && cached.layer.canvas.height === height
+				? cached.layer
+				: createLayer(width, height);
+		const { ctx } = layer;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, width, height);
+
+		const perBucketType = new Map<number, number>();
 		for (const cell of overview.food) {
-			const bucketX = cell.bucket_x;
-			const bucketY = cell.bucket_y;
-			if (
-				bucketX < 0 ||
-				bucketY < 0 ||
-				bucketX >= overview.gridWidth ||
-				bucketY >= overview.gridHeight
-			) {
-				continue;
-			}
+			const { bucket_x: bx, bucket_y: by } = cell;
+			if (bx < 0 || by < 0 || bx >= gridWidth || by >= gridHeight) continue;
 			const density = Math.max(0, cell.density);
 			if (density <= 0) continue;
-			const index = bucketY * overview.gridWidth + bucketX;
-			let perTypeDensity = buckets.get(index);
-			if (!perTypeDensity) {
-				perTypeDensity = new Map();
-				buckets.set(index, perTypeDensity);
-			}
-			perTypeDensity.set(cell.type_idx, (perTypeDensity.get(cell.type_idx) ?? 0) + density);
+			const key = (by * gridWidth + bx) * 4096 + cell.type_idx;
+			perBucketType.set(key, (perBucketType.get(key) ?? 0) + density);
 		}
-		const bucketColors = new Map<number, [number, number, number]>();
-		for (const [index, perTypeDensity] of buckets) {
-			let red = BG_R;
-			let green = BG_G;
-			let blue = BG_B;
-			for (const [typeIdx, rawDensity] of Array.from(perTypeDensity.entries()).toSorted(
-				([leftTypeIdx], [rightTypeIdx]) => leftTypeIdx - rightTypeIdx,
-			)) {
-				const density = Math.max(0, Math.min(1, rawDensity));
-				const alpha = foodOpacity(density);
-				if (alpha <= 0) continue;
-				const [colorR, colorG, colorB] = resolveFoodTypeColor(foodTypeColors, typeIdx);
-				const [shadeR, shadeG, shadeB] = shadeFoodRgb(colorR, colorG, colorB, density);
-				red = Math.round(red * (1 - alpha) + shadeR * alpha);
-				green = Math.round(green * (1 - alpha) + shadeG * alpha);
-				blue = Math.round(blue * (1 - alpha) + shadeB * alpha);
+		const groups = new Map<number, number[]>();
+		const occupancy = createOccupancy(gridWidth, gridHeight);
+		for (const [key, rawDensity] of perBucketType) {
+			const index = Math.floor(key / 4096);
+			const typeIdx = key % 4096;
+			pushTile(
+				groups,
+				occupancy,
+				typeIdx,
+				rawDensity,
+				index % gridWidth,
+				Math.floor(index / gridWidth),
+			);
+		}
+		drawFoodTiles(ctx, groups, occupancy, buildFoodTypeColorMap(overview.foodTypes), px);
+
+		let maxCount = 0;
+		for (const count of overview.creatureCounts) maxCount = Math.max(maxCount, count);
+		if (maxCount > 0) {
+			const levels = 4;
+			const paths = Array.from({ length: levels }, () => new Path2D());
+			const cellCount = gridWidth * gridHeight;
+			for (let index = 0; index < cellCount; index++) {
+				const count = overview.creatureCounts[index] ?? 0;
+				if (count <= 0) continue;
+				const ratio = Math.sqrt(count / maxCount);
+				const level = Math.min(levels - 1, Math.floor(ratio * levels));
+				const radius = px * (0.22 + 0.3 * ratio);
+				const centerX = ((index % gridWidth) + 0.5) * px;
+				const centerY = (Math.floor(index / gridWidth) + 0.5) * px;
+				paths[level]!.moveTo(centerX + radius, centerY);
+				paths[level]!.arc(centerX, centerY, radius, 0, Math.PI * 2);
 			}
-			bucketColors.set(index, [red, green, blue]);
+			for (let level = 0; level < levels; level++) {
+				const alpha = 0.45 + (0.5 * (level + 1)) / levels;
+				ctx.fillStyle = `rgba(${HEAT_R},${HEAT_G},${HEAT_B},${alpha.toFixed(2)})`;
+				ctx.fill(paths[level]!);
+			}
 		}
 
-		const built: OverviewFoodCache = {
-			foodRef: overview.food,
-			foodTypesRef: overview.foodTypes,
-			gridWidth: overview.gridWidth,
-			gridHeight: overview.gridHeight,
-			bucketColors,
+		const built: OverviewLayerCache = {
+			layer,
+			food: overview.food,
+			foodTypes: overview.foodTypes,
+			counts: overview.creatureCounts,
+			gridWidth,
+			gridHeight,
+			pxPerBucket: px,
 		};
-		this.overviewFoodCache = built;
+		this.overviewCache = built;
 		return built;
 	}
 
-	private renderRectMode(
+	private drawFoodLayer(
 		frame: Frame,
 		foodTypes: FoodTypeMetadata[],
+		detailRect: ViewRect | null,
 		camera: CameraState,
-		detailed: boolean,
-		fertilityOverlay: FertilityOverlay | null,
-		maxEnergy: number | null,
 	): void {
-		const { ctx } = this;
+		const rect = detailRect ?? { x: 0, y: 0, width: frame.width, height: frame.height };
+		if (rect.width <= 0 || rect.height <= 0) return;
+		const cache = this.ensureFoodLayer(frame.food, foodTypes, rect, camera.zoom);
 		const { x: cx, y: cy, zoom } = camera;
-		const bounds = visibleCellBounds(camera, this.viewSize, frame);
-		if (bounds.startX >= bounds.endX || bounds.startY >= bounds.endY) {
-			return;
-		}
-		this.ensureFoodTypeColors(foodTypes);
-
-		for (const food of frame.food) {
-			if (!inBounds(bounds, food.x, food.y)) continue;
-			const style = this.foodFillStyle(food.type_idx, food.density);
-			if (style === null) continue;
-			ctx.fillStyle = style;
-			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
-		}
-
-		if (fertilityOverlay) {
-			this.drawFertilityRects(fertilityOverlay, camera);
-		}
-
-		ctx.fillStyle = BARRIER_FILL;
-		let visibleBarriers = 0;
-		for (const barrier of frame.barriers) {
-			if (!inBounds(bounds, barrier.x, barrier.y)) continue;
-			ctx.fillRect(cx + barrier.x * zoom, cy + barrier.y * zoom, zoom, zoom);
-			visibleBarriers++;
-		}
-		if (visibleBarriers > 0) {
-			this.drawBarrierHatch(frame, bounds, camera);
-		}
-
-		for (const creature of frame.creatures) {
-			if (!inBounds(bounds, creature.x, creature.y)) continue;
-			ctx.fillStyle = this.creatureFillStyle(creature.phenotype_rgb);
-			ctx.fillRect(cx + creature.x * zoom + 0.5, cy + creature.y * zoom + 0.5, zoom - 1, zoom - 1);
-
-			if (detailed) {
-				this.drawCreatureDetail(
-					creature,
-					cx + creature.x * zoom,
-					cy + creature.y * zoom,
-					zoom,
-					maxEnergy,
-				);
-			}
-		}
-
-		this.flashOverlay.drawRects(ctx, camera);
-
-		if (detailed) {
-			this.drawGrid(bounds, camera);
-		}
-
-		if (this.previewCells && this.previewTool) {
-			const [pr, pg, pb] = this.previewColor(this.previewTool);
-			ctx.fillStyle = `rgba(${pr},${pg},${pb},0.4)`;
-			for (const key of this.previewCells) {
-				const sep = key.indexOf(",");
-				const px = Number.parseInt(key.substring(0, sep), 10);
-				const py = Number.parseInt(key.substring(sep + 1), 10);
-				if (!inBounds(bounds, px, py)) continue;
-				ctx.fillRect(cx + px * zoom, cy + py * zoom, zoom, zoom);
-			}
-		}
-
-		if (this.selectedCreatureId !== null) {
-			const selected = frame.creatures.find((creature) => creature.id === this.selectedCreatureId);
-			if (selected) {
-				ctx.strokeStyle = "#34d399";
-				ctx.lineWidth = 2;
-				ctx.strokeRect(cx + selected.x * zoom + 1, cy + selected.y * zoom + 1, zoom - 2, zoom - 2);
-			}
-		}
+		const { ctx } = this;
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = "medium";
+		ctx.drawImage(
+			cache.layer.canvas,
+			cx + cache.rect.x * zoom,
+			cy + cache.rect.y * zoom,
+			cache.rect.width * zoom,
+			cache.rect.height * zoom,
+		);
 	}
 
-	private drawCreatureDetail(
-		creature: Creature,
-		px: number,
-		py: number,
-		cellSize: number,
-		maxEnergy: number | null,
-	): void {
-		const { ctx } = this;
-		const energyRatio = energyBarFraction(creature.energy, maxEnergy);
-		if (energyRatio === null) return;
-		const barHeight = Math.max(2, cellSize * 0.15);
-		const barWidth = cellSize - 1;
-
-		ctx.fillStyle = "rgba(0,0,0,0.6)";
-		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth, barHeight);
-
-		ctx.fillStyle = energyRatio > 0.3 ? "#10b981" : "#ef4444";
-		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth * energyRatio, barHeight);
+	private foodSpriteScale(rect: ViewRect, zoom: number): number {
+		const wanted = Math.min(MAX_FOOD_SPRITE_PX, Math.max(1, Math.round(zoom * this.dpr)));
+		const fit = Math.floor(MAX_LAYER_PX / Math.max(rect.width, rect.height));
+		return Math.max(1, Math.min(wanted, fit));
 	}
 
-	private drawGrid(bounds: CellBounds, camera: CameraState): void {
-		const { ctx } = this;
-		const { x: cx, y: cy, zoom } = camera;
-		const top = cy + bounds.startY * zoom;
-		const bottom = cy + bounds.endY * zoom;
-		const left = cx + bounds.startX * zoom;
-		const right = cx + bounds.endX * zoom;
+	/**
+	 * The detail view's food as tiles in a layer covering the view rect.
+	 * Rebuilt per data update; zoom only forces a rebuild once the cached
+	 * resolution is off by more than 40%.
+	 */
+	private ensureFoodLayer(
+		food: Frame["food"],
+		foodTypes: FoodTypeMetadata[],
+		rect: ViewRect,
+		zoom: number,
+	): FoodLayerCache {
+		const wanted = this.foodSpriteScale(rect, zoom);
+		const cached = this.foodCache;
+		if (
+			cached &&
+			cached.food === food &&
+			cached.foodTypes === foodTypes &&
+			cached.rect.x === rect.x &&
+			cached.rect.y === rect.y &&
+			cached.rect.width === rect.width &&
+			cached.rect.height === rect.height &&
+			wanted / cached.pxPerCell < 1.4 &&
+			cached.pxPerCell / wanted < 1.4
+		) {
+			return cached;
+		}
 
-		ctx.strokeStyle = "rgba(148,163,184,0.1)";
-		ctx.lineWidth = 0.5;
-		ctx.beginPath();
-		for (let x = bounds.startX; x <= bounds.endX; x++) {
-			const px = cx + x * zoom;
-			ctx.moveTo(px, top);
-			ctx.lineTo(px, bottom);
+		const px = wanted;
+		const width = rect.width * px;
+		const height = rect.height * px;
+		const layer =
+			cached && cached.layer.canvas.width === width && cached.layer.canvas.height === height
+				? cached.layer
+				: createLayer(width, height);
+		const { ctx } = layer;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, width, height);
+
+		const groups = new Map<number, number[]>();
+		const occupancy = createOccupancy(rect.width, rect.height);
+		for (const cell of food) {
+			const localX = cell.x - rect.x;
+			const localY = cell.y - rect.y;
+			if (localX < 0 || localY < 0 || localX >= rect.width || localY >= rect.height) continue;
+			pushTile(groups, occupancy, cell.type_idx, cell.density, localX, localY);
 		}
-		for (let y = bounds.startY; y <= bounds.endY; y++) {
-			const py = cy + y * zoom;
-			ctx.moveTo(left, py);
-			ctx.lineTo(right, py);
+		drawFoodTiles(ctx, groups, occupancy, buildFoodTypeColorMap(foodTypes), px);
+
+		const built: FoodLayerCache = { layer, food, foodTypes, rect: { ...rect }, pxPerCell: px };
+		this.foodCache = built;
+		return built;
+	}
+
+	private drawFertilityLayer(overlay: FertilityOverlay, camera: CameraState): void {
+		const layer = this.ensureFertilityLayer(overlay);
+		if (!layer) return;
+		const { ctx } = this;
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = "high";
+		ctx.drawImage(
+			layer.canvas,
+			camera.x,
+			camera.y,
+			overlay.worldWidth * camera.zoom,
+			overlay.worldHeight * camera.zoom,
+		);
+	}
+
+	private ensureFertilityLayer(overlay: FertilityOverlay): Layer | null {
+		const { worldGrid, worldWidth, worldHeight, worldStaticRevision } = overlay;
+		if (worldWidth <= 0 || worldHeight <= 0) return null;
+		const cached = this.fertilityCache;
+		if (
+			cached &&
+			cached.grid === worldGrid &&
+			cached.revision === worldStaticRevision &&
+			cached.width === worldWidth &&
+			cached.height === worldHeight
+		) {
+			return cached.layer;
 		}
-		ctx.stroke();
+
+		const layer = createLayer(worldWidth, worldHeight);
+		const image = new ImageData(worldWidth, worldHeight);
+		const data = image.data;
+		const cellCount = Math.min(worldWidth * worldHeight, worldGrid.length);
+		for (let i = 0; i < cellCount; i++) {
+			const value = worldGrid[i] ?? 128;
+			if (value === 128) continue;
+			const t = (value - 128) / 127;
+			const offset = i * 4;
+			const barren = t < 0;
+			const [r, g, b] = barren ? FERT_BARREN : FERT_FERTILE;
+			data[offset] = r;
+			data[offset + 1] = g;
+			data[offset + 2] = b;
+			data[offset + 3] = Math.round(Math.abs(t) * FERT_ALPHA * 255);
+		}
+		layer.ctx.putImageData(image, 0, 0);
+		this.fertilityCache = {
+			layer,
+			grid: worldGrid,
+			revision: worldStaticRevision,
+			width: worldWidth,
+			height: worldHeight,
+		};
+		return layer;
+	}
+
+	private drawBarrierLayer(frame: Frame, camera: CameraState): void {
+		const layer = this.ensureBarrierLayer(frame);
+		if (!layer) return;
+		const { ctx } = this;
+		// Walls stay crisp once a cell is at least a pixel; smoothing only helps
+		// when the whole world is squeezed below one pixel per cell.
+		ctx.imageSmoothingEnabled = camera.zoom < 1;
+		ctx.imageSmoothingQuality = "high";
+		ctx.drawImage(
+			layer.canvas,
+			camera.x,
+			camera.y,
+			frame.width * camera.zoom,
+			frame.height * camera.zoom,
+		);
+	}
+
+	private ensureBarrierLayer(frame: Frame): Layer | null {
+		const cached = this.barrierCache;
+		if (
+			cached &&
+			cached.barriers === frame.barriers &&
+			cached.width === frame.width &&
+			cached.height === frame.height
+		) {
+			return cached.layer;
+		}
+
+		let layer: Layer | null = null;
+		if (frame.barriers.length > 0) {
+			layer = createLayer(frame.width, frame.height);
+			const image = new ImageData(frame.width, frame.height);
+			const data = image.data;
+			for (const barrier of frame.barriers) {
+				const offset = (barrier.y * frame.width + barrier.x) * 4;
+				// Checkered texture: walls read as a pattern, not only as a hue.
+				const hatch = ((barrier.x + barrier.y) & 1) === 1;
+				data[offset] = hatch ? BARRIER_HATCH_R : BARRIER_R;
+				data[offset + 1] = hatch ? BARRIER_HATCH_G : BARRIER_G;
+				data[offset + 2] = hatch ? BARRIER_HATCH_B : BARRIER_B;
+				data[offset + 3] = 255;
+			}
+			layer.ctx.putImageData(image, 0, 0);
+		}
+		this.barrierCache = {
+			layer,
+			barriers: frame.barriers,
+			width: frame.width,
+			height: frame.height,
+		};
+		return layer;
+	}
+
+	private visibleCells(frame: Frame, camera: CameraState): CellBounds {
+		return visibleCellBounds(
+			camera,
+			{ width: this.cssWidth, height: this.cssHeight },
+			{ width: frame.width, height: frame.height },
+		);
 	}
 
 	/** Diagonal hatch on visible barrier cells: a non-colour cue that separates walls from barren ground. */
-	private drawBarrierHatch(frame: Frame, bounds: CellBounds, camera: CameraState): void {
+	private drawBarrierHatch(frame: Frame, camera: CameraState): void {
+		const bounds = this.visibleCells(frame, camera);
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
 		ctx.strokeStyle = BARRIER_HATCH;
@@ -750,140 +1015,213 @@ export class WorldRenderer {
 		ctx.stroke();
 	}
 
-	/** Food type colours, rebuilt only when the food type list changes. */
-	private ensureFoodTypeColors(
-		foodTypes: FoodTypeMetadata[],
-	): Map<number, [number, number, number]> {
-		if (this.foodTypeColorsRef !== foodTypes) {
-			this.foodTypeColorsRef = foodTypes;
-			this.foodTypeColors = buildFoodTypeColorMap(foodTypes);
-			this.foodStyleCache.clear();
-		}
-		return this.foodTypeColors;
-	}
-
-	/** Cached fillStyle for a food cell, with density quantised so strings are shared. */
-	private foodFillStyle(typeIdx: number, rawDensity: number): string | null {
-		const density = Math.max(0, Math.min(1, rawDensity));
-		const step = Math.round(density * FOOD_DENSITY_STEPS);
-		if (step <= 0) return null;
-		const key = typeIdx * (FOOD_DENSITY_STEPS + 1) + step;
-		let style = this.foodStyleCache.get(key);
-		if (style === undefined) {
-			const quantised = step / FOOD_DENSITY_STEPS;
-			const alpha = foodOpacity(quantised);
-			const [baseR, baseG, baseB] = resolveFoodTypeColor(this.foodTypeColors, typeIdx);
-			const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, quantised);
-			style = `rgba(${r},${g},${b},${alpha})`;
-			this.foodStyleCache.set(key, style);
-		}
-		return style;
-	}
-
-	/** Cached fillStyle for a creature phenotype colour. */
-	private creatureFillStyle(rgb: [number, number, number]): string {
-		const [r, g, b] = rgb;
-		const key = (r << 16) | (g << 8) | b;
-		let style = this.creatureStyleCache.get(key);
-		if (style === undefined) {
-			if (this.creatureStyleCache.size >= MAX_CREATURE_STYLE_CACHE) {
-				this.creatureStyleCache.clear();
-			}
-			style = `rgb(${r},${g},${b})`;
-			this.creatureStyleCache.set(key, style);
-		}
-		return style;
-	}
-
-	private blendFertilityPixels(data: Uint8ClampedArray, overlay: FertilityOverlay): void {
-		const cache = this.ensureFertilityBlendCache(overlay);
-		if (!cache) return;
-		const { indices, colors } = cache;
-		for (let entry = 0; entry < indices.length; entry++) {
-			const cellIndex = indices[entry]!;
-			const idx = cellIndex * 4;
-			const colorIndex = entry * 4;
-			const a = colors[colorIndex + 3]!;
-			if (a <= 0) continue;
-			const inv = 255 - a;
-			data[idx] = ((data[idx]! * inv + colors[colorIndex]! * a + 127) / 255) | 0;
-			data[idx + 1] = ((data[idx + 1]! * inv + colors[colorIndex + 1]! * a + 127) / 255) | 0;
-			data[idx + 2] = ((data[idx + 2]! * inv + colors[colorIndex + 2]! * a + 127) / 255) | 0;
-		}
-	}
-
-	private ensureFertilityBlendCache(overlay: FertilityOverlay): FertilityBlendCache | null {
-		const { worldWidth, worldHeight, worldStaticRevision, worldGrid } = overlay;
-		if (worldWidth <= 0 || worldHeight <= 0) {
-			this.fertilityBlendCache = null;
-			return null;
-		}
-		const cached = this.fertilityBlendCache;
-		if (
-			cached &&
-			cached.worldStaticRevision === worldStaticRevision &&
-			cached.worldWidth === worldWidth &&
-			cached.worldHeight === worldHeight
-		) {
-			return cached;
-		}
-
-		const cellCount = Math.min(worldWidth * worldHeight, worldGrid.length);
-		const indices: number[] = [];
-		const colors: number[] = [];
-		for (let i = 0; i < cellCount; i++) {
-			const value = worldGrid[i] ?? 128;
-			if (value === 128) continue;
-			const t = (value - 128) / 127;
-			const absT = Math.abs(t);
-			const alpha = Math.round(absT * FERT_ALPHA * 255);
-			if (alpha <= 0) continue;
-			indices.push(i);
-			colors.push(
-				t < 0 ? FERT_BARREN_R : FERT_FERTILE_R,
-				t < 0 ? FERT_BARREN_G : FERT_FERTILE_G,
-				t < 0 ? FERT_BARREN_B : FERT_FERTILE_B,
-				alpha,
-			);
-		}
-
-		const built: FertilityBlendCache = {
-			worldStaticRevision,
-			worldWidth,
-			worldHeight,
-			indices: Uint32Array.from(indices),
-			colors: Uint8Array.from(colors),
-		};
-		this.fertilityBlendCache = built;
-		return built;
-	}
-
-	private drawFertilityRects(overlay: FertilityOverlay, camera: CameraState): void {
+	private drawLattice(frame: Frame, camera: CameraState): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
-		const { worldGrid, worldWidth, worldHeight } = overlay;
-		const {
-			startX: viewportStartX,
-			startY: viewportStartY,
-			endX: viewportEndX,
-			endY: viewportEndY,
-		} = visibleCellBounds(camera, this.viewSize, { width: worldWidth, height: worldHeight });
-		if (viewportStartX >= viewportEndX || viewportStartY >= viewportEndY) {
+		const alpha = Math.min(0.16, ((zoom - LATTICE_ZOOM) / 6) * 0.16 + 0.04);
+		const { startX: x0, startY: y0, endX: x1, endY: y1 } = this.visibleCells(frame, camera);
+		const dot = Math.max(1, zoom * 0.06);
+		ctx.fillStyle = `rgba(148,163,184,${alpha.toFixed(3)})`;
+		ctx.beginPath();
+		for (let y = y0; y <= y1; y++) {
+			for (let x = x0; x <= x1; x++) {
+				ctx.rect(cx + x * zoom - dot / 2, cy + y * zoom - dot / 2, dot, dot);
+			}
+		}
+		ctx.fill();
+	}
+
+	/** Linear progress through the current glide, 0 to 1. */
+	private glideLinear(now: number): number {
+		const duration = this.glideDuration ?? 0;
+		return duration > 0 ? Math.min(1, (now - this.glideStart) / duration) : 1;
+	}
+
+	/**
+	 * Where a creature's body is drawn now, in CSS pixels: an oozing square that
+	 * stretches toward its next cell, scaled about its centre while being born.
+	 */
+	private creatureRect(
+		motion: CreatureMotion,
+		camera: CameraState,
+		now: number,
+		size: number,
+	): CellRect {
+		const cell = oozeRect(motion, this.glideLinear(now), size);
+		const { x: cx, y: cy, zoom } = camera;
+		let x = cx + cell.x * zoom;
+		let y = cy + cell.y * zoom;
+		let width = cell.width * zoom;
+		let height = cell.height * zoom;
+		if (motion.born && !this.reducedMotion) {
+			const pop = birthPop((now - this.glideStart) / BIRTH_MS);
+			x += (width * (1 - pop.scaleX)) / 2;
+			y += (height * (1 - pop.scaleY)) / 2;
+			width *= pop.scaleX;
+			height *= pop.scaleY;
+		}
+		return { x, y, width, height };
+	}
+
+	/** A soft ring in the newborn's colour spreading out from its cell. */
+	private drawBirthRipple(
+		motion: CreatureMotion,
+		camera: CameraState,
+		now: number,
+		color: string,
+	): void {
+		const pop = birthPop((now - this.glideStart) / BIRTH_MS);
+		if (pop.rippleAlpha <= 0) return;
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+		ctx.save();
+		ctx.globalAlpha = pop.rippleAlpha;
+		ctx.strokeStyle = color;
+		ctx.lineWidth = Math.max(1, zoom * 0.08);
+		ctx.beginPath();
+		ctx.arc(
+			cx + (motion.toX + 0.5) * zoom,
+			cy + (motion.toY + 0.5) * zoom,
+			pop.rippleRadius * zoom,
+			0,
+			Math.PI * 2,
+		);
+		ctx.stroke();
+		ctx.restore();
+	}
+
+	/** Body size as a share of the cell: near-full squares, smaller once a frame wraps them. */
+	private creatureSize(zoom: number): number {
+		if (zoom >= DETAIL_MODE_THRESHOLD && this.maxEnergy !== null) return CREATURE_FRAMED_SIZE;
+		return Math.max(0.6, 1 - 1 / zoom);
+	}
+
+	/**
+	 * Creatures as solid squares in their phenotype colour. They ooze to each
+	 * new cell (the leading edge surges, the body stretches and settles), pop in
+	 * when born, and at inspect zoom wear their energy as a frame that fills
+	 * clockwise from the top.
+	 */
+	private drawCreatures(camera: CameraState, now: number): void {
+		if (this.motions.size === 0) return;
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+		const minX = -cx / zoom - 2;
+		const minY = -cy / zoom - 2;
+		const maxX = (this.cssWidth - cx) / zoom + 2;
+		const maxY = (this.cssHeight - cy) / zoom + 2;
+		const offscreen = (motion: CreatureMotion) =>
+			Math.max(motion.fromX, motion.toX) < minX ||
+			Math.min(motion.fromX, motion.toX) > maxX ||
+			Math.max(motion.fromY, motion.toY) < minY ||
+			Math.min(motion.fromY, motion.toY) > maxY;
+
+		if (zoom < 2) {
+			// Far out a creature is a pixel or two; draw it at its glide position.
+			const size = Math.max(1, zoom);
+			const t = glideProgress(now - this.glideStart, this.glideDuration ?? 0);
+			for (const [id, motion] of this.motions) {
+				if (offscreen(motion)) continue;
+				const point = sampleMotion(motion, t);
+				ctx.fillStyle = this.looks.get(id)?.fill ?? "#e2e8f0";
+				ctx.fillRect(cx + point.x * zoom, cy + point.y * zoom, size, size);
+			}
 			return;
 		}
 
-		for (let y = viewportStartY; y < viewportEndY; y++) {
-			for (let x = viewportStartX; x < viewportEndX; x++) {
-				const value = worldGrid[y * worldWidth + x] ?? 128;
-				const style = FERTILITY_FILL_STYLES[value];
-				if (!style) continue;
-				ctx.fillStyle = style;
-				ctx.fillRect(cx + x * zoom, cy + y * zoom, zoom, zoom);
+		// Energy frames need the configured max energy; without it, draw none
+		// rather than a guessed scale.
+		const showFrames = zoom >= DETAIL_MODE_THRESHOLD && this.maxEnergy !== null;
+		const size = this.creatureSize(zoom);
+		const frameWidth = Math.max(1, zoom * 0.07);
+		const frameGap = (CREATURE_FRAME_INSET - (1 - CREATURE_FRAMED_SIZE) / 2) * zoom;
+		const track = showFrames ? new Path2D() : null;
+		const good = showFrames ? new Path2D() : null;
+		const low = showFrames ? new Path2D() : null;
+
+		for (const [id, motion] of this.motions) {
+			if (offscreen(motion)) continue;
+			const look = this.looks.get(id);
+			if (!look) continue;
+			const body = this.creatureRect(motion, camera, now, size);
+			ctx.fillStyle = look.fill;
+			ctx.fillRect(body.x, body.y, body.width, body.height);
+			if (motion.born && !this.reducedMotion) {
+				this.drawBirthRipple(motion, camera, now, look.fill);
 			}
+
+			if (showFrames) {
+				const creature = this.creaturesById.get(id);
+				const ratio = creature ? (energyBarFraction(creature.energy, this.maxEnergy) ?? 0) : 0;
+				const frame = {
+					x: body.x + frameGap,
+					y: body.y + frameGap,
+					width: body.width - frameGap * 2,
+					height: body.height - frameGap * 2,
+				};
+				track!.rect(frame.x, frame.y, frame.width, frame.height);
+				if (ratio > 0) addFrameProgress(ratio > 0.3 ? good! : low!, frame, ratio);
+			}
+		}
+
+		if (showFrames) {
+			ctx.lineWidth = frameWidth;
+			ctx.lineJoin = "miter";
+			// A faint slate track so a low reading still reads as a gauge.
+			ctx.strokeStyle = "rgba(148,163,184,0.28)";
+			ctx.stroke(track!);
+			ctx.strokeStyle = ENERGY_GOOD;
+			ctx.stroke(good!);
+			ctx.strokeStyle = ENERGY_LOW;
+			ctx.stroke(low!);
 		}
 	}
 
-	private previewColor(tool: PaintTool): [number, number, number] {
+	private drawPreview(camera: CameraState): void {
+		if (!this.previewCells || !this.previewTool || this.previewCells.size === 0) return;
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+		const [r, g, b] = this.previewColor(this.previewTool);
+		ctx.fillStyle = `rgba(${r},${g},${b},0.4)`;
+		ctx.beginPath();
+		for (const key of this.previewCells) {
+			const sep = key.indexOf(",");
+			const px = Number.parseInt(key.substring(0, sep), 10);
+			const py = Number.parseInt(key.substring(sep + 1), 10);
+			ctx.rect(cx + px * zoom, cy + py * zoom, zoom, zoom);
+		}
+		ctx.fill();
+	}
+
+	private drawSelection(camera: CameraState, now: number): void {
+		if (this.selectedCreatureId === null) return;
+		const motion = this.motions.get(this.selectedCreatureId);
+		if (!motion) return;
+		const { ctx } = this;
+		const body = this.creatureRect(motion, camera, now, this.creatureSize(camera.zoom));
+		const breath = this.reducedMotion
+			? 0
+			: Math.sin(((now % SELECTION_PULSE_MS) / SELECTION_PULSE_MS) * Math.PI * 2);
+		const pad = Math.max(3, camera.zoom * 0.14) + breath;
+
+		ctx.fillStyle = `rgba(${SELECTION_RGB},${(0.12 + breath * 0.04).toFixed(3)})`;
+		ctx.beginPath();
+		ctx.roundRect(
+			body.x - pad - 4,
+			body.y - pad - 4,
+			body.width + (pad + 4) * 2,
+			body.height + (pad + 4) * 2,
+			6,
+		);
+		ctx.fill();
+		ctx.strokeStyle = `rgb(${SELECTION_RGB})`;
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.roundRect(body.x - pad, body.y - pad, body.width + pad * 2, body.height + pad * 2, 3);
+		ctx.stroke();
+	}
+
+	private previewColor(tool: PaintTool): Rgb {
 		switch (tool) {
 			case "barrier":
 				return [220, 120, 50];
@@ -891,7 +1229,7 @@ export class WorldRenderer {
 				return [0, 180, 0];
 			case "erase_barrier":
 			case "erase_food":
-				return [BG_R, BG_G, BG_B];
+				return [GROUND_R, GROUND_G, GROUND_B];
 		}
 	}
 }

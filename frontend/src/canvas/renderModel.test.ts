@@ -66,6 +66,7 @@ describe("buildRenderModel", () => {
 				showFertilityOverlay: false,
 			}),
 		).toEqual({
+			detailRect: null,
 			frame: {
 				width: 20,
 				height: 10,
@@ -260,5 +261,30 @@ describe("buildRenderModel", () => {
 		});
 
 		expect(result?.fertilityOverlay).toBeNull();
+	});
+
+	it("carries the detail view rect so the renderer can place its food layer", () => {
+		const rect = { x: 3, y: 4, width: 5, height: 6 };
+		const result = buildRenderModel({
+			frame: { width: 20, height: 20, creatures: [], food: [], barriers: [] },
+			overviewView: null,
+			detailView: {
+				rect,
+				width: 5,
+				height: 6,
+				food: [],
+				creatures: [],
+				predation_events: [],
+			},
+			worldStatic: null,
+			tick: 1,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 4 },
+			fertilityGrid: null,
+			fertilityRevision: 0,
+			showFertilityOverlay: false,
+		});
+
+		expect(result?.detailRect).toEqual(rect);
 	});
 });
