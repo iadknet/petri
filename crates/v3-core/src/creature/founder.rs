@@ -596,10 +596,10 @@ mod tests {
             let BackendDef::Graph(graph) = &genome.nodes[0].backend_def else {
                 panic!("graph")
             };
-            assert_eq!(graph.compute_nodes.len(), 3);
+            assert_eq!(graph.compute_nodes().len(), 3);
             assert_eq!(
                 graph
-                    .output_sinks
+                    .output_sinks()
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count(),
@@ -611,7 +611,7 @@ mod tests {
             // Eat, four Move, four Reproduce, Terminate, and one parameter.
             assert_eq!(
                 decision
-                    .output_sinks
+                    .output_sinks()
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count(),

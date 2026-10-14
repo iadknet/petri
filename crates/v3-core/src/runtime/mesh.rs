@@ -765,16 +765,16 @@ mod tests {
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::DecayIntegrator(0.5),
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 1.0,
-            }],
-            plasticity: Some(crate::creature::genome::PlasticityConfig {
+                1.0,
+            )],
+            Some(crate::creature::genome::PlasticityConfig {
                 rule: crate::creature::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 2.0,
@@ -784,7 +784,7 @@ mod tests {
                     trace_decay: 0.9,
                 }),
             }),
-        });
+        ));
         let mut vm = vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]);
         if let BackendDef::Vm(def) = &mut vm.backend_def {
             def.program.splice(
@@ -2073,21 +2073,20 @@ mod tests {
         NodeGenome {
             node_id,
             input_refs: vec![InputReference::World(key)],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: Vec::new(),
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::InputLeaf {
-                            ref_idx: 0,
-                            sub_idx: 0,
-                        },
-                        weight: 1.0,
-                    }],
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(Vec::new())
+                    .with_output_sinks(vec![OutputSink::new(
+                        OutputSinkKind::CustomOutput(0),
+                        vec![GraphEdge::new(
+                            GraphSource::InputLeaf {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            1.0,
+                        )],
+                    )]),
+            ),
             targets: vec![],
         }
     }
@@ -2160,17 +2159,17 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: vec![RingProjection::new(
-                        0,
-                        DirectedVoteKind::StealEnergy,
-                        0,
-                        0.5,
-                    )],
-                    birth_weights: None,
-                    compute_nodes: Vec::new(),
-                    output_sinks: Vec::new(),
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(Vec::new())
+                        .with_output_sinks(Vec::new())
+                        .with_projections(vec![RingProjection::new(
+                            0,
+                            DirectedVoteKind::StealEnergy,
+                            0,
+                            0.5,
+                        )]),
+                ),
                 targets: vec![],
             }],
         };
@@ -2216,23 +2215,21 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![InputReference::World(key)],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    // CN0 feeds no sink: dead to the census, evaluated anyway.
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Add,
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::InputLeaf {
-                                ref_idx: 0,
-                                sub_idx: 0,
-                            },
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    }],
-                    output_sinks: Vec::new(),
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::Add,
+                            vec![GraphEdge::new(
+                                GraphSource::InputLeaf {
+                                    ref_idx: 0,
+                                    sub_idx: 0,
+                                },
+                                1.0,
+                            )],
+                            None,
+                        )])
+                        .with_output_sinks(Vec::new()),
+                ),
                 targets: vec![],
             }],
         };

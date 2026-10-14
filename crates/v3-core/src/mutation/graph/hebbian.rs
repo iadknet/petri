@@ -166,7 +166,7 @@ pub(super) fn is_reward_modulated(node: &ComputeNode) -> bool {
 /// Whether any compute node in `def` matches `predicate`: the def-level form
 /// of the predicates above, and what [`select_eligible`] needs to succeed.
 pub(super) fn any_node(def: &CgpGraphBackendDef, predicate: fn(&ComputeNode) -> bool) -> bool {
-    def.compute_nodes.iter().any(predicate)
+    def.compute_nodes().iter().any(predicate)
 }
 
 /// Pick a random compute node matching `predicate`. Returns its index or
@@ -196,16 +196,19 @@ pub(crate) fn enable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, can_enable_hebbian, rng)?;
+    let idx = select_eligible(def.compute_nodes(), can_enable_hebbian, rng)?;
 
     let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
-    def.compute_nodes[idx].plasticity = Some(PlasticityConfig {
-        rule,
-        learning_rate: rng.gen_range(0.01f32..0.2),
-        weight_clamp: rng.gen_range(1.0f32..5.0),
-        lamarckian: rng.gen_bool(0.5),
-        modulation: None,
-    });
+    def.set_node_plasticity(
+        idx,
+        Some(PlasticityConfig {
+            rule,
+            learning_rate: rng.gen_range(0.01f32..0.2),
+            weight_clamp: rng.gen_range(1.0f32..5.0),
+            lamarckian: rng.gen_bool(0.5),
+            modulation: None,
+        }),
+    );
     Ok(())
 }
 
@@ -214,8 +217,8 @@ pub(crate) fn disable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
-    def.compute_nodes[idx].plasticity = None;
+    let idx = select_eligible(def.compute_nodes(), is_plastic, rng)?;
+    def.set_node_plasticity(idx, None);
     Ok(())
 }
 
@@ -224,9 +227,9 @@ pub(crate) fn mutate_hebbian_rule_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_plastic, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         let others: Vec<HebbianRule> = ALL_RULES
             .iter()
             .copied()
@@ -247,9 +250,9 @@ pub(crate) fn mutate_hebbian_rate_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_plastic, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         if cfg.learning_rate.abs() > 0.01 {
             cfg.learning_rate *= 1.0 + rng.gen_range(-0.3f32..=0.3);
         } else {
@@ -265,9 +268,9 @@ pub(crate) fn toggle_hebbian_lamarckian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_plastic, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         cfg.lamarckian = !cfg.lamarckian;
     }
     Ok(())
@@ -278,9 +281,9 @@ pub(crate) fn enable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, can_enable_reward_modulation, rng)?;
+    let idx = select_eligible(def.compute_nodes(), can_enable_reward_modulation, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
         cfg.modulation = Some(RewardModulationConfig {
             reward_source: channel,
@@ -295,9 +298,9 @@ pub(crate) fn disable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_reward_modulated, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         cfg.modulation = None;
     }
     Ok(())
@@ -308,9 +311,9 @@ pub(crate) fn mutate_reward_source_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_reward_modulated, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         if let Some(ref mut modulation) = cfg.modulation {
             let others: Vec<OutcomeChannel> = ALL_CHANNELS
                 .iter()
@@ -333,9 +336,9 @@ pub(crate) fn mutate_trace_decay_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
+    let idx = select_eligible(def.compute_nodes(), is_reward_modulated, rng)?;
 
-    if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
+    if let Some(cfg) = def.node_plasticity_mut(idx) {
         if let Some(ref mut modulation) = cfg.modulation {
             if modulation.trace_decay.abs() > 0.01 {
                 modulation.trace_decay *= 1.0 + rng.gen_range(-0.3f32..=0.3);
@@ -360,50 +363,38 @@ mod tests {
     }
 
     fn def_with_nodes(nodes: Vec<ComputeNode>) -> CgpGraphBackendDef {
-        CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: nodes,
-            output_sinks: Vec::new(),
-        }
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(nodes)
+            .with_output_sinks(Vec::new())
     }
 
     fn node_without_hebbian() -> ComputeNode {
-        ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            plasticity: None,
-        }
+        ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            None,
+        )
     }
 
     fn node_with_hebbian() -> ComputeNode {
-        ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            plasticity: Some(PlasticityConfig {
+        ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: false,
                 modulation: None,
             }),
-        }
+        )
     }
 
     fn node_with_reward_modulation() -> ComputeNode {
-        ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            plasticity: Some(PlasticityConfig {
+        ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
@@ -413,7 +404,7 @@ mod tests {
                     trace_decay: 0.9,
                 }),
             }),
-        }
+        )
     }
 
     #[test]
@@ -421,7 +412,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_without_hebbian()]);
         let mut r = rng(42);
         assert!(enable_hebbian_in_def(&mut def, &mut r).is_ok());
-        assert!(def.compute_nodes[0].plasticity.is_some());
+        assert!(def.compute_nodes()[0].plasticity.is_some());
     }
 
     #[test]
@@ -436,11 +427,7 @@ mod tests {
 
     #[test]
     fn enable_hebbian_skips_nodes_without_inputs() {
-        let node = ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: Vec::new(),
-            plasticity: None,
-        };
+        let node = ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new(), None);
         let mut def = def_with_nodes(vec![node]);
         let mut r = rng(42);
         assert_eq!(
@@ -454,7 +441,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_hebbian()]);
         let mut r = rng(42);
         assert!(disable_hebbian_in_def(&mut def, &mut r).is_ok());
-        assert!(def.compute_nodes[0].plasticity.is_none());
+        assert!(def.compute_nodes()[0].plasticity.is_none());
     }
 
     #[test]
@@ -472,7 +459,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_hebbian()]);
         let mut r = rng(42);
         assert!(mutate_hebbian_rule_in_def(&mut def, &mut r).is_ok());
-        let new_rule = def.compute_nodes[0].plasticity.as_ref().unwrap().rule;
+        let new_rule = def.compute_nodes()[0].plasticity.as_ref().unwrap().rule;
         assert_ne!(new_rule, HebbianRule::Classic);
     }
 
@@ -492,7 +479,7 @@ mod tests {
             let mut def = def_with_nodes(vec![node_with_hebbian()]);
             let mut r = rng(seed);
             mutate_hebbian_rate_in_def(&mut def, &mut r).unwrap();
-            let rate = def.compute_nodes[0]
+            let rate = def.compute_nodes()[0]
                 .plasticity
                 .as_ref()
                 .unwrap()
@@ -526,11 +513,29 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_hebbian()]);
         let mut r = rng(42);
 
-        assert!(!def.compute_nodes[0].plasticity.as_ref().unwrap().lamarckian);
+        assert!(
+            !def.compute_nodes()[0]
+                .plasticity
+                .as_ref()
+                .unwrap()
+                .lamarckian
+        );
         toggle_hebbian_lamarckian_in_def(&mut def, &mut r).unwrap();
-        assert!(def.compute_nodes[0].plasticity.as_ref().unwrap().lamarckian);
+        assert!(
+            def.compute_nodes()[0]
+                .plasticity
+                .as_ref()
+                .unwrap()
+                .lamarckian
+        );
         toggle_hebbian_lamarckian_in_def(&mut def, &mut r).unwrap();
-        assert!(!def.compute_nodes[0].plasticity.as_ref().unwrap().lamarckian);
+        assert!(
+            !def.compute_nodes()[0]
+                .plasticity
+                .as_ref()
+                .unwrap()
+                .lamarckian
+        );
     }
 
     #[test]
@@ -538,7 +543,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_hebbian()]);
         let mut r = rng(42);
         assert!(enable_reward_modulation_in_def(&mut def, &mut r).is_ok());
-        let cfg = def.compute_nodes[0].plasticity.as_ref().unwrap();
+        let cfg = def.compute_nodes()[0].plasticity.as_ref().unwrap();
         assert!(cfg.modulation.is_some());
     }
 
@@ -557,7 +562,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_reward_modulation()]);
         let mut r = rng(42);
         assert!(disable_reward_modulation_in_def(&mut def, &mut r).is_ok());
-        let cfg = def.compute_nodes[0].plasticity.as_ref().unwrap();
+        let cfg = def.compute_nodes()[0].plasticity.as_ref().unwrap();
         assert!(cfg.modulation.is_none());
     }
 
@@ -566,7 +571,7 @@ mod tests {
         let mut def = def_with_nodes(vec![node_with_reward_modulation()]);
         let mut r = rng(42);
         assert!(mutate_reward_source_in_def(&mut def, &mut r).is_ok());
-        let channel = def.compute_nodes[0]
+        let channel = def.compute_nodes()[0]
             .plasticity
             .as_ref()
             .unwrap()
@@ -594,7 +599,7 @@ mod tests {
             let mut def = def_with_nodes(vec![node_with_reward_modulation()]);
             let mut r = rng(seed);
             mutate_trace_decay_in_def(&mut def, &mut r).unwrap();
-            let decay = def.compute_nodes[0]
+            let decay = def.compute_nodes()[0]
                 .plasticity
                 .as_ref()
                 .unwrap()

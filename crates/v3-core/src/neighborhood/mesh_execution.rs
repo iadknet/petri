@@ -508,25 +508,19 @@ mod tests {
             type_idx: Default::default(),
         })];
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::WeightedSum,
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
+        graph.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::WeightedSum,
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: 0,
                 },
-                weight: 7.0,
-            }],
-            plasticity: None,
-        });
-        graph
-            .sink_mut(OutputSinkKind::CustomOutput(0))
-            .unwrap()
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            });
+                7.0,
+            )],
+            None,
+        ));
+        let surface = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
+        graph.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         producer.backend_def = BackendDef::Graph(graph);
         let mut consumer = node(1, &[], false);
         consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
@@ -1097,21 +1091,17 @@ mod tests {
         assert_eq!(reading(&g).knockout_count, 0);
         assert_eq!(reading(&g).backends.vm.contributing, 2);
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::WeightedSum,
-            inputs: vec![],
-            plasticity: None,
-        });
-        graph.output_sinks = vec![OutputSink {
-            kind: OutputSinkKind::WriteSlot(0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
+        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::WeightedSum, vec![], None));
+        graph = graph.with_output_sinks(vec![OutputSink::new(
+            OutputSinkKind::WriteSlot(0),
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: 0,
                 },
-                weight: 7.0,
-            }],
-        }];
+                7.0,
+            )],
+        )]);
         let graph_writer = NodeGenome {
             node_id: NodeId::new(1),
             input_refs: vec![InputReference::World(WorldInputKey::FoodHere {

@@ -139,10 +139,7 @@ struct Author<'a> {
 impl Author<'_> {
     fn edge(&mut self, source: GraphSource, weight: f32) -> GraphEdge {
         self.edges += 1;
-        GraphEdge {
-            source,
-            weight: weight * self.scale,
-        }
+        GraphEdge::new(source, weight * self.scale)
     }
 
     fn node(&mut self, kind: ComputeNodeKind, inputs: &[(GraphSource, f32)]) -> GraphSource {
@@ -151,21 +148,18 @@ impl Author<'_> {
             .map(|&(source, weight)| self.edge(source, weight))
             .collect();
         self.nodes += 1;
-        self.graph.compute_nodes.push(ComputeNode {
-            kind,
-            inputs,
-            plasticity: None,
-        });
-        GraphSource::ComputeNode((self.graph.compute_nodes.len() - 1) as u16)
+        self.graph
+            .append_compute_node(ComputeNode::new(kind, inputs, None));
+        GraphSource::ComputeNode((self.graph.compute_nodes().len() - 1) as u16)
     }
 
     fn wire(&mut self, sink: OutputSinkKind, source: GraphSource, weight: f32) {
         let edge = self.edge(source, weight);
-        self.graph
-            .sink_mut(sink)
-            .expect("the fixed catalog holds every vote and parameter sink")
-            .inputs
-            .push(edge);
+        let surface = self
+            .graph
+            .sink_surface(sink)
+            .expect("the fixed catalog holds every vote and parameter sink");
+        self.graph.push_edge(surface, edge);
     }
 }
 

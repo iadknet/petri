@@ -16,7 +16,8 @@ use v3_core::contracts::InputReference;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::analysis::mesh_reachable_nodes;
 use v3_core::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
 use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::reachability::ParentExecuted;
@@ -454,15 +455,25 @@ fn graph_mut(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDe
     }
 }
 
+/// `def` with its `kind` sink reading exactly `edges`.
+fn set_sink_inputs(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edges: &[GraphEdge]) {
+    assert!(def.sink(kind).is_some(), "fixed catalog");
+    let sinks = def
+        .output_sinks()
+        .iter()
+        .map(|sink| match sink.kind {
+            k if k == kind => OutputSink::new(k, edges.to_vec()),
+            _ => sink.clone(),
+        })
+        .collect();
+    *def = def.clone().with_output_sinks(sinks);
+}
+
 /// The readiness signal silenced: node 0's `CustomOutput(1)` (the founder's
 /// can-reproduce slot) loses every input edge.
 fn silenced(genome: &CreatureGenome) -> CreatureGenome {
     let mut g = genome.clone();
-    graph_mut(&mut g, 0)
-        .sink_mut(OutputSinkKind::CustomOutput(1))
-        .expect("fixed catalog")
-        .inputs
-        .clear();
+    set_sink_inputs(graph_mut(&mut g, 0), OutputSinkKind::CustomOutput(1), &[]);
     g
 }
 
@@ -481,27 +492,20 @@ fn repointed(genome: &CreatureGenome, pairs: &[(usize, usize)]) -> CreatureGenom
 fn restored(plateau: &CreatureGenome) -> CreatureGenome {
     let mut g = plateau.clone();
     let def = graph_mut(&mut g, 0);
-    let idx = u16::try_from(def.compute_nodes.len()).expect("small graph");
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Multiply,
-        inputs: vec![
-            GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            },
-            GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            },
+    let idx = u16::try_from(def.compute_nodes().len()).expect("small graph");
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Multiply,
+        vec![
+            GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
+            GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        plasticity: None,
-    });
-    def.sink_mut(OutputSinkKind::CustomOutput(1))
-        .expect("fixed catalog")
-        .inputs = vec![GraphEdge {
-        source: GraphSource::ComputeNode(idx),
-        weight: 1.0,
-    }];
+        None,
+    ));
+    set_sink_inputs(
+        def,
+        OutputSinkKind::CustomOutput(1),
+        &[GraphEdge::new(GraphSource::ComputeNode(idx), 1.0)],
+    );
     repointed(&g, &[(1, 1)])
 }
 
@@ -921,7 +925,7 @@ fn p2e_exact_zero_charge() {
 /// to `threshold` (a diagnostic genome: reproduction active at lower energy).
 fn gate_lowered(genome: &CreatureGenome, threshold: f32) -> CreatureGenome {
     let mut g = genome.clone();
-    graph_mut(&mut g, 0).compute_nodes[0].kind = ComputeNodeKind::Threshold(threshold);
+    graph_mut(&mut g, 0).set_compute_kind(0, ComputeNodeKind::Threshold(threshold));
     g
 }
 

@@ -1220,18 +1220,23 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
     let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
         panic!("the default founder's entry node is a Graph node");
     };
-    def.sink_mut(OutputSinkKind::ActionVote(VoteSink::Drive(
-        DirectedVoteKind::Move,
-    )))
-    .unwrap()
-    .inputs
-    .push(GraphEdge {
-        source: GraphSource::SharedMemory {
-            slot: 0,
-            previous: false,
-        },
-        weight: 0.5,
-    });
+    {
+        let surface = def
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
+                DirectedVoteKind::Move,
+            )))
+            .unwrap();
+        def.push_edge(
+            surface,
+            GraphEdge::new(
+                GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                0.5,
+            ),
+        );
+    }
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
@@ -1392,18 +1397,20 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
         panic!("the default founder's entry node is a Graph node");
     };
-    let edge = |slot, weight| GraphEdge {
-        source: GraphSource::SharedMemory {
-            slot,
-            previous: false,
-        },
-        weight,
+    let edge = |slot, weight| {
+        GraphEdge::new(
+            GraphSource::SharedMemory {
+                slot,
+                previous: false,
+            },
+            weight,
+        )
     };
-    let compute = def.compute_nodes.len();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![edge(0, 0.5), edge(1, 0.0)],
-        plasticity: Some(PlasticityConfig {
+    let compute = def.compute_nodes().len();
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![edge(0, 0.5), edge(1, 0.0)],
+        Some(PlasticityConfig {
             rule: HebbianRule::Covariance,
             learning_rate: 0.1,
             weight_clamp: 1.0,
@@ -1413,7 +1420,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                 trace_decay: 0.5,
             }),
         }),
-    });
+    ));
     let learned = &mut creature.graph_runtime.plasticity_weights;
     learned.resize_with(entry + 1, Vec::new);
     learned[entry].resize_with(compute + 1, Default::default);

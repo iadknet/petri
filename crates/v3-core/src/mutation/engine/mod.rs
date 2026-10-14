@@ -506,8 +506,8 @@ fn collect_added_node_input_classes(
                     &after_node.backend_def,
                 ) {
                     (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
-                        if after_graph.compute_nodes.len()
-                            == before_graph.compute_nodes.len() + 1 =>
+                        if after_graph.compute_nodes().len()
+                            == before_graph.compute_nodes().len() + 1 =>
                     {
                         Some(after_node)
                     }
@@ -541,8 +541,8 @@ fn collect_added_node_world_inputs_for_operator(
                     &after_node.backend_def,
                 ) {
                     (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
-                        if after_graph.compute_nodes.len()
-                            == before_graph.compute_nodes.len() + 1 =>
+                        if after_graph.compute_nodes().len()
+                            == before_graph.compute_nodes().len() + 1 =>
                     {
                         Some(after_node)
                     }
@@ -577,6 +577,27 @@ fn select_weighted_index<T: Copy>(
     unreachable!("weight draw must return an index");
 }
 
+/// Apply one mutation event with the parseability gate: snapshot the genome
+/// (birth seeds included), apply, and commit when the event applied and the
+/// genome still parses; otherwise restore the snapshot. A rejected event
+/// leaves the draft, its seeds included, exactly as it was.
+fn apply_gated<T>(
+    genome: &mut CreatureGenome,
+    apply: impl FnOnce(&mut CreatureGenome) -> Result<T, MutationSkipReason>,
+) -> Result<T, MutationSkipReason> {
+    let snapshot = genome.clone();
+    let result = match apply(genome) {
+        Ok(_) if ParseabilityGate::validate(genome).is_err() => {
+            Err(MutationSkipReason::ParseabilityViolation)
+        }
+        result => result,
+    };
+    if result.is_err() {
+        *genome = snapshot;
+    }
+    result
+}
+
 /// Apply one topology mutation event with parseability gate.
 fn apply_topology_event(
     genome: &mut CreatureGenome,
@@ -586,28 +607,16 @@ fn apply_topology_event(
     config: &MutationConfig,
     food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let snapshot = genome.clone();
-    match TopologyMutator::apply_with_food_type_count(
-        genome,
-        op,
-        targets,
-        rng,
-        config,
-        food_type_count,
-    ) {
-        Ok(reachability) => {
-            if ParseabilityGate::validate(genome).is_ok() {
-                Ok(reachability)
-            } else {
-                *genome = snapshot;
-                Err(MutationSkipReason::ParseabilityViolation)
-            }
-        }
-        Err(reason) => {
-            *genome = snapshot;
-            Err(reason)
-        }
-    }
+    apply_gated(genome, |genome| {
+        TopologyMutator::apply_with_food_type_count(
+            genome,
+            op,
+            targets,
+            rng,
+            config,
+            food_type_count,
+        )
+    })
 }
 
 /// Apply one VM mutation event with parseability gate.
@@ -618,21 +627,9 @@ fn apply_vm_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let snapshot = genome.clone();
-    match VmMutator::apply(genome, op, targets, rng, config) {
-        Ok(reachability) => {
-            if ParseabilityGate::validate(genome).is_ok() {
-                Ok(reachability)
-            } else {
-                *genome = snapshot;
-                Err(MutationSkipReason::ParseabilityViolation)
-            }
-        }
-        Err(reason) => {
-            *genome = snapshot;
-            Err(reason)
-        }
-    }
+    apply_gated(genome, |genome| {
+        VmMutator::apply(genome, op, targets, rng, config)
+    })
 }
 
 /// Apply one graph mutation event with parseability gate.
@@ -644,21 +641,9 @@ fn apply_graph_event(
     config: &MutationConfig,
     food_type_count: usize,
 ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
-    let snapshot = genome.clone();
-    match GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count) {
-        Ok(reachability) => {
-            if ParseabilityGate::validate(genome).is_ok() {
-                Ok(reachability)
-            } else {
-                *genome = snapshot;
-                Err(MutationSkipReason::ParseabilityViolation)
-            }
-        }
-        Err(reason) => {
-            *genome = snapshot;
-            Err(reason)
-        }
-    }
+    apply_gated(genome, |genome| {
+        GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
+    })
 }
 
 /// Apply one input ref mutation event with parseability gate.
@@ -670,21 +655,9 @@ fn apply_input_ref_event(
     config: &MutationConfig,
     food_type_count: usize,
 ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
-    let snapshot = genome.clone();
-    match InputRefMutator::apply_classified(genome, op, targets, rng, config, food_type_count) {
-        Ok(reachability) => {
-            if ParseabilityGate::validate(genome).is_ok() {
-                Ok(reachability)
-            } else {
-                *genome = snapshot;
-                Err(MutationSkipReason::ParseabilityViolation)
-            }
-        }
-        Err(reason) => {
-            *genome = snapshot;
-            Err(reason)
-        }
-    }
+    apply_gated(genome, |genome| {
+        InputRefMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
+    })
 }
 
 pub(crate) fn topology_operator_key(op: TopologyOperator) -> MutationOperator {

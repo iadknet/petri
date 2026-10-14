@@ -517,14 +517,14 @@ fn only_east_edge_appended(
     a: &CgpGraphBackendDef,
     accept: impl Fn(&GraphSource) -> bool,
 ) -> bool {
-    a.compute_nodes == b.compute_nodes
-        && a.output_sinks.len() == b.output_sinks.len()
-        && a.output_sinks
+    a.compute_nodes() == b.compute_nodes()
+        && a.output_sinks().len() == b.output_sinks().len()
+        && a.output_sinks()
             .iter()
-            .zip(&b.output_sinks)
+            .zip(b.output_sinks())
             .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y)
         && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
-            .is_some_and(|edge| accept(&edge.source) && edge.weight > 0.0)
+            .is_some_and(|edge| accept(&edge.source()) && edge.weight() > 0.0)
 }
 
 /// The Task B-correct VM copy: the ring added to the table, the read's
@@ -596,11 +596,11 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
         |before, after| {
             let (b, a) = (graph(before), graph(after));
             only_scaffold_backend_changed(before, after)
-                && a.compute_nodes == b.compute_nodes
+                && a.compute_nodes() == b.compute_nodes()
                 && move_sink(a, 0).inputs.is_empty()
-                && a.output_sinks
+                && a.output_sinks()
                     .iter()
-                    .zip(&b.output_sinks)
+                    .zip(b.output_sinks())
                     .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)) || x == y)
         },
     );
@@ -773,14 +773,14 @@ fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionSt
 /// the split inserted before it).
 fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
     graph
-        .compute_nodes
+        .compute_nodes()
         .iter()
         .enumerate()
         .filter(|(_, node)| {
             node.inputs.len() == 1
-                && node.inputs[0].weight == 1.0
+                && node.inputs[0].weight() == 1.0
                 && matches!(
-                    node.inputs[0].source,
+                    node.inputs[0].source(),
                     GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0
@@ -907,6 +907,7 @@ pub fn qualified_paths() -> Vec<QualifiedPath> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeMut, EdgeOccurrence, EdgeSurface};
 
     /// `form`'s step specs and the genome before each step, then the last
     /// step's result, replayed with the pinned seeds.
@@ -955,13 +956,23 @@ mod tests {
         (accept, before, after)
     }
 
-    fn born_edge_mut(genome: &mut CreatureGenome) -> &mut GraphEdge {
-        scaffold_graph_mut(genome)
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
-            .expect("the fixed catalog holds every Move sink")
-            .inputs
-            .last_mut()
-            .expect("the born step appended an edge")
+    /// The last edge of the `Move(EAST)` sink: the edge the step appended.
+    fn born_edge(graph: &CgpGraphBackendDef) -> EdgeOccurrence {
+        let east = graph
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
+            .expect("the fixed catalog holds every Move sink");
+        let last = graph
+            .surface_edges(east)
+            .len()
+            .checked_sub(1)
+            .expect("the step appended an edge");
+        EdgeOccurrence::new(east, last)
+    }
+
+    fn born_edge_mut(genome: &mut CreatureGenome) -> EdgeMut<'_> {
+        let graph = scaffold_graph_mut(genome);
+        let born = born_edge(graph);
+        graph.edge_mut(born)
     }
 
     /// The born edge must carry a strictly positive weight: the same edge at
@@ -972,7 +983,7 @@ mod tests {
         let (accept, before, mut zero_weight) = born_ring_step();
 
         // Act
-        born_edge_mut(&mut zero_weight).weight = 0.0;
+        born_edge_mut(&mut zero_weight).set_weight(0.0);
 
         // Assert
         assert!(!accept(&before, &zero_weight));
@@ -987,17 +998,13 @@ mod tests {
 
         // Act
         let graph = scaffold_graph_mut(&mut elsewhere);
-        let edge = graph
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
-            .expect("the fixed catalog holds every Move sink")
-            .inputs
-            .pop()
-            .expect("the born step appended an edge");
-        graph
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(0)))
-            .expect("the fixed catalog holds every Move sink")
-            .inputs
-            .push(edge);
+        let born = born_edge(graph);
+        let edge = *graph.edge_at(born);
+        graph.remove_edge(born);
+        let surface = graph
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .expect("the fixed catalog holds every Move sink");
+        graph.push_edge(surface, edge);
 
         // Assert
         assert!(!accept(&before, &elsewhere));
@@ -1011,10 +1018,10 @@ mod tests {
         let (accept, before, mut other_sub) = born_ring_step();
 
         // Act
-        born_edge_mut(&mut other_sub).source = GraphSource::InputLeaf {
+        born_edge_mut(&mut other_sub).set_source(GraphSource::InputLeaf {
             ref_idx: 1,
             sub_idx: 1,
-        };
+        });
 
         // Assert
         assert!(!accept(&before, &other_sub));
@@ -1031,13 +1038,7 @@ mod tests {
         assert!(accept(before, after));
 
         let mut zero_weight = after.clone();
-        scaffold_graph_mut(&mut zero_weight)
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
-            .expect("the fixed catalog holds every Move sink")
-            .inputs
-            .last_mut()
-            .expect("the step appended an edge")
-            .weight = 0.0;
+        born_edge_mut(&mut zero_weight).set_weight(0.0);
 
         assert!(!accept(before, &zero_weight));
     }
@@ -1054,7 +1055,10 @@ mod tests {
         assert!(accept(before, after));
 
         let mut changed_compute = after.clone();
-        scaffold_graph_mut(&mut changed_compute).compute_nodes[0].inputs[0].weight += 1.0;
+        let graph = scaffold_graph_mut(&mut changed_compute);
+        let first = EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0);
+        let weight = graph.edge_at(first).weight();
+        graph.edge_mut(first).set_weight(weight + 1.0);
 
         assert!(!accept(before, &changed_compute));
     }

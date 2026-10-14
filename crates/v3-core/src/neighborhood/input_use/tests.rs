@@ -24,10 +24,7 @@ fn barriers() -> InputReference {
 }
 
 fn leaf(ref_idx: u16, sub_idx: u16) -> GraphEdge {
-    GraphEdge {
-        source: GraphSource::InputLeaf { ref_idx, sub_idx },
-        weight: 1.0,
-    }
+    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 1.0)
 }
 
 fn channel(reference: &InputReference, sub_idx: u16) -> Channel {
@@ -46,8 +43,8 @@ fn graph_node(
     edges: Vec<GraphEdge>,
 ) -> NodeGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes = compute;
-    def.sink_mut(sink).expect("fixed catalog").inputs = edges;
+    def = def.with_compute_nodes(compute);
+    crate::creature::genome::cgp::test_support::set_sink_inputs(&mut def, sink, edges);
     NodeGenome {
         node_id: NodeId::new(id),
         input_refs: refs,
@@ -175,23 +172,19 @@ fn an_executed_read_into_a_custom_output_has_no_effect() {
 
 #[test]
 fn a_structurally_dead_compute_node_still_reads_its_inputs() {
-    let dead = ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![leaf(0, 0)],
-        plasticity: None,
-    };
+    let dead = ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0, 0)], None);
     let parent = Fixture::new().read(&genome(vec![graph_node(
         0,
         vec![food_here()],
         vec![dead],
         OutputSinkKind::CustomOutput(0),
-        vec![GraphEdge {
-            source: GraphSource::SharedMemory {
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
                 slot: 3,
                 previous: true,
             },
-            weight: 1.0,
-        }],
+            1.0,
+        )],
     )]));
     let food = channel(&food_here(), 0);
     assert!(!parent.connected.contains(&food));

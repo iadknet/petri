@@ -422,12 +422,12 @@ pub fn consumers(genome: &CreatureGenome) -> BTreeMap<Family, BTreeSet<usize>> {
         match &node.backend_def {
             BackendDef::Graph(graph) => {
                 let edges = graph
-                    .compute_nodes
+                    .compute_nodes()
                     .iter()
                     .flat_map(|compute| &compute.inputs)
-                    .chain(graph.output_sinks.iter().flat_map(|sink| &sink.inputs));
+                    .chain(graph.output_sinks().iter().flat_map(|sink| &sink.inputs));
                 for edge in edges {
-                    match edge.source {
+                    match edge.source() {
                         GraphSource::InputLeaf { ref_idx, .. } => {
                             if let Some(family) = reference(ref_idx) {
                                 add(family);
@@ -613,23 +613,11 @@ pub fn ablation_supported(genome: &CreatureGenome) -> bool {
 /// [`ablate`].
 fn for_each_ref_idx(backend: &mut BackendDef, mut visit: impl FnMut(&mut u16)) {
     match backend {
-        BackendDef::Graph(graph) => {
-            let edges = graph
-                .compute_nodes
-                .iter_mut()
-                .flat_map(|compute| &mut compute.inputs)
-                .chain(
-                    graph
-                        .output_sinks
-                        .iter_mut()
-                        .flat_map(|sink| &mut sink.inputs),
-                );
-            for edge in edges {
-                if let GraphSource::InputLeaf { ref_idx, .. } = &mut edge.source {
-                    visit(ref_idx);
-                }
-            }
-        }
+        BackendDef::Graph(graph) => graph.redirect_leaf_reads(|ref_idx, _| {
+            let mut redirected = ref_idx;
+            visit(&mut redirected);
+            (redirected != ref_idx).then_some(redirected)
+        }),
         BackendDef::Vm(vm) => {
             for instruction in &mut vm.program {
                 if let VmInstruction::ReadInput { ref_idx, .. } = instruction {

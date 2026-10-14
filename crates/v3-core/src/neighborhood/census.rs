@@ -72,14 +72,10 @@ fn with_edge(
     let BackendDef::Graph(graph) = &mut edited.nodes[node].backend_def else {
         panic!("the one-edge census reads a Graph node");
     };
-    graph
-        .sink_mut(OutputSinkKind::ActionVote(sink))
-        .expect("every Graph node carries the fixed vote sinks")
-        .inputs
-        .push(GraphEdge {
-            source,
-            weight: 1.0,
-        });
+    let surface = graph
+        .sink_surface(OutputSinkKind::ActionVote(sink))
+        .expect("every Graph node carries the fixed vote sinks");
+    graph.push_edge(surface, GraphEdge::new(source, 1.0));
     edited
 }
 

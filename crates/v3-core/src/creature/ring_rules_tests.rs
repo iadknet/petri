@@ -22,10 +22,7 @@ fn census_of(genomes: &[CreatureGenome]) -> RingRuleCensus {
 }
 
 fn leaf(ref_idx: u16, sub_idx: u16, weight: f32) -> GraphEdge {
-    GraphEdge {
-        source: GraphSource::InputLeaf { ref_idx, sub_idx },
-        weight,
-    }
+    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, weight)
 }
 
 fn node(id: u32, refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
@@ -38,7 +35,8 @@ fn node(id: u32, refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGeno
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
-    def.sink_mut(kind).expect("fixed catalog").inputs.push(edge);
+    let surface = def.sink_surface(kind).expect("fixed catalog");
+    def.push_edge(surface, edge);
 }
 
 fn single(def: CgpGraphBackendDef, refs: Vec<InputReference>) -> CreatureGenome {

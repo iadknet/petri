@@ -7,7 +7,7 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use v3_core::contracts::{InputReference, Position, WorldInputKey};
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
+use v3_core::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
 use v3_core::creature::genome::VmBackendDef;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::{
@@ -48,16 +48,17 @@ fn one_node(node: NodeGenome) -> CreatureGenome {
 /// unless `wired` names its kind; one non-relevant input reference.
 fn graph_node(id: u32, wired: Option<OutputSinkKind>) -> NodeGenome {
     let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-    for sink in &mut graph.output_sinks {
-        if Some(sink.kind) == wired {
-            sink.inputs.push(GraphEdge {
-                source: GraphSource::InputLeaf {
+    if let Some(sink) = wired.and_then(|kind| graph.sink_surface(kind)) {
+        graph.push_edge(
+            sink,
+            GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: 0,
                 },
-                weight: 1.0,
-            });
-        }
+                1.0,
+            ),
+        );
     }
     node(
         id,
@@ -649,11 +650,15 @@ fn touching_children_are_classed_on_the_battery_and_viable_needs_a_behavior_chan
     let mut dead = parent.clone();
     for n in &mut dead.nodes {
         if let BackendDef::Graph(graph) = &mut n.backend_def {
-            for sink in &mut graph.output_sinks {
-                if matches!(sink.kind, OutputSinkKind::ActionVote(_)) {
-                    sink.inputs.clear();
-                }
-            }
+            let sinks = graph
+                .output_sinks()
+                .iter()
+                .map(|sink| match sink.kind {
+                    OutputSinkKind::ActionVote(_) => OutputSink::new(sink.kind, Vec::new()),
+                    _ => sink.clone(),
+                })
+                .collect();
+            *graph = graph.clone().with_output_sinks(sinks);
         }
     }
     let touching = |child: &CreatureGenome| Birth {

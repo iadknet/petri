@@ -3,7 +3,7 @@ use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
@@ -89,15 +89,14 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: Vec::new(),
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: Vec::new(),
-                }],
-            }),
+            backend_def: BackendDef::Graph(
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(Vec::new())
+                    .with_output_sinks(vec![OutputSink::new(
+                        OutputSinkKind::CustomOutput(0),
+                        Vec::new(),
+                    )]),
+            ),
             targets: Vec::new(),
         }],
     }
@@ -221,15 +220,14 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
             NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: Vec::new(),
-                    output_sinks: vec![OutputSink {
-                        kind: OutputSinkKind::CustomOutput(0),
-                        inputs: Vec::new(),
-                    }],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(Vec::new())
+                        .with_output_sinks(vec![OutputSink::new(
+                            OutputSinkKind::CustomOutput(0),
+                            Vec::new(),
+                        )]),
+                ),
                 targets: vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
@@ -239,15 +237,14 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
             NodeGenome {
                 node_id: NodeId::new(1),
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: Vec::new(),
-                    output_sinks: vec![OutputSink {
-                        kind: OutputSinkKind::CustomOutput(0),
-                        inputs: Vec::new(),
-                    }],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(Vec::new())
+                        .with_output_sinks(vec![OutputSink::new(
+                            OutputSinkKind::CustomOutput(0),
+                            Vec::new(),
+                        )]),
+                ),
                 targets: vec![],
             },
         ],
@@ -1539,13 +1536,16 @@ fn an_edge_operator_selects_the_module_that_has_an_edge() {
     let BackendDef::Graph(ref mut def) = edged.backend_def else {
         panic!("fixture must be a Graph module");
     };
-    def.output_sinks[0].inputs.push(GraphEdge {
-        source: GraphSource::SharedMemory {
-            slot: 0,
-            previous: false,
-        },
-        weight: 0.5,
-    });
+    def.push_edge(
+        EdgeSurface::SinkInput(0),
+        GraphEdge::new(
+            GraphSource::SharedMemory {
+                slot: 0,
+                previous: false,
+            },
+            0.5,
+        ),
+    );
     genome.nodes.push(edged);
 
     let edge_operators = [
@@ -1756,23 +1756,23 @@ proptest::proptest! {
 #[test]
 fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind};
-    use crate::simulation::actions::cgp_reproduction::capture_birth_weights;
+    use crate::simulation::actions::cgp_reproduction::capture_def_seeds;
     use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);
     let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
         unreachable!()
     };
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![GraphEdge {
-            source: GraphSource::SharedMemory {
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
                 slot: 0,
                 previous: false,
             },
-            weight: 0.5,
-        }],
-        plasticity: None,
-    });
+            0.5,
+        )],
+        None,
+    ));
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;
     for seed in 0..32 {
@@ -1781,7 +1781,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         let BackendDef::Graph(def) = &mut tracked.nodes[0].backend_def else {
             unreachable!()
         };
-        capture_birth_weights(def, &[Box::new([0.75])]);
+        capture_def_seeds(def, &[Box::new([0.75])]);
         let mut plain_rng = rng(seed);
         let mut tracked_rng = rng(seed);
         let plain_summary = apply_events(&mut plain, &config, &[0], &mut plain_rng, 6);
@@ -1796,9 +1796,12 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         assert_eq!(plain_rng.next_u64(), tracked_rng.next_u64());
         for node in &tracked.nodes {
             if let BackendDef::Graph(def) = &node.backend_def {
-                if let Some(weights) = &def.birth_weights {
-                    assert_eq!(weights.len(), def.compute_nodes.len());
-                    for (row, node) in weights.iter().zip(&def.compute_nodes) {
+                if let Some(weights) = def
+                    .birth_seeds()
+                    .and_then(crate::creature::genome::cgp::BirthSeeds::rows)
+                {
+                    assert_eq!(weights.len(), def.compute_nodes().len());
+                    for (row, node) in weights.iter().zip(def.compute_nodes()) {
                         assert_eq!(row.len(), node.inputs.len());
                     }
                 }
@@ -1809,7 +1812,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
         unreachable!()
     };
-    capture_birth_weights(def, &[Box::new([0.75])]);
+    capture_def_seeds(def, &[Box::new([0.75])]);
     let before = original.clone();
     assert_eq!(
         apply_graph_event(
@@ -1826,5 +1829,10 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     let BackendDef::Graph(def) = &original.nodes[0].backend_def else {
         unreachable!()
     };
-    assert_eq!(def.birth_weights, Some(vec![vec![Some(0.75)]]));
+    assert_eq!(
+        def.birth_seeds(),
+        Some(&crate::creature::genome::cgp::BirthSeeds::Rows(vec![vec![
+            Some(0.75)
+        ]]))
+    );
 }

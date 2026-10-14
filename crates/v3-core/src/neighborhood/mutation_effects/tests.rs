@@ -16,18 +16,11 @@ fn fixture() -> (SimulationConfig, Battery) {
 }
 
 fn constant(value: f32) -> ComputeNode {
-    ComputeNode {
-        kind: ComputeNodeKind::Constant(value),
-        inputs: Vec::new(),
-        plasticity: None,
-    }
+    ComputeNode::new(ComputeNodeKind::Constant(value), Vec::new(), None)
 }
 
 fn from_node(index: u16, weight: f32) -> GraphEdge {
-    GraphEdge {
-        source: GraphSource::ComputeNode(index),
-        weight,
-    }
+    GraphEdge::new(GraphSource::ComputeNode(index), weight)
 }
 
 /// A genome that votes `Eat` with `weight` from a constant 1.0, plus extra
@@ -58,11 +51,11 @@ fn attribution(parent: &CreatureGenome, child: &CreatureGenome) -> Attribution {
 /// A stateful compute node wired to nothing: a rate edit changes graph
 /// runtime state only (the node count, and so the cost, is unchanged).
 fn unwired_integrator(rate: f32) -> ComputeNode {
-    ComputeNode {
-        kind: ComputeNodeKind::DecayIntegrator(rate),
-        inputs: vec![from_node(0, 1.0)],
-        plasticity: None,
-    }
+    ComputeNode::new(
+        ComputeNodeKind::DecayIntegrator(rate),
+        vec![from_node(0, 1.0)],
+        None,
+    )
 }
 
 #[test]
@@ -124,7 +117,7 @@ fn an_edit_to_a_never_dispatched_node_is_unexecuted() {
         ..stray
     });
     let mut child = parent.clone();
-    graph_def(&mut child, 1).compute_nodes[0].kind = ComputeNodeKind::Constant(4.0);
+    graph_def(&mut child, 1).set_compute_kind(0, ComputeNodeKind::Constant(4.0));
     assert_eq!(
         edited_node_ids(&parent, &child),
         BTreeSet::from([NodeId::new(9)])
@@ -147,10 +140,11 @@ fn a_changed_vote_with_the_same_action_is_masked_before_selection() {
 fn a_graph_parameter_decoded_to_the_same_action_is_masked_before_selection() {
     let with_param = |value: f32| {
         let mut genome = eater(1.0, Vec::new());
-        graph_def(&mut genome, 0)
-            .sink_mut(OutputSinkKind::ActionParam(ActionParamField::EatFoodType))
-            .expect("fixed catalog")
-            .inputs = vec![from_node(0, value)];
+        crate::creature::genome::cgp::test_support::set_sink_inputs(
+            graph_def(&mut genome, 0),
+            OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
+            vec![from_node(0, value)],
+        );
         genome
     };
     let result = attribution(&with_param(0.1), &with_param(0.2));
@@ -182,26 +176,26 @@ fn computation_and_state_changes_count_masked_and_silent_with_state() {
 #[test]
 fn a_dispatched_edit_nothing_records_is_unresolved() {
     let mut parent = controls::barrier_pair().0;
-    let barrier = |weight| GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx: 0,
-            sub_idx: 0,
-        },
-        weight,
+    let barrier = |weight| {
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
+            weight,
+        )
     };
-    graph_def(&mut parent, 0)
-        .sink_mut(OutputSinkKind::ActionVote(
-            crate::creature::genome::vote::VoteSink::Eat,
-        ))
-        .expect("fixed catalog")
-        .inputs = vec![barrier(1.0)];
+    crate::creature::genome::cgp::test_support::set_sink_inputs(
+        graph_def(&mut parent, 0),
+        OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
+        vec![barrier(1.0)],
+    );
     let mut child = parent.clone();
-    graph_def(&mut child, 0)
-        .sink_mut(OutputSinkKind::ActionVote(
-            crate::creature::genome::vote::VoteSink::Eat,
-        ))
-        .expect("fixed catalog")
-        .inputs = vec![barrier(2.0)];
+    crate::creature::genome::cgp::test_support::set_sink_inputs(
+        graph_def(&mut child, 0),
+        OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
+        vec![barrier(2.0)],
+    );
     let result = attribution(&parent, &child);
     assert_eq!(result.category, Category::Unresolved);
     assert!(!result.silent_with_state_or_cost);
@@ -222,7 +216,7 @@ fn an_entry_change_marks_both_entries_edited() {
 }
 
 #[test]
-fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birth_weights() {
+fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birth_seeds() {
     let with = |value: f32| graph_genome(Vec::new(), vec![constant(value)], Vec::new());
     assert_ne!(genome_identity(&with(0.0)), genome_identity(&with(-0.0)));
     assert_eq!(
@@ -230,7 +224,21 @@ fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birt
         genome_identity(&with(f32::from_bits(0x7fc0_0001)))
     );
     let mut learned = with(1.0);
-    graph_def(&mut learned, 0).birth_weights = Some(vec![vec![Some(0.5)]]);
+    let def = graph_def(&mut learned, 0);
+    def.push_edge(
+        crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+        crate::creature::genome::cgp::GraphEdge::new(
+            crate::creature::genome::cgp::GraphSource::ComputeNode(0),
+            0.25,
+        ),
+    );
+    let mut seeded = learned.clone();
+    graph_def(&mut seeded, 0).seed_birth(crate::creature::genome::cgp::BirthSeeds::Rows(vec![
+        vec![Some(0.5)],
+    ]));
+    assert_eq!(genome_identity(&seeded), genome_identity(&learned));
+    let mut learned = with(1.0);
+    graph_def(&mut learned, 0).seed_birth(crate::creature::genome::cgp::BirthSeeds::Empty);
     assert_eq!(genome_identity(&learned), genome_identity(&with(1.0)));
 }
 

@@ -1155,7 +1155,7 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                 else {
                     panic!()
                 };
-                assert_eq!(a.compute_nodes, b.compute_nodes);
+                assert_eq!(a.compute_nodes(), b.compute_nodes());
                 assert_eq!(
                     fixtures::move_sink(a, fixtures::EAST).inputs.len(),
                     fixtures::move_sink(b, fixtures::EAST).inputs.len() + 1
@@ -1174,7 +1174,7 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                 else {
                     panic!()
                 };
-                assert_eq!(a.compute_nodes, b.compute_nodes);
+                assert_eq!(a.compute_nodes(), b.compute_nodes());
                 assert_eq!(
                     fixtures::move_sink(a, fixtures::EAST).inputs.len(),
                     fixtures::move_sink(b, fixtures::EAST).inputs.len() + 1
@@ -1519,7 +1519,9 @@ fn synthetic_module_use(score_loss: i16) -> ModuleUse {
 
 #[test]
 fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::creature::genome::cgp::{
+        ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
+    };
     let starts = starting_forms();
     let scaffold = |name: &str| {
         let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1555,72 +1557,76 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
     let BackendDef::Graph(pure) = scaffold("graph_prepared") else {
         unreachable!()
     };
-    let edge = |source| GraphEdge {
-        source,
-        weight: 1.0,
-    };
+    let edge = |source| GraphEdge::new(source, 1.0);
     let mut stateful_kind = pure.clone();
-    stateful_kind.compute_nodes[0].kind = ComputeNodeKind::Momentum(0.5);
+    stateful_kind.set_compute_kind(0, ComputeNodeKind::Momentum(0.5));
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(stateful_kind)),
         DestinationKind::GraphStateful
     );
     let mut self_reference = pure.clone();
-    self_reference.compute_nodes[0]
-        .inputs
-        .push(edge(GraphSource::ComputeNode(0)));
+    self_reference.push_edge(
+        EdgeSurface::ComputeInput(0),
+        edge(GraphSource::ComputeNode(0)),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(self_reference)),
         DestinationKind::GraphStateful
     );
     let mut forward = pure.clone();
-    forward.compute_nodes[0]
-        .inputs
-        .push(edge(GraphSource::ComputeNode(1)));
+    forward.push_edge(
+        EdgeSurface::ComputeInput(0),
+        edge(GraphSource::ComputeNode(1)),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(forward)),
         DestinationKind::GraphStateful
     );
     let mut backward = pure.clone();
-    backward.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Relu,
-        inputs: vec![edge(GraphSource::ComputeNode(0))],
-        plasticity: None,
-    });
+    backward.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Relu,
+        vec![edge(GraphSource::ComputeNode(0))],
+        None,
+    ));
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(backward)),
         DestinationKind::GraphPureWithEffect
     );
     let mut previous = pure.clone();
-    previous.output_sinks[0]
-        .inputs
-        .push(edge(GraphSource::SharedMemory {
+    previous.push_edge(
+        EdgeSurface::SinkInput(0),
+        edge(GraphSource::SharedMemory {
             slot: 0,
             previous: true,
-        }));
+        }),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(previous)),
         DestinationKind::GraphStateful
     );
     let mut current_memory = pure.clone();
-    current_memory.output_sinks[0]
-        .inputs
-        .push(edge(GraphSource::SharedMemory {
+    current_memory.push_edge(
+        EdgeSurface::SinkInput(0),
+        edge(GraphSource::SharedMemory {
             slot: 0,
             previous: false,
-        }));
+        }),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(current_memory)),
         DestinationKind::GraphPureWithEffect
     );
     let mut plastic = pure;
-    plastic.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
-        rule: crate::creature::genome::HebbianRule::Classic,
-        learning_rate: 0.1,
-        weight_clamp: 1.0,
-        lamarckian: false,
-        modulation: None,
-    });
+    plastic.set_node_plasticity(
+        0,
+        Some(crate::creature::genome::PlasticityConfig {
+            rule: crate::creature::genome::HebbianRule::Classic,
+            learning_rate: 0.1,
+            weight_clamp: 1.0,
+            lamarckian: false,
+            modulation: None,
+        }),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(plastic)),
         DestinationKind::GraphStateful
@@ -2573,29 +2579,26 @@ fn recruitment_paths_destination_kind_reads_a_wired_vote_sink_alone_as_an_effect
         .inputs
         .is_empty());
     let mut inert = prepared.clone();
-    for sink in &mut inert.output_sinks {
-        sink.inputs.clear();
-    }
+    crate::creature::genome::cgp::test_support::edit_sinks(&mut inert, |sinks| {
+        sinks.iter_mut().for_each(|sink| sink.inputs.clear());
+    });
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(inert.clone())),
         DestinationKind::GraphPureNoEffect
     );
     let mut vote_only = inert;
-    vote_only
-        .output_sinks
-        .iter_mut()
-        .find(|sink| {
-            sink.kind
-                == crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                    crate::creature::genome::vote::VoteSink::Terminate,
-                )
-        })
-        .unwrap()
-        .inputs
-        .push(crate::creature::genome::cgp::GraphEdge {
-            source: crate::creature::genome::cgp::GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+    let terminate = vote_only
+        .sink_surface(crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+            crate::creature::genome::vote::VoteSink::Terminate,
+        ))
+        .unwrap();
+    vote_only.push_edge(
+        terminate,
+        crate::creature::genome::cgp::GraphEdge::new(
+            crate::creature::genome::cgp::GraphSource::ComputeNode(0),
+            1.0,
+        ),
+    );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(vote_only)),
         DestinationKind::GraphPureWithEffect

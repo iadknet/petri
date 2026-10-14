@@ -81,7 +81,11 @@ proptest! {
                                 let at=vm.program.iter().position(|i| matches!(i,VmInstruction::WriteRouteGate {slot,..} if *slot==added_slot)).unwrap();
                                 vm.program.remove(at);
                             }
-                            BackendDef::Graph(g) => {g.output_sinks.iter_mut().find(|s| s.kind==OutputSinkKind::RouterGate(added_slot)).unwrap().inputs.pop();}
+                            BackendDef::Graph(g) => {
+                                let gate = g.sink_surface(OutputSinkKind::RouterGate(added_slot)).unwrap();
+                                let last = g.surface_edges(gate).len() - 1;
+                                g.remove_edge(crate::creature::genome::cgp::EdgeOccurrence::new(gate, last));
+                            }
                         }
                         prop_assert_eq!(&restored,&base.nodes[0].backend_def);
                     } else {
@@ -108,26 +112,19 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
     // Keep a stateful surviving graph downstream of the attachment.
     let mut temporal = node(9, &[1]);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::DecayIntegrator(0.5),
-        inputs: vec![GraphEdge {
-            source: GraphSource::SharedMemory {
+    def.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::DecayIntegrator(0.5),
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
                 slot: 3,
                 previous: false,
             },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
-    def.output_sinks
-        .iter_mut()
-        .find(|s| s.kind == OutputSinkKind::WriteSlot(4))
-        .unwrap()
-        .inputs
-        .push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+            1.0,
+        )],
+        None,
+    ));
+    let surface = def.sink_surface(OutputSinkKind::WriteSlot(4)).unwrap();
+    def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     temporal.backend_def = BackendDef::Graph(def);
     base.nodes[0].targets[0].target_id = temporal.node_id;
     base.nodes.push(temporal);

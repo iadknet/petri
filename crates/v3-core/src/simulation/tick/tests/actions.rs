@@ -631,16 +631,16 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
     };
     for lamarckian in [false, true] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Constant(1.0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+        def.append_compute_node(ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 0.5,
-            }],
-            plasticity: Some(PlasticityConfig {
+                0.5,
+            )],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.5,
                 weight_clamp: 2.0,
@@ -650,7 +650,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
                     trace_decay: 0.5,
                 }),
             }),
-        });
+        ));
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

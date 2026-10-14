@@ -33,7 +33,7 @@ pub(crate) fn derive_cgp_annotations(
 
     // Stateful flags from live compute nodes
     for &idx in &live_indices {
-        let node = &def.compute_nodes[idx];
+        let node = &def.compute_nodes()[idx];
         if node.plasticity.is_some() {
             has_stateful_behavior = true;
         }
@@ -53,12 +53,12 @@ pub(crate) fn derive_cgp_annotations(
         has_stateful_behavior |= node
             .inputs
             .iter()
-            .any(|edge| matches!(edge.source, GraphSource::SharedMemory { .. }));
+            .any(|edge| matches!(edge.source(), GraphSource::SharedMemory { .. }));
     }
 
     // Read classes from InputLeaf edges anywhere on the wired surface.
     for edge in wired_surface_edges(def, &live_indices) {
-        if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
+        if let GraphSource::InputLeaf { ref_idx, .. } = edge.source() {
             if let Some(input_ref) = input_refs.get(ref_idx as usize) {
                 read_classes.insert(classify_input_ref(input_ref));
             }
@@ -77,7 +77,7 @@ pub(crate) fn derive_cgp_annotations(
     }
 
     // Write classes from wired output sinks
-    for sink in &def.output_sinks {
+    for sink in def.output_sinks() {
         if sink.inputs.is_empty() {
             continue;
         }
@@ -119,12 +119,9 @@ mod tests {
 
     #[test]
     fn empty_graph_no_annotations() {
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-        };
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(Vec::new());
         let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[]);
         assert!(reads.is_empty());
         assert!(writes.is_empty());
@@ -134,34 +131,25 @@ mod tests {
 
     #[test]
     fn wired_sink_produces_write_class() {
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            }],
-            output_sinks: vec![
-                OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                },
-                OutputSink {
-                    kind: OutputSinkKind::RouterGate(0),
-                    inputs: Vec::new(), // unwired — should not count
-                },
-            ],
-        };
+                    1.0,
+                )],
+                None,
+            )])
+            .with_output_sinks(vec![
+                OutputSink::new(
+                    OutputSinkKind::CustomOutput(0),
+                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                ),
+                OutputSink::new(OutputSinkKind::RouterGate(0), Vec::new()),
+            ]);
         let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
         })];
@@ -175,22 +163,16 @@ mod tests {
 
     #[test]
     fn stateful_node_detected() {
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::DecayIntegrator(0.5),
-                inputs: Vec::new(),
-                plasticity: None,
-            }],
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-        };
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::DecayIntegrator(0.5),
+                Vec::new(),
+                None,
+            )])
+            .with_output_sinks(vec![OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )]);
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
@@ -201,22 +183,16 @@ mod tests {
             OutputSinkKind::ActionVote(VoteSink::Eat),
             OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
         ] {
-            let def = CgpGraphBackendDef {
-                projections: Vec::new(),
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Constant(1.0),
-                    inputs: Vec::new(),
-                    plasticity: None,
-                }],
-                output_sinks: vec![OutputSink {
+            let def = CgpGraphBackendDef::new_with_fixed_outputs()
+                .with_compute_nodes(vec![ComputeNode::new(
+                    ComputeNodeKind::Constant(1.0),
+                    Vec::new(),
+                    None,
+                )])
+                .with_output_sinks(vec![OutputSink::new(
                     kind,
-                    inputs: vec![GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 1.0,
-                    }],
-                }],
-            };
+                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                )]);
             let (_, writes, _, _) = derive_cgp_annotations(&def, &[]);
             assert_eq!(writes, vec![MeshWriteClass::Action], "{kind:?}");
         }
@@ -224,22 +200,16 @@ mod tests {
 
     #[test]
     fn memory_sink_is_stateful() {
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Constant(1.0),
-                inputs: Vec::new(),
-                plasticity: None,
-            }],
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::WriteSlot(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-        };
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::Constant(1.0),
+                Vec::new(),
+                None,
+            )])
+            .with_output_sinks(vec![OutputSink::new(
+                OutputSinkKind::WriteSlot(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )]);
         let (_, writes, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
         assert!(writes.contains(&MeshWriteClass::Memory));
@@ -247,56 +217,49 @@ mod tests {
 
     #[test]
     fn shared_memory_source_is_stateful() {
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::SharedMemory {
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(
+                    GraphSource::SharedMemory {
                         slot: 0,
                         previous: false,
                     },
-                    weight: 1.0,
-                }],
-                plasticity: None,
-            }],
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-        };
+                    1.0,
+                )],
+                None,
+            )])
+            .with_output_sinks(vec![OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )]);
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
 
     #[test]
     fn read_class_from_vote_and_terminate_sink_edges() {
-        let leaf_edge = |ref_idx| GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx,
-                sub_idx: 0,
-            },
-            weight: 1.0,
-        };
-        let def = CgpGraphBackendDef {
-            projections: Vec::new(),
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: vec![
-                OutputSink {
-                    kind: OutputSinkKind::ActionVote(VoteSink::Move(0)),
-                    inputs: vec![leaf_edge(0)],
+        let leaf_edge = |ref_idx| {
+            GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx,
+                    sub_idx: 0,
                 },
-                OutputSink {
-                    kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                    inputs: vec![leaf_edge(1)],
-                },
-            ],
+                1.0,
+            )
         };
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(vec![
+                OutputSink::new(
+                    OutputSinkKind::ActionVote(VoteSink::Move(0)),
+                    vec![leaf_edge(0)],
+                ),
+                OutputSink::new(
+                    OutputSinkKind::ActionVote(VoteSink::Terminate),
+                    vec![leaf_edge(1)],
+                ),
+            ]);
         let input_refs = vec![
             InputReference::World(WorldInputKey::FoodHere {
                 type_idx: OrdinaryFoodTypeId::default(),

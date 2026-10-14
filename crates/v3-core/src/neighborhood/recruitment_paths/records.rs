@@ -214,23 +214,28 @@ impl DestinationKind {
         let previous_memory = |source: &GraphSource| {
             matches!(source, GraphSource::SharedMemory { previous: true, .. })
         };
-        let stateful = graph.compute_nodes.iter().enumerate().any(|(index, node)| {
-            node.kind.class() == NodeClass::Stateful
-                || node.plasticity.is_some()
-                || node.inputs.iter().any(|edge| match edge.source {
-                    GraphSource::ComputeNode(source) => usize::from(source) >= index,
-                    ref source => previous_memory(source),
-                })
-        }) || graph
-            .output_sinks
+        let stateful = graph
+            .compute_nodes()
             .iter()
-            .flat_map(|sink| &sink.inputs)
-            .any(|edge| previous_memory(&edge.source));
+            .enumerate()
+            .any(|(index, node)| {
+                node.kind.class() == NodeClass::Stateful
+                    || node.plasticity.is_some()
+                    || node.inputs.iter().any(|edge| match edge.source() {
+                        GraphSource::ComputeNode(source) => usize::from(source) >= index,
+                        ref source => previous_memory(source),
+                    })
+            })
+            || graph
+                .output_sinks()
+                .iter()
+                .flat_map(|sink| &sink.inputs)
+                .any(|edge| previous_memory(&edge.source()));
         if stateful {
             return Self::GraphStateful;
         }
         let effect = graph
-            .output_sinks
+            .output_sinks()
             .iter()
             .any(|sink| !sink.inputs.is_empty());
         if effect {

@@ -430,7 +430,7 @@ mod tests {
             panic!("node 0 should be graph backend");
         };
         assert_eq!(
-            graph.compute_nodes[1].kind,
+            graph.compute_nodes()[1].kind,
             crate::creature::genome::cgp::ComputeNodeKind::Threshold(24.5 / 1_000.0)
         );
     }

@@ -140,78 +140,57 @@ pub(super) fn assert_neutral(
 /// self-reference, and both wired surfaces (compute inputs and sinks, vote
 /// sinks included), so growth operators are exercised against real structure.
 pub(super) fn base_def() -> CgpGraphBackendDef {
-    CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![
-            ComputeNode {
-                kind: ComputeNodeKind::Sigmoid,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+    CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::Sigmoid,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 3,
                     },
-                    weight: 0.6,
-                }],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::WeightedSum,
-                inputs: vec![
-                    GraphEdge {
-                        source: GraphSource::ComputeNode(0),
-                        weight: 0.9,
-                    },
-                    GraphEdge {
-                        source: GraphSource::SharedMemory {
+                    0.6,
+                )],
+                None,
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::WeightedSum,
+                vec![
+                    GraphEdge::new(GraphSource::ComputeNode(0), 0.9),
+                    GraphEdge::new(
+                        GraphSource::SharedMemory {
                             slot: 2,
                             previous: false,
                         },
-                        weight: -0.5,
-                    },
+                        -0.5,
+                    ),
                 ],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::DecayIntegrator(0.4),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(2), // self-loop
-                    weight: 0.3,
-                }],
-                plasticity: None,
-            },
-        ],
-        output_sinks: vec![
-            OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(2),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-        ],
-    }
+                None,
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::DecayIntegrator(0.4),
+                vec![GraphEdge::new(GraphSource::ComputeNode(2), 0.3)],
+                None,
+            ),
+        ])
+        .with_output_sinks(vec![
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+                vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+        ])
 }
 
 pub(super) fn base_input_refs() -> Vec<InputReference> {
@@ -231,74 +210,55 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 /// operator away from this fixture's parameter-sink edge, which reads a live
 /// introspection reference directly on a non-compute surface.
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
-    CgpGraphBackendDef {
-        projections: Vec::new(),
-        birth_weights: None,
-        compute_nodes: vec![
-            ComputeNode {
-                kind: ComputeNodeKind::WeightedSum,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
+    CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::WeightedSum,
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 3,
                     },
-                    weight: 0.5,
-                }],
-                plasticity: Some(crate::creature::genome::PlasticityConfig {
+                    0.5,
+                )],
+                Some(crate::creature::genome::PlasticityConfig {
                     rule: crate::creature::genome::HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
                     lamarckian: false,
                     modulation: None,
                 }),
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::Sigmoid,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 0.7,
-                }],
-                plasticity: None,
-            },
-        ],
-        output_sinks: vec![
-            OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                inputs: vec![GraphEdge {
-                    // Directly on a non-compute surface: T11.F08's split
-                    // exclusion skips this edge instead of caching its value
-                    // in an identity node ahead of the plasticity-cost
-                    // deduction.
-                    source: GraphSource::InputLeaf {
+            ),
+            ComputeNode::new(
+                ComputeNodeKind::Sigmoid,
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.7)],
+                None,
+            ),
+        ])
+        .with_output_sinks(vec![
+            OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+                vec![GraphEdge::new(
+                    GraphSource::InputLeaf {
                         ref_idx: 2,
                         sub_idx: 0,
                     },
-                    weight: 1.0,
-                }],
-            },
-            OutputSink {
-                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-            },
-        ],
-    }
+                    1.0,
+                )],
+            ),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+        ])
 }
 
 pub(super) fn plasticity_input_refs() -> Vec<InputReference> {
@@ -596,7 +556,7 @@ proptest! {
         // identity node is unambiguous: the only `Add`-kind node afterward.
         let parent = base_def();
         prop_assert!(
-            parent.compute_nodes.iter().all(|n| n.kind != ComputeNodeKind::Add),
+            parent.compute_nodes().iter().all(|n| n.kind != ComputeNodeKind::Add),
             "base graph must not use Add so the split's new node is unambiguous"
         );
         let refs = base_input_refs();
@@ -608,13 +568,13 @@ proptest! {
         // Only compute-consumer splits insert-and-shift; sink/action/execute
         // splits append, leaving every original index unchanged.
         let inserted_idx = child
-            .compute_nodes
+            .compute_nodes()
             .iter()
             .position(|n| n.kind == ComputeNodeKind::Add);
         let Some(inserted_idx) = inserted_idx else {
             return Ok(());
         };
-        let is_append = inserted_idx == parent.compute_nodes.len();
+        let is_append = inserted_idx == parent.compute_nodes().len();
         let mapped = |old_idx: usize| -> usize {
             if is_append || old_idx < inserted_idx {
                 old_idx
@@ -627,7 +587,7 @@ proptest! {
         for sensors in scenarios() {
             let parent_trace = record(&parent, &refs, &config, &sensors);
             let child_trace = record(&child, &refs, &config, &sensors);
-            for old_idx in 0..parent.compute_nodes.len() {
+            for old_idx in 0..parent.compute_nodes().len() {
                 let expected = parent_trace.value_at(0, old_idx);
                 let actual = child_trace.value_at(0, mapped(old_idx));
                 prop_assert!(expected.is_some(), "seed {seed}: node {old_idx} was evaluated");
@@ -701,9 +661,9 @@ proptest! {
         let refs = base_input_refs();
         let mut def = base_def();
         let before: Vec<GraphSource> = def
-            .compute_nodes
+            .compute_nodes()
             .iter()
-            .flat_map(|n| n.inputs.iter().map(|e| e.source))
+            .flat_map(|n| n.inputs.iter().map(|e| e.source()))
             .collect();
         let mut rng = SmallRng::seed_from_u64(seed);
         if raw_field_mutation(&mut def, &refs, &mut rng)
@@ -712,9 +672,9 @@ proptest! {
             return Ok(());
         }
         let after: Vec<GraphSource> = def
-            .compute_nodes
+            .compute_nodes()
             .iter()
-            .flat_map(|n| n.inputs.iter().map(|e| e.source))
+            .flat_map(|n| n.inputs.iter().map(|e| e.source()))
             .collect();
         let diffs: usize = before
             .iter()

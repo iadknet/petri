@@ -28,7 +28,7 @@ pub(crate) fn ensure_hebbian_weights(
     }
 
     let node_weights = &mut hebbian_weights[node_idx];
-    let node_count = def.compute_nodes.len();
+    let node_count = def.compute_nodes().len();
 
     // Ensure inner vec covers all compute nodes.
     if node_weights.len() < node_count {
@@ -36,9 +36,9 @@ pub(crate) fn ensure_hebbian_weights(
     }
 
     // Lazily initialize weights for Hebbian nodes from genome.
-    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+    for (i, cnode) in def.compute_nodes().iter().enumerate() {
         if cnode.plasticity.is_some() && node_weights[i].is_empty() && !cnode.inputs.is_empty() {
-            let weights: Vec<f32> = cnode.inputs.iter().map(|edge| edge.weight).collect();
+            let weights: Vec<f32> = cnode.inputs.iter().map(|edge| edge.weight()).collect();
             node_weights[i] = weights.into_boxed_slice();
         }
     }
@@ -78,12 +78,12 @@ pub(crate) fn apply_hebbian_updates(
     prev_shared_memory: &[f32; 16],
     cost_per_update: f32,
 ) -> (f32, u32, u32) {
-    let compute_count = def.compute_nodes.len();
+    let compute_count = def.compute_nodes().len();
     let mut total_cost: f32 = 0.0;
     let mut update_count: u32 = 0;
     let mut changed_count: u32 = 0;
 
-    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+    for (i, cnode) in def.compute_nodes().iter().enumerate() {
         let cfg = match &cnode.plasticity {
             Some(c) => c,
             None => continue,
@@ -124,7 +124,7 @@ pub(crate) fn apply_hebbian_updates(
             }
 
             let pre = resolve_source_post_convergence(
-                &edge.source,
+                &edge.source(),
                 compute_count,
                 final_outputs,
                 input_refs,
@@ -178,7 +178,7 @@ pub(crate) fn collect_weighted_inputs_hebbian(
     buf.clear();
     buf.extend(node.inputs.iter().enumerate().map(|(edge_idx, edge)| {
         let source_value = resolve_source(
-            &edge.source,
+            &edge.source(),
             current_idx,
             node_count,
             prev_outputs,
@@ -188,14 +188,14 @@ pub(crate) fn collect_weighted_inputs_hebbian(
             shared_memory,
             prev_shared_memory,
         );
-        source_value * effective_weight(edge.weight, learned_weights, edge_idx)
+        source_value * effective_weight(edge.weight(), learned_weights, edge_idx)
     }));
 }
 
 /// Returns `true` if any internal node in this graph def has Hebbian learning enabled.
 #[inline]
 pub(crate) fn has_any_hebbian(def: &CgpGraphBackendDef) -> bool {
-    def.compute_nodes.iter().any(|n| n.plasticity.is_some())
+    def.compute_nodes().iter().any(|n| n.plasticity.is_some())
 }
 
 // Old Hebbian tests removed — CGP Hebbian tests live in mutation/graph/hebbian.rs.

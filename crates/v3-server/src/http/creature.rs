@@ -244,7 +244,7 @@ fn build_creature_diagnostics(
                 }
             }
             BackendDef::Graph(graph) => {
-                for sink in &graph.output_sinks {
+                for sink in graph.output_sinks() {
                     if sink.inputs.is_empty() {
                         continue;
                     }

@@ -95,15 +95,15 @@ impl GraphBuilder {
         kind: ComputeNodeKind,
         inputs: &[(GraphSource, f32)],
     ) -> GraphSource {
-        let index = self.0.compute_nodes.len() as u16;
-        self.0.compute_nodes.push(ComputeNode {
+        let index = self.0.compute_nodes().len() as u16;
+        self.0.append_compute_node(ComputeNode::new(
             kind,
-            inputs: inputs
+            inputs
                 .iter()
-                .map(|&(source, weight)| GraphEdge { source, weight })
+                .map(|&(source, weight)| GraphEdge::new(source, weight))
                 .collect(),
-            plasticity: None,
-        });
+            None,
+        ));
         GraphSource::ComputeNode(index)
     }
 
@@ -118,17 +118,10 @@ impl GraphBuilder {
         kind: OutputSinkKind,
         inputs: &[(GraphSource, f32)],
     ) -> &mut Self {
-        self.0
-            .output_sinks
-            .iter_mut()
-            .find(|sink| sink.kind == kind)
-            .expect("catalog sink")
-            .inputs
-            .extend(
-                inputs
-                    .iter()
-                    .map(|&(source, weight)| GraphEdge { source, weight }),
-            );
+        let sink = self.0.sink_surface(kind).expect("catalog sink");
+        for &(source, weight) in inputs {
+            self.0.push_edge(sink, GraphEdge::new(source, weight));
+        }
         self
     }
 

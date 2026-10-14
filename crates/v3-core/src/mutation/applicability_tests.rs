@@ -25,7 +25,7 @@ use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, GraphEdge};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, EdgeSurface, GraphEdge};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
@@ -115,44 +115,50 @@ fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> C
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // The first `sinks` value sinks and the first `vote_sinks` vote sinks.
     let first_vote = crate::creature::genome::cgp::FIRST_ACTION_VOTE_SINK;
-    let catalog = std::mem::take(&mut def.output_sinks);
-    def.output_sinks = catalog
-        .into_iter()
-        .enumerate()
-        .filter(|&(i, _)| i < size.sinks || (first_vote..first_vote + size.vote_sinks).contains(&i))
-        .map(|(_, sink)| sink)
-        .collect();
-    let vote_start = def.output_sinks.len() - size.vote_sinks;
+    let catalog = def.output_sinks().to_vec();
+    def = def.with_output_sinks(
+        catalog
+            .into_iter()
+            .enumerate()
+            .filter(|&(i, _)| {
+                i < size.sinks || (first_vote..first_vote + size.vote_sinks).contains(&i)
+            })
+            .map(|(_, sink)| sink)
+            .collect(),
+    );
+    let vote_start = def.output_sinks().len() - size.vote_sinks;
     for _ in 0..size.compute_nodes {
-        def.compute_nodes.push(ComputeNode {
-            kind: random_compute_node_kind(rng),
-            inputs: Vec::new(),
-            plasticity: plasticity(rng),
-        });
+        def.append_compute_node(ComputeNode::new(
+            random_compute_node_kind(rng),
+            Vec::new(),
+            plasticity(rng),
+        ));
     }
     // Edges are wired after every node exists so a `ComputeNode` source can
     // name any index, including a dangling one.
-    let compute_count = def.compute_nodes.len() as u16;
-    let edge = |rng: &mut SmallRng| GraphEdge {
-        source: random_graph_source(compute_count, refs, rng),
-        weight: rng.gen_range(-1.0f32..=1.0),
+    let compute_count = def.compute_nodes().len() as u16;
+    let edge = |rng: &mut SmallRng| {
+        GraphEdge::new(
+            random_graph_source(compute_count, refs, rng),
+            rng.gen_range(-1.0f32..=1.0),
+        )
     };
-    for i in 0..def.compute_nodes.len() {
+    for i in 0..def.compute_nodes().len() {
         for _ in 0..size.edges_per_node {
             let e = edge(rng);
-            def.compute_nodes[i].inputs.push(e);
+            def.push_edge(EdgeSurface::ComputeInput(i), e);
         }
     }
     for i in 0..vote_start {
         for _ in 0..size.edges_per_node {
             let e = edge(rng);
-            def.output_sinks[i].inputs.push(e);
+            def.push_edge(EdgeSurface::SinkInput(i), e);
         }
     }
-    for i in vote_start..def.output_sinks.len() {
+    for i in vote_start..def.output_sinks().len() {
         for _ in 0..size.vote_edges {
             let e = edge(rng);
-            def.output_sinks[i].inputs.push(e);
+            def.push_edge(EdgeSurface::SinkInput(i), e);
         }
     }
     def

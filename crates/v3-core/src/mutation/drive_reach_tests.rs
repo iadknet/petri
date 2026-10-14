@@ -20,9 +20,9 @@ use crate::mutation::vm::operators::random_vm_instruction;
 /// The vote sink whose edge count grew between `before` and `after`.
 fn grown_vote_sink(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Option<VoteSink> {
     before
-        .output_sinks
+        .output_sinks()
         .iter()
-        .zip(&after.output_sinks)
+        .zip(after.output_sinks())
         .find(|(old, new)| new.inputs.len() > old.inputs.len())
         .and_then(|(_, new)| match new.kind {
             OutputSinkKind::ActionVote(sink) => Some(sink),

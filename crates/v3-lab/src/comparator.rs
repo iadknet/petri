@@ -45,17 +45,19 @@ pub fn barrier_comparator(founder: &CreatureGenome) -> CreatureGenome {
         panic!("the founder's vote node is a Graph node");
     };
     for direction in RING_MOVES {
-        graph
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(direction)))
-            .expect("the fixed catalog holds every move sink")
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::InputLeaf {
+        let surface = graph
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(direction)))
+            .expect("the fixed catalog holds every move sink");
+        graph.push_edge(
+            surface,
+            GraphEdge::new(
+                GraphSource::InputLeaf {
                     ref_idx: RING_REF,
                     sub_idx: u16::from(direction),
                 },
-                weight: RING_INHIBITION,
-            });
+                RING_INHIBITION,
+            ),
+        );
     }
     genome
 }
@@ -107,26 +109,26 @@ mod tests {
         let BackendDef::Graph(vector) = &area_food(&founder).nodes[VOTE_NODE].backend_def else {
             panic!("graph vote node");
         };
-        assert_eq!(graph.compute_nodes, vector.compute_nodes);
+        assert_eq!(graph.compute_nodes(), vector.compute_nodes());
         for direction in 0..8u8 {
             let sink = OutputSinkKind::ActionVote(VoteSink::Move(direction));
             let edges = &graph.sink(sink).unwrap().inputs;
             let before = &vector.sink(sink).unwrap().inputs;
             let ring: Vec<&GraphEdge> = edges
                 .iter()
-                .filter(|e| matches!(e.source, GraphSource::InputLeaf { ref_idx: 8, .. }))
+                .filter(|e| matches!(e.source(), GraphSource::InputLeaf { ref_idx: 8, .. }))
                 .collect();
             if RING_MOVES.contains(&direction) {
                 assert_eq!(edges.len(), before.len() + 1);
                 assert_eq!(
                     ring,
-                    [&GraphEdge {
-                        source: GraphSource::InputLeaf {
+                    [&GraphEdge::new(
+                        GraphSource::InputLeaf {
                             ref_idx: 8,
                             sub_idx: u16::from(direction),
                         },
-                        weight: RING_INHIBITION,
-                    }]
+                        RING_INHIBITION
+                    )]
                 );
             } else {
                 assert_eq!(edges, before);

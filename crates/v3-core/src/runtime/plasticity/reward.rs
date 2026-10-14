@@ -36,7 +36,7 @@ pub(crate) fn apply_reward_modulated_updates(
     let mut update_count: u32 = 0;
     let mut changed_count: u32 = 0;
 
-    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+    for (i, cnode) in def.compute_nodes().iter().enumerate() {
         let cfg = match &cnode.plasticity {
             Some(c) => c,
             None => continue,

@@ -24,26 +24,28 @@ fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> Plast
 }
 
 fn node(plasticity: Option<PlasticityConfig>, weights: &[f32]) -> ComputeNode {
-    ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: weights
+    ComputeNode::new(
+        ComputeNodeKind::Add,
+        weights
             .iter()
             .enumerate()
-            .map(|(slot, &weight)| GraphEdge {
-                source: GraphSource::SharedMemory {
-                    slot: slot as u8,
-                    previous: false,
-                },
-                weight,
+            .map(|(slot, &weight)| {
+                GraphEdge::new(
+                    GraphSource::SharedMemory {
+                        slot: slot as u8,
+                        previous: false,
+                    },
+                    weight,
+                )
             })
             .collect(),
         plasticity,
-    }
+    )
 }
 
 fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.compute_nodes = compute_nodes;
+    def = def.with_compute_nodes(compute_nodes);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {

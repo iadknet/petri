@@ -251,8 +251,8 @@ pub fn expressed(genome: &CreatureGenome) -> CreatureGenome {
     let mut masked = genome.clone();
     for node in &mut masked.nodes {
         if let BackendDef::Graph(graph) = &mut node.backend_def {
-            for compute in &mut graph.compute_nodes {
-                compute.plasticity = None;
+            for compute in 0..graph.compute_nodes().len() {
+                graph.set_node_plasticity(compute, None);
             }
         }
     }
@@ -1424,14 +1424,17 @@ mod tests {
         let mut plastic = genome.clone();
         for node in &mut plastic.nodes {
             if let BackendDef::Graph(graph) = &mut node.backend_def {
-                for compute in &mut graph.compute_nodes {
-                    compute.plasticity = Some(v3_core::creature::genome::PlasticityConfig {
-                        rule: v3_core::creature::genome::HebbianRule::Classic,
-                        learning_rate: 0.5,
-                        weight_clamp: 5.0,
-                        lamarckian: false,
-                        modulation: None,
-                    });
+                for compute in 0..graph.compute_nodes().len() {
+                    graph.set_node_plasticity(
+                        compute,
+                        Some(v3_core::creature::genome::PlasticityConfig {
+                            rule: v3_core::creature::genome::HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 5.0,
+                            lamarckian: false,
+                            modulation: None,
+                        }),
+                    );
                 }
             }
         }

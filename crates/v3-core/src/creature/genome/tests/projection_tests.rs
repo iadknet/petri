@@ -80,24 +80,25 @@ proptest! {
         prop_assert_eq!(genome.genome_size(), before + projections.len() as u32);
     }
 
-    /// Removing a reference keeps every other projection on the same
-    /// `InputReference` and removes the projections that named it.
+    /// Removing a reference no projection names keeps every projection on
+    /// the same `InputReference`.
     #[test]
     fn reindex_keeps_each_projection_on_its_reference(
-        refs in prop::collection::vec(reference_strategy(), 1..8),
+        refs in prop::collection::vec(reference_strategy(), 2..8),
         picks in prop::collection::vec((any::<prop::sample::Index>(), projection_strategy()), 0..6),
         removed in any::<prop::sample::Index>(),
     ) {
+        let removed = removed.index(refs.len()) as u16;
+        // Every projection names a reference other than the removed one.
+        let others: Vec<u16> = (0..refs.len() as u16).filter(|&i| i != removed).collect();
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.projections = picks
             .iter()
-            .map(|(index, p)| RingProjection { ref_idx: index.index(refs.len()) as u16, ..*p })
+            .map(|(index, p)| RingProjection { ref_idx: others[index.index(others.len())], ..*p })
             .collect();
-        let removed = removed.index(refs.len()) as u16;
         let expected: Vec<(InputReference, RingProjection)> = def
             .projections
             .iter()
-            .filter(|p| p.ref_idx != removed)
             .map(|p| (refs[usize::from(p.ref_idx)].clone(), *p))
             .collect();
         let mut after_refs = refs.clone();

@@ -251,12 +251,12 @@ fn the_event_appends_a_losing_branch_with_its_own_gate_write_on_both_backends() 
             }
             BackendDef::Graph(backend) => {
                 let sink = backend
-                    .output_sinks
+                    .output_sinks()
                     .iter()
                     .find(|s| matches!(s.kind, OutputSinkKind::RouterGate(1)))
                     .unwrap();
                 assert_eq!(sink.inputs.len(), 1);
-                assert_eq!(sink.inputs[0].weight, 1.0);
+                assert_eq!(sink.inputs[0].weight(), 1.0);
             }
         }
         assert_eq!(
@@ -293,9 +293,9 @@ fn ineligible_sources_skip_atomically() {
     cases.push(("zero-register VM", zero_registers));
     let mut no_sink = base();
     let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
-    backend
-        .output_sinks
-        .retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
+    crate::creature::genome::cgp::test_support::edit_sinks(&mut backend, |sinks| {
+        sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
+    });
     no_sink.nodes[0].backend_def = BackendDef::Graph(backend);
     cases.push(("missing RouterGate sink", no_sink));
     let mut full = base();
@@ -386,12 +386,12 @@ fn a_feedback_branch_is_silent_at_birth_and_ordinary_bias_steps_activate_it() {
         feedback_seeded(&mut grown, &[0, 1], 7).unwrap();
         if let BackendDef::Graph(backend) = &grown.nodes[0].backend_def {
             let sink = backend
-                .output_sinks
+                .output_sinks()
                 .iter()
                 .find(|s| matches!(s.kind, OutputSinkKind::RouterGate(1)))
                 .unwrap();
             assert!(
-                !matches!(sink.inputs[0].source, GraphSource::SharedMemory { .. }),
+                !matches!(sink.inputs[0].source(), GraphSource::SharedMemory { .. }),
                 "seed 7 graph gate {:?}",
                 sink.inputs
             );

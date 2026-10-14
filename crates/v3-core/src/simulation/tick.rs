@@ -1541,30 +1541,26 @@ mod final_action_observation_tests {
     }
 
     fn runtime_state_action_genome() -> CreatureGenome {
-        let runtime_output = GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        };
+        let runtime_output = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    projections: Vec::new(),
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::DecayIntegrator(0.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![crate::creature::genome::cgp::OutputSink {
-                        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                            crate::creature::genome::vote::VoteSink::Eat,
-                        ),
-                        inputs: vec![runtime_output],
-                    }],
-                }),
+                backend_def: BackendDef::Graph(
+                    CgpGraphBackendDef::new_with_fixed_outputs()
+                        .with_compute_nodes(vec![ComputeNode::new(
+                            ComputeNodeKind::DecayIntegrator(0.0),
+                            vec![],
+                            None,
+                        )])
+                        .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
+                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                                crate::creature::genome::vote::VoteSink::Eat,
+                            ),
+                            vec![runtime_output],
+                        )]),
+                ),
                 targets: vec![],
             }],
         }
@@ -1724,10 +1720,7 @@ mod final_action_observation_tests {
                 },
                 _ => GraphSource::ComputeNode(0),
             };
-            let edge = GraphEdge {
-                source,
-                weight: 1.0,
-            };
+            let edge = GraphEdge::new(source, 1.0);
             let kind = if substrate == TemporalMemorySubstrate::OperatorState {
                 ComputeNodeKind::DecayIntegrator(0.0)
             } else {
@@ -1737,28 +1730,23 @@ mod final_action_observation_tests {
             let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
                 unreachable!()
             };
-            def.compute_nodes = vec![
-                ComputeNode {
-                    kind,
-                    inputs: vec![edge],
-                    plasticity: None,
-                },
-                ComputeNode {
-                    kind: ComputeNodeKind::Constant(0.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ];
-            def.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
-                rule: crate::creature::genome::HebbianRule::Classic,
-                learning_rate: 0.5,
-                weight_clamp: 2.0,
-                lamarckian: false,
-                modulation: Some(crate::creature::genome::RewardModulationConfig {
-                    reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
-                    trace_decay: 0.5,
+            *def = def.clone().with_compute_nodes(vec![
+                ComputeNode::new(kind, vec![edge], None),
+                ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![], None),
+            ]);
+            def.set_node_plasticity(
+                0,
+                Some(crate::creature::genome::PlasticityConfig {
+                    rule: crate::creature::genome::HebbianRule::Classic,
+                    learning_rate: 0.5,
+                    weight_clamp: 2.0,
+                    lamarckian: false,
+                    modulation: Some(crate::creature::genome::RewardModulationConfig {
+                        reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
+                        trace_decay: 0.5,
+                    }),
                 }),
-            });
+            );
             creature.genome = genome;
             creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.5]), Box::new([])]];
             creature.graph_runtime.plasticity_weights = vec![vec![Box::new([1.0]), Box::new([])]];

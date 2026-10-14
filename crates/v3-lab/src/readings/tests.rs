@@ -5,7 +5,9 @@ use crate::scene::SceneSpec;
 use proptest::prelude::*;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, RingProjection};
+use v3_core::creature::genome::cgp::{
+    ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, OutputSink, RingProjection,
+};
 use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::VmBackendDef;
 
@@ -202,17 +204,17 @@ fn with_unread_family(genome: &CreatureGenome) -> CreatureGenome {
     let BackendDef::Graph(graph) = &mut node.backend_def else {
         panic!("the founder entry is a graph node");
     };
-    graph.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Add,
-        inputs: vec![GraphEdge {
-            source: GraphSource::InputLeaf {
+    graph.append_compute_node(ComputeNode::new(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(
+            GraphSource::InputLeaf {
                 ref_idx,
                 sub_idx: 0,
             },
-            weight: 1.0,
-        }],
-        plasticity: None,
-    });
+            1.0,
+        )],
+        None,
+    ));
     genome
 }
 
@@ -434,21 +436,25 @@ fn two_references_of_one_family_keep_distinct_sentinels() {
     };
     // Wire the duplicate onto a surface that already reads reference 0.
     let sink = graph
-        .output_sinks
-        .iter_mut()
-        .find(|sink| {
+        .output_sinks()
+        .iter()
+        .position(|sink| {
             sink.inputs
                 .iter()
-                .any(|edge| matches!(edge.source, GraphSource::InputLeaf { ref_idx: 0, .. }))
+                .any(|edge| matches!(edge.source(), GraphSource::InputLeaf { ref_idx: 0, .. }))
         })
+        .map(EdgeSurface::SinkInput)
         .unwrap();
-    sink.inputs.push(GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx: duplicate,
-            sub_idx: 0,
-        },
-        weight: 0.0,
-    });
+    graph.push_edge(
+        sink,
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: duplicate,
+                sub_idx: 0,
+            },
+            0.0,
+        ),
+    );
     let family = Family::of(&genome.nodes[0].input_refs[0]);
     let ablated = ablate(&genome, family).unwrap();
     // One shared sentinel would count one consumed index where there were two.
@@ -555,24 +561,39 @@ fn a_ring_read_only_through_a_projection_is_causal() {
             continue;
         };
         let mut rings = BTreeSet::new();
-        let edges = graph
-            .compute_nodes
-            .iter_mut()
-            .map(|compute| &mut compute.inputs)
-            .chain(graph.output_sinks.iter_mut().map(|sink| &mut sink.inputs));
-        for inputs in edges {
-            inputs.retain(|edge| match edge.source {
-                GraphSource::InputLeaf { ref_idx, .. }
-                    if refs
-                        .get(usize::from(ref_idx))
-                        .is_some_and(|r| matches!(Family::of(r), Family::NeighborFoodRing(_))) =>
-                {
-                    rings.insert(ref_idx);
-                    false
-                }
-                _ => true,
-            });
-        }
+        let mut keep = |edge: &GraphEdge| match edge.source() {
+            GraphSource::InputLeaf { ref_idx, .. }
+                if refs
+                    .get(usize::from(ref_idx))
+                    .is_some_and(|r| matches!(Family::of(r), Family::NeighborFoodRing(_))) =>
+            {
+                rings.insert(ref_idx);
+                false
+            }
+            _ => true,
+        };
+        let nodes = graph
+            .compute_nodes()
+            .iter()
+            .map(|compute| {
+                let inputs = compute.inputs.iter().copied().filter(&mut keep).collect();
+                ComputeNode::new(compute.kind, inputs, compute.plasticity)
+            })
+            .collect();
+        let sinks = graph
+            .output_sinks()
+            .iter()
+            .map(|sink| {
+                OutputSink::new(
+                    sink.kind,
+                    sink.inputs.iter().copied().filter(&mut keep).collect(),
+                )
+            })
+            .collect();
+        *graph = graph
+            .clone()
+            .with_compute_nodes(nodes)
+            .with_output_sinks(sinks);
         moved += rings.len();
         graph.projections.extend(
             rings
@@ -678,20 +699,26 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
         let BackendDef::Graph(mut graph) = node.backend_def.clone() else {
             panic!("the founder's node 0 is a graph node");
         };
-        graph.compute_nodes.clear();
-        for sink in &mut graph.output_sinks {
-            sink.inputs.clear();
-        }
-        graph.output_sinks[0].inputs = idxs
+        let mut first = idxs
             .iter()
-            .map(|&ref_idx| GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx,
-                    sub_idx: 0,
-                },
-                weight: 1.0,
+            .map(|&ref_idx| {
+                GraphEdge::new(
+                    GraphSource::InputLeaf {
+                        ref_idx,
+                        sub_idx: 0,
+                    },
+                    1.0,
+                )
             })
             .collect();
+        let sinks = graph
+            .output_sinks()
+            .iter()
+            .map(|sink| OutputSink::new(sink.kind, std::mem::take(&mut first)))
+            .collect();
+        graph = graph
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(sinks);
         BackendDef::Graph(graph)
     };
     genome
@@ -842,21 +869,25 @@ fn a_wired_decision_read_is_live() {
     };
     // Wire it onto a surface that already reads reference 0.
     let sink = graph
-        .output_sinks
-        .iter_mut()
-        .find(|sink| {
+        .output_sinks()
+        .iter()
+        .position(|sink| {
             sink.inputs
                 .iter()
-                .any(|edge| matches!(edge.source, GraphSource::InputLeaf { ref_idx: 0, .. }))
+                .any(|edge| matches!(edge.source(), GraphSource::InputLeaf { ref_idx: 0, .. }))
         })
+        .map(EdgeSurface::SinkInput)
         .unwrap();
-    sink.inputs.push(GraphEdge {
-        source: GraphSource::InputLeaf {
-            ref_idx,
-            sub_idx: 0,
-        },
-        weight: 1.0,
-    });
+    graph.push_edge(
+        sink,
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx,
+                sub_idx: 0,
+            },
+            1.0,
+        ),
+    );
     let scenes = scenes(1);
     let run = observe(&setup, &genome, &scenes);
     let ancestry = Ancestry::default();

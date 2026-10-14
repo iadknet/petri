@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::{birth, structural::next_node_id};
 use crate::contracts::{InputReference, NodeId, RouteTarget, MAX_GATE_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, OutputSinkKind};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::creature::genome::CreatureGenome;
 use crate::creature::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::mutation::graph::operators::random_graph_source;
@@ -30,7 +30,7 @@ pub(super) fn static_incumbent(targets: &[RouteTarget]) -> Option<usize> {
 pub(super) fn writes_gate(backend: &BackendDef, slot: u8) -> bool {
     match backend {
         BackendDef::Vm(vm) => vm.program.iter().any(|instruction| matches!(instruction, VmInstruction::WriteRouteGate { slot: written, .. } if *written == slot)),
-        BackendDef::Graph(graph) => graph.output_sinks.iter().any(|sink| matches!(sink.kind, OutputSinkKind::RouterGate(written) if written == slot) && !sink.inputs.is_empty()),
+        BackendDef::Graph(graph) => graph.output_sinks().iter().any(|sink| matches!(sink.kind, OutputSinkKind::RouterGate(written) if written == slot) && !sink.inputs.is_empty()),
     }
 }
 
@@ -45,7 +45,7 @@ pub(super) fn free_gate_slot(node: &NodeGenome) -> Option<u8> {
 /// The index of `graph`'s `RouterGate(slot)` output sink, if it has one.
 fn gate_sink(graph: &CgpGraphBackendDef, slot: u8) -> Option<usize> {
     graph
-        .output_sinks
+        .output_sinks()
         .iter()
         .position(|s| matches!(s.kind, OutputSinkKind::RouterGate(written) if written == slot))
 }
@@ -78,11 +78,8 @@ fn add_gate_write(
         }
         BackendDef::Graph(graph) => {
             let sink = gate_sink(graph, slot).ok_or(MutationSkipReason::NoApplicableTarget)?;
-            let source = random_graph_source(graph.compute_nodes.len() as u16, input_refs, rng);
-            graph.output_sinks[sink].inputs.push(GraphEdge {
-                source,
-                weight: 1.0,
-            });
+            let source = random_graph_source(graph.compute_nodes().len() as u16, input_refs, rng);
+            graph.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(source, 1.0));
             Ok(())
         }
     }

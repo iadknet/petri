@@ -4,7 +4,6 @@ use super::cgp_reproduction;
 use crate::contracts::{CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
-use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::{CreatureState, PendingBirth};
 use crate::mutation::phenotype::mutate_phenotype;
@@ -14,30 +13,6 @@ use crate::runtime::action_decode::clamp_unit_interval;
 use crate::simulation::birth_age::BirthOrder;
 use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::simulation::Simulation;
-
-/// Capture birth-local values before any structural mutation.
-fn capture_birth_weights(genome: &mut CreatureGenome, parent: &[Vec<Box<[f32]>>]) {
-    for (idx, node) in genome.nodes.iter_mut().enumerate() {
-        if let BackendDef::Graph(def) = &mut node.backend_def {
-            cgp_reproduction::capture_birth_weights(
-                def,
-                parent.get(idx).map_or(&[], Vec::as_slice),
-            );
-        }
-    }
-}
-
-/// Consume every backend's birth correspondence before constructing the newborn.
-fn build_child_plasticity_weights(child_genome: &mut CreatureGenome) -> Vec<Vec<Box<[f32]>>> {
-    let mut result = Vec::new();
-    for (idx, node) in child_genome.nodes.iter_mut().enumerate() {
-        if let BackendDef::Graph(def) = &mut node.backend_def {
-            result.resize_with(idx + 1, Vec::new);
-            result[idx] = cgp_reproduction::build_cgp_child_plasticity_weights(def);
-        }
-    }
-    result
-}
 
 /// Genome replication cost multiplier on the parent's reproduce charge:
 /// `1 + rate * max(genome_size - FOUNDER_GENOME_SIZE_UNITS, 0)`.
@@ -399,9 +374,10 @@ fn spawn_child(
     let parent = &sim.creatures[parent_id];
     let parent_executed = ParentExecuted::Record(&parent.graph_runtime.dispatch_record, parent.age);
 
-    // Step 10: Apply genome mutations.
+    // Step 10: Apply genome mutations to the draft, which carries the
+    // parent's learned weights as birth seeds (T25.F01).
     let mut child_genome = child_genome;
-    capture_birth_weights(&mut child_genome, &parent_plasticity);
+    cgp_reproduction::capture_birth_seeds(&mut child_genome, &parent_plasticity);
     let summary = MutationEngine::apply_mutations_with_food_type_count(
         &mut child_genome,
         &sim.config.mutation,
@@ -524,8 +500,8 @@ fn spawn_child(
         child_identity.mutate_kin_tag(rng);
     }
 
-    // Step 12: Build child's plasticity weights (Lamarckian inheritance).
-    let child_plasticity = build_child_plasticity_weights(&mut child_genome);
+    // Step 12: Lamarckian inheritance happens in the constructors below,
+    // which build the newborn's weights from the draft's seeds.
 
     // Step 13–14: Spawn child in slotmap + world.
     // No-mutation fast path: if no genome mutations were applied, the offspring's
@@ -564,7 +540,6 @@ fn spawn_child(
                 child_shared_memory,
             )
         };
-        child.graph_runtime.plasticity_weights = child_plasticity;
         child.birth_mutation_operators = child_birth_mutation_operators;
         child.birth_edge_class = child_birth_edge_class;
         child.heading = direction;
@@ -589,7 +564,10 @@ fn spawn_child(
 mod tests {
     use super::*;
     use crate::config::MutationConfig;
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::creature::genome::cgp::{
+        ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
+    };
+    use crate::creature::genome::{BackendDef, CreatureGenome};
     use crate::creature::genome::{HebbianRule, PlasticityConfig};
 
     fn build_child_plasticity_weights(
@@ -597,8 +575,8 @@ mod tests {
         parent: &[Vec<Box<[f32]>>],
     ) -> Vec<Vec<Box<[f32]>>> {
         let mut child = genome.clone();
-        capture_birth_weights(&mut child, parent);
-        super::build_child_plasticity_weights(&mut child)
+        cgp_reproduction::capture_birth_seeds(&mut child, parent);
+        crate::creature::newborn::take_plasticity_weights(&mut child)
     }
 
     /// Helper: builds a genome with a single Graph mesh node containing the given compute nodes.
@@ -607,7 +585,7 @@ mod tests {
         use crate::creature::genome::NodeGenome;
 
         let mut def = crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
-        def.compute_nodes = compute_nodes;
+        def = def.with_compute_nodes(compute_nodes);
 
         CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -805,25 +783,18 @@ mod tests {
     #[test]
     fn lamarckian_copies_parent_learned_weights() {
         let genome = genome_with_cgp_compute_nodes(vec![
-            ComputeNode {
-                kind: ComputeNodeKind::Constant(1.0),
-                inputs: vec![],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 0.5,
-                }],
-                plasticity: Some(PlasticityConfig {
+            ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
+                Some(PlasticityConfig {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
                     lamarckian: true,
                     modulation: None,
                 }),
-            },
+            ),
         ]);
 
         // Parent has learned weight 0.9 (drifted from genome 0.5).
@@ -846,25 +817,18 @@ mod tests {
     #[test]
     fn darwinian_resets_to_empty() {
         let genome = genome_with_cgp_compute_nodes(vec![
-            ComputeNode {
-                kind: ComputeNodeKind::Constant(1.0),
-                inputs: vec![],
-                plasticity: None,
-            },
-            ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 0.5,
-                }],
-                plasticity: Some(PlasticityConfig {
+            ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
+                Some(PlasticityConfig {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
-                    lamarckian: false, // Darwinian
+                    lamarckian: false,
                     modulation: None,
                 }),
-            },
+            ),
         ]);
 
         // Parent has learned weight 0.9.
@@ -883,20 +847,17 @@ mod tests {
 
     #[test]
     fn lamarckian_with_no_parent_weights_returns_empty() {
-        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 0.5,
-            }],
-            plasticity: Some(PlasticityConfig {
+        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Oja,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: true,
                 modulation: None,
             }),
-        }]);
+        )]);
 
         // Parent never ran graph execution — no Hebbian weights.
         let parent_plasticity: Vec<Vec<Box<[f32]>>> = Vec::new();
@@ -940,23 +901,23 @@ mod tests {
         use crate::mutation::reachability::TargetSelector;
         use crate::mutation::topology::{TopologyMutator, TopologyOperator};
         use rand::SeedableRng;
-        let compute = ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+        let compute = ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 0.1,
-            }],
-            plasticity: Some(PlasticityConfig {
+                0.1,
+            )],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: true,
                 modulation: None,
             }),
-        };
+        );
         let mut original = genome_with_cgp_compute_nodes(vec![compute]);
         original.nodes = vec![original.nodes[0].clone(); 3];
         for (idx, node) in original.nodes.iter_mut().enumerate() {
@@ -971,7 +932,8 @@ mod tests {
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            def.compute_nodes[0].inputs[0].weight = idx as f32 + 1.0;
+            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
+                .set_weight(idx as f32 + 1.0);
         }
         let parent: Vec<Vec<Box<[f32]>>> = vec![
             vec![Box::new([11.0])],
@@ -985,7 +947,7 @@ mod tests {
             TopologyOperator::RemoveNode,
         ] {
             let mut child = original.clone();
-            capture_birth_weights(&mut child, &parent);
+            cgp_reproduction::capture_birth_seeds(&mut child, &parent);
             TopologyMutator::apply(
                 &mut child,
                 op,
@@ -994,61 +956,79 @@ mod tests {
                 &MutationConfig::default(),
             )
             .unwrap();
-            let result = super::build_child_plasticity_weights(&mut child);
+            let result = crate::creature::newborn::take_plasticity_weights(&mut child);
             for (idx, node) in child.nodes.iter().enumerate() {
                 let BackendDef::Graph(def) = &node.backend_def else {
                     unreachable!()
                 };
                 assert_eq!(
                     result[idx][0][0],
-                    def.compute_nodes[0].inputs[0].weight + 10.0
+                    def.compute_nodes()[0].inputs[0].weight() + 10.0
                 );
-                assert!(def.birth_weights.is_none());
+                assert!(def.birth_seeds().is_none());
             }
         }
         let mut child = original.clone();
-        capture_birth_weights(&mut child, &parent);
+        cgp_reproduction::capture_birth_seeds(&mut child, &parent);
         // Replacing a backend at the same mesh index/ID gives it no correspondence.
         child.nodes[0].backend_def = original.nodes[0].backend_def.clone();
-        let result = super::build_child_plasticity_weights(&mut child);
+        let result = crate::creature::newborn::take_plasticity_weights(&mut child);
         assert!(result[0][0].is_empty());
         assert_eq!(result[1][0][0], 12.0);
     }
 
-    #[test]
-    fn birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit() {
+    /// One live reproduction of a single Lamarckian parent holding `learned`
+    /// on its one edge, at mutation rate `rate` and reproduction seed `seed`.
+    /// Returns the simulation, the parent's id and genome, the child's id and
+    /// the genome events the birth applied.
+    fn live_birth(
+        rate: f64,
+        seed: u64,
+        learned: Vec<Vec<Box<[f32]>>>,
+    ) -> (
+        Simulation,
+        crate::contracts::CreatureId,
+        CreatureGenome,
+        crate::contracts::CreatureId,
+        u64,
+    ) {
         use crate::config::SimulationConfig;
         use crate::simulation::seed_simulation;
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
-        cfg.mutation.per_unit_rate = 0.0;
+        cfg.mutation.per_unit_rate = rate;
         // Rate 0.0 delivers at conception (T03.F12): the child exists at return.
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         let mut sim = seed_simulation(cfg, 83);
         let parent_id = sim.creatures.keys().next().unwrap();
-        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: GraphSource::SharedMemory {
+        // A seeded founder carries no seeds and no runtime weights.
+        assert!(sim.creatures[parent_id]
+            .graph_runtime
+            .plasticity_weights
+            .is_empty());
+        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Add,
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
                     slot: 0,
                     previous: false,
                 },
-                weight: 0.5,
-            }],
-            plasticity: Some(PlasticityConfig {
+                0.5,
+            )],
+            Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: true,
                 modulation: None,
             }),
-        }]);
+        )]);
         let parent = &mut sim.creatures[parent_id];
         parent.genome = genome.clone();
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
         parent.energy = 10000.0;
-        parent.graph_runtime.plasticity_weights = vec![vec![Box::new([0.9])]];
+        parent.graph_runtime.plasticity_weights = learned;
         parent.graph_runtime.eligibility_traces = vec![vec![Box::new([99.0])]];
         parent.graph_runtime.node_state = vec![vec![7.0]];
         parent.graph_runtime.node_outputs = vec![vec![8.0]];
@@ -1067,33 +1047,79 @@ mod tests {
                 &mut sim,
                 direction,
                 10.0,
-                &mut rand::rngs::SmallRng::seed_from_u64(2)
+                &mut rand::rngs::SmallRng::seed_from_u64(seed)
             ),
             ReproductionActionResult::Conceived
         );
-        let child = sim
-            .creatures
-            .iter()
-            .find(|(id, _)| *id != parent_id)
-            .unwrap()
-            .1;
+        let child_id = sim.creatures.keys().find(|&id| id != parent_id).unwrap();
+        let applied = sim.stats.mutation_events_applied_total;
+        (sim, parent_id, genome, child_id, applied)
+    }
+
+    /// The newborn holds the inherited value in its own storage, carries no
+    /// seeds, starts with empty temporal state, and the parent is unchanged.
+    fn assert_seeded_birth(
+        sim: &Simulation,
+        parent_id: crate::contracts::CreatureId,
+        genome: &CreatureGenome,
+        child_id: crate::contracts::CreatureId,
+    ) {
+        let child = &sim.creatures[child_id];
         assert_eq!(child.graph_runtime.plasticity_weights[0][0][0], 0.9);
         assert!(child.graph_runtime.eligibility_traces.is_empty());
         assert!(child.graph_runtime.node_state.is_empty());
         assert!(child.graph_runtime.node_outputs.is_empty());
         assert!(child.graph_runtime.dispatch_record.is_empty());
-        let BackendDef::Graph(def) = &child.genome.nodes[0].backend_def else {
-            unreachable!()
-        };
-        assert!(def.birth_weights.is_none());
-        assert_eq!(sim.creatures[parent_id].genome, genome);
-        assert_eq!(
-            sim.creatures[parent_id].graph_runtime.eligibility_traces[0][0][0],
-            99.0
-        );
-        assert_eq!(
-            sim.creatures[parent_id].graph_runtime.plasticity_weights[0][0][0],
-            0.9
-        );
+        for node in &child.genome.nodes {
+            if let BackendDef::Graph(def) = &node.backend_def {
+                assert!(def.birth_seeds().is_none());
+            }
+        }
+        let parent = &sim.creatures[parent_id];
+        assert_eq!(&parent.genome, genome);
+        assert_eq!(parent.graph_runtime.eligibility_traces[0][0][0], 99.0);
+        assert_eq!(parent.graph_runtime.plasticity_weights[0][0][0], 0.9);
+    }
+
+    /// Fast path (`new_with_cached_fields`, no genome event applied).
+    #[test]
+    fn birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit() {
+        let (sim, parent_id, genome, child_id, applied) =
+            live_birth(0.0, 2, vec![vec![Box::new([0.9])]]);
+        assert_eq!(applied, 0);
+        assert_seeded_birth(&sim, parent_id, &genome, child_id);
+    }
+
+    /// Mutated branch (`CreatureState::new`, at least one genome event
+    /// applied): the first seed whose events leave the learned edge in place.
+    #[test]
+    fn mutated_birth_keeps_parent_and_resets_all_newborn_credit() {
+        let (sim, parent_id, genome, child_id) = (0..64)
+            .find_map(|seed| {
+                let (sim, parent_id, genome, child_id, applied) =
+                    live_birth(1.0, seed, vec![vec![Box::new([0.9])]]);
+                let kept = sim.creatures[child_id]
+                    .graph_runtime
+                    .plasticity_weights
+                    .first()
+                    .and_then(|node| node.first())
+                    .is_some_and(|row| row.first() == Some(&0.9));
+                (applied > 0 && kept).then_some((sim, parent_id, genome, child_id))
+            })
+            .expect("a mutated birth keeps the learned edge");
+        assert_seeded_birth(&sim, parent_id, &genome, child_id);
+    }
+
+    /// A parent with nothing learned gives a newborn today's scaffold before
+    /// its first visit: one row per graph node, one empty slice per compute
+    /// node.
+    #[test]
+    fn birth_from_a_parent_with_nothing_learned_builds_the_empty_scaffold() {
+        let (sim, _, _, child_id, applied) = live_birth(0.0, 2, Vec::new());
+        assert_eq!(applied, 0);
+        let weights = &sim.creatures[child_id].graph_runtime.plasticity_weights;
+        assert_eq!(weights.len(), 1);
+        assert_eq!(weights[0].len(), 1);
+        assert!(weights[0][0].is_empty());
     }
 }

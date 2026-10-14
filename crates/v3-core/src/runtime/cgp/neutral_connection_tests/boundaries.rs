@@ -115,12 +115,9 @@ fn resolver_boundaries_preserve_wrap_scalar_raw_queue_and_soft_zero_semantics() 
         u16::try_from(refs.len()).is_err(),
         "a next index cannot be represented; no truncating admission"
     );
-    let empty = CgpGraphBackendDef {
-        projections: Vec::new(),
-        compute_nodes: vec![],
-        output_sinks: vec![],
-        birth_weights: None,
-    };
+    let empty = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![])
+        .with_output_sinks(vec![]);
     assert!(empty
         .sink(OutputSinkKind::ActionVote(VoteSink::Eat))
         .is_none());
@@ -226,20 +223,21 @@ fn zero_edges_can_clear_overwrite_and_change_nonadditive_compute_outputs() {
 fn native_nonadditive_compute_inputs_are_not_qualified_zero_destinations() {
     for kind in [ComputeNodeKind::Multiply, ComputeNodeKind::Min] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.compute_nodes.push(ComputeNode {
+        def.append_compute_node(ComputeNode::new(
             kind,
-            inputs: vec![edge(memory(0, false), 1.0)],
-            plasticity: None,
-        });
+            vec![edge(memory(0, false), 1.0)],
+            None,
+        ));
         wire(
             &mut def,
             OutputSinkKind::CustomOutput(0),
             edge(GraphSource::ComputeNode(0), 1.0),
         );
         let before = visit(&def, 10.0, GraphRuntimeState::new());
-        def.compute_nodes[0]
-            .inputs
-            .push(edge(memory(0, false), 0.0));
+        def.push_edge(
+            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+            edge(memory(0, false), 0.0),
+        );
         let after = visit(&def, 10.0, GraphRuntimeState::new());
         assert_eq!(before.result.output_slots[0], ramp::<16>(0.5)[0]);
         assert_eq!(after.result.output_slots[0], 0.0);

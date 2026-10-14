@@ -4,6 +4,7 @@ pub mod drives;
 pub mod founder;
 pub mod genome;
 pub mod identity;
+pub(crate) mod newborn;
 pub mod parseability;
 pub mod plasticity_census;
 pub mod ring_rules;
