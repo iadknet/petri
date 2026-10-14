@@ -3,7 +3,7 @@
 //! `mutation-effects-v1` runs single-event diagnostic proposals from three
 //! parent cohorts (the canonical founder, the drift walk's birth lineages at
 //! its last checkpoint, and a draw of a world's selected genomes) and
-//! attributes each applied proposal by comparing traced `neighborhood-v1`
+//! attributes each applied proposal by comparing traced `neighborhood-v2`
 //! executions of parent and child. `neighborhood-coverage-v1` re-reads a
 //! fixed sample of battery-silent pairs on contexts and histories the
 //! battery lacks, beside three controls.
@@ -317,7 +317,7 @@ pub struct Coverage {
     pub differ_any: u32,
     /// Pairs with identical actions everywhere and a differing state-and-cost record.
     pub state_or_cost_only: u32,
-    /// Parents all-`NoOp` on `neighborhood-v1`, and those that act somewhere
+    /// Parents all-`NoOp` on `neighborhood-v2`, and those that act somewhere
     /// on the extension.
     pub all_noop_parents: u32,
     pub all_noop_parents_acting: u32,
@@ -762,7 +762,7 @@ fn parent_coverage(
     coverage
 }
 
-/// Run one control pair on `neighborhood-v1` and on the extension.
+/// Run one control pair on `neighborhood-v2` and on the extension.
 fn run_control(
     name: &'static str,
     expectation: &'static str,
@@ -806,7 +806,7 @@ fn run_controls(
     battery: &Battery,
     context: &EvalContext,
 ) -> Vec<ControlOutcome> {
-    const DIFFERS: &str = "silent on neighborhood-v1, actions differ on the extension";
+    const DIFFERS: &str = "silent on neighborhood-v2, actions differ on the extension";
     let control = |name, expectation, pair, expect_difference| {
         run_control(
             name,

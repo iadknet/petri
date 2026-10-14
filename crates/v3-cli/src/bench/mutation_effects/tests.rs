@@ -72,7 +72,8 @@ fn world_set_cases_carry_reconciled_mutation_effects_on_the_existing_readings() 
         assert_eq!(effects.coverage.version, "neighborhood-coverage-v1");
         for (row, checkpoint) in effects.exposure.iter().zip(&drift.readings) {
             assert_eq!(row.panel, format!("drift@{}", checkpoint.depth));
-            assert_eq!(row.supply, "pinned 97 units (drift chart)");
+            // T25.F02 commit 1: the instrument anchor is 80 (97 restores).
+            assert_eq!(row.supply, "pinned 80 units (drift chart)");
             assert_reconciles(row, &checkpoint.births);
         }
         match case.neighborhood_read.defined() {

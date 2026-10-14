@@ -167,43 +167,68 @@ pub fn run_simulation<W: std::io::Write>(
     Ok(())
 }
 
-/// Means of the living population's structure and lineage depth, in one pass:
-/// total genome size (junk included), mesh node count, and generation. All
-/// `0.0` for an empty population, like `Simulation::mean_energy`.
-pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> (f64, f64, f64) {
+/// Means of the living population's structure and lineage depth: total
+/// genome size (junk included), mesh node count, generation, wired output
+/// sinks (sinks with at least one edge) and ring projections. All `0.0` for an
+/// empty population, like `Simulation::mean_energy`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct StructureMeans {
+    pub(crate) genome_size: f64,
+    pub(crate) mesh_nodes: f64,
+    pub(crate) generation: f64,
+    /// T25.F02: the sinks the unit rule stopped charging a unit for.
+    pub(crate) wired_sinks: f64,
+    /// T25.F02: each projection costs nine units.
+    pub(crate) projections: f64,
+}
+
+pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> StructureMeans {
+    use v3_core::creature::genome::BackendDef;
+
     let population = sim.creatures.len();
-    if population == 0 {
-        return (0.0, 0.0, 0.0);
+    let mut totals = [0u64; 5];
+    for creature in sim.creatures.values() {
+        totals[0] += u64::from(creature.cached_genome_size);
+        totals[1] += creature.genome.nodes.len() as u64;
+        totals[2] += creature.generation;
+        for node in &creature.genome.nodes {
+            if let BackendDef::Graph(graph) = &node.backend_def {
+                totals[3] += graph
+                    .output_sinks()
+                    .iter()
+                    .filter(|sink| !sink.inputs.is_empty())
+                    .count() as u64;
+                totals[4] += graph.projections.len() as u64;
+            }
+        }
     }
-    let mean = |total: u64| total as f64 / population as f64;
-    (
-        mean(
-            sim.creatures
-                .values()
-                .map(|c| u64::from(c.cached_genome_size))
-                .sum(),
-        ),
-        mean(
-            sim.creatures
-                .values()
-                .map(|c| c.genome.nodes.len() as u64)
-                .sum(),
-        ),
-        mean(sim.creatures.values().map(|c| c.generation).sum()),
-    )
+    let mean = |total: u64| {
+        if population == 0 {
+            0.0
+        } else {
+            total as f64 / population as f64
+        }
+    };
+    StructureMeans {
+        genome_size: mean(totals[0]),
+        mesh_nodes: mean(totals[1]),
+        generation: mean(totals[2]),
+        wired_sinks: mean(totals[3]),
+        projections: mean(totals[4]),
+    }
 }
 
 fn build_tick_sample(sim: &v3_core::simulation::Simulation, tick: u64) -> TickSampleEvent {
-    let (mean_genome_size, mean_mesh_nodes, mean_generation) = structure_means(sim);
+    let means = structure_means(sim);
     TickSampleEvent {
         protocol_version: PROTOCOL_VERSION,
         event_type: "tick_sample",
         tick,
         population: sim.creatures.len(),
         mean_energy: sim.mean_energy(),
-        mean_genome_size,
-        mean_mesh_nodes,
-        mean_generation,
+        mean_genome_size: means.genome_size,
+        mean_mesh_nodes: means.mesh_nodes,
+        mean_generation: means.generation,
         reproduction_actions_attempted_total: sim.stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: sim.stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: sim.stats.reproduction_actions_rejected_total,
@@ -262,7 +287,16 @@ mod tests {
         cfg.population.initial_creatures = 0;
         let sim = seed_simulation(cfg, 42);
         assert_eq!(sim.creatures.len(), 0);
-        assert_eq!(structure_means(&sim), (0.0, 0.0, 0.0));
+        assert_eq!(
+            structure_means(&sim),
+            StructureMeans {
+                genome_size: 0.0,
+                mesh_nodes: 0.0,
+                generation: 0.0,
+                wired_sinks: 0.0,
+                projections: 0.0,
+            }
+        );
     }
 
     #[test]
@@ -282,8 +316,15 @@ mod tests {
         ) / 4.0;
         assert_eq!(
             structure_means(&sim),
-            (expected_genome_size, 2.0, 0.0),
-            "founders carry two mesh nodes and generation zero"
+            StructureMeans {
+                genome_size: expected_genome_size,
+                mesh_nodes: 2.0,
+                generation: 0.0,
+                wired_sinks: 17.0,
+                projections: 0.0,
+            },
+            "founders carry two mesh nodes, generation zero, 6 + 11 wired sinks \
+             and no projection"
         );
     }
 }

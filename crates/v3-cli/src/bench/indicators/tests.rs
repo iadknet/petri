@@ -913,7 +913,7 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
     let ranks = read_sample_ranks(creature_ids.len(), 4, 11);
     assert_eq!(ranks.len(), 4, "six creatures, four sampled");
     assert_eq!(actual.version, "neighborhood-read-v1");
-    assert_eq!(actual.battery_version, "neighborhood-v1");
+    assert_eq!(actual.battery_version, "neighborhood-v2");
     assert_eq!(actual.sample_seed_formula, "8000000 + world_seed");
     assert_eq!(
         actual.birth_seed_formula,

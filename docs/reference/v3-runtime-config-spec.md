@@ -93,7 +93,7 @@ Type posture:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `mutation.per_unit_rate` | `f64` | `0.005` | The only mutation-count setting (T11.F19, T11.F20): chance that one genome unit requests a mutation event. Missing field defaults to `0.005`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.005`. Sized so the 97-unit V3Alpha1 founder expects about 0.485 events per birth. The five keys of the retired per-birth rule (T11.F20) are rejected as unknown fields. |
+| `mutation.per_unit_rate` | `f64` | `0.005` | The only mutation-count setting (T11.F19, T11.F20): chance that one genome unit requests a mutation event. Missing field defaults to `0.005`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.005`. At this rate the 80-unit V3Alpha1 founder expects about 0.4 events per birth. The five keys of the retired per-birth rule (T11.F20) are rejected as unknown fields. |
 | `mutation.structured_heritable_refinement` | `bool` | `true` | T20.F05 semantic coefficient refinement, on by default since 2026-10-12. Omission means true; enabled admits `Graph.RefineHeritableStructure` at weight 4, including restricted size pressure. One event adds a norm-bounded common increment to 2–8 existing homologous vote-edge weights; no structure is added. Off preserves existing sampling order and RNG. |
 | `mutation.neutral_input_recruitment` | enum | `"WholeFamily"` | Graph input recruitment (T20.F04), `"WholeFamily"` by default since 2026-10-12: `"Off"`, `"SingleChannel"`, or `"WholeFamily"`. Omission means WholeFamily; other values are rejected. Enabled arms admit `Graph.RecruitNeutralInput` at structural weight 1; Off excludes it before sampling and consumes no extra RNG. Restricted size pressure excludes this growth operator. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
@@ -121,8 +121,8 @@ Mutation randomization semantics:
    birth.
 2. The two instruments, the drift walk and the recruitment-paths legacy
    panel, draw the same rule on the canonical V3Alpha1 founder's
-   `genome_size()` (97) instead of the walked genome's own size, so their
-   exposure is `Binomial(97, per_unit_rate)` whatever the genome's size. No
+   `genome_size()` (80) instead of the walked genome's own size, so their
+   exposure is `Binomial(80, per_unit_rate)` whatever the genome's size. No
    config field selects a different count.
 3. For each event, select topology with `mesh_layer_probability`; otherwise
    select VM, graph, or input-reference mutation with equal probability.
@@ -158,7 +158,7 @@ config still carrying the field fails to load until it is removed.
 | `energy.lifecycle.age_reference_ticks` | `u64` | `500` | Span over which the brain's `AgeTicks` read rises from `0.0` to `1.0` (`min(age / age_reference_ticks, 1)`, T17.F02). A missing field defaults to `500`; `0` normalizes to `500`. The founder's age gate is derived from it at seeding and is exact only while `min_reproduce_age <= age_reference_ticks`; above that the threshold exceeds the saturated `1.0` read and the founder never attempts a birth. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (each attempt paying only its effort, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
-| `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 97. |
+| `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 80. |
 | `energy.lifecycle.gestation_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and delivers every birth at conception (the pre-feature engine). Gestation span per founder genome (T03.F12); see Gestation below. |
 | `energy.costs.move_cost` | `f32` | `1.6` | Must be finite and `>= 0.0`; invalid values fall back to `1.6`. |
 | `energy.costs.eat_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. Effort base of every `Eat` attempt; see Action effort below. |
@@ -181,27 +181,28 @@ Genome carrying cost:
   creature the combined charge takes to or below zero is removed by the
   existing `energy <= 0.0` rule in the same tick.
 - The unit is total genome size (`genome_size()`), which counts every node,
-  input reference, target, VM instruction, VM constant, compute node and its
-  edges, wired output sink and its edges, and ring projection (one unit each,
-  T11.F31) with equal weight. It is not reachability-aware, so unreachable and dead structure is
+  input reference, target, VM instruction, VM constant, compute node, and
+  edge on both graph surfaces (compute inputs and sink inputs) one unit each,
+  and each ring projection nine (its record plus its eight implied synapses);
+  a wired sink adds nothing of itself (T25.F02). It is not reachability-aware, so unreachable and dead structure is
   charged exactly like the executed core.
 - Is NOT scaled by the complexity or age action multipliers, exactly as
   `energy_decay_per_tick` is not; it is a world-level Phase 0 cost, not an
   action cost.
 - Is independent of `energy.complexity_cost`, which multiplies action costs by
   the reachability-aware `complexity()` and is disabled at canonical defaults.
-- At the default rate the canonical founder genome (97 units) pays 0.0097 per
-  tick, 1.94% of the default 0.5 decay.
+- At the default rate the canonical founder genome (80 units) pays 0.0080 per
+  tick, 1.60% of the default 0.5 decay.
 
 Genome replication cost:
 - At reproduction step 5 (`v3-reproduction-spec.md`) the parent's charge is
   `adjusted_action_cost(reproduce_cost, complexity, age) *
-  (1 + genome_replication_cost_per_unit * max(genome_size() - 97, 0))`,
+  (1 + genome_replication_cost_per_unit * max(genome_size() - 80, 0))`,
   computed at the charge site in
   `crates/v3-core/src/simulation/actions/reproduction.rs` from the parent's
-  cached `genome_size()` and `FOUNDER_GENOME_SIZE_UNITS` (97, the canonical
+  cached `genome_size()` and `FOUNDER_GENOME_SIZE_UNITS` (80, the canonical
   V3Alpha1 founder's size, pinned in `crates/v3-core/src/creature/founder.rs`).
-- The factor is exactly `1.0` for every genome of 97 units or fewer and at
+- The factor is exactly `1.0` for every genome of 80 units or fewer and at
   rate `0.0`, so the founder's charge and a rate-0.0 world are bit-identical to
   the pre-feature engine; it is non-decreasing in genome size.
 - Composes multiplicatively with the complexity and age action multipliers
@@ -212,7 +213,7 @@ Genome replication cost:
   only its effort. On a birth
   the whole charge lands in `energy_flows.action_charges.reproduce` and none
   of it reaches the offspring, whose transfer is unchanged.
-- At the default rate a 386-unit genome (289 above the founder) pays 29.9x the
+- At the default rate a 386-unit genome (306 above the founder) pays 31.6x the
   base charge per birth.
 
 Gestation:
@@ -220,9 +221,9 @@ Gestation:
   charge and the litter's energy at T and carries one pending birth (the chosen
   direction, the litter energy, `deliver_tick = T + h`), where
   `h = ceil(genome_size() * gestation_ticks_per_founder_genome / FOUNDER_GENOME_SIZE_UNITS)`
-  (97, the founder's size, `crates/v3-core/src/creature/founder.rs`) from the
+  (80, the founder's size, `crates/v3-core/src/creature/founder.rs`) from the
   parent's cached `genome_size()`. At the default rate the founder gestates one
-  tick, 98 to 194 units two.
+  tick, 81 to 160 units two.
 - The conception ends the parent's action queue for tick T. On ticks T+1
   through T+h the parent commits nothing: at its Phase 2 slot it is removed if
   its energy is at or below zero, otherwise on T+h its child is born there
@@ -300,7 +301,7 @@ spawn target validity and the population cap succeed, as defined in
 1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
 2. Compute `cost = energy.costs.reproduce_cost`, scaled by the complexity and
    age multipliers and by the genome replication cost factor
-   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 97, 0)`,
+   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 80, 0)`,
    and `after_cost = parent energy - cost`. Nothing is charged yet.
 3. Enforce `energy.lifecycle.min_reproduce_energy` gate on `after_cost`.
 4. Compute

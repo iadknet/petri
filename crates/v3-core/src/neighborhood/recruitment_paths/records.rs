@@ -185,7 +185,7 @@ impl Panel {
 }
 
 /// Version of the S0 panel's compact record.
-pub const S0_VERSION: &str = "recruitment-transitions-s0-v1";
+pub const S0_VERSION: &str = "recruitment-transitions-s0-v2";
 
 /// Which retention horizons (generations after the specialized retained
 /// discovery) the assay reads; the primary is 64.

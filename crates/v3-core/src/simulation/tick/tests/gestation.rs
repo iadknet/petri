@@ -16,7 +16,7 @@ const REPRODUCE: WorldAction = WorldAction::Reproduce {
     energy_transfer_fraction: 0.5,
 };
 
-/// One founder (97 units) at (5, 5) on free, ungated economics, gestating
+/// One founder (80 units) at (5, 5) on free, ungated economics, gestating
 /// at `rate` ticks per founder genome.
 fn gestating_sim(rate: f32) -> (Simulation, CreatureId) {
     let (mut sim, id) = make_sim_with_one_creature(PARENT_ENERGY);
@@ -121,7 +121,7 @@ fn gestation_conception_ends_the_queue_and_holds_the_founder_one_tick() {
 
 #[test]
 fn gestation_span_scales_with_rate_and_holds_every_tick_of_it() {
-    // Rate 2.0 on the founder: ceil(97 * 2 / 97) = 2 held ticks.
+    // Rate 2.0 on the founder: ceil(80 * 2 / 80) = 2 held ticks.
     let (mut sim, id) = gestating_sim(2.0);
     conceive(&mut sim, id);
     assert_eq!(sim.creatures[id].pending_birth.unwrap().deliver_tick, 2);
@@ -260,8 +260,11 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // Re-seeded 2026-10-12 (433 -> 740) when T20.F04 whole-family recruitment
     // and T20.F05 refinement became defaults and changed every Graph draw;
     // 740 is the first seed from 433 whose tick-50 state meets the
-    // precondition.
-    let mut sim = seed_simulation(cfg, 740);
+    // precondition. Re-seeded by T25.F02 (740 -> 2733): the uniform size
+    // rule lowers the carrying cost and the mutation draw count, and 2733 is
+    // the first seed from 740 whose tick-50 state meets the precondition;
+    // the old size rule and anchor 97 restore 740.
+    let mut sim = seed_simulation(cfg, 2733);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {

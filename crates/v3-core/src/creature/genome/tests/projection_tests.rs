@@ -69,15 +69,17 @@ proptest! {
         prop_assert_eq!(format!("{back:?}"), format!("{def:?}"));
     }
 
+    /// T25.F02: a projection costs its record plus its eight implied
+    /// synapses, so F03's eight-member groups replace it size-neutrally.
     #[test]
-    fn every_projection_is_one_size_unit(
+    fn a_ring_projection_costs_nine_units(
         projections in prop::collection::vec(projection_strategy(), 0..12),
     ) {
         let mut genome = v3alpha1_founder_genome();
         let before = genome.genome_size();
         let idx = founder_graph_index(&genome);
         graph_mut(&mut genome.nodes[idx]).projections = projections.clone();
-        prop_assert_eq!(genome.genome_size(), before + projections.len() as u32);
+        prop_assert_eq!(genome.genome_size(), before + 9 * projections.len() as u32);
     }
 
     /// Removing a reference no projection names keeps every projection on

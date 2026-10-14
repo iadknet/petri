@@ -276,7 +276,9 @@ fn discovery_steps_count_declarations_and_connections() {
         assert_eq!(reading.declare.proposals, 400);
         assert!(reading.declare.hits <= 400 && reading.connect.hits <= reading.connect.proposals);
         assert!(reading.connect.hits <= reading.connect.beside);
-        assert!((reading.events_per_birth - 0.485).abs() < 1e-9);
+        // T25.F02 commit 1: 80 units x 0.005 = 0.4; commit 2's rate restores
+        // 0.485, as do the old size rule and anchor 97.
+        assert!((reading.events_per_birth - 0.4).abs() < 1e-9);
         assert_eq!(
             reading.implied_births.is_some(),
             reading.declare.hits > 0 && reading.connect.hits > 0

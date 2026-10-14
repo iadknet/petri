@@ -1,7 +1,7 @@
 //! One-edge census (T19.F04 reading): every unit-weight edge from an
 //! input-leaf sub-value of one Graph node into each of the 27 vote sinks,
 //! added one at a time and classified against the unedited genome on the
-//! `neighborhood-v1` battery.
+//! `neighborhood-v2` battery.
 //!
 //! The rows a single edge can land in are the transition contract's worked
 //! cases, pinned exactly by the executor fixtures in

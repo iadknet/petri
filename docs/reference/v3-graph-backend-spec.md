@@ -281,7 +281,7 @@ Section 12 and commit no graph effects.
 | Added structure | Added `genome_size()` units |
 | --- | ---: |
 | One edge on an already wired sink | 1 |
-| First edge on an empty sink | 2 (sink plus edge) |
+| First edge on an empty sink | 1 (a sink costs nothing of itself, T25.F02) |
 | Separate input declaration | 1 more |
 
 These units feed existing maintenance, replication and size-dependent mutation
@@ -320,7 +320,8 @@ being the neighbor ring (`NeighborFoodRing`, `NeighborBarrierRing`,
   a projection makes the visit entered (Section 8), so a projection on a
   dormant graph pays one minimum visit, as the first zero vote edge does. Host
   work is eight reads and multiply-adds per projection per entered visit.
-- A projection is one `genome_size()` unit and one live component; its ring is
+- A projection is nine `genome_size()` units (its record plus its eight implied
+  synapses, T25.F02) and one live component; its ring is
   a consumed reference that `Prune` never deletes. Structured refinement
   groups `ActionVote` sink edges only, so a projection is never a group member.
 - The VM has no projection (T11.F18 parity exemption): a VM node reaches one
@@ -569,10 +570,11 @@ contribution:
   sinks are always structurally present.
 - **Wired**: has at least one edge. Only wired items write values or
   votes. Only wired items count toward `genome_size()` and
-  `functional_complexity()`.
+  `functional_complexity()`; `genome_size()` charges a wired sink its edges
+  only, one unit each, and nothing for the sink itself (T25.F02).
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
   any wired sink, vote and parameter sinks included. A ring projection is a
-  live component wiring no sink: one `genome_size()` unit, one
+  live component wiring no sink: nine `genome_size()` units, one
   `functional_complexity()` unit, its ring a consumed reference (T11.F31).
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.

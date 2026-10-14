@@ -1,5 +1,5 @@
 //! The `neighborhood-coverage-v1` contexts (T11.F26): recorded terminal-world
-//! snapshots, authored contexts that set one channel group `neighborhood-v1`
+//! snapshots, authored contexts that set one channel group `neighborhood-v2`
 //! leaves at zero, and long sequences over them. Any change to these rules
 //! bumps [`super::COVERAGE_VERSION`].
 
@@ -22,7 +22,7 @@ pub const SEQUENCE_TICKS: usize = 32;
 /// Sequence ticks `1..=EARLY_TICKS` report apart from the later ticks.
 pub const EARLY_TICKS: usize = 4;
 /// Authored context `i` sets group `i mod 8`; every group is zero in
-/// `neighborhood-v1`.
+/// `neighborhood-v2`.
 pub const CHANNEL_GROUPS: [&str; 8] = [
     "neighbor barriers",
     "previous outcomes",
@@ -84,7 +84,7 @@ fn set_group(sensors: &mut SensorSnapshot, group: usize, rng: &mut SmallRng) {
     }
 }
 
-/// The 24 authored contexts: context `i` copies `neighborhood-v1` snapshot
+/// The 24 authored contexts: context `i` copies `neighborhood-v2` snapshot
 /// `i` (energy included) and sets channel group `i mod 8` from
 /// `SmallRng::seed_from_u64(AUTHORED_SEED_BASE + i)`. Not guaranteed
 /// realizable in any world.

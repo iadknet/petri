@@ -138,10 +138,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// every Graph-domain draw (default 11106923287936488614 ->
 /// 1518722661182035271, rate 0.0 11416820348583511793 ->
 /// 1085458628830102075).
+/// Re-pinned by T25.F02 commit 1 after two agreeing runs: the unit rule
+/// changes the production supply's draw count per birth, and the anchor 80
+/// the replication multiplier and gestation of every genome above it (default
+/// 1518722661182035271 -> 8319452125048910825, rate 0.0 1085458628830102075
+/// -> 3061059511661688014); the old size rule and anchor 97 together restore.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 1518722661182035271);
-    assert_eq!(short_run_identity(Some(0.0)), 1085458628830102075);
+    assert_eq!(short_run_identity(None), 8319452125048910825);
+    assert_eq!(short_run_identity(Some(0.0)), 3061059511661688014);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

@@ -812,19 +812,31 @@ mod tests {
         }
     }
 
-    /// The carrying charge's founder sizing is read from this number: the spec's
-    /// The founder's decision node is a vote graph (T19.F04), so the founder
-    /// pays `97 * genome_carry_cost_per_unit` per tick. The replication cost's
-    /// anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to the same measurement, so
-    /// the founder's multiplier is exactly 1.0.
+    /// The carrying charge's founder sizing is read from this number. Under the
+    /// T25.F02 unit rule (one unit per edge, nothing per wired sink) the
+    /// canonical founder is node 0 = 1 mesh node + 5 input references + 1 route
+    /// target + 3 compute nodes + 4 compute edges + 6 sink edges = 20 and
+    /// node 1 = 1 + 7 references + 10 compute nodes + 13 compute edges + 29
+    /// sink edges = 60, so it pays `80 * genome_carry_cost_per_unit` per tick.
+    /// The replication cost's anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to
+    /// the same measurement, so the founder's multiplier is exactly 1.0. The
+    /// ForageFirst profiles carry one more 2-input compute node: 83.
     #[test]
-    fn the_canonical_founder_genome_is_ninety_seven_units() {
+    fn founder_is_eighty_units() {
         use crate::config::FounderProfile;
         use crate::creature::founder::{founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 
         let genome = founder_genome(FounderProfile::V3Alpha1);
-        assert_eq!(genome.genome_size(), 97);
+        assert_eq!(genome.genome_size(), 80);
         assert_eq!(genome.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
+        for profile in [
+            FounderProfile::ForageFirstSparse,
+            FounderProfile::ForageFirstSparseConservative,
+            FounderProfile::ForageFirstSparseRichOffspring,
+            FounderProfile::ForageFirstSparseBalanced,
+        ] {
+            assert_eq!(founder_genome(profile).genome_size(), 83, "{profile:?}");
+        }
     }
 
     #[test]

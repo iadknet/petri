@@ -267,6 +267,8 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                                 "mean_genome_size",
                                 "mean_mesh_nodes",
                                 "mean_generation",
+                                "mean_wired_sinks",
+                                "mean_projections",
                                 "surviving_founder_clade_count",
                                 "shannon_entropy_nats",
                                 "sensor_census",
@@ -584,13 +586,17 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
     "plateau_population",
     "mean_energy",
 ];
-/// Persistence checkpoint fields the page reads, each kept whole.
-const KEPT_SAMPLE_FIELDS: [&str; 12] = [
+/// Persistence checkpoint fields the page reads, each kept whole, and
+/// `mean_wired_sinks` and `mean_projections` (T25.F02), which the page does
+/// not read but the readings do.
+const KEPT_SAMPLE_FIELDS: [&str; 14] = [
     "tick",
     "population",
     "mean_energy",
     "mean_genome_size",
     "mean_mesh_nodes",
+    "mean_wired_sinks",
+    "mean_projections",
     "shannon_entropy_nats",
     "surviving_founder_clade_count",
     "food_density_total",

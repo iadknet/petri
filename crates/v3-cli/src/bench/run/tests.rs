@@ -206,7 +206,7 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
         drift.birth_seed_formula,
         "7000000 + 1000 * (lineage_index + 1) + checkpoint + 9000 + trial_index"
     );
-    assert_eq!(drift.battery_version, "neighborhood-v1");
+    assert_eq!(drift.battery_version, "neighborhood-v2");
     assert_eq!(drift.mesh_version, "mesh-execution-v2");
     assert_eq!(drift.knockout_method, "static-successor-bypass-v1");
     assert_eq!(
@@ -219,8 +219,9 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
     );
     assert_eq!(
         drift.supply_rule,
-        "per-unit draw on the canonical V3Alpha1 founder's genome_size() 97 at \
-         per_unit_rate 0.005: Binomial(97, 0.005) events per walk and checkpoint birth"
+        // T25.F02 commit 1: the instrument anchor is 80 (97 restores).
+        "per-unit draw on the canonical V3Alpha1 founder's genome_size() 80 at \
+         per_unit_rate 0.005: Binomial(80, 0.005) events per walk and checkpoint birth"
     );
     assert_eq!(
         (
@@ -394,7 +395,7 @@ fn recruitment_paths_is_goal_only_and_historical_absence_is_unmeasured() {
         .recruitment_paths
         .defined()
         .unwrap();
-    assert_eq!(reading.version, "recruitment-paths-v1");
+    assert_eq!(reading.version, "recruitment-paths-v2");
     assert_eq!(reading.total_proposals, reading.sizes.proposals());
     assert!(goal.environment.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
     for name in ["gate", "sweep", "synthetic"] {
@@ -573,7 +574,10 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // 1 is the lowest of 0..=40 that survives (1, 3, 19, 26, 33, 37 do).
     // T20.F04/F05 as defaults, 2026-10-12: seed 1 goes extinct at tick 99;
     // seed 4 is the lowest of 0..=40 that survives (4 and 18 do).
-    params.seeds = vec![4];
+    // T25.F02 (uniform size rule), 2026-10-14: seed 4 goes extinct at tick
+    // 86; seed 11 is the lowest of 0..=40 that passes. The old size rule and
+    // anchor 97 restore seed 4.
+    params.seeds = vec![11];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

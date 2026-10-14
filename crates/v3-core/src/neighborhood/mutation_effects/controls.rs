@@ -36,7 +36,7 @@ pub(super) fn graph_genome(
 }
 
 /// A barrier-dependent action edit: the child votes `Eat` on any neighbor
-/// barrier, which `neighborhood-v1` never shows; the parent votes nothing.
+/// barrier, which `neighborhood-v2` never shows; the parent votes nothing.
 pub(super) fn barrier_pair() -> (CreatureGenome, CreatureGenome) {
     let refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
     let votes = (0..8)

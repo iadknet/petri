@@ -329,7 +329,7 @@ impl Batteries {
         }
     }
 
-    /// `genome`'s `neighborhood-v1` signature, masked as the scoring pass
+    /// `genome`'s `neighborhood-v2` signature, masked as the scoring pass
     /// executes it.
     #[must_use]
     pub fn signature(
@@ -791,7 +791,7 @@ fn fold_mutants(elite_scalar: f64, results: &[(Class, f64, bool)]) -> Mutants {
 }
 
 /// `n` fresh mutants of the elite: each passed once through the engine as
-/// breeding passes a child, classed on `neighborhood-v1` against the masked
+/// breeding passes a child, classed on `neighborhood-v2` against the masked
 /// elite and scored on the training scenes (identical ones silent and
 /// scored by copy); with the production creature-ticks spent.
 fn mutants(

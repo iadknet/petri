@@ -1057,8 +1057,8 @@ fn per_unit_config(rate: f64) -> MutationConfig {
     }
 }
 
-/// The default rule on the founder: about 0.485 requested events per birth
-/// (0.005 per unit over 97 units), with a Binomial's spread.
+/// The default rule on the founder: about 0.4 requested events per birth
+/// (0.005 per unit over 80 units), with a Binomial's spread.
 #[test]
 fn per_unit_supply_founder_mean_matches_rate_times_genome_size() {
     let config = MutationConfig::default();

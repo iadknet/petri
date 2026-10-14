@@ -1,7 +1,7 @@
 //! Mutational-neighborhood indicator (T11.F01): how often a single mutation
 //! leaves a brain acting like its parent (silent), acting differently
 //! (changed), or not acting at all (dead), per operator at one event and per
-//! birth through the production mutation engine, on the fixed `neighborhood-v1`
+//! birth through the production mutation engine, on the fixed `neighborhood-v2`
 //! sensor battery.
 //!
 //! This module is a top-level sibling of `mutation`, `runtime`, and
@@ -50,7 +50,7 @@ pub const EVOLVED_SEED_MULTIPLIER: u64 = 100_000;
 /// Predeclared founder-half battery version and sizes (T11.F01 Battery,
 /// "Predeclared sizes and seeds"). Halved once, uniformly, if a compute limit
 /// is exceeded — never chosen for better readings.
-pub const BATTERY_VERSION: &str = "neighborhood-v1";
+pub const BATTERY_VERSION: &str = "neighborhood-v2";
 
 /// The pieces of a [`SimulationConfig`] a battery evaluation needs beyond the
 /// mutation config, bundled so call sites do not thread three separate values

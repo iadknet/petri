@@ -80,10 +80,10 @@ Mutation supply is owned by `v3-mutation-spec.md` and configured by
 `v3-runtime-config-spec.md`. The engine has one supply rule and requests
 `Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19,
 T11.F20): every unit of structure the parent carries is an independent 0.005
-chance of one event, so the 97-unit V3Alpha1 founder expects about 0.485
+chance of one event, so the 80-unit V3Alpha1 founder expects about 0.4
 requested events per birth and a larger genome pays its size in exposure. The
 drift walk and the recruitment-paths legacy panel draw the same rule on the
-founder's 97 units whatever the walked genome's size, so their exposure is an
+founder's 80 units whatever the walked genome's size, so their exposure is an
 instrument constant. Requested events become attempts;
 skipped events are not extra requests, and applied count governs downstream
 mutation effects. Compare both conditional mutated-birth outcomes and absolute
@@ -225,7 +225,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
   5. compute cost = energy.costs.reproduce_cost scaled by the complexity and
      age multipliers and by the genome replication cost factor
      (1 + energy.lifecycle.genome_replication_cost_per_unit
-        * max(genome_size() - 97, 0)), and after_cost = post-effort parent
+        * max(genome_size() - 80, 0)), and after_cost = post-effort parent
      energy - cost; nothing more is deducted yet
   6. enforce energy.lifecycle.min_reproduce_energy gate on after_cost
      -> below threshold : [reject RejectedEnergyConstraints; return]
@@ -240,7 +240,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
      subtractions; the extra cost energy is burned, not transferred
      -> result Conceived; the parent stores one pending birth
         (direction, litter energy = transfer, deliver_tick = T + h,
-         h = ceil(genome_size() * gestation_ticks_per_founder_genome / 97))
+         h = ceil(genome_size() * gestation_ticks_per_founder_genome / 80))
      -> h >= 1 : the rest of the parent's action queue for tick T is
         discarded (no penalty, no log entry); steps 9-12 run at delivery
      -> h == 0 : delivery runs now at the validated target and the queue

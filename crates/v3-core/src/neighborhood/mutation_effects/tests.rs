@@ -170,7 +170,7 @@ fn computation_and_state_changes_count_masked_and_silent_with_state() {
     assert!(result.silent_with_state_or_cost);
 }
 
-/// Neighbor barriers are zero on every `neighborhood-v1` execution, so a
+/// Neighbor barriers are zero on every `neighborhood-v2` execution, so a
 /// barrier weight edit on a dispatched node changes nothing the battery sees.
 #[test]
 fn a_dispatched_edit_nothing_records_is_unresolved() {

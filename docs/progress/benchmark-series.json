@@ -114,6 +114,13 @@
       "before": "entered relaxation passes",
       "after": "entered nonempty single-evaluation graph visits including unaffordable attempts",
       "comparison": "raw deltas retained; cross-definition deltas are not like-for-like work efficiency"
+    },
+    {
+      "feature": "T25.F02",
+      "counter": "genome_size",
+      "before": "wired sink 1 + edges, projection 1",
+      "after": "edges only, projection 9",
+      "comparison": "mean_genome_size shifts by 8P - S per creature (founder 97 -> 80); cross-definition deltas are not like-for-like size changes"
     }
   ],
   "goal_worlds": {
