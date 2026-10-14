@@ -9,19 +9,28 @@ import {
 } from "react";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
-import { CensusSheet } from "./stats/CensusSheet.tsx";
-import { MechanicsDetails } from "./stats/MechanicsDetails.tsx";
+import { BandTab } from "./stats/BandTab.tsx";
+import { MechanicsTab } from "./stats/MechanicsTab.tsx";
 import { BAND_COLOR } from "./stats/bandColors.ts";
 import { type DockLayout, clampDockHeight, loadDock, saveDock } from "./stats/dockLayout.ts";
-import { BANDS, bandVerdict } from "./stats/readings.ts";
+import { type BandId, bandVerdict } from "./stats/readings.ts";
 
 const KEY_STEP = 24;
+
+type TabId = "mechanics" | BandId;
+
+const TABS: { id: TabId; label: string }[] = [
+	{ id: "mechanics", label: "Mechanics" },
+	{ id: "world", label: "World" },
+	{ id: "evolution", label: "Evolution" },
+	{ id: "brains", label: "Brains" },
+];
 
 function windowHeight(): number {
 	return typeof window === "undefined" ? 1000 : window.innerHeight;
 }
 
-/** The live stats dock under the map: a verdict strip that expands into the census sheet. */
+/** The live stats dock under the map: tabs that each fill the panel, never scrolling. */
 export function StatsPanel() {
 	const samples = useStatsHistoryStore((s) => s.samples);
 	const foodTypes = useWorldViewStore((s) => s.worldStatic?.food_types);
@@ -31,13 +40,19 @@ export function StatsPanel() {
 		return names;
 	}, [foodTypes]);
 
+	const [tab, setTab] = useState<TabId>("mechanics");
+	const [scrub, setScrub] = useState<number | null>(null);
 	const [layout, setLayout] = useState<DockLayout>(() => {
 		const stored = loadDock();
 		return { ...stored, height: clampDockHeight(stored.height, windowHeight()) };
 	});
 	const [dragging, setDragging] = useState(false);
-	const [scrubbing, setScrubbing] = useState(false);
 	const drag = useRef<{ startY: number; startHeight: number } | null>(null);
+
+	const last = samples.length - 1;
+	const scrubbing = scrub != null && scrub < last;
+	const index = scrubbing ? scrub : last;
+	const span = last > 0 ? samples[last]!.tick - samples[0]!.tick : 0;
 
 	const update = useCallback((next: DockLayout) => {
 		setLayout(next);
@@ -50,6 +65,29 @@ export function StatsPanel() {
 		window.addEventListener("resize", onResize);
 		return () => window.removeEventListener("resize", onResize);
 	}, []);
+
+	const selectTab = useCallback(
+		(next: TabId, focus = false) => {
+			setTab(next);
+			setScrub(null);
+			if (layout.collapsed) update({ ...layout, collapsed: false });
+			if (focus) document.getElementById(`stats-tab-${next}`)?.focus();
+		},
+		[layout, update],
+	);
+
+	const onTabKey = (event: KeyboardEvent<HTMLButtonElement>, at: number) => {
+		if (event.ctrlKey || event.metaKey || event.altKey) return;
+		const lastTab = TABS.length - 1;
+		let next: number;
+		if (event.key === "ArrowRight") next = at === lastTab ? 0 : at + 1;
+		else if (event.key === "ArrowLeft") next = at === 0 ? lastTab : at - 1;
+		else if (event.key === "Home") next = 0;
+		else if (event.key === "End") next = lastTab;
+		else return;
+		event.preventDefault();
+		selectTab(TABS[next]!.id, true);
+	};
 
 	const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
 		if (event.button !== 0) return;
@@ -89,6 +127,7 @@ export function StatsPanel() {
 	};
 
 	const toggle = () => update({ ...layout, collapsed: !layout.collapsed });
+	const bandTab = tab !== "mechanics";
 
 	return (
 		<section
@@ -126,41 +165,81 @@ export function StatsPanel() {
 				/>
 			</div>
 
-			<header className="flex min-h-9 items-center gap-3 border-b border-petri-border bg-slate-950/70 pl-3 pr-1.5">
+			<header className="@container flex h-9 shrink-0 items-stretch gap-3 border-b border-petri-border bg-slate-950/70 pr-1.5 pl-1">
 				<h2 id="stats-panel-heading" className="sr-only">
 					Statistics
 				</h2>
-				<ul
-					data-testid="stats-verdicts"
-					aria-label="Verdicts now"
-					className={`flex min-w-0 flex-1 flex-wrap items-baseline gap-x-5 gap-y-0.5 py-1.5 text-xs transition-opacity duration-150 ${
-						scrubbing ? "opacity-60" : ""
-					}`}
-				>
-					{scrubbing && (
-						<li className="rounded-sm bg-slate-800 px-1.5 text-[11px] font-semibold text-slate-200">
-							Now
-						</li>
-					)}
-					{BANDS.map((band) => {
-						const verdict = bandVerdict(band.id, samples);
+				<div role="tablist" aria-label="Statistics views" className="flex min-w-0 items-stretch">
+					{TABS.map(({ id, label }, at) => {
+						const selected = tab === id;
+						const verdict = id === "mechanics" ? null : bandVerdict(id, samples);
 						return (
-							<li
-								key={band.id}
-								className="flex min-w-0 max-w-full items-baseline gap-1.5"
-								title={verdict.full}
+							<button
+								key={id}
+								type="button"
+								role="tab"
+								id={`stats-tab-${id}`}
+								aria-selected={selected}
+								aria-controls="stats-panel-body"
+								tabIndex={selected ? 0 : -1}
+								title={verdict?.full}
+								onClick={() => selectTab(id)}
+								onKeyDown={(event) => onTabKey(event, at)}
+								className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-xs transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400 ${
+									selected
+										? "border-sky-400 text-slate-100"
+										: "border-transparent text-slate-400 hover:text-slate-200"
+								}`}
 							>
-								<span
-									aria-hidden="true"
-									className="h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full"
-									style={{ backgroundColor: BAND_COLOR[band.id] }}
-								/>
-								<span className="shrink-0 font-semibold text-slate-200">{band.label}</span>
-								<span className="truncate text-slate-300">{verdict.short}</span>
-							</li>
+								{id !== "mechanics" && (
+									<span
+										aria-hidden="true"
+										className="h-1.5 w-1.5 shrink-0 rounded-full"
+										style={{ backgroundColor: BAND_COLOR[id] }}
+									/>
+								)}
+								<span className="font-semibold">{label}</span>
+								{verdict && (
+									// The word needs room; narrow panels keep it in the tooltip.
+									<span className="hidden text-slate-400 @2xl:inline">{verdict.word}</span>
+								)}
+							</button>
 						);
 					})}
-				</ul>
+				</div>
+				<div className="flex-1" />
+				{bandTab && !layout.collapsed && span > 0 && (
+					<div className="relative flex min-w-0 items-center rounded px-1.5 has-[input:focus-visible]:outline-2 has-[input:focus-visible]:-outline-offset-2 has-[input:focus-visible]:outline-sky-400">
+						<span
+							className={`truncate font-mono text-[11px] tabular-nums ${scrubbing ? "text-sky-300" : "text-slate-400"}`}
+						>
+							{scrubbing
+								? `At tick ${samples[index]!.tick.toLocaleString("en-US")}`
+								: `Last ${span.toLocaleString("en-US")} ticks`}
+						</span>
+						<input
+							type="range"
+							aria-label="Scrub through time"
+							aria-valuetext={`tick ${samples[index]!.tick}`}
+							title="Hover a chart, or focus here and use the arrow keys, to read every chart at that tick"
+							min={0}
+							max={last}
+							value={index}
+							onChange={(event) => {
+								const next = Number(event.target.value);
+								setScrub(next >= last ? null : next);
+							}}
+							onBlur={() => setScrub(null)}
+							onKeyDown={(event) => {
+								if (event.key !== "Escape" || !scrubbing) return;
+								// Back to now without also clearing the map selection.
+								event.preventDefault();
+								setScrub(null);
+							}}
+							className="absolute inset-0 h-full w-full cursor-default opacity-0"
+						/>
+					</div>
+				)}
 				<button
 					type="button"
 					onClick={toggle}
@@ -168,7 +247,7 @@ export function StatsPanel() {
 					aria-controls="stats-panel-body"
 					aria-label={layout.collapsed ? "Expand statistics" : "Collapse statistics"}
 					title={layout.collapsed ? "Expand" : "Collapse"}
-					className="grid h-7 w-7 shrink-0 place-items-center rounded text-slate-400 transition-colors duration-150 hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-sky-400"
+					className="my-auto grid h-7 w-7 shrink-0 place-items-center rounded text-slate-400 transition-colors duration-150 hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-sky-400"
 				>
 					<svg
 						aria-hidden="true"
@@ -181,15 +260,28 @@ export function StatsPanel() {
 			</header>
 
 			{!layout.collapsed && (
-				<div id="stats-panel-body" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-					{samples.length === 0 ? (
+				<div
+					id="stats-panel-body"
+					role="tabpanel"
+					aria-labelledby={`stats-tab-${tab}`}
+					className="min-h-0 flex-1 overflow-hidden"
+				>
+					{tab === "mechanics" ? (
+						<MechanicsTab />
+					) : samples.length === 0 ? (
 						<p className="px-3 py-4 text-[13px] text-slate-400">
 							Readings appear here once the simulation runs. Start or step it from the top bar.
 						</p>
 					) : (
-						<CensusSheet samples={samples} foodNames={foodNames} onScrubbingChange={setScrubbing} />
+						<BandTab
+							band={tab}
+							samples={samples}
+							foodNames={foodNames}
+							index={index}
+							scrubbing={scrubbing}
+							onScrub={setScrub}
+						/>
 					)}
-					<MechanicsDetails />
 				</div>
 			)}
 		</section>
