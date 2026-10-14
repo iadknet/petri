@@ -211,8 +211,8 @@ wrong.
 - [x] `the_walk_dates_modules_from_their_birth_and_from_every_refresh`
       rewritten to a constructed lineage asserting the dating properties
       (birth date, refresh folding, internal-change dating) without
-      pinning draw history; its pinned numbers pass unchanged before the
-      rewrite and are in the readings.
+      pinning draw history, beside an `observe` test that fails without
+      the refresh fold; the old pins are in the readings.
 - [x] Closing commit: the corpus test retired, its hashes kept in
       `docs/progress/readings/t25-f01.md`.
 
@@ -259,7 +259,8 @@ line is a seedless capture followed by a build):
       so does a child of a VM-only parent whose batch created a Graph
       node, and a seeded founder's stays empty.
 - [ ] `cargo test --workspace` -> every existing pin unchanged (Inputs
-      table); `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
+      table).
+- [x] `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
       constructors and destructuring patterns; `grep -rn birth_weights
       crates frontend` -> only the legacy `genome_identity` string in
       `v3-cli/src/bench/mutation_effects.rs:346` (world-set deterministic
