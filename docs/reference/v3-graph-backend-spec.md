@@ -23,10 +23,9 @@ T20.F16, so on this backend it is a connection event), and the
 taxonomy and per-operator contract text live in `v3-mutation-spec.md` rather
 than being duplicated here. T11.F08 adds duplication placement
 (`duplicate_compute_nodes_in_place`: each copy directly after its original, an
-edge between duplicated nodes following the copies, the split exclusion for a
-live `DynamicIntrospection(EnergyCurrent)` reference read directly by a
-non-compute surface on a plasticity-carrying graph, the only key whose value
-differs between the evaluation and effects contexts), which is what keeps a copied edge on the
+edge between duplicated nodes following the copies; its split exclusion for a
+sink's direct `DynamicIntrospection(EnergyCurrent)` read went with the
+learning charge at T25.F02), which is what keeps a copied edge on the
 evaluation phase Section 8's ordered pass gives it. T11.F06 established the
 committed-state clock and T19.F02 made it per visit.
 
@@ -370,8 +369,8 @@ fields are deleted (`v3-runtime-config-spec.md`).
 
 ## 9. Post-Evaluation Effects
 
-After the ordered evaluation and its plasticity cost are affordable, one
-effects pass processes all fixed structural outputs. A zero-compute
+After the ordered evaluation's pass cost is affordable (learning is free,
+T25.F02), one effects pass processes all fixed structural outputs. A zero-compute
 entered visit runs the same pass with `compute_count = 0`, where a `ComputeNode`
 source resolves to `0.0` as any out-of-range compute source does.
 
@@ -537,10 +536,11 @@ Activity excludes learning rate: Classic `pre*post`, Oja
 `(pre-0.5)*(post-0.5)`. It uses the unweighted source actually evaluated,
 the node's resulting output and effective evaluation weight. Lower-index
 sources use current-visit outputs; self/higher sources use the last committed
-outputs. Input context includes evaluation-time energy, before later pure
-Hebbian costs. Pure Hebbian updates retain their existing semantics.
+outputs. Input context includes evaluation-time energy, which pure Hebbian
+updates no longer change (T25.F02). Pure Hebbian updates retain their
+existing semantics.
 
-Commit activity only after evaluation and plasticity costs are affordable,
+Commit activity only after the evaluation's pass cost is affordable,
 before graph effects. A failed visit leaves the trace untouched, whatever
 earlier visits added this tick. Elapsed-time decay is never rolled back.
 Existing charges and work counters still apply.

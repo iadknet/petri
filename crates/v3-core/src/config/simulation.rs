@@ -714,12 +714,6 @@ pub struct RuntimeConfig {
     pub max_mesh_hops: u32,
     pub max_vm_steps: u32,
     pub graph_node_base_cost: f32,
-    /// Energy cost per plasticity weight update. Default 0.0 (free during initial rollout).
-    #[serde(default, alias = "hebbian_update_cost")]
-    pub plasticity_update_cost: f32,
-    /// Energy cost per reward-modulated weight update. Default 0.0 (free during initial rollout).
-    #[serde(default)]
-    pub reward_learning_cost: f32,
     /// Free mesh hops per world tick before the per-tick hop ramp charges.
     /// Default 32. Any value is valid; 0 ramps from the first hop.
     #[serde(default = "default_hop_ramp_allowance")]
@@ -755,8 +749,6 @@ impl Default for RuntimeConfig {
             max_mesh_hops: 64,
             max_vm_steps: 10000,
             graph_node_base_cost: 1e-5,
-            plasticity_update_cost: 0.0,
-            reward_learning_cost: 0.0,
             hop_ramp_allowance: default_hop_ramp_allowance(),
             hop_ramp_cost: default_hop_ramp_cost(),
             max_actions_per_turn: default_max_actions_per_turn(),
@@ -1058,8 +1050,6 @@ impl SimulationConfig {
             rt.max_vm_steps = 10000;
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
-        rt.plasticity_update_cost = normalize_f32_finite_nonneg(rt.plasticity_update_cost, 0.0);
-        rt.reward_learning_cost = normalize_f32_finite_nonneg(rt.reward_learning_cost, 0.0);
         // Any allowance is valid (0 ramps from the first hop); only the cost
         // needs a finite, non-negative guard, like `vm.step_ramp_cost`.
         rt.hop_ramp_cost = normalize_f32_finite_nonneg(rt.hop_ramp_cost, default_hop_ramp_cost());
@@ -1454,7 +1444,6 @@ mod tests {
         assert_eq!(cfg.runtime.vm.step_ramp_allowance, 100);
         assert!((cfg.runtime.vm.step_ramp_cost - 1e-6).abs() < 1e-12);
         assert_eq!(cfg.runtime.max_actions_per_turn, 10);
-        assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
@@ -1922,14 +1911,6 @@ mod tests {
         cfg.shared_memory.decay_rate = -0.5;
         cfg.normalize();
         assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn normalize_nan_reward_learning_cost_falls_back() {
-        let mut cfg = SimulationConfig::default();
-        cfg.runtime.reward_learning_cost = f32::NAN;
-        cfg.normalize();
-        assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
     }
 
     // ── ComplexityEnergyCostConfig tests ───────────────────────────────────

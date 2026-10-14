@@ -249,46 +249,18 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             commit_counts: &commit_counts,
             mesh_hops,
         };
-        let (plasticity_cost, plasticity_update_count, plasticity_changed_count) =
-            hebbian::apply_hebbian_updates(
-                def,
-                node_idx,
-                &mut graph_runtime.plasticity_weights,
-                &curr_outputs,
-                input_refs,
-                &post_ctx,
-                shared_memory,
-                prev_shared_memory,
-                config.plasticity_update_cost,
-            );
+        let (plasticity_update_count, plasticity_changed_count) = hebbian::apply_hebbian_updates(
+            def,
+            node_idx,
+            &mut graph_runtime.plasticity_weights,
+            &curr_outputs,
+            input_refs,
+            &post_ctx,
+            shared_memory,
+            prev_shared_memory,
+        );
         side_outputs.work_counters.plasticity_updates += plasticity_update_count;
         side_outputs.work_counters.plasticity_changes += plasticity_changed_count;
-        let before = *energy;
-        *energy -= plasticity_cost;
-        side_outputs.energy_observation.hebbian_learning += applied_debit(before, *energy);
-        observe_energy_change(
-            &mut side_outputs.energy_observation.pending_cause,
-            f64::from(before),
-            f64::from(*energy),
-            DeathCause::HebbianLearning,
-        );
-        if *energy <= 0.0 {
-            tracer.on_finish(
-                graph_runtime
-                    .node_outputs
-                    .get(node_idx)
-                    .map_or(&[], Vec::as_slice),
-                false,
-            );
-            restore_scratch(
-                graph_runtime,
-                prev_outputs,
-                curr_outputs,
-                candidate_state,
-                w_inputs_buf,
-            );
-            return NodeResult::exhausted();
-        }
     }
 
     if graph_runtime.node_state.len() <= node_idx {
@@ -533,7 +505,6 @@ mod work_counter_tests {
         let ss = empty_ss();
         let config = RuntimeConfig {
             graph_node_base_cost: 0.01,
-            plasticity_update_cost: 0.01,
             ..RuntimeConfig::default()
         };
         let mut energy = 100.0f32;
@@ -554,6 +525,8 @@ mod work_counter_tests {
 
         assert_eq!(output.work_counters.plasticity_updates, 1);
         assert_eq!(output.work_counters.graph_relax_iters, 1);
+        // Learning is free (T25.F02): the visit pays its one pass cost only.
+        assert_eq!(energy, 100.0f32 - 0.01);
     }
 }
 
@@ -657,7 +630,6 @@ mod clock_tests {
         );
         let config = RuntimeConfig {
             graph_node_base_cost: 1.0,
-            plasticity_update_cost: 1.0,
             ..RuntimeConfig::default()
         };
         let mut state = GraphRuntimeState::new();
@@ -665,7 +637,9 @@ mod clock_tests {
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         let committed_state = state.node_state.clone();
         let committed_outputs = state.node_outputs.clone();
-        for initial_energy in [0.5, 1.5] {
+        // The pass cost is the only exhaustion point: learning is free
+        // (T25.F02), so a plastic node that affords its pass completes it.
+        for initial_energy in [0.5, 1.0] {
             let mut energy = initial_energy;
             let (memory, side) = visit(&def, &mut state, 8.0, &mut energy, &config);
             assert_eq!(memory, -99.0);
@@ -692,12 +666,14 @@ mod clock_tests {
         );
         let config = RuntimeConfig {
             graph_node_base_cost: 1.0,
-            plasticity_update_cost: 1.0,
             ..RuntimeConfig::default()
         };
         let mut state = GraphRuntimeState::new();
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
-        for mut energy in [1.0, 2.0] {
+        // The pass cost is the only exhaustion point (T25.F02: learning is
+        // free).
+        {
+            let mut energy = 1.0;
             let mut memory = [0.0; 16];
             memory[0] = 8.0;
             let mut side = MeshSideOutputs::new(10);

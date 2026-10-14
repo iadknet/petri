@@ -1264,13 +1264,12 @@ fn run_phase_2(
 ///
 /// Every living creature stores this tick's outcome signal bank as its
 /// `previous_outcome` (T19.F05): energy now minus the post-Phase-0 snapshot,
-/// computed before any reward debit; a creature born this tick has no
+/// before the zero floor; a creature born this tick has no
 /// record and stores zeros. For each creature with reward-modulated graph
 /// nodes, the same bank then drives three-factor weight updates using
 /// eligibility traces.
 fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
-    use super::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
-    let reward_cost = sim.config.runtime.reward_learning_cost;
+    use super::energy_accounting::applied_debit;
 
     // Collect IDs to avoid borrow conflict (need &mut creature + &sim.config).
     let ids: Vec<CreatureId> = sim.creatures.keys().collect();
@@ -1301,32 +1300,23 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
         for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
             if let BackendDef::Graph(ref def) = node.backend_def {
                 if has_any_reward_modulated(def) {
-                    let (update_cost, update_count, changed_count) = apply_reward_modulated_updates(
+                    let (update_count, changed_count) = apply_reward_modulated_updates(
                         def,
                         node_idx,
                         &mut creature.graph_runtime.plasticity_weights,
                         &creature.graph_runtime.eligibility_traces,
                         &signals,
-                        reward_cost,
                     );
                     sim.stats.plasticity_updates_total += u64::from(update_count);
                     sim.stats.reward_modulated_updates_total += u64::from(update_count);
                     sim.stats.plasticity_changes_total += u64::from(changed_count);
                     sim.stats.reward_modulated_changes_total += u64::from(changed_count);
-                    let before = creature.energy;
-                    creature.energy -= update_cost;
-                    sim.stats.energy_flows.reward_learning +=
-                        applied_debit(before, creature.energy);
-                    observe_energy_change(
-                        &mut creature.pending_death_cause,
-                        f64::from(before),
-                        f64::from(creature.energy),
-                        DeathCause::RewardLearning,
-                    );
                 }
             }
         }
-        // Floor energy at 0.0 — same invariant as Phase 2 action costs.
+        // Floor energy at 0.0 — same invariant as Phase 2 action costs. Learning
+        // is free (T25.F02), so the floor is its own step: it reaches exactly
+        // the creatures with an outcome bank and a reward-modulated node.
         let before = creature.energy;
         creature.energy = creature.energy.max(0.0);
         sim.stats.energy_flows.zero_floor_credit += applied_debit(creature.energy, before);

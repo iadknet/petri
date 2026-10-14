@@ -435,7 +435,6 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
     });
     let config = RuntimeConfig {
         graph_node_base_cost: BASE_COST,
-        plasticity_update_cost: 0.125,
         max_mesh_hops: 3,
         max_actions_per_turn: 2,
         ..RuntimeConfig::default()

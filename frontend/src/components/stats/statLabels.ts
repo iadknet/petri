@@ -62,8 +62,6 @@ const DEATH_CAUSES: Record<string, string> = {
 	vm_compute: "VM compute",
 	graph_compute: "Graph compute",
 	mesh_ramp: "Mesh ramp cost",
-	hebbian_learning: "Hebbian learning cost",
-	reward_learning: "Reward learning cost",
 	priority_bid: "Priority bid",
 	action_noop: "Idling",
 	action_eat: "Eating",

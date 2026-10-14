@@ -8,8 +8,6 @@ pub enum DeathCause {
     VmCompute,
     GraphCompute,
     MeshRamp,
-    HebbianLearning,
-    RewardLearning,
     PriorityBid,
     ActionNoop,
     ActionEat,
@@ -23,14 +21,12 @@ pub enum DeathCause {
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 15] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
         Self::VmCompute,
         Self::GraphCompute,
         Self::MeshRamp,
-        Self::HebbianLearning,
-        Self::RewardLearning,
         Self::PriorityBid,
         Self::ActionNoop,
         Self::ActionEat,
@@ -51,8 +47,6 @@ impl DeathCause {
             Self::VmCompute => "vm_compute",
             Self::GraphCompute => "graph_compute",
             Self::MeshRamp => "mesh_ramp",
-            Self::HebbianLearning => "hebbian_learning",
-            Self::RewardLearning => "reward_learning",
             Self::PriorityBid => "priority_bid",
             Self::ActionNoop => "action_noop",
             Self::ActionEat => "action_eat",
@@ -119,7 +113,6 @@ pub struct CognitionEnergyObservation {
     pub graph_compute: f64,
     /// Per-tick hop ramp charged in the mesh loop before each dispatch (T19.F01).
     pub mesh_ramp: f64,
-    pub hebbian_learning: f64,
     pub priority_bid: f64,
     pub pending_cause: Option<DeathCause>,
 }
@@ -156,8 +149,6 @@ pub struct EnergyFlows {
     pub priority_bid: f64,
     pub graph_compute: f64,
     pub mesh_ramp: f64,
-    pub hebbian_learning: f64,
-    pub reward_learning: f64,
     pub lifecycle_decay: f64,
     pub genome_carrying: f64,
     pub genome_size_creature_ticks: u64,
@@ -241,7 +232,6 @@ impl EnergyFlows {
         self.priority_bid += observation.priority_bid;
         self.graph_compute += observation.graph_compute;
         self.mesh_ramp += observation.mesh_ramp;
-        self.hebbian_learning += observation.hebbian_learning;
     }
 }
 
@@ -255,7 +245,7 @@ mod tests {
         fn cause_keys_follow_the_stable_report_schema(index in 0usize..DeathCause::ALL.len()) {
             let expected = [
                 "lifecycle_decay", "genome_carrying", "vm_compute", "graph_compute",
-                "mesh_ramp", "hebbian_learning", "reward_learning", "priority_bid", "action_noop",
+                "mesh_ramp", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
                 "parental_transfer", "predation",
                 "external_removal", "unattributed",

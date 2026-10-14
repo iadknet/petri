@@ -196,8 +196,6 @@ fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
             f.vm_compute,
             f.priority_bid,
             f.graph_compute,
-            f.hebbian_learning,
-            f.reward_learning,
             f.lifecycle_decay,
             f.genome_carrying,
             f.parental_transfer_debit,

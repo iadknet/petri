@@ -351,8 +351,6 @@ fn run_families(families: &mut Vec<Family>) {
             "priority_bid",
             "graph_compute",
             "mesh_ramp",
-            "hebbian_learning",
-            "reward_learning",
             "lifecycle_decay",
             "genome_carrying",
             "parental_transfer_debit",

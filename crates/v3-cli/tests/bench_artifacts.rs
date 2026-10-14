@@ -192,11 +192,28 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
-/// Undoes T25.F02 on the resolved goal recipes and returns the
-/// input-mechanism values: restoring the rate 0.005 commit 2 replaced.
+/// Undoes T25.F02 on the resolved goal recipes, asserting the commit-2
+/// digests between its two steps, and returns the input-mechanism values:
+/// restoring the learning-cost knobs commit 3 deleted, then the rate 0.005
+/// commit 2 replaced.
 fn undo_t25_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
-    configs.map(|config| {
+    let rate_values = configs.map(|config| {
         let mut value = serde_json::to_value(config).unwrap();
+        let runtime = value["runtime"].as_object_mut().unwrap();
+        for key in ["plasticity_update_cost", "reward_learning_cost"] {
+            assert_eq!(runtime.insert(key.into(), json!(0.0)), None, "{key}");
+        }
+        value
+    });
+    assert_eq!(
+        rate_values.each_ref().map(value_digest),
+        [
+            "sha256:091478b9b96e143f2b45e5405b7f7bb95e8184d60ca7bcc489dac2eff748f6a9",
+            "sha256:d8248d44bd039920a0b2de4826f4b9a6a9c7d9d3fdbccace1a3d9b9eeedd2eaf",
+            "sha256:f7832b60cdc1aea190e97b71cda498e19ce04d1744a6c254c2e7562969fa9e84",
+        ]
+    );
+    rate_values.map(|mut value| {
         assert_eq!(
             value["mutation"]
                 .as_object_mut()
@@ -234,7 +251,10 @@ fn undo_t25_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
 /// recovers the effort-cost digests.
 /// T25.F02 commit 2 re-pinned all three after two agreeing runs:
 /// `mutation.per_unit_rate` 0.0060625; restoring 0.005 recovers the
-/// input-mechanism digests.
+/// input-mechanism digests. T25.F02 commit 3 re-pinned all three after two
+/// agreeing runs: the resolved `runtime` drops `plasticity_update_cost` and
+/// `reward_learning_cost`; restoring both at 0.0 recovers the commit-2
+/// digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -250,9 +270,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:091478b9b96e143f2b45e5405b7f7bb95e8184d60ca7bcc489dac2eff748f6a9",
-            "sha256:d8248d44bd039920a0b2de4826f4b9a6a9c7d9d3fdbccace1a3d9b9eeedd2eaf",
-            "sha256:f7832b60cdc1aea190e97b71cda498e19ce04d1744a6c254c2e7562969fa9e84",
+            "sha256:5ab6069b67f292606b2588fb6f7590c23a3ecc9705c02e5762a8048f4c6e8504",
+            "sha256:87ad318819d883fffe44baba9c262d832399976ead911d5d1d49ec624e9bc6de",
+            "sha256:b33044d50bf95be990c0d2fcd09af8c6685db5534e8b4b4dff71d3b284b3c559",
         ]
     );
 

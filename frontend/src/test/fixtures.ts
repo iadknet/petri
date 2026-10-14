@@ -88,8 +88,6 @@ export const MOCK_CONFIG: SimulationConfig = {
 		max_mesh_hops: 128,
 		max_vm_steps: 1024,
 		graph_node_base_cost: 0.05,
-		plasticity_update_cost: 0.0,
-		reward_learning_cost: 0.0,
 		hop_ramp_allowance: 32,
 		hop_ramp_cost: 0.0001,
 		max_actions_per_turn: 10,

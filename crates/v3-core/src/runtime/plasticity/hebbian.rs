@@ -65,7 +65,8 @@ pub(crate) fn effective_weight(
 /// node's own output is the "post" activation, and each input source's output
 /// is the "pre" activation.
 ///
-/// Returns energy cost, edge assignments, and assignments that change a weight.
+/// Returns edge assignments and assignments that change a weight; learning
+/// is free (T25.F02).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_hebbian_updates(
     def: &CgpGraphBackendDef,
@@ -76,10 +77,8 @@ pub(crate) fn apply_hebbian_updates(
     resolve_ctx: &ResolveCtx<'_>,
     shared_memory: &[f32; 16],
     prev_shared_memory: &[f32; 16],
-    cost_per_update: f32,
-) -> (f32, u32, u32) {
+) -> (u32, u32) {
     let compute_count = def.compute_nodes().len();
-    let mut total_cost: f32 = 0.0;
     let mut update_count: u32 = 0;
     let mut changed_count: u32 = 0;
 
@@ -145,12 +144,11 @@ pub(crate) fn apply_hebbian_updates(
             weights[edge_idx] = (w + dw).clamp(-w_clamp, w_clamp);
             // Exact stored-value inequality excludes deltas rounded/clamped away.
             changed_count += u32::from(weights[edge_idx] != w);
-            total_cost += cost_per_update;
             update_count += 1;
         }
     }
 
-    (total_cost, update_count, changed_count)
+    (update_count, changed_count)
 }
 
 /// Collect weighted inputs using effective weights (learned if available).
