@@ -1137,6 +1137,29 @@ fn founder_only_trajectory_digest_is_pinned() {
 /// Births, final population and trajectory digest of the founder-only run,
 /// at the default gestation rate or the given one.
 fn founder_only_trajectory(gestation_rate: Option<f32>) -> (u64, usize, String) {
+    founder_only_trajectory_with(gestation_rate, None)
+}
+
+/// The founder-only trajectory with the genome carrying cost off
+/// (`genome_carry_cost_per_unit = 0`), pinned on main before T25.F01's
+/// refactor: the digest fields of [`founder_only_trajectory_digest_is_pinned`].
+#[test]
+fn founder_only_trajectory_without_carrying_cost_is_pinned() {
+    assert_eq!(
+        founder_only_trajectory_with(None, Some(0.0)),
+        (
+            89,
+            0,
+            "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f".to_owned()
+        )
+    );
+}
+
+/// [`founder_only_trajectory`] with an optional genome carrying cost per unit.
+fn founder_only_trajectory_with(
+    gestation_rate: Option<f32>,
+    carry_cost_per_unit: Option<f32>,
+) -> (u64, usize, String) {
     use sha2::{Digest, Sha256};
     use slotmap::Key;
 
@@ -1144,6 +1167,9 @@ fn founder_only_trajectory(gestation_rate: Option<f32>) -> (u64, usize, String) 
     cfg.mutation.per_unit_rate = 0.0;
     if let Some(rate) = gestation_rate {
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+    }
+    if let Some(cost) = carry_cost_per_unit {
+        cfg.energy.lifecycle.genome_carry_cost_per_unit = cost;
     }
     let mut sim = seed_simulation(cfg, 2026);
     let mut hash = Sha256::new();
