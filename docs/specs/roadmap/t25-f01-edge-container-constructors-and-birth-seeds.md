@@ -262,13 +262,38 @@ line is a seedless capture followed by a build):
       ' crates` -> only inside the container module.
 - [ ] `make check` -> 0, `make rust-test-slow` -> 0 with recorded readings
       unchanged.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
-      summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred.
+- [x] Mutation gate (fresh, `e9bd8714`): 562 tested, 20 missed, 424
+      caught, 116 unviable, 2 timeouts; survivors in the table below.
 - [x] Gate profile: summary at
       `docs/progress/features/t25-f01-edge-container-constructors-and-birth-seeds.json`,
       deterministic blocks identical to the epoch, no new full report
       staged.
+
+| Mutant (fresh run) | Resolution |
+| --- | --- |
+| Output | `~/.local/share/petri-tools/mutants/t25-f01-fresh/mutants.out/` (`missed.txt`, `timeout.txt`); transcript in `docs/progress/readings/t25-f01.md` |
+| `creature/drives.rs:71:54` `>` to `<` in `node_fanouts` | Equivalent: flipping the sign key relabels both groups alike, so fan-out counts are unchanged |
+| `creature/drives.rs:71:54` `>` to `>=` in `node_fanouts` | Equivalent: `carries` admits only `\|w\| > 1e-3`, so `w == 0` never reaches the comparison |
+| `creature/drives.rs:108:50` `>` to `>=` in `observe_one` | Equivalent: the same `carries` filter precedes it |
+| `creature/ring_rules.rs:143:47` `>` to `>=` in `bus` | Equivalent: the same `carries` filter precedes it |
+| `creature/ring_rules.rs:193:57` `>` to `>=` in `observe_one` | Equivalent: the same `carries` filter precedes it |
+| `creature/ring_rules.rs:207:70` `>` to `>=` in `observe_one` | Equivalent: the same `carries` filter precedes it |
+| `mutation/engine/mod.rs:509:28` guard to `true` in `collect_added_node_input_classes` | Killed: `graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_graph` (`mutation/engine/tests.rs`) |
+| `mutation/engine/mod.rs:544:28` guard to `true` in `collect_added_node_world_inputs_for_operator` | Killed: the same test |
+| `mutation/graph/operators.rs:493:22` `<` to `<=` in `copy_cgp_subgraph` | Killed: `copy_cgp_subgraph_walk_skips_a_source_one_past_the_last_node` (`operators.rs` tests) |
+| `neighborhood/opportunity/controllers.rs:141:20` `+=` to `*=` in `Author::edge` | Killed: `authored_structure_counts_the_edges_and_nodes_the_controller_adds` (`opportunity/tests.rs`) |
+| `neighborhood/opportunity/controllers.rs:150:20` `+=` to `*=` in `Author::node` | Killed: the same test |
+| `neighborhood/opportunity/discovery.rs:85:5` `vote_surface_channels` to empty set | Killed: `connect_step_sees_authored_channels_behind_compute_nodes` (`opportunity/tests.rs`) |
+| `neighborhood/opportunity/discovery.rs:124:5` `graph_vote_edges` to `vec![]` | Killed: the same test |
+| `neighborhood/opportunity/discovery.rs:139:22` `<` to `==` in `graph_vote_edges` | Killed: the same test |
+| `neighborhood/opportunity/discovery.rs:139:22` `<` to `>` in `graph_vote_edges` | Killed: the same test |
+| `neighborhood/recruitment_paths/fixtures.rs:522:29` guard to `true` in `direction` | Equivalent: both callers pass a copy of the reactive module, whose only sink edges are Move edges, so every non-Move sink is already empty |
+| `cgp/container.rs:466:31` `>` to `>=` in `remove_compute_node` | Equivalent: the preceding `== removed` branch takes equality first |
+| `cgp/container.rs:547:36` `+` to `*` in `duplicate_compute_nodes` | Equivalent: inserting a clone of `rows[source]` just before or just after it yields the same rows |
+| `cgp/container.rs:685:35` `>` to `>=` in `reindex_input_refs_after_removal` | Equivalent: a pruned index is addressed by no projection (the `debug_assert_ne!` above), so equality never reaches it |
+| `cgp/container.rs:695:29` `>` to `>=` in `reindex_input_refs_after_removal` | Equivalent: the same contract for edges |
+| Timeout: `mutation/graph/operators.rs:554:5` `remove_edge` to `Ok(())` | Killed: strengthened `local_scalar_exceptions_sparse_deletion_copy_serde_and_pruning_persist` (`neutral_connection_tests/refinement.rs`), whose drain loop spun |
+| Timeout: `cgp/container.rs:598:9` `remove_edge` to `()` | Killed: the same strengthened test |
 
 ## Performance and Goal Impact
 
