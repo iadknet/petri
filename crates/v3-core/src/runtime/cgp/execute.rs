@@ -672,33 +672,31 @@ mod clock_tests {
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         // The pass cost is the only exhaustion point (T25.F02: learning is
         // free).
-        {
-            let mut energy = 1.0;
-            let mut memory = [0.0; 16];
-            memory[0] = 8.0;
-            let mut side = MeshSideOutputs::new(10);
-            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced(
-                &def,
-                &[],
-                &[0.0; OUTPUT_SLOT_COUNT],
-                &mut energy,
-                0.0,
-                0,
-                &mut state,
-                &super::work_counter_tests::empty_ss(),
-                &config,
-                &mut side,
-                &mut memory,
-                &[0.0; 16],
-            );
-            assert!(!trace.temporal_committed);
-            assert_eq!(trace.final_outputs, [0.5]);
-            assert_eq!(trace.passes.len(), 1);
-            assert_eq!(trace.passes[0].energy_cost, 1.0);
-            assert!(trace.output_sinks.is_empty());
-            assert_eq!(memory[1], 0.0);
-            assert_eq!(energy, 0.0);
-        }
+        let mut energy = 1.0;
+        let mut memory = [0.0; 16];
+        memory[0] = 8.0;
+        let mut side = MeshSideOutputs::new(10);
+        let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced(
+            &def,
+            &[],
+            &[0.0; OUTPUT_SLOT_COUNT],
+            &mut energy,
+            0.0,
+            0,
+            &mut state,
+            &super::work_counter_tests::empty_ss(),
+            &config,
+            &mut side,
+            &mut memory,
+            &[0.0; 16],
+        );
+        assert!(!trace.temporal_committed);
+        assert_eq!(trace.final_outputs, [0.5]);
+        assert_eq!(trace.passes.len(), 1);
+        assert_eq!(trace.passes[0].energy_cost, 1.0);
+        assert!(trace.output_sinks.is_empty());
+        assert_eq!(memory[1], 0.0);
+        assert_eq!(energy, 0.0);
     }
 
     #[test]
