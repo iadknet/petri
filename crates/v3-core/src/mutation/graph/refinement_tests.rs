@@ -280,8 +280,12 @@ proptest! {
             let norm = old.iter().zip(&new).map(|(a,b)| (f64::from(*b) - f64::from(*a)).powi(2)).sum::<f64>().sqrt();
             prop_assert!(norm <= 0.100001);
             for i in 1..count { prop_assert!(((new[i]-new[0]) - (old[i]-old[0])).abs() < 1e-7); }
-            let weights: Vec<f32> = graph(&before).edges().map(|e| e.weight()).collect();
-            edit_sinks(graph_mut(&mut node), |sinks| { let mut weights = weights.into_iter(); for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) { *edge = reweighted(*edge, weights.next().unwrap()); } });
+            let weights: Vec<f32> = graph(&before).output_sinks().iter().flat_map(|s| s.inputs.iter().map(|e| e.weight())).collect();
+            edit_sinks(graph_mut(&mut node), |sinks| {
+                for (edge, weight) in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()).zip(weights) {
+                    *edge = reweighted(*edge, weight);
+                }
+            });
             prop_assert_eq!(node,before);
         }
     }
@@ -493,7 +497,11 @@ proptest! {
         let (family,width)=[(WorldInputKey::NearbyCreatureCore,4),(WorldInputKey::NearbyCreatureVitals,2),(WorldInputKey::NearbyCreatureIdentity,3)][bank];
         let field=field % width;
         let mut node=slots(family,width,field,VoteSink::from_index(vote).unwrap());
-        edit_sinks(graph_mut(&mut node), |sinks| { for sink in sinks.iter_mut() { sink.inputs.retain(|edge| matches!(edge.source(),GraphSource::InputLeaf {sub_idx,..} if mask & (1 << (sub_idx/width)) != 0)); } });
+        edit_sinks(graph_mut(&mut node), |sinks| {
+            for sink in sinks.iter_mut() {
+                sink.inputs.retain(|edge| matches!(edge.source(),GraphSource::InputLeaf {sub_idx,..} if mask & (1 << (sub_idx/width)) != 0));
+            }
+        });
         let before=node.clone(); let count=mask.count_ones() as usize;
         let groups=all_groups(&node);
         prop_assert_eq!(groups.len(),usize::from(count>=2));

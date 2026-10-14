@@ -1220,23 +1220,21 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
     let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
         panic!("the default founder's entry node is a Graph node");
     };
-    {
-        let surface = def
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
-                DirectedVoteKind::Move,
-            )))
-            .unwrap();
-        def.push_edge(
-            surface,
-            GraphEdge::new(
-                GraphSource::SharedMemory {
-                    slot: 0,
-                    previous: false,
-                },
-                0.5,
-            ),
-        );
-    }
+    let surface = def
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
+            DirectedVoteKind::Move,
+        )))
+        .unwrap();
+    def.push_edge(
+        surface,
+        GraphEdge::new(
+            GraphSource::SharedMemory {
+                slot: 0,
+                previous: false,
+            },
+            0.5,
+        ),
+    );
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);

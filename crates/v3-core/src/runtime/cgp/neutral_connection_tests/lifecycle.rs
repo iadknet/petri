@@ -1,6 +1,7 @@
 //! Existing mutation, copy, serde and reference-repair seams for zero edges.
 use super::*;
 use crate::config::MutationConfig;
+use crate::creature::genome::cgp::test_support::{edit_sinks, reweighted};
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;
@@ -59,9 +60,9 @@ proptest! {
         }
         prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>());
         // Distinct weights expose which occurrence deletion removed.
-        crate::creature::genome::cgp::test_support::edit_sinks(graph_mut(&mut mutated), |sinks| {
+        edit_sinks(graph_mut(&mut mutated), |sinks| {
             for (index, e) in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()).enumerate() {
-                *e = crate::creature::genome::cgp::test_support::reweighted(*e, index as f32 + 0.25);
+                *e = reweighted(*e, index as f32 + 0.25);
             }
         });
         let before: Vec<_> = graph(&mutated).edges().cloned().collect();
