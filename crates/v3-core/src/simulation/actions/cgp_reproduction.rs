@@ -31,13 +31,9 @@ pub(crate) fn capture_def_seeds(def: &mut CgpGraphBackendDef, parent: &[Box<[f32
                 .iter()
                 .enumerate()
                 .map(|(node, compute)| {
+                    let values = parent.get(node).map_or(&[][..], |values| &values[..]);
                     (0..compute.inputs.len())
-                        .map(|edge| {
-                            parent
-                                .get(node)
-                                .and_then(|values| values.get(edge))
-                                .copied()
-                        })
+                        .map(|edge| values.get(edge).copied())
                         .collect()
                 })
                 .collect(),
@@ -55,6 +51,7 @@ mod tests {
         ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
         FIRST_ACTION_VOTE_SINK, FIXED_SINK_COUNT,
     };
+    use crate::creature::genome::{HebbianRule, PlasticityConfig};
     use crate::creature::newborn::take_graph_plasticity_weights;
 
     /// The seed rows a draft carries.
@@ -63,7 +60,6 @@ mod tests {
             .and_then(BirthSeeds::rows)
             .expect("the draft carries seed rows")
     }
-    use crate::creature::genome::{HebbianRule, PlasticityConfig};
 
     #[test]
     fn short_parent_slice_mixes_genomic_defaults_without_cross_talk() {

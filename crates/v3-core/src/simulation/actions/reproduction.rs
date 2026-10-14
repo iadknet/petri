@@ -946,11 +946,8 @@ mod tests {
 
         let result = crate::creature::newborn::take_plasticity_weights(&mut child);
 
-        let scaffold: Vec<Vec<Box<[f32]>>> = vec![
-            Vec::new(),
-            Vec::new(),
-            vec![Box::default(); compute_count],
-        ];
+        let scaffold: Vec<Vec<Box<[f32]>>> =
+            vec![Vec::new(), Vec::new(), vec![Box::default(); compute_count]];
         assert_eq!(result, scaffold);
         let BackendDef::Graph(created) = &child.nodes[2].backend_def else {
             unreachable!()

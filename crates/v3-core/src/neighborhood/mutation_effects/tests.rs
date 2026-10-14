@@ -2,8 +2,10 @@ use super::controls::graph_genome;
 use super::*;
 use crate::config::{FounderProfile, SimulationConfig};
 use crate::creature::founder::founder_genome;
+use crate::creature::genome::cgp::test_support::set_sink_inputs;
 use crate::creature::genome::cgp::{
-    ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+    BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge,
+    GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::vote::ActionParamField;
 use crate::creature::genome::{BackendDef, NodeGenome};
@@ -31,10 +33,7 @@ fn eater(weight: f32, extra: Vec<ComputeNode>) -> CreatureGenome {
     graph_genome(Vec::new(), nodes, vec![from_node(0, weight)])
 }
 
-fn graph_def(
-    genome: &mut CreatureGenome,
-    node: usize,
-) -> &mut crate::creature::genome::cgp::CgpGraphBackendDef {
+fn graph_def(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDef {
     match &mut genome.nodes[node].backend_def {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => unreachable!("fixtures are Graph genomes"),
@@ -140,7 +139,7 @@ fn a_changed_vote_with_the_same_action_is_masked_before_selection() {
 fn a_graph_parameter_decoded_to_the_same_action_is_masked_before_selection() {
     let with_param = |value: f32| {
         let mut genome = eater(1.0, Vec::new());
-        crate::creature::genome::cgp::test_support::set_sink_inputs(
+        set_sink_inputs(
             graph_def(&mut genome, 0),
             OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
             vec![from_node(0, value)],
@@ -185,13 +184,13 @@ fn a_dispatched_edit_nothing_records_is_unresolved() {
             weight,
         )
     };
-    crate::creature::genome::cgp::test_support::set_sink_inputs(
+    set_sink_inputs(
         graph_def(&mut parent, 0),
         OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
         vec![barrier(1.0)],
     );
     let mut child = parent.clone();
-    crate::creature::genome::cgp::test_support::set_sink_inputs(
+    set_sink_inputs(
         graph_def(&mut child, 0),
         OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
         vec![barrier(2.0)],
@@ -226,19 +225,14 @@ fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birt
     let mut learned = with(1.0);
     let def = graph_def(&mut learned, 0);
     def.push_edge(
-        crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
-        crate::creature::genome::cgp::GraphEdge::new(
-            crate::creature::genome::cgp::GraphSource::ComputeNode(0),
-            0.25,
-        ),
+        EdgeSurface::ComputeInput(0),
+        GraphEdge::new(GraphSource::ComputeNode(0), 0.25),
     );
     let mut seeded = learned.clone();
-    graph_def(&mut seeded, 0).seed_birth(crate::creature::genome::cgp::BirthSeeds::Rows(vec![
-        vec![Some(0.5)],
-    ]));
+    graph_def(&mut seeded, 0).seed_birth(BirthSeeds::Rows(vec![vec![Some(0.5)]]));
     assert_eq!(genome_identity(&seeded), genome_identity(&learned));
     let mut learned = with(1.0);
-    graph_def(&mut learned, 0).seed_birth(crate::creature::genome::cgp::BirthSeeds::Empty);
+    graph_def(&mut learned, 0).seed_birth(BirthSeeds::Empty);
     assert_eq!(genome_identity(&learned), genome_identity(&with(1.0)));
 }
 

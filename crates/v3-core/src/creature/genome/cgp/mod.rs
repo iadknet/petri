@@ -323,7 +323,7 @@ mod tests {
 
         // Wire an output sink
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
+            EdgeSurface::SinkInput(0),
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
         );
 
@@ -370,31 +370,31 @@ mod tests {
 
         // Compute node 2 (Relu) has edge to node 1 (Sigmoid)
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::ComputeInput(2),
+            EdgeSurface::ComputeInput(2),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         );
 
         // Output sink has edge to node 2 (Relu)
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
+            EdgeSurface::SinkInput(0),
             GraphEdge::new(GraphSource::ComputeNode(2), 0.5),
         );
 
         // Vote sink has edge to node 0 (Add)
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK),
+            EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK),
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
         );
 
         // Second vote sink has edge to node 1 (Sigmoid)
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK + 1),
+            EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK + 1),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         );
 
         // Parameter sink has edge to node 2 (Relu)
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1),
+            EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1),
             GraphEdge::new(GraphSource::ComputeNode(2), 1.0),
         );
 
@@ -491,15 +491,15 @@ mod tests {
             None,
         ));
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
+            EdgeSurface::SinkInput(0),
             GraphEdge::new(GraphSource::ComputeNode(1), 0.5),
         );
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK),
+            EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK),
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
         );
         def.push_edge(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1),
+            EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         );
 

@@ -1,8 +1,9 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
+use crate::creature::genome::cgp::test_support::{push_sink, set_compute_inputs};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource,
+    GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
@@ -155,7 +156,7 @@ fn repeated_visits_add_activity_on_the_decayed_base() {
 #[test]
 fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
-    crate::creature::genome::cgp::test_support::set_compute_inputs(
+    set_compute_inputs(
         &mut def,
         0,
         vec![
@@ -334,12 +335,10 @@ fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
 #[test]
 fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
     let mut def = graph(HebbianRule::Oja, 0.4, 0.7);
-    crate::creature::genome::cgp::test_support::push_sink(
+    push_sink(
         &mut def,
-        crate::creature::genome::cgp::OutputSink::new(
-            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                crate::creature::genome::vote::VoteSink::Eat,
-            ),
+        OutputSink::new(
+            OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
         ),
     );
@@ -452,7 +451,7 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
     let started = std::time::Instant::now();
     let mut def = graph(HebbianRule::Classic, 0.5, 0.0);
     def.set_compute_kind(0, ComputeNodeKind::Constant(1.0));
-    crate::creature::genome::cgp::test_support::set_compute_inputs(&mut def, 0, Vec::new());
+    set_compute_inputs(&mut def, 0, Vec::new());
     def.set_node_plasticity(0, None);
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Threshold(0.0),
@@ -462,10 +461,8 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
     let edge = |index, weight| GraphEdge::new(GraphSource::ComputeNode(index), weight);
     // Eat when the learned gate fires; otherwise nothing is voted and the
     // tick is `NoOp`.
-    def = def.with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
-        crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-            crate::creature::genome::vote::VoteSink::Eat,
-        ),
+    def = def.with_output_sinks(vec![OutputSink::new(
+        OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
         vec![edge(1, 1.0)],
     )]);
     let genome = genome(&def);
@@ -620,7 +617,7 @@ proptest! {
     ) {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
         let edge = def.compute_nodes()[0].inputs[0];
-        crate::creature::genome::cgp::test_support::set_compute_inputs(&mut def, 0, weights.iter().map(|&weight| GraphEdge::new(edge.source(), weight)).collect());
+        set_compute_inputs(&mut def, 0, weights.iter().map(|&weight| GraphEdge::new(edge.source(), weight)).collect());
         if !modulated { def.node_plasticity_mut(0).unwrap().modulation = None; }
         let mut state = GraphRuntimeState::new();
         begin(&mut state, &def);
