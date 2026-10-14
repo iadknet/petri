@@ -13,8 +13,8 @@ kind's eight direction votes as one silent gene; learning lives on edges and
 groups with an evolvable reward source and trace decay; mutation has a group
 layer and an edge layer. Design, boundaries, options and contracts:
 [edge groups and learning design note](../strategy/edge-groups-and-learning-design-2026-10-13.md)
-(version 2, after three Codex rounds and nine Opus facet reviews recorded in
-[the review readings](../progress/readings/t25-design-review.md)).
+(version 3, after three Codex rounds and two rounds of nine Opus facet
+reviews recorded in [the review readings](../progress/readings/t25-design-review.md)).
 
 ## Track Success Criteria
 
@@ -32,7 +32,7 @@ layer and an edge layer. Design, boundaries, options and contracts:
 - [ ] **T25.F01 — Edge Container, Constructors and Birth Seeds** — Depends on: None
   - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one captures what a child is born with, and one builds the running brain from it, with no behavior change.
 - [ ] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
-  - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, and the founder is re-anchored.
+  - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, a ring gene costs its eight synapses, and the founder is re-anchored.
 - [ ] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
 - [ ] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
@@ -59,7 +59,9 @@ layer and an edge layer. Design, boundaries, options and contracts:
   anchor re-pinned (97 → 80).
 - Decided (user, 2026-10-13): under uniform size the per-unit mutation
   rate becomes `0.485 / 80 = 0.0060625`, so the founder's supply is
-  unchanged (the note's D14, option a).
+  unchanged (the note's D14, option a). F02 lands the unit rule, the rate
+  and the plasticity cost-chain deletion as three commits and runs one
+  extra goal-long arm at rate 0.005 as the rate's counterfactual (D25).
 - Open: F08 decides the `GroupKey::Slots` refinement disposition from the
   refinement-by-key readings F04 and F05 record.
 - The chain is linear by design (D10): a later feature edits the same
@@ -69,7 +71,9 @@ layer and an edge layer. Design, boundaries, options and contracts:
   F02 on every feature predeclares its re-pins, one cause per commit; the
   note's §8 carries each feature's re-pin line, reference-spec line and the
   tests the implementer writes first.
-- Verification plans (note §8): F01 gate; F02 gate + goal + goal-long with
-  viability first; F03 gate + goal; F04 gate + goal-long; F05 gate + goal;
-  F06 gate + goal with viability first; F07 gate + goal; F08 gate + goal;
-  mutation gate and slow tests run on all eight.
+- Verification plans (note §8): F01 gate; F02 gate + goal + goal-long plus
+  the rate arm, viability first; F03 gate + goal + goal-long, viability
+  first; F04 gate + goal + goal-long; F05 gate + goal; F06 gate + goal,
+  viability first; F07 gate + goal, viability first; F08 gate + goal;
+  mutation gate and slow tests run on all eight. F03 and F06 land a
+  text-only commit (genome identity) before their behavior commit.
