@@ -47,7 +47,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.1,
 		defaultValue: 1.0,
 		tooltip:
-			"Gestation ticks per founder-sized genome (97 units); bigger genomes gestate longer, rounded up. The parent cannot act until the birth, and its death loses the child. 0 delivers at once",
+			"Gestation ticks per founder-sized genome (80 units); bigger genomes gestate longer, rounded up. The parent cannot act until the birth, and its death loses the child. 0 delivers at once",
 	},
 	{
 		path: "energy.lifecycle.min_reproduce_energy",

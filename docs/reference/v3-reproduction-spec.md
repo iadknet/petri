@@ -79,8 +79,8 @@ This document does not define:
 Mutation supply is owned by `v3-mutation-spec.md` and configured by
 `v3-runtime-config-spec.md`. The engine has one supply rule and requests
 `Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19,
-T11.F20): every unit of structure the parent carries is an independent 0.005
-chance of one event, so the 80-unit V3Alpha1 founder expects about 0.4
+T11.F20): every unit of structure the parent carries is an independent
+0.0060625 chance of one event, so the 80-unit V3Alpha1 founder expects 0.485
 requested events per birth and a larger genome pays its size in exposure. The
 drift walk and the recruitment-paths legacy panel draw the same rule on the
 founder's 80 units whatever the walked genome's size, so their exposure is an

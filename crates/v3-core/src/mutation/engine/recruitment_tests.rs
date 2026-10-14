@@ -49,8 +49,10 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Re-pinned by T25.F02 commit 1 (unit rule): the production supply draws
     // one `gen_bool` per `genome_size()` unit, and the founder falls 97 -> 80
     // (13078250158860285847 -> 4353978680418239853); the old size rule and
-    // anchor 97 together restore.
-    assert_eq!(hash, 4353978680418239853, "pin of the recruitment-Off path");
+    // anchor 97 together restore. Re-pinned by T25.F02 commit 2 (default
+    // rate 0.005 -> 0.0060625; 4353978680418239853 -> 7164882519974651247);
+    // rate 0.005 restores.
+    assert_eq!(hash, 7164882519974651247, "pin of the recruitment-Off path");
 }
 
 #[test]

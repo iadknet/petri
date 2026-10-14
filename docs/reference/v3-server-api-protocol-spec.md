@@ -188,7 +188,7 @@ Request (conceptual v3alpha5 shape):
     }
   },
   "mutation": {
-    "per_unit_rate": 0.005,
+    "per_unit_rate": 0.0060625,
     "phenotype": {
       "channel_step": 1,
       "channel_change_chance": 0.001,
@@ -502,7 +502,7 @@ Response:
       }
     },
     "mutation": {
-      "per_unit_rate": 0.005,
+      "per_unit_rate": 0.0060625,
       "phenotype": {
         "channel_step": 1,
         "channel_change_chance": 0.001,

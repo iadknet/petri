@@ -54,6 +54,11 @@
 //! (sampled 1d2ecdf7... -> 2f255722..., rate 0.0 1e29f964... -> a44c5736...;
 //! guard 8d8a3874... -> d04ad654..., rate 0.0 fb71cb3b... -> b97baeec...);
 //! the old size rule and anchor 97 together restore.
+//! Re-pinned by T25.F02 commit 2 after two agreeing runs: the default rate
+//! 0.005 -> 0.0060625 moves both guard digests, which run at the default
+//! rate (d04ad654... -> 2d0116fe..., gestation rate 0.0 b97baeec... ->
+//! 61b219b0...); the sampled digests run at rate 0.03 and hold; rate 0.005
+//! restores.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -142,11 +147,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "d04ad65470b26d4421020a5fb6d661dada5a295a1e8f3bbf904942179bb62e7b"
+        "2d0116fe148332cc867c1f248a75f5242c3fe7418ab03e08c35176c60e68d121"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "b97baeec48e02e704d757dc0a3d3b130f2df565dacd586a8ebe9315482a439e7"
+        "61b219b00c29b1fba91b9ae355b68caaffea3a50ce29e58ae96530b1cf163991"
     );
 }
 

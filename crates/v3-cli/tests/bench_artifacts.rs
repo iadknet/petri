@@ -192,6 +192,22 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
+/// Undoes T25.F02 on the resolved goal recipes and returns the
+/// input-mechanism values: restoring the rate 0.005 commit 2 replaced.
+fn undo_t25_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
+    configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        assert_eq!(
+            value["mutation"]
+                .as_object_mut()
+                .unwrap()
+                .insert("per_unit_rate".into(), json!(0.005)),
+            Some(json!(0.006_062_5))
+        );
+        value
+    })
+}
+
 /// These digests pin the fully resolved checked-in recipes. Intentional changes
 /// to inherited production defaults must update them after repeated resolution.
 /// T11.F20 re-pinned all three after two agreeing runs: the resolved
@@ -216,6 +232,9 @@ fn value_digest(value: &serde_json::Value) -> String {
 /// agreeing runs: `mutation.structured_heritable_refinement` true and
 /// `mutation.neutral_input_recruitment` WholeFamily; restoring false and Off
 /// recovers the effort-cost digests.
+/// T25.F02 commit 2 re-pinned all three after two agreeing runs:
+/// `mutation.per_unit_rate` 0.0060625; restoring 0.005 recovers the
+/// input-mechanism digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -231,6 +250,16 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:091478b9b96e143f2b45e5405b7f7bb95e8184d60ca7bcc489dac2eff748f6a9",
+            "sha256:d8248d44bd039920a0b2de4826f4b9a6a9c7d9d3fdbccace1a3d9b9eeedd2eaf",
+            "sha256:f7832b60cdc1aea190e97b71cda498e19ce04d1744a6c254c2e7562969fa9e84",
+        ]
+    );
+
+    let input_values = undo_t25_f02(configs);
+    assert_eq!(
+        input_values.each_ref().map(value_digest),
+        [
             "sha256:896d889fe6c01f65db02a96d38d6d8caa55622b68fb28e1e6132b78f49ecac2d",
             "sha256:9044de717582124cab29ae2968dfc9f4347628a28c6d052a628de06ef9201c80",
             "sha256:c0f2746541353555fd285c95b41407833d4b272da67cf64c96d6e4350329bf30",
@@ -238,8 +267,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     );
 
     // Undoing the input-mechanism defaults recovers the effort-cost digests.
-    let effort_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let effort_values = input_values.map(|mut value| {
         let mutation = value["mutation"].as_object_mut().unwrap();
         assert_eq!(
             mutation.insert("structured_heritable_refinement".into(), json!(false)),
