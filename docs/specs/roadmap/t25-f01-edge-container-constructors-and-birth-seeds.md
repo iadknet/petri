@@ -16,30 +16,29 @@ aligned with them; reproduction (`simulation::actions::cgp_reproduction`)
 captures a parent's learned weights as the child draft's `BirthSeeds` before
 mutation and writes no runtime field; the creature constructors
 (`CreatureState::new`, `new_with_cached_fields`) consume the seeds and build
-the newborn's runtime state. No mutation operator keeps birth alignment by
-hand, and no struct literal builds a `GraphEdge` or `ComputeNode` outside the
-constructors. Nothing a run computes changes: every seeded trajectory,
-genome text, mutation draw stream and existing pin is identical to main.
+the newborn's runtime state. No operator keeps birth alignment by hand; no
+struct literal builds an edge or node outside the constructors. Nothing a
+run computes changes: every seeded trajectory, genome text, draw stream
+and pin is identical to main.
 
 ## Non-Goals
 
-- No new domain object: `Group`, `Membership`, `Scope`, `EdgeOccurrence`
-  beyond this feature's definition, learned scales, `validate_graph`, the
-  genomic weight table and `GraphRuntimeState::for_genome` are F03 onward;
-  per-edge plasticity, `LearnedState`, sink-edge seeds and the removal of
-  lazy initialization are F06.
+- No new domain object: `Group`, `Membership`, `Scope`, learned scales,
+  `validate_graph`, the genomic weight table and `for_genome` are F03
+  onward; per-edge plasticity, `LearnedState`, sink-edge seeds and the
+  removal of lazy initialization are F06.
 - No size, cost or rate change (F02). No `RingProjection` change: the
   `projections` list, its five operators and the observation-only
   `#[serde(skip)]` field `ablated_channels` (`cgp.rs:150-160`) stay as they
   are until F03 deletes them.
 - No genome text change: JSON keys, `Debug` rendering and `PartialEq` of
-  every genome type are unchanged; the `own_weight` key is F03's text-only
-  commit. No frontend change (the wire shape is unchanged; the frontend
-  carries no `birth_weights`).
+  every genome type are unchanged (`own_weight` is F03's text-only
+  commit). No frontend change: the wire shape is unchanged and the
+  frontend carries no `birth_weights`.
 - No operator catalog, draw-order or applicability change; no re-pin.
-- `BirthEdgeClass` and its recording stay as they are.
-- No type or module rename (design note D11); `cgp.rs` is split into
-  submodules, its public paths re-exported.
+- `BirthEdgeClass` stays as it is.
+- No type or module rename (design note D11); `cgp.rs` splits into
+  submodules with its public paths re-exported.
 
 ## Inputs and Invariants
 
@@ -78,21 +77,18 @@ Invariants:
    constructor and no `From<Vec>`; the def's `compute_nodes` and
    `output_sinks` fields are private, read through `compute_nodes()` and
    `output_sinks()`, so no whole-list replacement can bypass the seeds;
-   `sink_mut` is removed. Readers change `def.compute_nodes` to
-   `def.compute_nodes()` (417 and 227 sites) and compile otherwise
-   unchanged; element reads (`node.inputs[k]`, `.iter()`, `.len()`) are
-   unchanged. No `&mut GraphEdge` and no `&mut ComputeNode` leaves the
+   `sink_mut` is removed. Readers change the field read to the accessor
+   (417 and 227 sites); element reads are unchanged. No `&mut GraphEdge` and no `&mut ComputeNode` leaves the
    container; `GraphEdge` fields are private behind `source()` and
    `weight()`. The container draws no RNG and imports nothing from
    `runtime`, `sensors` or `simulation`.
-4. **Seed rules unchanged.** Every primitive applies exactly the rule its
+4. **Seed rules unchanged.** Every primitive applies the rule its
    hand-written site applies today (table below); a same-source
-   `set_source` keeps the seed, a source-changing one clears it. Seeds
-   travel with `Clone` (topology clones) and roll back with the engine's
-   genome snapshot.
-5. **Behavior.** Every deterministic output is identical to main: the gate
-   profile's deterministic blocks, every pin in the Inputs table, every
-   operator's draw stream, and the golden Lamarckian corpus hashes.
+   `set_source` keeps the seed. Seeds travel with `Clone` (topology
+   clones) and roll back with the engine's genome snapshot.
+5. **Behavior.** Every deterministic output is identical to main: the
+   gate's deterministic blocks, every pin in the Inputs table, every draw
+   stream, and the corpus hashes.
 6. **Construction.** Every reproduction draft carries `BirthSeeds`:
    either rows (I11-aligned, when the parent had a learned value) or the
    explicit empty form (no rows, no alignment, no allocation; today's
@@ -102,30 +98,33 @@ Invariants:
    one row per graph node, one slice per compute node, a value per edge
    only on a Lamarckian node with at least one inherited value, the
    genomic weight filling the gaps; the empty form yields today's empty
-   scaffold). A genome with no seeds at all (seeding, the lab, instruments,
-   observation clones) keeps the empty outer vector (`state.rs:338`). A
-   built creature's genome carries no seeds, and `reproduction.rs` writes
-   no `graph_runtime` field. Every layout is byte-identical to today's,
+   scaffold). A Graph def a mutation operator creates on the draft
+   (`topology/birth.rs:15` `blank_graph_backend`, used by `detour` and
+   `copy_attached` with `swap_backend`) is created with the empty form, so
+   a child of a parent with no Graph node still gets today's scaffold. A
+   genome with no seeds at all (seeding, the lab, instruments, observation
+   clones) keeps the empty outer vector (`state.rs:338`). A built
+   creature's genome carries no seeds, and `reproduction.rs` writes no
+   `graph_runtime` field. Every layout is byte-identical to today's,
    which `tests/applied_trajectory.rs:104` hashes after every tick,
    newborns before their first visit included.
-7. **Decrement-only reindex.** `Prune` removes only an index no edge or
-   projection addresses (`prunable_indices`, `input_ref/mod.rs:127`), so
-   the reindex after removal decrements every higher `InputLeaf.ref_idx`
-   and projection `ref_idx`, leaves lower ones, removes nothing, and
-   `debug_assert`s that nothing addressed the removed index; the removal
-   branches and `clamp_sub_idx_after_swap` (a within-kind `Swap` keeps the
-   width, `input_ref/mod.rs:398-416`) are deleted, and the tests of those
-   branches (Inputs table) are rewritten to this contract.
+7. **Decrement-only reindex.** `Prune` removes only an index nothing
+   addresses (`prunable_indices`, `input_ref/mod.rs:127`), so the reindex
+   decrements every higher `InputLeaf.ref_idx` and projection `ref_idx`,
+   removes nothing, and `debug_assert`s the removed index was unaddressed;
+   the removal branches and `clamp_sub_idx_after_swap` (a within-kind
+   `Swap` keeps the width, `input_ref/mod.rs:398-416`) are deleted and
+   their tests (Inputs table) rewritten to this contract.
 8. **Observation copies.** `redirect_leaf_reads(f: FnMut(ref_idx, sub_idx)
    -> Option<u16>)` rewrites `InputLeaf.ref_idx` on a copy with no seed
-   change and no assertion; its callers are `input_use/mod.rs:249, :271`
-   and `opportunity/assay.rs:267` (through `consumers::ablated`) and the
-   lab's `ablate`; a copy never re-enters mutation or validation.
-   Projection masking through `ablated_channels` is untouched.
+   change and no assertion; callers: `consumers::ablated` (for
+   `input_use/mod.rs:249, :271`, `opportunity/assay.rs:267`) and the lab's
+   `ablate`; a copy never re-enters mutation or validation. Projection
+   masking through `ablated_channels` is untouched.
 9. **Hot path.** No new work per visit or per birth: the empty seed form
    is a tag, not an allocation, and the scaffold is built where it is
-   built today; getters are `#[inline]`; `GraphEdge` stays `Copy` at 8
-   bytes.
+   built today; getters are `#[inline]`; `GraphEdge` stays `Copy` at 12
+   bytes (main's layout: a 6-byte `GraphSource`, padding, an `f32`).
 
 Seed rules, today's site → the container primitive that owns it:
 
@@ -166,10 +165,10 @@ value, mechanism switch or span.
 
 ## Verification Plan
 
-**Question.** F01 claims the graph genome's edit, capture and build
-responsibilities can move to three owners with no behavior change; a gate
-deterministic block that differs from the epoch, a moved pin, a changed
-draw-stream tail or a corpus hash mismatch would show it wrong.
+**Question.** F01 claims edit, capture and build can move to three owners
+with no behavior change; a differing gate deterministic block, a moved
+pin, a changed draw-stream tail or a corpus hash mismatch would show it
+wrong.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -262,7 +261,8 @@ Its hashes are pinned as constants recorded on main.
       ported, with a fast-path twin); a parent with nothing learned gives
       a child whose `plasticity_weights` before its first visit is today's
       scaffold (one row per graph node, one empty slice per compute node),
-      and a seeded founder's stays empty.
+      so does a child of a VM-only parent whose batch created a Graph
+      node, and a seeded founder's stays empty.
 - [x] `cargo test --workspace` -> every existing pin unchanged (Inputs
       table); `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
       constructors and destructuring patterns; `grep -rn birth_weights
