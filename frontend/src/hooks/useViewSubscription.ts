@@ -75,6 +75,9 @@ export function defaultRequestFromSnapshot(snapshot: SnapshotResponse): ViewRequ
 	};
 }
 
+/** Minimum spacing between camera-driven view subscriptions, in milliseconds. */
+const VIEW_REQUEST_INTERVAL_MS = 50;
+
 function sameViewRequest(a: ViewRequest | null, b: ViewRequest | null): boolean {
 	if (a === b) return true;
 	if (!a || !b) return false;
@@ -201,17 +204,36 @@ export function useViewSubscription(client: WsClient = wsClient): void {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: useEffectEvent returns stable callbacks by contract.
 	useEffect(() => {
 		const unsubscribeClient = client.subscribe(handleClientEvent);
+		// Panning and zoom glides move the camera every frame. The first change in
+		// a burst subscribes at once; the rest coalesce into one trailing request
+		// for the latest view, so the server is not re-asked per mousemove.
+		let lastSent: ViewRequest | null = null;
+		let lastSentAt = Number.NEGATIVE_INFINITY;
+		let pending: ReturnType<typeof setTimeout> | null = null;
+		const flush = () => {
+			pending = null;
+			const request = deriveViewRequest(useViewportStore.getState());
+			if (sameViewRequest(request, lastSent)) return;
+			lastSent = request;
+			lastSentAt = performance.now();
+			sendViewRequest(request);
+		};
 		const unsubscribeViewport = useViewportStore.subscribe((state, prev) => {
 			const nextRequest = deriveViewRequest(state);
-			const previousRequest = deriveViewRequest(prev);
-			if (!sameViewRequest(nextRequest, previousRequest)) {
-				sendViewRequest(nextRequest);
+			if (sameViewRequest(nextRequest, deriveViewRequest(prev))) return;
+			if (pending !== null) return;
+			const wait = VIEW_REQUEST_INTERVAL_MS - (performance.now() - lastSentAt);
+			if (wait <= 0) {
+				flush();
+			} else {
+				pending = setTimeout(flush, wait);
 			}
 		});
 
 		client.connect();
 
 		return () => {
+			if (pending !== null) clearTimeout(pending);
 			unsubscribeViewport();
 			unsubscribeClient();
 			client.disconnect();

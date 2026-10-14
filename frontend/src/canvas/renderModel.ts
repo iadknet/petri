@@ -4,7 +4,9 @@ import type {
 	Frame,
 	OverviewFoodCellPayload,
 	PredationEvent,
+	ViewDetailPayload,
 	ViewOverviewPayload,
+	ViewRect,
 	WorldStaticPayload,
 } from "../types/api.ts";
 import type { CameraState } from "./camera.ts";
@@ -30,6 +32,8 @@ export interface RenderModel {
 	frame: Frame;
 	foodTypes: FoodTypeMetadata[];
 	overview: OverviewRenderLayer | null;
+	/** World cells covered by the detail view the frame's food and creatures came from. */
+	detailRect: ViewRect | null;
 	tick: number;
 	predationEvents: PredationEvent[];
 	camera: CameraState;
@@ -41,6 +45,7 @@ export interface RenderModel {
 export function buildRenderModel(input: {
 	frame: Frame | null;
 	overviewView: ViewOverviewPayload | null;
+	detailView?: ViewDetailPayload | null;
 	worldStatic: WorldStaticPayload | null;
 	tick: number;
 	predationEvents: PredationEvent[];
@@ -67,6 +72,7 @@ export function buildRenderModel(input: {
 					creatureCounts: input.overviewView.creature_count_u16,
 				}
 			: null,
+		detailRect: input.detailView?.rect ?? null,
 		tick: input.tick,
 		predationEvents: input.predationEvents,
 		camera: input.camera,

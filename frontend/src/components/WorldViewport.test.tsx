@@ -34,9 +34,9 @@ const rendererSpies = vi.hoisted(() => ({
 		y: camera.y + dy,
 		zoom: camera.zoom,
 	})),
-	zoomCenter: vi.fn((camera: { x: number; y: number; zoom: number }, delta: number) => ({
+	zoomCenterByFactor: vi.fn((camera: { x: number; y: number; zoom: number }, factor: number) => ({
 		...camera,
-		zoom: delta < 0 ? camera.zoom * 2 : camera.zoom / 2,
+		zoom: camera.zoom * factor,
 	})),
 	centerOn: vi.fn((worldX: number, worldY: number, zoom?: number) => ({
 		x: -worldX,
@@ -76,8 +76,8 @@ vi.mock("../canvas/renderer.ts", () => ({
 			return rendererSpies.pan(camera, dx, dy);
 		}
 
-		zoomCenter(camera: { x: number; y: number; zoom: number }, delta: number) {
-			return rendererSpies.zoomCenter(camera, delta);
+		zoomCenterByFactor(camera: { x: number; y: number; zoom: number }, factor: number) {
+			return rendererSpies.zoomCenterByFactor(camera, factor);
 		}
 
 		centerOn(worldX: number, worldY: number, zoom?: number) {
@@ -149,6 +149,50 @@ describe("WorldViewport frame sizing", () => {
 		expect(rendererSpies.fitToWorld).not.toHaveBeenCalled();
 		expect(useViewportStore.getState().camera).toEqual(userCamera);
 		expect(rendererSpies.invalidate).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps the user's zoom and view center when the viewport resizes", () => {
+		// Arrange
+		const observers: ResizeObserverCallback[] = [];
+		const OriginalResizeObserver = globalThis.ResizeObserver;
+		globalThis.ResizeObserver = class {
+			constructor(callback: ResizeObserverCallback) {
+				observers.push(callback);
+			}
+			observe() {}
+			unobserve() {}
+			disconnect() {}
+		} as unknown as typeof ResizeObserver;
+		const resizeTo = (width: number, height: number) =>
+			act(() => {
+				for (const callback of observers) {
+					callback(
+						[{ contentRect: { width, height } } as ResizeObserverEntry],
+						{} as ResizeObserver,
+					);
+				}
+			});
+
+		try {
+			render(<WorldViewport />);
+			act(() => {
+				useWorldViewStore.setState({ frame: frame(512, 512) });
+			});
+			resizeTo(400, 200);
+			act(() => {
+				useViewportStore.getState().setCamera({ x: -100, y: -50, zoom: 2 });
+			});
+			rendererSpies.fitToWorld.mockClear();
+
+			// Act
+			resizeTo(600, 300);
+
+			// Assert
+			expect(rendererSpies.fitToWorld).not.toHaveBeenCalled();
+			expect(useViewportStore.getState().camera).toEqual({ x: 0, y: 0, zoom: 2 });
+		} finally {
+			globalThis.ResizeObserver = OriginalResizeObserver;
+		}
 	});
 });
 
@@ -319,9 +363,9 @@ describe("WorldViewport keyboard access", () => {
 
 		// Act / Assert
 		fireEvent.keyDown(canvas, { key: "+" });
-		expect(useViewportStore.getState().camera.zoom).toBe(4);
+		expect(useViewportStore.getState().camera.zoom).toBeCloseTo(2.9);
 		fireEvent.keyDown(canvas, { key: "-" });
-		expect(useViewportStore.getState().camera.zoom).toBe(2);
+		expect(useViewportStore.getState().camera.zoom).toBeCloseTo(2);
 		fireEvent.keyDown(canvas, { key: "0" });
 		expect(rendererSpies.resetView).toHaveBeenCalledTimes(1);
 		expect(useViewportStore.getState().camera).toEqual({ x: 0, y: 0, zoom: 1 });

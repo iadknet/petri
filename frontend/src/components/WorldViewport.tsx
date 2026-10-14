@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef } from "react";
+import { resizeCameraKeepingCenter, wheelZoomFactor } from "../canvas/camera.ts";
 import { currentDevicePixelRatio, watchDevicePixelRatio } from "../canvas/dpr.ts";
 import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
@@ -17,7 +18,7 @@ import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
 import { PatternToolbar } from "./PatternToolbar.tsx";
-import { ZoomControls } from "./ZoomControls.tsx";
+import { ZoomControls, mapControlSurface } from "./ZoomControls.tsx";
 
 const KEYBOARD_PAN_STEP = 48;
 
@@ -29,11 +30,45 @@ function isEditableTarget(target: EventTarget | null): boolean {
 	return target.isContentEditable || (editable !== null && editable !== "false");
 }
 
+/**
+ * Zoom step for the +/- buttons. Kept below 1.5, the ratio between the detail
+ * (4x) and inspect (6x) tiers, so stepping can always land inside each tier.
+ */
+const BUTTON_ZOOM_FACTOR = 1.45;
+/** Pan momentum: release speeds below this (px/ms) stop dead. */
+const FLING_MIN_SPEED = 0.25;
+/** Pan momentum decay time constant, in milliseconds. */
+const FLING_DECAY_MS = 240;
+/** Only pointer samples this recent count toward the release velocity. */
+const FLING_SAMPLE_MS = 90;
+
+interface PanSample {
+	dx: number;
+	dy: number;
+	t: number;
+}
+
+function reducedMotion(): boolean {
+	return (
+		typeof window.matchMedia === "function" &&
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches
+	);
+}
+
 export function WorldViewport() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const rendererRef = useRef<WorldRenderer | null>(null);
 	const dragRef = useRef<{ startX: number; startY: number } | null>(null);
+	const panSamplesRef = useRef<PanSample[]>([]);
+	const flingRef = useRef(0);
+	const sizeRef = useRef<{ width: number; height: number } | null>(null);
+	const fittedRef = useRef(false);
+
+	const stopFling = useCallback(() => {
+		if (flingRef.current) cancelAnimationFrame(flingRef.current);
+		flingRef.current = 0;
+	}, []);
 
 	const paintMode = usePaintStore((s) => s.paintMode);
 	const simState = useSimulationStore((s) => s.simState);
@@ -72,8 +107,11 @@ export function WorldViewport() {
 				frame: worldView.frame,
 				overviewView:
 					worldView.currentView?.kind === "overview" ? worldView.currentView.payload : null,
+				detailView: worldView.currentView?.kind === "detail" ? worldView.currentView.payload : null,
 				worldStatic: worldView.worldStatic,
-				tick: sim.tick,
+				// The frame's own tick: status messages can land before or after
+				// the view they describe, and creature glides key off frame ticks.
+				tick: worldView.currentView?.tick ?? sim.tick,
 				predationEvents: worldView.predationEvents,
 				camera: viewport.camera,
 				fertilityGrid: worldView.worldStatic?.food_fertility_u8 ?? null,
@@ -97,32 +135,54 @@ export function WorldViewport() {
 		const container = containerRef.current;
 		if (!container) return;
 
-		let cssSize: { width: number; height: number } | null = null;
 		const observer = new ResizeObserver((entries) => {
 			const entry = entries[0];
 			if (!entry) return;
-			const { width, height } = entry.contentRect;
-			cssSize = { width: Math.floor(width), height: Math.floor(height) };
-			renderer.resize(cssSize.width, cssSize.height, currentDevicePixelRatio());
-			setCanvasSize(Math.floor(width), Math.floor(height));
+			const width = Math.floor(entry.contentRect.width);
+			const height = Math.floor(entry.contentRect.height);
+			const previous = sizeRef.current;
+			sizeRef.current = { width, height };
+			renderer.resize(width, height, currentDevicePixelRatio());
+			setCanvasSize(width, height);
 
+			// Resizing (window, stats dock) keeps the user's zoom and the world point
+			// at the center; only the first measured size fits the whole world.
 			const frame = useWorldViewStore.getState().frame;
-			if (frame) {
+			if (!frame) return;
+			if (fittedRef.current && previous) {
+				setCamera(
+					resizeCameraKeepingCenter(useViewportStore.getState().camera, previous, {
+						width,
+						height,
+					}),
+				);
+			} else {
 				setCamera(renderer.fitToWorld(frame.width, frame.height));
-				renderer.invalidate();
+				fittedRef.current = true;
 			}
+			renderer.invalidate();
 		});
 		observer.observe(container);
 
+		const motionQuery =
+			typeof window.matchMedia === "function"
+				? window.matchMedia("(prefers-reduced-motion: reduce)")
+				: null;
+		const handleMotionChange = (event: MediaQueryListEvent) =>
+			renderer.setReducedMotion(event.matches);
+		motionQuery?.addEventListener("change", handleMotionChange);
+
 		// Browser zoom or a move to another display changes the ratio without a resize.
 		const stopWatchingRatio = watchDevicePixelRatio((ratio) => {
-			if (!cssSize) return;
-			renderer.resize(cssSize.width, cssSize.height, ratio);
+			const size = sizeRef.current;
+			if (!size) return;
+			renderer.resize(size.width, size.height, ratio);
 		});
 
 		return () => {
 			renderer.stop();
 			observer.disconnect();
+			motionQuery?.removeEventListener("change", handleMotionChange);
 			stopWatchingRatio();
 		};
 	}, [initRenderer, setCamera, setCanvasSize]);
@@ -139,6 +199,7 @@ export function WorldViewport() {
 					state.frame.height !== prev.frame.height)
 			) {
 				setCamera(rendererRef.current.fitToWorld(state.frame.width, state.frame.height));
+				fittedRef.current = true;
 				rendererRef.current.invalidate();
 				return;
 			}
@@ -166,18 +227,6 @@ export function WorldViewport() {
 		});
 	}, []);
 
-	// Re-render when the configured max energy (energy bar scale) changes
-	useEffect(() => {
-		return useConfigStore.subscribe((state, prev) => {
-			if (
-				state.serverConfig?.energy.lifecycle.max_energy !==
-				prev.serverConfig?.energy.lifecycle.max_energy
-			) {
-				rendererRef.current?.invalidate();
-			}
-		});
-	}, []);
-
 	// Exit paint mode when simulation starts running
 	useEffect(() => {
 		return useSimulationStore.subscribe((state, prev) => {
@@ -196,6 +245,18 @@ export function WorldViewport() {
 		});
 	}, []);
 
+	// Re-render when the configured max energy (energy gauge scale) changes
+	useEffect(() => {
+		return useConfigStore.subscribe((state, prev) => {
+			if (
+				state.serverConfig?.energy.lifecycle.max_energy !==
+				prev.serverConfig?.energy.lifecycle.max_energy
+			) {
+				rendererRef.current?.invalidate();
+			}
+		});
+	}, []);
+
 	// Keyboard shortcut: Home to reset view, Escape to clear selection
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -205,6 +266,7 @@ export function WorldViewport() {
 			if (e.key === "Home" && rendererRef.current) {
 				const frame = useWorldViewStore.getState().frame;
 				if (frame) {
+					stopFling();
 					setCamera(rendererRef.current.resetView(frame));
 					rendererRef.current.invalidate();
 				}
@@ -215,20 +277,24 @@ export function WorldViewport() {
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [setCamera]);
+	}, [setCamera, stopFling]);
 
 	// Mouse wheel zoom — attached as native listener with { passive: false }
-	// so preventDefault() works (React registers wheel listeners as passive)
+	// so preventDefault() works (React registers wheel listeners as passive).
+	// The step follows the wheel delta, so trackpads zoom continuously and
+	// pinch (ctrl+wheel) works; the renderer glides to the new zoom.
 	const handleWheel = useCallback(
 		(e: WheelEvent) => {
 			e.preventDefault();
 			const renderer = rendererRef.current;
 			if (!renderer) return;
+			stopFling();
 			const camera = useViewportStore.getState().camera;
-			setCamera(renderer.zoomAt(camera, e.clientX, e.clientY, e.deltaY));
+			const factor = wheelZoomFactor(e.deltaY, e.deltaMode, e.ctrlKey);
+			setCamera(renderer.zoomAtByFactor(camera, e.clientX, e.clientY, factor));
 			renderer.invalidate();
 		},
-		[setCamera],
+		[setCamera, stopFling],
 	);
 
 	useEffect(() => {
@@ -238,9 +304,46 @@ export function WorldViewport() {
 		return () => canvas.removeEventListener("wheel", handleWheel);
 	}, [handleWheel]);
 
+	const panBy = useCallback(
+		(dx: number, dy: number) => {
+			const renderer = rendererRef.current;
+			if (!renderer) return;
+			setCamera(renderer.pan(useViewportStore.getState().camera, dx, dy));
+			renderer.invalidate();
+		},
+		[setCamera],
+	);
+
+	// Release a drag with momentum: the world keeps sliding and eases to rest.
+	const startFling = useCallback(() => {
+		const now = performance.now();
+		const recent = panSamplesRef.current.filter((sample) => now - sample.t <= FLING_SAMPLE_MS);
+		panSamplesRef.current = [];
+		if (recent.length < 2 || reducedMotion()) return;
+		const span = Math.max(16, now - recent[0]!.t);
+		let vx = recent.reduce((sum, sample) => sum + sample.dx, 0) / span;
+		let vy = recent.reduce((sum, sample) => sum + sample.dy, 0) / span;
+		if (Math.hypot(vx, vy) < FLING_MIN_SPEED) return;
+
+		let last = now;
+		const step = (t: number) => {
+			const dt = Math.min(48, t - last);
+			last = t;
+			panBy(vx * dt, vy * dt);
+			const decay = Math.exp(-dt / FLING_DECAY_MS);
+			vx *= decay;
+			vy *= decay;
+			flingRef.current = Math.hypot(vx, vy) > 0.02 ? requestAnimationFrame(step) : 0;
+		};
+		flingRef.current = requestAnimationFrame(step);
+	}, [panBy]);
+
+	useEffect(() => stopFling, [stopFling]);
+
 	// Pan: mouse down
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
+			stopFling();
 			if (paintMode && e.button === 0) {
 				const mode = usePaintStore.getState().mode;
 				if (mode === "pattern") {
@@ -253,9 +356,10 @@ export function WorldViewport() {
 			if (e.button === 0) {
 				selectionMouseDown(e);
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
+				panSamplesRef.current = [];
 			}
 		},
-		[paintMode, paintMouseDown, patternMouseDown, selectionMouseDown],
+		[paintMode, paintMouseDown, patternMouseDown, selectionMouseDown, stopFling],
 	);
 
 	// Pan: mouse move
@@ -273,11 +377,7 @@ export function WorldViewport() {
 					const dx = e.clientX - dragRef.current.startX;
 					const dy = e.clientY - dragRef.current.startY;
 					dragRef.current = { startX: e.clientX, startY: e.clientY };
-					const renderer = rendererRef.current;
-					if (renderer) {
-						setCamera(renderer.pan(useViewportStore.getState().camera, dx, dy));
-						renderer.invalidate();
-					}
+					panBy(dx, dy);
 				}
 				return;
 			}
@@ -285,20 +385,23 @@ export function WorldViewport() {
 				const dx = e.clientX - dragRef.current.startX;
 				const dy = e.clientY - dragRef.current.startY;
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
-				const renderer = rendererRef.current;
-				if (renderer) {
-					setCamera(renderer.pan(useViewportStore.getState().camera, dx, dy));
-					renderer.invalidate();
-				}
+				if (dx === 0 && dy === 0) return;
+				panSamplesRef.current.push({ dx, dy, t: performance.now() });
+				if (panSamplesRef.current.length > 12) panSamplesRef.current.shift();
+				if (canvasRef.current) canvasRef.current.style.cursor = "grabbing";
+				panBy(dx, dy);
 			}
 		},
-		[paintMode, paintMouseMove, patternMouseMove, setCamera],
+		[paintMode, paintMouseMove, patternMouseMove, panBy],
 	);
 
 	// Pan: mouse up
 	const handleMouseUp = useCallback(
 		(e: React.MouseEvent) => {
+			const wasPanning = dragRef.current !== null && !paintMode;
 			dragRef.current = null;
+			if (canvasRef.current) canvasRef.current.style.cursor = "";
+			if (wasPanning) startFling();
 			if (paintMode) {
 				const mode = usePaintStore.getState().mode;
 				if (mode === "pattern") {
@@ -310,7 +413,7 @@ export function WorldViewport() {
 				selectionMouseUp(e);
 			}
 		},
-		[paintMode, paintMouseUp, patternMouseUp, selectionMouseUp],
+		[paintMode, paintMouseUp, patternMouseUp, selectionMouseUp, startFling],
 	);
 
 	// Right-click drag for pan in paint mode
@@ -324,18 +427,21 @@ export function WorldViewport() {
 		[paintMode],
 	);
 
-	// Double-click: center + zoom to 4x (disabled in paint mode)
+	// Double-click: glide in on the clicked cell — first to creature scale,
+	// then deeper on each further double-click (disabled in paint mode).
 	const handleDoubleClick = useCallback(
 		(e: React.MouseEvent) => {
 			if (paintMode) return;
 			const renderer = rendererRef.current;
 			if (!renderer) return;
+			stopFling();
 			const camera = useViewportStore.getState().camera;
 			const world = renderer.canvasToWorld(camera, e.clientX, e.clientY);
-			setCamera(renderer.centerOn(world.x, world.y, 4));
+			const zoom = camera.zoom < 6 ? 8 : Math.min(20, camera.zoom * 1.75);
+			setCamera(renderer.centerOn(world.x + 0.5, world.y + 0.5, zoom));
 			renderer.invalidate();
 		},
-		[paintMode, setCamera],
+		[paintMode, setCamera, stopFling],
 	);
 
 	const handleMouseEnter = useCallback(
@@ -349,6 +455,8 @@ export function WorldViewport() {
 
 	const handleMouseLeave = useCallback(() => {
 		dragRef.current = null;
+		panSamplesRef.current = [];
+		if (canvasRef.current) canvasRef.current.style.cursor = "";
 		if (paintMode) {
 			const mode = usePaintStore.getState().mode;
 			if (mode === "pattern") {
@@ -366,24 +474,29 @@ export function WorldViewport() {
 	const handleZoomIn = useCallback(() => {
 		const renderer = rendererRef.current;
 		if (!renderer) return;
-		setCamera(renderer.zoomCenter(useViewportStore.getState().camera, -1));
+		stopFling();
+		setCamera(renderer.zoomCenterByFactor(useViewportStore.getState().camera, BUTTON_ZOOM_FACTOR));
 		renderer.invalidate();
-	}, [setCamera]);
+	}, [setCamera, stopFling]);
 
 	const handleZoomOut = useCallback(() => {
 		const renderer = rendererRef.current;
 		if (!renderer) return;
-		setCamera(renderer.zoomCenter(useViewportStore.getState().camera, 1));
+		stopFling();
+		setCamera(
+			renderer.zoomCenterByFactor(useViewportStore.getState().camera, 1 / BUTTON_ZOOM_FACTOR),
+		);
 		renderer.invalidate();
-	}, [setCamera]);
+	}, [setCamera, stopFling]);
 
 	const handleFitToWorld = useCallback(() => {
 		const renderer = rendererRef.current;
 		const frame = useWorldViewStore.getState().frame;
 		if (!renderer || !frame) return;
+		stopFling();
 		setCamera(renderer.resetView(frame));
 		renderer.invalidate();
-	}, [setCamera]);
+	}, [setCamera, stopFling]);
 
 	// Keyboard equivalents for the mouse map controls (Home and Escape are
 	// handled by the window listener above).
@@ -393,16 +506,16 @@ export function WorldViewport() {
 			const renderer = rendererRef.current;
 			if (!renderer) return;
 			const camera = useViewportStore.getState().camera;
-			const panBy: Record<string, [number, number]> = {
+			const arrowPan: Record<string, [number, number]> = {
 				ArrowLeft: [KEYBOARD_PAN_STEP, 0],
 				ArrowRight: [-KEYBOARD_PAN_STEP, 0],
 				ArrowUp: [0, KEYBOARD_PAN_STEP],
 				ArrowDown: [0, -KEYBOARD_PAN_STEP],
 			};
-			const pan = panBy[e.key];
+			const pan = arrowPan[e.key];
 			if (pan) {
-				setCamera(renderer.pan(camera, pan[0], pan[1]));
-				renderer.invalidate();
+				stopFling();
+				panBy(pan[0], pan[1]);
 			} else if (e.key === "+" || e.key === "=") {
 				handleZoomIn();
 			} else if (e.key === "-" || e.key === "_") {
@@ -426,6 +539,7 @@ export function WorldViewport() {
 						creatures[creatures.length - 1];
 				}
 				if (!next) return;
+				stopFling();
 				useCreatureInspectorStore.getState().selectCreature(next.id);
 				setCamera(renderer.centerOn(next.x, next.y, camera.zoom));
 				renderer.invalidate();
@@ -434,7 +548,7 @@ export function WorldViewport() {
 			}
 			e.preventDefault();
 		},
-		[setCamera, handleZoomIn, handleZoomOut, handleFitToWorld],
+		[setCamera, stopFling, panBy, handleZoomIn, handleZoomOut, handleFitToWorld],
 	);
 
 	const keyboardHelpId = useId();
@@ -449,7 +563,7 @@ export function WorldViewport() {
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className={`absolute inset-0 h-full w-full ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400`}
+				className={`absolute inset-0 block h-full w-full touch-none ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400`}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
@@ -501,12 +615,24 @@ export function WorldViewport() {
 					title={paintMode ? "Exit paint mode" : "Enter paint mode"}
 					aria-pressed={paintMode}
 					aria-label={paintMode ? "Exit paint mode" : "Enter paint mode"}
-					className={`absolute bottom-3 right-3 z-10 px-3 py-1.5 text-xs rounded transition-colors ${
+					className={`absolute bottom-3 right-3 z-10 flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-[color,background-color,border-color,transform] duration-150 ease-out active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${
 						paintMode
-							? "bg-emerald-600 text-white hover:bg-emerald-500"
-							: "bg-slate-800/60 backdrop-blur-sm text-slate-300 hover:bg-slate-700/80"
+							? "border border-emerald-400/40 bg-emerald-600 text-white hover:bg-emerald-500"
+							: `${mapControlSurface} text-slate-300 hover:bg-slate-800/90 hover:text-slate-50`
 					}`}
 				>
+					<svg
+						aria-hidden="true"
+						viewBox="0 0 16 16"
+						className="h-3.5 w-3.5"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth={1.5}
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<path d="M13.5 2.5 7.5 8.5M9.5 4.5l2 2M7.5 8.5c-1.2-.4-2.6.2-3 1.6-.3 1-.3 2.2-2 2.9 2.4.8 5.2.3 5.8-1.6.3-.9 0-2.2-.8-2.9Z" />
+					</svg>
 					{paintMode ? "Painting" : "Paint"}
 				</button>
 			)}

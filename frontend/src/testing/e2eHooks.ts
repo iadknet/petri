@@ -1,3 +1,4 @@
+import { CANVAS_BACKGROUND_RGB } from "../canvas/renderer.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
@@ -36,9 +37,17 @@ declare global {
 	}
 }
 
-const BG_R = 2;
-const BG_G = 6;
-const BG_B = 23;
+/**
+ * Samples this close to the page or world ground are background: shadow, the
+ * world's hairline rim and lattice dots blend only slightly away from them.
+ */
+const BACKGROUND_TOLERANCE = 48;
+
+function isBackground(r: number, g: number, b: number): boolean {
+	return CANVAS_BACKGROUND_RGB.some(
+		([br, bg, bb]) => Math.hypot(r - br, g - bg, b - bb) < BACKGROUND_TOLERANCE,
+	);
+}
 
 function getCanvasPointForWorld(x: number, y: number) {
 	const canvas = document.querySelector('[data-testid="world-canvas"]');
@@ -78,7 +87,7 @@ function getCanvasContentSummary() {
 	for (let y = 0; y < height; y += step) {
 		for (let x = 0; x < width; x += step) {
 			const index = (y * width + x) * 4;
-			if (pixels[index] !== BG_R || pixels[index + 1] !== BG_G || pixels[index + 2] !== BG_B) {
+			if (!isBackground(pixels[index]!, pixels[index + 1]!, pixels[index + 2]!)) {
 				nonBackgroundSamples += 1;
 			}
 		}
