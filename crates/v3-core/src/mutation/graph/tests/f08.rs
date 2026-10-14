@@ -1,8 +1,8 @@
 //! T11.F08 graph tests: a copied compute node or cluster is placed so every
 //! copied edge reads the same evaluation phase its original reads, so the copy
 //! reproduces its original when a later mutation makes something read it; and
-//! `split_existing_edge` skips the one edge shape that cannot be split
-//! function-preservingly, replacing T11.F03's documented exception.
+//! `split_existing_edge` splits every introspection edge function-preservingly
+//! (T25.F02 retired the T11.F08 exclusion with the learning charge).
 
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
@@ -13,7 +13,7 @@ use super::operators::{
     plasticity_input_refs, scenarios,
 };
 use crate::config::RuntimeConfig;
-use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey};
+use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
@@ -412,11 +412,15 @@ proptest! {
     }
 }
 
-// ── Split exclusion (replacing T11.F03's documented exception) ─────────────
+// ── Introspection edges split (T25.F02 retires the T11.F08 exclusion) ─────
 
 /// A graph whose only splittable edge is one live introspection reference
-/// read directly by an `ActionParam` sink.
-fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphBackendDef {
+/// read directly by `sink` (or, with `on_compute_input`, by the compute node).
+fn introspection_edge_def(
+    plasticity: bool,
+    on_compute_input: bool,
+    sink: OutputSinkKind,
+) -> CgpGraphBackendDef {
     let edge = GraphEdge::new(
         GraphSource::InputLeaf {
             ref_idx: 0,
@@ -441,7 +445,7 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
             }),
         )])
         .with_output_sinks(vec![OutputSink::new(
-            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+            sink,
             if on_compute_input {
                 Vec::new()
             } else {
@@ -456,60 +460,101 @@ fn introspection_refs() -> Vec<InputReference> {
     )]
 }
 
+/// The shape T11.F08 excluded (a sink reading `EnergyCurrent` directly on a
+/// graph carrying plasticity) splits now that no learning charge sits between
+/// the evaluation and effects contexts, and the sink commits the same value
+/// through the identity node as it did directly. Node evaluation is free here
+/// so parent and child evaluate at the same energy: the split's extra node
+/// otherwise legitimately costs one `graph_node_base_cost`.
 #[test]
-fn split_skips_a_live_introspection_edge_into_a_non_compute_consumer_under_plasticity() {
-    let parent = introspection_edge_def(true, false);
+fn split_preserves_a_live_introspection_sink_edge_under_plasticity() {
+    let parent = introspection_edge_def(true, false, OutputSinkKind::CustomOutput(0));
+    let refs = introspection_refs();
+    let config = RuntimeConfig {
+        graph_node_base_cost: 0.0,
+        ..ample_runtime_config()
+    };
     for seed in 0u64..16 {
         let mut child = parent.clone();
         assert_eq!(
-            split_existing_edge(
-                &mut child,
-                &introspection_refs(),
-                &mut SmallRng::seed_from_u64(seed)
-            ),
-            Err(MutationSkipReason::NoApplicableTarget),
+            split_existing_edge(&mut child, &mut SmallRng::seed_from_u64(seed)),
+            Ok(()),
             "seed {seed}"
         );
-        assert_eq!(child, parent, "seed {seed}: the skip changes nothing");
+        assert_eq!(child.compute_nodes().len(), 2, "seed {seed}");
+        assert_eq!(
+            child.output_sinks()[0].inputs[0].source(),
+            GraphSource::ComputeNode(1),
+            "seed {seed}: the sink reads the inserted identity node"
+        );
+        assert_sequences_equivalent(
+            &format!("seed {seed}"),
+            &parent,
+            &refs,
+            &child,
+            &refs,
+            &config,
+        );
+        // Below the cap the read is unsaturated: 50 of 200 max energy.
+        for def in [&parent, &child] {
+            assert_eq!(
+                committed_at_energy(def, &refs, &config, 50.0),
+                0.25,
+                "seed {seed}: the sink commits the evaluation energy"
+            );
+        }
     }
 }
 
+/// The value `def`'s `CustomOutput(0)` sink commits on one visit of the
+/// first scenario starting at `energy`.
+fn committed_at_energy(
+    def: &CgpGraphBackendDef,
+    refs: &[InputReference],
+    config: &RuntimeConfig,
+    mut energy: f32,
+) -> f32 {
+    let mut graph_runtime = GraphRuntimeState::new();
+    graph_runtime.begin_tick(&[], 0);
+    let mut shared_memory = [0.0f32; 16];
+    execute_graph_node(
+        def,
+        refs,
+        &[0.0f32; OUTPUT_SLOT_COUNT],
+        &mut energy,
+        0.0,
+        0,
+        &mut graph_runtime,
+        &scenarios()[0],
+        config,
+        &mut MeshSideOutputs::new(8),
+        &mut shared_memory,
+        &[0.0f32; 16],
+    )
+    .output_slots[0]
+}
+
+/// The split reads neither the input references nor plasticity: every
+/// former exclusion condition splits alike.
 #[test]
-fn split_exclusion_is_scoped_to_each_of_its_conditions() {
-    let world_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
-    for (label, def, refs) in [
+fn split_applies_to_every_introspection_edge_shape() {
+    let param = OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction);
+    for (label, def) in [
         (
-            "no plasticity",
-            introspection_edge_def(false, false),
-            introspection_refs(),
+            "plasticity, sink consumer",
+            introspection_edge_def(true, false, param),
         ),
+        ("no plasticity", introspection_edge_def(false, false, param)),
         (
             "compute consumer",
-            introspection_edge_def(true, true),
-            introspection_refs(),
-        ),
-        (
-            "not introspection",
-            introspection_edge_def(true, false),
-            world_refs,
-        ),
-        // Only `EnergyCurrent` differs between the evaluation and effects
-        // contexts (`runtime/cgp/execute.rs`: the plasticity-cost deduction
-        // sits between them and touches nothing else), so the other
-        // dynamic key are outside the exclusion and still split.
-        (
-            "another dynamic introspection key",
-            introspection_edge_def(true, false),
-            vec![InputReference::DynamicIntrospection(
-                DynamicIntrospectionKey::EnergyConsumedThisTick,
-            )],
+            introspection_edge_def(true, true, param),
         ),
     ] {
         let mut child = def.clone();
         assert_eq!(
-            split_existing_edge(&mut child, &refs, &mut SmallRng::seed_from_u64(3)),
+            split_existing_edge(&mut child, &mut SmallRng::seed_from_u64(3)),
             Ok(()),
-            "{label}: outside the exclusion, the split still applies"
+            "{label}: the split applies"
         );
         assert_eq!(child.compute_nodes().len(), def.compute_nodes().len() + 1);
     }

@@ -2301,7 +2301,7 @@
       "id": 46,
       "type": "bargauge",
       "title": "Plasticity per creature-tick, run so far",
-      "description": "The Hebbian and reward-modulated update and change counters over all creature-ticks of the run so far. Learning energy is not charted: plasticity_update_cost and reward_learning_cost default to 0, so the hebbian_learning and reward_learning energy flows stay at 0.",
+      "description": "The Hebbian and reward-modulated update and change counters over all creature-ticks of the run so far. Learning is free (T25.F02), so it has no energy flow.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

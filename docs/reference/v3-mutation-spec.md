@@ -300,7 +300,7 @@ semantics are unchanged.
 
 T11.F08 owns duplication on all three backends: VM dormant-tail placement and
 its terminal guard, graph copy placement and the copy self-edge rule, the
-split exclusion, and the mesh post-activation qualification. A copy is
+split exclusion (retired by T25.F02), and the mesh post-activation qualification. A copy is
 required to be neutral when it fires *and* to reproduce its original when a
 later mutation runs it in the original's place. Learned-weight correspondence
 through such a copy follows T11.F09: birth-local available values move with each
@@ -387,20 +387,13 @@ added/removed/retyped — only their edges are evolvable.
   splittable and is excluded from the draw; when the graph has no splittable
   edge the split form is not offered and `AddComputeNode` draws one of the
   other two forms, both of which apply to any graph.
-  **Split exclusion** (T11.F08, replacing T11.F03's documented exception): an
-  edge is also unsplittable when the graph carries plasticity, the edge's
-  consumer is a sink, and its source is an
-  `InputLeaf` resolving to
-  `DynamicIntrospection(EnergyCurrent)`. An identity node between them caches
-  the value during evaluation, while the direct edge resolves it in the
-  post-evaluation effects context after the plasticity-cost deduction, so the
-  two can differ by `plasticity_cost * weight` (no observable effect under the
-  production default `plasticity_update_cost = 0.0`, but the split is not
-  function-preserving in general). `EnergyCurrent` is the only excluded key:
-  in `runtime/cgp/execute.rs` the effects `ResolveCtx` differs from the
-  evaluation `ResolveCtx` only in `energy`, so `EnergyConsumedThisTick`
-  resolves identically either side of the deduction and its edges split normally. With the exclusion in place, the
-  split's neutrality property holds unconditionally.
+  Every other edge splits, including a sink's direct
+  `DynamicIntrospection(EnergyCurrent)` read on a graph carrying plasticity:
+  learning is free (T25.F02), so the evaluation and post-evaluation effects
+  `ResolveCtx` carry the same energy and an identity node between them
+  commits the value the direct edge would. The T11.F08 exclusion of that
+  shape went with the plasticity-cost deduction it guarded, and the split's
+  neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one

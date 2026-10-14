@@ -286,7 +286,7 @@ mod tests {
         use rand::SeedableRng;
         let mut def = tracked_def();
         let mut rng = rand::rngs::SmallRng::seed_from_u64(19);
-        split_existing_edge(&mut def, &[], &mut rng).unwrap();
+        split_existing_edge(&mut def, &mut rng).unwrap();
         let birth = rows(&def);
         let identity = birth.iter().position(|v| v == &[None]).unwrap();
         assert_eq!(def.compute_nodes()[identity].inputs[0].weight(), 1.0);

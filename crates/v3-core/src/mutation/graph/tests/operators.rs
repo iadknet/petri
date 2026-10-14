@@ -204,11 +204,11 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 /// `DynamicIntrospection(EnergyCurrent)` input reference wired directly onto
 /// a non-compute surface (a parameter sink), on top of the
 /// same forward/backward/self-loop shape as `base_def`. Exercises the
-/// growth-neutrality properties against plasticity's post-convergence
-/// energy deduction and against the introspection reference kind, neither
-/// of which `base_def` carries. T11.F08's split exclusion keeps the split
-/// operator away from this fixture's parameter-sink edge, which reads a live
-/// introspection reference directly on a non-compute surface.
+/// growth-neutrality properties against plasticity and against the
+/// introspection reference kind, neither of which `base_def` carries. The
+/// split operator may split this fixture's parameter-sink edge, which reads
+/// a live introspection reference directly on a non-compute surface: with
+/// learning free (T25.F02) both contexts carry the same energy.
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![
@@ -325,7 +325,7 @@ proptest! {
         for (label, parent, refs) in fixtures() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            if split_existing_edge(&mut child, &refs, &mut rng).is_err() {
+            if split_existing_edge(&mut child, &mut rng).is_err() {
                 continue;
             }
             assert_neutral(
@@ -562,7 +562,7 @@ proptest! {
         let refs = base_input_refs();
         let mut child = parent.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if split_existing_edge(&mut child, &refs, &mut rng).is_err() {
+        if split_existing_edge(&mut child, &mut rng).is_err() {
             return Ok(());
         }
         // Only compute-consumer splits insert-and-shift; sink/action/execute

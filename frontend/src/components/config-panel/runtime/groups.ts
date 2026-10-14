@@ -194,10 +194,6 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 				),
 			},
 			{
-				title: "Learning cost",
-				fields: pick("runtime.plasticity_update_cost", "runtime.reward_learning_cost"),
-			},
-			{
 				title: "Senses and memory",
 				fields: pick(
 					"runtime.perception.vision_radius",

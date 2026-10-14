@@ -1142,7 +1142,7 @@ fn e2_delayed_reward_visited_every_tick() {
 
 /// E3: a conditional VM skips the graph on ticks 2 and 3. Measured nonzero
 /// EnergyDelta still updates its weights, using elapsed-tick decayed credit.
-/// Energy decay and reward-learning cost are zero in this fixture, so the
+/// Energy decay is zero in this fixture and learning is free, so the
 /// observed energy difference equals the production reward signal.
 #[test]
 fn e3_skipped_module_visits() {

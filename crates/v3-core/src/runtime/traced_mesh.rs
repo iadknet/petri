@@ -825,8 +825,10 @@ mod tests {
         assert!(hops[0].route.is_none());
     }
 
+    /// Learning is free (T25.F02): a plastic visit that affords its pass
+    /// commits its vote however little energy remains.
     #[test]
-    fn graph_plasticity_cost_exhaustion_stops_effects() {
+    fn graph_plasticity_charges_nothing_so_effects_commit() {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -864,7 +866,6 @@ mod tests {
         let ss = empty_ss();
         let mut config = default_config();
         config.graph_node_base_cost = 0.1;
-        config.plasticity_update_cost = 2.0;
         let mut energy = 1.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
@@ -881,16 +882,18 @@ mod tests {
             Direction::N,
         );
 
-        assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert_eq!(
+        assert_ne!(
             output.termination_reason,
             TerminationReason::EnergyExhausted
         );
-        // The exhausted visit committed no vote.
-        assert_eq!(passes[0].votes[VoteSink::Eat.index()], 0.0);
-        assert_eq!(hops.len(), 1);
+        assert!(energy > 0.0, "learning charged nothing: {energy}");
+        assert_eq!(passes[0].votes[VoteSink::Eat.index()], 1.0);
+        assert_eq!(
+            output.actions[0],
+            WorldAction::eat(crate::contracts::OrdinaryFoodTypeId::default())
+        );
         // No targets on this node, so route is None.
-        assert!(hops[0].route.is_none());
+        assert!(hops.iter().all(|hop| hop.route.is_none()));
     }
 
     /// Traced and non-traced paths produce identical MeshOutput when priority bid is used.

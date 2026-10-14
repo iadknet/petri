@@ -33,28 +33,26 @@ fn sensors() -> SensorSnapshot {
     }
 }
 
+/// Hebbian learning is free (T25.F02): a plastic visit pays its pass cost
+/// alone, and the pass cost is the only exhaustion it can cause.
 #[test]
-fn applied_graph_accounting_separates_base_and_hebbian_exhaustion() {
+fn applied_graph_accounting_charges_only_the_pass_under_hebbian_learning() {
     use crate::simulation::energy_accounting::DeathCause;
     let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
     def.node_plasticity_mut(0).unwrap().modulation = None;
     let runtime = RuntimeConfig {
         graph_node_base_cost: 2.0,
-        plasticity_update_cost: 3.0,
         ..RuntimeConfig::default()
     };
-    for (initial, cause, base, learning) in [
-        (1.0, DeathCause::GraphCompute, 2.0, 0.0),
-        (4.0, DeathCause::HebbianLearning, 2.0, 3.0),
-    ] {
+    for (initial, cause, updates) in [(1.0, Some(DeathCause::GraphCompute), 0), (4.0, None, 1)] {
         let mut state = GraphRuntimeState::new();
         begin(&mut state, &def);
         let mut energy = initial;
         let side = visit(&def, &mut state, 1.0, &mut energy, &runtime);
-        assert_eq!(side.energy_observation.graph_compute, base);
-        assert_eq!(side.energy_observation.hebbian_learning, learning);
-        assert_eq!(side.energy_observation.pending_cause, Some(cause));
-        assert_eq!(energy, initial - base as f32 - learning as f32);
+        assert_eq!(side.energy_observation.graph_compute, 2.0);
+        assert_eq!(side.energy_observation.pending_cause, cause);
+        assert_eq!(side.work_counters.plasticity_updates, updates);
+        assert_eq!(energy, initial - 2.0);
     }
 }
 
@@ -178,7 +176,7 @@ fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources()
 }
 
 #[test]
-fn activity_uses_evaluation_energy_before_pure_hebbian_cost() {
+fn activity_uses_evaluation_energy_beside_pure_hebbian_learning() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
     def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
         .set_source(GraphSource::InputLeaf {
@@ -190,14 +188,14 @@ fn activity_uses_evaluation_energy_before_pure_hebbian_cost() {
     def.append_compute_node(pure);
     let runtime = RuntimeConfig {
         graph_node_base_cost: 1.0,
-        plasticity_update_cost: 2.0,
         ..RuntimeConfig::default()
     };
     let mut state = GraphRuntimeState::new();
     begin(&mut state, &def);
     let mut energy = 10.0;
     let side = visit(&def, &mut state, 0.0, &mut energy, &runtime);
-    assert_eq!(energy, 6.0);
+    // Two nodes' pass cost; the pure Hebbian update is free (T25.F02).
+    assert_eq!(energy, 8.0);
     assert_eq!(side.work_counters.plasticity_updates, 1);
     // The read is the evaluation energy (8.0) as a fraction of max_energy.
     assert_eq!(state.eligibility_traces[0][0][0], 8.0 / 200.0);
@@ -211,36 +209,36 @@ fn failed_visits_preserve_decay_and_last_successful_activity() {
     def.append_compute_node(pure);
     let runtime = RuntimeConfig {
         graph_node_base_cost: 1.0,
-        plasticity_update_cost: 1.0,
         ..RuntimeConfig::default()
     };
     let mut state = GraphRuntimeState::new();
     begin(&mut state, &def);
     visit(&def, &mut state, 2.0, &mut 100.0, &runtime);
     begin(&mut state, &def);
-    for energy in [1.0, 2.5] {
+    // Both visits fail at the two-node pass cost, the only exhaustion point.
+    for energy in [1.0, 2.0] {
         visit(&def, &mut state, 9.0, &mut { energy }, &runtime);
         assert_eq!(state.eligibility_traces[0][0][0], 1.0);
     }
     visit(&def, &mut state, 3.0, &mut 100.0, &runtime);
-    for energy in [1.0, 2.5] {
+    for energy in [1.0, 2.0] {
         visit(&def, &mut state, 9.0, &mut { energy }, &runtime);
         assert_eq!(state.eligibility_traces[0][0][0], 4.0);
     }
 }
 
-fn reward(def: &CgpGraphBackendDef, state: &mut GraphRuntimeState, signal: f32) -> (f32, u32) {
+/// The reward pass's edge assignments for one signal.
+fn reward(def: &CgpGraphBackendDef, state: &mut GraphRuntimeState, signal: f32) -> u32 {
     let mut signals = super::OutcomeSignalBank::default();
     signals.signals[OutcomeChannel::EnergyDelta as usize] = signal;
-    let (cost, assignments, _) = super::reward::apply_reward_modulated_updates(
+    let (assignments, _) = super::reward::apply_reward_modulated_updates(
         def,
         0,
         &mut state.plasticity_weights,
         &state.eligibility_traces,
         &signals,
-        0.25,
     );
-    (cost, assignments)
+    assignments
 }
 
 #[test]
@@ -262,7 +260,7 @@ fn exact_rules_rewards_rates_and_hebbian_equivalence() {
                 begin(&mut state, &def);
                 visit(&def, &mut state, pre, &mut 100.0, &RuntimeConfig::default());
                 assert!((state.eligibility_traces[0][0][0] - activity).abs() < 1e-7);
-                assert_eq!(reward(&def, &mut state, signal), (0.25, 1));
+                assert_eq!(reward(&def, &mut state, signal), 1);
                 let expected = weight + eta * signal * activity;
                 assert!((state.plasticity_weights[0][0][0] - expected).abs() < 1e-7);
                 if signal == 1.0 {
@@ -324,11 +322,11 @@ fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
     }
     assert!(state.eligibility_traces.is_empty());
     assert!(state.plasticity_weights.is_empty());
-    assert_eq!(reward(&def, &mut state, 1.0), (0.0, 0));
+    assert_eq!(reward(&def, &mut state, 1.0), 0);
     // Failed first evaluation initializes zeros but never activity.
     visit(&def, &mut state, 3.0, &mut 0.0, &RuntimeConfig::default());
     assert_eq!(state.eligibility_traces[0][0][0], 0.0);
-    assert_eq!(reward(&def, &mut state, 1.0), (0.25, 1));
+    assert_eq!(reward(&def, &mut state, 1.0), 1);
     assert_eq!(state.plasticity_weights[0][0][0], 0.5);
 }
 
@@ -543,7 +541,7 @@ fn birth_aligned_weights_drive_first_execution_and_reward_without_parent_credit(
     let mut child = GraphRuntimeState::new();
     child.plasticity_weights = vec![take_graph_plasticity_weights(&mut def)];
     assert!(child.eligibility_traces.is_empty());
-    assert_eq!(reward(&def, &mut child, 1.0), (0.0, 0));
+    assert_eq!(reward(&def, &mut child, 1.0), 0);
     begin(&mut child, &def);
     visit(&def, &mut child, 2.0, &mut 100.0, &RuntimeConfig::default());
     assert_eq!(child.node_outputs[0][0], 1.5);
@@ -573,12 +571,13 @@ fn learning_counts_assignments_separately_from_final_weight_changes() {
             begin(&mut state, &def);
             let runtime = RuntimeConfig {
                 graph_node_base_cost: 0.0,
-                plasticity_update_cost: 0.25,
                 ..RuntimeConfig::default()
             };
             let mut energy = 100.0;
             let side = visit(&def, &mut state, input, &mut energy, &runtime);
-            let (cost, assignments, changes) = if modulated {
+            // Learning is free (T25.F02): neither form spends energy.
+            assert_eq!(energy, 100.0);
+            let (assignments, changes) = if modulated {
                 assert_eq!(side.work_counters.plasticity_updates, 0);
                 assert_eq!(side.work_counters.plasticity_changes, 0);
                 assert_eq!(energy, 100.0);
@@ -590,20 +589,15 @@ fn learning_counts_assignments_separately_from_final_weight_changes() {
                     &mut state.plasticity_weights,
                     &state.eligibility_traces,
                     &signals,
-                    0.25,
                 )
             } else {
                 (
-                    100.0 - energy,
                     side.work_counters.plasticity_updates,
                     side.work_counters.plasticity_changes,
                 )
             };
             assert_eq!(state.plasticity_weights[0][0][0], expected);
-            assert_eq!(
-                (cost, assignments, changes),
-                (0.25, 1, u32::from(expected != weight))
-            );
+            assert_eq!((assignments, changes), (1, u32::from(expected != weight)));
         }
     }
 }
@@ -625,11 +619,9 @@ proptest! {
         let (assignments, changes) = if modulated {
             let mut signals = super::OutcomeSignalBank::default();
             signals.signals[OutcomeChannel::EnergyDelta as usize] = signal;
-            let (cost, assignments, changes) = super::reward::apply_reward_modulated_updates(
-                &def, 0, &mut state.plasticity_weights, &state.eligibility_traces, &signals, 0.25,
-            );
-            prop_assert_eq!(cost, weights.len() as f32 * 0.25);
-            (assignments, changes)
+            super::reward::apply_reward_modulated_updates(
+                &def, 0, &mut state.plasticity_weights, &state.eligibility_traces, &signals,
+            )
         } else {
             (side.work_counters.plasticity_updates, side.work_counters.plasticity_changes)
         };

@@ -6,7 +6,7 @@
 
 use rand::Rng;
 
-use crate::contracts::{DynamicIntrospectionKey, InputReference};
+use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSinkKind,
@@ -274,13 +274,13 @@ pub(crate) fn add_compute_node(
     input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let can_split = check_compute_node_capacity(def, 1).is_ok()
-        && splittable_edge_sites(def, input_refs).next().is_some();
+    let can_split =
+        check_compute_node_capacity(def, 1).is_ok() && splittable_edge_sites(def).next().is_some();
     let forms = if can_split { 3u8 } else { 2u8 };
     match rng.gen_range(0u8..forms) {
         0 => add_disconnected_node(def, rng),
         1 => add_bootstrap_node(def, input_refs, rng),
-        _ => split_existing_edge(def, input_refs, rng),
+        _ => split_existing_edge(def, rng),
     }
 }
 
@@ -323,16 +323,13 @@ pub(crate) fn add_bootstrap_node(
 /// index and every `ComputeNode(i >= consumer)` reference is remapped to
 /// `i + 1` (`CgpGraphBackendDef::insert_compute_node`), so Gauss-Seidel
 /// pass order is preserved. When the consumer is a sink, the new node is
-/// appended instead. The one edge shape a
-/// split cannot preserve is skipped rather than split: see
-/// [`is_excluded_introspection_split`].
+/// appended instead.
 pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
-    input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     check_compute_node_capacity(def, 1)?;
-    let sites: Vec<EdgeOccurrence> = splittable_edge_sites(def, input_refs).collect();
+    let sites: Vec<EdgeOccurrence> = splittable_edge_sites(def).collect();
     if sites.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -342,56 +339,15 @@ pub(crate) fn split_existing_edge(
 }
 
 /// The edges `split_existing_edge` can split: every edge except one whose
-/// `ComputeNode` source dangles (a prior removal's sentinel) and one whose
-/// shape a split cannot preserve
-/// ([`is_excluded_introspection_split`], which only applies off the compute
-/// surfaces).
-fn splittable_edge_sites<'a>(
-    def: &'a CgpGraphBackendDef,
-    input_refs: &'a [InputReference],
-) -> impl Iterator<Item = EdgeOccurrence> + 'a {
-    def.edge_sites().filter(move |&occurrence| {
-        let source = def.edge_at(occurrence).source();
-        if let GraphSource::ComputeNode(idx) = source {
-            if idx as usize >= def.compute_nodes().len() {
-                return false;
-            }
-        }
-        matches!(occurrence.surface, EdgeSurface::ComputeInput(_))
-            || !is_excluded_introspection_split(def, input_refs, source)
-    })
-}
-
-/// True for the one edge shape a split cannot preserve (T11.F08, replacing
-/// T11.F03's documented exception): on a graph carrying plasticity, a sink
-/// reading a
-/// `DynamicIntrospection(EnergyCurrent)` reference directly. An identity node
-/// between them caches the value during evaluation, while the direct edge
-/// resolves it in the post-convergence effects context after the
-/// plasticity-cost deduction, so the two can differ.
-/// `split_existing_edge` skips such an edge instead of splitting it.
-///
-/// `EnergyCurrent` is the only excluded key. In `runtime/cgp/execute.rs` the
-/// effects `ResolveCtx` differs from the evaluation `ResolveCtx` only in
-/// `energy`: `energy_consumed` is unchanged, so `EnergyConsumedThisTick`
-/// resolves identically either side of the deduction and its edges split normally.
-fn is_excluded_introspection_split(
-    def: &CgpGraphBackendDef,
-    input_refs: &[InputReference],
-    source: GraphSource,
-) -> bool {
-    let GraphSource::InputLeaf { ref_idx, .. } = source else {
-        return false;
-    };
-    matches!(
-        input_refs.get(ref_idx as usize),
-        Some(InputReference::DynamicIntrospection(
-            DynamicIntrospectionKey::EnergyCurrent
-        ))
-    ) && def
-        .compute_nodes()
-        .iter()
-        .any(|node| node.plasticity.is_some())
+/// `ComputeNode` source dangles (a prior removal's sentinel). Every
+/// introspection edge splits: with learning free (T25.F02) the evaluation and
+/// effects contexts carry the same energy, so the T11.F08 exclusion is gone.
+fn splittable_edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = EdgeOccurrence> + '_ {
+    def.edge_sites()
+        .filter(move |&occurrence| match def.edge_at(occurrence).source() {
+            GraphSource::ComputeNode(idx) => (idx as usize) < def.compute_nodes().len(),
+            _ => true,
+        })
 }
 
 /// An identity `Add` node (weighted sum reproduces a single input exactly)
@@ -1026,7 +982,7 @@ mod tests {
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &[], &mut rng),
+            split_existing_edge(&mut def, &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1045,7 +1001,7 @@ mod tests {
             )]);
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &[], &mut rng),
+            split_existing_edge(&mut def, &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1072,7 +1028,7 @@ mod tests {
             )]);
         // Force selection of the only edge (ComputeInput(1), edge 0).
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &[], &mut rng).unwrap();
+        split_existing_edge(&mut def, &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 3);
         // New Add node inserted at index 1, reading the old source (CN(0)).
@@ -1112,7 +1068,7 @@ mod tests {
             )])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &[], &mut rng).unwrap();
+        split_existing_edge(&mut def, &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 2);
         assert_eq!(def.compute_nodes()[0].kind, ComputeNodeKind::Add);
@@ -1143,7 +1099,7 @@ mod tests {
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
             )]);
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &[], &mut rng).unwrap();
+        split_existing_edge(&mut def, &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 2);
         assert_eq!(def.compute_nodes()[1].kind, ComputeNodeKind::Add);

@@ -609,8 +609,6 @@ fn energy(f: &mut Families, s: &SimStats) {
         ("priority_bid".to_owned(), flows.priority_bid),
         ("graph_compute".to_owned(), flows.graph_compute),
         ("mesh_ramp".to_owned(), flows.mesh_ramp),
-        ("hebbian_learning".to_owned(), flows.hebbian_learning),
-        ("reward_learning".to_owned(), flows.reward_learning),
         ("lifecycle_decay".to_owned(), flows.lifecycle_decay),
         ("genome_carrying".to_owned(), flows.genome_carrying),
         (

@@ -71,9 +71,11 @@ Transport posture note:
 | `runtime.hop_ramp_allowance` | `u32` | `32` | Any value is valid; a missing field defaults to `32`. Free mesh hops per world tick before the per-tick hop ramp charges; `0` ramps from the first hop. | `v3-mesh-execution-spec.md` |
 | `runtime.hop_ramp_cost` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the ramp. Energy charged per excess hop, per hop past `hop_ramp_allowance`, within one world tick; each hop's charge is debited directly, so a configured cost below the ulp of a creature's energy is lost to rounding. | `v3-mesh-execution-spec.md` |
 | `runtime.perception.vision_radius` | `u8` | `5` | Must be in `1..=8`; out-of-range values are clamped to the nearest valid bound. | `v3-sensor-spec.md` |
-| `runtime.reward_learning_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; NaN/negative values fall back to `0.0`. Energy cost per reward-modulated weight update in Phase 2.5. | `v3-tick-orchestration-spec.md` |
 
-The three graph relaxation and convergence fields (inactive since T11.F06)
+Learning is free (T25.F02): `runtime.plasticity_update_cost` (and its alias
+`hebbian_update_cost`) and `runtime.reward_learning_cost` are deleted, and a
+config carrying any of them fails to load as an unknown field. The three
+graph relaxation and convergence fields (inactive since T11.F06)
 are deleted as of T19.F02. `RuntimeConfig` rejects unknown fields, so a
 stored config still carrying them fails to load until they are removed. Each
 nonempty visit evaluates compute nodes once.

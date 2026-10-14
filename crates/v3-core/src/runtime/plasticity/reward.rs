@@ -23,16 +23,15 @@ use crate::runtime::plasticity::OutcomeSignalBank;
 /// 2. For each edge, compute `dw = learning_rate * signal * trace`.
 /// 3. Update the learned weight with clamping.
 ///
-/// Returns energy cost, edge assignments, and assignments that change a weight.
+/// Returns edge assignments and assignments that change a weight; learning
+/// is free (T25.F02).
 pub(crate) fn apply_reward_modulated_updates(
     def: &CgpGraphBackendDef,
     node_idx: usize,
     plasticity_weights: &mut [Vec<Box<[f32]>>],
     eligibility_traces: &[Vec<Box<[f32]>>],
     signals: &OutcomeSignalBank,
-    cost_per_update: f32,
-) -> (f32, u32, u32) {
-    let mut total_cost: f32 = 0.0;
+) -> (u32, u32) {
     let mut update_count: u32 = 0;
     let mut changed_count: u32 = 0;
 
@@ -79,12 +78,11 @@ pub(crate) fn apply_reward_modulated_updates(
             weights[edge_idx] = (weights[edge_idx] + dw).clamp(-w_clamp, w_clamp);
             // Compare the final stored f32, including clamping and rounding.
             changed_count += u32::from(weights[edge_idx] != old_weight);
-            total_cost += cost_per_update;
             update_count += 1;
         }
     }
 
-    (total_cost, update_count, changed_count)
+    (update_count, changed_count)
 }
 
 // Old reward-modulated plasticity tests removed — production code ported to CGP types.

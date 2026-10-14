@@ -178,7 +178,7 @@ re-pin table, each test comment carrying its cause and restoring check.
 
 - [x] Commit 1, unit rule.
 - [x] Commit 2, rate.
-- [ ] Commit 3, cost chain.
+- [x] Commit 3, cost chain.
 
 ## Verification
 

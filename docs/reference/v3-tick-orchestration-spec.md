@@ -168,7 +168,7 @@ updates based on it. For each creature:
 
 1. Compute `OutcomeSignalBank` from Phase 0 energy snapshot and Phase 2
    action results (energy delta, action success rate, damage received,
-   offspring spawned), before any reward debit.
+   offspring spawned), before the Phase 2.5 zero floor (learning is free, T25.F02).
 2. Store the bank on the creature (`CreatureState::previous_outcome`,
    T19.F05). The next tick's sensor assembly reads it into
    `StaticInputs::previous_outcome` for the `PreviousOutcome` input
@@ -177,6 +177,8 @@ updates based on it. For each creature:
 3. For each reward-modulated edge, apply:
    `dw = learning_rate * outcome_signal[channel] * eligibility_trace[edge]`.
 4. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
+5. Floor the creature's energy at `0.0`, crediting `zero_floor_credit`; this
+   reaches exactly the creatures that have a bank and a reward-modulated node.
 
 Phase 0 calls `graph_runtime.begin_tick(&genome.nodes, age)` to record the
 dispatch record's age and decay initialized eligibility once; it snapshots

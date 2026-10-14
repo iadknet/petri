@@ -220,7 +220,6 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "runtime.max_mesh_hops",
         "runtime.max_vm_steps",
         "runtime.graph_node_base_cost",
-        "runtime.plasticity_update_cost",
         "runtime.hop_ramp_allowance",
         "runtime.hop_ramp_cost",
         "runtime.max_actions_per_turn",
@@ -255,7 +254,7 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "predation.steal_cost_rate",
         "predation.kill_complexity_bonus_multiplier",
     ]);
-    let reward_learning = config_keys(&["runtime.reward_learning_cost"]);
+    let reward_learning = config_keys(&[]);
     [
         tick,
         food_growth,

@@ -229,8 +229,6 @@ pub struct EnergyFlowTracking {
     /// Per-tick hop ramp (T19.F01); absent from reports stored before it.
     #[serde(default)]
     pub mesh_ramp: String,
-    pub hebbian_learning: String,
-    pub reward_learning: String,
     pub lifecycle_decay: String,
     pub genome_carrying: String,
     pub genome_size_creature_ticks: u64,
@@ -270,8 +268,6 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             priority_bid: six(flows.priority_bid),
             graph_compute: six(flows.graph_compute),
             mesh_ramp: six(flows.mesh_ramp),
-            hebbian_learning: six(flows.hebbian_learning),
-            reward_learning: six(flows.reward_learning),
             lifecycle_decay: six(flows.lifecycle_decay),
             genome_carrying: six(flows.genome_carrying),
             genome_size_creature_ticks: flows.genome_size_creature_ticks,

@@ -301,7 +301,6 @@ fn dispatch_float_totals_follow_priority_queue_order_without_preaggregation() {
         output.energy_observation.vm_compute = flow;
         output.energy_observation.graph_compute = flow;
         output.energy_observation.mesh_ramp = flow;
-        output.energy_observation.hebbian_learning = flow;
         output.energy_observation.priority_bid = flow;
         decisions.push((ids[index], output));
     }
@@ -313,13 +312,7 @@ fn dispatch_float_totals_follow_priority_queue_order_without_preaggregation() {
         &mut SmallRng::seed_from_u64(1),
     );
     let f = &sim.stats.energy_flows;
-    for total in [
-        f.vm_compute,
-        f.graph_compute,
-        f.mesh_ramp,
-        f.hebbian_learning,
-        f.priority_bid,
-    ] {
+    for total in [f.vm_compute, f.graph_compute, f.mesh_ramp, f.priority_bid] {
         assert_eq!(
             total.to_bits(),
             1.0e16f64.to_bits(),
@@ -365,8 +358,9 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
     assert_eq!(sim.creatures[id].pending_death_cause, None);
 }
 
-#[test]
-fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
+/// One Graph node whose single compute node carries plasticity; with
+/// `reward` it is reward-modulated on `EnergyDelta`.
+fn learning_genome(reward: bool) -> crate::creature::genome::CreatureGenome {
     use crate::contracts::NodeId;
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
@@ -375,7 +369,7 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
         RewardModulationConfig,
     };
-    let genome = CreatureGenome {
+    CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
@@ -397,7 +391,7 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
                             learning_rate: 0.5,
                             weight_clamp: 2.0,
                             lamarckian: false,
-                            modulation: Some(RewardModulationConfig {
+                            modulation: reward.then_some(RewardModulationConfig {
                                 reward_source: OutcomeChannel::EnergyDelta,
                                 trace_decay: 0.5,
                             }),
@@ -406,25 +400,47 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
                     .with_output_sinks(vec![]),
             ),
         }],
-    };
-    let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
+    }
+}
+
+/// Reward-modulated learning is free (T25.F02): a tick in which every other
+/// cost is zero leaves the learner's energy where it was, with no pending
+/// death cause, while its reward-modulated updates still run.
+#[test]
+fn reward_learning_charges_no_energy() {
+    let (mut sim, id) = make_sim_with_custom_genome(1.0, learning_genome(true));
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
     sim.config.energy.costs.noop_cost = 0.0;
     sim.config.runtime.graph_node_base_cost = 0.0;
-    sim.config.runtime.reward_learning_cost = 2.0;
     crate::simulation::run_tick(&mut sim, &mut None);
-    assert_eq!(sim.stats.energy_flows.reward_learning, 2.0);
-    assert_eq!(sim.stats.energy_flows.zero_floor_credit, 1.0);
-    assert_eq!(sim.creatures[id].energy, 0.0, "removal must remain delayed");
-    assert_eq!(
-        sim.creatures[id].pending_death_cause,
-        Some(DeathCause::RewardLearning)
-    );
-    sim.config.energy.lifecycle.energy_decay_per_tick = 1.0;
-    run_phase_0(&mut sim);
-    assert_eq!(sim.stats.mortality.count(DeathCause::RewardLearning), 1);
-    assert_eq!(sim.stats.mortality.count(DeathCause::LifecycleDecay), 0);
+    assert!(sim.stats.reward_modulated_updates_total > 0);
+    assert_eq!(sim.creatures[id].energy, 1.0);
+    assert_eq!(sim.creatures[id].pending_death_cause, None);
+    assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
+}
+
+/// The Phase 2.5 zero floor is its own step: it floors exactly the creatures
+/// the reward pass reaches (an outcome bank and a reward-modulated node) and
+/// credits `zero_floor_credit`; a creature without either is untouched.
+#[test]
+fn reward_phase_zero_floor_reaches_only_reward_learners_with_an_outcome_bank() {
+    for (label, reward, banked, floored) in [
+        ("reward learner with a bank", true, true, true),
+        ("plain Hebbian learner", false, true, false),
+        ("newborn reward learner", true, false, false),
+    ] {
+        let (mut sim, id) = make_sim_with_custom_genome(1.0, learning_genome(reward));
+        let mut outcomes = OutcomeAccumulator::default();
+        if banked {
+            outcomes.snapshot_energy(id, 1.0);
+        }
+        sim.creatures[id].energy = -1.5;
+        super::super::run_reward_learning(&mut sim, &outcomes);
+        let (energy, credit) = if floored { (0.0, 1.5) } else { (-1.5, 0.0) };
+        assert_eq!(sim.creatures[id].energy, energy, "{label}");
+        assert_eq!(sim.stats.energy_flows.zero_floor_credit, credit, "{label}");
+    }
 }
 
 #[test]

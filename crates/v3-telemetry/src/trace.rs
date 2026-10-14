@@ -241,10 +241,8 @@ fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig)
         }
         3 => cognition(a, config),
         4 => actions(a, config),
-        _ => a.double(
-            config_key("runtime.reward_learning_cost"),
-            config.runtime.reward_learning_cost,
-        ),
+        // Reward learning is free (T25.F02): no config value governs it.
+        _ => {}
     }
 }
 
@@ -317,10 +315,6 @@ pub(crate) fn cognition(a: &mut Attributes, config: &SimulationConfig) {
     a.double(
         config_key("runtime.graph_node_base_cost"),
         runtime.graph_node_base_cost,
-    );
-    a.double(
-        config_key("runtime.plasticity_update_cost"),
-        runtime.plasticity_update_cost,
     );
     a.int(
         config_key("runtime.hop_ramp_allowance"),

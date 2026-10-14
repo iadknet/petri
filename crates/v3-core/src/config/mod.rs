@@ -82,6 +82,23 @@ mod recipe_tests {
         }
     }
 
+    /// T25.F02: learning is free, so the learning-cost knobs and their alias
+    /// are retired with no alias; a recipe naming any fails to resolve and
+    /// names the key.
+    #[test]
+    fn recipe_rejects_the_retired_learning_cost_keys() {
+        for key in [
+            "plasticity_update_cost",
+            "reward_learning_cost",
+            "hebbian_update_cost",
+        ] {
+            let error =
+                resolve_config(&SimulationConfig::default(), json!({"runtime": {key: 0.0}}))
+                    .unwrap_err();
+            assert!(error.to_string().contains(key), "{key}: {error}");
+        }
+    }
+
     /// The seven tracked root recipes resolve once the retired keys are gone.
     #[test]
     fn root_world_recipes_resolve() {

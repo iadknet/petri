@@ -918,7 +918,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         ActionCharges, DeathCause, EnergyFlows, FailedActionEffort,
     };
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
-    sim.stats.mortality.record(DeathCause::RewardLearning);
+    sim.stats.mortality.record(DeathCause::MeshRamp);
     sim.stats.energy_flows = EnergyFlows {
         food_intake_by_type: vec![0.123456789, -2.0, 0.0],
         action_charges: ActionCharges {
@@ -938,8 +938,6 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         priority_bid: 8.0,
         graph_compute: 9.0,
         mesh_ramp: 9.5,
-        hebbian_learning: 10.0,
-        reward_learning: 11.0,
         lifecycle_decay: 12.0,
         genome_carrying: 13.0,
         genome_size_creature_ticks: 14,
@@ -963,8 +961,6 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         "vm_compute",
         "graph_compute",
         "mesh_ramp",
-        "hebbian_learning",
-        "reward_learning",
         "priority_bid",
         "action_noop",
         "action_eat",
@@ -978,7 +974,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     ];
     assert_eq!(mortality.by_cause.len(), expected_keys.len());
     for key in expected_keys {
-        assert_eq!(mortality.by_cause[key], u64::from(key == "reward_learning"));
+        assert_eq!(mortality.by_cause[key], u64::from(key == "mesh_ramp"));
     }
     assert_eq!(
         serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
@@ -988,7 +984,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
             "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
             "vm_compute": "7.000000", "priority_bid": "8.000000",
-            "graph_compute": "9.000000", "mesh_ramp": "9.500000", "hebbian_learning": "10.000000", "reward_learning": "11.000000",
+            "graph_compute": "9.000000", "mesh_ramp": "9.500000",
             "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
             "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000",
             "predation_victim_debit": "-17.000000", "predation_attacker_credit": "-18.000000",
