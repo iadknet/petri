@@ -46,7 +46,7 @@ and pin is identical to main.
 | --- | --- | --- |
 | Track row and Notes | `docs/roadmaps/t25-edge-groups-and-learning.md` | The goal; "F01 is behavior-preserving: any pin that moves under it is a defect"; verification plan "F01 gate", mutation gate and slow tests on all eight. |
 | Design note | `docs/strategy/edge-groups-and-learning-design-2026-10-13.md` §2, §3 (I9, I11, "Birth seeds (D1)"), §4 "Ablation (D3)", §7 (boundary table, dependency direction, "Determinism and pins"), §8 F01 contract | Scope, the container API restricted to today's write sites, the owners, the oracles and the tests-first list. |
-| Genome types | `crates/v3-core/src/creature/genome/cgp.rs` | `GraphEdge {source, weight}` (`Copy`, 8 bytes), `ComputeNode {kind, inputs, plasticity}`, `OutputSink {kind, inputs}`, `CgpGraphBackendDef {birth_weights (serde skip, doc hidden), compute_nodes, output_sinks, projections}` with a hand-written `Debug`/`PartialEq` that skip `birth_weights` and print `projections` only when non-empty; the alignment-bearing methods `remove_compute_node_at`, `insert_compute_node_at`, `duplicate_compute_nodes_in_place`, `reindex_input_refs_after_removal`, `clamp_sub_idx_after_swap`, `retain_edges`. |
+| Genome types | `crates/v3-core/src/creature/genome/cgp.rs` | `GraphEdge {source, weight}` (`Copy`, 12 bytes), `ComputeNode {kind, inputs, plasticity}`, `OutputSink {kind, inputs}`, `CgpGraphBackendDef {birth_weights (serde skip, doc hidden), compute_nodes, output_sinks, projections}` with a hand-written `Debug`/`PartialEq` that skip `birth_weights` and print `projections` only when non-empty; the alignment-bearing methods `remove_compute_node_at`, `insert_compute_node_at`, `duplicate_compute_nodes_in_place`, `reindex_input_refs_after_removal`, `clamp_sub_idx_after_swap`, `retain_edges`. |
 | Birth payload | `simulation/actions/cgp_reproduction.rs` (`capture_birth_weights`, `build_cgp_child_plasticity_weights`), `reproduction.rs:19-40, :404, :520-567` | Capture runs before `MutationEngine::apply_mutations_with_food_type_count`, build after, and the result is assigned to `child.graph_runtime.plasticity_weights` after construction (`:567`). All-empty parent rows give `None`, the fast path. |
 | Alignment sites | `mutation/graph/operators.rs:345, :424, :647, :667, :693, :752`; `cgp.rs:378, :424, :467, :532` | The twelve hand-maintained seed edits listed under "Seed rules". |
 | Engine wrappers | `mutation/engine/mod.rs:581-688` | Four identical snapshot, apply, validate, commit-or-rollback functions, one per domain. |
@@ -87,8 +87,9 @@ Invariants:
    `set_source` keeps the seed. Seeds travel with `Clone` (topology
    clones) and roll back with the engine's genome snapshot.
 5. **Behavior.** Every deterministic output is identical to main: the
-   gate's deterministic blocks, every pin in the Inputs table, every draw
-   stream, and the corpus hashes.
+   gate's and world-set deterministic blocks (their descriptive strings
+   included, `v3-cli/src/bench/mutation_effects.rs:346`), every pin in
+   the Inputs table, every draw stream, and the corpus hashes.
 6. **Construction.** Every reproduction draft carries `BirthSeeds`:
    either rows (I11-aligned, when the parent had a learned value) or the
    explicit empty form (no rows, no alignment, no allocation; today's
@@ -201,32 +202,28 @@ wrong.
       `CreatureState::new` and `new_with_cached_fields` take seeds out and
       build `plasticity_weights` with today's rule; `reproduction.rs:567`
       deleted; `reproduction.rs:806-1016` and `plasticity/tests.rs:554`
-      ported scenario by scenario with identical expected values,
-      `birth_mesh_copies_removal_and_backend_replacement_keep_their_own_values`
-      as an explicit backend-replacement test, same-source retargets
-      included; `docs/reference/v3-reproduction-spec.md` §4 "Graph state"
-      names `BirthSeeds` as the temporary correspondence.
+      ported scenario by scenario with identical expected values
+      (`reproduction.rs:938` as an explicit backend-replacement test,
+      same-source retargets included); `v3-reproduction-spec.md` §4 names
+      `BirthSeeds` as the temporary correspondence.
 - [x] Engine: one generic snapshot, validate, commit-or-rollback wrapper;
       `engine/tests.rs:1757` ported to the seed accessor.
 - [x] `the_walk_dates_modules_from_their_birth_and_from_every_refresh`
       rewritten to a constructed lineage asserting the dating properties
-      (birth date, refresh folding) without pinning draw history; its
-      pinned numbers pass unchanged before the rewrite and are recorded in
-      the readings.
+      (birth date, refresh folding, internal-change dating) without
+      pinning draw history; its pinned numbers pass unchanged before the
+      rewrite and are in the readings.
 - [x] Closing commit: the corpus test retired, its hashes kept in
       `docs/progress/readings/t25-f01.md`.
 
-**Golden Lamarckian corpus.** A `v3-core` unit test with a seeded RNG over
-a fixed multi-node graph genome with Lamarckian compute nodes and fixed
-parent weights. Each scenario captures, applies one named operator (or one
-engine event), builds the child weights, and hashes the child genome's
-`Debug` text with the built weights' bits. The test asserts its own
-coverage: at least one payload-carrying applied (not skipped) scenario for
-every site and every branch named in the table, not one per line, with
-two exceptions by nature: the rollback line is a payload-carrying draft
-whose event is rejected (`engine/mod.rs:653-654`) and whose seeds survive
-unchanged, and the all-empty line is a seedless capture (the empty form)
-followed by a build:
+**Golden Lamarckian corpus.** A seeded `v3-core` unit test over a fixed
+multi-node Lamarckian genome and parent weights: each scenario captures,
+applies one named operator or engine event, builds the child weights and
+hashes the child genome's `Debug` text with the weights' bits. It asserts
+at least one payload-carrying applied scenario for every site and branch
+in the table (two by nature: the rollback is a payload-carrying draft whose
+event is rejected, `engine/mod.rs:653-654`, seeds unchanged; the all-empty
+line is a seedless capture followed by a build):
 
 | Coverage line | Today's write site |
 | --- | --- |
@@ -242,8 +239,6 @@ followed by a build:
 | `Prune` reindex; recruitment and routing sink pushes | `input_ref/mod.rs:391, :374`, `routing.rs:82` |
 | topology: `CopyNode`, `CopyMeshBackwardSlice`, `CopyMeshForwardSlice`, `RemoveNode`, `Swap` | `reproduction.rs:938` scenarios |
 | one rollback (`ParseabilityViolation`); one all-empty parent | `engine/tests.rs:1757`; `cgp_reproduction.rs:9-17` |
-
-Its hashes are pinned as constants recorded on main.
 
 ## Verification
 
@@ -263,10 +258,12 @@ Its hashes are pinned as constants recorded on main.
       scaffold (one row per graph node, one empty slice per compute node),
       so does a child of a VM-only parent whose batch created a Graph
       node, and a seeded founder's stays empty.
-- [x] `cargo test --workspace` -> every existing pin unchanged (Inputs
+- [ ] `cargo test --workspace` -> every existing pin unchanged (Inputs
       table); `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
       constructors and destructuring patterns; `grep -rn birth_weights
-      crates frontend` -> none; `grep -rn 'compute_nodes = \|output_sinks =
+      crates frontend` -> only the legacy `genome_identity` string in
+      `v3-cli/src/bench/mutation_effects.rs:346` (world-set deterministic
+      output, text unchanged); `grep -rn 'compute_nodes = \|output_sinks =
       ' crates` -> only inside the container module.
 - [ ] `make check` -> 0, `make rust-test-slow` -> 0 with recorded readings
       unchanged.
