@@ -273,7 +273,7 @@ Its hashes are pinned as constants recorded on main.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred.
-- [ ] Gate profile: summary at
+- [x] Gate profile: summary at
       `docs/progress/features/t25-f01-edge-container-constructors-and-birth-seeds.json`,
       deterministic blocks identical to the epoch, no new full report
       staged.
@@ -288,7 +288,7 @@ byte-identical; a severe flag, a threshold crossing or any deterministic
 difference is a defect to fix, not a cost to accept. Predeclared re-pins:
 none.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Exit 0, `severe=false`, deterministic block equal to the epoch.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f01-edge-container-constructors-and-birth-seeds.json).
