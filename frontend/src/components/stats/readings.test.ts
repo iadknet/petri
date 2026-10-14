@@ -132,7 +132,7 @@ describe("bandVerdict", () => {
 			sample(0, { population: 200 }),
 			sample(10, { population: 150, birthsTotal: 10, deathsTotal: 60 }),
 		];
-		expect(bandVerdict("world", samples)).toEqual({
+		expect(bandVerdict("world", samples)).toMatchObject({
 			short: "Shrinking · \u221250 creatures",
 			full: "Shrinking · \u221250 creatures in 10 ticks · 1.00 born vs 6.00 died per tick",
 		});
@@ -166,7 +166,7 @@ describe("bandVerdict", () => {
 			sample(0, { lineagesEffective: 10, generationMean: 2 }),
 			sample(100, { lineagesEffective: 6, generationMean: 9, lineagesAlive: 8 }),
 		];
-		expect(bandVerdict("evolution", samples)).toEqual({
+		expect(bandVerdict("evolution", samples)).toMatchObject({
 			short: "Lineages narrowing · +7.0 generations",
 			full: "Lineages narrowing · +7.0 generations in 100 ticks · 6.0 effective of 8 alive",
 		});
@@ -177,10 +177,23 @@ describe("bandVerdict", () => {
 			sample(0),
 			sample(1, { weightChangesTotal: 25, memoryWritesTotal: 0, creatureTicksTotal: 100 }),
 		];
-		expect(bandVerdict("brains", samples)).toEqual({
+		expect(bandVerdict("brains", samples)).toMatchObject({
 			short: "Weights changing · memory unused",
 			full: "Weights changing · memory unused · 0.25 weight changes and 0 memory writes per creature-tick",
 		});
+	});
+});
+
+describe("verdict words for tab labels", () => {
+	it("gives each band one word", () => {
+		const shrinking = [sample(0, { population: 200 }), sample(10, { population: 150 })];
+		expect(bandVerdict("world", shrinking).word).toBe("Shrinking");
+		const narrowing = [sample(0, { lineagesEffective: 10 }), sample(10, { lineagesEffective: 6 })];
+		expect(bandVerdict("evolution", narrowing).word).toBe("Narrowing");
+		const learning = [sample(0), sample(1, { weightChangesTotal: 5, creatureTicksTotal: 100 })];
+		expect(bandVerdict("brains", learning).word).toBe("Weights changing");
+		expect(bandVerdict("brains", [sample(0), sample(1, { population: 0 })]).word).toBe("Extinct");
+		expect(bandVerdict("world", []).word).toBe("Waiting");
 	});
 });
 

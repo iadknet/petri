@@ -4,19 +4,18 @@ import { initializePausedSimulation, selectors } from "./common.ts";
 
 export const scenarioStatsAndPanels: ScenarioDefinition = {
 	id: "E2E-04",
-	description: "Shows the stats census, collapses the dock and toggles config/stats panel visibility",
+	description: "Opens stats on Mechanics, switches to World, collapses the dock and toggles config/stats panel visibility",
 	run: async (ctx) => {
 		await initializePausedSimulation(ctx, 6060, 40);
 
+		await ctx.browser.waitText("Deaths by cause");
+		await ctx.browser.click(selectors.statsTabWorld);
 		await ctx.browser.waitText("Creatures alive");
-		await ctx.browser.waitText("Founder lineages");
-		await ctx.browser.waitText("Weight changes");
 
 		await ctx.browser.click(selectors.statsCollapse);
 		await waitForCondition(async () => {
 			return (await ctx.browser.getCount(selectors.statsBody)).count === 0;
 		}, "stats body hidden after collapse", 10_000);
-		assert((await ctx.browser.getCount(selectors.statsVerdicts)).count > 0, "verdict strip stays visible when collapsed");
 		await ctx.browser.click(selectors.statsCollapse);
 		await waitForCondition(async () => {
 			return (await ctx.browser.getCount(selectors.statsBody)).count > 0;

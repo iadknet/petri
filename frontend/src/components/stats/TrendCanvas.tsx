@@ -6,6 +6,7 @@ import { type Point, sampleX, trendGeometry, xToIndex } from "./trend.ts";
 const SURFACE = "#0f172a";
 const SECONDARY = "#94a3b8";
 const SCRUB = "#38bdf8";
+const BASELINE = "#1e293b";
 
 function strokeRuns(ctx: CanvasRenderingContext2D, runs: Point[][]) {
 	ctx.beginPath();
@@ -35,34 +36,33 @@ function pointAt(runs: Point[][], x: number): Point | undefined {
 	return undefined;
 }
 
-/** One row's trend: the reading's line and wash, an optional grey second line, the scrub mark. */
+/** A reading's chart: its line and wash, an optional grey second line, the scrub mark. Fills a positioned parent. */
 export const TrendCanvas = memo(function TrendCanvas({
 	values,
 	secondary,
 	color,
 	scrubIndex,
 	onScrub,
-	height = 30,
 }: {
 	values: (number | null)[];
 	secondary?: (number | null)[];
 	color: string;
 	scrubIndex: number | null;
 	onScrub: (index: number | null) => void;
-	height?: number;
 }) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const [width, setWidth] = useState(0);
+	// The chart fills whatever box its parent gives it.
+	const [{ width, height }, setSize] = useState({ width: 0, height: 0 });
 	const [dpr, setDpr] = useState(currentDevicePixelRatio);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-		setWidth(canvas.clientWidth);
+		setSize({ width: canvas.clientWidth, height: canvas.clientHeight });
 		if (typeof ResizeObserver === "undefined") return;
 		const ro = new ResizeObserver((entries) => {
 			const entry = entries[0];
-			if (entry) setWidth(entry.contentRect.width);
+			if (entry) setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
 		});
 		ro.observe(canvas);
 		return () => ro.disconnect();
@@ -72,7 +72,7 @@ export const TrendCanvas = memo(function TrendCanvas({
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
-		if (!canvas || width <= 0) return;
+		if (!canvas || width <= 0 || height <= 0) return;
 		canvas.width = Math.round(width * dpr);
 		canvas.height = Math.round(height * dpr);
 		const ctx = canvas.getContext("2d");
@@ -83,6 +83,8 @@ export const TrendCanvas = memo(function TrendCanvas({
 		// Leave room on the right so the end dot and its ring are never clipped.
 		const plotWidth = Math.max(width - 6, 1);
 		const geo = trendGeometry(values, secondary, plotWidth, height, NOISE_FLOOR);
+		ctx.fillStyle = BASELINE;
+		ctx.fillRect(0, height - 1, width, 1);
 		ctx.lineJoin = "round";
 		ctx.lineCap = "round";
 
@@ -128,8 +130,7 @@ export const TrendCanvas = memo(function TrendCanvas({
 	return (
 		<canvas
 			ref={canvasRef}
-			className="block w-full cursor-crosshair touch-none"
-			style={{ height: `${height}px` }}
+			className="absolute inset-0 block h-full w-full cursor-crosshair touch-none"
 			onPointerMove={(event) => {
 				const rect = event.currentTarget.getBoundingClientRect();
 				onScrub(xToIndex(event.clientX - rect.left, Math.max(rect.width - 6, 1), values.length));

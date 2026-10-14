@@ -78,7 +78,7 @@ export const selectors = {
 	startupFertilityLayer0FbmSeed: '[data-testid="startup-field-fertility-layer-0-fbm-seed"]',
 	configPanel: '[data-testid="config-panel"]',
 	statsPanel: '[data-testid="stats-panel"]',
-	statsVerdicts: '[data-testid="stats-verdicts"]',
+	statsTabWorld: "#stats-tab-world",
 	statsCollapse: '[aria-controls="stats-panel-body"][aria-expanded]',
 	statsBody: "#stats-panel-body",
 	worldCanvas: '[data-testid="world-canvas"]',

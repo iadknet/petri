@@ -305,6 +305,8 @@ function lastValue(values: (number | null)[] | undefined): number | null {
 }
 
 export interface Verdict {
+	/** One word for a tab label. */
+	word: string;
 	/** Answer first: a trend word and one figure, short enough for the collapsed strip. */
 	short: string;
 	/** The short form plus the figures behind it. */
@@ -325,7 +327,7 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 	const last = samples.at(-1);
 	if (!first || !last) {
 		const waiting = "Waiting for the first tick";
-		return { short: waiting, full: waiting };
+		return { word: "Waiting", short: waiting, full: waiting };
 	}
 	const span = last.tick - first.tick;
 	const over = span > 0 ? ` in ${span.toLocaleString("en-US")} ticks` : "";
@@ -335,7 +337,7 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 
 	if (last.population === 0) {
 		const extinct = band === "world" ? "Extinct · no creatures alive" : "No creatures alive";
-		return { short: extinct, full: extinct };
+		return { word: "Extinct", short: extinct, full: extinct };
 	}
 	if (band === "world") {
 		const trend = trendWord(first.population, last.population, [
@@ -344,6 +346,7 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 			"Holding steady",
 		]);
 		const short = `${trend} · ${signed(last.population - first.population, fixed(0))} creatures`;
+		const word = trend === "Holding steady" ? "Steady" : trend;
 		const born = whole(
 			(s) => s.birthsTotal,
 			(s) => s.tick,
@@ -352,8 +355,9 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 			(s) => s.deathsTotal,
 			(s) => s.tick,
 		);
-		if (born == null || died == null) return { short, full: `${short}${over}` };
+		if (born == null || died == null) return { word, short, full: `${short}${over}` };
 		return {
+			word,
 			short,
 			full: `${short}${over} · ${fixed(2)(born)} born vs ${fixed(2)(died)} died per tick`,
 		};
@@ -366,6 +370,7 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 		]);
 		const short = `${trend} · ${signed(last.generationMean - first.generationMean, fixed(1))} generations`;
 		return {
+			word: trend.replace("Lineages ", "").replace(/^./, (c) => c.toUpperCase()),
 			short,
 			full: `${short}${over} · ${fixed(1)(last.lineagesEffective)} effective of ${fixed(0)(last.lineagesAlive)} alive`,
 		};
@@ -375,10 +380,12 @@ export function bandVerdict(band: BandId, samples: StatsSample[]): Verdict {
 	const memory = whole((s) => s.memoryWritesTotal, creatureTicks);
 	if (weights == null || memory == null) {
 		const waiting = "Waiting for a few ticks of mesh work";
-		return { short: waiting, full: waiting };
+		return { word: "Waiting", short: waiting, full: waiting };
 	}
-	const short = `${weights > 0 ? "Weights changing" : "Weights static"} · ${memory > 0 ? "memory in use" : "memory unused"}`;
+	const word = weights > 0 ? "Weights changing" : "Weights static";
+	const short = `${word} · ${memory > 0 ? "memory in use" : "memory unused"}`;
 	return {
+		word,
 		short,
 		full: `${short} · ${sig2(weights)} weight changes and ${sig2(memory)} memory writes per creature-tick`,
 	};
