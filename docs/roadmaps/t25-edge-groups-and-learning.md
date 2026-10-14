@@ -29,7 +29,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 ## Executable Features
 
-- [ ] **T25.F01 — Edge Container, Constructors and Birth Seeds** — Depends on: None
+- [x] **T25.F01 — Edge Container, Constructors and Birth Seeds** — Depends on: None
   - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one captures what a child is born with, and one builds the running brain from it, with no behavior change.
 - [ ] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
   - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, a ring gene costs its eight synapses, and the founder is re-anchored.

@@ -1,6 +1,6 @@
 # T25.F01 — Edge Container, Constructors and Birth Seeds
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-14
 **Feature**: T25.F01
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -252,7 +252,7 @@ line is a seedless capture followed by a build):
       whose batch created a Graph node, give a child whose
       `plasticity_weights` before its first visit is today's scaffold; a
       seeded founder's stays empty.
-- [ ] `cargo test --workspace` -> every existing pin unchanged (Inputs
+- [x] `cargo test --workspace` -> every existing pin unchanged (Inputs
       table).
 - [x] `grep -rn 'GraphEdge {\|ComputeNode {' crates` -> only the
       constructors and destructuring patterns; `grep -rn birth_weights
@@ -260,7 +260,7 @@ line is a seedless capture followed by a build):
       `v3-cli/src/bench/mutation_effects.rs:346` (world-set deterministic
       output, text unchanged); `grep -rn 'compute_nodes = \|output_sinks =
       ' crates` -> only inside the container module.
-- [ ] `make check` -> 0, `make rust-test-slow` -> 0 with recorded readings
+- [x] `make check` -> 0, `make rust-test-slow` -> 0 with recorded readings
       unchanged.
 - [x] Mutation gate (fresh, `e9bd8714`): 562 tested, 20 missed, 424
       caught, 116 unviable, 2 timeouts; survivors in the table below.
@@ -321,9 +321,9 @@ none.
       consume the seeds.
 - [x] No struct literal builds an edge, a compute node or a def outside the
       constructors, in any crate or test.
-- [ ] No behavior change: every pin, draw-stream tail, corpus hash and
+- [x] No behavior change: every pin, draw-stream tail, corpus hash and
       gate deterministic block is unchanged.
-- [ ] `make check`, the mutation gate and the slow tier pass.
+- [x] `make check`, the mutation gate and the slow tier pass.
 
 ## Notes for AI Agents
 
@@ -337,3 +337,4 @@ none.
 - Deferred: (review P3, fixed at `71325268`) `GraphEdge` is 12 bytes, not 8.
 - Decision: (design note D11) no type or module is renamed; `cgp.rs` splits
   into submodules with its public paths re-exported.
+- Cost: 3 passes, 6 consults; 5 resumes; 4 rounds, ready; P1/P2/P3 1/1/1.
