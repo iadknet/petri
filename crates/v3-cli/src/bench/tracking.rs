@@ -249,7 +249,7 @@ pub struct EnergyFlowTracking {
 impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
     fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
         Self {
-            definition: "applied-energy-flows-v2".into(),
+            definition: "applied-energy-flows-v3".into(),
             food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
             action_charges: ActionChargeTracking {
                 noop: six(flows.action_charges.noop),
@@ -638,7 +638,7 @@ impl WorldTracking {
                 shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
             }),
             mortality: Some(MortalityTracking {
-                definition: "applied-mortality-v2".into(),
+                definition: "applied-mortality-v3".into(),
                 deaths_total: stats.mortality.deaths_total,
                 by_cause: v3_core::simulation::energy_accounting::DeathCause::ALL
                     .into_iter()

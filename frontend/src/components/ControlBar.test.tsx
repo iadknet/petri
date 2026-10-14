@@ -117,7 +117,7 @@ const MOCK_CONFIG: SimulationConfig = {
 	mutation: {
 		structured_heritable_refinement: true,
 		neutral_input_recruitment: "WholeFamily",
-		per_unit_rate: 0.005,
+		per_unit_rate: 0.0060625,
 		mesh_layer_probability: 0.2,
 		large_copy_weight_percent: 25,
 		genome_size_cap: 1200,
