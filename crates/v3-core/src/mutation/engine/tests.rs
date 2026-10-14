@@ -353,6 +353,44 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
 }
 
 #[test]
+fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_graph() {
+    let food = InputReference::World(WorldInputKey::FoodHere {
+        type_idx: crate::config::OrdinaryFoodTypeId::default(),
+    });
+    let barrier = InputReference::World(WorldInputKey::NeighborBarrierRing);
+    let graph_node = |id: u32, input_ref: InputReference| NodeGenome {
+        node_id: NodeId::new(id),
+        input_refs: vec![input_ref],
+        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+        targets: Vec::new(),
+    };
+    let before = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![graph_node(0, food), graph_node(1, barrier)],
+    };
+    let mut after = before.clone();
+    let BackendDef::Graph(grown) = &mut after.nodes[1].backend_def else {
+        unreachable!("node 1 is a Graph node");
+    };
+    grown.append_compute_node(crate::creature::genome::cgp::ComputeNode::new(
+        crate::creature::genome::cgp::ComputeNodeKind::Add,
+        Vec::new(),
+        None,
+    ));
+    let operator = MutationOperator::GraphAddInternalGraphNode;
+
+    assert_eq!(
+        collect_added_node_input_classes(&before, &after, operator),
+        Some(vec![MutationAddedNodeInputClass::Barrier]),
+        "node 0 did not grow, so its food input is not the added node's"
+    );
+    assert_eq!(
+        collect_added_node_world_inputs_for_operator(&before, &after, operator),
+        Some(vec![WorldInputKey::NeighborBarrierRing])
+    );
+}
+
+#[test]
 fn engine_with_probability_one_applies_events() {
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;

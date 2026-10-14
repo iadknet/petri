@@ -1227,6 +1227,22 @@ mod tests {
         assert!(copy_cgp_subgraph(&mut def, &mut rng).is_err());
     }
 
+    #[test]
+    fn copy_cgp_subgraph_walk_skips_a_source_one_past_the_last_node() {
+        // Both nodes read `ComputeNode(2)`, one past the end, and neither
+        // reads the other, so the walk finds no neighbor and copies the seed.
+        let dangling = || vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)];
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![
+                ComputeNode::new(ComputeNodeKind::Add, dangling(), None),
+                ComputeNode::new(ComputeNodeKind::Add, dangling(), None),
+            ])
+            .with_output_sinks(Vec::new());
+        let mut rng = test_rng();
+        copy_cgp_subgraph(&mut def, &mut rng).unwrap();
+        assert_eq!(def.compute_nodes().len(), 3);
+    }
+
     // ── Edge tests ──────────────────────────────────────────────────────────
 
     #[test]

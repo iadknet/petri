@@ -103,6 +103,50 @@ fn authored_and_inert_pairs_match_in_size_and_differ_only_in_weights() {
 }
 
 #[test]
+fn authored_structure_counts_the_edges_and_nodes_the_controller_adds() {
+    use super::controllers::VOTE_NODE;
+    use crate::creature::genome::BackendDef;
+    let vote_graph = |genome: &crate::creature::genome::CreatureGenome| {
+        let BackendDef::Graph(graph) = &genome.nodes[VOTE_NODE].backend_def else {
+            panic!("the vote node is a Graph node");
+        };
+        (graph.edges().count(), graph.compute_nodes().len())
+    };
+    let (founder_edges, founder_nodes) = vote_graph(&founder());
+    for family in Family::ALL {
+        let (authored, structure) = controller(&founder(), family, false);
+        let (edges, nodes) = vote_graph(&authored);
+        assert!(structure.edges > 0, "{family:?}");
+        assert_eq!(
+            structure.edges as usize,
+            edges - founder_edges,
+            "{family:?}"
+        );
+        assert_eq!(
+            structure.compute_nodes as usize,
+            nodes - founder_nodes,
+            "{family:?}"
+        );
+    }
+    let (_, vector) = controller(&founder(), Family::Vector, false);
+    assert!(vector.compute_nodes > 0);
+}
+
+/// `A_vector` reaches its vote sinks only through compute nodes, so a connect
+/// child keeps the authored channels on its vote surface only when the
+/// backward walk from the sinks reads compute-node inputs.
+#[test]
+fn connect_step_sees_authored_channels_behind_compute_nodes() {
+    let (wired, _) = controller(&founder(), Family::Vector, false);
+    let reading = discovery(&wired, Family::Vector, &SimulationConfig::default(), 20);
+    assert_eq!(reading.connect.proposals, 20);
+    assert!(
+        reading.connect.hits > 10,
+        "most single-event children keep the authored wiring: {reading:?}"
+    );
+}
+
+#[test]
 fn applicability_names_the_two_null_references() {
     assert!(!applicable(Family::Ring, ORCHARDS));
     assert!(!applicable(Family::Scalar, CANYON));

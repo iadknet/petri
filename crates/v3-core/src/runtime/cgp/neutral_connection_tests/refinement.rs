@@ -160,8 +160,11 @@ fn local_scalar_exceptions_sparse_deletion_copy_serde_and_pruning_persist() {
                     < 1e-7
             );
         }
+        let dense_count = graph(&genome.nodes[0]).edges().count();
         remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();
         let sparse_count = graph(&genome.nodes[0]).edges().count();
+        // Each removal must shrink the graph, or the drain loop below spins.
+        assert_eq!(sparse_count, dense_count - 1);
         refine(&mut genome.nodes[0], &mut rng).unwrap();
         assert_eq!(graph(&genome.nodes[0]).edges().count(), sparse_count);
         let original_node = genome.nodes[0].clone();
