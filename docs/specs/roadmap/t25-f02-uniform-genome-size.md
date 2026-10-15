@@ -1,6 +1,6 @@
 # T25.F02 — Uniform Genome Size
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-14
 **Feature**: T25.F02
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -290,18 +290,18 @@ The counterfactual decomposition at tick 100 reads `E_new` within 0.003 of `E_ol
 
 ## Success Criteria
 
-- [ ] An edge costs one genome unit on either surface, a wired sink costs
+- [x] An edge costs one genome unit on either surface, a wired sink costs
       nothing of itself, a projection costs nine; the founder is 80 units
       and `FOUNDER_GENOME_SIZE_UNITS` is 80 with multiplier 1.0 and
       gestation 1 tick.
-- [ ] The per-unit rate default is `0.0060625` at every site, and the
+- [x] The per-unit rate default is `0.0060625` at every site, and the
       founder requests 0.485 events per birth.
-- [ ] No learning cost knob, parameter, deduction, death cause, flow,
+- [x] No learning cost knob, parameter, deduction, death cause, flow,
       metric row, trace attribute, bench or frontend field remains; the
       zero floor is its own pinned step; the split exclusion is gone.
-- [ ] Every moved pin is in the predeclared table with its cause and
+- [x] Every moved pin is in the predeclared table with its cause and
       restoring check; no unlisted pin moved.
-- [ ] `make check`, the mutation gate, the slow tier, gate, goal, goal-long
+- [x] `make check`, the mutation gate, the slow tier, gate, goal, goal-long
       and the rate arm ran and their readings are recorded.
 
 ## Notes for AI Agents
@@ -312,3 +312,11 @@ The counterfactual decomposition at tick 100 reads `E_new` within 0.003 of `E_ol
   with one extra goal-long arm at rate 0.005 (D25).
 - Decision: (design note, facet 8) a surviving `RingProjection` costs nine
   units in F02 so that F03's replacement is size-neutral.
+- Decision: (user, 2026-10-14) implementer passes after the first three ran
+  at effort high; the gate `decided_passes` and `pass_cap_hits` severes were
+  accepted and the gate and goal-worlds epochs re-pinned to this feature at
+  710d54a8, with the first `goal_worlds_long` epoch at the merge-base run.
+- Cost: `/usage` totals not recorded (user command); 8 implementer passes
+  (advisor consults 3, 3, 2, 2, 2, 2, 2, 2), 8 spec-owner resumes after the
+  Plan step, 4 Codex challenge rounds (final `ready`), Codex review
+  P1=0 P2=1 P3=2, all fixed at 14802d48; `make check` at 7478f3f0.
