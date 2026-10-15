@@ -79,7 +79,7 @@ function collectEdgesFromSources(
 				id: `${edgePrefix}:${i}`,
 				sourceId,
 				targetId,
-				weight: edge.weight,
+				weight: edge.own_weight,
 				edgeType,
 				isBackward,
 			});
@@ -91,7 +91,7 @@ function collectEdgesFromSources(
 					id: `${edgePrefix}:${i}`,
 					sourceId: inId,
 					targetId,
-					weight: edge.weight,
+					weight: edge.own_weight,
 					edgeType,
 					isBackward: false,
 				});

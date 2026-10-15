@@ -38,7 +38,7 @@ pub(crate) fn ensure_hebbian_weights(
     // Lazily initialize weights for Hebbian nodes from genome.
     for (i, cnode) in def.compute_nodes().iter().enumerate() {
         if cnode.plasticity.is_some() && node_weights[i].is_empty() && !cnode.inputs.is_empty() {
-            let weights: Vec<f32> = cnode.inputs.iter().map(|edge| edge.weight()).collect();
+            let weights: Vec<f32> = cnode.inputs.iter().map(|edge| edge.own_weight()).collect();
             node_weights[i] = weights.into_boxed_slice();
         }
     }
@@ -186,7 +186,7 @@ pub(crate) fn collect_weighted_inputs_hebbian(
             shared_memory,
             prev_shared_memory,
         );
-        source_value * effective_weight(edge.weight(), learned_weights, edge_idx)
+        source_value * effective_weight(edge.own_weight(), learned_weights, edge_idx)
     }));
 }
 

@@ -1025,7 +1025,7 @@ mod tests {
                 };
                 assert_eq!(
                     result[idx][0][0],
-                    def.compute_nodes()[0].inputs[0].weight() + 10.0
+                    def.compute_nodes()[0].inputs[0].own_weight() + 10.0
                 );
                 assert!(def.birth_seeds().is_none());
             }

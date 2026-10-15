@@ -16,7 +16,9 @@ pub const SUMMARY_KIND: &str = "petri-lab-summary";
 pub const SUMMARY_VERSION: u32 = 4;
 /// The oldest summary version `report` still renders.
 pub const SUMMARY_VERSION_MIN: u32 = 2;
-pub const GENOME_FORMAT: u32 = 1;
+/// Genome-file format: 2 since T25.F03 (`own_weight`, edge membership and
+/// groups replace `weight` and ring projections).
+pub const GENOME_FORMAT: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Summary {

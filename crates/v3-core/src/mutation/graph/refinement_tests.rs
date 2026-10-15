@@ -154,7 +154,7 @@ fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_group()
                 ref_idx: 1,
                 sub_idx: 0,
             },
-            sink.inputs[0].weight(),
+            sink.inputs[0].own_weight(),
         );
     });
     assert_eq!(all_groups(&node).len(), 1);
@@ -274,13 +274,13 @@ proptest! {
         if count < 2 { prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget)); prop_assert_eq!(node, before); }
         else {
             prop_assert!(result.is_ok());
-            let old: Vec<_> = graph(&before).edges().map(|e| e.weight()).collect();
-            let new: Vec<_> = graph(&node).edges().map(|e| e.weight()).collect();
+            let old: Vec<_> = graph(&before).edges().map(|e| e.own_weight()).collect();
+            let new: Vec<_> = graph(&node).edges().map(|e| e.own_weight()).collect();
             prop_assert_eq!(old.len(), new.len());
             let norm = old.iter().zip(&new).map(|(a,b)| (f64::from(*b) - f64::from(*a)).powi(2)).sum::<f64>().sqrt();
             prop_assert!(norm <= 0.100001);
             for i in 1..count { prop_assert!(((new[i]-new[0]) - (old[i]-old[0])).abs() < 1e-7); }
-            let weights: Vec<f32> = graph(&before).output_sinks().iter().flat_map(|s| s.inputs.iter().map(|e| e.weight())).collect();
+            let weights: Vec<f32> = graph(&before).output_sinks().iter().flat_map(|s| s.inputs.iter().map(|e| e.own_weight())).collect();
             edit_sinks(graph_mut(&mut node), |sinks| {
                 for (edge, weight) in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()).zip(weights) {
                     *edge = reweighted(*edge, weight);
@@ -403,9 +403,9 @@ proptest! {
         let result = apply_step(graph_mut(&mut node), &group, scalar);
         if result.is_err() { prop_assert_eq!(result, Err(MutationSkipReason::NumericProposalRejected)); prop_assert_eq!(node, before); }
         else {
-            let actual = graph(&node).edges().zip(graph(&before).edges()).map(|(a,b)| (f64::from(a.weight())-f64::from(b.weight())).powi(2)).sum::<f64>().sqrt();
+            let actual = graph(&node).edges().zip(graph(&before).edges()).map(|(a,b)| (f64::from(a.own_weight())-f64::from(b.own_weight())).powi(2)).sum::<f64>().sqrt();
             prop_assert!(actual <= 0.100001);
-            prop_assert!(graph(&node).edges().all(|e| e.weight().is_finite()));
+            prop_assert!(graph(&node).edges().all(|e| e.own_weight().is_finite()));
         }
     }
 }
@@ -414,11 +414,11 @@ proptest! {
 fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
     for scalar in [-0.1, 0.1] {
         let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
-        let old: Vec<_> = graph(&node).edges().map(|e| e.weight()).collect();
+        let old: Vec<_> = graph(&node).edges().map(|e| e.own_weight()).collect();
         let group = all_groups(&node).remove(0);
         apply_step(graph_mut(&mut node), &group, scalar).unwrap();
         for (edge, old) in graph(&node).edges().zip(old) {
-            assert_eq!(edge.weight(), old + scalar / 2.0);
+            assert_eq!(edge.own_weight(), old + scalar / 2.0);
         }
         // The normalization's maximum is accepted at every permitted ring size,
         // including the tiny rounding excess covered by the numeric tolerance.
@@ -438,7 +438,7 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
             apply_step(graph_mut(&mut node), &group, scalar).unwrap();
             let norm = graph(&node)
                 .edges()
-                .map(|e| f64::from(e.weight()).powi(2))
+                .map(|e| f64::from(e.own_weight()).powi(2))
                 .sum::<f64>()
                 .sqrt();
             assert!((norm - 0.1).abs() < 1e-7, "m={count}: {norm}");
@@ -471,13 +471,13 @@ fn native_sampler_accepts_the_exact_numeric_tolerance_boundary() {
             *edge = reweighted(*edge, f32::from_bits(bits));
         }
     });
-    let before: Vec<_> = graph(&node).edges().map(|edge| edge.weight()).collect();
+    let before: Vec<_> = graph(&node).edges().map(|edge| edge.own_weight()).collect();
     let scalar = f32::from_bits(0x3dcc_cb75);
     let increment = scalar / (before.len() as f32).sqrt();
 
     refine(&mut node, &mut StepRng::new(0xffff_2600, 0)).unwrap();
 
-    let after: Vec<_> = graph(&node).edges().map(|edge| edge.weight()).collect();
+    let after: Vec<_> = graph(&node).edges().map(|edge| edge.own_weight()).collect();
     let norm = before
         .iter()
         .zip(&after)
@@ -514,7 +514,7 @@ proptest! {
             let increment=rng.gen_range(-0.1f32..=0.1)/(count as f32).sqrt();
             for (old,new) in graph(&before).edges().zip(graph(&node).edges()) {
                 prop_assert_eq!(old.source(),new.source());
-                prop_assert_eq!(new.weight(),old.weight()+increment);
+                prop_assert_eq!(new.own_weight(),old.own_weight()+increment);
             }
             prop_assert_eq!(graph(&node).edges().count(),count);
         }

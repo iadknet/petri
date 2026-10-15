@@ -55,7 +55,7 @@ pub(crate) fn take_graph_plasticity_weights(def: &mut CgpGraphBackendDef) -> Vec
                         .and_then(|values| values.get(edge))
                         .copied()
                         .flatten()
-                        .unwrap_or(genomic.weight())
+                        .unwrap_or(genomic.own_weight())
                 })
                 .collect()
         })

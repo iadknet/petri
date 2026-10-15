@@ -12,6 +12,7 @@ use crate::creature::genome::vote::{
 
 mod container;
 mod edge;
+mod group;
 #[cfg(test)]
 pub(crate) mod test_support;
 
@@ -19,7 +20,8 @@ pub use container::{
     BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList, EdgeMut, EdgeOccurrence,
     EdgeSurface, OutputSink, OutputSinks,
 };
-pub use edge::{GraphEdge, GraphSource};
+pub use edge::{GraphEdge, GraphSource, Membership};
+pub use group::{compose, Group, GroupId, Shape};
 
 // ── Compute layer ───────────────────────────────────────────────────────────
 
@@ -119,6 +121,7 @@ pub enum OutputSinkKind {
 /// not an edge of any sink; its weight, offset, kind and existence change only
 /// as a unit.
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RingProjection {
     pub ref_idx: u16,
     pub kind: DirectedVoteKind,

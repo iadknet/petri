@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha5 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha6 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha5 protocol-version posture;
+- v3alpha6 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,10 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha5"`.
-- Breaking payload changes require protocol-version bump. `v3alpha5`
+- Canonical value: `"v3alpha6"`.
+- Breaking payload changes require protocol-version bump. `v3alpha6`
+  (T25.F03) renamed every genome edge's `weight` to `own_weight` and gave a
+  graph genome edge memberships and `groups`. `v3alpha5`
   (T11.F30) widened every vote vector to 30 (the three kind drives), added
   each pass's `best` and `bars`, the tick's starting `heading` and the
   creature detail's `heading`. `v3alpha4`
@@ -97,7 +99,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha5 shape):
+Request (conceptual v3alpha6 shape):
 
 ```json
 {
@@ -232,7 +234,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -253,7 +255,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "running",
   "tick": 123
 }
@@ -268,7 +270,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "paused",
   "tick": 123
 }
@@ -297,7 +299,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -310,7 +312,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -364,7 +366,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -413,7 +415,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "paused",
   "config": {
     "population": {
@@ -556,7 +558,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -587,7 +589,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -600,7 +602,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -611,7 +613,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -705,7 +707,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -743,7 +745,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha5"`. |
+| `protocol_version` | string | Always `"v3alpha6"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -797,7 +799,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -905,7 +907,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha5
+  performance, but must document the throttle policy. The default v3alpha6
   behavior is per-tick emission.
 
 Ordering rules:
@@ -922,7 +924,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha5",
+  "protocol_version": "v3alpha6",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -948,7 +950,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha5)
+## 7. Out-of-Scope API Surfaces (v3alpha6)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -970,7 +972,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha5 server transport/API semantics.
+This file remains canonical for v3alpha6 server transport/API semantics.
 
 ---
 

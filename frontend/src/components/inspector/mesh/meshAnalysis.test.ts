@@ -30,7 +30,7 @@ function makeGenome(): CreatureGenome {
 								inputs: [
 									{
 										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
-										weight: 1,
+										own_weight: 1,
 									},
 								],
 							},
@@ -38,7 +38,7 @@ function makeGenome(): CreatureGenome {
 						output_sinks: [
 							{
 								kind: { RouterGate: 0 },
-								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+								inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
 							},
 						],
 					},

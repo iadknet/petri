@@ -11,6 +11,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use super::edge::{GraphEdge, GraphSource};
+use super::group::Group;
 use super::{
     ComputeNodeKind, DirectedVoteKind, OutputSinkKind, RingProjection, CUSTOM_OUTPUT_COUNT,
     FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
@@ -88,6 +89,7 @@ read_only_list!(
 
 /// A single compute node in the graph backend.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComputeNode {
     pub kind: ComputeNodeKind,
     pub inputs: EdgeList,
@@ -113,6 +115,7 @@ impl ComputeNode {
 /// Fixed structural output — one per target slot.
 /// Kind is NOT mutated; only inputs (edges) change via mutation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OutputSink {
     pub kind: OutputSinkKind,
     pub inputs: EdgeList,
@@ -183,6 +186,7 @@ impl BirthSeeds {
 
 /// CGP-style graph backend definition.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CgpGraphBackendDef {
     /// Birth-only payload; see [`BirthSeeds`].
     #[serde(skip)]
@@ -193,6 +197,10 @@ pub struct CgpGraphBackendDef {
     /// Ring projections (T11.F31), in genome order; omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub projections: Vec<RingProjection>,
+    /// Edge-group records (T25.F03), indexed by `GroupId`; omitted from JSON
+    /// when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    groups: Vec<Group>,
 }
 
 // Keep the birth payload out of diagnostic genome identity as well as
@@ -203,12 +211,10 @@ impl fmt::Debug for CgpGraphBackendDef {
         debug
             .field("compute_nodes", &self.compute_nodes)
             .field("output_sinks", &self.output_sinks);
-        // Omitted when empty, so a genome without projections keeps the
-        // fingerprint it had before T11.F31.
         if !self.projections.is_empty() {
             debug.field("projections", &self.projections);
         }
-        debug.finish()
+        debug.field("groups", &self.groups).finish()
     }
 }
 
@@ -217,6 +223,7 @@ impl PartialEq for CgpGraphBackendDef {
         self.compute_nodes == other.compute_nodes
             && self.output_sinks == other.output_sinks
             && self.projections == other.projections
+            && self.groups == other.groups
     }
 }
 
@@ -249,7 +256,7 @@ impl EdgeMut<'_> {
     /// Set the edge's weight; its seed is cleared.
     pub fn set_weight(&mut self, weight: f32) {
         self.def.clear_seed(self.occurrence);
-        self.def.edge_slot(self.occurrence).weight = weight;
+        self.def.edge_slot(self.occurrence).own_weight = weight;
         self.def.debug_assert_seed_shape();
     }
 }
@@ -288,6 +295,7 @@ impl CgpGraphBackendDef {
             compute_nodes: ComputeNodes::default(),
             output_sinks: OutputSinks(output_sinks),
             projections: Vec::new(),
+            groups: Vec::new(),
         }
     }
 
@@ -382,6 +390,13 @@ impl CgpGraphBackendDef {
     #[must_use]
     pub fn edge_at(&self, occurrence: EdgeOccurrence) -> &GraphEdge {
         &self.surface_edges(occurrence.surface)[occurrence.index]
+    }
+
+    /// The edge-group records, indexed by `GroupId`.
+    #[inline]
+    #[must_use]
+    pub fn groups(&self) -> &[Group] {
+        &self.groups
     }
 
     /// The birth payload, when this def belongs to a reproduction draft.

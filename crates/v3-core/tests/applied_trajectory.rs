@@ -59,6 +59,13 @@
 //! rate (d04ad654... -> 2d0116fe..., gestation rate 0.0 b97baeec... ->
 //! 61b219b0...); the sampled digests run at rate 0.03 and hold; rate 0.005
 //! restores.
+//! Re-pinned by T25.F03 commit 1 (text only) after two agreeing runs: the
+//! genome JSON names `own_weight` and serializes edge memberships, which
+//! moves the two sampled digests (2f255722... -> 8cad8472..., gestation rate
+//! 0.0 a44c5736... -> e46c2e81...); the guard digests hold. The sampled
+//! digest recomputed without genome bytes is ef1d2719... (rate 0.0
+//! f01286e7...) at the merge base and after the commit, so the commit moved
+//! no simulation; reverting the key rename restores both old digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -70,11 +77,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "2f25572287f41c0b6c6cabd9a3babc6c3c0ab778a4151ef9b40c27f702f7f6a0"
+        "8cad847257ad5c9702dd166a3e600886f63de0d3031ebf66e5376ce1ad9e6240"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "a44c5736d0b50fbfc2005ca5b1220de27cb50c5cc1f5ca989095659db291b6d8"
+        "e46c2e81f9482e305e640fbd00e0c0825b39fb5fd80bb7ad027b3091ef851ba5"
     );
 }
 

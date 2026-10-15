@@ -1,6 +1,7 @@
 use proptest::prelude::*;
 
 use super::*;
+use crate::creature::genome::cgp::{compose, GroupId, Membership, Shape};
 use crate::creature::genome::HebbianRule;
 
 /// A new def field is a compile error here until it is placed inside or
@@ -12,7 +13,63 @@ fn def_fields_are_exhaustively_accounted_for() {
         compute_nodes: _,
         output_sinks: _,
         projections: _,
+        groups: _,
     } = CgpGraphBackendDef::new_with_fixed_outputs();
+    let GraphEdge {
+        source: _,
+        own_weight: _,
+        membership: _,
+    } = GraphEdge::new(leaf(0), 0.0);
+    let Group {
+        shape: _,
+        kind: _,
+        offset: _,
+        scale: _,
+    } = Group {
+        shape: Shape::Ring { ring_ref: 0 },
+        kind: DirectedVoteKind::Move,
+        offset: 0,
+        scale: 0.0,
+    };
+    let Membership { group: _ } = Membership {
+        group: GroupId::new(0),
+    };
+}
+
+#[test]
+fn a_graph_edge_is_sixteen_bytes() {
+    assert_eq!(std::mem::size_of::<GraphEdge>(), 16);
+}
+
+#[test]
+fn genome_json_uses_own_weight_and_rejects_unknown_keys() {
+    let edge: GraphEdge =
+        serde_json::from_str(r#"{"source":{"ComputeNode":0},"own_weight":0.5}"#).unwrap();
+    assert_eq!(edge, GraphEdge::new(GraphSource::ComputeNode(0), 0.5));
+    assert!(edge.membership().is_none());
+    assert!(
+        serde_json::from_str::<GraphEdge>(r#"{"source":{"ComputeNode":0},"weight":0.5}"#).is_err()
+    );
+    assert!(serde_json::from_str::<GraphEdge>(
+        r#"{"source":{"ComputeNode":0},"own_weight":0.5,"extra":1}"#
+    )
+    .is_err());
+    let def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let mut json = serde_json::to_value(&def).unwrap();
+    json["unknown"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<CgpGraphBackendDef>(json).is_err());
+    let mut json = serde_json::to_value(&def).unwrap();
+    json["output_sinks"][0]["extra"] = serde_json::json!(1);
+    assert!(serde_json::from_value::<CgpGraphBackendDef>(json).is_err());
+}
+
+#[test]
+fn compose_is_scale_times_pattern_plus_own() {
+    assert_eq!(compose(0.25, 0.5, 1.0), 0.75);
+    assert_eq!(compose(-0.5, 2.0, 0.0), -0.5);
+    // Pattern 1 is bitwise an ungrouped edge of weight `scale + own`.
+    let (own, scale) = (0.1_f32, 0.2_f32);
+    assert_eq!(compose(own, scale, 1.0).to_bits(), (scale + own).to_bits());
 }
 
 fn leaf(ref_idx: u16) -> GraphSource {
@@ -70,7 +127,7 @@ fn compute(node: usize, index: usize) -> EdgeOccurrence {
 }
 
 #[test]
-fn the_json_and_debug_text_of_a_def_are_the_vec_shapes_they_replace() {
+fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
     let def = CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Add,
@@ -83,14 +140,15 @@ fn the_json_and_debug_text_of_a_def_are_the_vec_shapes_they_replace() {
         )]);
     assert_eq!(
         serde_json::to_string(&def).unwrap(),
-        r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"weight":0.5}]}],"output_sinks":[{"kind":{"CustomOutput":0},"inputs":[{"source":{"InputLeaf":{"ref_idx":1,"sub_idx":0}},"weight":1.0}]}]}"#
+        r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.5}]}],"output_sinks":[{"kind":{"CustomOutput":0},"inputs":[{"source":{"InputLeaf":{"ref_idx":1,"sub_idx":0}},"own_weight":1.0}]}]}"#
     );
     assert_eq!(
         format!("{def:?}"),
         "CgpGraphBackendDef { compute_nodes: [ComputeNode { kind: Add, inputs: \
-         [GraphEdge { source: ComputeNode(0), weight: 0.5 }], plasticity: None }], \
-         output_sinks: [OutputSink { kind: CustomOutput(0), inputs: [GraphEdge { \
-         source: InputLeaf { ref_idx: 1, sub_idx: 0 }, weight: 1.0 }] }] }"
+         [GraphEdge { source: ComputeNode(0), own_weight: 0.5, membership: None }], \
+         plasticity: None }], output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
+         [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
+         membership: None }] }], groups: [] }"
     );
 }
 
@@ -123,7 +181,7 @@ fn a_same_source_set_keeps_the_seed_and_a_changed_one_clears_it() {
     // Sink edges carry no seeds.
     let sink = EdgeOccurrence::new(EdgeSurface::SinkInput(0), 0);
     def.edge_mut(sink).set_weight(2.0);
-    assert_eq!(def.edge_at(sink).weight(), 2.0);
+    assert_eq!(def.edge_at(sink).own_weight(), 2.0);
     assert_eq!(rows(&def)[1], vec![Some(3.0)]);
 }
 

@@ -147,10 +147,17 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 0.005 -> 0.0060625 moves both digests (default 8319452125048910825 ->
 /// 15444665604557976202, rate 0.0 3061059511661688014 ->
 /// 17948922656767329856); rate 0.005 restores them.
+/// Re-pinned by T25.F03 commit 1 (text only) after two agreeing runs: every
+/// genome's `Debug` text names `own_weight`, `membership: None` and
+/// `groups: []` (default 15444665604557976202 -> 12338524851174507136, rate
+/// 0.0 17948922656767329856 -> 10384326889006245954). The identity hashed
+/// without genome text is 18157138273463701869 (rate 0.0
+/// 7389079404809992313) at the merge base and after the commit; reverting
+/// the text change restores both old values.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 15444665604557976202);
-    assert_eq!(short_run_identity(Some(0.0)), 17948922656767329856);
+    assert_eq!(short_run_identity(None), 12338524851174507136);
+    assert_eq!(short_run_identity(Some(0.0)), 10384326889006245954);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

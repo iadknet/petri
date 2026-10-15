@@ -629,7 +629,7 @@ fn paired_graph_gates_reach_all_sensor_subvalues_without_resampling() {
             .inputs
             .last()
             .unwrap();
-        assert_eq!(edge.weight(), 1.0);
+        assert_eq!(edge.own_weight(), 1.0);
         match edge.source() {
             GraphSource::InputLeaf {
                 ref_idx: 0,

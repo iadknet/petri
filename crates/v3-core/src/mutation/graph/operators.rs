@@ -531,7 +531,7 @@ pub(crate) fn alter_edge_weight_in_def(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let occurrence = pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let mut weight = def.edge_at(occurrence).weight();
+    let mut weight = def.edge_at(occurrence).own_weight();
     perturb_weight(&mut weight, rng);
     def.edge_mut(occurrence).set_weight(weight);
     Ok(())
@@ -1060,7 +1060,7 @@ mod tests {
             def.compute_nodes()[1].inputs[0].source(),
             GraphSource::ComputeNode(0)
         );
-        assert_eq!(def.compute_nodes()[1].inputs[0].weight(), 1.0);
+        assert_eq!(def.compute_nodes()[1].inputs[0].own_weight(), 1.0);
         // Sigmoid (the consumer) shifted to index 2, now reads the new node,
         // keeping its old weight.
         assert_eq!(def.compute_nodes()[2].kind, ComputeNodeKind::Sigmoid);
@@ -1068,7 +1068,7 @@ mod tests {
             def.compute_nodes()[2].inputs[0].source(),
             GraphSource::ComputeNode(1)
         );
-        assert_eq!(def.compute_nodes()[2].inputs[0].weight(), 0.75);
+        assert_eq!(def.compute_nodes()[2].inputs[0].own_weight(), 0.75);
         // The vote sink's unrelated reference to the shifted Sigmoid is
         // remapped too.
         assert_eq!(
@@ -1129,12 +1129,12 @@ mod tests {
             def.compute_nodes()[1].inputs[0].source(),
             GraphSource::ComputeNode(0)
         );
-        assert_eq!(def.compute_nodes()[1].inputs[0].weight(), 1.0);
+        assert_eq!(def.compute_nodes()[1].inputs[0].own_weight(), 1.0);
         assert_eq!(
             def.output_sinks()[0].inputs[0].source(),
             GraphSource::ComputeNode(1)
         );
-        assert_eq!(def.output_sinks()[0].inputs[0].weight(), 2.0);
+        assert_eq!(def.output_sinks()[0].inputs[0].own_weight(), 2.0);
     }
 
     #[test]
@@ -1281,7 +1281,7 @@ mod tests {
         for _ in 0..10 {
             alter_edge_weight_in_def(&mut def, &mut rng).unwrap();
         }
-        let new_weight = def.compute_nodes()[0].inputs[0].weight();
+        let new_weight = def.compute_nodes()[0].inputs[0].own_weight();
         assert!(
             (new_weight - original_weight).abs() > f32::EPSILON,
             "weight should change after 10 mutations"
@@ -1673,7 +1673,7 @@ mod tests {
                 // Split: the pre-existing edge now sources the new identity
                 // node, which reproduces the old source exactly.
                 assert_eq!(
-                    def.output_sinks()[0].inputs[0].weight(),
+                    def.output_sinks()[0].inputs[0].own_weight(),
                     0.5,
                     "split preserves the old weight"
                 );

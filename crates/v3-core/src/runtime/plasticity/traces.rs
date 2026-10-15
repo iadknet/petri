@@ -151,7 +151,7 @@ pub(crate) fn update_eligibility_traces(
             let w = if edge_idx < weights.len() {
                 weights[edge_idx]
             } else {
-                edge.weight() // fall back to genome weight
+                edge.own_weight() // fall back to genome weight
             };
 
             // Compute activity only; reward applies the learning rate.

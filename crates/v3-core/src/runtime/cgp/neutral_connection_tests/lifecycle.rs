@@ -32,7 +32,7 @@ fn existing_weight_mutation_refines_one_zero_duplicate_without_touching_the_orig
     let before: Vec<_> = graph(&original).edges().cloned().collect();
     let after: Vec<_> = graph(&copy).edges().cloned().collect();
     assert_eq!(after.iter().zip(&before).filter(|(a, b)| a != b).count(), 1);
-    assert!(before.iter().all(|e| e.weight() == 0.0));
+    assert!(before.iter().all(|e| e.own_weight() == 0.0));
     let votes = effects(graph(&copy), &copy.input_refs, 0.25)
         .side
         .dispatch_effects()
@@ -54,7 +54,7 @@ proptest! {
         let selected = replay.gen_range(0usize..3);
         let delta = replay.gen_range(-0.1f32..=0.1);
         alter_edge_weight_in_def(graph_mut(&mut mutated), &mut rng).unwrap();
-        let weights: Vec<_> = graph(&mutated).edges().map(|e| e.weight()).collect();
+        let weights: Vec<_> = graph(&mutated).edges().map(|e| e.own_weight()).collect();
         for (index, weight) in weights.iter().enumerate() {
             prop_assert_eq!(*weight, if index == selected { delta } else { 0.0 });
         }

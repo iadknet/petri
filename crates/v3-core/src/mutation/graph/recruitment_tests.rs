@@ -217,7 +217,7 @@ proptest! {
             prop_assert_eq!(&new.inputs[..old.inputs.len()], &old.inputs[..]);
             if new.inputs.len() != old.inputs.len() { changed += 1; }
             added += new.inputs.len() - old.inputs.len();
-            prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.weight() == 0.0));
+            prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.own_weight() == 0.0));
         }
         // A ring family landing on a directed vote sink becomes one silent
         // projection in place of its edges (T11.F31).

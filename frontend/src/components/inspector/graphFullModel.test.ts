@@ -11,11 +11,11 @@ function makeGraphDef(overrides: Partial<GraphBackendDef> = {}): GraphBackendDef
 }
 
 function inputEdge(ref_idx: number, sub_idx: number, weight = 1): GraphEdge {
-	return { source: { InputLeaf: { ref_idx, sub_idx } }, weight };
+	return { source: { InputLeaf: { ref_idx, sub_idx } }, own_weight: weight };
 }
 
 function computeEdge(nodeIdx: number, weight = 1): GraphEdge {
-	return { source: { ComputeNode: nodeIdx }, weight };
+	return { source: { ComputeNode: nodeIdx }, own_weight: weight };
 }
 
 describe("buildFullGraphModel", () => {
@@ -184,7 +184,7 @@ describe("buildFullGraphModel", () => {
 	it("preserves SharedMemory input source deduplication", () => {
 		const memEdge = (slot: number, prev: boolean): GraphEdge => ({
 			source: { SharedMemory: { slot, previous: prev } },
-			weight: 1,
+			own_weight: 1,
 		});
 		const model = buildFullGraphModel(
 			makeGraphDef({

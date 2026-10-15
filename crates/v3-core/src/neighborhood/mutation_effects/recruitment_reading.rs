@@ -84,7 +84,7 @@ fn neutral_recruitment_engineering_panel() {
                         };
                         *sinks.entry(format!("{vote:?}")).or_default() += 1;
                         for edge in &new_sink.inputs[old_sink.inputs.len()..] {
-                            assert_eq!(edge.weight(), 0.0);
+                            assert_eq!(edge.own_weight(), 0.0);
                             edges += 1;
                             let channel = match edge.source() {
                                 GraphSource::InputLeaf { ref_idx, sub_idx } => {
