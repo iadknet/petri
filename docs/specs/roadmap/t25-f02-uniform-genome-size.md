@@ -195,9 +195,11 @@ re-pin table, each test comment carrying its cause and restoring check.
 | Readings table: mean genome size, mean wired sinks, mean projections, births per creature-tick and gestation per goal world at 2,000 and 40,000 ticks against the merge base and the arm; the same-population counterfactual expectations `E_old = 0.005 (x̄' + S̄ − 8P̄)`, `E_size = 0.005 x̄'`, `E_new = 0.0060625 x̄'` from the living population's checkpoint means, beside the observed requested events per birth from the report's mutation counters | readings file |
 
 - [x] Every row above ran on the final production code and its result is
-  recorded: every row ran at or after `db053a14`, the last production-code
-  change (the focused-tests row names the two crates that ran at commit 3,
-  untouched since; the slow tier ran at the test-only re-pin commit).
+  recorded: every row ran at or after `db053a14`, the last simulation-code
+  change (later commits change tests, a doc comment and the replication
+  tooltip text; `make check` passed at `b0214f2a`; the focused-tests row
+  names the two crates that ran at commit 3, untouched since; the slow tier
+  ran at the test-only re-pin commit).
 - [x] Mutation gate (one fresh run, `14802d48`): `85 mutants tested in 29m:
   2 missed, 71 caught, 11 unviable, 1 timeouts`. Fresh output rotated to
   `~/.local/share/petri-tools/mutants/t25-f02/mutants.out.old/`
