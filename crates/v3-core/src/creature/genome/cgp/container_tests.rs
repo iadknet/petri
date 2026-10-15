@@ -636,6 +636,71 @@ fn validate_graph_rejects_each_broken_invariant() {
     );
 }
 
+/// `u16::MAX` group records are the most a def may hold; one more is
+/// `TooManyGroups`. Records without members fail only later, as `EmptyGroup`.
+#[test]
+fn the_group_count_limit_is_u16_max_records() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let record = Group {
+        shape: ring(),
+        kind: DirectedVoteKind::Move,
+        offset: 0,
+        scale: 0.0,
+    };
+    def.groups = vec![record; usize::from(u16::MAX)];
+    assert_eq!(
+        def.check_local_invariants(),
+        Err(GraphInvariantViolation::EmptyGroup)
+    );
+    def.groups.push(record);
+    assert_eq!(
+        def.check_local_invariants(),
+        Err(GraphInvariantViolation::TooManyGroups)
+    );
+}
+
+/// A member reading ring channel 8 is out of shape even though its
+/// direction wraps onto the sink of channel 0.
+#[test]
+fn a_member_reading_channel_eight_is_out_of_shape() {
+    let (mut def, _) = grouped(DirectedVoteKind::Move, 3);
+    let edge = def
+        .output_sinks
+        .0
+        .iter_mut()
+        .flat_map(|sink| sink.inputs.0.iter_mut())
+        .find(|edge| {
+            edge.membership.is_some()
+                && edge.source
+                    == GraphSource::InputLeaf {
+                        ref_idx: RING,
+                        sub_idx: 0,
+                    }
+        })
+        .expect("the group's channel-0 member");
+    edge.source = GraphSource::InputLeaf {
+        ref_idx: RING,
+        sub_idx: 8,
+    };
+    assert_eq!(
+        def.check_local_invariants(),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+}
+
+/// A group-touching primitive checks the local invariants of a def with
+/// groups at its exit in debug builds.
+#[test]
+#[should_panic(expected = "graph invariant violated")]
+fn a_primitive_on_a_broken_grouped_def_is_a_debug_assertion() {
+    let (mut def, _) = grouped(DirectedVoteKind::Move, 1);
+    def.groups[0].offset = 2;
+    def.push_edge(
+        EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
+        GraphEdge::new(leaf(0), 0.25),
+    );
+}
+
 #[test]
 fn a_grouped_def_round_trips_json_and_identity_both_ways() {
     let (mut def, id) = grouped(DirectedVoteKind::StealEnergy, 6);

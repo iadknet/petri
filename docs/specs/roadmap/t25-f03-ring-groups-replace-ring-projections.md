@@ -195,9 +195,27 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       its event mix; with it, viability (29 passed), `cargo test -p v3-core`,
       clippy (0 warnings) and `cargo fmt --all --check` pass, and it passes at
       `PROPTEST_CASES=5000`. `make check` pending.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
-      summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred.
+- [x] Mutation gate, fresh `MUTANTS_ITERATE=0 make rust-mutants`:
+
+      | Item | Record |
+      | --- | --- |
+      | Fresh runs | 1 of 1, at `7221e214`; a 10:32 fresh start killed by a host crash after ~197 of 456 mutants gave no result and is not counted |
+      | Summary | `456 mutants tested in 2h: 22 missed, 347 caught, 87 unviable`; 0 timeouts |
+      | Output | `~/.local/share/petri-tools/mutants/t25-f03/mutants.out.old/` (`missed.txt`, empty `timeout.txt`; moved aside by the `MUTANTS_ITERATE=1` pass) and `fresh-run-2026-10-15.log` beside it |
+      | `apply_step` tolerance | line unchanged since the merge base, so no mutant of its constant or comparison was generated; the one `apply_step` mutant (`-> Ok(())`) was caught |
+      | `mutation/engine/mod.rs:607:22` `+`→`*` (`group_tallies`) | killed: `group_tallies_count_members_and_group_records` |
+      | `mutation/types/mod.rs:679:35` `+=`→`*=` | killed: `record_group_edits_accumulates_across_events` |
+      | `simulation/actions/reproduction.rs:476:42`, `477:36` `+=`→`*=` | killed: `a_births_detaches_and_group_removals_reach_the_run_totals` |
+      | `creature/genome/cgp/container.rs:1054:9` body→`()`, `1054:38` delete `!` (`debug_assert_groups`) | killed: `a_primitive_on_a_broken_grouped_def_is_a_debug_assertion` |
+      | `container.rs:1064:30` `>`→`==`, `>`→`>=` | killed: `the_group_count_limit_is_u16_max_records` |
+      | `container.rs:1102:36` `<`→`<=` | killed: `a_member_reading_channel_eight_is_out_of_shape` |
+      | `creature/drives.rs:76:58` `>`→`>=`, `drives.rs:114:54` `>`→`>=`, `creature/ring_rules.rs:153:64`, `207:50`, `221:63`, `248:71` `>`→`>=`, `249:71` `<`→`<=` | equivalent: each compares a weight that already passed `carries` (`\|w\| > 1e-3`, false for NaN), so it is never 0 and the strict and non-strict forms agree |
+      | `drives.rs:76:58` `>`→`<` | equivalent: the sign is only a fan-out grouping key of a nonzero weight, so negating it relabels every key uniformly and leaves the counts unchanged |
+      | `mutation/graph/recruitment.rs:50:38` `%`→`+` | equivalent: a ring channel is below the ring width 8, so `channel + 8` still fits `u8` and `ring_offset` reduces its channel mod 8 itself |
+      | `container.rs:814:26`, `1043:28` `>`→`>=` | equivalent: they differ only at equality, which the preceding `debug_assert_ne!` rejects and no caller produces (Prune removes only unaddressed references; a record is dropped only after its last member is gone) |
+      | `container.rs:1031:85` `>`→`>=` (`insert_member`) | equivalent: it differs only when the sink already holds a member with the same `(group, channel)` key, a duplicate no caller inserts |
+      | `container.rs:1054:35` `&&`→`\|\|` | equivalent: with no group records a def satisfying the invariants holds no member, so `check_local_invariants` returns `Ok` and running it changes nothing |
+      | Feedback | `MUTANTS_ITERATE=1` (not closure evidence): `22 mutants tested in 7m: 13 missed, 9 caught`, the 13 being the equivalents; tests only, so no second fresh run |
 - [ ] Slow tier: `make rust-test-slow` -> result, with the re-pinned
       recruitment-paths rows recorded in the readings file.
 - [x] Gate and goal summaries at
