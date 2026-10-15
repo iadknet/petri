@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t11-f30-kind-drives.json",
+    "epoch_baseline": "docs/progress/features/t25-f02-uniform-genome-size.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -73,7 +73,8 @@
       "docs/progress/features/effort-cost-defaults.json",
       "docs/progress/features/t11-f31-ring-projection-motif.json",
       "docs/progress/features/t11-f30-kind-drives.json",
-      "docs/progress/features/input-mechanism-defaults.json"
+      "docs/progress/features/input-mechanism-defaults.json",
+      "docs/progress/features/t25-f02-uniform-genome-size.json"
     ]
   },
   "goal": {
@@ -125,7 +126,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t11-f30-kind-drives-goal.json",
+    "epoch_baseline": "docs/progress/features/t25-f02-uniform-genome-size-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -173,7 +174,15 @@
       "docs/progress/features/effort-cost-defaults-goal.json",
       "docs/progress/features/t11-f31-ring-projection-motif-goal.json",
       "docs/progress/features/t11-f30-kind-drives-goal.json",
-      "docs/progress/features/input-mechanism-defaults-goal.json"
+      "docs/progress/features/input-mechanism-defaults-goal.json",
+      "docs/progress/features/t25-f02-uniform-genome-size-goal.json"
+    ]
+  },
+  "goal_worlds_long": {
+    "series": "goal-worlds-long-v1",
+    "epoch_baseline": "docs/progress/features/t25-f02-uniform-genome-size-base-goal-long.json",
+    "closed": [
+      "docs/progress/features/t25-f02-uniform-genome-size-goal-long.json"
     ]
   }
 }
