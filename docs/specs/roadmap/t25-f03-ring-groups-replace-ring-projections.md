@@ -194,11 +194,19 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       equivalent, or deferred.
 - [ ] Slow tier: `make rust-test-slow` -> result, with the re-pinned
       recruitment-paths rows recorded in the readings file.
-- [ ] Gate and goal summaries at
+- [x] Gate and goal summaries at
       `docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json`
       and `-goal.json`; raw hash and byte count, verification time, series
       entries; no full report staged.
-- [ ] Readings in [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md):
+      Recorded 2026-10-15 (`make bench`, gate then goal): CLI exit 0 and
+      `severe` false for both, outer exit not observed (recording agent
+      stopped; source is the summaries), raw 105,736 and 691,454,296 bytes
+      verified against the summaries' hashes, verified at 15:27:04Z and
+      15:35:26Z, series entries added; the Performance section and readings
+      file carry the verdicts. goal-long not run (dropped).
+- [ ] Readings in [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md)
+      (goal-profile readings recorded under "Benchmark runs"; the readers'
+      post-change expectations remain open):
       the three readers' post-change expectations checked on the goal
       populations; ring groups per creature, members per group,
       `graph_edges_detached` and `groups_removed` totals as the goal profile
@@ -250,9 +258,16 @@ named value:
 | 2 | `applied_trajectory.rs` four digests (the two guard digests may move here and only here; outcome: they held, the readings record which listed pins moved), `baseline_worlds.rs:142`, `recruitment_tests.rs:49`, the slow-tier and `--lib` recruitment-paths rows, `recruitment_tests.rs:223` and its regression file, `neutral_connection_tests/projection.rs:212`, the v3-cli trajectory fixtures (`the_real_run_path_*`, `persistence_samples_*`; re-searched with every assertion and oracle unchanged, a weakened assertion being a requirement change for the spec owner), the gate and world-set deterministic blocks | draw stream (invariant 13) and the summation order on sinks carrying members; `ring_rules` v2 and `reachable-structure-v2` tokens; the renamed operator keys | the causal check is mutation off: with no draws, every trajectory of any genome without a group is byte-identical across the commit (the founder-only viability siblings, and any `applied_trajectory.rs` sampled run the implementer takes with `mutation.per_unit_rate` 0; its existing `Some(0.0)` argument is the gestation rate, not the mutation rate), while the mutation-on movers are attributed by the two-run agreement rule; a pin that moves under mutation off, or for a reason outside invariant 13, is reported to the spec owner |
 | 2 | `counter_definition_changes` entries for `ring_rules` and `mean_projections` → `mean_ring_groups` | definition change | the entries name before and after |
 
-**Measured verdict.** Pending: one line per profile with CLI and outer exit
-statuses, the `severe` flag, thresholds crossed and whether the epoch was
-re-pinned.
+**Measured verdict** (2026-10-15, summaries at `21f440ba`, code `2d300ef9`; command lines, hashes and tables in the readings file, "Benchmark runs"). The recording agent was stopped after both profiles completed: the outer exit status was not observed (source: the summaries only; their `outer_exit` is null).
+
+| Profile | CLI exit (source: `measurement_evidence.cli_exit`) | Outer exit | `severe` | Verdict |
+| --- | ---: | --- | --- | --- |
+| gate | 0 | not observed | false | no counter crossed a threshold; wall +4.7% against F02 (ok); the gate epoch is still to be re-pinned in the closing commit |
+| goal | 0 | not observed | false | flags only: `vm_steps` +21.9% and `plasticity_updates` +22.6% against F02; wall -3.9% (ok); per-case readings the CLI does not level moved in Canyon and Confluence (readings, "Anything that does not fit") |
+
+Raw and summary sizes: gate 105,736 / 20,410 bytes, sha256 `e487961aac0c26ed5cb4c69a05ea9a9599aca25900af951df31d5852987054d2`; goal 691,454,296 / 386,157 bytes, sha256 `73c460cf00b697e5f5abc4bd2536c2916fd40f4a0af28076931fe69cfa4aa8ec`. Raw reports sit under `.bench-artifacts/t25-f03-ring-groups-replace-ring-projections/` and are not staged. Each summary's recorded raw hash and byte count equal the local raw file. The goal summary records `dirty: true` (an untracked gate summary sat in the worktree).
+
+Goal predeclaration readings: mean ring groups per creature 0.325 / 1.494 / 0.669 (Orchards / Canyon / Confluence), mean members per group 7.87 / 7.86 / 7.81 (below 8 on every world), `graph_edges_detached` 469 and `groups_removed` 811 in total (both above 0), no extinction, `mean_genome_size` 81.5 to 81.9 at the first sample.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f03-ring-groups-replace-ring-projections.json),
