@@ -37,7 +37,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.001,
 		defaultValue: 0.1,
 		tooltip:
-			"Raises the parent's reproduce charge for big genomes: the charge is multiplied by 1 + rate \u00d7 (genome units above the founder's 97)",
+			"Raises the parent's reproduce charge for big genomes: the charge is multiplied by 1 + rate \u00d7 (genome units above the founder's 80)",
 	},
 	{
 		path: "energy.lifecycle.gestation_ticks_per_founder_genome",

@@ -195,8 +195,8 @@ re-pin table, each test comment carrying its cause and restoring check.
 | Readings table: mean genome size, mean wired sinks, mean projections, births per creature-tick and gestation per goal world at 2,000 and 40,000 ticks against the merge base and the arm; the same-population counterfactual expectations `E_old = 0.005 (x̄' + S̄ − 8P̄)`, `E_size = 0.005 x̄'`, `E_new = 0.0060625 x̄'` from the living population's checkpoint means, beside the observed requested events per birth from the report's mutation counters | readings file |
 
 - [ ] Every row above ran on the final build and its result is recorded
-  (the viability and focused-test rows have; mutation, slow tier, gate,
-  goal, goal-long and the rate arm have not run).
+  (viability, focused tests, gate, goal, goal-long and the rate arm have;
+  the mutation gate and the slow tier have not run).
 - [ ] Mutation survivors: pending.
 
 ## Performance and Goal Impact

@@ -458,9 +458,9 @@ graph_energy_requested =
 ```
 
 If energy is exhausted during graph evaluation, node evaluation halts and mesh
-execution returns `WorldAction::NoOp`. Evaluation-cost and plasticity-cost
-exhaustion preserve the prior successful temporal state and outputs and emit
-no graph effects. Actual charge and entered work remain recorded; learned
+execution returns `WorldAction::NoOp`. Evaluation-cost exhaustion preserves
+the prior successful temporal state and outputs and emits no graph effects;
+learning charges no energy (T25.F02), so it cannot exhaust a creature. Actual charge and entered work remain recorded; learned
 pure Hebbian weight and reward rollback are outside this temporal transaction.
 Reward-trace activity commits at this same successful boundary.
 
@@ -556,8 +556,8 @@ Learning rate is clamped to [0,1] and weight-clamp magnitude to [0.01,10].
 Eta applies once: unit activity/reward at eta 0.5 yields trace 1 and delta
 0.5. At lambda 0 and unit reward, a feed-forward edge matches its pure
 Hebbian update. Phase 2.5 updates every initialized modulated edge each tick,
-even on skipped visits or zero deltas, retaining configured cost/work
-semantics. Reward does not clear eligibility.
+even on skipped visits or zero deltas, and counts each update; learning
+charges no energy (T25.F02). Reward does not clear eligibility.
 
 ---
 
