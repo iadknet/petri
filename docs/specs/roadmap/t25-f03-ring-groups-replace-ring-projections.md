@@ -124,7 +124,7 @@ test, after each commit.
 
 ## Implementation Tasks
 
-- [ ] **Commit 1 (text-only identity).** `GraphEdge` gains `own_weight`
+- [x] **Commit 1 (text-only identity, `c3994a6b`).** `GraphEdge` gains `own_weight`
       (JSON key, no alias) and `membership: Option<Membership>` (always
       `None`), `size_of` 16; `Group`, `GroupId`, `Membership`, `Shape::Ring`,
       `compose` and the `groups` container field (always empty, no writer
@@ -135,7 +135,8 @@ test, after each commit.
       `edge.weight` on `own_weight`. No draw, no sum, no counter changes:
       the only pins that move hash genome text (re-pin table), each checked
       by "the hash without genome text is unchanged".
-- [ ] **Commit 2 (behavior), tests first** (the tests-first table below):
+- [x] **Commit 2 (behavior, `238ad78d`; the inspector split off as
+      `6b356439`, which moves no pin), tests first** (the tests-first table below):
       the container primitives (`add_group`, `remove_group`,
       `relocate_group`, `detach_at`, `members`, `genomic_weight`,
       `GroupMut::set_scale`, I10 insertion, `validate_graph` and the
@@ -152,7 +153,7 @@ test, after each commit.
       the inspector. Re-pins by the draw stream, one cause per commit (a
       later commit that moves no pin may be split off, such as the
       inspector).
-- [ ] Reference specs and `benchmark-series.json` rewritten to groups
+- [x] Reference specs and `benchmark-series.json` rewritten to groups
       (Inputs table, last row); `docs/benchmark-artifacts.md` untouched.
 
 Tests written first (file → test):
@@ -178,10 +179,14 @@ Every `RingProjection` test site is ported, rewritten or deleted:
 
 ## Verification
 
-- [ ] Viability first: `cargo test -p v3-core --test viability` -> result
-      after commit 1 and after commit 2.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 29
+      passed after commit 1 (`c3994a6b`) and after commit 2 (`238ad78d`); the
+      founder-only siblings did not move.
 - [ ] Focused tests (the tests-first table) and `make check` -> result,
-      commit hash.
+      commit hash. Focused: `cargo test --workspace --no-fail-fast` all
+      passed at `238ad78d`; `cargo clippy --workspace --all-targets` clean;
+      `npx vitest run` (frontend) 630 passed at `6b356439`. `make check`
+      pending.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred.
