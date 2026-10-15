@@ -96,7 +96,8 @@ fn empty_readings() -> PopulationReadings {
         mean_mesh_nodes: 0.0,
         mean_generation: 0.0,
         mean_wired_sinks: 0.0,
-        mean_projections: 0.0,
+        mean_ring_groups: 0.0,
+        mean_ring_group_members: None,
         surviving_founder_clade_count: 0,
         shannon_entropy_nats: UNDEFINED.to_string(),
         sensor_census: census_for(0),
@@ -117,7 +118,8 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         mean_mesh_nodes: tick as f64 * 2.0,
         mean_generation: tick as f64 * 3.0,
         mean_wired_sinks: tick as f64 * 5.0,
-        mean_projections: tick as f64 * 7.0,
+        mean_ring_groups: tick as f64 * 7.0,
+        mean_ring_group_members: Some(tick as f64 * 11.0),
         surviving_founder_clade_count: population,
         shannon_entropy_nats: six(tick as f64 / 4.0),
         sensor_census: census_for(population),
@@ -234,8 +236,12 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
             Some(six(expected.mean_wired_sinks).as_str())
         );
         assert_eq!(
-            sample.mean_projections.as_deref(),
-            Some(six(expected.mean_projections).as_str())
+            sample.mean_ring_groups.as_deref(),
+            Some(six(expected.mean_ring_groups).as_str())
+        );
+        assert_eq!(
+            sample.mean_ring_group_members,
+            expected.mean_ring_group_members.map(six)
         );
         assert_eq!(sample.surviving_founder_clade_count, Some(6));
         assert_eq!(
@@ -451,7 +457,8 @@ proptest! {
         mean_mesh_nodes in proptest::option::of(0.0f64..1e6),
         mean_generation in proptest::option::of(0.0f64..1e6),
         mean_wired_sinks in proptest::option::of(0.0f64..1e3),
-        mean_projections in proptest::option::of(0.0f64..1e3),
+        mean_ring_groups in proptest::option::of(0.0f64..1e3),
+        mean_ring_group_members in proptest::option::of(0.0f64..8.0),
         surviving_founder_clade_count in proptest::option::of(0u64..10_000),
         shannon_entropy_nats in proptest::option::of(0.0f64..20.0),
         population in 0u64..1000,
@@ -465,7 +472,8 @@ proptest! {
             mean_mesh_nodes: mean_mesh_nodes.map(six),
             mean_generation: mean_generation.map(six),
             mean_wired_sinks: mean_wired_sinks.map(six),
-            mean_projections: mean_projections.map(six),
+            mean_ring_groups: mean_ring_groups.map(six),
+            mean_ring_group_members: mean_ring_group_members.map(six),
             surviving_founder_clade_count,
             shannon_entropy_nats: shannon_entropy_nats.map(six),
             sensor_census: Some(census_for(population)),
@@ -481,7 +489,8 @@ proptest! {
         prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
         prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
         prop_assert_eq!(&decoded.mean_wired_sinks, &sample.mean_wired_sinks);
-        prop_assert_eq!(&decoded.mean_projections, &sample.mean_projections);
+        prop_assert_eq!(&decoded.mean_ring_groups, &sample.mean_ring_groups);
+        prop_assert_eq!(&decoded.mean_ring_group_members, &sample.mean_ring_group_members);
         prop_assert_eq!(
             decoded.surviving_founder_clade_count,
             sample.surviving_founder_clade_count
@@ -499,7 +508,8 @@ proptest! {
             "mean_mesh_nodes",
             "mean_generation",
             "mean_wired_sinks",
-            "mean_projections",
+            "mean_ring_groups",
+            "mean_ring_group_members",
             "surviving_founder_clade_count",
             "shannon_entropy_nats",
             "sensor_census",
@@ -513,7 +523,8 @@ proptest! {
         prop_assert_eq!(historical.mean_mesh_nodes, None);
         prop_assert_eq!(historical.mean_generation, None);
         prop_assert_eq!(historical.mean_wired_sinks, None);
-        prop_assert_eq!(historical.mean_projections, None);
+        prop_assert_eq!(historical.mean_ring_groups, None);
+        prop_assert_eq!(historical.mean_ring_group_members, None);
         prop_assert_eq!(historical.surviving_founder_clade_count, None);
         prop_assert_eq!(historical.shannon_entropy_nats, None);
         prop_assert_eq!(historical.sensor_census, None);
@@ -660,6 +671,8 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.mutation_reachable_target_total = 17;
     stats.mutation_unreachable_target_total = 11;
     stats.mutation_not_applicable_target_total = 3;
+    stats.graph_edges_detached_total = 8;
+    stats.groups_removed_total = 2;
     stats.mutation_outcome_summary = MutationValueTotals {
         carriers_observed_total: 5,
         survival_ticks_sum: 120,
@@ -714,6 +727,8 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             reachable_target_total: 17,
             unreachable_target_total: 11,
             not_applicable_target_total: 3,
+            graph_edges_detached_total: 8,
+            groups_removed_total: 2,
         })
     );
     assert_eq!(
@@ -1257,7 +1272,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
     assert_eq!(legacy.mean_mesh_nodes, None);
     assert_eq!(legacy.mean_generation, None);
     assert_eq!(legacy.mean_wired_sinks, None);
-    assert_eq!(legacy.mean_projections, None);
+    assert_eq!(legacy.mean_ring_groups, None);
+    assert_eq!(legacy.mean_ring_group_members, None);
     assert_eq!(legacy.surviving_founder_clade_count, None);
     assert_eq!(legacy.shannon_entropy_nats, None);
     assert_eq!(legacy.sensor_census, None);
@@ -1272,7 +1288,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         mean_mesh_nodes: Some(six(8.0)),
         mean_generation: Some(six(3.5)),
         mean_wired_sinks: Some(six(17.0)),
-        mean_projections: Some(six(0.5)),
+        mean_ring_groups: Some(six(0.5)),
+        mean_ring_group_members: Some(six(7.5)),
         surviving_founder_clade_count: Some(4),
         shannon_entropy_nats: Some(six(1.25)),
         sensor_census: Some(census_for(5)),
@@ -1311,6 +1328,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 reachable_target_total: 5,
                 unreachable_target_total: 3,
                 not_applicable_target_total: 1,
+                graph_edges_detached_total: 4,
+                groups_removed_total: 1,
             }),
             mutation_outcome_summary: Some(MutationOutcomeTotals {
                 carriers_observed_total: 4,

@@ -66,6 +66,15 @@
 //! digest recomputed without genome bytes is ef1d2719... (rate 0.0
 //! f01286e7...) at the merge base and after the commit, so the commit moved
 //! no simulation; reverting the key rename restores both old digests.
+//! Re-pinned by T25.F03 commit 2 after two agreeing runs: ring projections
+//! become `Ring` edge groups, so a projection-creating draw writes a group of
+//! eight members into the genome text, which moves the two sampled digests
+//! (8cad8472... -> 545c5490..., gestation rate 0.0 e46c2e81... ->
+//! b5c8617d...). The sampled digest without genome bytes holds (ef1d2719...,
+//! rate 0.0 f01286e7...), the guard digests hold, and with
+//! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
+//! commit, genome bytes included (a81e66c5..., gestation rate 0.0
+//! 17189f7a...); reverting the commit restores both old digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -77,11 +86,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "8cad847257ad5c9702dd166a3e600886f63de0d3031ebf66e5376ce1ad9e6240"
+        "545c54907f7961aedaebc61b2ebc69323a4cb3698edb25d65497b4e8d8757ef4"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "e46c2e81f9482e305e640fbd00e0c0825b39fb5fd80bb7ad027b3091ef851ba5"
+        "b5c8617d1cb47bc21e81c8c446e46201fd54dd6ce8c682e80034fac4e32a5c47"
     );
 }
 

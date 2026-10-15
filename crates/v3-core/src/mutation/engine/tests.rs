@@ -1860,7 +1860,8 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
             &mut rng(9),
             &config,
             1
-        ),
+        )
+        .0,
         Err(MutationSkipReason::ParseabilityViolation)
     );
     assert_eq!(original, before);

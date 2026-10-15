@@ -53,9 +53,10 @@ impl GenomeFile {
     ///
     /// # Errors
     ///
-    /// I/O failures, malformed JSON, an unknown `genome_format`, or a node
+    /// I/O failures, malformed JSON, an unknown `genome_format`, a node
     /// with [`readings::ABLATED_REF`] references or more (the ablation
-    /// sentinel would be in range).
+    /// sentinel would be in range), or a Graph node breaking a graph
+    /// invariant (`validate_graph`, T25.F03).
     pub fn load(path: &Path) -> Result<CreatureGenome, LabError> {
         let file: Self = read_json(path)?;
         if file.genome_format != summary::GENOME_FORMAT {
@@ -64,6 +65,22 @@ impl GenomeFile {
                 path.display(),
                 file.genome_format,
                 summary::GENOME_FORMAT
+            )));
+        }
+        if let Some((index, violation)) =
+            file.genome
+                .nodes
+                .iter()
+                .enumerate()
+                .find_map(|(index, node)| {
+                    v3_core::creature::genome::cgp::validate_graph(node)
+                        .err()
+                        .map(|violation| (index, violation))
+                })
+        {
+            return Err(LabError::Config(format!(
+                "{}: node {index} breaks a graph invariant: {violation:?}",
+                path.display()
             )));
         }
         if !readings::ablation_supported(&file.genome) {

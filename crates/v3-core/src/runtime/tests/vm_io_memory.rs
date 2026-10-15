@@ -557,7 +557,7 @@ fn vm_eats_when_food_here() {
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::creature::state::GraphRuntimeState::new(),
+        &mut crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new()),
         &config(),
         crate::contracts::Direction::N,
     )
@@ -648,7 +648,7 @@ fn vm_noop_when_no_food() {
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::creature::state::GraphRuntimeState::new(),
+        &mut crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new()),
         &config(),
         crate::contracts::Direction::N,
     )

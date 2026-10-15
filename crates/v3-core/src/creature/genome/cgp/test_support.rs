@@ -6,7 +6,9 @@
 use super::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::PlasticityConfig;
+use crate::contracts::NodeId;
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, PlasticityConfig};
+use crate::creature::state::GraphRuntimeState;
 
 /// An editable copy of one output sink.
 #[derive(Debug, Clone)]
@@ -24,7 +26,8 @@ pub(crate) struct NodeDraft {
 }
 
 /// Edit `def`'s sink catalog as drafts; the def keeps its compute nodes,
-/// projections and seeds.
+/// group records and seeds (a member stays a member: the caller keeps the
+/// group invariants).
 pub(crate) fn edit_sinks(def: &mut CgpGraphBackendDef, edit: impl FnOnce(&mut Vec<SinkDraft>)) {
     let mut drafts: Vec<SinkDraft> = def
         .output_sinks()
@@ -67,6 +70,32 @@ pub(crate) fn edit_compute_nodes(
 /// `edge` with its weight replaced.
 pub(crate) fn reweighted(edge: GraphEdge, weight: f32) -> GraphEdge {
     GraphEdge::new(edge.source(), weight)
+}
+
+/// The runtime state of a genome whose mesh nodes `0..defs.len()` are
+/// `defs`, each with no input references: a fixture over the only
+/// constructor, [`GraphRuntimeState::for_genome`]. A graph with members
+/// needs its input references; build its genome and call `for_genome`.
+pub(crate) fn runtime_for_defs(defs: &[&CgpGraphBackendDef]) -> GraphRuntimeState {
+    let genome = CreatureGenome {
+        entry_node_id: NodeId(0),
+        nodes: defs
+            .iter()
+            .enumerate()
+            .map(|(id, def)| NodeGenome {
+                node_id: NodeId(id as u32),
+                input_refs: Vec::new(),
+                backend_def: BackendDef::Graph((*def).clone()),
+                targets: Vec::new(),
+            })
+            .collect(),
+    };
+    GraphRuntimeState::for_genome(&genome, Vec::new())
+}
+
+/// [`runtime_for_defs`] for one graph at mesh node 0.
+pub(crate) fn runtime_for(def: &CgpGraphBackendDef) -> GraphRuntimeState {
+    runtime_for_defs(&[def])
 }
 
 /// Append `sink` to `def`'s catalog, exactly as given.

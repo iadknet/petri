@@ -4,7 +4,9 @@
 //! real sink edges whose [`super::Membership`] names it. A member's genomic
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
-use crate::creature::genome::vote::DirectedVoteKind;
+use super::{CgpGraphBackendDef, EdgeOccurrence};
+use crate::contracts::InputReference;
+use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 
 /// Index of a group in its graph's `groups` list.
 #[derive(
@@ -50,6 +52,25 @@ pub struct Group {
 }
 
 impl Group {
+    /// The group's pattern at a member: 1 for a `Ring` group whose
+    /// `ring_ref` resolves to a ring of `input_refs`, 0 otherwise. Resolved
+    /// from the shape reference, never from the member's own source.
+    #[must_use]
+    pub fn pattern(&self, input_refs: &[InputReference]) -> f32 {
+        match self.shape {
+            Shape::Ring { ring_ref } => {
+                if input_refs
+                    .get(usize::from(ring_ref))
+                    .is_some_and(InputReference::is_ring)
+                {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+        }
+    }
+
     #[inline]
     #[must_use]
     pub const fn shape(&self) -> Shape {
@@ -73,6 +94,33 @@ impl Group {
     pub const fn scale(&self) -> f32 {
         self.scale
     }
+}
+
+/// Detach the member at `occurrence` (an edit that changes its source outside
+/// a shape operator): its own weight becomes its genomic weight, bitwise, and
+/// it leaves its group. Returns the edge's new occurrence, on which the
+/// calling operator continues its edit, and whether the group was removed
+/// (it was the last member).
+pub fn detach(
+    def: &mut CgpGraphBackendDef,
+    occurrence: EdgeOccurrence,
+    input_refs: &[InputReference],
+) -> (EdgeOccurrence, bool) {
+    let group = def
+        .edge_at(occurrence)
+        .membership()
+        .expect("detach: a member")
+        .group;
+    let pattern = def.groups()[group.index()].pattern(input_refs);
+    def.detach_at(occurrence, pattern)
+}
+
+/// The `Ring` offset whose member on channel `channel` sits on direction
+/// `d`'s sink: `(d − channel) mod 8`, for every `u8` pair.
+#[must_use]
+pub const fn ring_offset(d: u8, channel: u8) -> u8 {
+    let n = VOTE_DIRECTION_COUNT;
+    (d % n + n - channel % n) % n
 }
 
 /// The only composition formula: a member's genomic weight from its own

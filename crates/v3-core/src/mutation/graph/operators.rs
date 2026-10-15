@@ -8,8 +8,8 @@ use rand::Rng;
 
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource, OutputSinkKind,
+    detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
+    GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
@@ -280,7 +280,22 @@ pub(crate) fn add_compute_node(
     match rng.gen_range(0u8..forms) {
         0 => add_disconnected_node(def, rng),
         1 => add_bootstrap_node(def, input_refs, rng),
-        _ => split_existing_edge(def, rng),
+        _ => split_existing_edge(def, input_refs, rng),
+    }
+}
+
+/// Detach the edge at `occurrence` when it is a group member (T25.F03), so
+/// an edit that changes its source keeps its genomic weight and leaves its
+/// group; returns the occurrence the edit continues on. No draw.
+fn detached(
+    def: &mut CgpGraphBackendDef,
+    occurrence: EdgeOccurrence,
+    input_refs: &[InputReference],
+) -> EdgeOccurrence {
+    if def.edge_at(occurrence).membership().is_some() {
+        detach(def, occurrence, input_refs).0
+    } else {
+        occurrence
     }
 }
 
@@ -326,6 +341,7 @@ pub(crate) fn add_bootstrap_node(
 /// appended instead.
 pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
+    input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     check_compute_node_capacity(def, 1)?;
@@ -334,6 +350,8 @@ pub(crate) fn split_existing_edge(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let occurrence = sites[rng.gen_range(0..sites.len())];
+    // A member is detached before its split: the split rewires its source.
+    let occurrence = detached(def, occurrence, input_refs);
     def.split_edge(occurrence, identity_add_node());
     Ok(())
 }
@@ -521,7 +539,12 @@ pub(crate) fn retarget_edge(
     let occurrence = pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes().len() as u16;
     let new_source = random_graph_source(compute_count, input_refs, rng);
-    def.edge_mut(occurrence).set_source(new_source);
+    // A same-source draw changes nothing; a changed source detaches a member
+    // first (T25.F03).
+    if def.edge_at(occurrence).source() != new_source {
+        let occurrence = detached(def, occurrence, input_refs);
+        def.edge_mut(occurrence).set_source(new_source);
+    }
     Ok(())
 }
 
@@ -538,7 +561,7 @@ pub(crate) fn alter_edge_weight_in_def(
 }
 
 /// `AlterGraphEdgeWeight`'s weight law, shared with
-/// `AlterRingProjectionWeight` (T11.F31): `|w| > 0.01` scales by
+/// `AlterGroupScale` (T11.F31): `|w| > 0.01` scales by
 /// `1 + U[−0.2, 0.2]`, otherwise adds `U[−0.1, 0.1]`. One draw.
 pub(crate) fn perturb_weight(w: &mut f32, rng: &mut impl Rng) {
     if w.abs() > 0.01 {
@@ -790,6 +813,9 @@ pub(crate) fn raw_field_mutation(
     let chosen = moves[rng.gen_range(0..moves.len())];
     let mut source = def.edge_at(occurrence).source();
     apply_edge_field_move(&mut source, chosen);
+    // A raw-field step always changes the source, so a member detaches first
+    // (T25.F03).
+    let occurrence = detached(def, occurrence, input_refs);
     def.edge_mut(occurrence).set_source(source);
     Ok(())
 }
@@ -982,7 +1008,7 @@ mod tests {
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &mut rng),
+            split_existing_edge(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1001,7 +1027,7 @@ mod tests {
             )]);
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &mut rng),
+            split_existing_edge(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1022,7 +1048,7 @@ mod tests {
             )]);
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &mut rng),
+            split_existing_edge(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
         assert_eq!(def.compute_nodes().len(), 1);
@@ -1050,7 +1076,7 @@ mod tests {
             )]);
         // Force selection of the only edge (ComputeInput(1), edge 0).
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 3);
         // New Add node inserted at index 1, reading the old source (CN(0)).
@@ -1090,7 +1116,7 @@ mod tests {
             )])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 2);
         assert_eq!(def.compute_nodes()[0].kind, ComputeNodeKind::Add);
@@ -1121,7 +1147,7 @@ mod tests {
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
             )]);
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes().len(), 2);
         assert_eq!(def.compute_nodes()[1].kind, ComputeNodeKind::Add);

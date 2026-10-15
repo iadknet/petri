@@ -103,7 +103,7 @@ fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
         &mut 1000.0,
         &mut [0.0; 16],
         &[0.0; 16],
-        &mut GraphRuntimeState::new(),
+        &mut GraphRuntimeState::for_genome(g, Vec::new()),
         &config,
         crate::contracts::Direction::N,
         ObservedMeshExecution::default(),
@@ -165,7 +165,7 @@ fn backend_costs_accumulate_every_dispatch_and_close_the_energy_account() {
             &mut energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::new(),
+            &mut GraphRuntimeState::for_genome(g, Vec::new()),
             &config,
             crate::contracts::Direction::N,
             ObservedMeshExecution::default(),
@@ -233,9 +233,9 @@ fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost()
             let mut energies = [start; 3];
             let mut memories = [[0.5; 16]; 3];
             let mut states = [
-                GraphRuntimeState::new(),
-                GraphRuntimeState::new(),
-                GraphRuntimeState::new(),
+                GraphRuntimeState::for_genome(&g, Vec::new()),
+                GraphRuntimeState::for_genome(&g, Vec::new()),
+                GraphRuntimeState::for_genome(&g, Vec::new()),
             ];
             for tick in 0..2 {
                 for state in &mut states {

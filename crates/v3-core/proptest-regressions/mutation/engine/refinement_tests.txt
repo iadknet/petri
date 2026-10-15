@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc 46de2e3906ed3018915f2c2e7b1da8b5ee0e353292656abb7a0ebdccb1d9a9c1 # shrinks to refs = [World(NeighborFoodRing { type_idx: OrdinaryFoodTypeId(0) })], picks = [(Index(0), RingProjection { ref_idx: 0, kind: Move, offset: 0, weight: 0.0 })], removed = Index(0)
+cc 0b89075a6773597ee421aa0c7ce7901f9b8eda2a60e87a635ad3b95429c2f108 # shrinks to seed = 0, padding = 0

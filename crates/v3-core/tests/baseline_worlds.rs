@@ -154,10 +154,20 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// without genome text is 18157138273463701869 (rate 0.0
 /// 7389079404809992313) at the merge base and after the commit; reverting
 /// the text change restores both old values.
+/// Re-pinned by T25.F03 commit 2 after two agreeing runs: the edge-group
+/// operators replace the projection operators at their catalog positions and
+/// `edge_sites` enumerates members, which changes Graph-domain draws on any
+/// genome carrying a group (invariant 13), and the genome text names groups
+/// (default 12338524851174507136 -> 13875145475904938210, rate 0.0
+/// 10384326889006245954 -> 2420636156610368321). Without genome text the
+/// rate-0.0 identity holds (7389079404809992313) and the default one moves
+/// 18157138273463701869 -> 8851126832724384691 by the draw stream; mutation
+/// off leaves every founder trajectory byte-identical (the viability
+/// siblings); reverting the commit restores both old values.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 12338524851174507136);
-    assert_eq!(short_run_identity(Some(0.0)), 10384326889006245954);
+    assert_eq!(short_run_identity(None), 13875145475904938210);
+    assert_eq!(short_run_identity(Some(0.0)), 2420636156610368321);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

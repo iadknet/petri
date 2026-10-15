@@ -415,7 +415,7 @@ fn execute_with_config(
         &mut energy,
         &mut memory,
         &[1.0; 16],
-        &mut crate::creature::state::GraphRuntimeState::new(),
+        &mut crate::creature::state::GraphRuntimeState::for_genome(g, Vec::new()),
         config,
         crate::contracts::Direction::N,
         crate::runtime::mesh::ObservedMeshExecution::default(),

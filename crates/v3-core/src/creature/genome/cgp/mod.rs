@@ -6,8 +6,7 @@
 
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::vote::{
-    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_DIRECTION_COUNT,
-    VOTE_SINK_COUNT,
+    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
 
 mod container;
@@ -17,11 +16,11 @@ mod group;
 pub(crate) mod test_support;
 
 pub use container::{
-    BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList, EdgeMut, EdgeOccurrence,
-    EdgeSurface, OutputSink, OutputSinks,
+    validate_graph, BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList, EdgeMut,
+    EdgeOccurrence, EdgeSurface, GraphInvariantViolation, GroupMut, OutputSink, OutputSinks,
 };
 pub use edge::{GraphEdge, GraphSource, Membership};
-pub use group::{compose, Group, GroupId, Shape};
+pub use group::{compose, detach, ring_offset, Group, GroupId, Shape};
 
 // ── Compute layer ───────────────────────────────────────────────────────────
 
@@ -111,78 +110,6 @@ pub enum OutputSinkKind {
     /// Overwrite `action_params[field.index()]` (T11.F27), read when a pass
     /// commits `field.kind()` (T19.F04).
     ActionParam(ActionParamField),
-}
-
-// ── Ring projections ────────────────────────────────────────────────────────
-
-/// One ring projection (T11.F31): a single gene that adds
-/// `weight · ring[(d − offset) mod 8]` to `kind`'s direction-`d` vote for all
-/// eight directions, `ring` the neighbor ring at `input_refs[ref_idx]`. It is
-/// not an edge of any sink; its weight, offset, kind and existence change only
-/// as a unit.
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RingProjection {
-    pub ref_idx: u16,
-    pub kind: DirectedVoteKind,
-    /// Rotation offset; read mod 8.
-    pub offset: u8,
-    pub weight: f32,
-    /// Ring channels whose term reads 0.0, bit `c` for channel `c`: input-use
-    /// ablation state only (`neighborhood::input_use`). Outside genome
-    /// identity, serialization, equality and size.
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub ablated_channels: u8,
-}
-
-impl RingProjection {
-    #[must_use]
-    pub const fn new(ref_idx: u16, kind: DirectedVoteKind, offset: u8, weight: f32) -> Self {
-        Self {
-            ref_idx,
-            kind,
-            offset,
-            weight,
-            ablated_channels: 0,
-        }
-    }
-
-    /// The ring channel this projection reads for direction `d`:
-    /// `(d − offset) mod 8`.
-    #[must_use]
-    pub const fn channel_for(&self, d: u8) -> u8 {
-        let n = VOTE_DIRECTION_COUNT;
-        (d % n + n - self.offset % n) % n
-    }
-
-    /// The offset whose direction-`d` vote reads ring channel `channel`:
-    /// `(d − channel) mod 8`, the inverse of [`Self::channel_for`].
-    #[must_use]
-    pub const fn offset_for(d: u8, channel: u8) -> u8 {
-        let n = VOTE_DIRECTION_COUNT;
-        (d % n + n - channel % n) % n
-    }
-}
-
-impl PartialEq for RingProjection {
-    fn eq(&self, other: &Self) -> bool {
-        self.ref_idx == other.ref_idx
-            && self.kind == other.kind
-            && self.offset == other.offset
-            && self.weight == other.weight
-    }
-}
-
-impl std::fmt::Debug for RingProjection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RingProjection")
-            .field("ref_idx", &self.ref_idx)
-            .field("kind", &self.kind)
-            .field("offset", &self.offset)
-            .field("weight", &self.weight)
-            .finish()
-    }
 }
 
 /// Number of CustomOutput sinks in the fixed catalog.

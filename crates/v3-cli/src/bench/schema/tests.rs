@@ -154,7 +154,7 @@ fn new_reports_carry_indicator_version_tokens() {
             .as_deref(),
         Some(REACHABLE_STRUCTURE_VERSION)
     );
-    assert_eq!(REACHABLE_STRUCTURE_VERSION, "reachable-structure-v1");
+    assert_eq!(REACHABLE_STRUCTURE_VERSION, "reachable-structure-v2");
     assert!(!indicators.cases.is_empty());
     for case in &indicators.cases {
         assert_eq!(

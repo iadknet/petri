@@ -20,7 +20,6 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::PlasticityConfig;
-use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
 };
@@ -49,7 +48,7 @@ fn run_tick_sequences(
         .iter()
         .map(|sensors| {
             let mut shared_memory = [0.0f32; 16];
-            let mut graph_runtime = GraphRuntimeState::new();
+            let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
             (0..SEQUENCE_TICKS)
                 .map(|_| {
                     let prev_shared_memory = shared_memory;
@@ -477,7 +476,7 @@ fn split_preserves_a_live_introspection_sink_edge_under_plasticity() {
     for seed in 0u64..16 {
         let mut child = parent.clone();
         assert_eq!(
-            split_existing_edge(&mut child, &mut SmallRng::seed_from_u64(seed)),
+            split_existing_edge(&mut child, &[], &mut SmallRng::seed_from_u64(seed)),
             Ok(()),
             "seed {seed}"
         );
@@ -514,7 +513,7 @@ fn committed_at_energy(
     config: &RuntimeConfig,
     mut energy: f32,
 ) -> f32 {
-    let mut graph_runtime = GraphRuntimeState::new();
+    let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
     graph_runtime.begin_tick(&[], 0);
     let mut shared_memory = [0.0f32; 16];
     execute_graph_node(
@@ -552,7 +551,7 @@ fn split_applies_to_every_introspection_edge_shape() {
     ] {
         let mut child = def.clone();
         assert_eq!(
-            split_existing_edge(&mut child, &mut SmallRng::seed_from_u64(3)),
+            split_existing_edge(&mut child, &[], &mut SmallRng::seed_from_u64(3)),
             Ok(()),
             "{label}: the split applies"
         );

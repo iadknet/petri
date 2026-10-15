@@ -161,3 +161,42 @@ fn a_weight_exactly_at_the_floor_carries_no_path() {
         "the floor is exclusive: |w| must exceed it"
     );
 }
+
+/// A group is not a fan-out (T25.F03): two `Move` groups reading the same
+/// ring channels at different offsets send each channel to two directions,
+/// which as independent edges is eight fan-outs, and as members is none.
+#[test]
+fn a_group_is_not_a_fanout() {
+    use crate::contracts::{InputReference, WorldInputKey};
+    use crate::creature::genome::cgp::Shape;
+    let mut grouped = CgpGraphBackendDef::new_with_fixed_outputs();
+    for offset in [0, 3] {
+        let id = grouped.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);
+        grouped.group_mut(id).set_scale(1.0);
+    }
+    let mut independent = CgpGraphBackendDef::new_with_fixed_outputs();
+    for offset in [0u8, 3] {
+        for channel in 0..8u8 {
+            wire(
+                &mut independent,
+                VoteSink::Move((channel + offset) % 8),
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: u16::from(channel),
+                },
+                1.0,
+            );
+        }
+    }
+    let ring = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
+    let with_refs = |def| {
+        let mut genome = graph_genome(def);
+        genome.nodes[0].input_refs = ring.clone();
+        genome
+    };
+    let moves = |def| census_of(&[with_refs(def)]).kinds[DirectedVoteKind::Move.index()];
+    let edges = moves(independent);
+    assert_eq!((edges.fanouts, edges.fanout_edges), (8, 16));
+    let members = moves(grouped);
+    assert_eq!((members.fanouts, members.fanout_edges), (0, 0));
+}

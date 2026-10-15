@@ -53,7 +53,8 @@ fn carries(weight: f32) -> bool {
     weight.abs() > PATH_WEIGHT_FLOOR
 }
 
-/// One Graph node's fan-outs of `kind`: `(fanouts, fanout_edges)`.
+/// One Graph node's fan-outs of `kind`: `(fanouts, fanout_edges)`. A group's
+/// members are not a fan-out (T25.F03): the census reads independent edges.
 fn node_fanouts(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> (u64, u64) {
     let mut by_source: HashMap<(GraphSource, bool), (BTreeSet<u8>, u64)> = HashMap::new();
     for sink in def.output_sinks() {
@@ -66,7 +67,11 @@ fn node_fanouts(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> (u64, u64) 
         if sink_kind != kind {
             continue;
         }
-        for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight())) {
+        for edge in sink
+            .inputs
+            .iter()
+            .filter(|edge| edge.membership().is_none() && carries(edge.own_weight()))
+        {
             let entry = by_source
                 .entry((edge.source(), edge.own_weight() > 0.0))
                 .or_default();

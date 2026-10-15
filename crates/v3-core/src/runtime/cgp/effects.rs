@@ -1,10 +1,10 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::{
-    DirectedVoteKind, VoteVector, VOTE_DIRECTION_COUNT, VOTE_SINK_COUNT,
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphEdge, OutputSinkKind,
 };
+use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::routing::RouteGateMap;
@@ -21,6 +21,7 @@ pub(crate) struct CgpEffectsTrace {
 #[allow(clippy::too_many_arguments)]
 fn edges_wsum(
     edges: &[GraphEdge],
+    weights: &[f32],
     compute_count: usize,
     curr_outputs: &[f32],
     input_refs: &[InputReference],
@@ -30,7 +31,7 @@ fn edges_wsum(
     buf: &mut Vec<f32>,
 ) -> f32 {
     buf.clear();
-    buf.extend(edges.iter().map(|edge| {
+    buf.extend(edges.iter().zip(weights).map(|(edge, &weight)| {
         let v = resolve_source_post_convergence(
             &edge.source(),
             compute_count,
@@ -40,62 +41,9 @@ fn edges_wsum(
             shared_memory,
             prev_shared_memory,
         );
-        v * edge.own_weight()
+        v * weight
     }));
     buf.iter().copied().sum()
-}
-
-/// Per directed kind, the projection term of each direction's vote, or `None`
-/// when the kind has no projection (T11.F31).
-type ProjectionTerms = [Option<DirectionTerms>; DirectedVoteKind::ALL.len()];
-type DirectionTerms = [f32; VOTE_DIRECTION_COUNT as usize];
-
-/// `P_K[d] = Σ w_p · r_p((d − k_p) mod 8)` over each kind's projections in
-/// genome order, accumulated from 0.0. A projection whose `ref_idx` is out of
-/// range or not a ring contributes nothing, whatever its weight; an ablated
-/// channel reads 0.0, as it does for an edge.
-fn projection_terms(
-    def: &CgpGraphBackendDef,
-    compute_count: usize,
-    curr_outputs: &[f32],
-    input_refs: &[InputReference],
-    resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
-) -> ProjectionTerms {
-    let mut terms: ProjectionTerms = [None; DirectedVoteKind::ALL.len()];
-    for projection in &def.projections {
-        let entry = terms[projection.kind.index()].get_or_insert([0.0; _]);
-        if !input_refs
-            .get(usize::from(projection.ref_idx))
-            .is_some_and(InputReference::is_ring)
-        {
-            continue;
-        }
-        let mut ring: DirectionTerms = [0.0; _];
-        for (channel, value) in ring.iter_mut().enumerate() {
-            if projection.ablated_channels & (1 << channel) != 0 {
-                continue;
-            }
-            *value = resolve_source_post_convergence(
-                &GraphSource::InputLeaf {
-                    ref_idx: projection.ref_idx,
-                    sub_idx: channel as u16,
-                },
-                compute_count,
-                curr_outputs,
-                input_refs,
-                resolve_ctx,
-                shared_memory,
-                prev_shared_memory,
-            );
-        }
-        for (d, term) in entry.iter_mut().enumerate() {
-            let channel = projection.channel_for(d as u8);
-            *term += projection.weight * ring[usize::from(channel)];
-        }
-    }
-    terms
 }
 
 /// Apply post-convergence effects from CGP graph evaluation.
@@ -103,6 +51,7 @@ fn projection_terms(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_cgp_graph_effects(
     def: &CgpGraphBackendDef,
+    sink_weights: &[Box<[f32]>],
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
@@ -120,28 +69,21 @@ pub(crate) fn apply_cgp_graph_effects(
     // each wired `ActionVote` sink, 0 for an unwired one. Staged at the end of
     // the effects, which only run when the visit commits.
     let mut contribution: VoteVector = [0.0; VOTE_SINK_COUNT];
-    let projections = projection_terms(
-        def,
-        compute_count,
-        curr_outputs,
-        input_refs,
-        resolve_ctx,
-        shared_memory,
-        prev_shared_memory,
+    debug_assert_eq!(
+        sink_weights.len(),
+        def.output_sinks().len(),
+        "the weight table has one row per sink"
     );
-
-    for sink in def.output_sinks() {
-        // A directed vote sink's projection term (T11.F31), added to its edge
-        // sum; the sink is applied when it has edges or a projection.
-        let projection = match sink.kind {
-            OutputSinkKind::ActionVote(vote) => {
-                DirectedVoteKind::of_sink(vote).and_then(|(kind, d)| {
-                    projections[kind.index()].and_then(|terms| terms.get(usize::from(d)).copied())
-                })
-            }
-            _ => None,
-        };
-        if sink.inputs.is_empty() && projection.is_none() {
+    for (sink_idx, (sink, weights)) in def.output_sinks().iter().zip(sink_weights).enumerate() {
+        debug_assert!(
+            weights.len() == sink.inputs.len()
+                && weights.iter().enumerate().all(|(index, weight)| {
+                    let occurrence = EdgeOccurrence::new(EdgeSurface::SinkInput(sink_idx), index);
+                    weight.to_bits() == def.genomic_weight(occurrence, input_refs).to_bits()
+                }),
+            "the weight table is the genome's: rebuild runtime state after editing the genome"
+        );
+        if sink.inputs.is_empty() {
             output_sink_traces.push(GraphOutputSinkTrace {
                 wired: false,
                 weighted_sum: 0.0,
@@ -151,24 +93,19 @@ pub(crate) fn apply_cgp_graph_effects(
             continue;
         }
 
-        let edge_sum = if sink.inputs.is_empty() {
-            0.0
-        } else {
-            edges_wsum(
-                &sink.inputs,
-                compute_count,
-                curr_outputs,
-                input_refs,
-                resolve_ctx,
-                shared_memory,
-                prev_shared_memory,
-                &mut buf,
-            )
-        };
-        let wsum = match projection {
-            Some(term) => edge_sum + term,
-            None => edge_sum,
-        };
+        // Members are ordinary sink edges at their genomic weights (T25.F03),
+        // summed in the sink's I10 order.
+        let wsum = edges_wsum(
+            &sink.inputs,
+            weights,
+            compute_count,
+            curr_outputs,
+            input_refs,
+            resolve_ctx,
+            shared_memory,
+            prev_shared_memory,
+            &mut buf,
+        );
         let mut applied = false;
         let mut applied_value = 0.0;
 

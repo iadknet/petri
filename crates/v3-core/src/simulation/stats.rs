@@ -338,6 +338,10 @@ pub struct SimStats {
     pub mutation_executed_target_total: u64,
     /// Mutation events where target reachability was not applicable (exempt operators).
     pub mutation_not_applicable_target_total: u64,
+    /// Group members committed mutation events detached (T25.F03).
+    pub graph_edges_detached_total: u64,
+    /// Edge groups committed mutation events removed (T25.F03).
+    pub groups_removed_total: u64,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
     pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
     /// The same aggregates keyed by birth edge class (`drive_births`,

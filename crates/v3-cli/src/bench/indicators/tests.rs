@@ -471,6 +471,10 @@ fn temporal_report_keeps_substrate_counts_separate() {
             ),
         }],
     };
+    sim.creatures[id].graph_runtime = v3_core::creature::state::GraphRuntimeState::for_genome(
+        &sim.creatures[id].genome,
+        Vec::new(),
+    );
     sim.creatures[id].prev_shared_memory[0] = 1.0;
     let report = temporal_memory_sensitivity(11, &sim);
     assert_eq!(report.previous_slots.final_creature_count, 1);

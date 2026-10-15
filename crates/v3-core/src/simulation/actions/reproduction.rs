@@ -473,6 +473,8 @@ fn spawn_child(
     sim.stats.mutation_executed_target_total += summary.executed_target_events as u64;
     sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
+    sim.stats.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
+    sim.stats.groups_removed_total += u64::from(summary.groups_removed);
     let mut child_birth_mutation_operators: Vec<_> =
         summary.applied_by_operator.keys().copied().collect();
     child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());

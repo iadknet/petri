@@ -4,6 +4,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
+use crate::creature::genome::cgp::validate_graph;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -12,7 +13,7 @@ use crate::mutation::pressure;
 use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    BirthEdgeClass, GroupEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
@@ -36,6 +37,9 @@ struct SelectedEvent {
     /// The reachability and, for `AddGraphEdge` and `InputRef.Add`, the class
     /// of the vote-sink edge the event pushed (T11.F30).
     result: Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason>,
+    /// The detaches and group removals the event made, counted when it
+    /// commits (T25.F03); zero outside the Graph domain.
+    group_edits: GroupEdits,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
     /// it stood before the event (T13.F01).
@@ -214,6 +218,7 @@ impl MutationEngine {
                         operator,
                         tracked_before,
                         result,
+                        group_edits: GroupEdits::default(),
                         executed_hits: targets.executed_hits(),
                         first_pick: targets.first_pick(),
                     });
@@ -257,6 +262,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
+                                group_edits: GroupEdits::default(),
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -291,7 +297,7 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let result = apply_graph_event(
+                            let (result, group_edits) = apply_graph_event(
                                 genome,
                                 op,
                                 &mut targets,
@@ -311,6 +317,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
+                                group_edits,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -358,6 +365,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
+                                group_edits: GroupEdits::default(),
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -370,6 +378,7 @@ impl MutationEngine {
                 operator,
                 tracked_before,
                 result,
+                group_edits,
                 executed_hits,
                 first_pick,
             }) = selected
@@ -404,6 +413,7 @@ impl MutationEngine {
             match result {
                 Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
+                    summary.record_group_edits(group_edits);
                     if let Some(class) = edge_class {
                         summary.record_vote_edge_class(class);
                     }
@@ -577,10 +587,63 @@ fn select_weighted_index<T: Copy>(
     unreachable!("weight draw must return an index");
 }
 
-/// Apply one mutation event with the parseability gate: snapshot the genome
-/// (birth seeds included), apply, and commit when the event applied and the
-/// genome still parses; otherwise restore the snapshot. A rejected event
-/// leaves the draft, its seeds included, exactly as it was.
+/// The genome's group members and group records, summed over its Graph
+/// backends.
+fn group_tallies(genome: &CreatureGenome) -> (u32, u32) {
+    genome
+        .nodes
+        .iter()
+        .filter_map(|node| match &node.backend_def {
+            BackendDef::Graph(def) => Some(def),
+            BackendDef::Vm(_) => None,
+        })
+        .fold((0, 0), |(members, groups), def| {
+            let present = def
+                .output_sinks()
+                .iter()
+                .flat_map(|sink| sink.inputs.iter())
+                .filter(|edge| edge.membership().is_some())
+                .count();
+            (members + present as u32, groups + def.groups().len() as u32)
+        })
+}
+
+/// What a committed Graph event `op` did to groups, from the tallies before
+/// and after it. Only retarget, a raw-field step and a split detach (each at
+/// most one member, and nothing else they do loses one); `RemoveGroup` and
+/// `RemoveGraphEdge` remove groups, as does a last member's detach.
+fn group_edits(op: GraphOperator, before: (u32, u32), after: (u32, u32)) -> GroupEdits {
+    let detaches = matches!(
+        op,
+        GraphOperator::RetargetGraphEdge
+            | GraphOperator::GraphRawFieldMutation
+            | GraphOperator::AddInternalGraphNode
+    );
+    let removes = detaches
+        || matches!(
+            op,
+            GraphOperator::RemoveGroup | GraphOperator::RemoveGraphEdge
+        );
+    GroupEdits {
+        detached: if detaches {
+            before.0.saturating_sub(after.0)
+        } else {
+            0
+        },
+        groups_removed: if removes {
+            before.1.saturating_sub(after.1)
+        } else {
+            0
+        },
+    }
+}
+
+/// Apply one mutation event with the parseability and graph-invariant gate:
+/// snapshot the genome (birth seeds included), apply, and commit when the
+/// event applied, the genome still parses and every Graph backend passes
+/// `validate_graph` (T25.F03); otherwise restore the snapshot. A rejected
+/// event leaves the draft, its seeds included, exactly as it was. Shared by
+/// all four domains.
 fn apply_gated<T>(
     genome: &mut CreatureGenome,
     apply: impl FnOnce(&mut CreatureGenome) -> Result<T, MutationSkipReason>,
@@ -589,6 +652,14 @@ fn apply_gated<T>(
     let result = match apply(genome) {
         Ok(_) if ParseabilityGate::validate(genome).is_err() => {
             Err(MutationSkipReason::ParseabilityViolation)
+        }
+        Ok(_)
+            if genome
+                .nodes
+                .iter()
+                .any(|node| validate_graph(node).is_err()) =>
+        {
+            Err(MutationSkipReason::GraphInvariantViolation)
         }
         result => result,
     };
@@ -633,6 +704,9 @@ fn apply_vm_event(
 }
 
 /// Apply one graph mutation event with parseability gate.
+/// Apply one graph mutation event with the gate, and the detaches and group
+/// removals it made, counted only when it commits: a rolled-back event
+/// reports none (T25.F03).
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
@@ -640,10 +714,20 @@ fn apply_graph_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
-) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
-    apply_gated(genome, |genome| {
+) -> (
+    Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason>,
+    GroupEdits,
+) {
+    let before = group_tallies(genome);
+    let result = apply_gated(genome, |genome| {
         GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
-    })
+    });
+    let edits = if result.is_ok() {
+        group_edits(op, before, group_tallies(genome))
+    } else {
+        GroupEdits::default()
+    };
+    (result, edits)
 }
 
 /// Apply one input ref mutation event with parseability gate.
@@ -728,17 +812,11 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
         GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
         GraphOperator::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
-        GraphOperator::AddRingProjection => MutationOperator::GraphAddRingProjection,
-        GraphOperator::AlterRingProjectionWeight => {
-            MutationOperator::GraphAlterRingProjectionWeight
-        }
-        GraphOperator::ShiftRingProjectionOffset => {
-            MutationOperator::GraphShiftRingProjectionOffset
-        }
-        GraphOperator::RetargetRingProjectionKind => {
-            MutationOperator::GraphRetargetRingProjectionKind
-        }
-        GraphOperator::RemoveRingProjection => MutationOperator::GraphRemoveRingProjection,
+        GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
+        GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
+        GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
+        GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
+        GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
     }
 }
 
@@ -762,3 +840,6 @@ mod membership_tests;
 
 #[cfg(test)]
 mod refinement_tests;
+
+#[cfg(test)]
+mod group_tests;

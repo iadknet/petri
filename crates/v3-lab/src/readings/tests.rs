@@ -6,7 +6,8 @@ use proptest::prelude::*;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::cgp::{
-    ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, OutputSink, RingProjection,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GroupId, OutputSink,
+    Shape as GroupShape,
 };
 use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::VmBackendDef;
@@ -488,15 +489,16 @@ fn with_ring(genome: &mut CreatureGenome, key: WorldInputKey) -> (usize, u16) {
     (entry, ref_idx)
 }
 
-fn projections(genome: &CreatureGenome, node: usize) -> &[RingProjection] {
+fn graph(genome: &CreatureGenome, node: usize) -> &CgpGraphBackendDef {
     let BackendDef::Graph(graph) = &genome.nodes[node].backend_def else {
         panic!("a graph node");
     };
-    &graph.projections
+    graph
 }
 
-#[test]
-fn a_ring_projection_is_a_consumer_and_ablation_masks_every_channel_of_its_family() {
+/// The founder with a barrier and an occupied ring on its entry node, each
+/// read by a `Ring` group: `(genome, entry, barrier, occupied)`.
+fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
     let (entry, barrier) = with_ring(&mut genome, WorldInputKey::NeighborBarrierRing);
@@ -504,56 +506,102 @@ fn a_ring_projection_is_a_consumer_and_ablation_masks_every_channel_of_its_famil
     let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
         panic!("the founder entry is a graph node");
     };
-    graph.projections.extend([
-        RingProjection::new(barrier, DirectedVoteKind::Move, 0, 0.5),
-        RingProjection::new(occupied, DirectedVoteKind::Move, 3, -0.5),
-    ]);
+    for (ring_ref, offset, scale) in [(barrier, 0, 0.5), (occupied, 3, -0.5)] {
+        let id = graph.add_group(
+            GroupShape::Ring { ring_ref },
+            DirectedVoteKind::Move,
+            offset,
+        );
+        graph.group_mut(id).set_scale(scale);
+    }
+    (genome, entry, barrier, occupied)
+}
+
+/// The lab's sentinel scheme masks a ring family through its group's
+/// members: each member reading the family reads a sentinel out of range
+/// (0.0), and the other ring's members are untouched.
+#[test]
+fn masking_a_ring_reference_zeroes_every_member_read() {
+    let (genome, entry, barrier, occupied) = grouped_founder();
     let found = consumers(&genome);
     assert!(found[&Family::NeighborBarrierRing].contains(&entry));
     assert!(found[&Family::NeighborOccupiedRing].contains(&entry));
 
     let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
-    // The production input-use mask: `ref_idx`, and with it every charge,
-    // unchanged.
-    let masks: Vec<(u16, u8)> = projections(&ablated, entry)
-        .iter()
-        .map(|projection| (projection.ref_idx, projection.ablated_channels))
-        .collect();
-    assert_eq!(masks, [(barrier, u8::MAX), (occupied, 0)]);
-    assert_eq!(ablated.genome_size(), genome.genome_size());
-    assert_eq!(ablated.complexity(), genome.complexity());
+    let len = genome.nodes[entry].input_refs.len();
+    let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
+    for (group, ring) in [(GroupId::new(0), barrier), (GroupId::new(1), occupied)] {
+        let reads: Vec<u16> = after
+            .members(group)
+            .map(|occurrence| match after.edge_at(occurrence).source() {
+                GraphSource::InputLeaf { ref_idx, .. } => ref_idx,
+                other => panic!("a member reads a leaf, not {other:?}"),
+            })
+            .collect();
+        assert_eq!(reads.len(), 8);
+        if ring == barrier {
+            assert!(reads.iter().all(|&ref_idx| usize::from(ref_idx) >= len));
+        } else {
+            assert!(reads.iter().all(|&ref_idx| ref_idx == occupied));
+        }
+        assert_eq!(after.members(group).count(), before.members(group).count());
+    }
     let left = consumers(&ablated);
     assert!(!left.contains_key(&Family::NeighborBarrierRing));
     assert!(left[&Family::NeighborOccupiedRing].contains(&entry));
 }
 
+/// The sentinel rewrite is an observation copy: size, complexity, the group
+/// records, every membership and every member's genomic weight are the
+/// original's.
 #[test]
-fn a_sentinel_skips_an_out_of_range_projection_index() {
-    let setup = setup(1, 100.0);
-    let mut genome = founder(&setup);
-    let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
-        panic!("the founder's node 0 is a graph node");
-    };
-    // `functional_complexity` counts every projection's index, in range or
-    // not, as a consumed index.
-    graph.projections.push(RingProjection::new(
-        ABLATED_REF,
-        DirectedVoteKind::Move,
-        0,
-        0.5,
-    ));
-    let family = Family::of(&genome.nodes[0].input_refs[0]);
-    let ablated = ablate(&genome, family).unwrap();
+fn ablating_a_grouped_genome_leaves_size_complexity_groups_memberships_and_member_weights_unchanged(
+) {
+    let (genome, entry, _, _) = grouped_founder();
+    let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
+    assert_eq!(ablated.genome_size(), genome.genome_size());
     assert_eq!(ablated.complexity(), genome.complexity());
-    assert!(!ref_idxs(&ablated).contains(&ABLATED_REF));
+    let refs = &genome.nodes[entry].input_refs;
+    let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
+    assert_eq!(after.groups(), before.groups());
+    let memberships =
+        |def: &CgpGraphBackendDef| -> Vec<_> { def.edges().map(GraphEdge::membership).collect() };
+    assert_eq!(memberships(after), memberships(before));
+    assert_eq!(after.sink_weight_rows(refs), before.sink_weight_rows(refs));
+}
+
+/// `GenomeFile::load` accepts a valid grouped genome and refuses one whose
+/// group no longer reads a ring (I7).
+#[test]
+fn a_genome_file_breaking_a_graph_invariant_is_refused() {
+    let (genome, entry, barrier, _) = grouped_founder();
+    let dir = std::env::temp_dir().join(format!("petri-lab-groups-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("grouped.json");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&crate::GenomeFile::new(genome.clone())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(crate::GenomeFile::load(&path).unwrap(), genome);
+    let mut broken = genome;
+    broken.nodes[entry].input_refs[usize::from(barrier)] = InputReference::ActionVotes;
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&crate::GenomeFile::new(broken)).unwrap(),
+    )
+    .unwrap();
+    let error = crate::GenomeFile::load(&path).unwrap_err();
+    assert!(format!("{error:?}").contains("ShapeReference"), "{error:?}");
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
-fn a_ring_read_only_through_a_projection_is_causal() {
+fn a_ring_read_only_through_a_group_is_causal() {
     let setup = setup(100, 100.0);
     let mut genome = founder(&setup);
-    // Move every founder food-ring read from its edges onto a Move
-    // projection of the same reference.
+    // Move every founder food-ring read from its edges onto a Move group of
+    // the same reference at scale 1.
     let mut moved = 0;
     for node in &mut genome.nodes {
         let refs = &node.input_refs;
@@ -595,17 +643,16 @@ fn a_ring_read_only_through_a_projection_is_causal() {
             .with_compute_nodes(nodes)
             .with_output_sinks(sinks);
         moved += rings.len();
-        graph.projections.extend(
-            rings
-                .into_iter()
-                .map(|ref_idx| RingProjection::new(ref_idx, DirectedVoteKind::Move, 0, 1.0)),
-        );
+        for ring_ref in rings {
+            let id = graph.add_group(GroupShape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            graph.group_mut(id).set_scale(1.0);
+        }
     }
     assert!(moved > 0, "the founder reads its food ring");
     let family = *consumers(&genome)
         .keys()
         .find(|family| matches!(family, Family::NeighborFoodRing(_)))
-        .expect("the projection consumes the ring");
+        .expect("the group's members consume the ring");
     let scenes = scenes(2);
     let run = observe(&setup, &genome, &scenes);
     let ancestry = Ancestry::default();

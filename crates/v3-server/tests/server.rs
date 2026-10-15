@@ -2587,6 +2587,80 @@ async fn get_creature_mesh_annotations_use_cached_reachable_nodes() {
     );
 }
 
+/// `graph_weights` (T25.F03): absent for a creature without a group member;
+/// for a member, every member's genomic weight beside the genome, computed
+/// with the genome excluded too, and dropped by its own token.
+#[tokio::test]
+async fn get_creature_graph_weights_carry_member_genomic_weights() {
+    use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::Shape;
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::creature::genome::BackendDef;
+
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("graph_weights").is_none(), "no member, no payload");
+
+    let node_id = {
+        let mut handle = state.sim.lock().await;
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        let node = creature
+            .genome
+            .nodes
+            .iter_mut()
+            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("a Graph node");
+        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!()
+        };
+        let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+        def.group_mut(group).set_scale(0.5);
+        let member = def.members(group).next().unwrap();
+        def.edge_mut(member).set_weight(0.25);
+        node.node_id
+    };
+
+    for query in ["", "?exclude=genome"] {
+        let (status, body) =
+            do_request(router(state.clone()), get_req(&format!("{uri}{query}"))).await;
+        assert_eq!(status, StatusCode::OK, "body: {body}");
+        let weights = body["graph_weights"]
+            .as_array()
+            .expect("graph_weights array");
+        assert_eq!(weights.len(), 1, "{body}");
+        assert_eq!(weights[0]["node_id"], serde_json::json!(node_id));
+        assert_eq!(
+            weights[0]["scales"],
+            serde_json::json!([{"group": 0, "genomic": 0.5}])
+        );
+        let edges = weights[0]["edges"].as_array().unwrap();
+        assert_eq!(edges.len(), 8);
+        assert!(edges.iter().all(|edge| edge["surface"] == "sink"));
+        let mut genomic: Vec<f64> = edges
+            .iter()
+            .map(|edge| edge["genomic"].as_f64().unwrap())
+            .collect();
+        genomic.sort_by(f64::total_cmp);
+        assert_eq!(genomic, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]);
+    }
+    let (_, body) = do_request(
+        router(state),
+        get_req(&format!("{uri}?exclude=graph_weights")),
+    )
+    .await;
+    assert!(body.get("graph_weights").is_none(), "excluded by its token");
+    assert!(body.get("genome").is_some());
+}
+
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]

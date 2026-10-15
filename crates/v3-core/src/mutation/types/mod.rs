@@ -19,6 +19,14 @@ impl ComplexityEffect {
     }
 }
 
+/// The member detaches and group removals one committed Graph event made
+/// (T25.F03).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GroupEdits {
+    pub detached: u32,
+    pub groups_removed: u32,
+}
+
 /// Reason a mutation event was skipped.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -27,6 +35,9 @@ pub enum MutationSkipReason {
     ParseabilityViolation,
     NumericProposalRejected,
     NoApplicableTarget,
+    /// The event left a Graph backend breaking a graph invariant
+    /// (`validate_graph`, T25.F03); the draft was rolled back.
+    GraphInvariantViolation,
 }
 
 impl MutationSkipReason {
@@ -37,6 +48,7 @@ impl MutationSkipReason {
             Self::ParseabilityViolation => "ParseabilityViolation",
             Self::NumericProposalRejected => "NumericProposalRejected",
             Self::NoApplicableTarget => "NoApplicableTarget",
+            Self::GraphInvariantViolation => "GraphInvariantViolation",
         }
     }
 }
@@ -231,11 +243,11 @@ pub enum MutationOperator {
     GraphMutateTraceDecay,
     GraphRecruitNeutralInput,
     GraphRefineHeritableStructure,
-    GraphAddRingProjection,
-    GraphAlterRingProjectionWeight,
-    GraphShiftRingProjectionOffset,
-    GraphRetargetRingProjectionKind,
-    GraphRemoveRingProjection,
+    GraphAddRingGroup,
+    GraphAlterGroupScale,
+    GraphShiftGroupOffset,
+    GraphRetargetGroupKind,
+    GraphRemoveGroup,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -299,11 +311,11 @@ impl MutationOperator {
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
             Self::GraphRefineHeritableStructure => "Graph.RefineHeritableStructure",
-            Self::GraphAddRingProjection => "Graph.AddRingProjection",
-            Self::GraphAlterRingProjectionWeight => "Graph.AlterRingProjectionWeight",
-            Self::GraphShiftRingProjectionOffset => "Graph.ShiftRingProjectionOffset",
-            Self::GraphRetargetRingProjectionKind => "Graph.RetargetRingProjectionKind",
-            Self::GraphRemoveRingProjection => "Graph.RemoveRingProjection",
+            Self::GraphAddRingGroup => "Graph.AddRingGroup",
+            Self::GraphAlterGroupScale => "Graph.AlterGroupScale",
+            Self::GraphShiftGroupOffset => "Graph.ShiftGroupOffset",
+            Self::GraphRetargetGroupKind => "Graph.RetargetGroupKind",
+            Self::GraphRemoveGroup => "Graph.RemoveGroup",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -366,11 +378,11 @@ impl MutationOperator {
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
             | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingProjection
-            | Self::GraphAlterRingProjectionWeight
-            | Self::GraphShiftRingProjectionOffset
-            | Self::GraphRetargetRingProjectionKind
-            | Self::GraphRemoveRingProjection => MutationDomain::Graph,
+            | Self::GraphAddRingGroup
+            | Self::GraphAlterGroupScale
+            | Self::GraphShiftGroupOffset
+            | Self::GraphRetargetGroupKind
+            | Self::GraphRemoveGroup => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -425,13 +437,13 @@ impl MutationOperator {
             | Self::GraphEnableHebbian
             | Self::GraphEnableRewardModulation
             | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingProjection => ComplexityEffect::Increasing,
+            | Self::GraphAddRingGroup => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
             | Self::GraphDisableHebbian
             | Self::GraphDisableRewardModulation
-            | Self::GraphRemoveRingProjection => ComplexityEffect::Decreasing,
+            | Self::GraphRemoveGroup => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphRefineHeritableStructure
@@ -444,9 +456,9 @@ impl MutationOperator {
             | Self::GraphToggleHebbianLamarckian
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
-            | Self::GraphAlterRingProjectionWeight
-            | Self::GraphShiftRingProjectionOffset
-            | Self::GraphRetargetRingProjectionKind => ComplexityEffect::Neutral,
+            | Self::GraphAlterGroupScale
+            | Self::GraphShiftGroupOffset
+            | Self::GraphRetargetGroupKind => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -509,11 +521,11 @@ impl MutationOperator {
             Self::GraphMutateTraceDecay,
             Self::GraphRecruitNeutralInput,
             Self::GraphRefineHeritableStructure,
-            Self::GraphAddRingProjection,
-            Self::GraphAlterRingProjectionWeight,
-            Self::GraphShiftRingProjectionOffset,
-            Self::GraphRetargetRingProjectionKind,
-            Self::GraphRemoveRingProjection,
+            Self::GraphAddRingGroup,
+            Self::GraphAlterGroupScale,
+            Self::GraphShiftGroupOffset,
+            Self::GraphRetargetGroupKind,
+            Self::GraphRemoveGroup,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,
@@ -624,6 +636,12 @@ pub struct MutationSummary {
     /// The class of each vote-sink edge an applied `AddGraphEdge` or
     /// `InputRef.Add` pushed, in event order (T11.F30).
     pub vote_edge_classes: Vec<BirthEdgeClass>,
+    /// Group members committed events detached (T25.F03): retarget,
+    /// raw-field step or split of a member.
+    pub graph_edges_detached: u32,
+    /// Edge groups committed events removed (T25.F03): `RemoveGroup`, and a
+    /// last member's removal or detach.
+    pub groups_removed: u32,
 }
 
 impl MutationSummary {
@@ -651,7 +669,15 @@ impl MutationSummary {
             not_applicable_events: 0,
             events: Vec::new(),
             vote_edge_classes: Vec::new(),
+            graph_edges_detached: 0,
+            groups_removed: 0,
         }
+    }
+
+    /// Record the detaches and group removals of a committed event.
+    pub fn record_group_edits(&mut self, edits: GroupEdits) {
+        self.graph_edges_detached += edits.detached;
+        self.groups_removed += edits.groups_removed;
     }
 
     /// Record the class of a vote-sink edge an applied event pushed.

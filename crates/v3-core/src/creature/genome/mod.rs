@@ -258,9 +258,10 @@ impl CreatureGenome {
     ///
     /// Counts every mesh node, input ref, route target, VM instruction and
     /// constant, graph compute node, and edge on both graph surfaces (compute
-    /// inputs and sink inputs), plus nine units per ring projection: its
-    /// record and its eight implied synapses (T25.F02). A wired sink adds
-    /// nothing of itself; a synapse is one unit wherever it sits. Equal
+    /// inputs and sink inputs, group members included), plus one unit per
+    /// edge-group record (T25.F03): a `Ring` group of eight members costs nine
+    /// units. A wired sink adds nothing of itself; a synapse is one unit
+    /// wherever it sits. Equal
     /// weights, includes junk DNA, no reachability analysis. Read by the
     /// carrying cost, the per-unit mutation supply, the replication cost,
     /// gestation and the size-pressure gate (`genome_size_cap`).
@@ -285,9 +286,9 @@ impl CreatureGenome {
                     for sink in graph.output_sinks() {
                         score += sink.inputs.len() as u32;
                     }
-                    // A ring projection (T11.F31) is its record plus its
-                    // eight implied synapses.
-                    score += 9 * graph.projections.len() as u32;
+                    // An edge-group record (T25.F03); its members are
+                    // counted as sink edges above.
+                    score += graph.groups().len() as u32;
                 }
             }
         }
@@ -306,8 +307,8 @@ impl CreatureGenome {
 }
 
 #[cfg(test)]
-#[path = "tests/projection_tests.rs"]
-mod projection_tests;
+#[path = "tests/group_tests.rs"]
+mod group_tests;
 
 #[cfg(test)]
 #[path = "tests/size_tests.rs"]

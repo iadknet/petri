@@ -152,7 +152,7 @@ fn costly_config() -> RuntimeConfig {
 fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run {
     let mut energy = energy;
     let mut memory = [0.0; 16];
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
     state.begin_tick(&genome.nodes, 0);
     let (output, _, passes) = execute_creature_mesh_traced(
         genome,
@@ -401,7 +401,8 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
         };
         let mut energy = 100.0;
         let mut memory = [0.0; 16];
-        let mut state = GraphRuntimeState::new();
+        let mut state =
+            crate::creature::genome::cgp::test_support::runtime_for_defs(&vec![&def; node_idx + 1]);
         let _ = crate::runtime::cgp::execute_graph_node(
             &def,
             &[],
@@ -481,9 +482,9 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
             let mut energies = [start; 3];
             let mut memories = [[0.0; 16]; 3];
             let mut states = [
-                GraphRuntimeState::new(),
-                GraphRuntimeState::new(),
-                GraphRuntimeState::new(),
+                GraphRuntimeState::for_genome(&genome, Vec::new()),
+                GraphRuntimeState::for_genome(&genome, Vec::new()),
+                GraphRuntimeState::for_genome(&genome, Vec::new()),
             ];
             for state in &mut states {
                 state.begin_tick(&genome.nodes, 0);

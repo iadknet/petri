@@ -1,9 +1,10 @@
-//! T11.F31: ring projections through the native effects pass. Equality is
-//! exact numeric f32 equality (signed zero allowed), as for zero vote edges.
+//! T25.F03: `Ring` edge groups through the native effects pass. Members are
+//! ordinary sink edges at their genomic weight, so equality with the
+//! equivalent ungrouped edges is bitwise.
 use super::*;
-use crate::creature::genome::cgp::RingProjection;
+use crate::creature::genome::cgp::{EdgeSurface, GroupId, Shape};
 use crate::creature::genome::vote::DirectedVoteKind;
-use crate::mutation::graph::projection;
+use crate::mutation::graph::group;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::types::sanitize_f32;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -55,6 +56,7 @@ fn effects_at(
     let mut side = side();
     let (result, _) = apply_cgp_graph_effects(
         def,
+        &def.sink_weight_rows(refs),
         &[0.5; 3],
         refs,
         &ctx,
@@ -82,28 +84,60 @@ fn ring_strategy() -> impl Strategy<Value = [f32; 8]> {
     prop::array::uniform8(-10.0f32..10.0)
 }
 
-/// The eight edges a projection `(w, k)` of `kind` over `ref_idx` is
-/// equivalent to.
-fn eight_edges(def: &mut CgpGraphBackendDef, p: RingProjection) {
-    for d in 0..8 {
+/// Nonzero corrections, one per member.
+fn corrections_strategy() -> impl Strategy<Value = Vec<f32>> {
+    prop::collection::vec(prop_oneof![-4.0f32..-1e-3, 1e-3f32..4.0], 8)
+}
+
+/// Add a `Ring` group on `ring_ref` with `scale` and one correction per
+/// member, in member order.
+fn add_group(
+    def: &mut CgpGraphBackendDef,
+    ring_ref: u16,
+    kind: DirectedVoteKind,
+    offset: u8,
+    scale: f32,
+    corrections: &[f32],
+) -> GroupId {
+    let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
+    def.group_mut(id).set_scale(scale);
+    let members: Vec<_> = def.members(id).collect();
+    for (occurrence, &own) in members.into_iter().zip(corrections) {
+        def.edge_mut(occurrence).set_weight(own);
+    }
+    id
+}
+
+/// The eight ungrouped edges `grouped`'s group `id` is equivalent to: per
+/// member, an edge from the same leaf into the same sink at weight
+/// `scale + own_weight`, appended after the sink's incumbents (the member's
+/// I10 position when the group is the sink's only one).
+fn eight_edges(base: &mut CgpGraphBackendDef, grouped: &CgpGraphBackendDef, id: GroupId) {
+    let scale = grouped.groups()[id.index()].scale();
+    for occurrence in grouped.members(id) {
+        let member = grouped.edge_at(occurrence);
+        let EdgeSurface::SinkInput(sink) = occurrence.surface else {
+            unreachable!("members are sink edges")
+        };
         wire(
-            def,
-            OutputSinkKind::ActionVote(p.kind.sink(d)),
-            edge(leaf(p.ref_idx, u16::from(p.channel_for(d))), p.weight),
+            base,
+            grouped.output_sinks()[sink].kind,
+            edge(member.source(), scale + member.own_weight()),
         );
     }
 }
 
 proptest! {
+    /// A new group (scale 0, corrections 0) on a valid ring is exactly
+    /// neutral to every vote, result and memory.
     #[test]
-    fn zero_weight_projection_is_exactly_neutral(
+    fn a_new_group_is_exactly_neutral(
         food in ring_strategy(),
         barrier in ring_strategy(),
         occupied in ring_strategy(),
         kind in kind_strategy(),
-        offset in 0u8..16,
-        ref_idx in 0u16..5,
-        negative_zero in any::<bool>(),
+        offset in 0u8..8,
+        ring_ref in 0u16..3,
         incumbents in prop::collection::vec((0usize..27, -4.0f32..4.0), 0..6),
     ) {
         let sensors = ring_sensors(food, barrier, occupied);
@@ -113,8 +147,7 @@ proptest! {
             wire(&mut def, OutputSinkKind::ActionVote(vote), edge(memory(0, true), weight));
         }
         let before = effects_at(&def, &rings(), &sensors);
-        let weight = if negative_zero { -0.0 } else { 0.0 };
-        def.projections.push(RingProjection::new(ref_idx, kind, offset, weight));
+        def.add_group(Shape::Ring { ring_ref }, kind, offset);
         let after = effects_at(&def, &rings(), &sensors);
         prop_assert_eq!(after.side.dispatch_effects(), before.side.dispatch_effects());
         prop_assert_eq!(after.result, before.result);
@@ -122,14 +155,18 @@ proptest! {
         prop_assert_eq!(after.side.work_counters, before.side.work_counters);
     }
 
+    /// The `eight_edges` oracle: a group (scale `s`, corrections `c_i` drawn
+    /// nonzero) votes bitwise as its eight ungrouped edges of weight
+    /// `s + c_i` on a kind without other edges.
     #[test]
-    fn a_projection_equals_its_eight_edges_on_a_kind_without_edges(
+    fn a_group_equals_its_eight_edges_on_a_kind_without_edges(
         food in ring_strategy(),
         barrier in ring_strategy(),
         kind in kind_strategy(),
         offset in 0u8..8,
-        ref_idx in 0u16..3,
-        weight in -4.0f32..4.0,
+        ring_ref in 0u16..3,
+        scale in -4.0f32..4.0,
+        corrections in corrections_strategy(),
         others in prop::collection::vec((0usize..27, -4.0f32..4.0), 0..4),
     ) {
         let sensors = ring_sensors(food, barrier, ramp(0.25));
@@ -141,29 +178,30 @@ proptest! {
             }
             wire(&mut base, OutputSinkKind::ActionVote(vote), edge(memory(0, true), w));
         }
-        let p = RingProjection::new(ref_idx, kind, offset, weight);
-        let mut projected = base.clone();
-        projected.projections.push(p);
+        let mut grouped = base.clone();
+        let id = add_group(&mut grouped, ring_ref, kind, offset, scale, &corrections);
         let mut wired = base;
-        eight_edges(&mut wired, p);
-        prop_assert_eq!(votes(&projected, &sensors), votes(&wired, &sensors));
+        eight_edges(&mut wired, &grouped, id);
+        let (a, b) = (votes(&grouped, &sensors), votes(&wired, &sensors));
+        prop_assert_eq!(a.map(f32::to_bits), b.map(f32::to_bits));
     }
 
-    /// With incumbent edges, one projection is the same eight terms appended
-    /// after them, nonfinite weights and ring values included.
+    /// With incumbent edges, a group's members sum after them like appended
+    /// edges, nonfinite scales and ring values included.
     #[test]
-    fn one_projection_sums_after_incumbent_edges_like_appended_edges(
+    fn a_group_sums_after_incumbent_edges_like_appended_edges(
         mut food in ring_strategy(),
         nan_channel in prop::option::of(0usize..8),
         kind in kind_strategy(),
         offset in 0u8..8,
-        weight in prop_oneof![
+        scale in prop_oneof![
             -4.0f32..4.0,
             Just(f32::INFINITY),
             Just(f32::NEG_INFINITY),
             Just(f32::NAN),
             Just(3.0e38f32),
         ],
+        corrections in corrections_strategy(),
         incumbents in prop::collection::vec((0u8..8, -4.0f32..4.0), 1..6),
     ) {
         if let Some(channel) = nan_channel {
@@ -174,12 +212,11 @@ proptest! {
         for (d, w) in incumbents {
             wire(&mut base, OutputSinkKind::ActionVote(kind.sink(d)), edge(memory(1, false), w));
         }
-        let p = RingProjection::new(0, kind, offset, weight);
-        let mut projected = base.clone();
-        projected.projections.push(p);
+        let mut grouped = base.clone();
+        let id = add_group(&mut grouped, 0, kind, offset, scale, &corrections);
         let mut wired = base;
-        eight_edges(&mut wired, p);
-        let (a, b) = (votes(&projected, &sensors), votes(&wired, &sensors));
+        eight_edges(&mut wired, &grouped, id);
+        let (a, b) = (votes(&grouped, &sensors), votes(&wired, &sensors));
         for (x, y) in a.iter().zip(&b) {
             prop_assert!(x.to_bits() == y.to_bits() || x == y, "{a:?} {b:?}");
         }
@@ -190,26 +227,50 @@ proptest! {
         food in ring_strategy(),
         kind in kind_strategy(),
         offset in 0u8..8,
-        weight in -4.0f32..4.0,
+        scale in -4.0f32..4.0,
         seed in any::<u64>(),
     ) {
         let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.projections.push(RingProjection::new(0, kind, offset, weight));
+        add_group(&mut def, 0, kind, offset, scale, &[0.0; 8]);
         let before = votes(&def, &sensors);
-        projection::shift_offset(&mut def, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        group::shift_offset(&mut def, &mut SmallRng::seed_from_u64(seed)).unwrap();
         let after = votes(&def, &sensors);
-        let step = (def.projections[0].offset + 8 - offset) % 8;
+        let step = (def.groups()[0].offset() + 8 - offset) % 8;
         prop_assert!(step == 1 || step == 7);
         for d in 0..8u8 {
             let from = (d + 8 - step) % 8;
             prop_assert_eq!(after[kind.sink(d).index()], before[kind.sink(from).index()]);
         }
     }
+
+    /// Redirecting a member's read out of range (the ablation rewrite) reads
+    /// its ring channel as 0.0 at the member's unchanged genomic weight, and
+    /// leaves every other channel's term unchanged.
+    #[test]
+    fn an_ablated_member_reads_zero(
+        food in ring_strategy(),
+        channel in 0u16..8,
+        kind in kind_strategy(),
+        offset in 0u8..8,
+        scale in -4.0f32..4.0,
+    ) {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        add_group(&mut def, 0, kind, offset, scale, &[0.0; 8]);
+        let mut zeroed = food;
+        zeroed[usize::from(channel)] = 0.0;
+        let expected = votes(&def, &ring_sensors(zeroed, ramp(0.0), ramp(0.25)));
+        def.redirect_leaf_reads(|ref_idx, sub_idx| (ref_idx == 0 && sub_idx == channel).then_some(u16::MAX));
+        let masked = votes(&def, &ring_sensors(food, ramp(0.0), ramp(0.25)));
+        prop_assert_eq!(masked, expected);
+    }
 }
 
+/// Two groups of one kind and offset and an incumbent edge sum sequentially
+/// in the sink's I10 order: the incumbent, then the first group's member,
+/// then the second's.
 #[test]
-fn duplicate_projections_and_incumbent_edges_sum_in_the_stated_order() {
+fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
     let food = [0.5, -1.25, 3.0, 0.125, 7.5, -0.75, 2.0, 1e-3];
     let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -220,48 +281,72 @@ fn duplicate_projections_and_incumbent_edges_sum_in_the_stated_order() {
         edge(memory(1, false), edge_weight),
     );
     let (w1, k1, w2, k2) = (0.7f32, 3u8, -1.9f32, 3u8);
-    def.projections
-        .push(RingProjection::new(0, DirectedVoteKind::Move, k1, w1));
-    def.projections
-        .push(RingProjection::new(0, DirectedVoteKind::Move, k2, w2));
+    add_group(&mut def, 0, DirectedVoteKind::Move, k1, w1, &[0.0; 8]);
+    add_group(&mut def, 0, DirectedVoteKind::Move, k2, w2, &[0.0; 8]);
     let votes = votes(&def, &sensors);
     let memory_value = ramp::<16>(0.0)[1];
     for d in 0..8u8 {
         let c = usize::from((d + 8 - k1) % 8);
-        let p = (0.0f32 + w1 * food[c]) + w2 * food[c];
-        let s = if d == 2 {
-            [memory_value * edge_weight].iter().copied().sum::<f32>()
+        let members = [(w1 + 0.0) * food[c], (w2 + 0.0) * food[c]];
+        let terms: Vec<f32> = if d == 2 {
+            std::iter::once(memory_value * edge_weight)
+                .chain(members)
+                .collect()
         } else {
-            0.0
+            members.to_vec()
         };
         assert_eq!(
-            votes[VoteSink::Move(d).index()],
-            sanitize_f32(s + p),
+            votes[VoteSink::Move(d).index()].to_bits(),
+            sanitize_f32(terms.iter().copied().sum::<f32>()).to_bits(),
             "d={d}"
         );
     }
 }
 
+/// An unresolvable `ring_ref` (out of range or not a ring) reads pattern 0:
+/// every member weighs its own correction, so a group at any finite scale
+/// with zero corrections contributes nothing. Such a group fails
+/// `validate_graph` (I7) and never reaches a live genome.
 #[test]
-fn a_projection_off_range_or_off_ring_contributes_zero() {
+fn an_unresolvable_ring_ref_reads_pattern_zero() {
     let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
-    for ref_idx in [3, 4, u16::MAX] {
+    for ring_ref in [3, 4, u16::MAX] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.projections.push(RingProjection::new(
-            ref_idx,
+        add_group(
+            &mut def,
+            ring_ref,
             DirectedVoteKind::Reproduce,
             1,
             2.0,
-        ));
-        assert!(votes(&def, &sensors).iter().all(|&v| v == 0.0), "{ref_idx}");
+            &[0.0; 8],
+        );
+        assert!(def
+            .sink_weight_rows(&rings())
+            .iter()
+            .flat_map(|row| row.iter())
+            .all(|&w| w == 0.0));
+        assert!(
+            votes(&def, &sensors).iter().all(|&v| v == 0.0),
+            "{ring_ref}"
+        );
+        let node = crate::creature::genome::NodeGenome {
+            node_id: crate::contracts::NodeId(0),
+            input_refs: rings(),
+            backend_def: crate::creature::genome::BackendDef::Graph(def),
+            targets: Vec::new(),
+        };
+        assert_eq!(
+            crate::creature::genome::cgp::validate_graph(&node),
+            Err(crate::creature::genome::cgp::GraphInvariantViolation::ShapeReference)
+        );
     }
 }
 
-/// A nonfinite weight on an off-range or off-ring projection leaves the
-/// kind's incumbent edge votes unchanged: the projection contributes 0, not
-/// `weight · 0.0`.
+/// With pattern 0 a member's genomic weight is its correction, so an
+/// unresolvable group beside the kind's incumbent edges leaves their votes
+/// unchanged at any finite scale.
 #[test]
-fn a_nonfinite_weight_off_range_or_off_ring_leaves_incumbent_votes_unchanged() {
+fn an_unresolvable_ring_ref_leaves_incumbent_votes_unchanged() {
     let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
     let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
     for d in 0..8u8 {
@@ -273,38 +358,39 @@ fn a_nonfinite_weight_off_range_or_off_ring_leaves_incumbent_votes_unchanged() {
     }
     let incumbent = votes(&base, &sensors);
     assert!((0..8u8).all(|d| incumbent[DirectedVoteKind::Move.sink(d).index()] != 0.0));
-    for ref_idx in [3, 4, u16::MAX] {
-        for weight in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+    for ring_ref in [3, 4, u16::MAX] {
+        for scale in [-3.0e38, -2.0, 7.5, 3.0e38] {
             let mut def = base.clone();
-            def.projections.push(RingProjection::new(
-                ref_idx,
+            add_group(
+                &mut def,
+                ring_ref,
                 DirectedVoteKind::Move,
                 1,
-                weight,
-            ));
-            assert_eq!(votes(&def, &sensors), incumbent, "{ref_idx} {weight}");
+                scale,
+                &[0.0; 8],
+            );
+            assert_eq!(votes(&def, &sensors), incumbent, "{ring_ref} {scale}");
         }
     }
 }
 
 #[test]
-fn one_weight_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
+fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
     let mut food = [0.0; 8];
     for d in [1, 4, 6] {
         food[d] = 1.0;
     }
     let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.projections
-        .push(RingProjection::new(0, DirectedVoteKind::Move, 0, 0.0));
+    def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     assert!(votes(&def, &sensors).iter().all(|&v| v == 0.0));
-    projection::alter_weight(&mut def, &mut SmallRng::seed_from_u64(5)).unwrap();
-    let weight = def.projections[0].weight;
-    assert_ne!(weight, 0.0);
+    group::alter_scale(&mut def, &mut SmallRng::seed_from_u64(5)).unwrap();
+    let scale = def.groups()[0].scale();
+    assert_ne!(scale, 0.0);
     let votes = votes(&def, &sensors);
     for (index, &vote) in votes.iter().enumerate() {
         let expected = match VoteSink::from_index(index) {
-            Some(VoteSink::Move(d)) if food[usize::from(d)] != 0.0 => weight,
+            Some(VoteSink::Move(d)) if food[usize::from(d)] != 0.0 => scale,
             _ => 0.0,
         };
         assert_eq!(vote, expected, "{index}");
@@ -313,7 +399,17 @@ fn one_weight_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
 
 fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutputs, f32, Vec<f32>) {
     let mut energy = energy;
-    let mut state = GraphRuntimeState::new();
+    let refs = rings();
+    let genome = crate::creature::genome::CreatureGenome {
+        entry_node_id: crate::contracts::NodeId(0),
+        nodes: vec![crate::creature::genome::NodeGenome {
+            node_id: crate::contracts::NodeId(0),
+            input_refs: refs.clone(),
+            backend_def: crate::creature::genome::BackendDef::Graph(def.clone()),
+            targets: Vec::new(),
+        }],
+    };
+    let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
     let mut side = side();
     let mut memory = ramp(0.0);
     let config = RuntimeConfig {
@@ -321,7 +417,6 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
         ..RuntimeConfig::default()
     };
     let sensors = ring_sensors(ramp(0.0), ramp(0.5), ramp(0.25));
-    let refs = rings();
     let mut applied = Vec::new();
     if traced {
         let (_, trace) = execute_graph_node_traced(
@@ -364,20 +459,22 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
     (side, energy, applied)
 }
 
-fn projection_only() -> CgpGraphBackendDef {
+fn group_only() -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.projections.push(RingProjection::new(
+    add_group(
+        &mut def,
         1,
         DirectedVoteKind::StealEnergy,
         2,
         0.75,
-    ));
+        &[0.0; 8],
+    );
     def
 }
 
 #[test]
-fn production_and_traced_visits_agree_and_the_trace_carries_projection_terms() {
-    let def = projection_only();
+fn production_and_traced_visits_agree_and_the_trace_carries_member_terms() {
+    let def = group_only();
     assert!(def.enters_visit());
     let (production, energy_a, _) = visit(&def, 100.0, false);
     let (traced, energy_b, applied) = visit(&def, 100.0, true);
@@ -389,10 +486,10 @@ fn production_and_traced_visits_agree_and_the_trace_carries_projection_terms() {
 }
 
 #[test]
-fn a_projection_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
+fn a_group_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
     let (_, untouched, _) = visit(&CgpGraphBackendDef::new_with_fixed_outputs(), 100.0, false);
     assert_eq!(untouched, 100.0, "a dormant graph's visit is free");
-    let (side_a, projected, _) = visit(&projection_only(), 100.0, false);
+    let (side_a, grouped, _) = visit(&group_only(), 100.0, false);
     let mut zero_edge = CgpGraphBackendDef::new_with_fixed_outputs();
     wire(
         &mut zero_edge,
@@ -400,8 +497,8 @@ fn a_projection_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
         edge(memory(0, false), 0.0),
     );
     let (side_b, edged, _) = visit(&zero_edge, 100.0, false);
-    assert!(projected < 100.0);
-    assert_eq!(projected, edged);
+    assert!(grouped < 100.0);
+    assert_eq!(grouped, edged);
     assert_eq!(
         side_a.work_counters.graph_relax_iters,
         side_b.work_counters.graph_relax_iters
@@ -409,31 +506,7 @@ fn a_projection_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
 }
 
 #[test]
-fn an_exhausted_visit_stages_no_projection_term() {
-    let (side, _, _) = visit(&projection_only(), 0.0, false);
+fn an_exhausted_visit_stages_no_member_term() {
+    let (side, _, _) = visit(&group_only(), 0.0, false);
     assert!(side.dispatch_effects().0.iter().all(|&v| v == 0.0));
-}
-
-proptest! {
-    /// An ablation-only mask bit reads its ring channel as 0.0 and leaves
-    /// every other channel's term unchanged.
-    #[test]
-    fn an_ablated_channel_term_reads_zero(
-        food in ring_strategy(),
-        channel in 0usize..8,
-        kind in kind_strategy(),
-        offset in 0u8..8,
-        weight in -4.0f32..4.0,
-    ) {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let mut p = RingProjection::new(0, kind, offset, weight);
-        p.ablated_channels = 1 << channel;
-        def.projections.push(p);
-        let mut zeroed = food;
-        zeroed[channel] = 0.0;
-        let masked = votes(&def, &ring_sensors(food, ramp(0.0), ramp(0.25)));
-        def.projections[0].ablated_channels = 0;
-        let expected = votes(&def, &ring_sensors(zeroed, ramp(0.0), ramp(0.25)));
-        prop_assert_eq!(masked, expected);
-    }
 }

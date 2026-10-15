@@ -221,14 +221,6 @@ fn census_graph(
             GraphSource::ComputeNode(_) => {}
         }
     }
-    // A ring projection consumes its ring on the live walk (T11.F31).
-    for projection in &graph.projections {
-        census.insert_input(
-            input_refs
-                .get(usize::from(projection.ref_idx))
-                .filter(|reference| reference.is_ring()),
-        );
-    }
 }
 
 impl CreatureSensorCensus {
@@ -748,14 +740,14 @@ mod tests {
         );
     }
 
+    /// A group's members are wired sink edges: a member-only graph consumes
+    /// its ring (T25.F03).
     #[test]
-    fn a_ring_projection_is_a_live_consumer_of_its_ring() {
-        use crate::creature::genome::cgp::RingProjection;
+    fn a_ring_group_is_a_live_consumer_of_its_ring() {
+        use crate::creature::genome::cgp::Shape;
         use crate::creature::genome::vote::DirectedVoteKind;
-        let mut graph = empty_graph();
-        graph
-            .projections
-            .push(RingProjection::new(1, DirectedVoteKind::Move, 0, 0.0));
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
+        graph.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
         let refs = vec![
             InputReference::World(WorldInputKey::food_here(FOOD_0)),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
@@ -848,32 +840,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_projection_on_a_non_ring_or_missing_reference_wires_nothing() {
-        use crate::creature::genome::cgp::RingProjection;
-        use crate::creature::genome::vote::DirectedVoteKind;
-        let mut graph = empty_graph();
-        graph.projections.push(RingProjection::new(
-            0,
-            DirectedVoteKind::StealEnergy,
-            0,
-            1.0,
-        ));
-        graph
-            .projections
-            .push(RingProjection::new(9, DirectedVoteKind::Move, 0, 1.0));
-        let genome = graph_node(
-            graph,
-            vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
-        );
-
-        assert!(census_of(&genome).world_inputs.is_empty());
-        assert_eq!(
-            creature_declared_world_inputs(&genome, &mesh_reachable_nodes(&genome)),
-            BTreeSet::from([WorldInputKey::NearbyCreatureCore])
-        );
-    }
-
     fn world_key_strategy() -> impl Strategy<Value = WorldInputKey> {
         prop_oneof![
             (0u16..3).prop_map(|i| WorldInputKey::food_here(OrdinaryFoodTypeId::new(i))),
@@ -952,8 +918,8 @@ mod tests {
             prop_assert!(!census.reads_any_stateful());
         }
 
-        /// Whatever a creature wires it also declares: a graph leaf, a VM
-        /// read and a ring projection each resolve through the node's own
+        /// Whatever a creature wires it also declares: a graph leaf (a group
+        /// member is one) and a VM read each resolve through the node's own
         /// `input_refs`. The declared set is exactly the world references of
         /// the reachable nodes, the oracle built here from the refs alone.
         #[test]
@@ -970,22 +936,9 @@ mod tests {
                 0..4usize,
             ),
             leaves in proptest::collection::vec(0u16..8, 0..8usize),
-            projections in proptest::collection::vec((0u16..8, 0u8..8), 0..4usize),
             reads in proptest::collection::vec(0u16..6, 0..6usize),
         ) {
-            use crate::creature::genome::cgp::RingProjection;
-            use crate::creature::genome::vote::DirectedVoteKind;
             let mut genome = graph_reading_refs(&graph_refs, &leaves);
-            if let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def {
-                for &(ref_idx, offset) in &projections {
-                    graph.projections.push(RingProjection::new(
-                        ref_idx,
-                        DirectedVoteKind::Move,
-                        offset,
-                        1.0,
-                    ));
-                }
-            }
             let mut program = Vec::new();
             for &ref_idx in &reads {
                 program.push(VmInstruction::ReadInput { ref_idx, sub_idx: 0, dst: 1 });

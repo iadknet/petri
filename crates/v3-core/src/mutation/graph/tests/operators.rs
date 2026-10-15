@@ -17,7 +17,6 @@ use crate::creature::genome::cgp::{
     OutputSinkKind,
 };
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
-use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
     raw_field_mutation, split_existing_edge,
@@ -80,7 +79,7 @@ pub(super) fn run_scenarios(
             let mut energy = 1.0e6f32;
             let mut shared_memory = [0.0f32; 16];
             let prev_shared_memory = [0.0f32; 16];
-            let mut graph_runtime = GraphRuntimeState::new();
+            let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
             let mut side_outputs = MeshSideOutputs::new(8);
             let result = execute_graph_node(
                 def,
@@ -325,7 +324,7 @@ proptest! {
         for (label, parent, refs) in fixtures() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            if split_existing_edge(&mut child, &mut rng).is_err() {
+            if split_existing_edge(&mut child, &[], &mut rng).is_err() {
                 continue;
             }
             assert_neutral(
@@ -521,7 +520,7 @@ fn record(
     let mut energy = 1.0e6f32;
     let mut shared_memory = [0.0f32; 16];
     let prev_shared_memory = [0.0f32; 16];
-    let mut graph_runtime = GraphRuntimeState::new();
+    let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
     let mut side_outputs = MeshSideOutputs::new(8);
     let _: NodeResult = execute_graph_impl(
         &mut tracer,
@@ -562,7 +561,7 @@ proptest! {
         let refs = base_input_refs();
         let mut child = parent.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if split_existing_edge(&mut child, &mut rng).is_err() {
+        if split_existing_edge(&mut child, &[], &mut rng).is_err() {
             return Ok(());
         }
         // Only compute-consumer splits insert-and-shift; sink/action/execute

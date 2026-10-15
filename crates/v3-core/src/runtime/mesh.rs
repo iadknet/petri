@@ -629,7 +629,7 @@ mod tests {
                 &mut energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(genome, Vec::new()),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -724,7 +724,7 @@ mod tests {
                 &mut energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
             );
@@ -734,7 +734,7 @@ mod tests {
                 &mut { start },
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -745,7 +745,7 @@ mod tests {
                 &mut { start },
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
             );
@@ -822,7 +822,7 @@ mod tests {
             let mut observed_memory = memory;
             let mut traced_memory = memory;
             let previous = [0.25; 16];
-            let mut state = GraphRuntimeState::new();
+            let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
             let mut observed_state = state.clone();
             let mut traced_state = state.clone();
             let config = RuntimeConfig {
@@ -1019,7 +1019,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1044,7 +1044,7 @@ mod tests {
             energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::new(),
+            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
             config,
             Direction::N,
         )
@@ -1117,7 +1117,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1157,7 +1157,7 @@ mod tests {
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1187,7 +1187,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1237,7 +1237,7 @@ mod tests {
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1284,7 +1284,7 @@ mod tests {
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1320,7 +1320,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1372,7 +1372,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1599,7 +1599,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1633,7 +1633,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1705,7 +1705,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1734,7 +1734,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1784,7 +1784,7 @@ mod tests {
             energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::new(),
+            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
             config,
             Direction::N,
         )
@@ -1932,7 +1932,7 @@ mod tests {
                 &mut energy,
                 &mut shared_mem,
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
             );
@@ -1964,7 +1964,7 @@ mod tests {
         };
         let mut energy = 5.0f32;
         let mut memory = [0.5f32; 16];
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
         let output = execute_creature_mesh(
             &genome,
             &empty_sensor_snapshot(),
@@ -2019,7 +2019,7 @@ mod tests {
                 &mut observed_energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -2030,7 +2030,7 @@ mod tests {
                 &mut traced_energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
             );
@@ -2059,7 +2059,7 @@ mod tests {
             &mut 100.0,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::new(),
+            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
             &default_config(),
             Direction::N,
         );
@@ -2151,25 +2151,22 @@ mod tests {
     }
 
     #[test]
-    fn a_ring_projection_records_its_ring() {
-        use crate::creature::genome::cgp::{CgpGraphBackendDef, RingProjection};
+    fn a_ring_group_records_its_ring() {
+        use crate::creature::genome::cgp::{CgpGraphBackendDef, Shape};
         use crate::creature::genome::vote::DirectedVoteKind;
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = def.add_group(
+            Shape::Ring { ring_ref: 0 },
+            DirectedVoteKind::StealEnergy,
+            0,
+        );
+        def.group_mut(id).set_scale(0.5);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
-                backend_def: BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(Vec::new())
-                        .with_output_sinks(Vec::new())
-                        .with_projections(vec![RingProjection::new(
-                            0,
-                            DirectedVoteKind::StealEnergy,
-                            0,
-                            0.5,
-                        )]),
-                ),
+                backend_def: BackendDef::Graph(def),
                 targets: vec![],
             }],
         };

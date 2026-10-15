@@ -45,7 +45,7 @@ fn applied_graph_accounting_charges_only_the_pass_under_hebbian_learning() {
         ..RuntimeConfig::default()
     };
     for (initial, cause, updates) in [(1.0, Some(DeathCause::GraphCompute), 0), (4.0, None, 1)] {
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
         begin(&mut state, &def);
         let mut energy = initial;
         let side = visit(&def, &mut state, 1.0, &mut energy, &runtime);
@@ -136,7 +136,7 @@ fn visit(
 #[test]
 fn repeated_visits_add_activity_on_the_decayed_base() {
     let def = graph(HebbianRule::Classic, 1.0, 0.5);
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     let runtime = RuntimeConfig::default();
     begin(&mut state, &def);
     visit(&def, &mut state, 2.0, &mut 100.0, &runtime);
@@ -167,7 +167,7 @@ fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources()
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
         Some(config(HebbianRule::Classic, 1.0, 0.0)),
     ));
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     state.node_outputs = vec![vec![2.0, 4.0]];
     begin(&mut state, &def);
     visit(&def, &mut state, 0.0, &mut 100.0, &RuntimeConfig::default());
@@ -190,7 +190,7 @@ fn activity_uses_evaluation_energy_beside_pure_hebbian_learning() {
         graph_node_base_cost: 1.0,
         ..RuntimeConfig::default()
     };
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     begin(&mut state, &def);
     let mut energy = 10.0;
     let side = visit(&def, &mut state, 0.0, &mut energy, &runtime);
@@ -211,7 +211,7 @@ fn failed_visits_preserve_decay_and_last_successful_activity() {
         graph_node_base_cost: 1.0,
         ..RuntimeConfig::default()
     };
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     begin(&mut state, &def);
     visit(&def, &mut state, 2.0, &mut 100.0, &runtime);
     begin(&mut state, &def);
@@ -256,7 +256,7 @@ fn exact_rules_rewards_rates_and_hebbian_equivalence() {
             for signal in [-0.75, 0.0, 1.0] {
                 let mut def = graph(rule, eta, 0.0);
                 def.set_compute_kind(0, ComputeNodeKind::Constant(post));
-                let mut state = GraphRuntimeState::new();
+                let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
                 begin(&mut state, &def);
                 visit(&def, &mut state, pre, &mut 100.0, &RuntimeConfig::default());
                 assert!((state.eligibility_traces[0][0][0] - activity).abs() < 1e-7);
@@ -266,7 +266,7 @@ fn exact_rules_rewards_rates_and_hebbian_equivalence() {
                 if signal == 1.0 {
                     let mut pure = def.clone();
                     pure.node_plasticity_mut(0).unwrap().modulation = None;
-                    let mut pure_state = GraphRuntimeState::new();
+                    let mut pure_state = GraphRuntimeState::for_genome(&genome(&pure), Vec::new());
                     begin(&mut pure_state, &pure);
                     visit(
                         &pure,
@@ -287,7 +287,7 @@ fn isolated_pulse_discounts_by_elapsed_ticks_including_zero_activity_visits() {
     for lambda in [0.0f32, 0.5, 1.0] {
         for delay in [1, 2, 4, 8, 16] {
             let def = graph(HebbianRule::Classic, 0.4, lambda);
-            let mut skipped = GraphRuntimeState::new();
+            let mut skipped = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
             begin(&mut skipped, &def);
             visit(
                 &def,
@@ -316,7 +316,7 @@ fn isolated_pulse_discounts_by_elapsed_ticks_including_zero_activity_visits() {
 #[test]
 fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
     let def = graph(HebbianRule::Classic, 1.0, 0.5);
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     for _ in 0..4 {
         begin(&mut state, &def);
     }
@@ -341,7 +341,7 @@ fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
         ),
     );
     let runtime = RuntimeConfig::default();
-    let mut ordinary = GraphRuntimeState::new();
+    let mut ordinary = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     let mut traced = ordinary.clone();
     for _ in 0..3 {
         begin(&mut ordinary, &def);
@@ -390,7 +390,7 @@ proptest! {
     #[test]
     fn skipped_tick_decay_is_exponential(lambda in 0.0f32..=1.0, pulse in -2.0f32..2.0, ticks in 0i32..24) {
         let def = graph(HebbianRule::Classic, 0.5, lambda);
-        let mut state = GraphRuntimeState::new(); begin(&mut state, &def);
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new()); begin(&mut state, &def);
         visit(&def, &mut state, pulse, &mut 100.0, &RuntimeConfig::default());
         for _ in 0..ticks { begin(&mut state, &def); }
         let expected = lambda.powi(ticks) * pulse;
@@ -409,7 +409,7 @@ proptest! {
         let def = graph(HebbianRule::Classic, 0.5, lambda);
         let mut bigger = def.clone();
         for _ in 0..extras { bigger.append_compute_node(ComputeNode::new(ComputeNodeKind::Oscillator(0.25), vec![], None)); }
-        let mut once = GraphRuntimeState::new(); let mut repeated = GraphRuntimeState::new();
+        let mut once = GraphRuntimeState::for_genome(&genome(&def), Vec::new()); let mut repeated = GraphRuntimeState::for_genome(&genome(&bigger), Vec::new());
         let runtime = RuntimeConfig::default();
         let trace = |state: &GraphRuntimeState| state.eligibility_traces.first().and_then(|m| m.first()).and_then(|e| e.first()).copied().unwrap_or(0.0);
         for _ in 0..3 {
@@ -431,7 +431,7 @@ proptest! {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
         def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0)).set_weight(weight);
         def.node_plasticity_mut(0).unwrap().weight_clamp = clamp;
-        let mut state = GraphRuntimeState::new(); begin(&mut state, &def);
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new()); begin(&mut state, &def);
         visit(&def, &mut state, pulse, &mut 100.0, &RuntimeConfig::default());
         reward(&def, &mut state, signal);
         let bound = clamp.clamp(0.01, 10.0);
@@ -493,7 +493,7 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
         }
         (correct, weights, counts)
     };
-    let mut live = GraphRuntimeState::new();
+    let mut live = GraphRuntimeState::for_genome(&genome, Vec::new());
     let acquisition = run(&mut live, true, false);
     assert_ne!(live.plasticity_weights[0][1][0], 0.5);
     assert!(acquisition.0[24..].iter().filter(|&&x| x).count() >= 7);
@@ -512,7 +512,7 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
 fn explicit_reward_clamp_bounds_and_decay_normalization() {
     for (lambda, expected) in [(-1.0, 0.0), (2.0, 3.0)] {
         let def = graph(HebbianRule::Classic, 1.0, lambda);
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
         begin(&mut state, &def);
         visit(&def, &mut state, 3.0, &mut 100.0, &RuntimeConfig::default());
         begin(&mut state, &def);
@@ -520,7 +520,7 @@ fn explicit_reward_clamp_bounds_and_decay_normalization() {
     }
     for (signal, expected) in [(-10.0, -2.0), (10.0, 2.0)] {
         let def = graph(HebbianRule::Classic, 1.0, 0.0);
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
         begin(&mut state, &def);
         visit(&def, &mut state, 3.0, &mut 100.0, &RuntimeConfig::default());
         reward(&def, &mut state, signal);
@@ -538,7 +538,7 @@ fn birth_aligned_weights_drive_first_execution_and_reward_without_parent_credit(
     capture_def_seeds(&mut def, &[Box::new([0.75])]);
     def.duplicate_compute_nodes(&[0]);
     def.remove_compute_node(0);
-    let mut child = GraphRuntimeState::new();
+    let mut child = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
     child.plasticity_weights = vec![take_graph_plasticity_weights(&mut def)];
     assert!(child.eligibility_traces.is_empty());
     assert_eq!(reward(&def, &mut child, 1.0), 0);
@@ -567,7 +567,7 @@ fn learning_counts_assignments_separately_from_final_weight_changes() {
             if !modulated {
                 def.node_plasticity_mut(0).unwrap().modulation = None;
             }
-            let mut state = GraphRuntimeState::new();
+            let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
             begin(&mut state, &def);
             let runtime = RuntimeConfig {
                 graph_node_base_cost: 0.0,
@@ -613,7 +613,7 @@ proptest! {
         let edge = def.compute_nodes()[0].inputs[0];
         set_compute_inputs(&mut def, 0, weights.iter().map(|&weight| GraphEdge::new(edge.source(), weight)).collect());
         if !modulated { def.node_plasticity_mut(0).unwrap().modulation = None; }
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
         begin(&mut state, &def);
         let side = visit(&def, &mut state, input, &mut 100.0, &RuntimeConfig::default());
         let (assignments, changes) = if modulated {

@@ -6,7 +6,7 @@ use rand::{seq::SliceRandom, Rng};
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, RingProjection,
+    ring_offset, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, NodeGenome};
@@ -26,15 +26,16 @@ struct Plan {
     declarations: Vec<InputReference>,
     sources: Vec<GraphSource>,
     /// The ring declared or found, and the drawn channel, when the family is
-    /// a neighbor ring (T11.F31).
+    /// a neighbor ring.
     ring: Option<(u16, u16)>,
 }
 
 impl Plan {
     /// Append the plan at `destination`. A ring family landing on a directed
-    /// vote sink `K(d)` becomes one zero-weight projection
-    /// `{ref_idx, K, (d − channel) mod 8, 0.0}` in place of its edges
-    /// (T11.F31); every other plan appends its edges at weight 0.
+    /// vote sink `K(d)` becomes one silent `Ring` group on `ref_idx` into `K`
+    /// at offset `(d − channel) mod 8`, eight members at own weight 0 and
+    /// scale 0, in place of its edges (T25.F03); every other plan appends its
+    /// edges at weight 0.
     fn append(self, node: &mut NodeGenome, destination: usize) {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("admission requires a Graph backend")
@@ -47,12 +48,11 @@ impl Plan {
         if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
             let channel =
                 u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
-            def.projections.push(RingProjection::new(
-                ref_idx,
+            def.add_group(
+                Shape::Ring { ring_ref: ref_idx },
                 kind,
-                RingProjection::offset_for(d, channel),
-                0.0,
-            ));
+                ring_offset(d, channel),
+            );
             return;
         }
         for source in self.sources {
@@ -70,24 +70,29 @@ struct Admission<'a> {
     existing: HashMap<&'a InputReference, u16>,
     next: usize,
     append_end: usize,
+    /// Whether a ring family's group can be created
+    /// ([`CgpGraphBackendDef::can_host_ring_group`]); when not, ring families
+    /// leave the universe, so a drawn ring plan always completes.
+    hosts_ring_group: bool,
 }
 
 impl<'a> Admission<'a> {
     fn new(references: &'a [InputReference], def: &CgpGraphBackendDef) -> Self {
+        let hosts_ring_group = def.can_host_ring_group();
         let mut existing = HashMap::new();
         for (index, reference) in references.iter().enumerate().take(65536) {
             existing
                 .entry(reference)
                 .or_insert(u16::try_from(index).expect("representable prefix"));
         }
-        // A dangling projection reference is a dangling leaf (T11.F31).
+        // A group's members are edges, so a dangling member reference is a
+        // dangling leaf like any other (T25.F03).
         let append_end = def
             .edges()
             .filter_map(|edge| match edge.source() {
                 GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
                 _ => None,
             })
-            .chain(def.projections.iter().map(|projection| projection.ref_idx))
             .map(usize::from)
             .filter(|&ref_idx| ref_idx >= references.len())
             .min()
@@ -96,6 +101,7 @@ impl<'a> Admission<'a> {
             existing,
             next: references.len(),
             append_end,
+            hosts_ring_group,
         }
     }
 
@@ -188,6 +194,7 @@ impl<'a> Admission<'a> {
                         InputReference::ActionQueue | InputReference::UpstreamSlot(_)
                     )
             })
+            .filter(|reference| self.hosts_ring_group || !reference.is_ring())
             .map(SourceFamily::Input)
             .collect();
         if arm == Arm::WholeFamily {

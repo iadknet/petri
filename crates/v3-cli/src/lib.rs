@@ -169,8 +169,8 @@ pub fn run_simulation<W: std::io::Write>(
 
 /// Means of the living population's structure and lineage depth: total
 /// genome size (junk included), mesh node count, generation, wired output
-/// sinks (sinks with at least one edge) and ring projections. All `0.0` for an
-/// empty population, like `Simulation::mean_energy`.
+/// sinks (sinks with at least one edge) and `Ring` edge groups. All `0.0` for
+/// an empty population, like `Simulation::mean_energy`.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct StructureMeans {
     pub(crate) genome_size: f64,
@@ -178,8 +178,11 @@ pub(crate) struct StructureMeans {
     pub(crate) generation: f64,
     /// T25.F02: the sinks the unit rule stopped charging a unit for.
     pub(crate) wired_sinks: f64,
-    /// T25.F02: each projection costs nine units.
-    pub(crate) projections: f64,
+    /// T25.F03: `Ring` edge groups per creature.
+    pub(crate) ring_groups: f64,
+    /// T25.F03: members present per group across the population; `None`
+    /// when the population carries no group.
+    pub(crate) ring_group_members: Option<f64>,
 }
 
 pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> StructureMeans {
@@ -189,8 +192,8 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
     if population == 0 {
         return StructureMeans::default();
     }
-    let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut projections] =
-        [0u64; 5];
+    let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut groups, mut members] =
+        [0u64; 6];
     for creature in sim.creatures.values() {
         genome_size += u64::from(creature.cached_genome_size);
         mesh_nodes += creature.genome.nodes.len() as u64;
@@ -202,7 +205,13 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count() as u64;
-                projections += graph.projections.len() as u64;
+                groups += graph.groups().len() as u64;
+                members += graph
+                    .output_sinks()
+                    .iter()
+                    .flat_map(|sink| sink.inputs.iter())
+                    .filter(|edge| edge.membership().is_some())
+                    .count() as u64;
             }
         }
     }
@@ -212,7 +221,8 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
         mesh_nodes: mean(mesh_nodes),
         generation: mean(generation),
         wired_sinks: mean(wired_sinks),
-        projections: mean(projections),
+        ring_groups: mean(groups),
+        ring_group_members: (groups > 0).then(|| members as f64 / groups as f64),
     }
 }
 
@@ -292,7 +302,8 @@ mod tests {
                 mesh_nodes: 0.0,
                 generation: 0.0,
                 wired_sinks: 0.0,
-                projections: 0.0,
+                ring_groups: 0.0,
+                ring_group_members: None,
             }
         );
     }
@@ -319,16 +330,18 @@ mod tests {
                 mesh_nodes: 2.0,
                 generation: 0.0,
                 wired_sinks: 17.0,
-                projections: 0.0,
+                ring_groups: 0.0,
+                ring_group_members: None,
             },
             "founders carry two mesh nodes, generation zero, 6 + 11 wired sinks \
-             and no projection"
+             and no group"
         );
     }
 
     #[test]
-    fn structure_means_count_ring_projections_across_the_population() {
-        use v3_core::creature::genome::cgp::RingProjection;
+    fn structure_means_count_ring_groups_and_their_members_across_the_population() {
+        use v3_core::contracts::{InputReference, WorldInputKey};
+        use v3_core::creature::genome::cgp::{EdgeSurface, Shape};
         use v3_core::creature::genome::vote::DirectedVoteKind;
         use v3_core::creature::genome::BackendDef;
 
@@ -339,22 +352,29 @@ mod tests {
         let mut sim = seed_simulation(cfg, 42);
         assert_eq!(sim.creatures.len(), 4);
 
-        // Two projections on one creature's first graph: 2 / 4 = 0.5.
+        // Two groups on one creature's first graph, one of them missing a
+        // member: 2 / 4 = 0.5 groups per creature, 15 / 2 members per group.
         let creature = sim.creatures.values_mut().next().unwrap();
-        let graph = creature
+        let node = creature
             .genome
             .nodes
             .iter_mut()
-            .find_map(|node| match &mut node.backend_def {
-                BackendDef::Graph(graph) => Some(graph),
-                _ => None,
-            })
+            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
             .expect("a founder carries a graph node");
-        graph.projections.extend([
-            RingProjection::new(0, DirectedVoteKind::Move, 0, 1.0),
-            RingProjection::new(0, DirectedVoteKind::Move, 1, 1.0),
-        ]);
+        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let BackendDef::Graph(graph) = &mut node.backend_def else {
+            unreachable!()
+        };
+        graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+        let second = graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Reproduce, 1);
+        let member = graph.members(second).next().unwrap();
+        assert!(matches!(member.surface, EdgeSurface::SinkInput(_)));
+        graph.remove_edge(member);
 
-        assert_eq!(structure_means(&sim).projections, 0.5);
+        let means = structure_means(&sim);
+        assert_eq!(means.ring_groups, 0.5);
+        assert_eq!(means.ring_group_members, Some(7.5));
     }
 }

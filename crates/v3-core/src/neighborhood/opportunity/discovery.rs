@@ -295,7 +295,7 @@ fn work_on_fixtures(genome: &CreatureGenome, family: Family, config: &Simulation
             &mut energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut crate::creature::state::GraphRuntimeState::new(),
+            &mut crate::creature::state::GraphRuntimeState::for_genome(genome, Vec::new()),
             &config.runtime,
             crate::contracts::Direction::N,
             UntracedMeshExecution,
@@ -530,5 +530,50 @@ pub fn vm_concern(family: Family, config: &SimulationConfig, after_steps: u32) -
         after_steps,
         charge_after_founder: charge(after_steps as usize),
         step_ramp_allowance: vm.step_ramp_allowance,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contracts::{InputReference, NodeId, WorldInputKey};
+    use crate::creature::genome::cgp::Shape;
+    use crate::creature::genome::vote::DirectedVoteKind;
+
+    /// A group's members are vote edges (T25.F03): every channel of the ring
+    /// a member reads is on the node's vote surface.
+    #[test]
+    fn group_member_channels_are_on_the_vote_surface() {
+        let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+        // A member lost to deletion leaves its channel off the surface.
+        let lost = def.members(id).next().unwrap();
+        let GraphSource::InputLeaf {
+            sub_idx: lost_channel,
+            ..
+        } = def.edge_at(lost).source()
+        else {
+            unreachable!("a ring member reads a leaf")
+        };
+        def.remove_edge(lost);
+        let node = NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![ring.clone()],
+            backend_def: BackendDef::Graph(def),
+            targets: Vec::new(),
+        };
+        let surface = vote_surface_channels(&node);
+        assert_eq!(surface.len(), 7);
+        for channel in 0..8u16 {
+            let Addressed::Channel(addressed) = addressed(&ring, channel) else {
+                panic!("a ring channel is in width")
+            };
+            assert_eq!(
+                surface.contains(&addressed),
+                channel != lost_channel,
+                "{channel}"
+            );
+        }
     }
 }

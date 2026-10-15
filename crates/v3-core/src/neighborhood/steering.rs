@@ -24,7 +24,7 @@ use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
 use crate::creature::genome::cgp::OutputSinkKind;
-use crate::creature::genome::vote::{DirectedVoteKind, VoteKind, VoteSink};
+use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -98,8 +98,8 @@ impl SteeringPooled {
 
 /// Whether a node in `executed` structurally contributes to a `Move` sink
 /// (T19.F04): a VM program with an `AddVote` naming a `Move` sink, or a graph
-/// with a wired `ActionVote(Move(_))` sink or a `Move` ring projection
-/// (T11.F31); the `Move` drive counts as a `Move` sink (T11.F30).
+/// with a wired `ActionVote(Move(_))` sink, group members included
+/// (T25.F03); the `Move` drive counts as a `Move` sink (T11.F30).
 #[must_use]
 pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
     let is_move = |sink: Option<VoteSink>| sink.and_then(VoteSink::kind) == Some(VoteKind::Move);
@@ -112,13 +112,10 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
                 matches!(instruction, VmInstruction::AddVote { sink, .. }
                     if is_move(VoteSink::from_index(usize::from(*sink))))
             }),
-            BackendDef::Graph(graph) => {
-                graph.projects_kind(DirectedVoteKind::Move)
-                    || graph.output_sinks().iter().any(|sink| {
-                        !sink.inputs.is_empty()
-                            && matches!(sink.kind, OutputSinkKind::ActionVote(vote) if is_move(Some(vote)))
-                    })
-            }
+            BackendDef::Graph(graph) => graph.output_sinks().iter().any(|sink| {
+                !sink.inputs.is_empty()
+                    && matches!(sink.kind, OutputSinkKind::ActionVote(vote) if is_move(Some(vote)))
+            }),
         })
 }
 
@@ -214,6 +211,7 @@ mod tests {
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::NodeGenome;
     use crate::neighborhood::Battery;
 
@@ -234,12 +232,12 @@ mod tests {
     }
 
     #[test]
-    fn a_move_projection_votes_move_and_another_kind_does_not() {
-        use crate::creature::genome::cgp::RingProjection;
+    fn a_move_group_votes_move_through_its_members_and_another_kind_does_not() {
+        use crate::creature::genome::cgp::Shape;
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.projections.push(RingProjection::new(0, kind, 0, 0.0));
+            def.add_group(Shape::Ring { ring_ref: 0 }, kind, 0);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {

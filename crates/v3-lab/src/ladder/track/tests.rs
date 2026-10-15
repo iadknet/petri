@@ -77,6 +77,28 @@ fn the_founder_has_a_sensor_site_and_a_motor_site() {
     assert!(motor_node(&founder.nodes[1]), "the decision node votes");
 }
 
+/// A node whose only vote edges are a group's members votes through them
+/// (T25.F03): a `Move` group makes it a motor node, a `Reproduce` one not.
+#[test]
+fn a_node_voting_only_through_group_members_is_a_motor_node() {
+    use v3_core::creature::genome::cgp::Shape;
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    for (kind, motor) in [
+        (DirectedVoteKind::Move, true),
+        (DirectedVoteKind::Reproduce, false),
+        (DirectedVoteKind::StealEnergy, false),
+    ] {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_group(Shape::Ring { ring_ref: 0 }, kind, 4);
+        let genome = one_node(node(
+            0,
+            vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
+            BackendDef::Graph(def),
+        ));
+        assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
+    }
+}
+
 #[test]
 fn unconnected_vote_sinks_are_not_motor_sites_and_a_bare_start_has_no_site() {
     let bare = one_node(graph_node(0, None));

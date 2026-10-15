@@ -107,6 +107,7 @@ fn populated() -> SimStats {
         MutationSkipReason::ParseabilityViolation,
         MutationSkipReason::NumericProposalRejected,
         MutationSkipReason::NoApplicableTarget,
+        MutationSkipReason::GraphInvariantViolation,
     ];
     let classes = [
         MutationAddedNodeInputClass::None,
@@ -248,6 +249,7 @@ fn skip_reasons() -> Attribute {
                 "ParseabilityViolation",
                 "NumericProposalRejected",
                 "NoApplicableTarget",
+                "GraphInvariantViolation",
             ],
             str::to_owned,
         ),
@@ -302,6 +304,8 @@ fn run_families(families: &mut Vec<Family>) {
         "mutation_unreachable_target",
         "mutation_executed_target",
         "mutation_not_applicable_target",
+        "graph_edges_detached",
+        "groups_removed",
         "mesh_hops",
         "vm_steps",
         "graph_relax_iters",

@@ -27,8 +27,8 @@ use crate::simulation::tick::advance_shared_memory;
 use proptest::prelude::*;
 
 mod boundaries;
+mod group;
 mod lifecycle;
-mod projection;
 mod recruitment;
 mod refinement;
 
@@ -233,6 +233,7 @@ fn effects(def: &CgpGraphBackendDef, refs: &[InputReference], source_memory: f32
     let mut side = side();
     let (result, _) = apply_cgp_graph_effects(
         def,
+        &def.sink_weight_rows(refs),
         &[0.5; 3],
         refs,
         &ctx,
@@ -439,7 +440,10 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         max_actions_per_turn: 2,
         ..RuntimeConfig::default()
     };
-    let mut states = [GraphRuntimeState::new(), GraphRuntimeState::new()];
+    let mut states = [
+        GraphRuntimeState::for_genome(&genomes[0], Vec::new()),
+        GraphRuntimeState::for_genome(&genomes[1], Vec::new()),
+    ];
     for state in &mut states {
         state.node_state = vec![vec![0.25, 0.75]];
         state.node_outputs = vec![vec![0.125, 0.5]];

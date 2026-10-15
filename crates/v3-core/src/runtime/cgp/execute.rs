@@ -316,6 +316,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     };
     let (result, effects_trace) = apply_cgp_graph_effects(
         def,
+        &graph_runtime.sink_weights[node_idx],
         &curr_outputs,
         input_refs,
         &effects_resolve_ctx,
@@ -443,7 +444,7 @@ mod work_counter_tests {
         let mut energy = 100.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let output = execute_creature_mesh(
             &genome,
@@ -510,7 +511,7 @@ mod work_counter_tests {
         let mut energy = 100.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let output = execute_creature_mesh(
             &genome,
@@ -598,7 +599,7 @@ mod clock_tests {
     #[test]
     fn repeated_visits_advance_from_the_last_commit_and_skipped_ticks_hold() {
         let def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        let mut state = GraphRuntimeState::new();
+        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
         let config = RuntimeConfig {
             graph_node_base_cost: 0.25,
             ..RuntimeConfig::default()
@@ -632,7 +633,7 @@ mod clock_tests {
             graph_node_base_cost: 1.0,
             ..RuntimeConfig::default()
         };
-        let mut state = GraphRuntimeState::new();
+        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
         state.begin_tick(&[], 0);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         let committed_state = state.node_state.clone();
@@ -668,7 +669,7 @@ mod clock_tests {
             graph_node_base_cost: 1.0,
             ..RuntimeConfig::default()
         };
-        let mut state = GraphRuntimeState::new();
+        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         // The pass cost is the only exhaustion point (T25.F02: learning is
         // free).
@@ -712,7 +713,7 @@ mod clock_tests {
             0,
         ))
         .set_source(GraphSource::ComputeNode(1));
-        let mut ordinary = GraphRuntimeState::new();
+        let mut ordinary = crate::creature::genome::cgp::test_support::runtime_for(&def);
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {
             ordinary.begin_tick(&[], 0);
@@ -775,7 +776,7 @@ mod clock_tests {
                 2 => (old + 0.125).fract(),
                 _ => (old + 0.01 * input).clamp(0.1, 2.0),
             };
-            let mut state = GraphRuntimeState::new(); state.node_state = vec![vec![old]];
+            let mut state = crate::creature::genome::cgp::test_support::runtime_for(&graph(kind, extra)); state.node_state = vec![vec![old]];
             state.begin_tick(&[], 0);
             let config = RuntimeConfig::default();
             let def = graph(kind, extra);

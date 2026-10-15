@@ -629,18 +629,18 @@ proptest! {
     }
 }
 
-/// A ring projection (T11.F31) consumes all eight channels of its ring, live
-/// and read whenever its node's effects pass runs.
+/// A `Ring` group's members consume all eight channels of its ring, live and
+/// read whenever its node's effects pass runs (T25.F03).
 #[test]
-fn a_ring_projection_consumes_all_eight_channels_of_its_ring() {
-    use crate::creature::genome::cgp::RingProjection;
+fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
+    use crate::creature::genome::cgp::Shape;
     use crate::creature::genome::vote::DirectedVoteKind;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    def.projections
-        .push(RingProjection::new(0, DirectedVoteKind::Move, 1, -2.0));
+    let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    def.group_mut(id).set_scale(-2.0);
     let parent = Fixture::new().read(&genome(vec![node]));
     for c in 0..8 {
         let ring = channel(&barriers(), c);
@@ -650,38 +650,61 @@ fn a_ring_projection_consumes_all_eight_channels_of_its_ring() {
     assert!(parent.consistency_ok());
 }
 
-/// Ablating one channel zeroes that channel's term in every projection that
-/// reads it and changes nothing a genome reader sees.
+/// Ablating one ring channel redirects exactly the members reading it, and
+/// every member keeps its membership and its genomic weight, which resolves
+/// from its group's ring (T25.F03).
 #[test]
-fn ablating_a_ring_channel_masks_only_that_projection_term() {
-    use crate::creature::genome::cgp::RingProjection;
+fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() {
+    use crate::creature::genome::cgp::{GraphSource, Shape};
     use crate::creature::genome::vote::DirectedVoteKind;
     let refs = vec![barriers(), food_here(), barriers()];
-    let mut node = graph_node(0, refs, Vec::new(), EAT, vec![leaf(1, 0)]);
+    let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    def.projections = vec![
-        RingProjection::new(0, DirectedVoteKind::Move, 1, -2.0),
-        RingProjection::new(2, DirectedVoteKind::Reproduce, 0, 1.0),
-        RingProjection::new(1, DirectedVoteKind::Move, 0, 1.0),
-    ];
+    for (ring_ref, kind, offset, scale) in [
+        (0, DirectedVoteKind::Move, 1, -2.0),
+        (2, DirectedVoteKind::Reproduce, 0, 1.0),
+    ] {
+        let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
+        def.group_mut(id).set_scale(scale);
+    }
     let genome = genome(vec![node]);
     let target = channel(&barriers(), 3);
     let ablated = super::consumers::ablated(&genome, |c| c == target);
-    assert_eq!(ablated, genome);
     assert_eq!(ablated.genome_size(), genome.genome_size());
-    assert_eq!(
-        serde_json::to_string(&ablated).unwrap(),
-        serde_json::to_string(&genome).unwrap()
-    );
-    assert_eq!(format!("{ablated:?}"), format!("{genome:?}"));
-    let BackendDef::Graph(def) = &ablated.nodes[0].backend_def else {
+    let (BackendDef::Graph(before), BackendDef::Graph(after)) =
+        (&genome.nodes[0].backend_def, &ablated.nodes[0].backend_def)
+    else {
         unreachable!()
     };
-    let masks: Vec<u8> = def.projections.iter().map(|p| p.ablated_channels).collect();
-    // Both barrier projections lose channel 3; the off-ring one is untouched.
-    assert_eq!(masks, vec![1 << 3, 1 << 3, 0]);
+    assert_eq!(after.groups(), before.groups());
+    assert_eq!(
+        after.sink_weight_rows(&refs),
+        before.sink_weight_rows(&refs)
+    );
+    let mut redirected = 0;
+    for (old, new) in before.edges().zip(after.edges()) {
+        assert_eq!(new.membership(), old.membership());
+        match old.source() {
+            GraphSource::InputLeaf {
+                sub_idx: 3,
+                ref_idx,
+            } if ref_idx != 1 => {
+                redirected += 1;
+                assert_eq!(
+                    new.source(),
+                    GraphSource::InputLeaf {
+                        ref_idx: u16::MAX,
+                        sub_idx: 3
+                    }
+                );
+            }
+            _ => assert_eq!(new.source(), old.source()),
+        }
+    }
+    // Channel 3 of each barrier ring, one member per group.
+    assert_eq!(redirected, 2);
     // The ordinary food consumer is untouched.
-    assert_eq!(def.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
+    assert_eq!(after.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
 }

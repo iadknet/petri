@@ -1601,6 +1601,8 @@ mod final_action_observation_tests {
         let id = sim.creatures.keys().next().expect("one founder");
         let creature = &mut sim.creatures[id];
         creature.genome = memory_direction_genome();
+        creature.graph_runtime =
+            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
         creature.prev_shared_memory[0] = 0.75;
@@ -1677,6 +1679,8 @@ mod final_action_observation_tests {
         let id = sim.creatures.keys().next().expect("one founder");
         let creature = &mut sim.creatures[id];
         creature.genome = runtime_state_action_genome();
+        creature.graph_runtime =
+            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
         creature.graph_runtime.node_state = vec![vec![1.0]];
@@ -1738,6 +1742,8 @@ mod final_action_observation_tests {
                 }),
             );
             creature.genome = genome;
+            creature.graph_runtime =
+                crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
             creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.5]), Box::new([])]];
             creature.graph_runtime.plasticity_weights = vec![vec![Box::new([1.0]), Box::new([])]];
             creature.prev_shared_memory[0] = 1.0;
@@ -1795,6 +1801,8 @@ mod final_action_observation_tests {
             let id = sim.creatures.keys().next().expect("one founder");
             let creature = &mut sim.creatures[id];
             creature.genome = memory_direction_genome();
+        creature.graph_runtime =
+            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
             creature.shared_memory[0] = slot_zero;
             creature.shared_memory[1] = slot_one;
 

@@ -396,15 +396,10 @@ fn shared_memory_family(previous: bool) -> Family {
     }
 }
 
-/// Ring-projection channel mask that silences every channel.
-const ALL_RING_CHANNELS: u8 = u8::MAX;
-
 /// Every catalog family with a consumer, and the node indices holding one.
-/// A consumer is an `InputLeaf` edge or `ReadInput` instruction whose
-/// in-range `ref_idx` names a reference of the family, a T11.F31 ring
-/// projection whose in-range `ref_idx` names a ring of the family and which
-/// [`ablate`] has not silenced, a `SharedMemory` source or a `LoadSlot*`
-/// instruction. No liveness filter.
+/// A consumer is an `InputLeaf` edge (group members included) or `ReadInput`
+/// instruction whose in-range `ref_idx` names a reference of the family, a
+/// `SharedMemory` source or a `LoadSlot*` instruction. No liveness filter.
 #[must_use]
 pub fn consumers(genome: &CreatureGenome) -> BTreeMap<Family, BTreeSet<usize>> {
     let mut families: BTreeMap<Family, BTreeSet<usize>> = BTreeMap::new();
@@ -413,12 +408,6 @@ pub fn consumers(genome: &CreatureGenome) -> BTreeMap<Family, BTreeSet<usize>> {
             families.entry(family).or_default().insert(index);
         };
         let reference = |ref_idx: u16| node.input_refs.get(usize::from(ref_idx)).map(Family::of);
-        let ring = |ref_idx: u16| {
-            node.input_refs
-                .get(usize::from(ref_idx))
-                .filter(|reference| reference.is_ring())
-                .map(Family::of)
-        };
         match &node.backend_def {
             BackendDef::Graph(graph) => {
                 let edges = graph
@@ -437,13 +426,6 @@ pub fn consumers(genome: &CreatureGenome) -> BTreeMap<Family, BTreeSet<usize>> {
                             add(shared_memory_family(previous));
                         }
                         GraphSource::ComputeNode(_) => {}
-                    }
-                }
-                for projection in &graph.projections {
-                    if projection.ablated_channels != ALL_RING_CHANNELS {
-                        if let Some(family) = ring(projection.ref_idx) {
-                            add(family);
-                        }
                     }
                 }
             }
@@ -609,8 +591,8 @@ pub fn ablation_supported(genome: &CreatureGenome) -> bool {
 }
 
 /// Hand every input-reference index of `backend` (`InputLeaf` edges and
-/// `ReadInput` instructions) to `visit`. Ring projections keep theirs; see
-/// [`ablate`].
+/// `ReadInput` instructions) to `visit`. A group's shape reference is not an
+/// edge and keeps its index; see [`ablate`].
 fn for_each_ref_idx(backend: &mut BackendDef, mut visit: impl FnMut(&mut u16)) {
     match backend {
         BackendDef::Graph(graph) => graph.redirect_leaf_reads(|ref_idx, _| {
@@ -633,11 +615,9 @@ fn for_each_ref_idx(backend: &mut BackendDef, mut visit: impl FnMut(&mut u16)) {
 /// backends resolve to 0.0. Each distinct ablated index gets its own
 /// sentinel (from [`ABLATED_REF`] down, skipping indices the node already
 /// uses), so the distinct consumed indices `functional_complexity` counts,
-/// and with them every charge, are unchanged. Each T11.F31 ring projection
-/// on a ring of `family` keeps its `ref_idx` and has every channel masked
-/// (`ablated_channels`, the production input-use mask), so it reads 0.0 at
-/// the same charges; before this, projections were left live and a family
-/// read through them was undercounted as non-causal. `None` when the rewrite
+/// and with them every charge, are unchanged. A group member is such an edge:
+/// it reads 0.0 and keeps its genomic weight, which resolves from its
+/// group's ring reference, never its own (T25.F03). `None` when the rewrite
 /// is unsound: a node without the headroom.
 #[must_use]
 pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome> {
@@ -659,16 +639,6 @@ pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome>
                 targets.insert(*ref_idx);
             }
         });
-        // `functional_complexity` counts every projection's index as
-        // consumed, in range or not: no sentinel may land on one.
-        if let BackendDef::Graph(graph) = &node.backend_def {
-            used.extend(
-                graph
-                    .projections
-                    .iter()
-                    .map(|projection| projection.ref_idx),
-            );
-        }
         let mut free = (0..=ABLATED_REF)
             .rev()
             .take_while(|&candidate| usize::from(candidate) >= len)
@@ -682,17 +652,6 @@ pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome>
                 *ref_idx = sentinel;
             }
         });
-        if let BackendDef::Graph(graph) = &mut node.backend_def {
-            for projection in &mut graph.projections {
-                if node
-                    .input_refs
-                    .get(usize::from(projection.ref_idx))
-                    .is_some_and(|reference| reference.is_ring() && Family::of(reference) == family)
-                {
-                    projection.ablated_channels = ALL_RING_CHANNELS;
-                }
-            }
-        }
     }
     Some(ablated)
 }
