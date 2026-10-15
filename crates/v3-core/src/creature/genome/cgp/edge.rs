@@ -76,4 +76,11 @@ impl GraphEdge {
     pub const fn membership(&self) -> Option<Membership> {
         self.membership
     }
+
+    /// Whether this edge is a member of `group`.
+    #[inline]
+    #[must_use]
+    pub fn is_member_of(&self, group: GroupId) -> bool {
+        self.membership == Some(Membership { group })
+    }
 }

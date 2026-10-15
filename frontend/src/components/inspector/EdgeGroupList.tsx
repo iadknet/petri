@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { EdgeGroup, GraphBackendDef, InputReference } from "../../types/genome.ts";
+import { directionName } from "./directions.ts";
 import { formatInputRef } from "./inputRefUtils.ts";
 
-const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
 const RING_CHANNELS = 8;
 
 interface EdgeGroupListProps {
@@ -99,8 +99,8 @@ function GroupRow({
 				<ul className="ml-4 space-y-0.5 text-slate-400">
 					{byChannel.map((member) => (
 						<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
-							cell {DIRECTIONS[member.channel % RING_CHANNELS]} → {group.kind}[
-							{DIRECTIONS[(member.channel + group.offset) % RING_CHANNELS]}] own=
+							cell {directionName(member.channel)} → {group.kind}[
+							{directionName(member.channel + group.offset)}] own=
 							{member.ownWeight.toFixed(3)}
 							{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
 						</li>

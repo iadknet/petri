@@ -304,6 +304,12 @@ pub enum GraphInvariantViolation {
     SinkOrder,
 }
 
+/// The direction a `Ring` member of `group` on `channel` votes toward:
+/// `(offset + channel) mod 8`.
+fn member_direction(group: &Group, channel: u16) -> u8 {
+    ((u16::from(group.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT)) as u8
+}
+
 /// Check every graph invariant (I2–I10) of `node`'s graph against its input
 /// references: at `GenomeFile::load` and in the mutation gate. A VM node
 /// passes.
@@ -463,7 +469,13 @@ impl CgpGraphBackendDef {
     /// ungrouped, [`compose`]`(own_weight, scale, pattern)` for a member.
     #[must_use]
     pub fn genomic_weight(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32 {
-        let edge = self.edge_at(occurrence);
+        self.edge_weight(self.edge_at(occurrence), input_refs)
+    }
+
+    /// The genomic weight of `edge`, an edge of this graph: its own weight
+    /// when ungrouped, [`compose`]`(own_weight, scale, pattern)` for a member.
+    #[must_use]
+    pub fn edge_weight(&self, edge: &GraphEdge, input_refs: &[InputReference]) -> f32 {
         match edge.membership {
             None => edge.own_weight,
             Some(membership) => {
@@ -479,15 +491,11 @@ impl CgpGraphBackendDef {
     pub fn sink_weight_rows(&self, input_refs: &[InputReference]) -> Vec<Box<[f32]>> {
         self.output_sinks
             .iter()
-            .enumerate()
-            .map(|(sink, entry)| {
-                (0..entry.inputs.len())
-                    .map(|index| {
-                        self.genomic_weight(
-                            EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index),
-                            input_refs,
-                        )
-                    })
+            .map(|entry| {
+                entry
+                    .inputs
+                    .iter()
+                    .map(|edge| self.edge_weight(edge, input_refs))
                     .collect()
             })
             .collect()
@@ -864,7 +872,7 @@ impl CgpGraphBackendDef {
                     .inputs
                     .iter()
                     .enumerate()
-                    .filter(move |(_, edge)| edge.membership == Some(Membership { group }))
+                    .filter(move |(_, edge)| edge.is_member_of(group))
                     .map(move |(index, _)| EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index))
             })
     }
@@ -911,9 +919,7 @@ impl CgpGraphBackendDef {
         let mut removed = 0;
         for sink in &mut self.output_sinks.0 {
             let before = sink.inputs.len();
-            sink.inputs
-                .0
-                .retain(|edge| edge.membership != Some(Membership { group }));
+            sink.inputs.0.retain(|edge| !edge.is_member_of(group));
             removed += before - sink.inputs.len();
         }
         self.drop_group_record(group);
@@ -936,7 +942,7 @@ impl CgpGraphBackendDef {
         let mut moved = Vec::with_capacity(usize::from(VOTE_DIRECTION_COUNT));
         for sink in &mut self.output_sinks.0 {
             sink.inputs.0.retain(|edge| {
-                let member = edge.membership == Some(Membership { group });
+                let member = edge.is_member_of(group);
                 if member {
                     moved.push(*edge);
                 }
@@ -1011,8 +1017,7 @@ impl CgpGraphBackendDef {
     fn member_sink(&self, edge: &GraphEdge) -> usize {
         let (group, channel) = Self::member_key(edge).expect("a member");
         let record = &self.groups[group.index()];
-        let d = (u16::from(record.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT);
-        self.direction_sink(record.kind, d as u8)
+        self.direction_sink(record.kind, member_direction(record, channel))
             .expect("a group's graph carries every direction sink")
     }
 
@@ -1100,11 +1105,8 @@ impl CgpGraphBackendDef {
                             ref_idx: ring_ref,
                             sub_idx: channel,
                         }
-                    && self.direction_sink(
-                        record.kind,
-                        ((u16::from(record.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT))
-                            as u8,
-                    ) == Some(sink_idx);
+                    && self.direction_sink(record.kind, member_direction(record, channel))
+                        == Some(sink_idx);
                 if !fits {
                     return Err(V::MemberShape);
                 }
