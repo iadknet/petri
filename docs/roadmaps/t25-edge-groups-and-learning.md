@@ -31,7 +31,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 - [x] **T25.F01 — Edge Container, Constructors and Birth Seeds** — Depends on: None
   - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one captures what a child is born with, and one builds the running brain from it, with no behavior change.
-- [ ] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
+- [x] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
   - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, a ring gene costs its eight synapses, and the founder is re-anchored.
 - [ ] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
