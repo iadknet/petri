@@ -7,13 +7,14 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use super::*;
-use crate::contracts::{InputReference, WorldInputKey};
+use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
     test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::NodeGenome;
+use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+use crate::creature::parseability::ParseabilityGate;
 
 fn graph_index(genome: &CreatureGenome) -> usize {
     genome
@@ -203,43 +204,89 @@ fn expected_delta(
     }
 }
 
+/// Adds one `Ring` group per entry of `groups` to the Graph `node`, all
+/// reading one appended occupied-ring reference, each with up to seven
+/// members dropped (a group keeps at least one).
+fn add_ring_groups(node: &mut NodeGenome, groups: &[(usize, u8, f32, u8)]) {
+    let ring = u16::try_from(node.input_refs.len()).unwrap();
+    node.input_refs
+        .push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
+    let def = graph_mut(node);
+    for &(kind, offset, scale, drop) in groups {
+        let id = def.add_group(
+            Shape::Ring { ring_ref: ring },
+            DirectedVoteKind::ALL[kind],
+            offset,
+        );
+        def.group_mut(id).set_scale(scale);
+        let members: Vec<_> = def.members(id).collect();
+        for (channel, occurrence) in members.into_iter().enumerate().rev().skip(1) {
+            if drop & (1 << channel) != 0 {
+                def.remove_edge(occurrence);
+            }
+        }
+    }
+}
+
+/// The founder with ring groups on both Graph nodes — node 1 is routed from
+/// node 0, so Topology copies and swaps reach a grouped backend — and an
+/// appended VM node routed from node 1, so VM events have a target.
+fn grouped_mixed_genome(groups: &[Vec<(usize, u8, f32, u8)>; 2]) -> CreatureGenome {
+    let mut genome = v3alpha1_founder_genome();
+    let graphs: Vec<usize> = (0..genome.nodes.len())
+        .filter(|&i| matches!(genome.nodes[i].backend_def, BackendDef::Graph(_)))
+        .collect();
+    assert_eq!(graphs.len(), 2, "the founder carries two Graph nodes");
+    for (&idx, groups) in graphs.iter().zip(groups) {
+        add_ring_groups(&mut genome.nodes[idx], groups);
+    }
+    let vm_id = NodeId::new(genome.nodes.iter().map(|n| n.node_id.0).max().unwrap() + 1);
+    genome.nodes[graphs[1]].targets.push(RouteTarget {
+        target_id: vm_id,
+        slot: 0,
+        gate_bias: 0.0,
+    });
+    genome.nodes.push(NodeGenome {
+        node_id: vm_id,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 2,
+            constants: vec![1.0],
+            program: vec![VmInstruction::Halt],
+        }),
+        targets: vec![],
+    });
+    genome
+}
+
 proptest! {
-    /// Random grouped genomes under random events of all four domains: every
-    /// applied event leaves every Graph backend valid, the gate never rejects
-    /// one, and each group operator changes `genome_size` by its declared
-    /// amount (`AddRingGroup` +9, `RemoveGroup` −(n + 1), a last member's
-    /// `RemoveGraphEdge` −2, the three record edits 0).
+    /// Random grouped genomes (two grouped Graph nodes and a VM node) under
+    /// random events of all four domains, the mesh layer's share drawn over
+    /// [0, 1]: every applied event leaves every Graph backend valid, the gate
+    /// never rejects one, and each group operator changes `genome_size` by
+    /// its declared amount (`AddRingGroup` +9, `RemoveGroup` −(n + 1), a last
+    /// member's `RemoveGraphEdge` −2, the three record edits 0).
     #[test]
     fn every_applied_event_keeps_the_graph_invariants(
         seed in any::<u64>(),
-        groups in prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, 0u8..=u8::MAX), 0..4),
+        mesh_layer_probability in 0.0f64..=1.0,
+        groups in [
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, 0u8..=u8::MAX), 0..4),
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, 0u8..=u8::MAX), 0..4),
+        ],
     ) {
-        let mut genome = v3alpha1_founder_genome();
-        let idx = graph_index(&genome);
-        {
-            let node = &mut genome.nodes[idx];
-            let ring = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs.push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
-            let def = graph_mut(node);
-            for (kind, offset, scale, drop) in groups {
-                let id = def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
-                def.group_mut(id).set_scale(scale);
-                let members: Vec<_> = def.members(id).collect();
-                // Drop up to seven members; a group keeps at least one.
-                for (channel, occurrence) in members.into_iter().enumerate().rev().skip(1) {
-                    if drop & (1 << channel) != 0 {
-                        def.remove_edge(occurrence);
-                    }
-                }
-            }
+        let mut genome = grouped_mixed_genome(&groups);
+        prop_assert!(ParseabilityGate::validate(&genome).is_ok());
+        for node in &genome.nodes {
+            prop_assert_eq!(validate_graph(node), Ok(()));
         }
         let config = MutationConfig {
             per_unit_rate: 1.0,
-            mesh_layer_probability: 0.0,
+            mesh_layer_probability,
             ..MutationConfig::default()
         };
         let mut rng = SmallRng::seed_from_u64(seed);
-        for _ in 0..24 {
+        for _ in 0..32 {
             let before = genome.clone();
             let reachable: Vec<usize> = (0..genome.nodes.len()).collect();
             let summary = MutationEngine::apply_mutations_on_units(

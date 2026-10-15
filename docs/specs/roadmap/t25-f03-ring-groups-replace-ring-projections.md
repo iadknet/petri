@@ -188,7 +188,13 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       `cargo clippy --workspace --all-targets` is clean,
       `cargo fmt --all --check` and `cargo check --workspace --all-targets`
       pass, and frontend `npx vitest run` (630 passed) and
-      `npx tsc --noEmit` pass. `make check` pending.
+      `npx tsc --noEmit` pass. The invariant proptest
+      `every_applied_event_keeps_the_graph_invariants` runs on two grouped
+      Graph nodes plus a VM node with the mesh-layer share drawn over [0, 1],
+      so Topology copies and swaps of grouped backends and VM events are in
+      its event mix; with it, viability (29 passed), `cargo test -p v3-core`,
+      clippy (0 warnings) and `cargo fmt --all --check` pass, and it passes at
+      `PROPTEST_CASES=5000`. `make check` pending.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred.
