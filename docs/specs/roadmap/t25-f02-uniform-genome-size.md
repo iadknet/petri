@@ -251,14 +251,27 @@ named value:
 | 2 | `config/simulation.rs:1362-1367` and `opportunity/tests.rs:279` (back to 0.485), `:1460`, `server.rs:3818`, `ConfigPanel.test.tsx:69`, `fixtures.ts:102`, the `supply_rule` strings, the default-rate trajectory pins `baseline_worlds.rs:142-145`, `applied_trajectory.rs:136-143` and `recruitment_tests.rs:49`, the slow-tier recruitment-paths rows and the `--lib` S0 recruitment-paths fixtures (`experiment.rs:960` draws `MutationConfig::default()` through `Supply::Production`: `tests.rs:2114` specialized proposals 129 → 128; the known-deleting lineage re-searched under its commit-1 row's step (b)), the v3-cli trajectory fixtures (`the_real_run_path_*`, `persistence_samples_carry_world_tracking_on_the_births_cadence`) re-searched under the fixture rule, `bench_artifacts.rs` digests (undo link) | rate | 0.005 restores the commit-1 values. Commit 2 is committed green: a fixture re-search happens at the commit that moves it; the implementer may verify each candidate against commit 3's diff before committing and prefer one that holds under both, but never commits red |
 | 3 | `bench_artifacts.rs` digests (undo link); `reproducibility.rs` fingerprint (field removed, still a live two-run comparison); energy-accounting and plasticity tests that assert a charge; the split tests named in Implementation Tasks; mutation-on pins susceptible through the splittable set: all four `applied_trajectory.rs` digests (`:59-66`, `:136-143`), `baseline_worlds.rs:142-145`, `recruitment_tests.rs:49`, the slow-tier and `--lib` S0 recruitment-paths fixtures, the v3-cli trajectory fixtures, the gate and world-set deterministic blocks | config shape (the `applied-energy-flows` and `applied-mortality` definition tokens go v2 → v3 with their key sets, as T16.F02 bumped v1 → v2); deleted charge; splittable set | restoring the two keys recovers the commit-2 digests; restoring `is_excluded_introspection_split` recovers every commit-2 pin value; neither `viability.rs` founder-only digest moves |
 
-**Measured verdict.** Pending.
+**Measured verdict** (2026-10-14, head `bb62efea`, code `db053a14`; command lines, wall times, hashes and the tables in the readings file, "Benchmark runs").
+
+| Profile | CLI exit (source: `measurement_evidence.cli_exit`) | Outer exit (source: run log) | `severe` | Verdict |
+| --- | ---: | --- | --- | --- |
+| gate | 3 | `make: Error 3` | true | `decided_passes` +133.5% against T11.F30 (user-accepted 2026-10-14); also severe against `input-mechanism-defaults.json` on `decided_passes` (reference 0) and `pass_cap_hits` (+293.4%), outside the predeclaration and not yet decided by the user; wall +12.9% / +2.4% (ok) |
+| goal | 0 | 0 | false | flags only: `pass_cap_hits` +14.3% (T11.F30), `plasticity_updates` +20.1% (input-mechanism-defaults); wall +20.0% (ok) |
+| goal-long base | 0 | 0 | false | no reference (series opener); Canyon seed 22 went extinct at tick 290 |
+| goal-long | 0 | 0 | false | no stored epoch baseline at run time, so the CLI compared nothing; derived deltas against the base in the readings (`vm_steps` +28.4%, `pass_cap_hits` +36.4%, `decided_passes` +124.7%, wall +16.5%) |
+| rate arm (three sweeps) | 0, 0, 0 | 0, 0, 0 | false | no reference; no predeclared ordering |
+
+Raw and summary sizes: gate 107,935 / 21,575 bytes; goal 691,402,116 / 399,895; goal-long base 700,311,616 / 323,240; goal-long 710,753,228 / 394,684; arm 6,723,417 / 65,611 (Orchards), 6,468,859 / 59,136 (Canyon), 6,704,400 / 64,120 (Confluence). Raw hashes are in the readings file.
+
+The counterfactual decomposition at tick 100 reads `E_new` within 0.003 of `E_old` in every goal world; at 2,000 and 40,000 ticks `E_new` exceeds `E_old` in every world while 8P is below S (readings, "per-world readings"). The predeclaration's `E_new > E_old wherever 8P > S` is therefore not exercised by these populations; the readings table carries the values.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f02-uniform-genome-size.json),
   [goal](../../progress/features/t25-f02-uniform-genome-size-goal.json),
   [goal-long baseline](../../progress/features/t25-f02-uniform-genome-size-base-goal-long.json),
   [goal-long](../../progress/features/t25-f02-uniform-genome-size-goal-long.json),
-  rate arm `t25-f02-uniform-genome-size-rate-0005-<world>-sweep.json`.
+  rate arm `t25-f02-uniform-genome-size-rate-0005-<world>-sweep.json` with
+  `<world>` = `orchards-in-grassland`, `canyon-country`, `confluence`.
 - Full readings: [`docs/progress/readings/t25-f02.md`](../../progress/readings/t25-f02.md).
 
 ## Success Criteria
