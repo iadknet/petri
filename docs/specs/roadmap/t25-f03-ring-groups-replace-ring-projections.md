@@ -262,8 +262,8 @@ named value:
 
 | Profile | CLI exit (source: `measurement_evidence.cli_exit`) | Outer exit | `severe` | Verdict |
 | --- | ---: | --- | --- | --- |
-| gate | 0 | not observed | false | no counter crossed a threshold; wall +4.7% against F02 (ok); the gate epoch is still to be re-pinned in the closing commit |
-| goal | 0 | not observed | false | flags only: `vm_steps` +21.9% and `plasticity_updates` +22.6% against F02; wall -3.9% (ok); per-case readings the CLI does not level moved in Canyon and Confluence (readings, "Anything that does not fit") |
+| gate | 0 | not observed | false | no counter crossed a threshold; wall +4.7% against F02 (ok); the gate epoch is re-pinned in the closing commit as predeclared (its deterministic block changed by construction: operator keys, `ring_rules` v2, `reachable-structure-v2`, the persistence fields), no severe needed |
+| goal | 0 | not observed | false | flags only: `vm_steps` +21.9% and `plasticity_updates` +22.6% against F02; wall -3.9% (ok); the per-world movements are trajectory readings with no predeclared direction, accepted as recorded (spec-owner ruling in the readings); the goal epoch is re-pinned in the closing commit with the gate's, its `ring_rules` and persistence definitions having changed by construction (the F02 precedent); per-case readings the CLI does not level moved in Canyon and Confluence (readings, "Anything that does not fit") |
 
 Raw and summary sizes: gate 105,736 / 20,410 bytes, sha256 `e487961aac0c26ed5cb4c69a05ea9a9599aca25900af951df31d5852987054d2`; goal 691,454,296 / 386,157 bytes, sha256 `73c460cf00b697e5f5abc4bd2536c2916fd40f4a0af28076931fe69cfa4aa8ec`. Raw reports sit under `.bench-artifacts/t25-f03-ring-groups-replace-ring-projections/` and are not staged. Each summary's recorded raw hash and byte count equal the local raw file. The goal summary records `dirty: true` (an untracked gate summary sat in the worktree).
 
