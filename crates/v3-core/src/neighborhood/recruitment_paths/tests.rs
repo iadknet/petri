@@ -2714,6 +2714,13 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// 0.005 together restore batch 2 lineage 2.
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
+    // The pinned lineage is the default rate's; check it before the 263-
+    // generation walk, which a much larger rate makes unbounded in practice.
+    assert_eq!(
+        crate::config::MutationConfig::default().per_unit_rate,
+        0.006_062_5,
+        "the batch 22 lineage 0 fixture is pinned at the default rate 0.0060625"
+    );
     let sizes = Sizes {
         batches: 4,
         lineages: 1,

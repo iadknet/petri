@@ -195,9 +195,20 @@ re-pin table, each test comment carrying its cause and restoring check.
 | Readings table: mean genome size, mean wired sinks, mean projections, births per creature-tick and gestation per goal world at 2,000 and 40,000 ticks against the merge base and the arm; the same-population counterfactual expectations `E_old = 0.005 (x̄' + S̄ − 8P̄)`, `E_size = 0.005 x̄'`, `E_new = 0.0060625 x̄'` from the living population's checkpoint means, beside the observed requested events per birth from the report's mutation counters | readings file |
 
 - [ ] Every row above ran on the final build and its result is recorded
-  (viability, focused tests, gate, goal, goal-long and the rate arm have;
-  the mutation gate and the slow tier have not run).
-- [ ] Mutation survivors: pending.
+  (viability, focused tests, gate, goal, goal-long, the rate arm and the
+  mutation gate have; the slow tier has not run).
+- [x] Mutation gate (one fresh run, `14802d48`): `85 mutants tested in 29m:
+  2 missed, 71 caught, 11 unviable, 1 timeouts`. Fresh output rotated to
+  `~/.local/share/petri-tools/mutants/t25-f02/mutants.out.old/`
+  (`missed.txt`, `timeout.txt`) by the `MUTANTS_ITERATE=1` feedback pass,
+  which caught all three in `mutants.out/`. Triage added and strengthened
+  tests only, so no second fresh run.
+
+| Mutant (fresh run) | Resolution |
+| --- | --- |
+| `v3-cli/src/lib.rs:205:29` `+=` to `*=` in `structure_means` | Killed: `structure_means_count_ring_projections_across_the_population` (`v3-cli/src/lib.rs` tests) |
+| `mutation/graph/operators.rs:348:61` `<` to `<=` in `splittable_edge_sites` | Killed: `split_existing_edge_skips_a_source_one_past_the_last_node` (`operators.rs` tests) |
+| Timeout: `config/simulation.rs:868:5` `default_per_unit_rate` to `1.0` | Killed: strengthened `recruitment_paths_known_deleting_lineage_reads_deleted_retention` (`recruitment_paths/tests.rs`) to check its pinned default rate before the 263-generation walk, which spun at rate 1.0 and held the lib binary past the timeout although the rate pin tests failed |
 
 ## Performance and Goal Impact
 

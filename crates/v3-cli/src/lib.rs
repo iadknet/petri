@@ -325,4 +325,36 @@ mod tests {
              and no projection"
         );
     }
+
+    #[test]
+    fn structure_means_count_ring_projections_across_the_population() {
+        use v3_core::creature::genome::cgp::RingProjection;
+        use v3_core::creature::genome::vote::DirectedVoteKind;
+        use v3_core::creature::genome::BackendDef;
+
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 32;
+        cfg.world.height = 32;
+        cfg.population.initial_creatures = 4;
+        let mut sim = seed_simulation(cfg, 42);
+        assert_eq!(sim.creatures.len(), 4);
+
+        // Two projections on one creature's first graph: 2 / 4 = 0.5.
+        let creature = sim.creatures.values_mut().next().unwrap();
+        let graph = creature
+            .genome
+            .nodes
+            .iter_mut()
+            .find_map(|node| match &mut node.backend_def {
+                BackendDef::Graph(graph) => Some(graph),
+                _ => None,
+            })
+            .expect("a founder carries a graph node");
+        graph.projections.extend([
+            RingProjection::new(0, DirectedVoteKind::Move, 0, 1.0),
+            RingProjection::new(0, DirectedVoteKind::Move, 1, 1.0),
+        ]);
+
+        assert_eq!(structure_means(&sim).projections, 0.5);
+    }
 }
