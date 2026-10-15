@@ -1006,6 +1006,28 @@ mod tests {
         );
     }
 
+    #[test]
+    fn split_existing_edge_skips_a_source_one_past_the_last_node() {
+        // The only edge reads `ComputeNode(1)` with one compute node: the
+        // first out-of-range index dangles just like the `u16::MAX` sentinel.
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(
+                ComputeNodeKind::Constant(1.0),
+                Vec::new(),
+                None,
+            )])
+            .with_output_sinks(vec![OutputSink::new(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            )]);
+        let mut rng = test_rng();
+        assert_eq!(
+            split_existing_edge(&mut def, &mut rng),
+            Err(MutationSkipReason::NoApplicableTarget)
+        );
+        assert_eq!(def.compute_nodes().len(), 1);
+    }
+
     /// Splitting an edge whose consumer is a compute node inserts the new
     /// `Add` node at the consumer's index, remaps every `ComputeNode(i >=
     /// consumer)` reference, and retargets the split edge to the new node
