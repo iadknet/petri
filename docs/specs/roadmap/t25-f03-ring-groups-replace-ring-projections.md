@@ -180,13 +180,15 @@ Every `RingProjection` test site is ported, rewritten or deleted:
 ## Verification
 
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 29
-      passed after commit 1 (`c3994a6b`) and after commit 2 (`238ad78d`); the
-      founder-only siblings did not move.
+      passed after commit 1 (`c3994a6b`), commit 2 (`238ad78d`) and the
+      self-review commit (`2d300ef9`); the founder-only siblings did not move.
 - [ ] Focused tests (the tests-first table) and `make check` -> result,
       commit hash. Focused: `cargo test --workspace --no-fail-fast` all
-      passed at `238ad78d`; `cargo clippy --workspace --all-targets` clean;
-      `npx vitest run` (frontend) 630 passed at `6b356439`. `make check`
-      pending.
+      passed at `238ad78d`; at `2d300ef9` `cargo test -p v3-core` passes,
+      `cargo clippy --workspace --all-targets` is clean,
+      `cargo fmt --all --check` and `cargo check --workspace --all-targets`
+      pass, and frontend `npx vitest run` (630 passed) and
+      `npx tsc --noEmit` pass. `make check` pending.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred.
