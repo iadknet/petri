@@ -66,9 +66,9 @@ fn node_fanouts(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> (u64, u64) 
         if sink_kind != kind {
             continue;
         }
-        for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+        for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight())) {
             let entry = by_source
-                .entry((edge.source(), edge.weight() > 0.0))
+                .entry((edge.source(), edge.own_weight() > 0.0))
                 .or_default();
             entry.0.insert(d);
             entry.1 += 1;
@@ -103,9 +103,10 @@ impl DriveCensus {
                     for kind in DirectedVoteKind::ALL {
                         let row = &mut one[kind.index()];
                         if let Some(sink) = def.sink(OutputSinkKind::ActionVote(kind.drive())) {
-                            for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+                            for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight()))
+                            {
                                 row.drive_edges += 1;
-                                if edge.weight() > 0.0 {
+                                if edge.own_weight() > 0.0 {
                                     row.drive_edges_positive += 1;
                                 } else {
                                     row.drive_edges_negative += 1;

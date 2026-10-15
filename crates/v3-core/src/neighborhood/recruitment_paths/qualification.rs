@@ -524,7 +524,7 @@ fn only_east_edge_appended(
             .zip(b.output_sinks())
             .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y)
         && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
-            .is_some_and(|edge| accept(&edge.source()) && edge.weight() > 0.0)
+            .is_some_and(|edge| accept(&edge.source()) && edge.own_weight() > 0.0)
 }
 
 /// The Task B-correct VM copy: the ring added to the table, the read's
@@ -778,7 +778,7 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
         .enumerate()
         .filter(|(_, node)| {
             node.inputs.len() == 1
-                && node.inputs[0].weight() == 1.0
+                && node.inputs[0].own_weight() == 1.0
                 && matches!(
                     node.inputs[0].source(),
                     GraphSource::InputLeaf {
@@ -1057,7 +1057,7 @@ mod tests {
         let mut changed_compute = after.clone();
         let graph = scaffold_graph_mut(&mut changed_compute);
         let first = EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0);
-        let weight = graph.edge_at(first).weight();
+        let weight = graph.edge_at(first).own_weight();
         graph.edge_mut(first).set_weight(weight + 1.0);
 
         assert!(!accept(before, &changed_compute));

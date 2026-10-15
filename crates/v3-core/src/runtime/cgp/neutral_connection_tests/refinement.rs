@@ -40,7 +40,7 @@ fn fixture(ring: bool) -> CreatureGenome {
 fn weights(genome: &CreatureGenome) -> Vec<f32> {
     graph(&genome.nodes[0])
         .edges()
-        .map(|edge| edge.weight())
+        .map(|edge| edge.own_weight())
         .collect()
 }
 
@@ -91,7 +91,7 @@ fn native_run(
                 snapshot.perception.nearby_core[usize::from(sub_idx)]
             };
             assert!(input > 0.0);
-            expected[vote.index()] += edge.weight() * input;
+            expected[vote.index()] += edge.own_weight() * input;
         }
     }
     assert_eq!(
@@ -325,7 +325,7 @@ fn proposal(genome: &mut CreatureGenome, arm: Arm, seed: u64) -> (f64, Vec<usize
             .filter(|occurrence| matches!(occurrence.surface, EdgeSurface::SinkInput(_)))
             .collect();
         for occurrence in sink_edges {
-            let weight = def.edge_at(occurrence).weight();
+            let weight = def.edge_at(occurrence).own_weight();
             let step = if replay.gen_bool(0.5) {
                 increment
             } else {

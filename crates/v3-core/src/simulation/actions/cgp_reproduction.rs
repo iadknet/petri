@@ -289,7 +289,7 @@ mod tests {
         split_existing_edge(&mut def, &mut rng).unwrap();
         let birth = rows(&def);
         let identity = birth.iter().position(|v| v == &[None]).unwrap();
-        assert_eq!(def.compute_nodes()[identity].inputs[0].weight(), 1.0);
+        assert_eq!(def.compute_nodes()[identity].inputs[0].own_weight(), 1.0);
         let retained: Vec<_> = birth.iter().flatten().filter_map(|v| *v).collect();
         assert_eq!(retained, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
     }

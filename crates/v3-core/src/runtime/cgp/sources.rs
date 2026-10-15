@@ -109,6 +109,6 @@ pub(crate) fn collect_cgp_weighted_inputs(
             shared_memory,
             prev_shared_memory,
         );
-        source_value * edge.weight()
+        source_value * edge.own_weight()
     }));
 }

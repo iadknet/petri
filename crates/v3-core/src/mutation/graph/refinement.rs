@@ -113,7 +113,7 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
                 candidates.len() - 1
             });
             let (group, valid) = &mut candidates[index];
-            if !edge.weight().is_finite()
+            if !edge.own_weight().is_finite()
                 || group
                     .members
                     .iter()
@@ -160,7 +160,7 @@ fn apply_step(
     let mut proposed = [0.0f32; 8];
     let mut norm_squared = 0.0f64;
     for (member, proposed) in group.members.iter().zip(&mut proposed) {
-        let old = def.output_sinks()[member.sink].inputs[member.edge].weight();
+        let old = def.output_sinks()[member.sink].inputs[member.edge].own_weight();
         *proposed = old + increment;
         if !proposed.is_finite() {
             return Err(MutationSkipReason::NumericProposalRejected);

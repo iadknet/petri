@@ -761,7 +761,7 @@ fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
         .flat_map(|(vote, sink)| {
             sink.inputs
                 .iter()
-                .map(move |edge| (vote, edge.source(), edge.weight()))
+                .map(move |edge| (vote, edge.source(), edge.own_weight()))
         })
         .collect()
 }
@@ -874,7 +874,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         before_def
             .compute_nodes()
             .iter()
-            .any(|node| node.inputs.iter().any(|edge| edge.weight() != 0.0)),
+            .any(|node| node.inputs.iter().any(|edge| edge.own_weight() != 0.0)),
         "the fixture carries weighted compute edges"
     );
     assert!(
@@ -1099,7 +1099,7 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
             panic!("seed {seed}: {:?}", edge.source());
         };
         subs.insert(sub_idx);
-        if edge.weight() < 0.0 {
+        if edge.own_weight() < 0.0 {
             negative += 1;
         } else {
             positive += 1;

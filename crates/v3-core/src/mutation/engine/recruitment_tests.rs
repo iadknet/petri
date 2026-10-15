@@ -52,7 +52,14 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // anchor 97 together restore. Re-pinned by T25.F02 commit 2 (default
     // rate 0.005 -> 0.0060625; 4353978680418239853 -> 7164882519974651247);
     // rate 0.005 restores.
-    assert_eq!(hash, 7164882519974651247, "pin of the recruitment-Off path");
+    // Re-pinned by T25.F03 commit 1 (text only): the genome JSON names
+    // `own_weight` (7164882519974651247 -> 12816372541544823979); the hash
+    // without the genome JSON is 8964731210341994819 at the merge base and
+    // after the commit, and reverting the key rename restores.
+    assert_eq!(
+        hash, 12816372541544823979,
+        "pin of the recruitment-Off path"
+    );
 }
 
 #[test]

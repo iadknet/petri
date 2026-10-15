@@ -41,7 +41,7 @@ describe("NodeBackendDetail", () => {
 				compute_nodes: [
 					{
 						kind: "Add",
-						inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 }],
+						inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
 					},
 				],
 				output_sinks: [],

@@ -12,9 +12,17 @@ export type GraphSource =
 	| { SharedMemory: { slot: number; previous: boolean } }
 	| { ComputeNode: number };
 
+/** A sink edge's membership in an edge group (T25.F03). */
+export interface Membership {
+	group: number;
+}
+
 export interface GraphEdge {
 	source: GraphSource;
-	weight: number;
+	/** The genomic weight of an ungrouped edge; a member's correction. */
+	own_weight: number;
+	/** Omitted by the server when the edge belongs to no group. */
+	membership?: Membership;
 }
 
 export type ComputeNodeKind =

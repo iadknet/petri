@@ -36,17 +36,17 @@ const graphNode: NodeGenome = {
 			compute_nodes: [
 				{
 					kind: { DecayIntegrator: 0.5 },
-					inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 }],
+					inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
 				},
 			],
 			output_sinks: [
 				{
 					kind: { CustomOutput: 1 },
-					inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+					inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
 				},
 				{
 					kind: { RouterGate: 0 },
-					inputs: [{ source: { ComputeNode: 0 }, weight: 0.5 }],
+					inputs: [{ source: { ComputeNode: 0 }, own_weight: 0.5 }],
 				},
 			],
 		},

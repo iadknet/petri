@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha5";
+pub const PROTOCOL_VERSION: &str = "v3alpha6";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -55,11 +55,11 @@ mod tests {
         }
     }
 
-    /// T19.F06 removed trace fields and a config key, a breaking payload
-    /// change.
+    /// T25.F03 renamed the genome edge `weight` to `own_weight` and replaced
+    /// ring projections with edge groups, a breaking payload change.
     #[test]
-    fn protocol_version_is_v3alpha5() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha5");
+    fn protocol_version_is_v3alpha6() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha6");
     }
 
     #[test]

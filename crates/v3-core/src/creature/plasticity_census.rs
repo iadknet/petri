@@ -167,7 +167,7 @@ impl PlasticityCensus {
                     let Some(&weight) = weights.get(edge) else {
                         continue;
                     };
-                    let drift = f64::from((weight - genomic.weight()).abs());
+                    let drift = f64::from((weight - genomic.own_weight()).abs());
                     // A non-finite weight would poison the population sum.
                     if drift.is_finite() {
                         row.drift_sum += drift;

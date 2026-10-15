@@ -256,7 +256,7 @@ fn the_event_appends_a_losing_branch_with_its_own_gate_write_on_both_backends() 
                     .find(|s| matches!(s.kind, OutputSinkKind::RouterGate(1)))
                     .unwrap();
                 assert_eq!(sink.inputs.len(), 1);
-                assert_eq!(sink.inputs[0].weight(), 1.0);
+                assert_eq!(sink.inputs[0].own_weight(), 1.0);
             }
         }
         // T25.F02: +2 on both backends (Graph was +3, the newly wired sink's

@@ -40,7 +40,7 @@ fn edges_wsum(
             shared_memory,
             prev_shared_memory,
         );
-        v * edge.weight()
+        v * edge.own_weight()
     }));
     buf.iter().copied().sum()
 }

@@ -130,7 +130,7 @@ fn bus(
             let OutputSinkKind::CustomOutput(slot) = sink.kind else {
                 continue;
             };
-            for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+            for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight())) {
                 if let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() {
                     if let (Some(family), Ok(channel)) = (
                         ring_of(refs.get(usize::from(ref_idx))),
@@ -140,7 +140,7 @@ fn bus(
                             bus.entry(slot).or_default().push((
                                 family,
                                 channel,
-                                edge.weight() > 0.0,
+                                edge.own_weight() > 0.0,
                             ));
                         }
                     }
@@ -179,7 +179,7 @@ impl RingRuleCensus {
                 if d >= DIRECTIONS {
                     continue;
                 }
-                for edge in sink.inputs.iter().filter(|edge| carries(edge.weight())) {
+                for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight())) {
                     let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() else {
                         continue;
                     };
@@ -190,7 +190,7 @@ impl RingRuleCensus {
                                 family,
                                 kind,
                                 offset: RingProjection::offset_for(d, channel),
-                                positive: edge.weight() > 0.0,
+                                positive: edge.own_weight() > 0.0,
                             };
                             coverage.add(rule, d, true);
                         }
@@ -204,7 +204,7 @@ impl RingRuleCensus {
                                 family,
                                 kind,
                                 offset: RingProjection::offset_for(d, channel),
-                                positive: positive == (edge.weight() > 0.0),
+                                positive: positive == (edge.own_weight() > 0.0),
                             };
                             coverage.add(rule, d, true);
                         }
