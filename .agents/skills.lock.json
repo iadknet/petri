@@ -24,12 +24,6 @@
       "commit": null,
       "path": ".agents/skills/agents-md",
       "license": "MIT"
-    },
-    "petri-visuals": {
-      "repository": "local",
-      "commit": null,
-      "path": ".agents/skills/petri-visuals",
-      "license": "MIT"
     }
   },
   "excluded_files": [
@@ -98,7 +92,7 @@
     },
     {
       "path": "petri-visuals/spec.md",
-      "sha256": "253b6442e1f260d1254a42f5ed44cad8a529a16b86863a99f7b748613e8756b4"
+      "sha256": "2a9d576e58dcdf5f1c70dae58ec70bb6d2a245b499f2d56f7b19f373f4a0a11f"
     },
     {
       "path": "petri-visuals/viz/build.sh",
@@ -106,15 +100,15 @@
     },
     {
       "path": "petri-visuals/viz/example.json",
-      "sha256": "86e87274a3b06fe716a2f80591a8c11d88ffed502468e5ec9c592c7e709935e4"
+      "sha256": "609c39b0fad161991c92aba73a4fa2eb74780165764688270ab11ccbddad60b9"
     },
     {
       "path": "petri-visuals/viz/petri-viz.js",
-      "sha256": "fdc812a1ad63ecc944368bf5a290edd530ecd84e05615b11039f0f4763a984c7"
+      "sha256": "b055617baa65ff09313fa30172c3ccdc0f19fd30c04b79932a12fe30c9d3cfca"
     },
     {
       "path": "petri-visuals/viz/petri-viz.min.js",
-      "sha256": "1d222dc143d2b0f968e90865a319303edd602d2ba09ada90fb3b3ec385ea5870"
+      "sha256": "444862be557d97a58f8a2c1c2cd5e873f738e7b5d73ccdfcb37c0272a53fc2c1"
     },
     {
       "path": "petri-visuals/viz/preview.sh",

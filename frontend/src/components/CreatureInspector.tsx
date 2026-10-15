@@ -15,6 +15,7 @@ function CreatureInspector() {
 	const meshAnnotations = useCreatureInspectorStore(
 		creatureInspectorSelectors.creatureMeshAnnotations,
 	);
+	const graphWeights = useCreatureInspectorStore(creatureInspectorSelectors.creatureGraphWeights);
 	const sharedMemory = useCreatureInspectorStore(creatureInspectorSelectors.creatureSharedMemory);
 	const actionLog = useCreatureInspectorStore(creatureInspectorSelectors.actionLog);
 	const diagnostics = useCreatureInspectorStore(creatureInspectorSelectors.creatureDiagnostics);
@@ -74,6 +75,7 @@ function CreatureInspector() {
 			creatureId={stats.id}
 			genome={genome}
 			meshAnnotations={meshAnnotations}
+			graphWeights={graphWeights}
 			sharedMemory={sharedMemory}
 			actionLog={actionLog}
 			diagnostics={diagnostics}

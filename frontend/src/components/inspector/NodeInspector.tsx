@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo } from "react";
+import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { GraphTrace, VmTrace } from "../../types/trace.ts";
 import type { MeshHopTrace } from "../../types/trace.ts";
 import { NodeBackendDetail } from "./NodeBackendDetail.tsx";
@@ -7,7 +8,7 @@ import { NodeExecutionTrace } from "./NodeExecutionTrace.tsx";
 import { NodeIdentity } from "./NodeIdentity.tsx";
 import { NodeMemorySlots } from "./NodeMemorySlots.tsx";
 import type { MeshAnalyzedNode } from "./mesh/meshAnalysis.ts";
-import { collectNodeBadges, summarizeBackendDef } from "./mesh/meshPresentation.ts";
+import { summarizeBackendDef } from "./mesh/meshPresentation.ts";
 import type { MeshNodeSemantics } from "./mesh/meshSemantics.ts";
 
 const GraphInternalsViz = lazy(async () => {
@@ -18,11 +19,19 @@ const GraphInternalsViz = lazy(async () => {
 interface NodeInspectorProps {
 	node: MeshAnalyzedNode | null;
 	semantics: MeshNodeSemantics | null;
+	/** This node's member genomic weights, when it carries an edge group. */
+	graphWeights?: NodeGraphWeights | null;
 	sharedMemory: number[] | null;
 	executionHop: { hop: MeshHopTrace; detailIndex: number } | null;
 }
 
-export function NodeInspector({ node, semantics, sharedMemory, executionHop }: NodeInspectorProps) {
+export function NodeInspector({
+	node,
+	semantics,
+	graphWeights = null,
+	sharedMemory,
+	executionHop,
+}: NodeInspectorProps) {
 	// Hooks must be called unconditionally (Rules of Hooks)
 	const isGraph = node ? "Graph" in node.node.backend_def : false;
 	const isVm = node ? "Vm" in node.node.backend_def : false;
@@ -49,7 +58,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 		);
 	}
 
-	const badges = semantics?.badges ?? collectNodeBadges(node.node);
+	const badges = semantics?.badges ?? [];
 	const summary = summarizeBackendDef(node.node.backend_def);
 	const hasMemoryWrite = semantics?.writeClasses.includes("memory") ?? false;
 
@@ -75,6 +84,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 				>
 					<GraphInternalsViz
 						graphDef={node.node.backend_def.Graph}
+						graphWeights={graphWeights}
 						liveIndices={semantics?.liveInternalNodeIndices ?? []}
 						inputRefs={node.node.input_refs}
 						targets={node.node.targets}

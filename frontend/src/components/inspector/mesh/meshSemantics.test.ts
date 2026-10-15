@@ -106,18 +106,7 @@ describe("meshSemantics", () => {
 		expect(node?.rationale.confidence).toContain("server-provided");
 	});
 
-	it("falls back to heuristics when annotations are unavailable", () => {
-		const semantics = deriveMeshSemantics(makeGenome(), null);
-		const node = semantics.nodesById.get(3);
-
-		expect(node?.role).toBe("memory_reader");
-		expect(node?.confidence).toBe("medium");
-		expect(node?.badges).toContain("slot");
-		expect(node?.label).toBe("Memory Reader · Introspection");
-		expect(node?.rationale.confidence).toContain("Inferred");
-	});
-
-	it("handles typed world food references without crashing", () => {
+	it("reads classes only from the server's annotations, never from the genome", () => {
 		const genome = makeGenome();
 		genome.nodes[0]!.input_refs = [
 			{
@@ -131,18 +120,12 @@ describe("meshSemantics", () => {
 
 		expect(() => deriveMeshSemantics(genome, null)).not.toThrow();
 		const semantics = deriveMeshSemantics(genome, null);
-		expect(semantics.nodesById.get(1)?.sourceClass).toBe("food");
-	});
-
-	it("classes the decision-state inputs as decision or introspection reads", () => {
-		const genome = makeGenome();
-		genome.nodes[0]!.input_refs = ["ActionVotes", "PreviousPassVotes", "CommitCounts"];
-		genome.nodes[2]!.input_refs = ["PreviousOutcome", { DynamicIntrospection: "HopsThisTick" }];
-
-		const semantics = deriveMeshSemantics(genome, null);
-
-		expect(semantics.nodesById.get(1)?.readClasses).toEqual(["decision"]);
-		expect(semantics.nodesById.get(1)?.label).toContain("Decision");
-		expect(semantics.nodesById.get(3)?.readClasses).toEqual(["introspection"]);
+		for (const node of semantics.nodes) {
+			expect(node.readClasses).toEqual([]);
+			expect(node.writeClasses).toEqual([]);
+			expect(node.hasStatefulBehavior).toBe(false);
+		}
+		const annotated = deriveMeshSemantics(genome, annotations);
+		expect(annotated.nodesById.get(1)?.sourceClass).toBe("food");
 	});
 });

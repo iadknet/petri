@@ -1,10 +1,11 @@
 import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
+import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { GraphBackendDef, InputReference, RouteTarget } from "../../types/genome.ts";
 import type { GraphTrace } from "../../types/trace.ts";
+import { EdgeGroupList } from "./EdgeGroupList.tsx";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
-import { RingProjectionList } from "./RingProjectionList.tsx";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import { BackwardWeightEdge, WeightEdge } from "./graphInternalsEdges.tsx";
@@ -18,6 +19,8 @@ import { buildComputeTraceOverlay, buildOutputTraceOverlay } from "./graphTraceO
 
 interface GraphInternalsVizProps {
 	graphDef: GraphBackendDef;
+	/** The server's genomic member weights for this node (T25.F03). */
+	graphWeights?: NodeGraphWeights | null;
 	liveIndices: number[];
 	inputRefs: InputReference[];
 	targets: RouteTarget[];
@@ -45,6 +48,7 @@ export function resolveSelectedTarget(
 
 export const GraphInternalsViz = memo(function GraphInternalsViz({
 	graphDef,
+	graphWeights = null,
 	liveIndices,
 	inputRefs,
 	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterGate nodes
@@ -58,7 +62,10 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 	const hasTrace = trace !== null;
 
 	// 1. Build domain model
-	const model = useMemo(() => buildFullGraphModel(graphDef, inputRefs), [graphDef, inputRefs]);
+	const model = useMemo(
+		() => buildFullGraphModel(graphDef, inputRefs, graphWeights),
+		[graphDef, inputRefs, graphWeights],
+	);
 
 	// 2. Compute layout input (nodes with layer constraints + edges)
 	const layoutInput = useMemo(() => {
@@ -171,7 +178,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 					/>
 				</ReactFlowProvider>
 			</div>
-			<RingProjectionList projections={graphDef.projections} inputRefs={inputRefs} />
+			<EdgeGroupList graphDef={graphDef} inputRefs={inputRefs} graphWeights={graphWeights} />
 		</div>
 	);
 });

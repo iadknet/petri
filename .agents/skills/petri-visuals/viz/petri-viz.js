@@ -18,8 +18,9 @@
 		// Not in the inspector: a proposed mechanism that does not exist yet.
 		proposal: [45, 212, 191, 0.14, 0.55, "#5eead4"],
 	};
-	// graphFlowAdapter.ts EDGE_TINTS; compute-to-compute (cc) falls back to slate.
-	const TINT = { ic: [16, 185, 129], io: [251, 191, 36], co: [251, 191, 36], cc: [148, 163, 184] };
+	// graphFlowAdapter.ts EDGE_TINTS; compute-to-compute (cc) falls back to slate;
+	// gm is an edge-group member (group_member).
+	const TINT = { ic: [16, 185, 129], io: [251, 191, 36], co: [251, 191, 36], cc: [148, 163, 184], gm: [192, 132, 252] };
 	// graphNodeFormatters.ts labels and graphNodeCategories.ts sets.
 	const STR = { WeightedSum: "Σ Sum", Clamp01: "Clamp", GreaterThan: "A > B" };
 	const PARAM = { Constant: "Const", Threshold: "Thresh", DecayIntegrator: "Decay", Momentum: "Momentum", Oscillator: "Osc" };
@@ -200,18 +201,23 @@
 		for (const t in TINT) defs += `<marker id="${uid}${t}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${rgba(TINT[t], 0.85)}"/></marker>`;
 		return `<svg width="${L.W}" viewBox="0 0 ${L.W} ${L.H}" height="${L.H}" style="display:block" role="img" aria-label="Graph"><defs>${defs}</defs>${groups}${edges}${nodes}</svg>`;
 	}
-	function projectionsHtml(view, R, tick) {
-		const ps = view.projections || [];
-		if (!ps.length) return "";
-		return `<div class="pv-h">${esc(view.projectionsTitle || "Ring projections")} (${ps.length})</div>` + ps.map((p) => {
-			const off = ((Math.round(p.offset || 0) % 8) + 8) % 8, cells = R && own(tick.rings, p.ring);
-			let row = `<span>${esc(p.ring)}</span><span style="color:${MUTED}">${esc(p.kind)}</span><span>offset ${off}</span><span>w=${Number(p.w).toFixed(3)}</span>`;
-			if (p.gain) row += `<span style="color:#d8b4fe">gain=${esc(p.gain)}</span>`;
-			if (p.isNew) row += `<span style="color:#fbbf24">new</span>`;
-			if (p.note) row += `<span style="color:${MUTED}">${esc(p.note)}</span>`;
+	// v3-core cgp/group.rs compose(own, scale, pattern): a Ring member's
+	// pattern is 1, so its weight is scale + own.
+	const compose = (own, scale, pattern) => scale * pattern + own;
+	function edgeGroupsHtml(view, R, tick) {
+		const gs = view.edgeGroups || [];
+		if (!gs.length) return "";
+		return `<div class="pv-h">${esc(view.edgeGroupsTitle || "Edge groups")} (${gs.length})</div>` + gs.map((g) => {
+			const off = ((Math.round(g.offset || 0) % 8) + 8) % 8, cells = R && own(tick.rings, g.ring);
+			const own8 = (c) => Number(own(g.own || {}, DN[c]) || 0);
+			const present = g.members ? g.members.map((m) => DN.indexOf(m)) : [0, 1, 2, 3, 4, 5, 6, 7];
+			let row = `<span>${esc(g.ring)}</span><span style="color:${MUTED}">${esc(g.kind)}</span><span>offset ${off}</span><span>scale=${Number(g.scale).toFixed(3)}</span><span style="color:${rgba(TINT.gm, 1)}">${present.length}/8 ${DN.map((_, c) => (present.includes(c) ? "●" : "○")).join("")}</span>`;
+			if (g.gain) row += `<span style="color:#d8b4fe">gain=${esc(g.gain)}</span>`;
+			if (g.isNew) row += `<span style="color:#fbbf24">new</span>`;
+			if (g.note) row += `<span style="color:${MUTED}">${esc(g.note)}</span>`;
 			if (cells) {
-				const g = p.gain ? R.val[p.gain] || 0 : 1;
-				const out = cells.map((c, i) => (c ? `${p.kind}[${DN[(i + off) % 8]}] ${signed(p.w * c * g)}` : "")).filter(Boolean);
+				const k = g.gain ? R.val[g.gain] || 0 : 1;
+				const out = present.map((c) => (cells[c] ? `${g.kind}[${DN[(c + off) % 8]}] ${signed(compose(own8(c), Number(g.scale), 1) * cells[c] * k)}` : "")).filter(Boolean);
 				row += `<span style="color:${VALUE}">→ ${esc(out.join(", ") || "nothing")}</span>`;
 			}
 			return `<div class="pv-rl">${row}</div>`;
@@ -279,7 +285,7 @@
 			h += `<div class="pv-ip"><div class="pv-h" style="margin-top:0">${esc(tick ? `Example tick · ${tick.name}` : view.header || `Graph (${count("in")} in · ${count("cn")} compute · ${count("out")} out)`)}</div>`;
 			if (tick) h += sceneHtml(G, R, tick);
 			h += `<div class="pv-gb">${G.nodes.length ? graphSvg(G, L, R, uid, view.edgeLabels !== false) : `<div class="pv-msg" style="padding:16px;text-align:center">${esc(view.empty || "No graph edges.")}</div>`}</div>`;
-			h += projectionsHtml(view, R, tick) + gridHtml(view.grid, R) + "</div>";
+			h += edgeGroupsHtml(view, R, tick) + gridHtml(view.grid, R) + "</div>";
 			if (view.cards) h += `<div class="pv-cards">${view.cards.map((c) => `<div><b>${esc(c[0])}</b><span>${esc(c[1])}</span></div>`).join("")}</div>`;
 			(view.notes || []).forEach((n) => (h += `<p class="pv-cap" style="margin-top:8px">${esc(n)}</p>`));
 			el.innerHTML = h;

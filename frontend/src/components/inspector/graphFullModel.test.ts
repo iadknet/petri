@@ -18,6 +18,41 @@ function computeEdge(nodeIdx: number, weight = 1): GraphEdge {
 	return { source: { ComputeNode: nodeIdx }, own_weight: weight };
 }
 
+describe("buildFullGraphModel edge-group members", () => {
+	/** A Move group member on sink 0 (scale 0.5, correction 0) beside an
+	 * independent edge. */
+	function grouped(): GraphBackendDef {
+		return makeGraphDef({
+			output_sinks: [
+				{
+					kind: { ActionVote: { Move: 0 } },
+					inputs: [inputEdge(1, 3, 0.25), { ...inputEdge(0, 0, 0), membership: { group: 0 } }],
+				},
+			],
+			groups: [{ shape: { Ring: { ring_ref: 0 } }, kind: "Move", offset: 0, scale: 0.5 }],
+		});
+	}
+
+	it("draws a member at the server's genomic weight, never its own", () => {
+		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }], {
+			node_id: 0,
+			scales: [{ group: 0, genomic: 0.5 }],
+			edges: [{ surface: "sink", container: 0, edge: 1, genomic: 0.5 }],
+		});
+		const member = model.edges.find((edge) => edge.id === "sink:0:1");
+		expect(member?.weight).toBe(0.5);
+		expect(member?.isMember).toBe(true);
+		const independent = model.edges.find((edge) => edge.id === "sink:0:0");
+		expect(independent?.weight).toBe(0.25);
+		expect(independent?.isMember).toBe(false);
+	});
+
+	it("composes scale plus correction when the payload is missing", () => {
+		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
+		expect(model.edges.find((edge) => edge.id === "sink:0:1")?.weight).toBe(0.5);
+	});
+});
+
 describe("buildFullGraphModel", () => {
 	it("returns empty model for empty graph", () => {
 		const model = buildFullGraphModel(makeGraphDef(), []);

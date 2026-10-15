@@ -4,11 +4,11 @@ import type {
 	MeshReadClass,
 	MeshWriteClass,
 } from "../../../types/creature-detail.ts";
-import type { CreatureGenome, InputReference, NodeGenome } from "../../../types/genome.ts";
-import { formatInputRef, parseWorldInputRef } from "../inputRefUtils.ts";
+import type { CreatureGenome, NodeGenome } from "../../../types/genome.ts";
+import { formatInputRef } from "../inputRefUtils.ts";
 import { type MeshAnalysis, type MeshBackendKind, analyzeMesh } from "./meshAnalysis.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
-import { classifyComputeNodeKind, classifyVmInstruction } from "./runtimeIoSemantics.ts";
+import { classifyVmInstruction } from "./runtimeIoSemantics.ts";
 
 export type MeshNodeBadge = RuntimeIoBadge;
 export type MeshSemanticRole =
@@ -101,12 +101,11 @@ function deriveNodeSemantics(
 	reachableFallback: boolean,
 	annotation?: CreatureMeshAnnotation,
 ): MeshNodeSemantics {
-	const readClasses = unique([
-		...(annotation?.read_classes ?? []),
-		...inferReadClasses(node.input_refs),
-	]);
-	const writeClasses = unique([...(annotation?.write_classes ?? []), ...inferWriteClasses(node)]);
-	const hasStatefulBehavior = annotation?.has_stateful_behavior ?? inferStatefulBehavior(node);
+	// The server's annotations are required whenever the genome is present
+	// (T25.F03); a node without one reads, writes and holds nothing here.
+	const readClasses = unique(annotation?.read_classes ?? []);
+	const writeClasses = unique(annotation?.write_classes ?? []);
+	const hasStatefulBehavior = annotation?.has_stateful_behavior ?? false;
 	const slotReads = hasSlotRead(node);
 	const sourceClass = deriveSourceClass(readClasses);
 	const role = deriveRole({
@@ -176,132 +175,6 @@ function deriveNodeSemantics(
 		liveInstructionIndices,
 		liveInternalNodeIndices,
 	};
-}
-
-function inferReadClasses(inputRefs: InputReference[]): MeshReadClass[] {
-	const classes = new Set<MeshReadClass>();
-	for (const inputRef of inputRefs) {
-		if (typeof inputRef === "string") {
-			if (inputRef === "ActionQueue") {
-				classes.add("action_queue");
-			} else if (inputRef === "PreviousOutcome") {
-				classes.add("introspection");
-			} else if (
-				inputRef === "ActionVotes" ||
-				inputRef === "PreviousPassVotes" ||
-				inputRef === "CommitCounts"
-			) {
-				classes.add("decision");
-			}
-			continue;
-		}
-
-		if ("World" in inputRef) {
-			const worldKey = parseWorldInputRef(inputRef.World).key;
-			if (worldKey === "NeighborFoodRing") {
-				classes.add("neighbor");
-				classes.add("food");
-			} else if (worldKey === "NeighborBarrierRing") {
-				classes.add("neighbor");
-				classes.add("barrier");
-			} else if (worldKey === "NeighborOccupiedRing") {
-				classes.add("neighbor");
-				classes.add("occupancy");
-			} else if (String(worldKey).toLowerCase().includes("food")) {
-				classes.add("food");
-			}
-			continue;
-		}
-
-		if ("StaticIntrospection" in inputRef || "DynamicIntrospection" in inputRef) {
-			classes.add("introspection");
-			continue;
-		}
-
-		if ("UpstreamSlot" in inputRef) {
-			classes.add("upstream");
-		}
-	}
-
-	return [...classes];
-}
-
-function inferWriteClasses(node: NodeGenome): MeshWriteClass[] {
-	const classes = new Set<MeshWriteClass>();
-
-	if ("Vm" in node.backend_def) {
-		for (const instruction of node.backend_def.Vm.program) {
-			const semantics = classifyVmInstruction(instruction);
-			if (semantics.writesRoute) {
-				classes.add("route");
-			}
-			if (semantics.writesAction) {
-				classes.add("action");
-			}
-			if (semantics.writesPayload) {
-				classes.add("payload");
-			}
-			if (semantics.writesSlot) {
-				classes.add("memory");
-			}
-		}
-	}
-
-	if ("Graph" in node.backend_def) {
-		const graph = node.backend_def.Graph;
-
-		// Derive write classes from fixed structural outputs (wired sinks only)
-		for (const sink of graph.output_sinks) {
-			if (sink.inputs.length === 0) continue;
-			const kind = sink.kind;
-			if (typeof kind !== "string" && "RouterGate" in kind) {
-				classes.add("route");
-			} else if ("CustomOutput" in kind) {
-				classes.add("payload");
-			} else if ("WriteSlot" in kind || "ClearSlot" in kind) {
-				classes.add("memory");
-			} else if ("ActionVote" in kind || "ActionParam" in kind) {
-				// Vote and parameter sinks write the action channel.
-				classes.add("action");
-			}
-		}
-	}
-
-	return [...classes];
-}
-
-function inferStatefulBehavior(node: NodeGenome): boolean {
-	if ("Vm" in node.backend_def) {
-		return node.backend_def.Vm.program.some((instruction) => {
-			const semantics = classifyVmInstruction(instruction);
-			return (
-				semantics.stateful || semantics.readsSlot || semantics.readsPrevSlot || semantics.writesSlot
-			);
-		});
-	}
-
-	if (!("Graph" in node.backend_def)) {
-		return false;
-	}
-
-	const graph = node.backend_def.Graph;
-	// Compute nodes may be stateful (DecayIntegrator, Momentum, etc.)
-	const hasStatefulCompute = graph.compute_nodes.some((cn) => {
-		const semantics = classifyComputeNodeKind(cn.kind);
-		return semantics.stateful;
-	});
-	// SharedMemory sources in edges indicate slot reads
-	const hasSharedMemoryRead = graph.compute_nodes.some((cn) =>
-		cn.inputs.some((edge) => "SharedMemory" in edge.source),
-	);
-	// WriteSlot/ClearSlot sinks indicate slot writes
-	const hasSlotWrite = graph.output_sinks.some(
-		(sink) =>
-			sink.inputs.length > 0 &&
-			typeof sink.kind !== "string" &&
-			("WriteSlot" in sink.kind || "ClearSlot" in sink.kind),
-	);
-	return hasStatefulCompute || hasSharedMemoryRead || hasSlotWrite;
 }
 
 function hasSlotRead(node: NodeGenome): boolean {

@@ -14,6 +14,8 @@ export const EDGE_TINTS: Record<string, { r: number; g: number; b: number }> = {
 	input_to_compute: { r: 16, g: 185, b: 129 },
 	input_to_output: { r: 251, g: 191, b: 36 },
 	compute_to_output: { r: 251, g: 191, b: 36 },
+	// An edge-group member (T25.F03), drawn dashed at its genomic weight.
+	group_member: { r: 192, g: 132, b: 252 },
 };
 
 export function buildGraphFlowScene(input: {
@@ -76,7 +78,7 @@ export function buildGraphFlowScene(input: {
 		const weightOpacity = Math.max(0.2, Math.min(Math.abs(me.weight), 1));
 		const opacity = endpointsLive ? weightOpacity : weightOpacity * 0.35;
 
-		const tint = EDGE_TINTS[me.edgeType];
+		const tint = me.isMember ? EDGE_TINTS.group_member : EDGE_TINTS[me.edgeType];
 		const strokeColor = tint
 			? `rgba(${tint.r},${tint.g},${tint.b},${opacity})`
 			: `rgba(148,163,184,${opacity})`;
@@ -118,7 +120,9 @@ export function buildGraphFlowScene(input: {
 					width: 10,
 					height: 10,
 				},
-				style: { stroke: strokeColor },
+				style: me.isMember
+					? { stroke: strokeColor, strokeDasharray: "4 3" }
+					: { stroke: strokeColor },
 				data: {
 					weight: me.weight,
 					opacity,

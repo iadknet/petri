@@ -16,8 +16,8 @@ A spec is plain JSON. Full working example: `viz/example.json`.
 | `header` | Replaces `Graph (n in · m compute · k out)` |
 | `nodes` | The graph, see Node |
 | `groups` | `[{ "label", "ids": [...] }]`: dashed teal box around nodes in one column |
-| `projections` | `[{ "ring", "kind", "offset", "w", "gain"?, "isNew"?, "note"? }]`: rows like the inspector's ring projection list; `offset` is any integer, read mod 8; `gain` names a node whose tick value scales the votes |
-| `projectionsTitle` | Default `Ring projections` |
+| `edgeGroups` | `[{ "ring", "kind", "offset", "scale", "members"?, "own"?, "gain"?, "isNew"?, "note"? }]`: rows like the inspector's edge-group list (T25.F03); `offset` is any integer, read mod 8; `members` lists the ring cells present (`["N", "E", …]`, default all eight; a missing cell is a hole); `own` maps a cell to its member's correction (default 0), so the member votes at `scale + own`; `gain` names a node whose tick value scales the votes |
+| `edgeGroupsTitle` | Default `Edge groups` |
 | `grid` | `{ "title"?, "cols", "rows": [{ "label", "key", "w": [...] }], "vote"? }`: weight table; `key` is a node id (its tick value) or a number; a `null` weight shows "no edge"; `vote` names a bottom row of Σ value × weight per column |
 | `ticks` | Example ticks, see Tick; adds an "Example tick" button bar |
 | `cards` | `[[label, value], ...]`: metric cards under the panel |
@@ -75,8 +75,8 @@ its text, so keep labels short and graphs to about five columns.
   this tick. Default 0.
 - `prev` is a stateful node's operator state before this run (default 0, as in
   the runtime). The node shows `old→new`.
-- `rings` gives a projection ring's 8 cells (N, NE, E, SE, S, SW, W, NW); the
-  projection row then lists the votes it adds.
+- `rings` gives an edge group's ring's 8 cells (N, NE, E, SE, S, SW, W, NW);
+  the group row then lists the votes its members add.
 - `scene` draws a 7×7 view around the creature (white): `[dx, dy, "kin" |
   "stranger" | "other"]`, with dy positive = south. `arrow` is a direction or
   `{ "kind" }`, which picks the sink whose label contains `kind[DIR]` with the

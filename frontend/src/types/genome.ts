@@ -110,25 +110,29 @@ export interface OutputSink {
 	inputs: GraphEdge[];
 }
 
-/** A directed vote kind a ring projection votes for (T11.F31). */
+/** A directed vote kind an edge group votes for (T25.F03). */
 export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy";
 
+/** The geometry an edge group's members fit (T25.F03). */
+export type GroupShape = { Ring: { ring_ref: number } };
+
 /**
- * One ring projection (T11.F31): adds `weight * ring[(d - offset) mod 8]` to
- * `kind`'s direction-`d` vote for all eight directions.
+ * One edge-group record (T25.F03). A `Ring` group's members are sink edges:
+ * ring cell `c` of `input_refs[ring_ref]` into `kind`'s direction
+ * `(c + offset) mod 8`, each at genomic weight `scale + own_weight`.
  */
-export interface RingProjection {
-	ref_idx: number;
+export interface EdgeGroup {
+	shape: GroupShape;
 	kind: DirectedVoteKind;
 	offset: number;
-	weight: number;
+	scale: number;
 }
 
 export interface GraphBackendDef {
 	compute_nodes: ComputeNode[];
 	output_sinks: OutputSink[];
-	/** Omitted by the server when the node carries none. */
-	projections?: RingProjection[];
+	/** Edge-group records by `GroupId`; omitted by the server when empty. */
+	groups?: EdgeGroup[];
 }
 
 export type VmInstruction =

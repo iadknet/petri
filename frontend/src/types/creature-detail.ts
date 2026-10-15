@@ -23,6 +23,29 @@ export interface CreatureMeshAnnotation {
 	live_internal_node_indices?: number[];
 }
 
+/** One group's shared scale in `graph_weights` (T25.F03). */
+export interface GroupScaleWeight {
+	group: number;
+	genomic: number;
+}
+
+/** One member edge's genomic weight in `graph_weights` (T25.F03). */
+export interface EdgeGenomicWeight {
+	surface: "compute" | "sink";
+	/** The compute node or sink index. */
+	container: number;
+	/** The index within that container's inputs. */
+	edge: number;
+	genomic: number;
+}
+
+/** One Graph node's entry in `graph_weights` (T25.F03). */
+export interface NodeGraphWeights {
+	node_id: number;
+	scales: GroupScaleWeight[];
+	edges: EdgeGenomicWeight[];
+}
+
 export interface CreatureCurrentInputsDiagnostics {
 	food_here: number;
 	neighbor_food: number[];
@@ -71,6 +94,11 @@ export interface CreatureDetail {
 	genome?: CreatureGenome;
 	/** Present whenever `genome` is included in the response. */
 	mesh_annotations?: CreatureMeshAnnotation[];
+	/**
+	 * Member genomic weights per Graph node carrying an edge group; absent
+	 * when the creature has no member or via `exclude=graph_weights`.
+	 */
+	graph_weights?: NodeGraphWeights[];
 	/** Present unless excluded via `exclude=shared_memory` query parameter. */
 	shared_memory?: number[];
 	/** Present unless excluded via `exclude=action_log` query parameter. */
