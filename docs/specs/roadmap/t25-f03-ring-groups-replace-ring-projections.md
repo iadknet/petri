@@ -42,7 +42,7 @@ commit, each with its re-pins predeclared below.
 
 | Input | Where | What F03 takes from it |
 | --- | --- | --- |
-| Track row, success criterion 3 and Notes | `docs/roadmaps/t25-edge-groups-and-learning.md` | The goal; eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts members as edges and reads membership from the genome; user decisions of 2026-10-13 (only geometry is built in, group creation never randomizes the pattern, size-neutral replacement after F02's nine-unit charge); verification gate + goal + goal-long, viability first, mutation gate and slow tests run; a text-only commit before the behavior commit. |
+| Track row, success criterion 3 and Notes | `docs/roadmaps/t25-edge-groups-and-learning.md` | The goal; eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts members as edges and reads membership from the genome; user decisions of 2026-10-13 (only geometry is built in, group creation never randomizes the pattern, size-neutral replacement after F02's nine-unit charge); verification gate + goal (goal-long dropped by user decision, 2026-10-15), viability first, mutation gate and slow tests run; a text-only commit before the behavior commit. |
 | Design note | `docs/strategy/edge-groups-and-learning-design-2026-10-13.md` §3 (domain model, invariants I2–I11, accounting contract), §4 (shape operators, removal, edge operators on members, recruitment, ablation D3, draw contracts, refinement D7), §7 (boundary table, dependency direction, determinism and pins), §8 F03 contract | The types, the container API additions, the operator list and draws, the readers, the serde and payload shapes, the re-pin list, the tests-first list and the readings. |
 | F02 outputs | `docs/specs/roadmap/t25-f02-uniform-genome-size.md` invariants 1–3 | A projection costs nine units, so `genome_size` is unchanged by the replacement; anchor 80 and rate `0.0060625` stay; `cached_genome_size == genome_size()` after every edit. |
 | Projection today | `creature/genome/cgp/mod.rs:105-160` (`RingProjection`, `channel_for`, `offset_for`, `ablated_channels`), `cgp/container.rs:184-186, :297, :402-412, :588-602` (field, builder, `enters_visit`, `projects_kind`, reindex), `runtime/cgp/effects.rs:48-99, :117-157` (`projection_terms`, the sink term), `mutation/graph/projection.rs`, `mutation/graph/mod.rs:42-46, :74-78, :111-115, :151-170, :235-239, :395-413`, `mutation/types/mod.rs:234-238, :302-306, :369-373, :428-449, :458-516`, `mutation/engine/mod.rs:731-741`, `genome/mod.rs:288-290`, `cgp_analysis.rs:94-101, :135` | Everything the behavior commit deletes or replaces. |
@@ -110,12 +110,12 @@ members are ordinary edges to every operator and reader; the readings that
 would show it wrong are the bitwise oracle or an invariant proptest failing,
 a founder-only viability digest moving, a reader disagreeing with the genome
 (`direction_general` moving at tick 0 between v1 and v2 on an unevolved
-population), or a goal-long run in which ring-group carriers vanish while
-projection carriers persisted under F02, or no member ever erodes.
+population), or a goal run whose `ring_rules` v2 block or group counters
+disagree with the genomes they are read from.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
-| Benchmark profiles | `gate + goal + goal-long` | The track Notes declare it; member erosion and ring-carrier retention are 40,000-tick questions (the ring motif was declared goal-long at T11.F31), the 2,000-tick series carries the early counters and the `ring_rules` v2 definition change, and the gate pins the hot-path claim. |
+| Benchmark profiles | `gate + goal` | The gate pins the hot-path claim and the 2,000-tick series carries the early counters and the `ring_rules` v2 definition change; goal-long is dropped by user decision (2026-10-15: at most once or twice per track, T25 ran it at F02 and F04's success criterion needs one), so the 40,000-tick readings F03 predeclared are deferred to F04's run (Notes). |
 | Mutation gate | `run` | New production logic in `v3-core` (container primitives, group module, five operators, `validate_graph`, the weight table) and in `v3-server` whose behavior tests must pin. |
 | Slow tests (`make rust-test-slow`) | `run` | Five operators change name and key, members enter every edge draw and recruitment's ring case emits a group: the tier pins the recruitment-paths rows those draws move. |
 
@@ -194,15 +194,15 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       equivalent, or deferred.
 - [ ] Slow tier: `make rust-test-slow` -> result, with the re-pinned
       recruitment-paths rows recorded in the readings file.
-- [ ] Gate, goal and goal-long summaries at
-      `docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json`,
-      `-goal.json`, `-goal-long.json`; raw hash and byte count, verification
-      time, series entries; no full report staged.
+- [ ] Gate and goal summaries at
+      `docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json`
+      and `-goal.json`; raw hash and byte count, verification time, series
+      entries; no full report staged.
 - [ ] Readings in [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md):
       the three readers' post-change expectations checked on the goal
-      populations; ring groups per creature, members per surviving group,
-      `graph_edges_detached` and `groups_removed` totals over 40,000 ticks
-      against the erosion model below; the size series continued from F02.
+      populations; ring groups per creature, members per group,
+      `graph_edges_detached` and `groups_removed` totals as the goal profile
+      reads them; the size series continued from F02.
 
 ## Performance and Goal Impact
 
@@ -229,25 +229,16 @@ trajectory reading reported to the user, who decides whether to accept it;
 the deterministic block changes by construction (operator keys, `ring_rules` v2, `reachable-structure-v2`, the
 persistence fields) and the gate epoch is re-pinned in the closing commit.
 
-Goal and goal-long: `mean_genome_size` is unchanged by construction at
-tick 0 and tracks the F02 rule thereafter. Expected directions: `ring_group_carriers`
-at 40,000 ticks is of the order of F02's `projection_carriers` (698 of 832
-on Canyon, 4,492 of 4,936 on Confluence, 11,801 of 12,221 on Orchards) on
-at least one world; the mean members per reachable group,
-`ring_group_members / ring_groups` (and `mean_ring_group_members` over the
-population), is below 8 on at least one world, because a member is now one
-of its graph's `E` edges for `RemoveGraphEdge` (weight 2 of 56, uniform
-over `edge_sites` of the selected backend) and, as a constant-size
-approximation that ignores detaches, whole-group removals and the node
-draw, survives `n` such events on its lineage with probability
-`(1 − 1/E)^n`; the readings compare observed erosion against that
-approximation using the goal populations' edge counts and event totals;
-`graph_edges_detached` and `groups_removed` are above 0 on every world
-that evolves groups. Births, gestation, persistence, clade count and
-entropy have no predeclared direction. The goal-long comparison is against
-the series' latest entry (F02's run at `db053a14`, the merge base); a
-`severe` flag or threshold crossing is reported with its reading and goes
-to the user.
+Goal: `mean_genome_size` is unchanged by construction at tick 0 and
+tracks the F02 rule thereafter. The `ring_rules` v2 block,
+`mean_ring_groups`, `mean_ring_group_members`, `graph_edges_detached` and
+`groups_removed` enter the 2,000-tick series under their new definitions
+with no predeclared direction (a group is born silent and the series is
+too short for its erosion to be read). Births, gestation, persistence,
+clade count and entropy have no predeclared direction. A `severe` flag or
+threshold crossing is reported with its reading and goes to the user. The
+40,000-tick readings this feature would have predeclared (ring-carrier
+retention, member erosion) are deferred to F04's goal-long run (Notes).
 
 Predeclared re-pins, one cause per commit, each restorable by reverting the
 named value:
@@ -265,8 +256,7 @@ re-pinned.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f03-ring-groups-replace-ring-projections.json),
-  [goal](../../progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json),
-  [goal-long](../../progress/features/t25-f03-ring-groups-replace-ring-projections-goal-long.json).
+  [goal](../../progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json).
 - Full readings: [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md).
 
 ## Success Criteria
@@ -297,3 +287,17 @@ re-pinned.
 - Decision: (user, 2026-10-13) the replacement is size-neutral under F02's
   nine-unit projection charge; the founder anchor stays 80 and the rate
   `0.0060625`.
+- Decision: (user, 2026-10-15) goal-long runs at most once or twice per
+  track, only where absolutely necessary; T25 ran it at F02 and F04's
+  success criterion needs one, so F03 declares `gate + goal`.
+- Deferred: to F04's goal-long run, the 40,000-tick readings F03 planned:
+  `ring_group_carriers` of the order of F02's `projection_carriers` (698 of
+  832 on Canyon, 4,492 of 4,936 on Confluence, 11,801 of 12,221 on
+  Orchards) on at least one world; the mean members per reachable group
+  (`ring_group_members / ring_groups`, `mean_ring_group_members`) below 8
+  on at least one world, a member being one of its graph's `E` edges for
+  `RemoveGraphEdge` (weight 2 of 56, uniform over `edge_sites`) and
+  surviving `n` such events with probability about `(1 − 1/E)^n` (a
+  constant-size approximation ignoring detaches, whole-group removals and
+  the node draw); `graph_edges_detached` and `groups_removed` above 0 on
+  every world that evolves groups.

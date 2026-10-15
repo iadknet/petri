@@ -72,8 +72,10 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   note's §8 carries each feature's re-pin line, reference-spec line and the
   tests the implementer writes first.
 - Verification plans (note §8): F01 gate; F02 gate + goal + goal-long plus
-  the rate arm, viability first; F03 gate + goal + goal-long, viability
-  first; F04 gate + goal + goal-long; F05 gate + goal; F06 gate + goal,
+  the rate arm, viability first; F03 gate + goal, viability first
+  (goal-long dropped, user 2026-10-15: at most once or twice per track);
+  F04 gate + goal + goal-long, carrying F03's deferred 40,000-tick ring
+  readings; F05 gate + goal; F06 gate + goal,
   viability first; F07 gate + goal, viability first; F08 gate + goal;
   mutation gate and slow tests run on all eight. F03 and F06 land a
   text-only commit (genome identity) before their behavior commit.
