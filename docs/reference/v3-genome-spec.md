@@ -66,8 +66,13 @@ and fixed structural outputs (the sinks). The fixed catalog holds 98 sinks: 24 `
 `ActionParam`, one per decoded parameter field (T11.F27, T02.F08); the vote and parameter sinks are how a graph acts
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
 `genome_size` charges one unit per edge on both graph surfaces and nothing
-for a sink itself, so unwired sinks add nothing to it (T25.F02); the founder
-is 80 units.
+for a sink itself, so unwired sinks add nothing to it (T25.F02), and one unit
+per edge-group record (T25.F03); the founder is 80 units.
+A graph edge serializes as `{source, own_weight, membership?}` and a graph
+backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
+offset, scale}]` (T25.F03); the `cgp` genome types deny unknown fields, so a
+genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
+with no conversion path. The lab's genome files are `genome_format` 2.
 A serialized genome from before T11.F27 that carries an old parameter sink
 (`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam { slot_idx, .. }`
 fails to deserialize; there is no conversion path. A pre-T11.F27 genome with
@@ -89,6 +94,9 @@ Required invariants:
 - backend payloads remain decodable.
 - Graph backend fixed output catalog is structurally intact (correct sink
   count and sink kinds match the canonical catalog).
+- Every Graph backend passes `validate_graph` (T25.F03): the edge-group
+  invariants of `v3-graph-backend-spec.md` ("Ring edge groups"), checked in
+  the mutation gate after every event and at the lab's `GenomeFile::load`.
 
 Deliberately not required at validation time:
 - `entry_node_id` must resolve.

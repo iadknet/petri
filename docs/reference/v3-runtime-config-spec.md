@@ -184,9 +184,10 @@ Genome carrying cost:
   existing `energy <= 0.0` rule in the same tick.
 - The unit is total genome size (`genome_size()`), which counts every node,
   input reference, target, VM instruction, VM constant, compute node, and
-  edge on both graph surfaces (compute inputs and sink inputs) one unit each,
-  and each ring projection nine (its record plus its eight implied synapses);
-  a wired sink adds nothing of itself (T25.F02). It is not reachability-aware, so unreachable and dead structure is
+  edge on both graph surfaces (compute inputs and sink inputs, edge-group
+  members included) one unit each, and each edge-group record one, so a full
+  `Ring` group is nine (T25.F03); a wired sink adds nothing of itself
+  (T25.F02). It is not reachability-aware, so unreachable and dead structure is
   charged exactly like the executed core.
 - Is NOT scaled by the complexity or age action multipliers, exactly as
   `energy_decay_per_tick` is not; it is a world-level Phase 0 cost, not an

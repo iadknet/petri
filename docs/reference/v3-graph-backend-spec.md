@@ -53,17 +53,17 @@ produces a structurally valid genome.
 
 ```rust
 pub struct GraphBackendDef {
-    pub compute_nodes: Vec<ComputeNode>,
-    pub output_sinks: Vec<OutputSink>,
-    /// Ring projections (T11.F31); serde default empty, omitted when empty.
-    pub projections: Vec<RingProjection>,
+    compute_nodes: Vec<ComputeNode>,
+    output_sinks: Vec<OutputSink>,
+    /// Edge-group records by `GroupId` (T25.F03); omitted from JSON when empty.
+    groups: Vec<Group>,
 }
 
-pub struct RingProjection {
-    pub ref_idx: u16,                // a neighbor ring in `input_refs`
-    pub kind: DirectedVoteKind,      // Move | Reproduce | StealEnergy
-    pub offset: u8,                  // read mod 8
-    pub weight: f32,
+pub struct Group {
+    shape: Shape,                    // Ring { ring_ref: u16 }
+    kind: DirectedVoteKind,          // Move | Reproduce | StealEnergy
+    offset: u8,                      // always < 8
+    scale: f32,                      // one shared weight, born 0
 }
 
 pub struct ComputeNode {
@@ -78,18 +78,20 @@ pub struct OutputSink {
 }
 
 pub struct GraphEdge {
-    pub source: GraphSource,
-    pub weight: f32,
+    source: GraphSource,
+    own_weight: f32,                 // JSON key `own_weight`
+    membership: Option<Membership>,  // { group: GroupId }; omitted when None
 }
 ```
 
 Design choice: edges are co-located with each node/sink for linear,
 cache-friendly evaluation. Fixed structural outputs are stored in separate
-Vecs to prevent topology mutations from affecting them. A ring projection is
-not an edge of any sink (Section 6). Equality and the `Debug` genome identity
-include `projections`; `Debug` omits an empty list, so a genome without
-projections keeps its pre-T11.F31 fingerprint. Each projection also carries an
-input-use ablation mask that is outside equality, `Debug`, serde and size.
+Vecs to prevent topology mutations from affecting them. Fields are private;
+the container (`cgp/container.rs`) is the only writer and keeps the birth
+seeds and the group invariants aligned. A group's members are ordinary sink
+edges (Section 6). Equality, the `Debug` genome identity and JSON cover every
+heritable field and nothing else (`Debug` prints `groups` unconditionally);
+the `cgp` genome types deny unknown JSON fields.
 
 ---
 
@@ -292,39 +294,41 @@ neither free storage/work/reproduction nor unchanged fitness.
 The runtime and property fixtures, commands and cost observations are indexed
 in [T20.F02 readings](../progress/readings/t20-f02.md).
 
-### Ring projections (T11.F31)
+### Ring edge groups (T25.F03)
 
-A projection `{ref_idx, kind K, offset k, weight w}` adds
-`w · ring[(d − k) mod 8]` to `K(d)`'s vote for all eight directions, the ring
-being the neighbor ring (`NeighborFoodRing`, `NeighborBarrierRing`,
-`NeighborOccupiedRing`) at `input_refs[ref_idx]`, whose channel `c` is
-`Direction::ALL[c]`, the vote's own direction index.
+A `Ring` group `{shape: Ring {ring_ref}, kind K, offset k, scale s}` is one
+record plus up to eight member sink edges: the member for ring cell `c` reads
+`InputLeaf { ring_ref, c }` and sits on sink `K((c + k) mod 8)`, `c < 8`, the
+ring being the neighbor ring at `input_refs[ring_ref]`, whose channel `c` is
+`Direction::ALL[c]`. A member's genomic weight is
+`compose(own_weight, s, pattern) = s · pattern + own_weight`, the only
+formula; a `Ring` member's pattern is 1 when `ring_ref` resolves to a ring and
+0 otherwise, resolved from the group's `ring_ref`, never the member's own
+source, so an ablation redirect keeps the weight. A non-member's genomic
+weight is its `own_weight`.
 
-- In the effects pass of an entered visit, for each directed kind and
-  direction, `P_K[d] = Σ w_p · r_p((d + 8 − k_p) mod 8)` over `K`'s projections
-  in genome order, accumulated from 0.0; `r_p(c)` is what
-  `InputLeaf { ref_idx, sub_idx: c }` resolves to. A projection whose
-  `ref_idx` is out of range or not a ring contributes 0.
-- Sink `K(d)`'s contribution is `sanitize_f32(S + P_K[d])`, `S` its edge sum
-  (0.0 without edges). A sink with neither edges nor a projection of its kind
-  stays inert. One implementation serves production, observed and traced
-  visits; a traced sink record carries the applied value including the
-  projection term. An exhausted visit stages nothing. The pass is RNG-free.
-- A weight-0 projection over finite ring values leaves the visit's vote
-  contribution, output slots, parameters, shared memory, route scores and
-  carried state exactly equal (signed zero allowed). On a kind without edges a
-  projection is exactly its eight edges `InputLeaf { ref_idx, (d − k) mod 8 }`
-  → `K(d)` at weight `w`.
-- No per-projection energy charge: the graph charge stays per compute node, and
-  a projection makes the visit entered (Section 8), so a projection on a
-  dormant graph pays one minimum visit, as the first zero vote edge does. Host
-  work is eight reads and multiply-adds per projection per entered visit.
-- A projection is nine `genome_size()` units (its record plus its eight implied
-  synapses, T25.F02) and one live component; its ring is
-  a consumed reference that `Prune` never deletes. Structured refinement
-  groups `ActionVote` sink edges only, so a projection is never a group member.
-- The VM has no projection (T11.F18 parity exemption): a VM node reaches one
-  by `SwapNodeBackend` to Graph.
+- Invariants (checked by `validate_graph` at `GenomeFile::load` and in the
+  mutation gate): only sink edges are members; every `GroupId` names a record
+  and `groups.len() ≤ u16::MAX`; a member fits its shape; at most one member
+  per `(group, source, target)`; a group has at least one member;
+  `input_refs[ring_ref]` is a ring and `offset < 8`; within a sink,
+  independent edges come first in insertion order, then members sorted by
+  `(GroupId, channel)` (I10).
+- Members are summed with the sink's other edges at their genomic weights,
+  sequentially in the I10 order: the runtime reads one weight per sink edge
+  from the table `GraphRuntimeState::for_genome` builds at construction. A
+  `Ring` group at scale `s` with corrections `c_i` is bitwise its eight
+  ungrouped edges of weight `s + c_i`.
+- A new group (scale 0, corrections 0) is silent. No per-group energy
+  charge: members wire their sinks, so a group on a dormant graph makes the
+  visit entered (Section 8) and pays one minimum visit, as the first zero
+  vote edge does.
+- A group record is one `genome_size()` unit and each member one edge unit,
+  so a full `Ring` group is nine units (T25.F02's projection charge). Its
+  ring is consumed through its members; `Prune` never deletes it.
+  Structured refinement never steps a member.
+- The VM has no group (T11.F18 parity exemption): a VM node reaches one by
+  `SwapNodeBackend` to Graph.
 
 ---
 
@@ -345,8 +349,8 @@ eligibility once; it snapshots nothing (T19.F02). Internal time is counted in
 visits and world time in ticks: a module's state advances once per visit,
 however many visits a tick's pass makes, and the per-pass hop cap and the
 per-tick hop ramp bound and price those visits. A visit is entered when the
-graph has at least one compute node, a wired effect surface (an output
-sink carrying at least one edge), or a ring projection (T11.F31). An entered visit evaluates all compute nodes once in index order,
+graph has at least one compute node or a wired effect surface (an output
+sink carrying at least one edge, a group member included). An entered visit evaluates all compute nodes once in index order,
 including disconnected nodes; with zero compute nodes that evaluation is
 empty and the effects pass still runs.
 
@@ -377,8 +381,10 @@ source resolves to `0.0` as any out-of-range compute source does.
 ### Phase 1: Value outputs
 
 Iterate `output_sinks`. For each sink with non-empty `inputs`:
-- Gather `wsum = sum(resolve_source(edge.source) * edge.weight)` using
-  current-visit `curr_outputs` for `ComputeNode` sources.
+- Gather `wsum = sum(resolve_source(edge.source) * genomic_weight(edge))`,
+  sequentially in the sink's edge order, the weight read from the runtime
+  weight table (Section 6), using current-visit `curr_outputs` for
+  `ComputeNode` sources.
 - Write to target:
   - `CustomOutput(slot)`: `output_slots[slot] = wsum` (slot < 12).
   - `RouterOutput`: emit `RouteDecision::CgpNormalized { raw_value: wsum }`.
@@ -387,14 +393,10 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
   - `WriteSlot(slot)`: `shared_memory[slot % 16] = sanitize_f32(wsum)`.
   - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
     the act of having edges and firing is what clears).
-  - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`, with a
-    directed sink's ring projection term added to `wsum` first (Section 6);
-    a directed sink whose kind has a projection is applied even without
-    edges.
+  - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`.
   - `ActionParam(field)`: `action_params[field.index()] = sanitize_f32(wsum)`.
 
-Sinks with empty `inputs` are inert — no write occurs — except a directed
-vote sink whose kind has a ring projection. A visit that reaches
+Sinks with empty `inputs` are inert — no write occurs. A visit that reaches
 its effects stages its vote contribution; an exhausted visit stages nothing.
 
 ### Effect-phase trace visibility (Execution Sampler)
@@ -573,9 +575,10 @@ contribution:
   `functional_complexity()`; `genome_size()` charges a wired sink its edges
   only, one unit each, and nothing for the sink itself (T25.F02).
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
-  any wired sink, vote and parameter sinks included. A ring projection is a
-  live component wiring no sink: nine `genome_size()` units, one
-  `functional_complexity()` unit, its ring a consumed reference (T11.F31).
+  any wired sink, vote and parameter sinks included. An edge-group record is
+  one `genome_size()` and one `functional_complexity()` unit; its members are
+  sink edges that wire their sinks, and its ring is consumed through them
+  (T25.F03).
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.
 
@@ -622,11 +625,11 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | `SharedMemory { slot }` where `slot >= 16` | Bound at mutation time to 0-15; defensive fallback: 0.0 |
 | `CustomOutput(s)` where `s >= 12` | Constructor invariant; defensive fallback: 0.0 |
 | Unwired `ActionParam` sink | The parameter keeps its last write this tick (zero at tick start) |
-| Graph with no wired vote sink and no ring projection | Votes nothing; the pass commits only what other nodes vote |
+| Graph with no wired vote sink | Votes nothing; the pass commits only what other nodes vote |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
-| Sink with empty `inputs` | Inert — does not write, unless it is a directed vote sink whose kind has a ring projection |
-| Ring projection whose `ref_idx` is out of range or not a ring | Contributes 0.0 whatever its weight (NaN/Inf included); its kind's sinks are still applied |
-| Ring projection `offset >= 8` | Read mod 8 |
+| Sink with empty `inputs` | Inert — does not write |
+| Group whose `ring_ref` is out of range or not a ring | Pattern 0: each member weighs its own correction; `validate_graph` rejects the genome (I7), so a live genome never carries one |
+| Group `offset >= 8` or a member off its shape | Rejected by `validate_graph`; the mutation gate rolls the event back under `GraphInvariantViolation` |
 | Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
 

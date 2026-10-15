@@ -396,6 +396,18 @@ added/removed/retyped — only their edges are evolvable.
   neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
+- Edge operators and edge groups (T25.F03): every edge draw indexes
+  `edge_sites`, which enumerates group members as ordinary sink edges. A
+  member may be re-weighted (its correction), removed (the last member's
+  removal removes the group) or retargeted on its own; an edit that changes a
+  member's source outside a group operator (`RetargetGraphEdge` with a changed
+  source, every `GraphRawFieldMutation` step on a member, `AddComputeNode`'s
+  split) detaches it first: its own weight becomes its genomic weight
+  `scale + own_weight`, bitwise, and it moves to the end of its sink's
+  independent edges, where the edit continues. A same-source retarget draw
+  changes nothing. `AddGraphEdge` inserts before a sink's first member and
+  never joins a group. Each committed detach and group removal is counted
+  (`graph_edges_detached_total`, `groups_removed_total`).
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
   order: all 98 sinks, the 30 vote sinks and the four parameter sinks
@@ -462,21 +474,22 @@ added/removed/retyped — only their edges are evolvable.
   `mutation.structured_heritable_refinement`, true by default since
   2026-10-12 (omitted means true).
   Select an eligible Graph node with the existing target selector, then one
-  semantic group uniformly. The groups contain only existing direct
-  `InputLeaf` edges to valid `ActionVote` sinks:
+  inferred set uniformly. The sets contain only existing direct, ungrouped
+  `InputLeaf` edges to valid `ActionVote` sinks (refinement never steps an
+  edge-group member, T25.F03):
 
-  - Ring: one concrete NeighborFoodRing food identity, NeighborBarrierRing or
-    NeighborOccupiedRing; one directed vote kind (Move, Reproduce or
-    StealEnergy); one relative offset `(sink_direction - source_direction) mod 8`.
-    Every offset and directed kind has support. Canonical directions are 0–7.
   - Slots: one nearby-creature bank and field, across four ranked slots, within
     one sink occurrence. Core has width 4, Vitals 2 and Identity 3 per slot.
     Every field and all 30 valid vote identities have support. Rank is not a
     direction; no cyclic rotation or cross-field/bank correspondence is inferred.
 
-  Groups need at least two distinct homologous positions, with at most eight
-  ring or four slot members. A duplicate semantic position excludes its whole
-  group, including repeated sink identities in ring groups. Duplicate input
+  The ring key (one ring, kind and offset across direction sinks) is gone
+  since T25.F03: a ring map is an explicit `Ring` edge group, refined through
+  `AlterGroupScale`.
+
+  Sets need at least two distinct homologous positions, with at most four
+  members. A duplicate semantic position excludes its whole
+  set. Duplicate input
   declarations alone do not exclude a unique semantic edge. Nonfinite weights
   exclude their group. Dangling references, invalid channels/directions,
   compute-node inputs, non-vote sinks and unsupported input meanings are
@@ -547,34 +560,38 @@ added/removed/retyped — only their edges are evolvable.
   a dormant graph's first edge adds its minimum charged visit. Silent signaling
   does not imply physiological neutrality or discovered usefulness.
 
-  Ring case (T11.F31): a ring family (`NeighborFoodRing`, `NeighborBarrierRing`,
+  Ring case (T25.F03): a ring family (`NeighborFoodRing`, `NeighborBarrierRing`,
   `NeighborOccupiedRing`) landing on a directed sink `K(d)` is declared as
-  above, then appends one ring projection `{ref_idx, K, (d − channel) mod 8,
-  0.0}` instead of the edge or column (`channel` 0 under WholeFamily), with no
+  above, then creates one silent `Ring` edge group on that reference into `K`
+  at offset `(d − channel) mod 8` (`channel` 0 under WholeFamily): eight
+  members at own weight 0 and scale 0, in place of the edge or column, with no
   new draw. Other families and destinations are unchanged: a ring family
   landing on a kind drive (T11.F30) appends its zero-weight edges as on `Eat`,
-  never a projection. Admission treats a
-  dangling projection `ref_idx` as a dangling leaf.
+  never a group. The family universe drops ring families when the graph
+  cannot host a group (`can_host_ring_group`: all 24 direction sinks and
+  fewer than `u16::MAX` groups), so a drawn ring plan always completes. A
+  dangling member reference bounds admission as any dangling leaf does.
 
-- Ring projections (T11.F31), appended to `GraphOperator::ALL` after
-  `RefineHeritableStructure`; the default-arm total weight is 56 (44 before).
-  A projection is one gene (graph backend spec, "Ring projections"): its
-  weight, offset, kind and existence change only as a unit, and no operator
-  changes part of one or its `ref_idx`.
+- Edge-group operators (T25.F03), at the catalog positions and weights of the
+  T11.F31 ring projection operators they replace, after
+  `RefineHeritableStructure`; the default-arm total weight is 56. A group is
+  a record `{shape: Ring {ring_ref}, kind, offset, scale}` plus its member
+  sink edges (graph backend spec, "Ring edge groups"); the unit operators edit
+  the record and move members with it.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
-  | `AddRingProjection` | 2 | a Graph node with a ring at an index ≤ 65,535 | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; pushes `{ref_idx, kind, offset, 0.0}` (duplicates allowed) | Increasing |
-  | `AlterRingProjectionWeight` | 4 | a Graph node with a projection | the projection uniformly; `AlterGraphEdgeWeight`'s law (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
-  | `ShiftRingProjectionOffset` | 2 | same | the projection; `gen_bool(0.5)` true +1, false −1, mod 8 | Neutral |
-  | `RetargetRingProjectionKind` | 2 | same | the projection; `gen_range(0..2)` over the other two kinds in catalog order | Neutral |
-  | `RemoveRingProjection` | 2 | same | the projection; `Vec::remove`, order kept | Decreasing |
+  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); `Δgenome_size` +9 | Increasing |
+  | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
+  | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
+  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink | Neutral |
+  | `RemoveGroup` | 2 | same | the group; removes the record and every member, renumbering higher `GroupId`s; `Δgenome_size` −(n + 1) for n members | Decreasing |
 
-  Restricted size pressure admits only `RemoveRingProjection` of the five. A
-  born-connected `InputRef.Add` ring landing on a direction sink stays one
-  ordinary edge (T20.F16 unchanged, draw for draw). Existing operators' code
-  paths and the founder battery's per-family seeds are unchanged; the new
-  operators remap every Graph-domain draw.
+  Restricted size pressure admits only `RemoveGroup` of the five. A shift or
+  retarget re-inserts each member at its new sink in the I10 position, so it
+  and its inverse return an equal genome. A born-connected `InputRef.Add`
+  ring landing on a direction sink stays one ordinary edge (T20.F16
+  unchanged, draw for draw).
 
 ### InputRef domain
 
@@ -595,8 +612,8 @@ added/removed/retyped — only their edges are evolvable.
   applied event is one of them stores that class, and `SimStats` keys its
   carrier outcome by it (`mutation_value_totals_by_birth_edge_class`). The born edge is an ordinary edge with no provenance; the
   connected reference is not prunable while the edge consumes it. A ring
-  landing on a direction sink stays this one ordinary edge, never a ring
-  projection (T11.F31).
+  landing on a direction sink stays this one ordinary edge, never joining an
+  edge group (T25.F03).
 
   The new reference is one `gen_range(0..27)` key draw (T19.F05):
 
@@ -612,10 +629,10 @@ added/removed/retyped — only their edges are evolvable.
   | 14 to 18 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
   | 19 to 26 | `UpstreamSlot` | the slot |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
-  `GraphSource::InputLeaf { ref_idx }` on any edge container, no ring
-  projection `ref_idx` (T11.F31), and no VM `ReadInput { ref_idx }` anywhere
+  `GraphSource::InputLeaf { ref_idx }` on any edge container (a group's
+  members address its ring), and no VM `ReadInput { ref_idx }` anywhere
   in the program, live or not. Higher `ref_idx` values are decremented on both
-  backends, projections included, so every consumer
+  backends, group shape references included, so every consumer
   resolves to the same reference afterwards and none is removed or rewritten;
   the event is neutral at birth. A node with no unreferenced entry is not a
   target.
@@ -699,10 +716,14 @@ for each selected event:
   3) run the remaining domain pre-guards (construction constraints)
   4) snapshot local mutation target (or full genome)
   5) apply candidate mutation
-  6) run ParseabilityGate
+  6) run ParseabilityGate, then validate_graph on every Graph backend
   7) if parseability fails:
        rollback event
        mark skipped(ParseabilityViolation)
+       continue
+     if validate_graph fails (T25.F03, every domain):
+       rollback event
+       mark skipped(GraphInvariantViolation)
        continue
   8) commit event; classify target as Reachable/Unreachable/NotApplicable
 ```
@@ -865,7 +886,10 @@ records no target.
 
 ### Post-apply parseability check (global)
 
-After each event, run `ParseabilityGate`.
+After each event, run `ParseabilityGate`, then `validate_graph` on every Graph
+backend (T25.F03): the edge-group invariants I2–I10 of the graph backend
+spec, checked after every applied event of any domain, since `InputRef.Prune`
+reindexes shape references and topology events clone and swap backends.
 
 Required parseability invariants are defined authoritatively in
 `v3-genome-spec.md` (Section 4) and must be applied verbatim by
@@ -884,10 +908,13 @@ chain-level fallback behavior is in
 
 ## 6. Invalid Event Policy
 
-If an event results in non-parseable genome:
-1. rollback that event,
-2. mark event skipped with reason `ParseabilityViolation`,
-3. continue with remaining events.
+If an event results in non-parseable genome or a Graph backend failing
+`validate_graph`:
+1. rollback that event (the genome, birth seeds included, is restored),
+2. mark event skipped with reason `ParseabilityViolation` or
+   `GraphInvariantViolation`,
+3. continue with remaining events. A rolled-back event counts no detach and no
+   group removal.
 
 No behavioral repair is required.
 No global topology rewrite is required.
@@ -896,6 +923,7 @@ No global topology rewrite is required.
 
 - `ParseabilityViolation`
 - `NoApplicableTarget`
+- `GraphInvariantViolation` (T25.F03)
 
 ---
 
