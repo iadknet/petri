@@ -1286,21 +1286,28 @@ mod tests {
     /// rows too (Graph Drift `[20, 17, 15, 7]` -> `[22, 17, 16, 5]`,
     /// Selection `[20, 20, 20, 19]` -> `[22, 22, 22, 21]`; VM Drift
     /// `[24, 18, 18, 11]` -> `[25, 19, 19, 11]`, Selection
-    /// `[24, 24, 24, 23]` -> `[25, 25, 25, 24]`).
+    /// `[24, 24, 24, 23]` -> `[25, 25, 25, 24]`). Re-pinned by T25.F02
+    /// (uniform genome size): under the one-unit-per-edge rule proposals
+    /// draw `Binomial(80, 0.0060625)` on the founder's units instead of
+    /// `Binomial(97, 0.005)` (Graph Drift `[22, 17, 16, 5]` ->
+    /// `[18, 14, 12, 7]`, Selection `[22, 22, 22, 21]` -> `[18; 4]`; VM Drift
+    /// `[25, 19, 19, 11]` -> `[22, 15, 15, 7]`, Selection `[25, 25, 25, 24]`
+    /// -> `[22; 4]`); the discard counts stay zero. Rate 0.005 and then the
+    /// old size rule with anchor 97 restore the previous values.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [22, 17, 16, 5], [0, 0]),
+            ("graph_prepared", Policy::Drift, [18, 14, 12, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [22, 22, 22, 21],
+                [18, 18, 18, 18],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [25, 19, 19, 11], [0, 0]),
-            ("vm_prepared", Policy::Selection, [25, 25, 25, 24], [0, 0]),
+            ("vm_prepared", Policy::Drift, [22, 15, 15, 7], [0, 0]),
+            ("vm_prepared", Policy::Selection, [22, 22, 22, 22], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1429,14 +1436,18 @@ mod tests {
     /// discoveries remain useful. Re-pinned 2026-10-12 when T20.F04
     /// whole-family recruitment and T20.F05 refinement became production
     /// defaults: 23/23 graph (censored 11 -> 9) and 24/24 VM (censored
-    /// 9 -> 8) retained discoveries remain useful.
+    /// 9 -> 8) retained discoveries remain useful. Re-pinned by T25.F02
+    /// (proposals draw `Binomial(80, 0.0060625)` under the one-unit-per-edge
+    /// rule): 16/16 graph (censored 9 -> 16) and 20/20 VM (censored 8 -> 12)
+    /// retained discoveries remain useful; rate 0.005 and then the old size
+    /// rule with anchor 97 restore the previous values.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [23, 23, 23, 23], 9),
-            ("vm_prepared", [24, 24, 24, 24], 8),
+            ("graph_prepared", [16, 16, 16, 16], 16),
+            ("vm_prepared", [20, 20, 20, 20], 12),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);
