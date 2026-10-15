@@ -62,7 +62,8 @@ impl Step {
 pub struct Discovery {
     pub declare: Step,
     pub connect: Step,
-    /// Requested events per birth at the founder's size: `97 * per_unit_rate`.
+    /// Requested events per birth at the founder's size:
+    /// `FOUNDER_GENOME_SIZE_UNITS * per_unit_rate` (80 units since T25.F02).
     pub events_per_birth: f64,
     /// `(1 / p_declare + 1 / p_connect) / events_per_birth`, an instrument
     /// figure; `None` when either share is zero.
