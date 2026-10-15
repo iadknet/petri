@@ -443,7 +443,13 @@ reads it in the goal worlds.
 | `none` | a change that cannot alter a simulation trajectory or its cost: documentation, frontend, telemetry export, lab code, tooling | none |
 | `gate` | a change to simulation cost or tick-loop code where no population reading is in question | seconds |
 | `gate + goal` | a production behavior change answered by a 2,000-tick reading: a cost, a default, an operator, an early-dynamics effect | about 5 to 20 minutes |
-| `gate + goal-long` | a question about long-run evolution: discovery, retention, memory, genome growth, persistence past the founding crash; add `goal` when the 2,000-tick series also matters | about an hour or more |
+| `gate + goal-long` | a question about long-run evolution: discovery, retention, memory, genome growth, persistence past the founding crash, and only on a feature the track plan names as one of its goal-long carriers (see below); add `goal` when the 2,000-tick series also matters | about an hour or more |
+
+**Goal-long is rationed per track** (user decision, 2026-10-15): at most one
+or two features per roadmap track declare it, and only where no cheaper
+profile can answer the question. The track plan names those carriers; every
+other feature declares at most `gate + goal` and defers its long-run reading
+to the next carrier as a `Deferred:` bullet.
 
 | Mutation gate | Declare for |
 | --- | --- |
