@@ -183,18 +183,13 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       passed after commit 1 (`c3994a6b`), commit 2 (`238ad78d`) and the
       self-review commit (`2d300ef9`); the founder-only siblings did not move.
 - [ ] Focused tests (the tests-first table) and `make check` -> result,
-      commit hash. Focused: `cargo test --workspace --no-fail-fast` all
-      passed at `238ad78d`; at `2d300ef9` `cargo test -p v3-core` passes,
-      `cargo clippy --workspace --all-targets` is clean,
-      `cargo fmt --all --check` and `cargo check --workspace --all-targets`
-      pass, and frontend `npx vitest run` (630 passed) and
-      `npx tsc --noEmit` pass. The invariant proptest
-      `every_applied_event_keeps_the_graph_invariants` runs on two grouped
-      Graph nodes plus a VM node with the mesh-layer share drawn over [0, 1],
-      so Topology copies and swaps of grouped backends and VM events are in
-      its event mix; with it, viability (29 passed), `cargo test -p v3-core`,
-      clippy (0 warnings) and `cargo fmt --all --check` pass, and it passes at
-      `PROPTEST_CASES=5000`. `make check` pending.
+      commit hash. `cargo test --workspace --no-fail-fast` passed at
+      `238ad78d`; at `2d300ef9` `cargo test -p v3-core`, clippy, fmt,
+      `cargo check --workspace --all-targets`, frontend `npx vitest run`
+      (630 passed) and `npx tsc --noEmit` pass; the invariant proptest
+      `every_applied_event_keeps_the_graph_invariants` mixes Topology,
+      VM and grouped-Graph events (two grouped Graph nodes plus a VM node)
+      and passes at `PROPTEST_CASES=5000`. `make check` pending.
 - [x] Mutation gate, fresh `MUTANTS_ITERATE=0 make rust-mutants`:
 
       | Item | Record |
@@ -232,13 +227,13 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       verified against the summaries' hashes, verified at 15:27:04Z and
       15:35:26Z, series entries added; the Performance section and readings
       file carry the verdicts. goal-long not run (dropped).
-- [ ] Readings in [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md)
-      (goal-profile readings recorded under "Benchmark runs"; the readers'
-      post-change expectations remain open):
-      the three readers' post-change expectations checked on the goal
-      populations; ring groups per creature, members per group,
-      `graph_edges_detached` and `groups_removed` totals as the goal profile
-      reads them; the size series continued from F02.
+- [x] Readings in [`docs/progress/readings/t25-f03.md`](../../progress/readings/t25-f03.md):
+      the three readers' post-change expectations met on the goal
+      populations ("Readers' post-change expectations": `ring_rules` v2
+      counts a nonzero group once with edge-only paths 0; `drives` skips
+      members; refinement by test); groups per creature, members per group
+      (7.81 to 7.87), `graph_edges_detached` 469, `groups_removed` 811 and
+      the size series ("Goal readings against the predeclaration").
 
 ## Performance and Goal Impact
 
@@ -304,21 +299,26 @@ Goal predeclaration readings: mean ring groups per creature 0.325 / 1.494 / 0.66
 
 ## Success Criteria
 
-- [ ] A `Ring` group is born as eight member edges with one shared scale
+- [x] A `Ring` group is born as eight member edges with one shared scale
       and survives with one to eight; the bitwise oracle, the I10 identity
       tests and the invariant proptest pass; `RingProjection` and its five
-      operators no longer exist.
-- [ ] Any one member can be re-weighted, retargeted, split or removed on
+      operators no longer exist. (Tests-first table green at `9793783d`;
+      no `RingProjection` token in `crates/` or `frontend/src`; the
+      mutation record.)
+- [x] Any one member can be re-weighted, retargeted, split or removed on
       its own while the group survives; the last member's removal removes
       the group; the two counters and `ring_rules` v2 read it on the goal
-      runs.
-- [ ] Every reader in the readers table counts members as edges and reads
+      runs. (Container and group tests; the goal readings above.)
+- [x] Every reader in the readers table counts members as edges and reads
       membership from the genome; no reader re-derives explicit membership;
       `drives` and the edge-only ring-rule paths keep their definitions over
-      non-member edges.
-- [ ] Size-neutral: the founder is 80 units, a group is nine at creation
+      non-member edges. (Readers' post-change expectations in the readings;
+      the vote-surface, motor-node and refinement tests.)
+- [x] Size-neutral: the founder is 80 units, a group is nine at creation
       and `n + 1` with `n` surviving members, and the founder-only
-      viability digests are unchanged in both commits.
+      viability digests are unchanged in both commits. (`group_tests.rs`;
+      viability item above; `mean_genome_size` 81.5 to 81.9 at the first
+      goal sample, as at F02.)
 - [ ] Track row checked, spec Complete, `make check` green on main.
 
 ## Notes for AI Agents
