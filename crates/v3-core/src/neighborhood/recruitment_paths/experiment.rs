@@ -1293,13 +1293,20 @@ mod tests {
     /// `[18, 14, 12, 7]`, Selection `[22, 22, 22, 21]` -> `[18; 4]`; VM Drift
     /// `[25, 19, 19, 11]` -> `[22, 15, 15, 7]`, Selection `[25, 25, 25, 24]`
     /// -> `[22; 4]`); the discard counts stay zero. Rate 0.005 and then the
-    /// old size rule with anchor 97 restore the previous values.
+    /// old size rule with anchor 97 restore the previous values. Re-pinned
+    /// by T25.F03 (ring groups replace ring projections): members enter
+    /// every edge-site draw and recruitment's ring case emits a group, so
+    /// proposals on grouped parents draw differently; in Graph Drift lineage
+    /// (2, 5) the followup chain diverges on a grouped parent and its
+    /// retained discovery stays useful (Graph Drift `[18, 14, 12, 7]` ->
+    /// `[18, 14, 12, 8]`). Every other row and the discard counts are
+    /// unchanged.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [18, 14, 12, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [18, 14, 12, 8], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,

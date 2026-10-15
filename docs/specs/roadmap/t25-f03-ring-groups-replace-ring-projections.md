@@ -216,8 +216,12 @@ Every `RingProjection` test site is ported, rewritten or deleted:
       | `container.rs:1031:85` `>`→`>=` (`insert_member`) | equivalent: it differs only when the sink already holds a member with the same `(group, channel)` key, a duplicate no caller inserts |
       | `container.rs:1054:35` `&&`→`\|\|` | equivalent: with no group records a def satisfying the invariants holds no member, so `check_local_invariants` returns `Ok` and running it changes nothing |
       | Feedback | `MUTANTS_ITERATE=1` (not closure evidence): `22 mutants tested in 7m: 13 missed, 9 caught`, the 13 being the equivalents; tests only, so no second fresh run |
-- [ ] Slow tier: `make rust-test-slow` -> result, with the re-pinned
-      recruitment-paths rows recorded in the readings file.
+- [x] Slow tier: `make rust-test-slow` -> exit 0 (`3 passed` v3-core
+      experiment pins, `6 passed` lab runs), log
+      `~/.local/share/petri-tools/slow/t25-f03/rust-test-slow-2026-10-15.log`.
+      One recruitment-paths cell re-pinned under invariant 13: Graph Drift
+      `[18, 14, 12, 7]` -> `[18, 14, 12, 8]`; the readings file records the
+      cause check.
 - [x] Gate and goal summaries at
       `docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json`
       and `-goal.json`; raw hash and byte count, verification time, series
