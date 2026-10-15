@@ -1,3 +1,4 @@
+import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type {
 	GraphBackendDef,
 	GraphEdge,
@@ -29,9 +30,27 @@ export interface GraphModelEdge {
 	id: string;
 	sourceId: string;
 	targetId: string;
+	/** The edge's genomic weight: a member's is the server's `graph_weights` value. */
 	weight: number;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
 	isBackward: boolean;
+	/** Whether the edge is an edge-group member (T25.F03), drawn dashed. */
+	isMember: boolean;
+}
+
+/**
+ * A member's genomic weight: the server's `graph_weights` value, or v3-core's
+ * `compose(own, scale, 1)` for a `Ring` member (`cgp/group.rs`) when the
+ * payload is missing. Never its own weight alone.
+ */
+function memberWeight(
+	graphDef: GraphBackendDef,
+	edge: GraphEdge,
+	genomic: number | undefined,
+): number {
+	if (genomic !== undefined) return genomic;
+	const group = edge.membership ? graphDef.groups?.[edge.membership.group] : undefined;
+	return (group?.scale ?? 0) + edge.own_weight;
 }
 
 export interface FullGraphModel {
@@ -57,6 +76,7 @@ function computeBaseWidth(label: string): number {
 
 function collectEdgesFromSources(
 	edges: GraphEdge[],
+	weightOf: (edge: GraphEdge, index: number) => number,
 	targetId: string,
 	targetArrayIndex: number,
 	targetType: "compute" | "output",
@@ -79,9 +99,10 @@ function collectEdgesFromSources(
 				id: `${edgePrefix}:${i}`,
 				sourceId,
 				targetId,
-				weight: edge.own_weight,
+				weight: weightOf(edge, i),
 				edgeType,
 				isBackward,
+				isMember: edge.membership !== undefined,
 			});
 		} else {
 			const inId = inputNodeId(source);
@@ -91,9 +112,10 @@ function collectEdgesFromSources(
 					id: `${edgePrefix}:${i}`,
 					sourceId: inId,
 					targetId,
-					weight: edge.own_weight,
+					weight: weightOf(edge, i),
 					edgeType,
 					isBackward: false,
+					isMember: edge.membership !== undefined,
 				});
 			}
 		}
@@ -104,7 +126,19 @@ function collectEdgesFromSources(
 export function buildFullGraphModel(
 	graphDef: GraphBackendDef,
 	inputRefs: InputReference[],
+	graphWeights: NodeGraphWeights | null = null,
 ): FullGraphModel {
+	const genomic = new Map(
+		(graphWeights?.edges ?? []).map((entry) => [
+			`${entry.surface}:${entry.container}:${entry.edge}`,
+			entry.genomic,
+		]),
+	);
+	const weightOf =
+		(surface: "compute" | "sink", container: number) => (edge: GraphEdge, index: number) =>
+			edge.membership
+				? memberWeight(graphDef, edge, genomic.get(`${surface}:${container}:${index}`))
+				: edge.own_weight;
 	const nodes: GraphModelNode[] = [];
 	const allEdges: GraphModelEdge[] = [];
 	const inputNodeIds = new Set<string>();
@@ -181,6 +215,7 @@ export function buildFullGraphModel(
 		allEdges.push(
 			...collectEdgesFromSources(
 				cn.inputs,
+				weightOf("compute", i),
 				`cn:${i}`,
 				i,
 				"compute",
@@ -197,6 +232,7 @@ export function buildFullGraphModel(
 		allEdges.push(
 			...collectEdgesFromSources(
 				sink.inputs,
+				weightOf("sink", i),
 				`sink:${i}`,
 				i,
 				"output",

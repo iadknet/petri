@@ -18,12 +18,17 @@ const SKILL = join(ROOT, ".agents/skills/petri-visuals/viz");
 // expectations below were last checked against it. When eval.rs changes, review
 // both, then update this fingerprint.
 const EVAL_RS_SHA256 = "7633522e8358e69eca347c5b29321ba1b109bc41cd7f3b4f207771366f1e6946";
+// sha256 of crates/v3-core/src/creature/genome/cgp/group.rs, the composition
+// source (`compose(own, scale, pattern)`) the renderer's edgeGroups and the
+// inspector's member-weight fallback mirror. When group.rs changes, review
+// both, then update this fingerprint.
+const GROUP_RS_SHA256 = "33e4a4c91a6d1505582ef56bcb719af7a12a03412c0a0a677c62a64849b73763";
 
 type Rgb = [number, number, number];
 interface PetriViz {
 	mount(target: Element, spec: unknown): void;
 	CAT: Record<string, [number, number, number, number, number, string]>;
-	TINT: Record<"ic" | "io" | "co" | "cc", Rgb>;
+	TINT: Record<"ic" | "io" | "co" | "cc" | "gm", Rgb>;
 	kindLabel(kind: ComputeNodeKind): string;
 	kindCat(kind: ComputeNodeKind): string;
 	evalKind(kind: ComputeNodeKind, w: number[], state: number): { v: number; state: number };
@@ -64,6 +69,11 @@ describe("petri-visuals renderer sources", () => {
 		expect(createHash("sha256").update(evalRs).digest("hex")).toBe(EVAL_RS_SHA256);
 	});
 
+	it("checked its member composition against the current group source", () => {
+		const groupRs = readFileSync(join(ROOT, "crates/v3-core/src/creature/genome/cgp/group.rs"));
+		expect(createHash("sha256").update(groupRs).digest("hex")).toBe(GROUP_RS_SHA256);
+	});
+
 	it("ships a minified copy built from the current source (sh viz/build.sh)", () => {
 		// The same esbuild command as build.sh; esbuild cannot load inside jsdom.
 		const built = execFileSync(join(ROOT, "frontend/node_modules/.bin/esbuild"), [
@@ -91,6 +101,33 @@ describe.each(["petri-viz.js", "petri-viz.min.js"])("petri-visuals renderer %s",
 		expect(viz.TINT.io).toEqual(rgb(EDGE_TINTS.input_to_output));
 		expect(viz.TINT.co).toEqual(rgb(EDGE_TINTS.compute_to_output));
 		expect(viz.TINT.cc).toEqual([148, 163, 184]);
+		expect(viz.TINT.gm).toEqual(rgb(EDGE_TINTS.group_member));
+	});
+
+	it("votes an edge group's members at scale plus correction, holes silent", () => {
+		const host = document.createElement("div");
+		viz.mount(host, {
+			views: [
+				{
+					nodes: [],
+					edgeGroups: [
+						{
+							ring: "Ring",
+							kind: "Move",
+							offset: 1,
+							scale: 0.5,
+							members: ["N", "E"],
+							own: { E: 0.25 },
+						},
+					],
+					ticks: [{ name: "t", values: {}, rings: { Ring: [1, 1, 1, 0, 0, 0, 0, 0] } }],
+				},
+			],
+			startTick: 0,
+		});
+		expect(host.textContent).toContain("2/8 ●○●○○○○○");
+		expect(host.textContent).toContain("Move[NE] +0.50, Move[SE] +0.75");
+		expect(host.textContent).not.toContain("Move[E]");
 	});
 
 	it.each(KINDS.map((kind) => [JSON.stringify(kind), kind] as const))(

@@ -1,7 +1,10 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError, api } from "../api/rest.ts";
-import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
+import {
+	creatureInspectorSelectors,
+	useCreatureInspectorStore,
+} from "../stores/creatureInspector.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useCreatureDetailResource } from "./useCreatureDetailResource.ts";
 
@@ -188,6 +191,61 @@ describe("useCreatureDetailResource", () => {
 		expect(api.getCreature).toHaveBeenCalledTimes(2);
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.energy).toBe(35);
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(9);
+	});
+
+	it("keeps graph_weights from the initial load across polls that exclude it and clears it on a new selection", async () => {
+		const graphWeights = [
+			{
+				node_id: 2,
+				scales: [{ group: 0, genomic: 0.5 }],
+				edges: [{ surface: "sink" as const, container: 65, edge: 0, genomic: 0.5 }],
+			},
+		];
+		const {
+			genome: _genome,
+			mesh_annotations: _annotations,
+			...polled
+		} = {
+			...buildCreatureDetail(),
+			latest_tick: 2733,
+		};
+		vi.mocked(api.getCreature)
+			.mockResolvedValueOnce({ ...buildCreatureDetail(), graph_weights: graphWeights })
+			.mockResolvedValueOnce(polled)
+			.mockResolvedValueOnce({ ...buildCreatureDetail(), id: 8 });
+
+		useCreatureInspectorStore.getState().selectCreature(7);
+		await act(async () => {
+			render(<Harness />);
+			await Promise.resolve();
+		});
+		const stored = () =>
+			creatureInspectorSelectors.creatureGraphWeights(useCreatureInspectorStore.getState());
+		expect(stored()).toEqual(graphWeights);
+
+		act(() => {
+			vi.advanceTimersByTime(200);
+			useSimulationStore.getState().setTick(2733);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(api.getCreature).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({
+			since_tick: 2732,
+			exclude: "genome,graph_weights",
+		});
+		expect(stored()).toEqual(graphWeights);
+
+		act(() => {
+			useCreatureInspectorStore.getState().selectCreature(8);
+		});
+		expect(stored()).toBeNull();
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(api.getCreature).toHaveBeenCalledTimes(3);
+		expect(stored()).toBeNull();
 	});
 
 	it("stops incremental polling after the selected creature is marked dead", async () => {

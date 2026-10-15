@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import type { ActionLogEntry } from "../types/action-log.ts";
-import type { CreatureDiagnostics, CreatureMeshAnnotation } from "../types/creature-detail.ts";
+import type {
+	CreatureDiagnostics,
+	CreatureMeshAnnotation,
+	NodeGraphWeights,
+} from "../types/creature-detail.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../types/genome.ts";
 
 export interface CreatureStats {
@@ -24,6 +28,8 @@ export interface CreatureSelectionState {
 export interface CreatureStaticDetailState {
 	genome: CreatureGenome | null;
 	meshAnnotations: CreatureMeshAnnotation[] | null;
+	/** Member genomic weights from the full fetch; `null` with no member. */
+	graphWeights: NodeGraphWeights[] | null;
 }
 
 export interface CreatureRuntimeSnapshotState {
@@ -64,6 +70,7 @@ interface CreatureInspectorState {
 		phenotype: CreaturePhenotype;
 		genome?: CreatureGenome;
 		meshAnnotations?: CreatureMeshAnnotation[];
+		graphWeights?: NodeGraphWeights[];
 		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
 		diagnostics?: CreatureDiagnostics;
@@ -93,7 +100,7 @@ function makeEmptyState(
 > {
 	return {
 		selection: { selectedCreatureId },
-		staticDetail: { genome: null, meshAnnotations: null },
+		staticDetail: { genome: null, meshAnnotations: null, graphWeights: null },
 		runtimeSnapshot: { sharedMemory: null },
 		liveDetail: { stats: null, actionLog: null, diagnostics: null },
 		resourceMeta: { isLoading, error: null, isDead: false },
@@ -105,6 +112,7 @@ export const creatureInspectorSelectors = {
 	creatureStats: (state: CreatureInspectorState) => state.liveDetail.stats,
 	creatureGenome: (state: CreatureInspectorState) => state.staticDetail.genome,
 	creatureMeshAnnotations: (state: CreatureInspectorState) => state.staticDetail.meshAnnotations,
+	creatureGraphWeights: (state: CreatureInspectorState) => state.staticDetail.graphWeights,
 	creatureSharedMemory: (state: CreatureInspectorState) => state.runtimeSnapshot.sharedMemory,
 	actionLog: (state: CreatureInspectorState) => state.liveDetail.actionLog,
 	creatureDiagnostics: (state: CreatureInspectorState) => state.liveDetail.diagnostics,
@@ -151,6 +159,12 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			meshAnnotations = detail.meshAnnotations;
 		}
 
+		// The full fetch carries the genome's weights (absent: no member);
+		// incremental polls exclude them and keep the stored value.
+		const graphWeights = detail.incremental
+			? state.staticDetail.graphWeights
+			: (detail.graphWeights ?? null);
+
 		let sharedMemory = state.runtimeSnapshot.sharedMemory;
 		if (detail.sharedMemory && (!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))) {
 			sharedMemory = detail.sharedMemory;
@@ -172,7 +186,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 		const diagnostics = detail.diagnostics ?? state.liveDetail.diagnostics;
 
 		set({
-			staticDetail: { genome, meshAnnotations },
+			staticDetail: { genome, meshAnnotations, graphWeights },
 			runtimeSnapshot: { sharedMemory },
 			liveDetail: { stats, actionLog, diagnostics },
 			resourceMeta: {

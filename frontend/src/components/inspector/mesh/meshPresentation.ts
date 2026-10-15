@@ -1,10 +1,4 @@
-import type {
-	BackendDef,
-	ComputeNodeKind,
-	NodeGenome,
-	OutputSinkKind,
-	VmInstruction,
-} from "../../../types/genome.ts";
+import type { BackendDef, ComputeNodeKind, VmInstruction } from "../../../types/genome.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
 import {
 	classifyComputeNodeKind,
@@ -90,49 +84,4 @@ export function describeGraphTraceKind(kind: string): MeshInstructionPresentatio
 		detail: semantics.detail,
 		badges: semantics.badges,
 	};
-}
-
-/** Get the kind name from an OutputSinkKind. */
-function getOutputSinkKindName(kind: OutputSinkKind): string {
-	if (typeof kind === "string") return kind;
-	const [name] = Object.entries(kind)[0] ?? ["?"];
-	return name;
-}
-
-export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
-	const badgeSet = new Set<MeshNodeBadge>();
-
-	if ("Vm" in node.backend_def) {
-		for (const instruction of node.backend_def.Vm.program) {
-			for (const badge of describeVmInstruction(instruction).badges) {
-				badgeSet.add(badge);
-			}
-		}
-	}
-
-	if ("Graph" in node.backend_def) {
-		const graph = node.backend_def.Graph;
-
-		// Compute node badges (stateful)
-		for (const computeNode of graph.compute_nodes) {
-			for (const badge of describeComputeNodeKind(computeNode.kind).badges) {
-				badgeSet.add(badge);
-			}
-		}
-
-		// Output sink badges
-		for (const sink of graph.output_sinks) {
-			if (sink.inputs.length === 0) continue; // unwired sinks don't contribute
-			const sinkName = getOutputSinkKindName(sink.kind);
-			if (sinkName === "RouterGate") badgeSet.add("route");
-			else if (sinkName === "CustomOutput") badgeSet.add("output");
-			else if (sinkName === "WriteSlot" || sinkName === "ClearSlot") badgeSet.add("slot");
-			// Vote and parameter sinks write the action channel.
-			else if (sinkName === "ActionVote" || sinkName === "ActionParam") badgeSet.add("action");
-		}
-	}
-
-	return ["input", "slot", "action", "route", "output", "stateful"].filter(
-		(badge): badge is MeshNodeBadge => badgeSet.has(badge as MeshNodeBadge),
-	);
 }

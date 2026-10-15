@@ -32,7 +32,7 @@ export function useCreatureDetailResource() {
 			const query: { since_tick?: number; exclude?: string } = {};
 			if (incremental && hasFullFetchRef.current && latestTickRef.current !== null) {
 				query.since_tick = latestTickRef.current;
-				query.exclude = "genome";
+				query.exclude = "genome,graph_weights";
 			}
 
 			try {
@@ -54,6 +54,7 @@ export function useCreatureDetailResource() {
 					phenotype: detail.phenotype,
 					genome: detail.genome,
 					meshAnnotations: detail.mesh_annotations,
+					graphWeights: detail.graph_weights,
 					sharedMemory: detail.shared_memory,
 					actionLog: detail.action_log,
 					diagnostics: detail.diagnostics,

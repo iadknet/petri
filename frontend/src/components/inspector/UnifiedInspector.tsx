@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
-import type { CreatureDiagnostics, CreatureMeshAnnotation } from "../../types/creature-detail.ts";
+import type {
+	CreatureDiagnostics,
+	CreatureMeshAnnotation,
+	NodeGraphWeights,
+} from "../../types/creature-detail.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
 import { InspectorDiagnosticsCards } from "./InspectorDiagnosticsCards.tsx";
 import { InspectorEmptyState } from "./InspectorEmptyState.tsx";
@@ -18,6 +22,8 @@ interface UnifiedInspectorProps {
 	creatureId: number;
 	genome: CreatureGenome;
 	meshAnnotations: CreatureMeshAnnotation[] | null;
+	/** Member genomic weights per Graph node with an edge group (T25.F03). */
+	graphWeights?: NodeGraphWeights[] | null;
 	sharedMemory: number[] | null;
 	actionLog: ActionLogEntry[] | null;
 	diagnostics: CreatureDiagnostics | null;
@@ -41,6 +47,7 @@ export function UnifiedInspector({
 	creatureId,
 	genome,
 	meshAnnotations,
+	graphWeights = null,
 	sharedMemory,
 	actionLog,
 	diagnostics,
@@ -244,6 +251,9 @@ export function UnifiedInspector({
 							<NodeInspector
 								node={mesh.detailNode}
 								semantics={mesh.detailSemantics}
+								graphWeights={
+									graphWeights?.find((entry) => entry.node_id === mesh.detailNode?.id) ?? null
+								}
 								sharedMemory={sharedMemory}
 								executionHop={executionHop}
 							/>
