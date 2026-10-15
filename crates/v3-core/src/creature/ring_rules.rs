@@ -22,8 +22,7 @@ use std::collections::BTreeMap;
 
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
-    ring_offset, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind,
-    Shape,
+    ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome};
@@ -134,15 +133,12 @@ fn bus(
 ) -> BTreeMap<u8, Vec<(WorldInputKey, u8, bool)>> {
     let mut bus: BTreeMap<u8, Vec<(WorldInputKey, u8, bool)>> = BTreeMap::new();
     for (def, refs) in graphs(genome, reachable) {
-        for (sink_idx, sink) in def.output_sinks().iter().enumerate() {
+        for sink in def.output_sinks() {
             let OutputSinkKind::CustomOutput(slot) = sink.kind else {
                 continue;
             };
-            for (index, edge) in sink.inputs.iter().enumerate() {
-                let weight = def.genomic_weight(
-                    EdgeOccurrence::new(EdgeSurface::SinkInput(sink_idx), index),
-                    refs,
-                );
+            for edge in sink.inputs.iter() {
+                let weight = def.edge_weight(edge, refs);
                 if !carries(weight) {
                     continue;
                 }
@@ -182,7 +178,7 @@ impl RingRuleCensus {
         let mut coverage = Coverage::default();
         let mut carried = 0u64;
         for (def, refs) in graphs(genome, reachable) {
-            for (sink_idx, sink) in def.output_sinks().iter().enumerate() {
+            for sink in def.output_sinks() {
                 let OutputSinkKind::ActionVote(vote) = sink.kind else {
                     continue;
                 };
@@ -192,11 +188,8 @@ impl RingRuleCensus {
                 if d >= DIRECTIONS {
                     continue;
                 }
-                for (index, edge) in sink.inputs.iter().enumerate() {
-                    let weight = def.genomic_weight(
-                        EdgeOccurrence::new(EdgeSurface::SinkInput(sink_idx), index),
-                        refs,
-                    );
+                for edge in sink.inputs.iter() {
+                    let weight = def.edge_weight(edge, refs);
                     if !carries(weight) {
                         continue;
                     }

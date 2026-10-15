@@ -1,9 +1,7 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphEdge, OutputSinkKind,
-};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, OutputSinkKind};
 use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::inputs::ResolveCtx;
@@ -74,13 +72,15 @@ pub(crate) fn apply_cgp_graph_effects(
         def.output_sinks().len(),
         "the weight table has one row per sink"
     );
-    for (sink_idx, (sink, weights)) in def.output_sinks().iter().zip(sink_weights).enumerate() {
+    for (sink, weights) in def.output_sinks().iter().zip(sink_weights) {
         debug_assert!(
             weights.len() == sink.inputs.len()
-                && weights.iter().enumerate().all(|(index, weight)| {
-                    let occurrence = EdgeOccurrence::new(EdgeSurface::SinkInput(sink_idx), index);
-                    weight.to_bits() == def.genomic_weight(occurrence, input_refs).to_bits()
-                }),
+                && weights
+                    .iter()
+                    .zip(sink.inputs.iter())
+                    .all(|(weight, edge)| {
+                        weight.to_bits() == def.edge_weight(edge, input_refs).to_bits()
+                    }),
             "the weight table is the genome's: rebuild runtime state after editing the genome"
         );
         if sink.inputs.is_empty() {
