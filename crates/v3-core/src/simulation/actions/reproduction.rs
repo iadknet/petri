@@ -1186,4 +1186,82 @@ mod tests {
         assert_eq!(weights[0].len(), 1);
         assert!(weights[0][0].is_empty());
     }
+
+    /// One live birth at mutation rate 1.0 and reproduction seed `seed` from
+    /// a founder parent whose Graph node carries two barrier-ring groups.
+    /// Returns the run's `(graph_edges_detached_total, groups_removed_total)`.
+    fn grouped_birth_totals(seed: u64) -> (u64, u64) {
+        use crate::config::SimulationConfig;
+        use crate::contracts::{InputReference, WorldInputKey};
+        use crate::creature::founder::v3alpha1_founder_genome;
+        use crate::creature::genome::cgp::Shape;
+        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::simulation::seed_simulation;
+        use rand::SeedableRng;
+
+        let mut cfg = SimulationConfig::default();
+        cfg.population.initial_creatures = 1;
+        cfg.mutation.per_unit_rate = 1.0;
+        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
+        let mut sim = seed_simulation(cfg, 83);
+        let parent_id = sim.creatures.keys().next().unwrap();
+        let mut genome = v3alpha1_founder_genome();
+        let node = genome
+            .nodes
+            .iter_mut()
+            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("the founder carries a Graph node");
+        let ring = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!("a Graph node")
+        };
+        def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 0);
+        def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 4);
+        let parent = &mut sim.creatures[parent_id];
+        parent.genome = genome;
+        parent.age = sim.config.energy.lifecycle.min_reproduce_age;
+        parent.energy = 10000.0;
+        let direction = Direction::ALL
+            .into_iter()
+            .find(|&direction| {
+                sim.world
+                    .resolve_neighbor(sim.creatures[parent_id].position, direction)
+                    .is_some_and(|p| sim.world.is_valid_target_cell(p))
+            })
+            .unwrap();
+        assert_eq!(
+            apply_reproduce(
+                parent_id,
+                &mut sim,
+                direction,
+                10.0,
+                &mut rand::rngs::SmallRng::seed_from_u64(seed)
+            ),
+            ReproductionActionResult::Conceived
+        );
+        (
+            sim.stats.graph_edges_detached_total,
+            sim.stats.groups_removed_total,
+        )
+    }
+
+    /// A birth's member detaches and group removals reach the run totals:
+    /// some seed's mutated birth detaches a member and some seed's removes a
+    /// group (T25.F03).
+    #[test]
+    fn a_births_detaches_and_group_removals_reach_the_run_totals() {
+        let (mut detached, mut removed) = (None, None);
+        for seed in 0..64 {
+            let (d, r) = grouped_birth_totals(seed);
+            detached = detached.or((d > 0).then_some(seed));
+            removed = removed.or((r > 0).then_some(seed));
+            if detached.is_some() && removed.is_some() {
+                break;
+            }
+        }
+        assert!(detached.is_some(), "no birth detached a member");
+        assert!(removed.is_some(), "no birth removed a group");
+    }
 }

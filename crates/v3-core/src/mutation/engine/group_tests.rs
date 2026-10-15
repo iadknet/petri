@@ -179,6 +179,36 @@ fn group_edits_count_detaches_and_removals_by_operator() {
     );
 }
 
+/// The tallies count every member edge and every group record: one ring
+/// group is eight members, a second doubles both.
+#[test]
+fn group_tallies_count_members_and_group_records() {
+    let (mut genome, idx, ring) = grouped_founder();
+    assert_eq!(group_tallies(&genome), (8, 1));
+    graph_mut(&mut genome.nodes[idx]).add_group(
+        Shape::Ring { ring_ref: ring },
+        DirectedVoteKind::Move,
+        5,
+    );
+    assert_eq!(group_tallies(&genome), (16, 2));
+}
+
+/// A summary accumulates every committed event's detaches and removals.
+#[test]
+fn record_group_edits_accumulates_across_events() {
+    let mut summary = MutationSummary::zero();
+    summary.record_group_edits(GroupEdits {
+        detached: 2,
+        groups_removed: 1,
+    });
+    summary.record_group_edits(GroupEdits {
+        detached: 3,
+        groups_removed: 4,
+    });
+    assert_eq!(summary.graph_edges_detached, 5);
+    assert_eq!(summary.groups_removed, 5);
+}
+
 /// The `genome_size` change of one applied group-touching event, read from
 /// the target node before and after.
 fn expected_delta(
