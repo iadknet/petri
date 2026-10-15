@@ -33,7 +33,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: Development separated from heredity, as a cell's machinery for building synapses is separate from what the egg carries: one owner edits the graph, one captures what a child is born with, and one builds the running brain from it, with no behavior change.
 - [x] **T25.F02 — Uniform Genome Size** — Depends on: T25.F01
   - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, a ring gene costs its eight synapses, and the founder is re-anchored.
-- [ ] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
+- [x] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
 - [ ] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
   - Goal: The sensory map sits in register with the motor map (superior colliculus): a creature's sensed offset to food, a barrier, a crowd or another creature can reach all eight direction votes of one kind as one silent gene, and that thing's plain facts reach the kind's drive.

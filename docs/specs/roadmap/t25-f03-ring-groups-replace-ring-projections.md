@@ -1,6 +1,6 @@
 # T25.F03 — Ring Groups Replace Ring Projections
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-15
 **Feature**: T25.F03
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -182,14 +182,14 @@ Every `RingProjection` test site is ported, rewritten or deleted:
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 29
       passed after commit 1 (`c3994a6b`), commit 2 (`238ad78d`) and the
       self-review commit (`2d300ef9`); the founder-only siblings did not move.
-- [ ] Focused tests (the tests-first table) and `make check` -> result,
+- [x] Focused tests (the tests-first table) and `make check` -> result,
       commit hash. `cargo test --workspace --no-fail-fast` passed at
       `238ad78d`; at `2d300ef9` `cargo test -p v3-core`, clippy, fmt,
       `cargo check --workspace --all-targets`, frontend `npx vitest run`
       (630 passed) and `npx tsc --noEmit` pass; the invariant proptest
       `every_applied_event_keeps_the_graph_invariants` mixes Topology,
       VM and grouped-Graph events (two grouped Graph nodes plus a VM node)
-      and passes at `PROPTEST_CASES=5000`. `make check` pending.
+      and passes at `PROPTEST_CASES=5000`. `make check` exited 0 at `9793783d` (tested commit).
 - [x] Mutation gate, fresh `MUTANTS_ITERATE=0 make rust-mutants`:
 
       | Item | Record |
@@ -319,7 +319,7 @@ Goal predeclaration readings: mean ring groups per creature 0.325 / 1.494 / 0.66
       viability digests are unchanged in both commits. (`group_tests.rs`;
       viability item above; `mean_genome_size` 81.5 to 81.9 at the first
       goal sample, as at F02.)
-- [ ] Track row checked, spec Complete, `make check` green on main.
+- [x] Track row checked, spec Complete, `make check` green on main.
 
 ## Notes for AI Agents
 
