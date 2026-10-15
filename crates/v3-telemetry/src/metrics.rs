@@ -539,6 +539,8 @@ fn counters(f: &mut Families, s: &SimStats) {
         mutation_unreachable_target_total,
         mutation_executed_target_total,
         mutation_not_applicable_target_total,
+        graph_edges_detached_total,
+        groups_removed_total,
         mesh_hops_total,
         vm_steps_total,
         graph_relax_iters_total,

@@ -11,24 +11,18 @@ use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::time::Instant;
 
-fn fixture(ring: bool) -> CreatureGenome {
-    let key = if ring {
-        WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(0))
-    } else {
-        WorldInputKey::NearbyCreatureCore
-    };
+/// The four ranked `present` slots of the nearby-creature core into `Eat`:
+/// the inferred set refinement steps. A ring's channels into a kind's
+/// direction sinks form no set since T25.F03 (a ring map is an explicit
+/// group, refined through its scale).
+fn fixture() -> CreatureGenome {
+    let key = WorldInputKey::NearbyCreatureCore;
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    for i in 0..if ring { 8 } else { 4 } {
-        let vote = if ring {
-            VoteSink::Move(i)
-        } else {
-            VoteSink::Eat
-        };
-        let channel = if ring { u16::from(i) } else { u16::from(i) * 4 };
+    for i in 0..4u16 {
         wire(
             &mut def,
-            OutputSinkKind::ActionVote(vote),
-            edge(leaf(0, channel), if i == 0 { 0.025 } else { 0.0 }),
+            OutputSinkKind::ActionVote(VoteSink::Eat),
+            edge(leaf(0, i * 4), if i == 0 { 0.025 } else { 0.0 }),
         );
     }
     CreatureGenome {
@@ -46,7 +40,6 @@ fn weights(genome: &CreatureGenome) -> Vec<f32> {
 
 fn native_run(
     genome: &CreatureGenome,
-    ring: bool,
 ) -> (
     crate::creature::genome::vote::VoteVector,
     crate::runtime::types::WorkCounters,
@@ -54,7 +47,7 @@ fn native_run(
 ) {
     let node = &genome.nodes[0];
     let mut energy = 10.0;
-    let mut state = GraphRuntimeState::new();
+    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
     let mut side = MeshSideOutputs::new(8);
     let mut memory = [0.0; 16];
     let snapshot = sensors();
@@ -85,11 +78,7 @@ fn native_run(
             let GraphSource::InputLeaf { sub_idx, .. } = edge.source() else {
                 panic!("fixture leaf")
             };
-            let input = if ring {
-                snapshot.typed_local_food.neighbor_food_by_type[0][usize::from(sub_idx)]
-            } else {
-                snapshot.perception.nearby_core[usize::from(sub_idx)]
-            };
+            let input = snapshot.perception.nearby_core[usize::from(sub_idx)];
             assert!(input > 0.0);
             expected[vote.index()] += edge.own_weight() * input;
         }
@@ -108,16 +97,16 @@ fn native_run(
 
 #[test]
 fn structured_refinement_reaches_native_votes_without_adding_native_work_or_units() {
-    for ring in [true, false] {
-        let original = fixture(ring);
+    {
+        let original = fixture();
         let mut changed = original.clone();
-        let before = native_run(&original, ring);
+        let before = native_run(&original);
         refine(
             &mut changed.nodes[0],
             &mut SmallRng::seed_from_u64(29_005_000),
         )
         .unwrap();
-        let after = native_run(&changed, ring);
+        let after = native_run(&changed);
         assert_ne!(before.0, after.0);
         assert_eq!(before.1, after.1);
         assert_eq!(before.2, after.2);
@@ -138,8 +127,8 @@ fn structured_refinement_reaches_native_votes_without_adding_native_work_or_unit
 
 #[test]
 fn local_scalar_exceptions_sparse_deletion_copy_serde_and_pruning_persist() {
-    for ring in [true, false] {
-        let mut genome = fixture(ring);
+    {
+        let mut genome = fixture();
         let mut rng = SmallRng::seed_from_u64(29_005_001);
         let original = weights(&genome);
         alter_edge_weight_in_def(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();
@@ -226,8 +215,8 @@ fn structured_coefficients_and_deleted_positions_survive_native_offspring_constr
         actions::{apply_reproduce, ReproductionActionResult},
         seed_simulation,
     };
-    for ring in [true, false] {
-        let mut genome = fixture(ring);
+    {
+        let mut genome = fixture();
         let mut rng = SmallRng::seed_from_u64(29_005_002);
         refine(&mut genome.nodes[0], &mut rng).unwrap();
         remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();
@@ -264,7 +253,7 @@ fn structured_coefficients_and_deleted_positions_survive_native_offspring_constr
         assert_eq!(child.genome, genome);
         assert_eq!(child.cached_genome_size, genome.genome_size());
         assert_eq!(sim.creatures[parent_id].genome, genome);
-        native_run(&child.genome, ring);
+        native_run(&child.genome);
     }
 }
 
@@ -342,11 +331,11 @@ fn proposal(genome: &mut CreatureGenome, arm: Arm, seed: u64) -> (f64, Vec<usize
 fn structured_refinement_engineering_panel() {
     let started = Instant::now();
     let mut rows = Vec::new();
-    for ring in [true, false] {
-        let original = fixture(ring);
+    {
+        let original = fixture();
         let old = weights(&original);
         let m = old.len();
-        let before = native_run(&original, ring);
+        let before = native_run(&original);
         for arm in [Arm::Scalar, Arm::MatchedAdditive, Arm::Coordinated] {
             let arm_started = Instant::now();
             let mut touches = 0;
@@ -392,7 +381,7 @@ fn structured_refinement_engineering_panel() {
                     assert!(exception_preserved);
                 }
                 assert_eq!(child.genome_size(), original.genome_size());
-                let after = native_run(&child, ring);
+                let after = native_run(&child);
                 assert_eq!(after.1, before.1);
                 assert_eq!(after.2, before.2);
                 let vote_changes = after
@@ -414,10 +403,10 @@ fn structured_refinement_engineering_panel() {
                 energy += after.2;
                 records.push(serde_json::json!({"seed":seed,"selected":selected,"changed":changed,"selected_members":selected_members,"changed_members":new.iter().zip(&old).enumerate().filter_map(|(index,(a,b))| (a!=b).then_some(index)).collect::<Vec<_>>(),"requested_norm":requested,"actual_norm":norm,"exception_preserved":exception_preserved,"vote_changes":vote_changes,"vote_delta_norm":vote_norm}));
             }
-            rows.push(serde_json::json!({"layout":if ring {"food_ring_move_offset_0"} else {"nearby_core_present_eat"},"arm":format!("{arm:?}"),"attempted":256,"applied":256,"skipped":0,"numeric_rejections":0,"selected_node":0,"selected_groups":if matches!(arm,Arm::Scalar){0}else{256},"selected_coefficients":touches,"changed_coefficients":changes,"unchanged_proposals":unchanged_proposals,"requested_norm_max":requested_max,"actual_norm_mean":norm_sum/256.0,"actual_norm_max":norm_max,"exceptions_preserved":preserved,"changed_vote_coefficients":vote_change_sum,"vote_delta_norm_mean":vote_norm_sum/256.0,"genomic_units":original.genome_size(),"net_units":0,"native_graph_visits":visits,"plasticity_updates":0,"native_graph_energy":energy,"elapsed_seconds":arm_started.elapsed().as_secs_f64(),"proposals":records}));
+            rows.push(serde_json::json!({"layout":"nearby_core_present_eat","arm":format!("{arm:?}"),"attempted":256,"applied":256,"skipped":0,"numeric_rejections":0,"selected_node":0,"selected_groups":if matches!(arm,Arm::Scalar){0}else{256},"selected_coefficients":touches,"changed_coefficients":changes,"unchanged_proposals":unchanged_proposals,"requested_norm_max":requested_max,"actual_norm_mean":norm_sum/256.0,"actual_norm_max":norm_max,"exceptions_preserved":preserved,"changed_vote_coefficients":vote_change_sum,"vote_delta_norm_mean":vote_norm_sum/256.0,"genomic_units":original.genome_size(),"net_units":0,"native_graph_visits":visits,"plasticity_updates":0,"native_graph_energy":energy,"elapsed_seconds":arm_started.elapsed().as_secs_f64(),"proposals":records}));
         }
     }
-    let evidence=serde_json::to_string_pretty(&serde_json::json!({"proposals":1536,"seed_start":29_005_000,"seed_end_exclusive":29_005_256,"learning":false,"inputs":{"food_ring":sensors().typed_local_food.neighbor_food_by_type[0],"nearby_core_present":[sensors().perception.nearby_core[0],sensors().perception.nearby_core[4],sensors().perception.nearby_core[8],sensors().perception.nearby_core[12]]},"rows":rows,"elapsed_seconds":started.elapsed().as_secs_f64(),"verdicts":{"ring":"correctness_pass","slots":"correctness_pass"}})).unwrap();
+    let evidence=serde_json::to_string_pretty(&serde_json::json!({"proposals":1536,"seed_start":29_005_000,"seed_end_exclusive":29_005_256,"learning":false,"inputs":{"food_ring":sensors().typed_local_food.neighbor_food_by_type[0],"nearby_core_present":[sensors().perception.nearby_core[0],sensors().perception.nearby_core[4],sensors().perception.nearby_core[8],sensors().perception.nearby_core[12]]},"rows":rows,"elapsed_seconds":started.elapsed().as_secs_f64(),"verdicts":{"slots":"correctness_pass"}})).unwrap();
     assert!(evidence.len() <= 10 * 1024 * 1024);
     println!("{evidence}");
     assert!(started.elapsed().as_secs_f64() < 60.0);
@@ -425,7 +414,7 @@ fn structured_refinement_engineering_panel() {
 
 #[test]
 fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
-    let mut genome = fixture(true);
+    let mut genome = fixture();
     let active = active_graph();
     let graph = graph_mut(&mut genome.nodes[0]);
     *graph = graph
@@ -458,7 +447,10 @@ fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
     assert_eq!(old.birth_seeds(), new.birth_seeds());
     assert_eq!(before.nodes[0].targets, genome.nodes[0].targets);
     for (old, new) in old.output_sinks().iter().zip(new.output_sinks()) {
-        if !matches!(old.kind, OutputSinkKind::ActionVote(VoteSink::Move(_))) {
+        if old.kind == OutputSinkKind::ActionVote(VoteSink::Eat) {
+            // The shared-memory vote edge beside the set is not a member.
+            assert_eq!(old.inputs.last(), new.inputs.last());
+        } else {
             assert_eq!(old, new);
         }
     }

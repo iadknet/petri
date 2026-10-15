@@ -187,7 +187,7 @@ impl VoteSink {
 }
 
 /// A directed world-action kind: the kinds with eight direction sinks, which a
-/// ring projection (T11.F31) votes for.
+/// `Ring` edge group (T25.F03) votes for.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -198,8 +198,8 @@ pub enum DirectedVoteKind {
 }
 
 impl DirectedVoteKind {
-    /// Catalog order, the order `AddRingProjection` and
-    /// `RetargetRingProjectionKind` draw over.
+    /// Catalog order, the order `AddRingGroup` and `RetargetGroupKind` draw
+    /// over.
     pub const ALL: [Self; 3] = [Self::Move, Self::Reproduce, Self::StealEnergy];
 
     /// Position in [`Self::ALL`].

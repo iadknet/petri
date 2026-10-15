@@ -313,7 +313,8 @@ pub(super) fn undefined_memory_sensitivity() -> Indicator<MemorySensitivity> {
 /// moves the token here, so a stored report names the definition it measured.
 pub const LINEAGE_DIVERSITY_VERSION: &str = "lineage-diversity-v1";
 pub const MEMORY_SENSITIVITY_VERSION: &str = "memory-sensitivity-v1";
-pub const REACHABLE_STRUCTURE_VERSION: &str = "reachable-structure-v1";
+/// `v2` since T25.F03: a group's members are edges in every size count.
+pub const REACHABLE_STRUCTURE_VERSION: &str = "reachable-structure-v2";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LineageDiversity {
@@ -1072,6 +1073,12 @@ pub struct MutationSupply {
     pub reachable_target_total: u64,
     pub unreachable_target_total: u64,
     pub not_applicable_target_total: u64,
+    /// Group members committed events detached (T25.F03); absent in reports
+    /// stored before T25.F03.
+    pub graph_edges_detached_total: u64,
+    /// Edge groups committed events removed (T25.F03); absent in reports
+    /// stored before T25.F03.
+    pub groups_removed_total: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,8 +2,8 @@
 use super::*;
 use crate::config::{MutationConfig, NeutralInputRecruitment as Arm};
 use crate::creature::genome::vote::DirectedVoteKind;
+use crate::mutation::graph::group;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
-use crate::mutation::graph::projection;
 use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;
@@ -45,18 +45,16 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                 assert_eq!(silent.memory, before.memory);
                 let ring = matches!(&family, SourceFamily::Input(reference) if reference.is_ring());
                 if let (true, Some((kind, _))) = (ring, DirectedVoteKind::of_sink(vote)) {
-                    // A ring landing on a directed sink is one silent
-                    // projection (T11.F31), refined as a unit: one weight
-                    // step moves the kind's vote in every direction.
-                    assert_eq!(graph(&node).edges().count(), 0);
-                    assert_eq!(graph(&node).projections.len(), 1);
-                    assert_eq!(graph(&node).projections[0].weight, 0.0);
+                    // A ring landing on a directed sink is one silent `Ring`
+                    // group (T25.F03), refined through its scale: one step
+                    // moves the kind's vote in every direction.
+                    assert_eq!(graph(&node).edges().count(), 8);
+                    assert!(graph(&node).edges().all(|edge| edge.membership().is_some()));
+                    assert_eq!(graph(&node).groups().len(), 1);
+                    assert_eq!(graph(&node).groups()[0].scale(), 0.0);
                     let mut refined = node.clone();
-                    projection::alter_weight(
-                        graph_mut(&mut refined),
-                        &mut SmallRng::seed_from_u64(11),
-                    )
-                    .unwrap();
+                    group::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
+                        .unwrap();
                     let votes = effects(graph(&refined), &refined.input_refs, 0.5)
                         .side
                         .dispatch_effects()
@@ -67,7 +65,7 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                     assert_eq!(votes.iter().filter(|&&vote| vote != 0.0).count(), 8);
                     continue;
                 }
-                assert!(graph(&node).projections.is_empty());
+                assert!(graph(&node).groups().is_empty());
                 let mut refined = node.clone();
                 alter_edge_weight_in_def(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                     .unwrap();
@@ -182,7 +180,8 @@ fn neutral_recruitment_native_work_charges_activation_but_no_per_edge_price() {
                     let mut readings = Vec::new();
                     for node in [&original, &recruited] {
                         let mut energy = 10.0;
-                        let mut state = GraphRuntimeState::new();
+                        let mut state =
+                            crate::creature::genome::cgp::test_support::runtime_for(graph(node));
                         let mut side = side();
                         let mut memory = ramp(0.5);
                         let result = execute_graph_node(

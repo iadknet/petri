@@ -5,7 +5,7 @@ use slotmap::{Key, KeyData};
 use std::collections::{BTreeMap, BTreeSet};
 use v3_core::contracts::{CreatureId, InputReference};
 use v3_core::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
-use v3_core::creature::genome::cgp::OutputSinkKind;
+use v3_core::creature::genome::cgp::{EdgeSurface, OutputSinkKind};
 use v3_core::creature::genome::mesh_annotations::{
     derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
     MeshWriteClass,
@@ -61,12 +61,98 @@ struct CreatureDetailResponse<'a> {
     genome: Option<&'a v3_core::creature::genome::CreatureGenome>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mesh_annotations: Option<Vec<MeshNodeAnnotation>>,
+    /// The genomic weights of edge groups and their members (T25.F03), per
+    /// Graph node carrying a group, in genome order. Computed whether or not
+    /// the genome is included; excluded by the `graph_weights` token and
+    /// omitted when the creature carries no member.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    graph_weights: Option<Vec<NodeGraphWeights>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     shared_memory: Option<&'a [f32]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     action_log: Option<Vec<&'a ActionLogEntry>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     diagnostics: Option<CreatureDiagnosticsResponse>,
+}
+
+/// One Graph node's group scales and member genomic weights.
+#[derive(Debug, PartialEq, serde::Serialize)]
+struct NodeGraphWeights {
+    node_id: v3_core::contracts::NodeId,
+    scales: Vec<GroupScaleWeight>,
+    edges: Vec<EdgeGenomicWeight>,
+}
+
+/// One group's shared scale, by `GroupId` index.
+#[derive(Debug, PartialEq, serde::Serialize)]
+struct GroupScaleWeight {
+    group: usize,
+    genomic: f32,
+}
+
+/// Which edge-bearing surface an edge sits on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum WeightSurface {
+    Compute,
+    Sink,
+}
+
+/// One edge's genomic weight, keyed by surface, container index (compute
+/// node or sink) and index within that container's inputs.
+#[derive(Debug, PartialEq, serde::Serialize)]
+struct EdgeGenomicWeight {
+    surface: WeightSurface,
+    container: usize,
+    edge: usize,
+    genomic: f32,
+}
+
+/// The `graph_weights` payload: one entry per Graph node with a group, its
+/// scales and its members' genomic weights; `None` when no node carries a
+/// member.
+fn graph_weights(
+    genome: &v3_core::creature::genome::CreatureGenome,
+) -> Option<Vec<NodeGraphWeights>> {
+    let nodes: Vec<NodeGraphWeights> = genome
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            let BackendDef::Graph(def) = &node.backend_def else {
+                return None;
+            };
+            let edges: Vec<EdgeGenomicWeight> = def
+                .edge_sites()
+                .filter(|&occurrence| def.edge_at(occurrence).membership().is_some())
+                .map(|occurrence| {
+                    let (surface, container) = match occurrence.surface {
+                        EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
+                        EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
+                    };
+                    EdgeGenomicWeight {
+                        surface,
+                        container,
+                        edge: occurrence.index,
+                        genomic: def.genomic_weight(occurrence, &node.input_refs),
+                    }
+                })
+                .collect();
+            (!edges.is_empty()).then(|| NodeGraphWeights {
+                node_id: node.node_id,
+                scales: def
+                    .groups()
+                    .iter()
+                    .enumerate()
+                    .map(|(group, record)| GroupScaleWeight {
+                        group,
+                        genomic: record.scale(),
+                    })
+                    .collect(),
+                edges,
+            })
+        })
+        .collect();
+    (!nodes.is_empty()).then_some(nodes)
 }
 
 #[derive(serde::Serialize)]
@@ -379,6 +465,11 @@ pub async fn get_creature(
         latest_tick,
         genome: include_genome.then_some(&creature.genome),
         mesh_annotations: include_genome.then_some(mesh_annotations),
+        graph_weights: if exclude.contains("graph_weights") {
+            None
+        } else {
+            graph_weights(&creature.genome)
+        },
         shared_memory: (!exclude.contains("shared_memory")).then(|| &creature.shared_memory[..]),
         action_log: (!exclude.contains("action_log")).then_some(action_log_entries),
         diagnostics,

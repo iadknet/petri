@@ -679,6 +679,8 @@ impl WorldTracking {
                 reachable_target_total: stats.mutation_reachable_target_total,
                 unreachable_target_total: stats.mutation_unreachable_target_total,
                 not_applicable_target_total: stats.mutation_not_applicable_target_total,
+                graph_edges_detached_total: stats.graph_edges_detached_total,
+                groups_removed_total: stats.groups_removed_total,
             }),
             mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
             mutation_value_totals_by_operator: Some(
@@ -783,11 +785,15 @@ pub struct PersistenceSample {
     /// extinction and absent in reports stored before T25.F02.
     #[serde(default)]
     pub mean_wired_sinks: Option<String>,
-    /// Mean ring projection count per living creature, each nine genome units
-    /// since T25.F02. `null` at extinction and absent in reports stored before
-    /// T25.F02.
+    /// Mean `Ring` edge-group count per living creature (T25.F03). `null` at
+    /// extinction and absent in reports stored before T25.F03.
     #[serde(default)]
-    pub mean_projections: Option<String>,
+    pub mean_ring_groups: Option<String>,
+    /// Mean members present per `Ring` group across the living population
+    /// (T25.F03). `null` with no group or at extinction, and absent in
+    /// reports stored before T25.F03.
+    #[serde(default)]
+    pub mean_ring_group_members: Option<String>,
     /// Founder clades with at least one living creature — a true `0` at
     /// extinction, absent in reports stored before T14.F04.
     #[serde(default)]
@@ -958,7 +964,8 @@ pub(super) struct PopulationReadings {
     pub(super) mean_mesh_nodes: f64,
     pub(super) mean_generation: f64,
     pub(super) mean_wired_sinks: f64,
-    pub(super) mean_projections: f64,
+    pub(super) mean_ring_groups: f64,
+    pub(super) mean_ring_group_members: Option<f64>,
     pub(super) surviving_founder_clade_count: u64,
     pub(super) shannon_entropy_nats: String,
     sensor_census: SensorCensus,
@@ -975,7 +982,8 @@ impl PopulationReadings {
             mean_mesh_nodes: means.mesh_nodes,
             mean_generation: means.generation,
             mean_wired_sinks: means.wired_sinks,
-            mean_projections: means.projections,
+            mean_ring_groups: means.ring_groups,
+            mean_ring_group_members: means.ring_group_members,
             surviving_founder_clade_count,
             shannon_entropy_nats,
             sensor_census: SensorCensus::observe(sim),
@@ -1069,7 +1077,11 @@ impl PersistenceAccumulator {
                 mean_mesh_nodes: alive.then(|| six(readings.mean_mesh_nodes)),
                 mean_generation: alive.then(|| six(readings.mean_generation)),
                 mean_wired_sinks: alive.then(|| six(readings.mean_wired_sinks)),
-                mean_projections: alive.then(|| six(readings.mean_projections)),
+                mean_ring_groups: alive.then(|| six(readings.mean_ring_groups)),
+                mean_ring_group_members: readings
+                    .mean_ring_group_members
+                    .filter(|_| alive)
+                    .map(six),
                 surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 sensor_census: Some(readings.sensor_census),

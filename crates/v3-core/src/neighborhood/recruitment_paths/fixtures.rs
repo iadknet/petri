@@ -323,7 +323,7 @@ pub fn constructed_paths() -> Vec<ConstructedPath> {
             let mut split = copied.clone();
             let node = &mut split.nodes[2];
             let BackendDef::Graph(graph) = &mut node.backend_def else { unreachable!() };
-            split_existing_edge(graph, &mut SmallRng::seed_from_u64(7)).expect("constructed graph has splittable edges");
+            split_existing_edge(graph, &[], &mut SmallRng::seed_from_u64(7)).expect("constructed graph has splittable edges");
             Some(stage("neutral_split", "constructed mutation::graph::operators::split_existing_edge", Some(7), &copied, split))
         } else { None };
         let mut blank_genome = base.clone();

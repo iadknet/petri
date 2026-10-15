@@ -1,6 +1,6 @@
+pub(crate) mod group;
 pub mod hebbian;
 pub(crate) mod operators;
-pub(crate) mod projection;
 pub(crate) mod recruitment;
 pub(crate) mod refinement;
 
@@ -39,11 +39,11 @@ pub enum GraphOperator {
     MutateTraceDecay,
     RecruitNeutralInput,
     RefineHeritableStructure,
-    AddRingProjection,
-    AlterRingProjectionWeight,
-    ShiftRingProjectionOffset,
-    RetargetRingProjectionKind,
-    RemoveRingProjection,
+    AddRingGroup,
+    AlterGroupScale,
+    ShiftGroupOffset,
+    RetargetGroupKind,
+    RemoveGroup,
 }
 
 impl GraphOperator {
@@ -71,11 +71,11 @@ impl GraphOperator {
         Self::MutateTraceDecay,
         Self::RecruitNeutralInput,
         Self::RefineHeritableStructure,
-        Self::AddRingProjection,
-        Self::AlterRingProjectionWeight,
-        Self::ShiftRingProjectionOffset,
-        Self::RetargetRingProjectionKind,
-        Self::RemoveRingProjection,
+        Self::AddRingGroup,
+        Self::AlterGroupScale,
+        Self::ShiftGroupOffset,
+        Self::RetargetGroupKind,
+        Self::RemoveGroup,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -106,13 +106,14 @@ impl GraphOperator {
             Self::MutateTraceDecay => 4,
             Self::RecruitNeutralInput => 1,
             Self::RefineHeritableStructure => 4,
-            // Ring projections (T11.F31): each the tier of the edge operator
-            // it parallels.
-            Self::AddRingProjection => 2,
-            Self::AlterRingProjectionWeight => 4,
-            Self::ShiftRingProjectionOffset => 2,
-            Self::RetargetRingProjectionKind => 2,
-            Self::RemoveRingProjection => 2,
+            // Edge groups (T25.F03, at the catalog positions and weights of
+            // the T11.F31 ring projection operators): each the tier of the
+            // edge operator it parallels.
+            Self::AddRingGroup => 2,
+            Self::AlterGroupScale => 4,
+            Self::ShiftGroupOffset => 2,
+            Self::RetargetGroupKind => 2,
+            Self::RemoveGroup => 2,
         }
     }
 
@@ -148,10 +149,10 @@ impl GraphOperator {
             | Self::EnableHebbian
             | Self::EnableRewardModulation
             | Self::RecruitNeutralInput
-            | Self::AddRingProjection => ComplexityEffect::Increasing,
+            | Self::AddRingGroup => ComplexityEffect::Increasing,
             Self::RemoveInternalGraphNode
             | Self::RemoveGraphEdge
-            | Self::RemoveRingProjection
+            | Self::RemoveGroup
             | Self::DisableHebbian
             | Self::DisableRewardModulation => ComplexityEffect::Decreasing,
             Self::AlterGraphEdgeWeight
@@ -165,9 +166,9 @@ impl GraphOperator {
             | Self::ToggleHebbianLamarckian
             | Self::MutateRewardSource
             | Self::MutateTraceDecay
-            | Self::AlterRingProjectionWeight
-            | Self::ShiftRingProjectionOffset
-            | Self::RetargetRingProjectionKind => ComplexityEffect::Neutral,
+            | Self::AlterGroupScale
+            | Self::ShiftGroupOffset
+            | Self::RetargetGroupKind => ComplexityEffect::Neutral,
         }
     }
 
@@ -216,7 +217,7 @@ impl GraphOperator {
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
             Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
-            Self::RefineHeritableStructure => refinement::has_group(def, input_refs),
+            Self::RefineHeritableStructure => refinement::has_inferred_set(def, input_refs),
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -232,11 +233,11 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_node(def, hebbian::is_reward_modulated)
             }
-            Self::AddRingProjection => projection::can_add(input_refs),
-            Self::AlterRingProjectionWeight
-            | Self::ShiftRingProjectionOffset
-            | Self::RetargetRingProjectionKind
-            | Self::RemoveRingProjection => projection::has_projection(def),
+            Self::AddRingGroup => group::can_add(def, input_refs),
+            Self::AlterGroupScale
+            | Self::ShiftGroupOffset
+            | Self::RetargetGroupKind
+            | Self::RemoveGroup => group::has_group(def),
         }
     }
 }
@@ -392,25 +393,23 @@ impl GraphMutator {
                 hebbian::mutate_reward_source(genome, node_idx, rng)
             }
             GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
-            GraphOperator::AddRingProjection => {
+            GraphOperator::AddRingGroup => {
                 let node = genome
                     .nodes
                     .get_mut(node_idx)
                     .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                projection::add(node, rng)
+                group::add(node, rng)
             }
-            GraphOperator::AlterRingProjectionWeight
-            | GraphOperator::ShiftRingProjectionOffset
-            | GraphOperator::RetargetRingProjectionKind
-            | GraphOperator::RemoveRingProjection => {
+            GraphOperator::AlterGroupScale
+            | GraphOperator::ShiftGroupOffset
+            | GraphOperator::RetargetGroupKind
+            | GraphOperator::RemoveGroup => {
                 let def = operators::graph_def_mut(genome, node_idx)?;
                 match op {
-                    GraphOperator::AlterRingProjectionWeight => projection::alter_weight(def, rng),
-                    GraphOperator::ShiftRingProjectionOffset => projection::shift_offset(def, rng),
-                    GraphOperator::RetargetRingProjectionKind => {
-                        projection::retarget_kind(def, rng)
-                    }
-                    _ => projection::remove(def, rng),
+                    GraphOperator::AlterGroupScale => group::alter_scale(def, rng),
+                    GraphOperator::ShiftGroupOffset => group::shift_offset(def, rng),
+                    GraphOperator::RetargetGroupKind => group::retarget_kind(def, rng),
+                    _ => group::remove(def, rng),
                 }
             }
         }

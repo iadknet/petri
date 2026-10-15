@@ -90,15 +90,14 @@ pub(crate) fn wired_surface_edges<'a>(
 // ── Functional complexity ───────────────────────────────────────────────────
 
 /// Collect consumed `InputLeaf` ref_idx values from the wired surface edges of
-/// a graph with these live compute nodes.
-/// A ring projection's ring is consumed too (T11.F31).
+/// a graph with these live compute nodes; a group's ring is consumed through
+/// its members, which are sink edges (T25.F03).
 fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &[usize]) -> HashSet<u16> {
     wired_surface_edges(def, live)
         .filter_map(|edge| match edge.source() {
             GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
             GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
         })
-        .chain(def.projections.iter().map(|projection| projection.ref_idx))
         .collect()
 }
 
@@ -108,9 +107,9 @@ fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &[usize]) -> Hash
 /// - +1 per wired output sink (has at least one edge)
 /// - +1 per live compute node (backward-reachable from wired surfaces)
 /// - +edge_count per live compute node
-/// - +1 per consumed InputLeaf ref_idx (across all live edges and ring
-///   projections)
-/// - +1 per ring projection, a live component (T11.F31)
+/// - +1 per consumed InputLeaf ref_idx (across all live edges, group members
+///   included)
+/// - +1 per edge-group record, a live component (T25.F03)
 ///
 /// Dormant (unwired) sinks are NOT counted.
 #[must_use]
@@ -132,7 +131,7 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
         score += def.compute_nodes()[idx].inputs.len() as u32;
     }
 
-    score += def.projections.len() as u32;
+    score += def.groups().len() as u32;
 
     // Consumed input refs across all live edges
     let consumed = collect_consumed_input_refs(def, &live_indices);

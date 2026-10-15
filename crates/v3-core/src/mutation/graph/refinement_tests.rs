@@ -1,11 +1,10 @@
 use super::*;
 use crate::contracts::{NodeId, OrdinaryFoodTypeId};
 use crate::creature::genome::cgp::test_support::{edit_sinks, reweighted, SinkDraft};
-use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::VoteSink;
+use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind, Shape};
+use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::BackendDef;
 use proptest::prelude::*;
-use rand::rngs::mock::StepRng;
 use rand::{rngs::SmallRng, SeedableRng};
 
 fn node() -> NodeGenome {
@@ -42,22 +41,16 @@ fn wire(node: &mut NodeGenome, vote: VoteSink, reference: u16, channel: u16, wei
         ),
     );
 }
-fn directed(kind: VoteKind, d: u8) -> VoteSink {
-    match kind {
-        VoteKind::Move => VoteSink::Move(d),
-        VoteKind::Reproduce => VoteSink::Reproduce(d),
-        VoteKind::StealEnergy => VoteSink::StealEnergy(d),
-        VoteKind::Eat => unreachable!(),
-    }
-}
-fn ring(family: WorldInputKey, kind: VoteKind, offset: u8, mask: u8) -> NodeGenome {
+/// Ring-channel edges into one kind's direction sinks at `offset`, one per
+/// channel in `mask`: the wiring the deleted ring key inferred.
+fn ring(family: WorldInputKey, kind: DirectedVoteKind, offset: u8, mask: u8) -> NodeGenome {
     let mut node = node();
     node.input_refs.push(InputReference::World(family));
     for d in 0..8 {
         if mask & (1 << d) != 0 {
             wire(
                 &mut node,
-                directed(kind, (d + offset) % 8),
+                kind.sink((d + offset) % 8),
                 0,
                 u16::from(d),
                 f32::from(d) / 100.0,
@@ -66,53 +59,61 @@ fn ring(family: WorldInputKey, kind: VoteKind, offset: u8, mask: u8) -> NodeGeno
     }
     node
 }
-fn slots(family: WorldInputKey, width: u16, field: u16, vote: VoteSink) -> NodeGenome {
+/// One field's ranked slots wired to `vote`, one edge per slot in `mask`.
+fn masked_slots(
+    family: WorldInputKey,
+    width: u16,
+    field: u16,
+    vote: VoteSink,
+    mask: u8,
+) -> NodeGenome {
     let mut node = node();
     node.input_refs.push(InputReference::World(family));
     for slot in 0..4 {
-        wire(
-            &mut node,
-            vote,
-            0,
-            slot * width + field,
-            f32::from(slot) / 100.0,
-        );
+        if mask & (1 << slot) != 0 {
+            wire(
+                &mut node,
+                vote,
+                0,
+                slot * width + field,
+                f32::from(slot) / 100.0,
+            );
+        }
     }
     node
 }
-fn all_groups(node: &NodeGenome) -> Vec<Group> {
-    groups(graph(node), &node.input_refs)
+fn slots(family: WorldInputKey, width: u16, field: u16, vote: VoteSink) -> NodeGenome {
+    masked_slots(family, width, field, vote, 0b1111)
+}
+fn core_slots(mask: u8) -> NodeGenome {
+    masked_slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat, mask)
+}
+fn all_sets(node: &NodeGenome) -> Vec<InferredSet> {
+    inferred_sets(graph(node), &node.input_refs)
 }
 
+/// The ring key is gone (T25.F03): a ring's channel edges into a kind's
+/// direction sinks form no inferred set whatever their offset.
 #[test]
-fn every_ring_family_kind_and_offset_has_exactly_its_semantic_group() {
+fn ring_channel_edges_form_no_inferred_set() {
     for family in [
         WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(0)),
         WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(1)),
         WorldInputKey::NeighborBarrierRing,
         WorldInputKey::NeighborOccupiedRing,
     ] {
-        for kind in [VoteKind::Move, VoteKind::Reproduce, VoteKind::StealEnergy] {
+        for kind in DirectedVoteKind::ALL {
             for offset in 0..8 {
                 let node = ring(family, kind, offset, 255);
-                let groups = all_groups(&node);
-                assert_eq!(groups.len(), 1);
-                assert_eq!(
-                    groups[0].key,
-                    GroupKey::Ring {
-                        family,
-                        kind,
-                        offset: u16::from(offset)
-                    }
-                );
-                assert_eq!(groups[0].members.len(), 8);
+                assert!(all_sets(&node).is_empty());
+                assert!(!has_inferred_set(graph(&node), &node.input_refs));
             }
         }
     }
 }
 
 #[test]
-fn every_nearby_field_and_vote_has_its_own_slot_group() {
+fn every_nearby_field_and_vote_has_its_own_slot_set() {
     for (family, width) in [
         (WorldInputKey::NearbyCreatureCore, 4),
         (WorldInputKey::NearbyCreatureVitals, 2),
@@ -121,13 +122,14 @@ fn every_nearby_field_and_vote_has_its_own_slot_group() {
         for field in 0..width {
             for vote in VoteSink::all() {
                 let node = slots(family, width, field, vote);
-                let groups = all_groups(&node);
-                assert_eq!(groups.len(), 1);
-                assert!(
-                    matches!(groups[0].key, GroupKey::Slots { family: f, field: c, .. } if f == family && c == field)
-                );
+                let sets = all_sets(&node);
+                assert_eq!(sets.len(), 1);
+                assert!(matches!(
+                    sets[0].key,
+                    SlotKey { family: f, field: c, .. } if f == family && c == field
+                ));
                 assert_eq!(
-                    groups[0]
+                    sets[0]
                         .members
                         .iter()
                         .map(|m| m.position)
@@ -139,15 +141,61 @@ fn every_nearby_field_and_vote_has_its_own_slot_group() {
     }
 }
 
+/// A `Slots` fixture beside a `Ring` group: refinement infers only the slot
+/// set and never steps a group member, whatever it draws.
 #[test]
-fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_group() {
-    let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 255);
+fn refinement_never_steps_a_member() {
+    let mut fixture = core_slots(0b1111);
+    fixture
+        .input_refs
+        .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+    let id =
+        graph_mut(&mut fixture).add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 2);
+    graph_mut(&mut fixture).group_mut(id).set_scale(0.5);
+    // A member alone never forms a set, even with ring channel edges beside it.
+    for d in 0..8u8 {
+        wire(
+            &mut fixture,
+            VoteSink::Move((d + 2) % 8),
+            1,
+            u16::from(d),
+            0.25,
+        );
+    }
+    assert_eq!(all_sets(&fixture).len(), 1);
+    let members = |genome: &NodeGenome| -> Vec<GraphEdge> {
+        let def = graph(genome);
+        def.members(id)
+            .map(|occurrence| *def.edge_at(occurrence))
+            .collect()
+    };
+    let before = members(&fixture);
+    for seed in 0..64 {
+        let mut refined = fixture.clone();
+        refine(&mut refined, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        assert_eq!(members(&refined), before);
+        assert_eq!(graph(&refined).groups(), graph(&fixture).groups());
+    }
+    let mut only_group = node();
+    only_group
+        .input_refs
+        .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+    graph_mut(&mut only_group).add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    assert!(!has_inferred_set(
+        graph(&only_group),
+        &only_group.input_refs
+    ));
+}
+
+#[test]
+fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_set() {
+    let mut node = core_slots(0b1111);
     node.input_refs.push(node.input_refs[0].clone());
-    // A duplicate declaration with a unique edge is still the same semantic group.
+    // A duplicate declaration with a unique edge is still the same semantic set.
     edit_sinks(graph_mut(&mut node), |sinks| {
         let sink = sinks
             .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
             .unwrap();
         sink.inputs[0] = GraphEdge::new(
             GraphSource::InputLeaf {
@@ -157,34 +205,24 @@ fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_group()
             sink.inputs[0].own_weight(),
         );
     });
-    assert_eq!(all_groups(&node).len(), 1);
-    wire(&mut node, VoteSink::Move(0), 0, 0, 0.0);
-    assert!(all_groups(&node).is_empty());
-    wire(&mut node, VoteSink::Reproduce(0), 0, 0, 0.0);
-    wire(&mut node, VoteSink::Reproduce(1), 0, 1, 0.0);
-    assert_eq!(all_groups(&node).len(), 1);
+    assert_eq!(all_sets(&node).len(), 1);
+    wire(&mut node, VoteSink::Eat, 0, 0, 0.0);
+    assert!(all_sets(&node).is_empty());
+    wire(&mut node, VoteSink::Move(0), 0, 1, 0.0);
+    wire(&mut node, VoteSink::Move(0), 0, 5, 0.0);
+    assert_eq!(all_sets(&node).len(), 1);
     edit_sinks(graph_mut(&mut node), |sinks| {
         let sink = sinks
             .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Reproduce(0)))
+            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
             .unwrap();
         sink.inputs[0] = reweighted(sink.inputs[0], f32::NAN);
     });
-    assert!(all_groups(&node).is_empty());
+    assert!(all_sets(&node).is_empty());
 }
 
 #[test]
-fn ring_repeated_sink_occurrences_are_ambiguous_but_slot_occurrences_are_independent() {
-    let mut node = ring(WorldInputKey::NeighborOccupiedRing, VoteKind::Move, 0, 255);
-    edit_sinks(graph_mut(&mut node), |sinks| {
-        let duplicate = sinks
-            .iter()
-            .find(|s| s.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)))
-            .unwrap()
-            .clone();
-        sinks.push(duplicate);
-    });
-    assert!(all_groups(&node).is_empty());
+fn repeated_slot_sink_occurrences_are_independent_sets() {
     let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
     edit_sinks(graph_mut(&mut node), |sinks| {
         let duplicate = sinks
@@ -194,7 +232,7 @@ fn ring_repeated_sink_occurrences_are_ambiguous_but_slot_occurrences_are_indepen
             .clone();
         sinks.push(duplicate);
     });
-    assert_eq!(all_groups(&node).len(), 2);
+    assert_eq!(all_sets(&node).len(), 2);
     edit_sinks(graph_mut(&mut node), |sinks| {
         sinks.last_mut().unwrap().inputs.push(GraphEdge::new(
             GraphSource::InputLeaf {
@@ -204,20 +242,17 @@ fn ring_repeated_sink_occurrences_are_ambiguous_but_slot_occurrences_are_indepen
             0.0,
         ));
     });
-    assert_eq!(all_groups(&node).len(), 1);
+    assert_eq!(all_sets(&node).len(), 1);
 }
 
 #[test]
-fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_groups() {
+fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_sets() {
     use crate::mutation::input_ref::input_reference_universe;
     for reference in input_reference_universe(2) {
         if matches!(
             reference,
             InputReference::World(
-                WorldInputKey::NeighborFoodRing { .. }
-                    | WorldInputKey::NeighborBarrierRing
-                    | WorldInputKey::NeighborOccupiedRing
-                    | WorldInputKey::NearbyCreatureCore
+                WorldInputKey::NearbyCreatureCore
                     | WorldInputKey::NearbyCreatureVitals
                     | WorldInputKey::NearbyCreatureIdentity
             )
@@ -228,48 +263,48 @@ fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_groups() {
         node.input_refs.push(reference);
         for d in 0..8 {
             wire(&mut node, VoteSink::Move(d), 0, u16::from(d), 0.0);
+            wire(&mut node, VoteSink::Eat, 0, u16::from(d), 0.0);
         }
-        assert!(all_groups(&node).is_empty());
+        assert!(all_sets(&node).is_empty());
     }
-    let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 0);
-    for (reference, channel, vote) in [
-        (0, 8, VoteSink::Move(0)),
-        (0, 9, VoteSink::Move(1)),
-        (1, 0, VoteSink::Move(0)),
-        (1, 1, VoteSink::Move(1)),
-    ] {
-        wire(&mut node, vote, reference, channel, 0.0);
+    // Out-of-range channels and an undeclared reference.
+    let mut node = core_slots(0);
+    for (reference, channel) in [(0, 16), (0, 20), (1, 0), (1, 4)] {
+        wire(&mut node, VoteSink::Eat, reference, channel, 0.0);
     }
-    for d in [8, 9] {
-        edit_sinks(graph_mut(&mut node), |sinks| {
-            sinks.push(SinkDraft {
-                kind: OutputSinkKind::ActionVote(VoteSink::Move(d)),
-                inputs: vec![GraphEdge::new(
-                    GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: u16::from(d - 8),
-                    },
-                    0.0,
-                )],
-            });
+    // A sink outside the vote catalog.
+    edit_sinks(graph_mut(&mut node), |sinks| {
+        sinks.push(SinkDraft {
+            kind: OutputSinkKind::ActionVote(VoteSink::Move(8)),
+            inputs: [0, 4]
+                .map(|sub_idx| {
+                    GraphEdge::new(
+                        GraphSource::InputLeaf {
+                            ref_idx: 0,
+                            sub_idx,
+                        },
+                        0.0,
+                    )
+                })
+                .to_vec(),
         });
-    }
-    assert!(all_groups(&node).is_empty());
+    });
+    assert!(all_sets(&node).is_empty());
     let mut node = slots(WorldInputKey::NearbyCreatureVitals, 2, 0, VoteSink::Eat);
     edit_sinks(graph_mut(&mut node), |sinks| {
         for sink in sinks.iter_mut().filter(|sink| !sink.inputs.is_empty()) {
             sink.kind = OutputSinkKind::CustomOutput(0);
         }
     });
-    assert!(all_groups(&node).is_empty());
+    assert!(all_sets(&node).is_empty());
 }
 
 proptest! {
     #[test]
-    fn sparse_refinement_preserves_structure_local_differences_and_vector_budget(mask in any::<u8>(), offset in 0u8..8, seed in any::<u64>()) {
-        let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, offset, mask);
+    fn sparse_refinement_preserves_structure_local_differences_and_vector_budget(mask in 0u8..16, seed in any::<u64>()) {
+        let mut node = core_slots(mask);
         let before = node.clone(); let count = mask.count_ones() as usize;
-        prop_assert_eq!(has_group(graph(&node), &node.input_refs), count >= 2);
+        prop_assert_eq!(has_inferred_set(graph(&node), &node.input_refs), count >= 2);
         let result = refine(&mut node, &mut SmallRng::seed_from_u64(seed));
         if count < 2 { prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget)); prop_assert_eq!(node, before); }
         else {
@@ -293,27 +328,27 @@ proptest! {
 
 #[test]
 fn numeric_preflight_rejects_atomically_and_rounding_is_not_an_extra_touch() {
-    let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 3);
+    let mut node = core_slots(0b0011);
     edit_sinks(graph_mut(&mut node), |sinks| {
         for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) {
             *edge = reweighted(*edge, 1_048_576.0);
         }
     });
     let before = node.clone();
-    let group = all_groups(&node).remove(0);
+    let set = all_sets(&node).remove(0);
     assert_eq!(
-        apply_step(graph_mut(&mut node), &group, 0.1),
+        apply_step(graph_mut(&mut node), &set, 0.1),
         Err(MutationSkipReason::NumericProposalRejected)
     );
     assert_eq!(node, before);
     for scalar in [f32::NAN, f32::INFINITY] {
         assert_eq!(
-            apply_step(graph_mut(&mut node), &group, scalar),
+            apply_step(graph_mut(&mut node), &set, scalar),
             Err(MutationSkipReason::NumericProposalRejected)
         );
         assert_eq!(node, before);
     }
-    apply_step(graph_mut(&mut node), &group, 0.01).unwrap();
+    apply_step(graph_mut(&mut node), &set, 0.01).unwrap();
     assert_eq!(
         node, before,
         "selected two, changed zero at this f32 magnitude"
@@ -321,7 +356,7 @@ fn numeric_preflight_rejects_atomically_and_rounding_is_not_an_extra_touch() {
 }
 
 #[test]
-fn fields_banks_food_types_and_offsets_never_mix() {
+fn fields_banks_and_rings_never_mix() {
     let mut node = node();
     node.input_refs = vec![
         InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
@@ -345,46 +380,40 @@ fn fields_banks_food_types_and_offsets_never_mix() {
     ] {
         wire(&mut node, vote, reference, channel, 0.0);
     }
-    assert!(all_groups(&node).is_empty());
+    assert!(all_sets(&node).is_empty());
     wire(&mut node, VoteSink::Move(7), 0, 7, 0.0);
-    assert_eq!(all_groups(&node).len(), 1);
+    assert!(all_sets(&node).is_empty());
     wire(&mut node, VoteSink::Eat, 3, 8, 0.0);
-    assert_eq!(all_groups(&node).len(), 2);
-    // Out-of-range nearby channels do not contaminate the valid core group.
+    assert_eq!(all_sets(&node).len(), 1);
+    // Out-of-range nearby channels do not contaminate the valid core set.
     wire(&mut node, VoteSink::Eat, 3, 16, f32::NAN);
-    assert_eq!(all_groups(&node).len(), 2);
+    assert_eq!(all_sets(&node).len(), 1);
 }
 
 #[test]
-fn every_group_has_selection_support_and_a_draw_matches_one_atomic_step() {
-    let mut fixture = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 255);
-    for d in 0..8 {
-        wire(
-            &mut fixture,
-            VoteSink::Reproduce((d + 3) % 8),
-            0,
-            u16::from(d),
-            0.25,
-        );
+fn every_set_has_selection_support_and_a_draw_matches_one_atomic_step() {
+    let mut fixture = core_slots(0b1111);
+    for slot in 0..4 {
+        wire(&mut fixture, VoteSink::Move(3), 0, slot * 4 + 1, 0.25);
     }
-    let groups = all_groups(&fixture);
-    assert_eq!(groups.len(), 2);
+    let sets = all_sets(&fixture);
+    assert_eq!(sets.len(), 2);
     let mut selected = [0; 2];
     for seed in 0..128 {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut replay = rng.clone();
-        let index = replay.gen_range(0..groups.len());
+        let index = replay.gen_range(0..sets.len());
         selected[index] += 1;
         let scalar = replay.gen_range(-0.1f32..=0.1);
         let mut expected = fixture.clone();
-        apply_step(graph_mut(&mut expected), &groups[index], scalar).unwrap();
+        apply_step(graph_mut(&mut expected), &sets[index], scalar).unwrap();
         let mut actual = fixture.clone();
         refine(&mut actual, &mut rng).unwrap();
         assert_eq!(actual, expected);
         assert_eq!(
             rng.gen::<u64>(),
             replay.gen::<u64>(),
-            "one group and one amplitude, no useful-effect retries"
+            "one set and one amplitude, no useful-effect retries"
         );
     }
     assert!(selected.iter().all(|n| *n > 0));
@@ -392,15 +421,15 @@ fn every_group_has_selection_support_and_a_draw_matches_one_atomic_step() {
 
 proptest! {
     #[test]
-    fn any_finite_weight_proposal_is_bounded_or_rejected_unchanged(weights in prop::collection::vec(any::<u32>(), 2..9), scalar in -0.1f32..=0.1) {
-        let mut node = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 255);
+    fn any_finite_weight_proposal_is_bounded_or_rejected_unchanged(weights in prop::collection::vec(any::<u32>(), 2..5), scalar in -0.1f32..=0.1) {
+        let mut node = core_slots(0b1111);
         edit_sinks(graph_mut(&mut node), |sinks| {
-            for (sink, bits) in sinks.iter_mut().filter(|s| !s.inputs.is_empty()).zip(weights.iter().cycle()) {
-                let weight = f32::from_bits(*bits); sink.inputs[0] = reweighted(sink.inputs[0], if weight.is_finite() { weight } else { 0.0 });
+            for (edge, bits) in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()).zip(weights.iter().cycle()) {
+                let weight = f32::from_bits(*bits); *edge = reweighted(*edge, if weight.is_finite() { weight } else { 0.0 });
             }
         });
-        let before = node.clone(); let group = all_groups(&node).remove(0);
-        let result = apply_step(graph_mut(&mut node), &group, scalar);
+        let before = node.clone(); let set = all_sets(&node).remove(0);
+        let result = apply_step(graph_mut(&mut node), &set, scalar);
         if result.is_err() { prop_assert_eq!(result, Err(MutationSkipReason::NumericProposalRejected)); prop_assert_eq!(node, before); }
         else {
             let actual = graph(&node).edges().zip(graph(&before).edges()).map(|(a,b)| (f64::from(a.own_weight())-f64::from(b.own_weight())).powi(2)).sum::<f64>().sqrt();
@@ -415,27 +444,22 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
     for scalar in [-0.1, 0.1] {
         let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
         let old: Vec<_> = graph(&node).edges().map(|e| e.own_weight()).collect();
-        let group = all_groups(&node).remove(0);
-        apply_step(graph_mut(&mut node), &group, scalar).unwrap();
+        let set = all_sets(&node).remove(0);
+        apply_step(graph_mut(&mut node), &set, scalar).unwrap();
         for (edge, old) in graph(&node).edges().zip(old) {
             assert_eq!(edge.own_weight(), old + scalar / 2.0);
         }
-        // The normalization's maximum is accepted at every permitted ring size,
+        // The normalization's maximum is accepted at every permitted set size,
         // including the tiny rounding excess covered by the numeric tolerance.
-        for count in 2..=8 {
-            let mut node = ring(
-                WorldInputKey::NeighborBarrierRing,
-                VoteKind::Move,
-                0,
-                ((1u16 << count) - 1) as u8,
-            );
+        for count in 2..=4 {
+            let mut node = core_slots(((1u16 << count) - 1) as u8);
             edit_sinks(graph_mut(&mut node), |sinks| {
                 for edge in sinks.iter_mut().flat_map(|s| s.inputs.iter_mut()) {
                     *edge = reweighted(*edge, 0.0);
                 }
             });
-            let group = all_groups(&node).remove(0);
-            apply_step(graph_mut(&mut node), &group, scalar).unwrap();
+            let set = all_sets(&node).remove(0);
+            apply_step(graph_mut(&mut node), &set, scalar).unwrap();
             let norm = graph(&node)
                 .edges()
                 .map(|e| f64::from(e.own_weight()).powi(2))
@@ -446,70 +470,20 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
     }
 }
 
-#[test]
-fn native_sampler_accepts_the_exact_numeric_tolerance_boundary() {
-    let mut node = ring(
-        WorldInputKey::NeighborBarrierRing,
-        VoteKind::Move,
-        0,
-        0b0011_1111,
-    );
-    let weight_bits = [
-        0x4380_0000,
-        0xb06d_84ba,
-        0xb06d_84ba,
-        0xb06d_84ba,
-        0xb06d_84ba,
-        0xa504_0000,
-    ];
-    edit_sinks(graph_mut(&mut node), |sinks| {
-        for (edge, bits) in sinks
-            .iter_mut()
-            .flat_map(|sink| sink.inputs.iter_mut())
-            .zip(weight_bits)
-        {
-            *edge = reweighted(*edge, f32::from_bits(bits));
-        }
-    });
-    let before: Vec<_> = graph(&node).edges().map(|edge| edge.own_weight()).collect();
-    let scalar = f32::from_bits(0x3dcc_cb75);
-    let increment = scalar / (before.len() as f32).sqrt();
-
-    refine(&mut node, &mut StepRng::new(0xffff_2600, 0)).unwrap();
-
-    let after: Vec<_> = graph(&node).edges().map(|edge| edge.own_weight()).collect();
-    let norm = before
-        .iter()
-        .zip(&after)
-        .map(|(old, new)| (f64::from(*new) - f64::from(*old)).powi(2))
-        .sum::<f64>()
-        .sqrt();
-    assert_eq!(norm, 0.1 + 1e-6);
-    for ((old, new), bits) in before.iter().zip(&after).zip(weight_bits) {
-        assert_eq!(old.to_bits(), bits);
-        assert_eq!(*new, *old + increment);
-    }
-}
-
 proptest! {
     #[test]
     fn sparse_slots_follow_ranked_fields_without_rotation_or_regrowth(mask in 0u8..16, bank in 0usize..3, field in any::<u16>(), vote in 0usize..27, seed in any::<u64>()) {
         let (family,width)=[(WorldInputKey::NearbyCreatureCore,4),(WorldInputKey::NearbyCreatureVitals,2),(WorldInputKey::NearbyCreatureIdentity,3)][bank];
         let field=field % width;
-        let mut node=slots(family,width,field,VoteSink::from_index(vote).unwrap());
-        edit_sinks(graph_mut(&mut node), |sinks| {
-            for sink in sinks.iter_mut() {
-                sink.inputs.retain(|edge| matches!(edge.source(),GraphSource::InputLeaf {sub_idx,..} if mask & (1 << (sub_idx/width)) != 0));
-            }
-        });
+        let mut node=masked_slots(family,width,field,VoteSink::from_index(vote).unwrap(), mask);
         let before=node.clone(); let count=mask.count_ones() as usize;
-        let groups=all_groups(&node);
-        prop_assert_eq!(groups.len(),usize::from(count>=2));
+        let sets=all_sets(&node);
+        prop_assert_eq!(sets.len(),usize::from(count>=2));
         let result=refine(&mut node,&mut SmallRng::seed_from_u64(seed));
         if count<2 { prop_assert_eq!(result,Err(MutationSkipReason::NoApplicableTarget)); prop_assert_eq!(node,before); }
         else {
             prop_assert!(result.is_ok());
-            prop_assert_eq!(groups[0].members.iter().map(|m|m.position).collect::<Vec<_>>(),(0..4).filter(|slot|mask&(1<<slot)!=0).collect::<Vec<_>>());
+            prop_assert_eq!(sets[0].members.iter().map(|m|m.position).collect::<Vec<_>>(),(0..4).filter(|slot|mask&(1<<slot)!=0).collect::<Vec<_>>());
             let mut rng=SmallRng::seed_from_u64(seed); let _selection=rng.gen_range(0..1usize);
             let increment=rng.gen_range(-0.1f32..=0.1)/(count as f32).sqrt();
             for (old,new) in graph(&before).edges().zip(graph(&node).edges()) {

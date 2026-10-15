@@ -1,4 +1,4 @@
-//! The per-world `ring_rules` block (T11.F31, `ring-rules-v1`): the
+//! The per-world `ring_rules` block (T11.F31, T25.F03, `ring-rules-v2`): the
 //! ring-rule census of the terminal population, projected from
 //! `v3_core::creature::ring_rules`. Rows are space-separated strings, as in
 //! `input_use`, so the committed summary stays inside its budget.
@@ -9,8 +9,8 @@ use v3_core::creature::ring_rules::{RingRuleCensus, RING_RULES_VERSION};
 use super::schema::Indicator;
 use crate::UNDEFINED;
 
-/// The fields of one `projection_rows` string, in order.
-pub const PROJECTION_ROW_FORMAT: &str = "family kind offset count positive negative";
+/// The fields of one `ring_group_rows` string, in order.
+pub const RING_GROUP_ROW_FORMAT: &str = "family kind offset count positive negative members";
 /// The fields of one `rule_rows` string, in order: creatures covering the
 /// rule in exactly 1 to 8 directions.
 pub const RULE_ROW_FORMAT: &str = "family kind offset sign n1 n2 n3 n4 n5 n6 n7 n8";
@@ -26,12 +26,13 @@ pub struct RingRules {
     pub creatures: u64,
     pub direction_general: u64,
     pub direction_general_edges_only: u64,
-    pub projection_carriers: u64,
-    pub projections: u64,
-    pub projections_nonzero: u64,
-    pub projections_unreachable: u64,
-    pub projection_row_format: String,
-    pub projection_rows: Vec<String>,
+    pub ring_group_carriers: u64,
+    pub ring_groups: u64,
+    pub ring_groups_nonzero: u64,
+    pub ring_groups_unreachable: u64,
+    pub ring_group_members: u64,
+    pub ring_group_row_format: String,
+    pub ring_group_rows: Vec<String>,
     pub rule_row_format: String,
     pub rule_rows: Vec<String>,
 }
@@ -43,12 +44,13 @@ impl From<&RingRuleCensus> for RingRules {
             creatures: census.creatures,
             direction_general: census.direction_general,
             direction_general_edges_only: census.direction_general_edges_only,
-            projection_carriers: census.projection_carriers,
-            projections: census.projections,
-            projections_nonzero: census.projections_nonzero,
-            projections_unreachable: census.projections_unreachable,
-            projection_row_format: PROJECTION_ROW_FORMAT.to_string(),
-            projection_rows: census.projection_rows(),
+            ring_group_carriers: census.ring_group_carriers,
+            ring_groups: census.ring_groups,
+            ring_groups_nonzero: census.ring_groups_nonzero,
+            ring_groups_unreachable: census.ring_groups_unreachable,
+            ring_group_members: census.ring_group_members,
+            ring_group_row_format: RING_GROUP_ROW_FORMAT.to_string(),
+            ring_group_rows: census.ring_group_rows(),
             rule_row_format: RULE_ROW_FORMAT.to_string(),
             rule_rows: census.rule_rows(),
         }
@@ -77,7 +79,7 @@ mod tests {
         config.population.initial_creatures = 3;
         let sim = seed_simulation(config, 1);
         let block = observe_world(&sim);
-        assert_eq!(block.version, "ring-rules-v1");
+        assert_eq!(block.version, "ring-rules-v2");
         assert_eq!(block.creatures, sim.creatures.len() as u64);
         assert_eq!(
             block.rule_rows,
@@ -86,7 +88,8 @@ mod tests {
                 block.creatures
             )]
         );
-        assert!(block.projection_rows.is_empty());
+        assert!(block.ring_group_rows.is_empty());
+        assert_eq!(block.ring_groups, 0);
         assert_eq!(block.direction_general, 0);
         let json = serde_json::to_value(&block).unwrap();
         assert_eq!(serde_json::from_value::<RingRules>(json).unwrap(), block);

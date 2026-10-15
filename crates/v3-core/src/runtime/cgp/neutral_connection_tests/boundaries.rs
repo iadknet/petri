@@ -136,7 +136,7 @@ fn dormant_zero_edge_charges_one_visit_and_exhaustion_commits_no_effects() {
                 );
             }
             let mut energy = initial_energy;
-            let mut state = GraphRuntimeState::new();
+            let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
             let mut memory = ramp(0.5);
             let mut side = side();
             // Distinguish no stage on exhaustion/skipping from a committed zero.
@@ -233,12 +233,20 @@ fn native_nonadditive_compute_inputs_are_not_qualified_zero_destinations() {
             OutputSinkKind::CustomOutput(0),
             edge(GraphSource::ComputeNode(0), 1.0),
         );
-        let before = visit(&def, 10.0, GraphRuntimeState::new());
+        let before = visit(
+            &def,
+            10.0,
+            crate::creature::genome::cgp::test_support::runtime_for(&def),
+        );
         def.push_edge(
             crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
             edge(memory(0, false), 0.0),
         );
-        let after = visit(&def, 10.0, GraphRuntimeState::new());
+        let after = visit(
+            &def,
+            10.0,
+            crate::creature::genome::cgp::test_support::runtime_for(&def),
+        );
         assert_eq!(before.result.output_slots[0], ramp::<16>(0.5)[0]);
         assert_eq!(after.result.output_slots[0], 0.0);
     }
@@ -259,7 +267,7 @@ fn nonfinite_zero_source_can_poison_an_incumbent_vote_before_sanitization() {
 #[test]
 fn unaffordable_active_graph_keeps_incumbent_carried_state_and_commits_no_effects() {
     let mut def = active_graph();
-    let mut initial = GraphRuntimeState::new();
+    let mut initial = crate::creature::genome::cgp::test_support::runtime_for(&def);
     initial.node_state = vec![vec![0.25, 0.75]];
     initial.node_outputs = vec![vec![0.5, 0.125]];
     initial.plasticity_weights = vec![vec![
@@ -336,7 +344,7 @@ fn dormant_activation_changes_a_later_live_energy_read() {
     for genome in [base, silent] {
         let mut energy = 10.0;
         let mut memory = ramp(0.5);
-        let mut state = GraphRuntimeState::new();
+        let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
         state.begin_tick(&genome.nodes, 0);
         let result = execute_creature_mesh(
             &genome,
@@ -379,9 +387,17 @@ fn already_wired_zero_compute_graph_keeps_its_native_charge_and_incumbent_effect
         if vote_already_wired {
             wire(&mut def, kind, edge(memory(0, false), 0.25));
         }
-        let before = visit(&def, 10.0, GraphRuntimeState::new());
+        let before = visit(
+            &def,
+            10.0,
+            crate::creature::genome::cgp::test_support::runtime_for(&def),
+        );
         wire(&mut def, kind, edge(memory(1, false), 0.0));
-        let after = visit(&def, 10.0, GraphRuntimeState::new());
+        let after = visit(
+            &def,
+            10.0,
+            crate::creature::genome::cgp::test_support::runtime_for(&def),
+        );
         assert_eq!(before.energy, 10.0 - BASE_COST);
         assert_eq!(after.energy, before.energy);
         assert_eq!(before.result, after.result);

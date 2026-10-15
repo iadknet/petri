@@ -84,6 +84,10 @@ pub struct GraphRuntimeState {
     /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     pub plasticity_weights: Vec<Vec<Box<[f32]>>>,
+    /// The genomic weight of every sink edge, built once at construction by
+    /// [`Self::for_genome`] and read by the sink loop (T25.F03). Indexed as
+    /// `[mesh_node_idx][sink_idx][edge_idx]`; a VM node's row is empty.
+    pub(crate) sink_weights: Vec<Vec<Box<[f32]>>>,
     /// Per-edge eligibility traces for reward-modulated plasticity.
     /// Indexed as `[mesh_node_idx][internal_node_idx][edge_idx]`, parallel to
     /// `plasticity_weights`.
@@ -119,12 +123,24 @@ impl GraphRuntimeState {
         );
     }
 
-    /// Create a new empty graph runtime state.
-    pub fn new() -> Self {
+    /// The only constructor (T25.F03): the runtime state of `genome`, with
+    /// the given compute-edge plasticity scaffold (the newborn's taken birth
+    /// seeds, or empty) and the sink weight table built from the genome.
+    #[must_use]
+    pub fn for_genome(genome: &CreatureGenome, plasticity_weights: Vec<Vec<Box<[f32]>>>) -> Self {
+        let sink_weights = genome
+            .nodes
+            .iter()
+            .map(|node| match &node.backend_def {
+                BackendDef::Graph(def) => def.sink_weight_rows(&node.input_refs),
+                BackendDef::Vm(_) => Vec::new(),
+            })
+            .collect();
         Self {
             node_state: Vec::new(),
             node_outputs: Vec::new(),
-            plasticity_weights: Vec::new(),
+            plasticity_weights,
+            sink_weights,
             eligibility_traces: Vec::new(),
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
@@ -132,12 +148,6 @@ impl GraphRuntimeState {
             scratch_w_inputs: Vec::new(),
             dispatch_record: DispatchRecord::default(),
         }
-    }
-}
-
-impl Default for GraphRuntimeState {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -321,6 +331,7 @@ impl CreatureState {
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
         let plasticity_weights = take_plasticity_weights(&mut genome);
+        let graph_runtime = GraphRuntimeState::for_genome(&genome, plasticity_weights);
         let cached_complexity = genome.complexity();
         let cached_genome_size = genome.genome_size();
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
@@ -340,10 +351,7 @@ impl CreatureState {
             generation,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
-            graph_runtime: GraphRuntimeState {
-                plasticity_weights,
-                ..GraphRuntimeState::new()
-            },
+            graph_runtime,
             identity,
             phenotype_channels,
             phenotype_active_channel,
@@ -395,6 +403,7 @@ impl CreatureState {
         cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
         let plasticity_weights = take_plasticity_weights(&mut genome);
+        let graph_runtime = GraphRuntimeState::for_genome(&genome, plasticity_weights);
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         let cached_live_vm_world_inputs =
@@ -411,10 +420,7 @@ impl CreatureState {
             generation,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
-            graph_runtime: GraphRuntimeState {
-                plasticity_weights,
-                ..GraphRuntimeState::new()
-            },
+            graph_runtime,
             identity,
             phenotype_channels,
             phenotype_active_channel,

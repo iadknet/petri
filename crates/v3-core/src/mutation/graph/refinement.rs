@@ -1,40 +1,38 @@
-//! Bounded additive refinement of existing semantic input-to-vote groups.
+//! Bounded additive refinement of inferred input-to-vote sets: the ranked
+//! slots of a creature-sensor field wired to one vote sink. A `Ring` edge
+//! group's scale is its explicit refinement (`AlterGroupScale`, T25.F03), so
+//! refinement infers no ring set and never steps a member.
 use rand::Rng;
 use std::collections::HashMap;
 
-use crate::contracts::{Direction, InputReference, WorldInputKey};
+use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome};
 use crate::mutation::types::MutationSkipReason;
 
+/// The key of an inferred set: one creature-sensor field across its ranked
+/// slots, into one vote sink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum GroupKey {
-    Ring {
-        family: WorldInputKey,
-        kind: VoteKind,
-        offset: u16,
-    },
-    Slots {
-        family: WorldInputKey,
-        field: u16,
-        sink: usize,
-    },
+struct SlotKey {
+    family: WorldInputKey,
+    field: u16,
+    sink: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Member {
+struct InferredMember {
     position: u16,
     sink: usize,
     edge: usize,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Group {
-    key: GroupKey,
-    members: Vec<Member>,
+struct InferredSet {
+    key: SlotKey,
+    members: Vec<InferredMember>,
 }
 
 fn correspondence(
@@ -42,37 +40,18 @@ fn correspondence(
     channel: u16,
     vote: VoteSink,
     sink: usize,
-) -> Option<(GroupKey, u16)> {
+) -> Option<(SlotKey, u16)> {
     if VoteSink::from_index(vote.index()) != Some(vote) || channel >= family.compound_width() {
         return None;
     }
     match family {
-        WorldInputKey::NeighborFoodRing { .. }
-        | WorldInputKey::NeighborBarrierRing
-        | WorldInputKey::NeighborOccupiedRing => {
-            let (kind, direction) = match vote {
-                VoteSink::Move(d) => (VoteKind::Move, d),
-                VoteSink::Reproduce(d) => (VoteKind::Reproduce, d),
-                VoteSink::StealEnergy(d) => (VoteKind::StealEnergy, d),
-                _ => return None,
-            };
-            let directions = Direction::ALL.len() as u16;
-            Some((
-                GroupKey::Ring {
-                    family,
-                    kind,
-                    offset: (u16::from(direction) + directions - channel) % directions,
-                },
-                channel,
-            ))
-        }
         WorldInputKey::NearbyCreatureCore
         | WorldInputKey::NearbyCreatureVitals
         | WorldInputKey::NearbyCreatureIdentity => {
             // Four ranked slots; field identity, not slot rank, is repeated.
             let width = family.compound_width() / 4;
             Some((
-                GroupKey::Slots {
+                SlotKey {
                     family,
                     field: channel % width,
                     sink,
@@ -84,15 +63,19 @@ fn correspondence(
     }
 }
 
-fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group> {
+fn inferred_sets(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<InferredSet> {
     // The map is lookup-only: first genomic occurrence fixes selection order.
     let mut indices = HashMap::new();
-    let mut candidates: Vec<(Group, bool)> = Vec::new();
+    let mut candidates: Vec<(InferredSet, bool)> = Vec::new();
     for (sink_index, sink) in def.output_sinks().iter().enumerate() {
         let OutputSinkKind::ActionVote(vote) = sink.kind else {
             continue;
         };
         for (edge_index, edge) in sink.inputs.iter().enumerate() {
+            // A group member is its group's to refine (T25.F03).
+            if edge.membership().is_some() {
+                continue;
+            }
             let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() else {
                 continue;
             };
@@ -104,7 +87,7 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
             };
             let index = *indices.entry(key).or_insert_with(|| {
                 candidates.push((
-                    Group {
+                    InferredSet {
                         key,
                         members: Vec::new(),
                     },
@@ -121,7 +104,7 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
             {
                 *valid = false;
             } else {
-                group.members.push(Member {
+                group.members.push(InferredMember {
                     position,
                     sink: sink_index,
                     edge: edge_index,
@@ -135,25 +118,25 @@ fn groups(def: &CgpGraphBackendDef, references: &[InputReference]) -> Vec<Group>
         .collect()
 }
 
-pub(super) fn has_group(def: &CgpGraphBackendDef, references: &[InputReference]) -> bool {
-    !groups(def, references).is_empty()
+pub(super) fn has_inferred_set(def: &CgpGraphBackendDef, references: &[InputReference]) -> bool {
+    !inferred_sets(def, references).is_empty()
 }
 
 pub(crate) fn refine(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         return Err(MutationSkipReason::NoApplicableTarget);
     };
-    let groups = groups(def, &node.input_refs);
-    if groups.is_empty() {
+    let sets = inferred_sets(def, &node.input_refs);
+    if sets.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let selected = &groups[rng.gen_range(0..groups.len())];
+    let selected = &sets[rng.gen_range(0..sets.len())];
     apply_step(def, selected, rng.gen_range(-0.1f32..=0.1))
 }
 
 fn apply_step(
     def: &mut CgpGraphBackendDef,
-    group: &Group,
+    group: &InferredSet,
     scalar: f32,
 ) -> Result<(), MutationSkipReason> {
     let increment = scalar / (group.members.len() as f32).sqrt();

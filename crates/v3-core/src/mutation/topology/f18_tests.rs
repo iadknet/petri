@@ -167,7 +167,10 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                 controlled_growth(&mut grown, op, graph);
                 let mut runtime = crate::config::RuntimeConfig::default();
                 runtime.vm.opcode_cost_multiplier = 1.0;
-                let mut states = [GraphRuntimeState::new(), GraphRuntimeState::new()];
+                let mut states = [
+                    GraphRuntimeState::for_genome(&base, Vec::new()),
+                    GraphRuntimeState::for_genome(&grown, Vec::new()),
+                ];
                 let mut memory = [[3.0; 16]; 2];
                 for (tick, input) in [0.0, 1.0, 2.0, 0.0].into_iter().enumerate() {
                     let mut results = Vec::new();

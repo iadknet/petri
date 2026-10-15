@@ -321,7 +321,7 @@ mod tests {
     }
 
     fn runtime(node_state: Vec<Vec<f32>>) -> GraphRuntimeState {
-        let mut runtime = GraphRuntimeState::new();
+        let mut runtime = GraphRuntimeState::for_genome(&genome(&[0]), Vec::new());
         runtime.node_state = node_state;
         runtime
     }
@@ -334,7 +334,7 @@ mod tests {
             none,
             graph_state(&two, &runtime(vec![Vec::new(), Vec::new()]))
         );
-        let mut placeholders = GraphRuntimeState::new();
+        let mut placeholders = GraphRuntimeState::for_genome(&genome(&[0]), Vec::new());
         placeholders.plasticity_weights = vec![vec![Box::from([])], Vec::new()];
         assert_eq!(none, graph_state(&two, &placeholders));
         assert_ne!(none, graph_state(&two, &runtime(vec![vec![0.0]])));

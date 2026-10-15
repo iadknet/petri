@@ -1266,13 +1266,14 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
 }
 
 /// Founders list the occupied ring on their entry node but nothing reads it;
-/// a ring projection on it makes one founder wire it and, after a tick, read it.
+/// a `Ring` group on it makes one founder wire it and, after a tick, read it.
 #[test]
 fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::RingProjection;
+    use v3_core::creature::genome::cgp::Shape;
     use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::BackendDef;
+    use v3_core::creature::state::GraphRuntimeState;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1289,14 +1290,17 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         panic!("the default founder's entry node is a Graph node");
     };
-    def.projections.push(RingProjection::new(
-        u16::try_from(ring).unwrap(),
+    let group = def.add_group(
+        Shape::Ring {
+            ring_ref: u16::try_from(ring).unwrap(),
+        },
         DirectedVoteKind::StealEnergy,
         0,
-        0.5,
-    ));
-    // The declared and wired sets are cached at birth.
+    );
+    def.group_mut(group).set_scale(0.5);
+    // The declared and wired sets and the weight table are built at birth.
     creature.refresh_sensor_caches();
+    creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, Vec::new());
     v3_core::simulation::run_tick(&mut sim, &mut None);
     assert!(
         sim.creatures.contains_key(id),

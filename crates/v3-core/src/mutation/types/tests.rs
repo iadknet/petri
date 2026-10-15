@@ -251,11 +251,11 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphMutateTraceDecay
             | MutationOperator::GraphRecruitNeutralInput
             | MutationOperator::GraphRefineHeritableStructure
-            | MutationOperator::GraphAddRingProjection
-            | MutationOperator::GraphAlterRingProjectionWeight
-            | MutationOperator::GraphShiftRingProjectionOffset
-            | MutationOperator::GraphRetargetRingProjectionKind
-            | MutationOperator::GraphRemoveRingProjection => {
+            | MutationOperator::GraphAddRingGroup
+            | MutationOperator::GraphAlterGroupScale
+            | MutationOperator::GraphShiftGroupOffset
+            | MutationOperator::GraphRetargetGroupKind
+            | MutationOperator::GraphRemoveGroup => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -369,17 +369,11 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::RefineHeritableStructure => {
                 MutationOperator::GraphRefineHeritableStructure
             }
-            GraphOperator::AddRingProjection => MutationOperator::GraphAddRingProjection,
-            GraphOperator::AlterRingProjectionWeight => {
-                MutationOperator::GraphAlterRingProjectionWeight
-            }
-            GraphOperator::ShiftRingProjectionOffset => {
-                MutationOperator::GraphShiftRingProjectionOffset
-            }
-            GraphOperator::RetargetRingProjectionKind => {
-                MutationOperator::GraphRetargetRingProjectionKind
-            }
-            GraphOperator::RemoveRingProjection => MutationOperator::GraphRemoveRingProjection,
+            GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
+            GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
+            GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
+            GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
+            GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
         };
         assert_eq!(
             mo.complexity_effect(),

@@ -3,8 +3,8 @@ use super::*;
 mod copy;
 mod extensions;
 mod f08;
+mod group;
 mod operators;
-mod projection;
 
 #[test]
 fn complexity_effect_consistent_with_types() {

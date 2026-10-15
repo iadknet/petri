@@ -510,7 +510,7 @@ mod tests {
         let mut energy_a = 100.0f32;
         let mut smem_a = [0.0f32; 16];
         let prev_a = [0.0f32; 16];
-        let mut gr_a = GraphRuntimeState::new();
+        let mut gr_a = GraphRuntimeState::for_genome(&genome, Vec::new());
         let output_a = execute_creature_mesh(
             &genome,
             &ss,
@@ -526,7 +526,7 @@ mod tests {
         let mut energy_b = 100.0f32;
         let mut smem_b = [0.0f32; 16];
         let prev_b = [0.0f32; 16];
-        let mut gr_b = GraphRuntimeState::new();
+        let mut gr_b = GraphRuntimeState::for_genome(&genome, Vec::new());
         let (output_b, hops, passes) = execute_creature_mesh_traced(
             &genome,
             &ss,
@@ -625,7 +625,7 @@ mod tests {
         let mut energy = 1000.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let (output, hops, _) = execute_creature_mesh_traced(
             &genome,
@@ -691,7 +691,7 @@ mod tests {
         let mut energy = 100.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
         let config = default_config();
 
         let (output, hops, passes) = execute_creature_mesh_traced(
@@ -754,7 +754,7 @@ mod tests {
         let mut energy = 0.01f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let (output, hops, _) = execute_creature_mesh_traced(
             &genome,
@@ -802,7 +802,7 @@ mod tests {
         let mut energy = 0.1f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let (output, hops, _) = execute_creature_mesh_traced(
             &genome,
@@ -869,7 +869,7 @@ mod tests {
         let mut energy = 1.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
+        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
 
         let (output, hops, passes) = execute_creature_mesh_traced(
             &genome,
@@ -936,7 +936,7 @@ mod tests {
         let mut energy_a = 100.0f32;
         let mut smem_a = [0.0f32; 16];
         let prev_a = [0.0f32; 16];
-        let mut gr_a = GraphRuntimeState::new();
+        let mut gr_a = GraphRuntimeState::for_genome(&genome, Vec::new());
         let output_a = execute_creature_mesh(
             &genome,
             &ss,
@@ -952,7 +952,7 @@ mod tests {
         let mut energy_b = 100.0f32;
         let mut smem_b = [0.0f32; 16];
         let prev_b = [0.0f32; 16];
-        let mut gr_b = GraphRuntimeState::new();
+        let mut gr_b = GraphRuntimeState::for_genome(&genome, Vec::new());
         let (output_b, _, _) = execute_creature_mesh_traced(
             &genome,
             &ss,
@@ -1019,7 +1019,7 @@ mod tests {
         let config = default_config();
         let mut energy_a = 100.0;
         let mut memory_a = [0.0; 16];
-        let mut runtime_a = GraphRuntimeState::new();
+        let mut runtime_a = GraphRuntimeState::for_genome(&genome, Vec::new());
         let output_a = execute_creature_mesh(
             &genome,
             &ss,
@@ -1032,7 +1032,7 @@ mod tests {
         );
         let mut energy_b = 100.0;
         let mut memory_b = [0.0; 16];
-        let mut runtime_b = GraphRuntimeState::new();
+        let mut runtime_b = GraphRuntimeState::for_genome(&genome, Vec::new());
         let (output_b, _, _) = execute_creature_mesh_traced(
             &genome,
             &ss,
@@ -1062,7 +1062,7 @@ mod tests {
 
         let mut energy_a = starting_energy;
         let mut memory_a = [0.0; 16];
-        let mut runtime_a = GraphRuntimeState::new();
+        let mut runtime_a = GraphRuntimeState::for_genome(genome, Vec::new());
         let output_a = execute_creature_mesh(
             genome,
             &sensors,
@@ -1076,7 +1076,7 @@ mod tests {
 
         let mut energy_b = starting_energy;
         let mut memory_b = [0.0; 16];
-        let mut runtime_b = GraphRuntimeState::new();
+        let mut runtime_b = GraphRuntimeState::for_genome(genome, Vec::new());
         let (output_b, _, _) = execute_creature_mesh_traced(
             genome,
             &sensors,
@@ -1225,7 +1225,7 @@ mod tests {
             &mut energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::new(),
+            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
             config,
             Direction::N,
         )
@@ -1460,7 +1460,7 @@ mod tests {
                 &mut energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::new(),
+                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
                 &config,
                 Direction::N,
                 Some(RecordLimit { events, bytes }),

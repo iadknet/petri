@@ -10,15 +10,18 @@
 use std::fmt;
 use std::ops::Deref;
 
+use super::edge::Membership;
 use super::edge::{GraphEdge, GraphSource};
-use super::group::Group;
+use super::group::{compose, Group, GroupId, Shape};
 use super::{
-    ComputeNodeKind, DirectedVoteKind, OutputSinkKind, RingProjection, CUSTOM_OUTPUT_COUNT,
-    FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
+    ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
+use crate::contracts::InputReference;
 use crate::contracts::MAX_GATE_SLOTS;
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
-use crate::creature::genome::PlasticityConfig;
+use crate::creature::genome::vote::{
+    ActionParamField, DirectedVoteKind as Kind, VoteSink, VOTE_DIRECTION_COUNT,
+};
+use crate::creature::genome::{BackendDef, NodeGenome, PlasticityConfig};
 
 // ── Read-only list newtypes ─────────────────────────────────────────────────
 
@@ -194,9 +197,6 @@ pub struct CgpGraphBackendDef {
     compute_nodes: ComputeNodes,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     output_sinks: OutputSinks,
-    /// Ring projections (T11.F31), in genome order; omitted when empty.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub projections: Vec<RingProjection>,
     /// Edge-group records (T25.F03), indexed by `GroupId`; omitted from JSON
     /// when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -211,9 +211,6 @@ impl fmt::Debug for CgpGraphBackendDef {
         debug
             .field("compute_nodes", &self.compute_nodes)
             .field("output_sinks", &self.output_sinks);
-        if !self.projections.is_empty() {
-            debug.field("projections", &self.projections);
-        }
         debug.field("groups", &self.groups).finish()
     }
 }
@@ -222,7 +219,6 @@ impl PartialEq for CgpGraphBackendDef {
     fn eq(&self, other: &Self) -> bool {
         self.compute_nodes == other.compute_nodes
             && self.output_sinks == other.output_sinks
-            && self.projections == other.projections
             && self.groups == other.groups
     }
 }
@@ -246,6 +242,10 @@ impl EdgeMut<'_> {
     pub fn set_source(&mut self, source: GraphSource) {
         let edge = self.def.edge_slot(self.occurrence);
         let changed = edge.source != source;
+        debug_assert!(
+            !changed || edge.membership.is_none(),
+            "a member's source changes only through its group or after a detach"
+        );
         edge.source = source;
         if changed {
             self.def.clear_seed(self.occurrence);
@@ -259,6 +259,74 @@ impl EdgeMut<'_> {
         self.def.edge_slot(self.occurrence).own_weight = weight;
         self.def.debug_assert_seed_shape();
     }
+}
+
+/// A handle on one group's record.
+pub struct GroupMut<'a> {
+    def: &'a mut CgpGraphBackendDef,
+    group: GroupId,
+}
+
+impl GroupMut<'_> {
+    /// The record as it stands.
+    #[must_use]
+    pub fn group(&self) -> Group {
+        self.def.groups[self.group.index()]
+    }
+
+    /// Set the group's shared scale.
+    pub fn set_scale(&mut self, scale: f32) {
+        self.def.groups[self.group.index()].scale = scale;
+    }
+}
+
+/// The graph invariant a genome breaks (T25.F03, design note §3, I2–I10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphInvariantViolation {
+    /// I2: a compute-input edge carries a membership.
+    MemberOnComputeInput,
+    /// I3: a membership names no group.
+    GroupIdOutOfRange,
+    /// I3: more than `u16::MAX` groups.
+    TooManyGroups,
+    /// I4, I8: a member does not fit its group's shape.
+    MemberShape,
+    /// I5: two members of one group share a coordinate.
+    DuplicateMember,
+    /// I6: a group has no member.
+    EmptyGroup,
+    /// I7: a group's offset is not below 8.
+    OffsetOutOfRange,
+    /// I7: a group's shape reference is not a ring.
+    ShapeReference,
+    /// I10: a sink's members are not after its independent edges in
+    /// `(GroupId, channel)` order.
+    SinkOrder,
+}
+
+/// Check every graph invariant (I2–I10) of `node`'s graph against its input
+/// references: at `GenomeFile::load` and in the mutation gate. A VM node
+/// passes.
+///
+/// # Errors
+///
+/// The first invariant the graph breaks.
+pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> {
+    let BackendDef::Graph(def) = &node.backend_def else {
+        return Ok(());
+    };
+    def.check_local_invariants()?;
+    for group in &def.groups {
+        let Shape::Ring { ring_ref } = group.shape;
+        if !node
+            .input_refs
+            .get(usize::from(ring_ref))
+            .is_some_and(InputReference::is_ring)
+        {
+            return Err(GraphInvariantViolation::ShapeReference);
+        }
+    }
+    Ok(())
 }
 
 impl CgpGraphBackendDef {
@@ -294,7 +362,6 @@ impl CgpGraphBackendDef {
             birth_seeds: None,
             compute_nodes: ComputeNodes::default(),
             output_sinks: OutputSinks(output_sinks),
-            projections: Vec::new(),
             groups: Vec::new(),
         }
     }
@@ -313,13 +380,6 @@ impl CgpGraphBackendDef {
     #[must_use = "the builder returns the modified def"]
     pub fn with_output_sinks(mut self, output_sinks: Vec<OutputSink>) -> Self {
         self.output_sinks = OutputSinks(output_sinks);
-        self
-    }
-
-    /// Replace the ring projections with `projections`, exactly as given.
-    #[must_use = "the builder returns the modified def"]
-    pub fn with_projections(mut self, projections: Vec<RingProjection>) -> Self {
-        self.projections = projections;
         self
     }
 
@@ -399,6 +459,40 @@ impl CgpGraphBackendDef {
         &self.groups
     }
 
+    /// The genomic weight of the edge at `occurrence`: its own weight when
+    /// ungrouped, [`compose`]`(own_weight, scale, pattern)` for a member.
+    #[must_use]
+    pub fn genomic_weight(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32 {
+        let edge = self.edge_at(occurrence);
+        match edge.membership {
+            None => edge.own_weight,
+            Some(membership) => {
+                let group = &self.groups[membership.group.index()];
+                compose(edge.own_weight, group.scale, group.pattern(input_refs))
+            }
+        }
+    }
+
+    /// One row per sink, one genomic weight per sink edge in order: the
+    /// runtime weight table of this graph (T25.F03).
+    #[must_use]
+    pub fn sink_weight_rows(&self, input_refs: &[InputReference]) -> Vec<Box<[f32]>> {
+        self.output_sinks
+            .iter()
+            .enumerate()
+            .map(|(sink, entry)| {
+                (0..entry.inputs.len())
+                    .map(|index| {
+                        self.genomic_weight(
+                            EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index),
+                            input_refs,
+                        )
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
     /// The birth payload, when this def belongs to a reproduction draft.
     #[inline]
     #[must_use]
@@ -409,20 +503,13 @@ impl CgpGraphBackendDef {
     /// Whether a visit to this graph enters evaluation and the effects pass.
     ///
     /// True with at least one compute node, and true for a zero-compute graph
-    /// with a wired output sink or a ring projection (T11.F31). A graph with
-    /// none of these computes nothing and applies nothing, so its visit is
+    /// with a wired output sink (a group's members wire their sinks). A graph
+    /// with neither computes nothing and applies nothing, so its visit is
     /// free. Derived from the genome on every visit and stored nowhere.
     #[must_use]
     pub fn enters_visit(&self) -> bool {
         !self.compute_nodes.is_empty()
-            || !self.projections.is_empty()
             || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
-    }
-
-    /// Whether any projection votes for `kind`.
-    #[must_use]
-    pub fn projects_kind(&self, kind: DirectedVoteKind) -> bool {
-        self.projections.iter().any(|p| p.kind == kind)
     }
 
     // ── Seeds ───────────────────────────────────────────────────────────────
@@ -603,9 +690,17 @@ impl CgpGraphBackendDef {
                     rows[i].push(None);
                 }
             }
-            EdgeSurface::SinkInput(i) => self.output_sinks.0[i].inputs.0.push(edge),
+            EdgeSurface::SinkInput(i) => {
+                debug_assert!(
+                    edge.membership.is_none(),
+                    "push_edge adds an ungrouped edge"
+                );
+                let at = self.first_member(i);
+                self.output_sinks.0[i].inputs.0.insert(at, edge);
+            }
         }
         self.debug_assert_seed_shape();
+        self.debug_assert_groups();
     }
 
     /// Remove the edge at `occurrence` with its seed.
@@ -619,10 +714,16 @@ impl CgpGraphBackendDef {
                 }
             }
             EdgeSurface::SinkInput(i) => {
-                self.output_sinks.0[i].inputs.0.remove(index);
+                let removed = self.output_sinks.0[i].inputs.0.remove(index);
+                if let Some(Membership { group }) = removed.membership {
+                    if self.members(group).next().is_none() {
+                        self.drop_group_record(group);
+                    }
+                }
             }
         }
         self.debug_assert_seed_shape();
+        self.debug_assert_groups();
     }
 
     /// Append copies of compute node `from`'s edges, with their seeds, to
@@ -666,6 +767,10 @@ impl CgpGraphBackendDef {
                     GraphSource::ComputeNode(consumer as u16);
             }
             EdgeSurface::SinkInput(sink) => {
+                debug_assert!(
+                    self.output_sinks[sink].inputs[index].membership.is_none(),
+                    "split_edge: a member is detached before its split"
+                );
                 let new_idx = self.compute_nodes.len() as u16;
                 let source = self.output_sinks[sink].inputs[index].source;
                 identity.inputs.0.push(GraphEdge::new(source, 1.0));
@@ -688,17 +793,18 @@ impl CgpGraphBackendDef {
     // ── Input-reference primitives ──────────────────────────────────────────
 
     /// After the input reference at `removed_ref_idx` is pruned, decrement
-    /// every higher `InputLeaf.ref_idx` and projection `ref_idx`. `Prune`
+    /// every higher `InputLeaf.ref_idx` and group shape reference. `Prune`
     /// removes only an index nothing addresses (`prunable_indices`), so no
-    /// edge or projection is removed and the seeds are untouched.
+    /// edge or group is removed and the seeds are untouched.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
-        for projection in &mut self.projections {
+        for group in &mut self.groups {
+            let Shape::Ring { ring_ref } = &mut group.shape;
             debug_assert_ne!(
-                projection.ref_idx, removed_ref_idx,
-                "a pruned input reference is addressed by no projection"
+                *ring_ref, removed_ref_idx,
+                "a pruned input reference is addressed by no group"
             );
-            if projection.ref_idx > removed_ref_idx {
-                projection.ref_idx -= 1;
+            if *ring_ref > removed_ref_idx {
+                *ring_ref -= 1;
             }
         }
         self.for_each_edge_mut(|edge| {
@@ -726,6 +832,293 @@ impl CgpGraphBackendDef {
                 }
             }
         });
+    }
+
+    // ── Group primitives (T25.F03) ──────────────────────────────────────────
+
+    /// Whether a `Ring` group can be created: all 24 direction sinks are
+    /// present and the group list is below capacity.
+    #[must_use]
+    pub fn can_host_ring_group(&self) -> bool {
+        self.groups.len() < usize::from(u16::MAX)
+            && Kind::ALL.into_iter().all(|kind| {
+                (0..VOTE_DIRECTION_COUNT).all(|d| self.direction_sink(kind, d).is_some())
+            })
+    }
+
+    /// The catalog index of `kind`'s direction-`d` sink, when present.
+    fn direction_sink(&self, kind: Kind, d: u8) -> Option<usize> {
+        let target = OutputSinkKind::ActionVote(kind.sink(d));
+        self.output_sinks
+            .iter()
+            .position(|sink| sink.kind == target)
+    }
+
+    /// Every member of `group`, in canonical edge order.
+    pub fn members(&self, group: GroupId) -> impl Iterator<Item = EdgeOccurrence> + '_ {
+        self.output_sinks
+            .iter()
+            .enumerate()
+            .flat_map(move |(sink, entry)| {
+                entry
+                    .inputs
+                    .iter()
+                    .enumerate()
+                    .filter(move |(_, edge)| edge.membership == Some(Membership { group }))
+                    .map(move |(index, _)| EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index))
+            })
+    }
+
+    /// Create a `Ring` group reading `input_refs[ring_ref]` into `kind` at
+    /// `offset`: one record at scale 0 and eight members at own weight 0,
+    /// channel `c` on sink `kind[(c + offset) mod 8]`. A new group is silent.
+    ///
+    /// # Panics
+    ///
+    /// If [`Self::can_host_ring_group`] is false or `offset >= 8`.
+    pub fn add_group(&mut self, shape: Shape, kind: Kind, offset: u8) -> GroupId {
+        assert!(
+            self.can_host_ring_group(),
+            "add_group: the graph cannot host a group"
+        );
+        assert!(offset < VOTE_DIRECTION_COUNT, "add_group: offset below 8");
+        let id = GroupId(u16::try_from(self.groups.len()).expect("groups below u16::MAX"));
+        self.groups.push(Group {
+            shape,
+            kind,
+            offset,
+            scale: 0.0,
+        });
+        let Shape::Ring { ring_ref } = shape;
+        for channel in 0..VOTE_DIRECTION_COUNT {
+            let edge = GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: ring_ref,
+                    sub_idx: u16::from(channel),
+                },
+                own_weight: 0.0,
+                membership: Some(Membership { group: id }),
+            };
+            self.insert_member(edge);
+        }
+        self.debug_assert_groups();
+        id
+    }
+
+    /// Remove `group`'s record and every member, renumbering every higher
+    /// `GroupId`. Returns the number of members removed.
+    pub fn remove_group(&mut self, group: GroupId) -> usize {
+        let mut removed = 0;
+        for sink in &mut self.output_sinks.0 {
+            let before = sink.inputs.len();
+            sink.inputs
+                .0
+                .retain(|edge| edge.membership != Some(Membership { group }));
+            removed += before - sink.inputs.len();
+        }
+        self.drop_group_record(group);
+        self.debug_assert_groups();
+        removed
+    }
+
+    /// Move `group` to `kind` at `offset` (`ShiftGroupOffset`,
+    /// `RetargetGroupKind`): every member leaves its sink and is re-inserted
+    /// at its new sink in the I10 position, keeping its own weight.
+    ///
+    /// # Panics
+    ///
+    /// If `offset >= 8`.
+    pub fn relocate_group(&mut self, group: GroupId, kind: Kind, offset: u8) {
+        assert!(
+            offset < VOTE_DIRECTION_COUNT,
+            "relocate_group: offset below 8"
+        );
+        let mut moved = Vec::with_capacity(usize::from(VOTE_DIRECTION_COUNT));
+        for sink in &mut self.output_sinks.0 {
+            sink.inputs.0.retain(|edge| {
+                let member = edge.membership == Some(Membership { group });
+                if member {
+                    moved.push(*edge);
+                }
+                !member
+            });
+        }
+        let record = &mut self.groups[group.index()];
+        record.kind = kind;
+        record.offset = offset;
+        for edge in moved {
+            self.insert_member(edge);
+        }
+        self.debug_assert_groups();
+    }
+
+    /// Detach the member at `occurrence` with its group's `pattern` there:
+    /// its own weight becomes its genomic weight
+    /// `compose(own, scale, pattern)`, bitwise, its membership is cleared and
+    /// it moves to the end of its sink's independent prefix. Detaching a
+    /// group's last member removes the group. Returns the edge's new
+    /// occurrence and whether the group was removed.
+    pub fn detach_at(
+        &mut self,
+        occurrence: EdgeOccurrence,
+        pattern: f32,
+    ) -> (EdgeOccurrence, bool) {
+        let EdgeSurface::SinkInput(sink) = occurrence.surface else {
+            panic!("detach_at: only a sink edge is a member");
+        };
+        let mut edge = self.output_sinks.0[sink].inputs.0.remove(occurrence.index);
+        let Membership { group } = edge.membership.expect("detach_at: the edge is a member");
+        edge.own_weight = compose(edge.own_weight, self.groups[group.index()].scale, pattern);
+        edge.membership = None;
+        let at = self.first_member(sink);
+        self.output_sinks.0[sink].inputs.0.insert(at, edge);
+        let removed = self.members(group).next().is_none();
+        if removed {
+            self.drop_group_record(group);
+        }
+        self.debug_assert_groups();
+        (
+            EdgeOccurrence::new(EdgeSurface::SinkInput(sink), at),
+            removed,
+        )
+    }
+
+    /// A handle for changing `group`'s record.
+    pub fn group_mut(&mut self, group: GroupId) -> GroupMut<'_> {
+        GroupMut { def: self, group }
+    }
+
+    /// The index of `sink`'s first member, its input count when it has none.
+    fn first_member(&self, sink: usize) -> usize {
+        let inputs = &self.output_sinks[sink].inputs;
+        inputs
+            .iter()
+            .position(|edge| edge.membership.is_some())
+            .unwrap_or(inputs.len())
+    }
+
+    /// The I10 sort key of a member: `(GroupId, channel)`.
+    fn member_key(edge: &GraphEdge) -> Option<(GroupId, u16)> {
+        let Membership { group } = edge.membership?;
+        let channel = match edge.source {
+            GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
+            _ => u16::MAX,
+        };
+        Some((group, channel))
+    }
+
+    /// The sink a `Ring` member of its group sits on.
+    fn member_sink(&self, edge: &GraphEdge) -> usize {
+        let (group, channel) = Self::member_key(edge).expect("a member");
+        let record = &self.groups[group.index()];
+        let d = (u16::from(record.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT);
+        self.direction_sink(record.kind, d as u8)
+            .expect("a group's graph carries every direction sink")
+    }
+
+    /// Insert member `edge` at its sink in the I10 position.
+    fn insert_member(&mut self, edge: GraphEdge) {
+        let sink = self.member_sink(&edge);
+        let key = Self::member_key(&edge);
+        let inputs = &mut self.output_sinks.0[sink].inputs.0;
+        let at = inputs
+            .iter()
+            .position(|other| other.membership.is_some() && Self::member_key(other) > key)
+            .unwrap_or(inputs.len());
+        inputs.insert(at, edge);
+    }
+
+    /// Remove `group`'s record and decrement every higher `GroupId`.
+    fn drop_group_record(&mut self, group: GroupId) {
+        self.groups.remove(group.index());
+        for sink in &mut self.output_sinks.0 {
+            for edge in &mut sink.inputs.0 {
+                if let Some(Membership { group: id }) = &mut edge.membership {
+                    debug_assert_ne!(*id, group, "the dropped group has no member");
+                    if *id > group {
+                        id.0 -= 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /// The def-local group invariants (I2–I6, I10, `offset < 8`), checked
+    /// in debug builds at every group-touching primitive's exit.
+    fn debug_assert_groups(&self) {
+        if cfg!(debug_assertions) && !self.groups.is_empty() {
+            if let Err(violation) = self.check_local_invariants() {
+                panic!("graph invariant violated: {violation:?}");
+            }
+        }
+    }
+
+    /// The invariants that need only the def (I2–I6, I10, `offset < 8`).
+    pub(crate) fn check_local_invariants(&self) -> Result<(), GraphInvariantViolation> {
+        use GraphInvariantViolation as V;
+        if self.groups.len() > usize::from(u16::MAX) {
+            return Err(V::TooManyGroups);
+        }
+        if self
+            .compute_nodes
+            .iter()
+            .any(|node| node.inputs.iter().any(|e| e.membership.is_some()))
+        {
+            return Err(V::MemberOnComputeInput);
+        }
+        if self
+            .groups
+            .iter()
+            .any(|group| group.offset >= VOTE_DIRECTION_COUNT)
+        {
+            return Err(V::OffsetOutOfRange);
+        }
+        let mut channels = vec![0u8; self.groups.len()];
+        for (sink_idx, sink) in self.output_sinks.iter().enumerate() {
+            let mut previous: Option<(GroupId, u16)> = None;
+            let mut in_members = false;
+            for edge in sink.inputs.iter() {
+                let Some(key) = Self::member_key(edge) else {
+                    if in_members {
+                        return Err(V::SinkOrder);
+                    }
+                    continue;
+                };
+                in_members = true;
+                if previous.is_some_and(|previous| previous >= key) {
+                    return Err(V::SinkOrder);
+                }
+                previous = Some(key);
+                let (group, channel) = key;
+                let Some(record) = self.groups.get(group.index()) else {
+                    return Err(V::GroupIdOutOfRange);
+                };
+                let Shape::Ring { ring_ref } = record.shape;
+                let fits = channel < u16::from(VOTE_DIRECTION_COUNT)
+                    && edge.source
+                        == GraphSource::InputLeaf {
+                            ref_idx: ring_ref,
+                            sub_idx: channel,
+                        }
+                    && self.direction_sink(
+                        record.kind,
+                        ((u16::from(record.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT))
+                            as u8,
+                    ) == Some(sink_idx);
+                if !fits {
+                    return Err(V::MemberShape);
+                }
+                let bit = 1u8 << channel;
+                if channels[group.index()] & bit != 0 {
+                    return Err(V::DuplicateMember);
+                }
+                channels[group.index()] |= bit;
+            }
+        }
+        if channels.contains(&0) {
+            return Err(V::EmptyGroup);
+        }
+        Ok(())
     }
 
     // ── Internal helpers ────────────────────────────────────────────────────

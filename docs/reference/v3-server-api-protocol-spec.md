@@ -700,8 +700,9 @@ Query parameters (all optional):
 - `since_tick` (u64) — when present, only action_log entries with
   `entry.tick > since_tick` are returned. Omit for the full log.
 - `exclude` (string) — comma-separated field names to omit from the response.
-  Valid values: `genome`, `action_log`, `shared_memory`. Excluded fields are absent
-  from the JSON (not set to null). Unknown names are silently ignored.
+  Valid values: `genome`, `action_log`, `shared_memory`, `diagnostics`,
+  `graph_weights`. Excluded fields are absent from the JSON (not set to null).
+  Unknown names are silently ignored.
 
 Response (full, no query parameters):
 
@@ -756,7 +757,9 @@ Field definitions:
 | `complexity` | u32 | Genome complexity (node count). |
 | `phenotype` | object | Visual phenotype state. |
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
-| `genome` | object | Full genome (omitted when `exclude` contains `genome`). |
+| `genome` | object | Full genome (omitted when `exclude` contains `genome`). A Graph backend's edges carry `own_weight` and, for an edge-group member, `membership: {group}`; its `groups` list (`{shape: {Ring: {ring_ref}}, kind, offset, scale}`) is omitted when empty (T25.F03). |
+| `mesh_annotations` | array | Per-node read and write classes, reachability and liveness; present whenever `genome` is. |
+| `graph_weights` | array | Per Graph node carrying an edge group, in genome order: `{node_id, scales: [{group, genomic}], edges: [{surface: "compute" \| "sink", container, edge, genomic}]}`, one `edges` entry per group member at its genomic weight `scale + own_weight` (T25.F03). Computed whether or not `genome` is included; omitted when the creature has no member or `exclude` contains `graph_weights`. |
 | `shared_memory` | `f32[]` | 16-slot creature shared memory (omitted when `exclude` contains `shared_memory`). |
 | `action_log` | array | Action log entries (omitted when `exclude` contains `action_log`). |
 
@@ -785,7 +788,7 @@ Field definitions:
 
 Incremental polling pattern:
 1. First request: `GET /v3/simulation/creature/:id` (no query params) — full response.
-2. Subsequent requests: `GET /v3/simulation/creature/:id?since_tick={latest_tick}&exclude=genome` — returns only new action_log entries and omits immutable genome.
+2. Subsequent requests: `GET /v3/simulation/creature/:id?since_tick={latest_tick}&exclude=genome,graph_weights` — returns only new action_log entries and omits the immutable genome and its genomic weights, which the client keeps from the first request.
 3. Client appends returned action_log entries to its local cache, trimming to ring buffer capacity.
 
 Error cases:

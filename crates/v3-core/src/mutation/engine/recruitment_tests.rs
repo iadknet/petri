@@ -56,10 +56,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // `own_weight` (7164882519974651247 -> 12816372541544823979); the hash
     // without the genome JSON is 8964731210341994819 at the merge base and
     // after the commit, and reverting the key rename restores.
-    assert_eq!(
-        hash, 12816372541544823979,
-        "pin of the recruitment-Off path"
-    );
+    // Re-pinned by T25.F03 commit 2: the five projection operators become
+    // the edge-group operators at the same catalog positions and weights, so
+    // the event keys and the genome text of every group-creating draw change
+    // (12816372541544823979 -> 7833229115364439623); reverting the commit
+    // restores.
+    assert_eq!(hash, 7833229115364439623, "pin of the recruitment-Off path");
 }
 
 #[test]

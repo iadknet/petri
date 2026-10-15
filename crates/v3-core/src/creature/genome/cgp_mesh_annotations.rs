@@ -65,17 +65,6 @@ pub(crate) fn derive_cgp_annotations(
         }
     }
 
-    // A ring projection reads its ring and writes the action channel (T11.F31).
-    for projection in &def.projections {
-        if let Some(input_ref) = input_refs
-            .get(usize::from(projection.ref_idx))
-            .filter(|reference| reference.is_ring())
-        {
-            read_classes.insert(classify_input_ref(input_ref));
-        }
-        write_classes.insert(MeshWriteClass::Action);
-    }
-
     // Write classes from wired output sinks
     for sink in def.output_sinks() {
         if sink.inputs.is_empty() {
@@ -116,6 +105,22 @@ mod tests {
         ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::vote::{ActionParamField, VoteSink};
+
+    /// A node wired only through a group's members writes the action
+    /// channel and reads its ring (T25.F03).
+    #[test]
+    fn a_member_only_node_is_an_action_writer() {
+        use crate::creature::genome::cgp::Shape;
+        use crate::creature::genome::vote::DirectedVoteKind;
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 5);
+        let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
+        let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[ring]);
+        assert_eq!(writes, vec![MeshWriteClass::Action]);
+        assert_eq!(reads, vec![MeshReadClass::Barrier]);
+        assert!(!stateful);
+        assert!(live.is_empty());
+    }
 
     #[test]
     fn empty_graph_no_annotations() {

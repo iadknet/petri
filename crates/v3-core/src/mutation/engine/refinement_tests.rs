@@ -5,18 +5,20 @@ use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::NodeGenome;
 use rand::{rngs::SmallRng, SeedableRng};
 
+/// Two ranked slots of one nearby-creature core field into `Eat`: an
+/// inferred set of two.
 fn fixture(weight: f32) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    for d in 0..2 {
-        let surface = def
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(d)))
-            .unwrap();
+    let surface = def
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+        .unwrap();
+    for slot in 0..2u16 {
         def.push_edge(
             surface,
             GraphEdge::new(
                 GraphSource::InputLeaf {
                     ref_idx: 0,
-                    sub_idx: u16::from(d),
+                    sub_idx: slot * 4,
                 },
                 weight,
             ),
@@ -26,7 +28,7 @@ fn fixture(weight: f32) -> CreatureGenome {
         entry_node_id: NodeId::new(7),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(7),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
             backend_def: BackendDef::Graph(def),
             targets: vec![],
         }],

@@ -1,13 +1,13 @@
 //! T25.F02 unit rule: `genome_size()` charges one unit per edge on both graph
-//! surfaces, nothing for a wired sink itself, and nine units per ring
-//! projection (its record plus its eight implied synapses).
+//! surfaces, nothing for a wired sink itself, and (T25.F03) one unit per
+//! edge-group record, so a `Ring` group of eight members costs nine.
 use proptest::prelude::*;
 
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind, RingProjection,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
+    OutputSink, OutputSinkKind, Shape,
 };
 use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -78,42 +78,48 @@ fn edges_strategy() -> impl Strategy<Value = Vec<GraphEdge>> {
     )
 }
 
+/// A def with compute nodes, independent `CustomOutput` edges and `Ring`
+/// groups, each group losing the members its mask drops (a group keeps at
+/// least one).
 fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
     (
         prop::collection::vec(edges_strategy(), 0..5),
-        prop::collection::vec((0u8..24, edges_strategy()), 0..6),
-        prop::collection::vec((0usize..3, any::<u8>(), -4.0f32..4.0), 0..4),
+        prop::collection::vec((0usize..24, edges_strategy()), 0..6),
+        prop::collection::vec((0usize..3, 0u8..8, 1u8..=u8::MAX), 0..4),
     )
-        .prop_map(|(nodes, sinks, projections)| {
-            let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-                .with_compute_nodes(
-                    nodes
-                        .into_iter()
-                        .map(|inputs| ComputeNode::new(ComputeNodeKind::Add, inputs, None))
-                        .collect(),
-                )
-                .with_output_sinks(
-                    sinks
-                        .into_iter()
-                        .map(|(slot, inputs)| {
-                            OutputSink::new(OutputSinkKind::CustomOutput(slot), inputs)
-                        })
-                        .collect(),
+        .prop_map(|(nodes, sinks, groups)| {
+            let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(
+                nodes
+                    .into_iter()
+                    .map(|inputs| ComputeNode::new(ComputeNodeKind::Add, inputs, None))
+                    .collect(),
+            );
+            for (slot, inputs) in sinks {
+                for edge in inputs {
+                    def.push_edge(EdgeSurface::SinkInput(slot), edge);
+                }
+            }
+            for (kind, offset, keep) in groups {
+                let id = def.add_group(
+                    Shape::Ring { ring_ref: 0 },
+                    DirectedVoteKind::ALL[kind],
+                    offset,
                 );
-            def.projections = projections
-                .into_iter()
-                .map(|(kind, offset, weight)| {
-                    RingProjection::new(0, DirectedVoteKind::ALL[kind], offset, weight)
-                })
-                .collect();
+                let members: Vec<_> = def.members(id).collect();
+                for (channel, occurrence) in members.into_iter().enumerate().rev() {
+                    if keep & (1 << channel) == 0 {
+                        def.remove_edge(occurrence);
+                    }
+                }
+            }
             def
         })
 }
 
 proptest! {
     /// `genome_size` is the unit rule's sum: mesh node + input references +
-    /// route targets + compute nodes + edges on both surfaces + 9 per
-    /// projection, whatever the generated def.
+    /// route targets + compute nodes + edges on both surfaces (members
+    /// included) + 1 per group record, whatever the generated def.
     #[test]
     fn genome_size_is_the_unit_rule_sum(
         def in def_strategy(),
@@ -123,9 +129,9 @@ proptest! {
         let compute_nodes = def.compute_nodes().len();
         let compute_edges: usize = def.compute_nodes().iter().map(|n| n.inputs.len()).sum();
         let sink_edges: usize = def.output_sinks().iter().map(|s| s.inputs.len()).sum();
-        let projections = def.projections.len();
+        let groups = def.groups().len();
         let expected = 1 + refs + usize::from(targets) + compute_nodes + compute_edges + sink_edges
-            + 9 * projections;
+            + groups;
         let genome = graph_genome(def, refs, targets);
         prop_assert_eq!(genome.genome_size() as usize, expected);
     }

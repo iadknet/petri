@@ -64,7 +64,7 @@ impl WorldInputKey {
     }
 
     /// Whether this is one of the three neighbor rings: width 8, sub-value `c`
-    /// the neighbor in `Direction::ALL[c]` (T11.F31 ring projections).
+    /// the neighbor in `Direction::ALL[c]` (the shape `Ring` edge groups read).
     #[must_use]
     pub const fn is_neighbor_ring(self) -> bool {
         matches!(
@@ -156,8 +156,8 @@ pub enum InputReference {
 }
 
 impl InputReference {
-    /// Whether this reference is a neighbor ring a ring projection reads
-    /// (T11.F31): `World` of one of [`WorldInputKey::is_neighbor_ring`].
+    /// Whether this reference is a neighbor ring a `Ring` edge group can read
+    /// (T25.F03): `World` of one of [`WorldInputKey::is_neighbor_ring`].
     #[must_use]
     pub const fn is_ring(&self) -> bool {
         matches!(self, Self::World(key) if key.is_neighbor_ring())

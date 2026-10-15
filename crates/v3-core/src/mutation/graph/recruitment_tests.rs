@@ -220,16 +220,21 @@ proptest! {
             prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.own_weight() == 0.0));
         }
         // A ring family landing on a directed vote sink becomes one silent
-        // projection in place of its edges (T11.F31).
-        let projected = after_graph.projections.len() - before_graph.projections.len();
-        prop_assert_eq!(&after_graph.projections[..before_graph.projections.len()], &before_graph.projections[..]);
-        prop_assert!(after_graph.projections.iter().all(|projection| projection.weight == 0.0));
-        prop_assert_eq!(changed + projected, 1);
-        if projected == 0 {
+        // `Ring` group of eight born-0 members in place of its edges
+        // (T25.F03).
+        let grouped = after_graph.groups().len() - before_graph.groups().len();
+        prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
+        prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
+        if grouped == 0 {
+            prop_assert_eq!(changed, 1);
             prop_assert!((1..=30).contains(&added));
             if !whole { prop_assert_eq!(added, 1); }
+            prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {
-            prop_assert_eq!(added, 0);
+            prop_assert_eq!(grouped, 1);
+            prop_assert_eq!((changed, added), (8, 8));
+            let id = crate::creature::genome::cgp::GroupId::new(0);
+            prop_assert_eq!(after_graph.members(id).count(), 8);
         }
         prop_assert_eq!(after_graph.compute_nodes(), before_graph.compute_nodes());
         prop_assert_eq!(&fixture.targets, &before.targets);
@@ -377,8 +382,8 @@ proptest! {
 }
 
 #[test]
-fn a_ring_on_a_directed_sink_becomes_one_silent_projection() {
-    use crate::creature::genome::cgp::RingProjection;
+fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
+    use crate::creature::genome::cgp::{GroupId, Shape};
     use crate::creature::genome::vote::DirectedVoteKind;
     let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
     let family = SourceFamily::Input(ring.clone());
@@ -393,11 +398,16 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_projection() {
     )
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
-    assert_eq!(graph(&fixture).edges().count(), 0);
+    let def = graph(&fixture);
+    assert_eq!(def.groups().len(), 1);
+    let group = def.groups()[0];
     assert_eq!(
-        graph(&fixture).projections,
-        vec![RingProjection::new(0, DirectedVoteKind::Move, 6, 0.0)]
+        (group.shape(), group.kind(), group.offset(), group.scale()),
+        (Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 6, 0.0)
     );
+    assert_eq!(def.edges().count(), 8);
+    assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
+    assert_eq!(def.members(GroupId::new(0)).count(), 8);
     // WholeFamily reads channel 0, and an existing declaration is reused.
     recruit_source(
         &mut fixture,
@@ -408,14 +418,15 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_projection() {
     )
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
+    let group = graph(&fixture).groups()[1];
     assert_eq!(
-        graph(&fixture).projections[1],
-        RingProjection::new(0, DirectedVoteKind::StealEnergy, 7, 0.0)
+        (group.kind(), group.offset()),
+        (DirectedVoteKind::StealEnergy, 7)
     );
     // An undirected destination keeps today's edges.
     recruit_source(&mut fixture, &family, Arm::SingleChannel, 2, VoteSink::Eat).unwrap();
-    assert_eq!(graph(&fixture).projections.len(), 2);
-    assert_eq!(graph(&fixture).edges().count(), 1);
+    assert_eq!(graph(&fixture).groups().len(), 2);
+    assert_eq!(graph(&fixture).edges().count(), 17);
     // A non-ring family on a directed sink keeps today's edge.
     let mut other = node();
     recruit_source(
@@ -426,18 +437,16 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_projection() {
         VoteSink::Move(0),
     )
     .unwrap();
-    assert!(graph(&other).projections.is_empty());
+    assert!(graph(&other).groups().is_empty());
     assert_eq!(graph(&other).edges().count(), 1);
 }
 
 #[test]
-fn a_dangling_projection_reference_bounds_admission_like_a_dangling_leaf() {
-    use crate::creature::genome::cgp::RingProjection;
+fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
+    use crate::creature::genome::cgp::Shape;
     use crate::creature::genome::vote::DirectedVoteKind;
     let mut fixture = node();
-    graph_mut(&mut fixture)
-        .projections
-        .push(RingProjection::new(0, DirectedVoteKind::Move, 0, 1.0));
+    graph_mut(&mut fixture).add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
     assert!(admission
         .plan(
@@ -449,4 +458,30 @@ fn a_dangling_projection_reference_bounds_admission_like_a_dangling_leaf() {
     assert!(admission
         .plan(&SourceFamily::Memory(false), Arm::SingleChannel, 0)
         .is_some());
+}
+
+/// Ring families leave recruitment's universe exactly when the graph cannot
+/// host a group, so a drawn ring plan always completes; every other family
+/// is unchanged.
+#[test]
+fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
+    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
+        let full = node();
+        let hosting = Admission::new(&full.input_refs, graph(&full)).families(arm, 2);
+        assert!(graph(&full).can_host_ring_group());
+        let mut partial = node();
+        edit_sinks(graph_mut(&mut partial), |sinks| {
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Reproduce(4)));
+        });
+        assert!(!graph(&partial).can_host_ring_group());
+        let without = Admission::new(&partial.input_refs, graph(&partial)).families(arm, 2);
+        let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
+        assert!(hosting.iter().any(is_ring));
+        assert!(!without.iter().any(is_ring));
+        let others: Vec<_> = hosting
+            .into_iter()
+            .filter(|family| !is_ring(family))
+            .collect();
+        assert_eq!(without, others);
+    }
 }

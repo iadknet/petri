@@ -17,7 +17,7 @@ mod drive_reach_tests;
 
 pub use engine::MutationEngine;
 pub use types::{
-    BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    BirthEdgeClass, GroupEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
     MutationSummary, TargetReachability,
 };
