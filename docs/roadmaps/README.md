@@ -27,7 +27,8 @@ execution policy or integration authority. Those belong in
 [`docs/workflow.md`](../workflow.md), the one live execution workflow. It runs
 one feature per goal, in dependency order: the target feature must have all
 dependencies checked, and a goal never implements a prerequisite or an unrelated
-ready feature implicitly.
+ready feature implicitly. A preparatory refactor the feature's spec declares
+is part of that feature, not a prerequisite.
 
 Feature specs that introduce environmental pressures must include their
 integration into all three standard goal environments and applied-behavior

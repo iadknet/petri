@@ -21,9 +21,9 @@ Verify the active session model and effort; this workflow does not set them.
 | Implementer | `gpt-6-astra` | `xhigh` | Feature code and production-code remediation; same agent across passes |
 | Benchmark specialist | `gpt-5.6-terra` | `high` | Run the gate and goal baseline profiles and record their verdicts |
 | Mutation specialist | `gpt-5.6-sol` | `medium` | Run the mutation gate, perform test-only survivor remediation, and record its verdict |
-| Reviewer | `gpt-6-astra` | `high` | Fresh-context final review |
+| Reviewers | `gpt-6-astra` | `high` | Three fresh-context final reviews, one lens skill each |
 
-The reviewer uses a fresh Astra context at `high` effort for independent
+Each reviewer uses a fresh Astra context at `high` effort for independent
 review. The spec owner also provides implementation advice in the same
 persistent context; do not spawn a separate advisor. Advice is read-only with
 respect to feature code. The benchmark and mutation specialists have narrow,
@@ -89,7 +89,7 @@ intent as well as the spec and diff; do not reuse the spec owner for that review
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Sol (gpt-5.6-sol, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, xhigh) subagent for feature implementation and production-code remediation, a separate Terra (gpt-5.6-terra, high) benchmark specialist for the benchmark profiles the spec's Verification Plan declares and their records, a fresh Astra (gpt-6-astra, high) subagent for final review, and a separate Sol (gpt-5.6-sol, medium) mutation specialist for the mutation gate, test-only survivor remediation, and its record; spawn neither specialist for a check that the Verification Plan does not declare. Run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Sol (gpt-5.6-sol, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, xhigh) subagent for feature implementation and production-code remediation, a separate Terra (gpt-5.6-terra, high) benchmark specialist for the benchmark profiles the spec's Verification Plan declares and their records, three fresh Astra (gpt-6-astra, high) subagents for final review, one lens skill each, and a separate Sol (gpt-5.6-sol, medium) mutation specialist for the mutation gate, test-only survivor remediation, and its record; spawn neither specialist for a check that the Verification Plan does not declare. Run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -213,11 +213,15 @@ sandbox, and do not bypass `scripts/bench-wait` when permission is unavailable.
 
 ### Final review
 
-For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `high`, and
-`fork_turns: none`. Provide the worktree/spec paths and feature ID; instruct it
-to read the shared Review contract and `.claude/agents/roadmap-reviewer.md`
-as a checklist, ignoring its Claude model/tool front matter. It must not edit,
-run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer. Apply
+For final review, spawn three `roadmap_reviewer` agents together, each using
+`gpt-6-astra`, `high`, and `fork_turns: none`, one per lens of the shared
+Review contract's table. Give each the worktree/spec paths, feature ID, its
+lens skill and the inputs that table lists, and point it at
+`.claude/agents/roadmap-reviewer.md` as a checklist, ignoring its Claude
+model/tool front matter. None may edit,
+run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer.
+Save each returned report to its own file outside the worktree, named for its
+lens, and quote that path in place of the shared contract's output file. Apply
 the existing severity rules and route remediation to the same implementer agent.
 
 ### Mutation specialist

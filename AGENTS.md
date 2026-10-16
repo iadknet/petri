@@ -33,6 +33,8 @@ Before editing this file, follow `.agents/skills/agents-md/SKILL.md`.
 - Capability, discovery and reachability questions run on the T22 lab (`crates/v3-lab`), not as
   one-off assay code in `v3-core` or scratch crates; lab code never enters production. Lab
   experiments are not roadmap features; `docs/lab.md` holds the lab contract.
+- Fix a deficiency rather than work around it; a kept workaround carries a
+  `WORKAROUND(<id>): <intended design>` comment so it is never read as intended design.
 - Use TDD for behavior changes and bug fixes. Require determinism only where an assertion depends
   on reproducibility.
 - Pure invariants get proptest property tests in v3-core whose assertions do not depend on which
