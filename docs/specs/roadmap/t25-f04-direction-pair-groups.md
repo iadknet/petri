@@ -163,7 +163,7 @@ Tests written first (file → test):
       all passed; `cargo clippy --workspace --all-targets -- -D warnings`
       clean; `cargo fmt --all -- --check` clean; `cd frontend && npx tsc
       --noEmit -p .` clean, `npx biome check src` clean, `npx vitest run`
-      -> 98 files, 633 tests passed. Old and new value of every re-pin,
+      -> 98 files, 634 tests passed. Old and new value of every re-pin,
       three of them not predeclared (fixture seeds), in the readings file.
 - [x] `scripts/telemetry-dashboards-check` lists
       `pair_group_inherited_nonzero_births_total` in `always_names` and
