@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
+import directionPairsFixture from "./directionPairs.json";
 import {
+	DIRECTION_PAIRS,
 	describeInputRef,
 	directionName,
 	formatAction,
@@ -226,5 +228,11 @@ describe("parseWorldInputRef", () => {
 			key: "FoodHere",
 			typeIdx: null,
 		});
+	});
+});
+
+describe("DIRECTION_PAIRS", () => {
+	it("equals the shared fixture the v3-core declaration is pinned to", () => {
+		expect(DIRECTION_PAIRS).toEqual(directionPairsFixture);
 	});
 });
