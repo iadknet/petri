@@ -211,7 +211,7 @@ Tests written first (file → test):
       projection (485,544 bytes, raw hash unchanged); raw hashes, byte
       counts, exits and verdicts in the readings and the Performance
       section; no full report staged.
-- [x] `make check` -> exited 0 at 87007bb5 (tested commit).
+- [x] `make check` -> exit 0 at 0c82aaef (tested; rebased on a3e65701).
 
 ## Performance and Goal Impact
 
