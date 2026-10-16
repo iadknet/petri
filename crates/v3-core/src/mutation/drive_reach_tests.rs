@@ -62,6 +62,53 @@ fn add_graph_edge_and_input_ref_add_reach_every_drive() {
     assert_eq!(by_input, drives());
 }
 
+/// The Graph event dispatch reports the class `AddGraphEdge` pushed, not
+/// only the operator itself (T25.F04 moved the report into the dispatch).
+#[test]
+fn a_dispatched_add_graph_edge_reports_its_vote_sink_class() {
+    use crate::config::MutationConfig;
+    use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::genome::BackendDef;
+    use crate::mutation::graph::{GraphMutator, GraphOperator};
+    use crate::mutation::reachability::TargetSelector;
+
+    let base = v3alpha1_founder_genome();
+    let all: Vec<usize> = (0..base.nodes.len()).collect();
+    let config = MutationConfig::default();
+    let mut classified = 0;
+    for seed in 0..256 {
+        let mut genome = base.clone();
+        let mut targets = TargetSelector::reachable_only(&all, 0.0);
+        let Ok((_, report)) = GraphMutator::apply_classified(
+            &mut genome,
+            GraphOperator::AddGraphEdge,
+            &mut targets,
+            &mut SmallRng::seed_from_u64(seed),
+            &config,
+            1,
+        ) else {
+            continue;
+        };
+        let pick = targets
+            .first_pick()
+            .expect("an applied event records its pick");
+        let (BackendDef::Graph(before), BackendDef::Graph(after)) = (
+            &base.nodes[pick].backend_def,
+            &genome.nodes[pick].backend_def,
+        ) else {
+            panic!("AddGraphEdge picks a Graph node");
+        };
+        let expected = grown_vote_sink(before, after).and_then(BirthEdgeClass::of_sink);
+        assert_eq!(report.class, expected, "seed {seed}");
+        assert_eq!(report.refined, None, "seed {seed}");
+        classified += usize::from(expected.is_some());
+    }
+    assert!(
+        classified > 0,
+        "some seed pushes onto a classified vote sink"
+    );
+}
+
 #[test]
 fn vm_add_vote_reaches_every_drive() {
     let mut rng = SmallRng::seed_from_u64(30);

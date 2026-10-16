@@ -896,6 +896,18 @@ fn pair_creation_materializes_12_members_not_16() {
 }
 
 #[test]
+fn pair_birth_members_reduce_every_offset_mod_8() {
+    let layout = pair_layout();
+    for offset in 0..=u8::MAX {
+        let got: Vec<_> =
+            crate::creature::genome::cgp::pair_birth_members(layout, offset).collect();
+        let want: Vec<_> =
+            crate::creature::genome::cgp::pair_birth_members(layout, offset % 8).collect();
+        assert_eq!(got, want, "offset {offset}");
+    }
+}
+
+#[test]
 fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 3);
     def.group_mut(id).set_scale(1.0);
@@ -1087,6 +1099,49 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     assert_eq!(
         duplicate.check_local_invariants(),
         Err(GraphInvariantViolation::DuplicateMember)
+    );
+    // I5: an equal member key is a duplicate before its shape is checked:
+    // the repeat reads another reference at the same field.
+    let mut repeated = def.clone();
+    let mut stray = *repeated.edge_at(first);
+    let GraphSource::InputLeaf { sub_idx, .. } = stray.source else {
+        unreachable!("a pair member reads an input leaf")
+    };
+    stray.source = GraphSource::InputLeaf {
+        ref_idx: RING,
+        sub_idx,
+    };
+    repeated.output_sinks.0[sink]
+        .inputs
+        .0
+        .insert(first.index + 1, stray);
+    assert_eq!(
+        repeated.check_local_invariants(),
+        Err(GraphInvariantViolation::DuplicateMember)
+    );
+    // I10: two members of one sink out of key order.
+    let mut swapped = def.clone();
+    let (two, members) = (0..swapped.output_sinks.0.len())
+        .map(|s| {
+            let n = swapped.output_sinks.0[s]
+                .inputs
+                .0
+                .iter()
+                .filter(|e| e.membership.is_some())
+                .count();
+            (s, n)
+        })
+        .find(|&(_, n)| n >= 2)
+        .expect("a sink holding both pair fields");
+    assert_eq!(members, 2);
+    let inputs = &mut swapped.output_sinks.0[two].inputs.0;
+    let at: Vec<usize> = (0..inputs.len())
+        .filter(|&i| inputs[i].membership.is_some())
+        .collect();
+    inputs.swap(at[0], at[1]);
+    assert_eq!(
+        swapped.check_local_invariants(),
+        Err(GraphInvariantViolation::SinkOrder)
     );
     // I4: a member reading another reference.
     let mut other = def;

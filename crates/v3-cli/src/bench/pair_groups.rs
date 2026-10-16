@@ -195,7 +195,10 @@ mod tests {
         let carrier = grouped(&[
             (0, move_, 2, 0.5, false),
             (0, move_, 2, -0.25, true),
-            (0, DirectedVoteKind::StealEnergy, 0, 1e-4, false),
+            // Exactly at the floor: not nonzero.
+            (0, DirectedVoteKind::StealEnergy, 0, NONZERO_FLOOR, false),
+            // A lone positive group: the sign split is not symmetric.
+            (0, move_, 0, 0.5, false),
             (1, move_, 2, 0.5, false),
         ]);
         let plain = v3alpha1_founder_genome();
@@ -208,9 +211,9 @@ mod tests {
             3,
         );
         assert_eq!(block.version, PAIR_GROUPS_VERSION);
-        assert_eq!((block.creatures, block.carriers, block.groups), (2, 1, 3));
-        assert_eq!((block.groups_nonzero, block.groups_unreachable), (2, 1));
-        assert_eq!(block.members, 12 + 11 + 12);
+        assert_eq!((block.creatures, block.carriers, block.groups), (2, 1, 4));
+        assert_eq!((block.groups_nonzero, block.groups_unreachable), (3, 1));
+        assert_eq!(block.members, 12 + 11 + 12 + 12);
         assert_eq!(
             (
                 block.add_applied_total,
@@ -231,6 +234,7 @@ mod tests {
         assert_eq!(
             block.rows,
             vec![
+                row(move_, 0, 1, 1, 1, 0, 12),
                 row(move_, 2, 2, 2, 1, 1, 23),
                 row(DirectedVoteKind::StealEnergy, 0, 1, 0, 0, 0, 12),
             ]
