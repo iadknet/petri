@@ -35,7 +35,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: Every synapse costs the same to carry wherever it sits, as a neuron pays per synapse and not per target: an edge is one unit on both surfaces, a wired sink costs nothing of itself, a ring gene costs its eight synapses, and the founder is re-anchored.
 - [x] **T25.F03 — Ring Groups Replace Ring Projections** — Depends on: T25.F02
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
-- [ ] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
+- [x] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
   - Goal: The sensory map sits in register with the motor map (superior colliculus): a creature's sensed offset to food, a barrier, a crowd or another creature can reach all eight direction votes of one kind as one silent gene, and that thing's plain facts reach the kind's drive.
 - [ ] **T25.F05 — The NearbyCreature Family** — Depends on: T25.F04
   - Goal: One sense of another creature, as an animal reads a neighbor's place, condition and kinship in one glance: the three creature families become one, so a slot's position, vitals and identity arrive from one declaration.

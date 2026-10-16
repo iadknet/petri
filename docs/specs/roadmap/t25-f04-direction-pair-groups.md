@@ -1,7 +1,7 @@
 # T25.F04 — Direction-Pair Groups
 
-**Status**: In Progress
-**Last updated**: 2026-10-15
+**Status**: Complete
+**Last updated**: 2026-10-16
 **Feature**: T25.F04
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
 
@@ -158,26 +158,22 @@ Tests written first (file → test):
 
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 29
       passed at HEAD; the founder-only digests do not move.
-- [x] Focused tests: the tests-first table -> `cargo test -p v3-core -p
-      v3-cli -p v3-telemetry -p v3-server -p v3-lab` (v3-core lib 2,164)
-      all passed; `cargo clippy --workspace --all-targets -- -D warnings`
-      clean; `cargo fmt --all -- --check` clean; `cd frontend && npx tsc
-      --noEmit -p .` clean, `npx biome check src` clean, `npx vitest run`
-      -> 98 files, 634 tests passed. Old and new value of every re-pin,
-      three of them not predeclared (fixture seeds), in the readings file.
+- [x] Focused tests: the tests-first table -> `cargo test` over v3-core,
+      v3-cli, v3-telemetry, v3-server and v3-lab all passed (v3-core lib
+      2,164); clippy `-D warnings` and `fmt --check` clean; frontend `tsc`,
+      `biome check` and `vitest run` (98 files, 634 tests) clean. Every
+      re-pin's old and new value in the readings file.
 - [x] `scripts/telemetry-dashboards-check` lists
       `pair_group_inherited_nonzero_births_total` in `always_names` and
       names `refinement_applications_by_key_total` among the families the
-      seed-7 workload gives no key to (it goes extinct by tick ~800).
-- [x] `make rust-test-slow` -> exit 0 (`3 passed` v3-core experiment
-      pins, `6 passed` lab runs), log
-      `~/.local/share/petri-tools/slow/t25-f04/rust-test-slow-2026-10-15.log`.
-      Two recruitment-paths pins re-pinned on the final code (Graph Drift
-      `[18, 14, 12, 8]` -> `[14, 11, 10, 6]`, Selection `[18; 4]` ->
-      `[14; 4]`, VM Drift `[22, 15, 15, 7]` -> `[22, 16, 16, 7]`; cost
-      selection graph 16/16 -> 15/15, VM 20/20 -> 21/21); the two commits'
-      causes are not separated (the tier was not run at commit 1); the
-      readings file records old and new values.
+      seed-7 workload gives no key to.
+- [x] `make rust-test-slow` -> exit 0 at 87007bb5, the tested commit
+      (v3-core `3 passed` in 122.87 s, lab `6 passed` in 30.35 s; the
+      re-pin run's log at
+      `~/.local/share/petri-tools/slow/t25-f04/rust-test-slow-2026-10-15.log`).
+      The recruitment-paths rows were re-pinned once on the final code
+      (old and new values in the readings; causes of commits 1 and 2 not
+      separated, Notes).
 - [x] Mutation gate (fresh run, survivors below):
 
 | Gate | Record |
@@ -208,17 +204,14 @@ Tests written first (file → test):
 | `cgp/group.rs:187:36` `%` → `+` in `pair_birth_members` | Killed: `pair_birth_members_reduce_every_offset_mod_8` (overflow at `offset >= 241`) |
 | `v3-telemetry/metrics.rs:798:71` `+=` → `*=` in `mutations` | Killed: the encoded-values test reads one `refinement_applications_by_key` series value |
 
-- [x] Benchmark profiles (gate, goal and goal-long summaries and their
-      series entries committed; the goal-long summary converted from its
+- [x] Benchmark profiles: gate, goal and goal-long summaries at
+      `docs/progress/features/t25-f04-direction-pair-groups{,-goal,-goal-long}.json`
+      with their series entries; the goal-long summary converted from its
       raw report with `v3-cli bench-summarize` after the `pair_groups`
-      projection, 485,544 bytes, raw hash unchanged; raw hashes, byte
+      projection (485,544 bytes, raw hash unchanged); raw hashes, byte
       counts, exits and verdicts in the readings and the Performance
-      section): summaries at
-      `docs/progress/features/t25-f04-direction-pair-groups.json` (gate),
-      `...-goal.json`, `...-goal-long.json`; local raw hash/byte count and
-      verification time checked, series entry points to the summary, no
-      full report staged.
-- [ ] `make check` -> result.
+      section; no full report staged.
+- [x] `make check` -> exited 0 at 87007bb5 (tested commit).
 
 ## Performance and Goal Impact
 
@@ -333,26 +326,31 @@ edited):
 
 ## Success Criteria
 
-- [ ] A `DirectionPair` group is born as twelve silent members with one
+- [x] A `DirectionPair` group is born as twelve silent members with one
       shared scale on any declared pair of the four families; at scale 1 it
       votes toward (offset 0) or away from (offset 4) a thing at each of the
       eight directions through the real reducers; the invariant proptest,
       the relocation identity and the bitwise oracle pass; the catalog is
-      29 / 58 / 62. (Tests-first table.)
-- [ ] Recruitment's `WholeFamily` pair case wires one group and the facts
+      29 / 58 / 62. (Tests-first table green at 87007bb5.)
+- [x] Recruitment's `WholeFamily` pair case wires one group and the facts
       edges into `Drive K` in the pinned draw order; every other plan is
-      unchanged. (Recruitment tests; the slow-tier rows.)
-- [ ] Every reader in the readers table meets its expectation; the
+      unchanged. (Recruitment tests at 87007bb5; the slow-tier rows
+      re-pinned and green.)
+- [x] Every reader in the readers table meets its expectation; the
       `pair_groups` block is on every persistence sample and kept;
       `refinement_applications_by_key` is exported; the inspector and
-      petri-visuals show a pair group. (Reader tests; the goal summary.)
-- [ ] On at least one standard goal world `inherited_nonzero_births_total`
+      petri-visuals show a pair group. (Reader and frontend tests; the
+      goal summary carries `drives-v1`, `ring-rules-v2`,
+      `reachable-structure-v2`, `pair_groups` on all 60 samples and
+      `refinement_applications_by_key` keyed on two worlds.)
+- [x] On at least one standard goal world `inherited_nonzero_births_total`
       rises between tick 30,000 and 40,000 and the `pair_groups` series
       shows `groups_nonzero ≥ 1` on reachable nodes at every sample in that
       window (the operational retention reading of the Performance
-      section); F03's deferred ring readings are recorded. (Goal-long
-      summary and readings.)
-- [ ] Track row checked, spec Complete, `make check` green on main.
+      section); F03's deferred ring readings are recorded. (Met on all
+      three worlds: measured verdict, goal-long bullet; the readings.)
+- [x] Track row checked, spec Complete, `make check` green on main
+      (exited 0 at 87007bb5, fast-forwarded to main at closure).
 
 ## Notes for AI Agents
 
@@ -372,3 +370,7 @@ edited):
 - Exception: (spec owner, 2026-10-16) the slow-tier rows were re-pinned
   once on the final code, attributed to commits 1 and 2 jointly; the
   Graph Drift drop (18 → 14) is inside the predeclaration, no cause dump.
+- Cost: `/usage` totals not collected (asked at close); implementer
+  passes 4 (build, self-review, slow-tier re-pin, summary projection),
+  advisor consults 3/2/2/2; spec-owner resumes after Plan 6; Codex
+  challenge rounds 3, final verdict ready; Codex review P1 0, P2 1, P3 0.
