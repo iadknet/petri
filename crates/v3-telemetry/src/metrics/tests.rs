@@ -900,6 +900,17 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
         ),
         PointValue::Int(1)
     );
+    // Each key's count reaches its series (one per key in `populated`).
+    assert_eq!(
+        value(
+            "petri.run.refinement_applications_by_key",
+            &[
+                ("petri.world_input", "NearbyCreatureCore"),
+                ("petri.field", "0")
+            ]
+        ),
+        PointValue::Int(1)
+    );
     assert_eq!(
         value("petri.tick.food_total_density", &[("petri.food_type", "1")]),
         PointValue::Double(0.25)

@@ -103,6 +103,14 @@ mod tests {
     }
 
     #[test]
+    fn compass_components_reduce_every_index_mod_8() {
+        for d in 0..=u8::MAX {
+            assert_eq!(compass_x(d), compass_x(d % 8), "x at {d}");
+            assert_eq!(compass_y(d), compass_y(d % 8), "y at {d}");
+        }
+    }
+
+    #[test]
     fn direction_all_has_eight_entries() {
         assert_eq!(Direction::ALL.len(), 8);
     }

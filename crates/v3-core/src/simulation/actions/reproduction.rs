@@ -1404,4 +1404,92 @@ mod tests {
         );
         assert_eq!(sim.stats.pair_group_inherited_nonzero_births_total, 1);
     }
+
+    /// A birth's committed refinements reach the run's per-key totals: every
+    /// applied `Graph.RefineHeritableStructure` event counts its stepped set
+    /// once (T25.F04).
+    #[test]
+    fn a_births_refinements_reach_the_run_totals_by_key() {
+        use crate::config::SimulationConfig;
+        use crate::contracts::{InputReference, WorldInputKey};
+        use crate::creature::founder::v3alpha1_founder_genome;
+        use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+        use crate::creature::genome::vote::VoteSink;
+        use crate::mutation::types::MutationOperator;
+        use crate::simulation::seed_simulation;
+        use rand::SeedableRng;
+
+        // The founder with two NearbyCreatureCore slots of one field wired to
+        // `Eat`: an inferred set refinement can step.
+        let mut genome = v3alpha1_founder_genome();
+        let node = genome
+            .nodes
+            .iter_mut()
+            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("the founder carries a Graph node");
+        let core = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NearbyCreatureCore));
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!("a Graph node")
+        };
+        let sink = def
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+            .unwrap();
+        for slot in 0..2u16 {
+            let source = GraphSource::InputLeaf {
+                ref_idx: core,
+                sub_idx: 4 * slot + 3,
+            };
+            def.push_edge(sink, GraphEdge::new(source, 0.25));
+        }
+
+        for seed in 0..32 {
+            let mut cfg = SimulationConfig::default();
+            cfg.population.initial_creatures = 1;
+            cfg.mutation.per_unit_rate = 1.0;
+            cfg.mutation.structured_heritable_refinement = true;
+            cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
+            let mut sim = seed_simulation(cfg, 83);
+            let parent_id = sim.creatures.keys().next().unwrap();
+            let parent = &mut sim.creatures[parent_id];
+            parent.genome = genome.clone();
+            parent.age = sim.config.energy.lifecycle.min_reproduce_age;
+            parent.energy = 10000.0;
+            let direction = Direction::ALL
+                .into_iter()
+                .find(|&direction| {
+                    sim.world
+                        .resolve_neighbor(sim.creatures[parent_id].position, direction)
+                        .is_some_and(|p| sim.world.is_valid_target_cell(p))
+                })
+                .unwrap();
+            assert_eq!(
+                apply_reproduce(
+                    parent_id,
+                    &mut sim,
+                    direction,
+                    10.0,
+                    &mut rand::rngs::SmallRng::seed_from_u64(seed)
+                ),
+                ReproductionActionResult::Conceived
+            );
+            let applied = sim
+                .stats
+                .mutation_events_applied_total_by_operator
+                .get(&MutationOperator::GraphRefineHeritableStructure)
+                .copied()
+                .unwrap_or(0);
+            let by_key: u64 = sim
+                .stats
+                .refinement_applications_total_by_key
+                .values()
+                .sum();
+            assert_eq!(by_key, applied, "seed {seed}");
+            if applied > 0 {
+                return;
+            }
+        }
+        panic!("no birth committed a refinement");
+    }
 }

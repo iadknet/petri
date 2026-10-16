@@ -178,9 +178,36 @@ Tests written first (file → test):
       selection graph 16/16 -> 15/15, VM 20/20 -> 21/21); the two commits'
       causes are not separated (the tier was not run at commit 1); the
       readings file records old and new values.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
-      summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred (full list here).
+- [x] Mutation gate (fresh run, survivors below):
+
+| Gate | Record |
+| --- | --- |
+| Run | one fresh `MUTANTS_ITERATE=0 make rust-mutants` at 79e1a43b, `run-mode.txt` `fresh` |
+| Summary | `284 mutants tested in 89m: 17 missed, 220 caught, 47 unviable`; no timeouts |
+| Output | `~/.local/share/petri-tools/mutants/t25-f04/` |
+| Triage | test-only; one `MUTANTS_ITERATE=1` pass (not closure evidence): 11 caught, 6 missed, the six equivalents |
+| Second run | none: no production code, test selection or tool configuration changed, no test weakened |
+
+| Survivor | Resolution |
+| --- | --- |
+| `bench/pair_groups.rs:99:55` `>` → `>=` in `census` | Killed: census test has a group at exactly `NONZERO_FLOOR` |
+| `bench/pair_groups.rs:124:72` `>` → `<` | Killed: census test adds a lone positive group (sign split asymmetric) |
+| `bench/pair_groups.rs:124:72` `>` → `>=` | Equivalent: `nonzero` already requires `\|scale\| > 1e-3`, so `> 0` and `>= 0` agree on every counted group |
+| `bench/pair_groups.rs:125:72` `<` → `<=` | Killed: caught in the iterative pass |
+| `bench/pair_groups.rs:125:72` `<` → `>` | Killed: the asymmetric census test |
+| `contracts/direction.rs:76:18` `%` → `+` in `compass_y` | Killed: `compass_components_reduce_every_index_mod_8` (overflow at `d >= 242`) |
+| `contracts/direction.rs:76:27` `%` → `+` in `compass_y` | Equivalent: `compass_x` reduces its argument mod 8 and `d % 8 + 14 <= 21` cannot overflow, so the same compass entry is read |
+| `mutation/graph/mod.rs:336:13` delete `AddGraphEdge` arm in `apply_classified` | Killed: `a_dispatched_add_graph_edge_reports_its_vote_sink_class` |
+| `actions/reproduction.rs:123:74` `>` → `>=` in `inherits_nonzero_pair_group` | Equivalent: `applied_by_operator` entries are created only by `+= 1`, so no stored count is 0 |
+| `actions/reproduction.rs:507:27` `+=` → `*=` in `spawn_child` | Killed: `a_births_refinements_reach_the_run_totals_by_key` |
+| `cgp/container.rs:894:27` `>` → `>=` in `reindex_input_refs_after_removal` | Equivalent: `Prune` removes only an unaddressed reference (asserted by the `debug_assert_ne!` above), so equality never reaches the comparison |
+| `cgp/container.rs:1228:21` delete `Greater` arm in `check_local_invariants` | Killed: pair-invariant test swaps a sink's two members (`SinkOrder`) |
+| `cgp/container.rs:1229:21` delete `Equal` arm | Killed: pair-invariant test repeats a member key reading another reference (`DuplicateMember`, not `MemberShape`) |
+| `cgp/container.rs:1260:39` `<<` → `>>` | Equivalent: a Ring member's channel fixes its one sink, where the strict `(group, channel)` order already rejects a repeat, so the bitset never decides |
+| `cgp/container.rs:1262:54` `\|=` → `&=` | Equivalent: the same redundant Ring channel bitset |
+| `cgp/group.rs:187:36` `%` → `+` in `pair_birth_members` | Killed: `pair_birth_members_reduce_every_offset_mod_8` (overflow at `offset >= 241`) |
+| `v3-telemetry/metrics.rs:798:71` `+=` → `*=` in `mutations` | Killed: the encoded-values test reads one `refinement_applications_by_key` series value |
+
 - [x] Benchmark profiles (gate, goal and goal-long summaries and their
       series entries committed; the goal-long summary converted from its
       raw report with `v3-cli bench-summarize` after the `pair_groups`
