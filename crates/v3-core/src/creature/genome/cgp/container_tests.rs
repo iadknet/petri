@@ -541,9 +541,9 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
 }
 
 #[test]
-fn can_host_ring_group_needs_every_direction_sink_and_capacity() {
+fn can_host_group_needs_every_direction_sink_and_capacity() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert!(def.can_host_ring_group());
+    assert!(def.can_host_group());
     def.groups = vec![
         Group {
             shape: ring(),
@@ -553,12 +553,12 @@ fn can_host_ring_group_needs_every_direction_sink_and_capacity() {
         };
         usize::from(u16::MAX)
     ];
-    assert!(!def.can_host_ring_group());
+    assert!(!def.can_host_group());
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     crate::creature::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::StealEnergy(7)));
     });
-    assert!(!partial.can_host_ring_group());
+    assert!(!partial.can_host_group());
 }
 
 #[test]
@@ -800,5 +800,399 @@ proptest! {
                 own.to_bits()
             );
         }
+    }
+}
+
+// ── Direction-pair groups (T25.F04) ─────────────────────────────────────────
+
+/// `input_refs[PAIR_REF]` is `AreaFoodSummary`; its pair 1 is
+/// `(nearest_dx, nearest_dy)`, fields `(3, 4)`.
+const PAIR_REF: u16 = 2;
+const PX: u16 = 3;
+const PY: u16 = 4;
+
+fn pair_refs() -> Vec<InputReference> {
+    let mut refs = ring_refs();
+    refs.push(InputReference::World(
+        crate::contracts::WorldInputKey::area_food_summary(
+            crate::contracts::OrdinaryFoodTypeId::new(0),
+        ),
+    ));
+    refs
+}
+
+fn pair_layout() -> crate::contracts::DirectionPair {
+    pair_refs()[usize::from(PAIR_REF)].direction_pairs()[1]
+}
+
+fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    def.push_edge(
+        EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
+        GraphEdge::new(leaf(0), 0.5),
+    );
+    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset);
+    (def, id)
+}
+
+/// A member's `(field, sink direction)`.
+fn coordinates_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> (u16, u8) {
+    let EdgeSurface::SinkInput(sink) = occurrence.surface else {
+        unreachable!("members are sink edges")
+    };
+    let OutputSinkKind::ActionVote(vote) = def.output_sinks()[sink].kind else {
+        unreachable!("members sit on vote sinks")
+    };
+    let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(occurrence).source() else {
+        unreachable!("members read leaves")
+    };
+    let (_, d) = DirectedVoteKind::of_sink(vote).expect("a direction sink");
+    (sub_idx, d)
+}
+
+fn coordinates(def: &CgpGraphBackendDef, id: GroupId) -> Vec<(u16, u8)> {
+    def.members(id).map(|o| coordinates_of(def, o)).collect()
+}
+
+fn pair_node(def: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> NodeGenome {
+    NodeGenome {
+        node_id: crate::contracts::NodeId(0),
+        input_refs,
+        backend_def: BackendDef::Graph(def),
+        targets: Vec::new(),
+    }
+}
+
+/// Re-sort a hand-edited sink into the I10 order.
+fn resort(def: &mut CgpGraphBackendDef, sink: usize) {
+    def.output_sinks.0[sink]
+        .inputs
+        .0
+        .sort_by_key(CgpGraphBackendDef::member_key);
+}
+
+#[test]
+fn pair_creation_materializes_12_members_not_16() {
+    for offset in 0..8u8 {
+        let (def, id) = paired(DirectedVoteKind::StealEnergy, offset);
+        let mut got = coordinates(&def, id);
+        got.sort_unstable();
+        let rel = |field: u16, relatives: [u8; 6]| relatives.map(|r| (field, (r + offset) % 8));
+        // x at NE, E, SE, SW, W, NW; y at N, NE, SE, S, SW, NW.
+        let mut want: Vec<_> = rel(PX, [1, 2, 3, 5, 6, 7])
+            .into_iter()
+            .chain(rel(PY, [0, 1, 3, 4, 5, 7]))
+            .collect();
+        want.sort_unstable();
+        assert_eq!(got, want, "offset {offset}");
+        assert_eq!(def.groups()[0].scale(), 0.0);
+        for occurrence in def.members(id) {
+            assert_eq!(def.edge_at(occurrence).own_weight(), 0.0);
+            assert_eq!(def.genomic_weight(occurrence, &pair_refs()), 0.0);
+            assert_ne!(def.member_pattern(occurrence, &pair_refs()), 0.0);
+        }
+        assert_eq!(validate_graph(&pair_node(def, pair_refs())), Ok(()));
+    }
+}
+
+#[test]
+fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 3);
+    def.group_mut(id).set_scale(1.0);
+    for occurrence in def.members(id).collect::<Vec<_>>() {
+        let (field, d) = coordinates_of(&def, occurrence);
+        let relative = (d + 8 - 3) % 8;
+        let want = if field == PX {
+            crate::contracts::compass_x(relative)
+        } else {
+            crate::contracts::compass_y(relative)
+        };
+        assert_eq!(
+            def.genomic_weight(occurrence, &pair_refs()).to_bits(),
+            want.to_bits()
+        );
+    }
+}
+
+#[test]
+fn an_unresolvable_or_non_pair_reference_reads_pattern_zero() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 0);
+    def.group_mut(id).set_scale(2.0);
+    let occurrence = def.members(id).next().unwrap();
+    let group = def.groups()[0];
+    // Too short, a non-pair world key, a non-world reference.
+    let short = ring_refs();
+    let mut ring_at = pair_refs();
+    ring_at[usize::from(PAIR_REF)] =
+        InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
+    let mut votes_at = pair_refs();
+    votes_at[usize::from(PAIR_REF)] = InputReference::ActionVotes;
+    for refs in [short, ring_at, votes_at] {
+        assert_eq!(def.member_pattern(occurrence, &refs), 0.0);
+        assert_eq!(def.genomic_weight(occurrence, &refs), 0.0);
+    }
+    // A pair index beyond the declared ones.
+    let beyond = Group {
+        shape: Shape::DirectionPair {
+            ref_idx: PAIR_REF,
+            pair: 2,
+        },
+        ..group
+    };
+    for d in 0..8 {
+        assert_eq!(beyond.pattern(&pair_refs(), PX, d), 0.0);
+    }
+    // A field that is neither x nor y, and a direction past the compass.
+    assert_eq!(group.pattern(&pair_refs(), 0, 2), 0.0);
+    assert_eq!(group.pattern(&pair_refs(), PX, 8), 0.0);
+}
+
+#[test]
+fn identical_source_members_on_different_sinks_resolve_different_weights() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 0);
+    def.group_mut(id).set_scale(1.0);
+    let x_members: Vec<_> = def
+        .members(id)
+        .filter(|&o| coordinates_of(&def, o).0 == PX)
+        .collect();
+    assert_eq!(x_members.len(), 6);
+    let source = def.edge_at(x_members[0]).source();
+    assert!(x_members.iter().all(|&o| def.edge_at(o).source() == source));
+    let weights: std::collections::BTreeSet<u32> = x_members
+        .iter()
+        .map(|&o| def.genomic_weight(o, &pair_refs()).to_bits())
+        .collect();
+    // +1, +FRAC_1_SQRT_2, −FRAC_1_SQRT_2, −1.
+    assert_eq!(weights.len(), 4);
+    // The runtime weight table is the same resolver.
+    let rows = def.sink_weight_rows(&pair_refs());
+    for o in x_members {
+        let EdgeSurface::SinkInput(sink) = o.surface else {
+            unreachable!()
+        };
+        assert_eq!(
+            rows[sink][o.index].to_bits(),
+            def.genomic_weight(o, &pair_refs()).to_bits()
+        );
+    }
+}
+
+#[test]
+fn a_pair_groups_last_member_removed_removes_the_group() {
+    let (mut def, id) = paired(DirectedVoteKind::Reproduce, 5);
+    for remaining in (1..12).rev() {
+        let occurrence = def.members(id).next().unwrap();
+        def.remove_edge(occurrence);
+        assert_eq!(def.members(id).count(), remaining);
+        assert_eq!(def.groups().len(), 1);
+    }
+    let last = def.members(id).next().unwrap();
+    def.remove_edge(last);
+    assert!(def.groups().is_empty());
+    assert!(def.edges().all(|edge| edge.membership().is_none()));
+}
+
+/// Relocation preserves every member's relative coordinate, holes and a
+/// hand-built zero-pattern member included.
+#[test]
+fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coordinate() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 2);
+    // A hole: the x member at relative E (direction 4).
+    let hole = def
+        .members(id)
+        .find(|&o| coordinates_of(&def, o) == (PX, 4))
+        .unwrap();
+    def.remove_edge(hole);
+    // A zero-pattern member: x at relative N (direction 2).
+    let sink = vote_sink(DirectedVoteKind::Move, 2);
+    def.output_sinks.0[sink].inputs.0.push(GraphEdge {
+        source: GraphSource::InputLeaf {
+            ref_idx: PAIR_REF,
+            sub_idx: PX,
+        },
+        own_weight: 0.25,
+        membership: Some(Membership { group: id }),
+    });
+    resort(&mut def, sink);
+    assert_eq!(def.check_local_invariants(), Ok(()));
+    assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
+    let zero = def
+        .members(id)
+        .find(|&o| coordinates_of(&def, o) == (PX, 2))
+        .unwrap();
+    assert_eq!(def.member_pattern(zero, &pair_refs()), 0.0);
+    let relative = |def: &CgpGraphBackendDef| {
+        let offset = def.groups()[0].offset();
+        let mut set: Vec<_> = coordinates(def, id)
+            .into_iter()
+            .map(|(field, d)| (field, (d + 8 - offset) % 8))
+            .collect();
+        set.sort_unstable();
+        set
+    };
+    let before = relative(&def);
+    assert_eq!(before.len(), 12);
+    let original = def.clone();
+    def.relocate_group(id, DirectedVoteKind::StealEnergy, 7);
+    assert_eq!(relative(&def), before);
+    assert_eq!(def.check_local_invariants(), Ok(()));
+    def.relocate_group(id, DirectedVoteKind::Move, 2);
+    assert_eq!(def, original);
+}
+
+#[test]
+fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
+    let (def, id) = paired(DirectedVoteKind::Move, 1);
+    assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
+    // I7: the pair index is out of range for the reference.
+    let mut range = def.clone();
+    range.groups[0].shape = Shape::DirectionPair {
+        ref_idx: PAIR_REF,
+        pair: 2,
+    };
+    assert_eq!(
+        validate_graph(&pair_node(range, pair_refs())),
+        Err(GraphInvariantViolation::ShapeReference)
+    );
+    // I7: the reference declares no pairs.
+    let mut no_pairs = pair_refs();
+    no_pairs[usize::from(PAIR_REF)] = InputReference::ActionVotes;
+    assert_eq!(
+        validate_graph(&pair_node(def.clone(), no_pairs)),
+        Err(GraphInvariantViolation::ShapeReference)
+    );
+    // I4: a member reading a field that is neither x nor y.
+    let first = def.members(id).next().unwrap();
+    let EdgeSurface::SinkInput(sink) = first.surface else {
+        unreachable!()
+    };
+    let mut role = def.clone();
+    role.output_sinks.0[sink].inputs.0[first.index].source = GraphSource::InputLeaf {
+        ref_idx: PAIR_REF,
+        sub_idx: 0,
+    };
+    resort(&mut role, sink);
+    assert_eq!(role.check_local_invariants(), Ok(()));
+    assert_eq!(
+        validate_graph(&pair_node(role, pair_refs())),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+    // I5: a duplicate (field, direction).
+    let mut duplicate = def.clone();
+    let copied = *duplicate.edge_at(first);
+    duplicate.output_sinks.0[sink]
+        .inputs
+        .0
+        .insert(first.index, copied);
+    assert_eq!(
+        duplicate.check_local_invariants(),
+        Err(GraphInvariantViolation::DuplicateMember)
+    );
+    // I4: a member reading another reference.
+    let mut other = def;
+    other.output_sinks.0[sink].inputs.0[first.index].source = GraphSource::InputLeaf {
+        ref_idx: RING,
+        sub_idx: PX,
+    };
+    assert_eq!(
+        other.check_local_invariants(),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+}
+
+#[test]
+fn a_pair_group_adds_thirteen_units() {
+    let units = |def: &CgpGraphBackendDef| {
+        def.output_sinks()
+            .iter()
+            .map(|sink| sink.inputs.len())
+            .sum::<usize>()
+            + def.groups().len()
+    };
+    let base = CgpGraphBackendDef::new_with_fixed_outputs();
+    let mut grouped = base.clone();
+    grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0);
+    assert_eq!(units(&grouped) - units(&base), 13);
+    let genome = |def| crate::creature::genome::CreatureGenome {
+        entry_node_id: crate::contracts::NodeId(0),
+        nodes: vec![pair_node(def, pair_refs())],
+    };
+    assert_eq!(
+        genome(grouped).genome_size() - genome(base).genome_size(),
+        13
+    );
+}
+
+#[test]
+fn a_pair_shape_round_trips_json_with_its_external_tag() {
+    let (mut def, id) = paired(DirectedVoteKind::StealEnergy, 6);
+    def.group_mut(id).set_scale(-0.5);
+    let json = serde_json::to_string(&def).unwrap();
+    assert!(
+        json.contains(r#"{"DirectionPair":{"ref_idx":2,"pair":1}}"#),
+        "{json}"
+    );
+    let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, def);
+    assert_eq!(format!("{decoded:?}"), format!("{def:?}"));
+    // A ring group's text is unchanged by the new variant.
+    let (ring_def, _) = grouped(DirectedVoteKind::Move, 0);
+    assert!(serde_json::to_string(&ring_def)
+        .unwrap()
+        .contains(r#"{"Ring":{"ring_ref":1}}"#));
+}
+
+proptest! {
+    /// Detach of a pair member is bitwise `compose` at its pattern.
+    #[test]
+    fn detaching_a_pair_member_preserves_its_genomic_weight_bitwise(
+        kind in 0usize..3,
+        offset in 0u8..8,
+        scale in -4.0f32..4.0,
+        own in -4.0f32..4.0,
+        pick in 0usize..12,
+    ) {
+        let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
+        def.group_mut(id).set_scale(scale);
+        let occurrence = def.members(id).nth(pick).unwrap();
+        def.edge_mut(occurrence).set_weight(own);
+        let pattern = def.member_pattern(occurrence, &pair_refs());
+        let before = def.genomic_weight(occurrence, &pair_refs());
+        prop_assert_eq!(before.to_bits(), compose(own, scale, pattern).to_bits());
+        let source = def.edge_at(occurrence).source();
+        let (moved, removed) = detach(&mut def, occurrence, &pair_refs());
+        prop_assert!(!removed);
+        let edge = def.edge_at(moved);
+        prop_assert_eq!(edge.membership(), None);
+        prop_assert_eq!(edge.source(), source);
+        prop_assert_eq!(edge.own_weight().to_bits(), before.to_bits());
+        prop_assert_eq!(def.members(id).count(), 11);
+    }
+
+    /// A pair group's shift or retarget followed by its inverse returns an
+    /// equal def, holes and a ring group beside it included.
+    #[test]
+    fn pair_shift_then_unshift_is_identity(
+        kind in 0usize..3,
+        offset in 0u8..8,
+        step in 1u8..8,
+        other_kind in 0usize..3,
+        holes in any::<u16>(),
+    ) {
+        let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
+        def.add_group(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
+        let members: Vec<_> = def.members(id).collect();
+        // Punch holes, keeping the first member.
+        for (i, occurrence) in members.into_iter().enumerate().skip(1).rev() {
+            if holes & (1 << i) != 0 {
+                def.remove_edge(occurrence);
+            }
+        }
+        let original = def.clone();
+        def.relocate_group(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
+        prop_assert!(def.check_local_invariants().is_ok());
+        prop_assert!(validate_graph(&pair_node(def.clone(), pair_refs())).is_ok());
+        def.relocate_group(id, DirectedVoteKind::ALL[kind], offset);
+        prop_assert_eq!(&def, &original);
     }
 }

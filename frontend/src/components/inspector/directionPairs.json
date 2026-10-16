@@ -1,0 +1,20 @@
+{
+	"AreaFoodSummary": [
+		{ "x": 1, "y": 2, "facts": [0, 5, 6] },
+		{ "x": 3, "y": 4, "facts": [0, 5, 6] }
+	],
+	"AreaBarrierSummary": [
+		{ "x": 2, "y": 3, "facts": [0, 1, 6] },
+		{ "x": 4, "y": 5, "facts": [0, 1, 6] }
+	],
+	"AreaOccupancySummary": [
+		{ "x": 1, "y": 2, "facts": [0, 5, 6] },
+		{ "x": 3, "y": 4, "facts": [0, 5, 6] }
+	],
+	"NearbyCreatureCore": [
+		{ "x": 1, "y": 2, "facts": [0, 3] },
+		{ "x": 5, "y": 6, "facts": [4, 7] },
+		{ "x": 9, "y": 10, "facts": [8, 11] },
+		{ "x": 13, "y": 14, "facts": [12, 15] }
+	]
+}

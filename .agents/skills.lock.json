@@ -92,7 +92,7 @@
     },
     {
       "path": "petri-visuals/spec.md",
-      "sha256": "2a9d576e58dcdf5f1c70dae58ec70bb6d2a245b499f2d56f7b19f373f4a0a11f"
+      "sha256": "00a146d91f87df99fde26b3400d3e4c6e1b9f6bfae9113178e3a313fba4b675b"
     },
     {
       "path": "petri-visuals/viz/build.sh",
@@ -104,11 +104,11 @@
     },
     {
       "path": "petri-visuals/viz/petri-viz.js",
-      "sha256": "b055617baa65ff09313fa30172c3ccdc0f19fd30c04b79932a12fe30c9d3cfca"
+      "sha256": "200b0331dae1031c3e7285b67b07a71de28153ea3ec03b52c272c8370b18f005"
     },
     {
       "path": "petri-visuals/viz/petri-viz.min.js",
-      "sha256": "444862be557d97a58f8a2c1c2cd5e873f738e7b5d73ccdfcb37c0272a53fc2c1"
+      "sha256": "a141000efe7aa37f131564628ee0cda1708af3c7e523d6355108b0eec82731d7"
     },
     {
       "path": "petri-visuals/viz/preview.sh",

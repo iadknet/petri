@@ -681,6 +681,13 @@ impl WorldTracking {
                 not_applicable_target_total: stats.mutation_not_applicable_target_total,
                 graph_edges_detached_total: stats.graph_edges_detached_total,
                 groups_removed_total: stats.groups_removed_total,
+                pair_group_inherited_nonzero_births_total: stats
+                    .pair_group_inherited_nonzero_births_total,
+                refinement_applications_by_key: stats
+                    .refinement_applications_total_by_key
+                    .iter()
+                    .map(|(key, count)| (key.as_key(), *count))
+                    .collect(),
             }),
             mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
             mutation_value_totals_by_operator: Some(
@@ -812,6 +819,11 @@ pub struct PersistenceSample {
     /// before T14.F10.
     #[serde(default)]
     pub occupancy_grid: Option<OccupancyGrid>,
+    /// The `DirectionPair` groups the living population carries on reachable
+    /// nodes (T25.F04, `pair-groups-v1`). `null` at extinction, absent in
+    /// reports stored before T25.F04.
+    #[serde(default)]
+    pub pair_groups: Option<super::pair_groups::PairGroups>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
 }
@@ -970,6 +982,7 @@ pub(super) struct PopulationReadings {
     pub(super) shannon_entropy_nats: String,
     sensor_census: SensorCensus,
     occupancy_grid: OccupancyGrid,
+    pair_groups: Option<super::pair_groups::PairGroups>,
 }
 
 impl PopulationReadings {
@@ -988,6 +1001,7 @@ impl PopulationReadings {
             shannon_entropy_nats,
             sensor_census: SensorCensus::observe(sim),
             occupancy_grid: OccupancyGrid::observe(sim),
+            pair_groups: super::pair_groups::PairGroups::observe(sim),
         }
     }
 }
@@ -1086,6 +1100,7 @@ impl PersistenceAccumulator {
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 sensor_census: Some(readings.sensor_census),
                 occupancy_grid: Some(readings.occupancy_grid),
+                pair_groups: readings.pair_groups.filter(|_| alive),
                 tracking: tracking(),
             });
         }

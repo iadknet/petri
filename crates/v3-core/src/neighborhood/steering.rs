@@ -260,6 +260,33 @@ mod tests {
         ));
     }
 
+    /// A pair group votes `Move` through its members (T25.F04).
+    #[test]
+    fn a_move_pair_group_votes_move_through_its_members() {
+        let area = InputReference::World(WorldInputKey::AreaFoodSummary {
+            type_idx: crate::contracts::OrdinaryFoodTypeId::new(0),
+        });
+        let genome_with = |kind| {
+            let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+            def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 2);
+            CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![area.clone()],
+                    backend_def: BackendDef::Graph(def),
+                    targets: vec![],
+                }],
+            }
+        };
+        let executed = BTreeSet::from([NodeId::new(0)]);
+        assert!(votes_move(&genome_with(DirectedVoteKind::Move), &executed));
+        assert!(!votes_move(
+            &genome_with(DirectedVoteKind::StealEnergy),
+            &executed
+        ));
+    }
+
     #[test]
     fn an_edge_or_add_vote_into_the_move_drive_votes_move() {
         use crate::creature::genome::cgp::{GraphEdge, GraphSource};

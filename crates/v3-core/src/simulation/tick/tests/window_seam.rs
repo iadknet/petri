@@ -207,10 +207,13 @@ fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // Uniform genome size (T25.F02), 2026-10-14: seed 16 to 21. At seed 16 a
     // traced target dies of a move at tick 49, inside its window; seeds 17 to
     // 20 also lose a target inside its window. The old size rule and anchor
-    // 97 restore seed 16.
+    // 97 restore seed 16. `AddDirectionPairGroup` (T25.F04 commit 1): seed 21
+    // to 24. At seed 21 a traced target dies of a move at tick 46, inside its
+    // window; seeds 22 and 23 also fail the check. Removing the catalog entry
+    // restores seed 21.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 21));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 21));
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 24));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 24));
         assert_equivalent(traced, plain, budget);
     }
 }

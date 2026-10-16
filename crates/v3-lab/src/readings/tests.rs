@@ -997,3 +997,54 @@ fn read_charges_the_ablated_copies_and_the_mutants() {
     let (_, ticks) = read(&setup, &batteries, &elite, Some((3, seed())));
     assert_eq!(ticks, causal_ticks + mutant_ticks);
 }
+
+/// The founder with an area-barrier summary on its entry node read by one
+/// `DirectionPair` group (T25.F04): `(genome, entry)`.
+fn pair_grouped_founder() -> (CreatureGenome, usize) {
+    let setup = setup(1, 100.0);
+    let mut genome = founder(&setup);
+    let (entry, summary) = with_ring(&mut genome, WorldInputKey::AreaBarrierSummary);
+    let layout = genome.nodes[entry].input_refs[usize::from(summary)].direction_pairs()[1];
+    let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
+        panic!("the founder entry is a graph node");
+    };
+    let id = graph.add_pair_group(summary, 1, layout, DirectedVoteKind::Move, 2);
+    graph.group_mut(id).set_scale(0.75);
+    (genome, entry)
+}
+
+/// The lab's sentinel scheme masks a pair family through its group's
+/// members, and the observation copy keeps size, complexity, the group,
+/// every membership and every member's genomic weight (T25.F04).
+#[test]
+fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_group() {
+    let (genome, entry) = pair_grouped_founder();
+    assert!(consumers(&genome)[&Family::AreaBarrierSummary].contains(&entry));
+    let ablated = ablate(&genome, Family::AreaBarrierSummary).unwrap();
+    let len = genome.nodes[entry].input_refs.len();
+    let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
+    let group = GroupId::new(0);
+    let reads: Vec<u16> = after
+        .members(group)
+        .map(|occurrence| match after.edge_at(occurrence).source() {
+            GraphSource::InputLeaf { ref_idx, .. } => ref_idx,
+            other => panic!("a member reads a leaf, not {other:?}"),
+        })
+        .collect();
+    assert_eq!(reads.len(), 12);
+    assert!(reads.iter().all(|&ref_idx| usize::from(ref_idx) >= len));
+    assert!(!consumers(&ablated).contains_key(&Family::AreaBarrierSummary));
+
+    assert_eq!(ablated.genome_size(), genome.genome_size());
+    assert_eq!(ablated.complexity(), genome.complexity());
+    assert_eq!(after.groups(), before.groups());
+    let memberships =
+        |def: &CgpGraphBackendDef| -> Vec<_> { def.edges().map(GraphEdge::membership).collect() };
+    assert_eq!(memberships(after), memberships(before));
+    let refs = &genome.nodes[entry].input_refs;
+    assert_eq!(after.sink_weight_rows(refs), before.sink_weight_rows(refs));
+    assert_ne!(
+        before.genomic_weight(before.members(group).next().unwrap(), refs),
+        0.0
+    );
+}

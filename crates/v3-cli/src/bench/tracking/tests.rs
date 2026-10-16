@@ -87,6 +87,12 @@ fn grid_for(population: u64) -> OccupancyGrid {
     }
 }
 
+/// A `pair_groups` block keyed to `tick`: no groups, the two counters
+/// traceable to the tick.
+fn pair_groups_for(tick: u64) -> crate::bench::pair_groups::PairGroups {
+    crate::bench::pair_groups::PairGroups::census(std::iter::empty(), tick, tick * 2)
+}
+
 /// The reading `PopulationReadings::observe` produces for an empty
 /// population: zero means that never reach the report, no surviving clade,
 /// undefined entropy, and an all-zero census.
@@ -102,6 +108,7 @@ fn empty_readings() -> PopulationReadings {
         shannon_entropy_nats: UNDEFINED.to_string(),
         sensor_census: census_for(0),
         occupancy_grid: grid_for(0),
+        pair_groups: None,
     }
 }
 
@@ -124,6 +131,7 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         shannon_entropy_nats: six(tick as f64 / 4.0),
         sensor_census: census_for(population),
         occupancy_grid: grid_for(population),
+        pair_groups: Some(pair_groups_for(tick)),
     }
 }
 
@@ -478,6 +486,7 @@ proptest! {
             shannon_entropy_nats: shannon_entropy_nats.map(six),
             sensor_census: Some(census_for(population)),
             occupancy_grid: Some(grid_for(population)),
+            pair_groups: None,
             tracking: WorldTracking::default(),
         };
 
@@ -673,6 +682,14 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.mutation_not_applicable_target_total = 3;
     stats.graph_edges_detached_total = 8;
     stats.groups_removed_total = 2;
+    stats.pair_group_inherited_nonzero_births_total = 5;
+    stats.refinement_applications_total_by_key.insert(
+        v3_core::mutation::types::RefinementKey {
+            family: v3_core::contracts::WorldInputKey::NearbyCreatureCore,
+            field: 3,
+        },
+        4,
+    );
     stats.mutation_outcome_summary = MutationValueTotals {
         carriers_observed_total: 5,
         survival_ticks_sum: 120,
@@ -729,6 +746,11 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             not_applicable_target_total: 3,
             graph_edges_detached_total: 8,
             groups_removed_total: 2,
+            pair_group_inherited_nonzero_births_total: 5,
+            refinement_applications_by_key: BTreeMap::from([(
+                "NearbyCreatureCore:3".to_string(),
+                4
+            )]),
         })
     );
     assert_eq!(
@@ -1294,6 +1316,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         shannon_entropy_nats: Some(six(1.25)),
         sensor_census: Some(census_for(5)),
         occupancy_grid: Some(grid_for(5)),
+        pair_groups: Some(pair_groups_for(100)),
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],
@@ -1330,6 +1353,11 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 not_applicable_target_total: 1,
                 graph_edges_detached_total: 4,
                 groups_removed_total: 1,
+                pair_group_inherited_nonzero_births_total: 3,
+                refinement_applications_by_key: BTreeMap::from([(
+                    "NearbyCreatureVitals:0".to_string(),
+                    2,
+                )]),
             }),
             mutation_outcome_summary: Some(MutationOutcomeTotals {
                 carriers_observed_total: 4,

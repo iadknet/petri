@@ -6,65 +6,12 @@ use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 /// Number of ranked nearby-creature slots.
 pub const NEARBY_SLOTS: usize = 4;
 
-// ── Compound sub-field index constants ──────────────────────────────────────
-// Per v3-sensor-spec.md Section 5. Prevents magic-number indexing in assembly.
-
-/// `AreaFoodSummary` sub-field indices (width 7).
-pub mod food_idx {
-    pub const TOTAL_RATIO: usize = 0;
-    pub const GRADIENT_X: usize = 1;
-    pub const GRADIENT_Y: usize = 2;
-    pub const NEAREST_DX: usize = 3;
-    pub const NEAREST_DY: usize = 4;
-    pub const NEAREST_DIST: usize = 5;
-    pub const MAX_VALUE: usize = 6;
-}
-
-/// `AreaBarrierSummary` sub-field indices (width 7).
-pub mod barrier_idx {
-    pub const DENSITY_RATIO: usize = 0;
-    pub const BLOCKED_ADJACENT_RATIO: usize = 1;
-    pub const GRADIENT_X: usize = 2;
-    pub const GRADIENT_Y: usize = 3;
-    pub const NEAREST_DX: usize = 4;
-    pub const NEAREST_DY: usize = 5;
-    pub const NEAREST_DIST: usize = 6;
-}
-
-/// `AreaOccupancySummary` sub-field indices (width 7).
-pub mod occupancy_idx {
-    pub const COUNT_RATIO: usize = 0;
-    pub const CENTER_X: usize = 1;
-    pub const CENTER_Y: usize = 2;
-    pub const NEAREST_DX: usize = 3;
-    pub const NEAREST_DY: usize = 4;
-    pub const NEAREST_DIST: usize = 5;
-    pub const CROWDING_RATIO: usize = 6;
-}
-
-/// `NearbyCreatureCore` per-slot field count and offsets.
-pub mod core_idx {
-    pub const FIELDS_PER_SLOT: usize = 4;
-    pub const PRESENT: usize = 0;
-    pub const REL_X: usize = 1;
-    pub const REL_Y: usize = 2;
-    pub const DIST: usize = 3;
-}
-
-/// `NearbyCreatureVitals` per-slot field count and offsets.
-pub mod vitals_idx {
-    pub const FIELDS_PER_SLOT: usize = 2;
-    pub const ENERGY_RATIO: usize = 0;
-    pub const REPRODUCE_READY: usize = 1;
-}
-
-/// `NearbyCreatureIdentity` per-slot field count and offsets.
-pub mod identity_idx {
-    pub const FIELDS_PER_SLOT: usize = 3;
-    pub const KIN_AFFINITY: usize = 0;
-    pub const LINEAGE_MATCH: usize = 1;
-    pub const PHENOTYPE_SIMILARITY: usize = 2;
-}
+// The compound sub-field index constants live with the layouts they index in
+// `contracts::inputs` (T25.F04); re-exported here so every reader compiles
+// unchanged.
+pub use crate::contracts::{
+    barrier_idx, core_idx, food_idx, identity_idx, occupancy_idx, vitals_idx,
+};
 
 /// Fixed-width extended perception snapshot assembled from the frozen world state.
 ///

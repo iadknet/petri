@@ -16,7 +16,7 @@ A spec is plain JSON. Full working example: `viz/example.json`.
 | `header` | Replaces `Graph (n in · m compute · k out)` |
 | `nodes` | The graph, see Node |
 | `groups` | `[{ "label", "ids": [...] }]`: dashed teal box around nodes in one column |
-| `edgeGroups` | `[{ "ring", "kind", "offset", "scale", "members"?, "own"?, "gain"?, "isNew"?, "note"? }]`: rows like the inspector's edge-group list (T25.F03); `offset` is any integer, read mod 8; `members` lists the ring cells present (`["N", "E", …]`, default all eight; a missing cell is a hole); `own` maps a cell to its member's correction (default 0), so the member votes at `scale + own`; `gain` names a node whose tick value scales the votes |
+| `edgeGroups` | `[{ "ring", "kind", "offset", "scale", "members"?, "own"?, "gain"?, "isNew"?, "note"? }]`: rows like the inspector's edge-group list (T25.F03); `offset` is any integer, read mod 8; `members` lists the ring cells present (`["N", "E", …]`, default all eight; a missing cell is a hole); `own` maps a cell to its member's correction (default 0), so the member votes at `scale + own`; `gain` names a node whose tick value scales the votes. The pair form (T25.F04) replaces `ring` with `pair: { "family", "x", "y" }`: `members` lists `field:DIR` cells (`["x:E", "y:N", …]`, default all twelve: `x` at NE E SE SW W NW, `y` at N NE SE S SW NW, relative to the offset), `own` is keyed the same way, and a member votes at `scale × compass + own` |
 | `edgeGroupsTitle` | Default `Edge groups` |
 | `grid` | `{ "title"?, "cols", "rows": [{ "label", "key", "w": [...] }], "vote"? }`: weight table; `key` is a node id (its tick value) or a number; a `null` weight shows "no edge"; `vote` names a bottom row of Σ value × weight per column |
 | `ticks` | Example ticks, see Tick; adds an "Example tick" button bar |
@@ -77,6 +77,8 @@ its text, so keep labels short and graphs to about five columns.
   the runtime). The node shows `old→new`.
 - `rings` gives an edge group's ring's 8 cells (N, NE, E, SE, S, SW, W, NW);
   the group row then lists the votes its members add.
+- `pairs` gives a pair group's family `[x, y]` offset (x east, y south);
+  the pair row then lists the votes its members add per direction.
 - `scene` draws a 7×7 view around the creature (white): `[dx, dy, "kin" |
   "stranger" | "other"]`, with dy positive = south. `arrow` is a direction or
   `{ "kind" }`, which picks the sink whose label contains `kind[DIR]` with the

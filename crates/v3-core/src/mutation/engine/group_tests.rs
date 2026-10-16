@@ -116,7 +116,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let all: Vec<usize> = (0..valid.nodes.len()).collect();
     for seed in 0..8 {
         let mut committed = valid.clone();
-        let (result, edits) = apply_graph_event(
+        let (result, edits, _) = apply_graph_event(
             &mut committed,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -128,7 +128,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         assert_eq!(edits.groups_removed, 1);
 
         let mut rolled_back = broken.clone();
-        let (result, edits) = apply_graph_event(
+        let (result, edits, refined) = apply_graph_event(
             &mut rolled_back,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -138,8 +138,57 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         );
         assert_eq!(result, Err(MutationSkipReason::GraphInvariantViolation));
         assert_eq!(edits, GroupEdits::default());
+        assert_eq!(refined, None);
         assert_eq!(rolled_back, broken);
     }
+}
+
+/// A committed `RefineHeritableStructure` reports the stepped set's key and
+/// the summary counts it once per application (T25.F04).
+#[test]
+fn a_committed_refinement_reports_its_key() {
+    use crate::creature::genome::cgp::{GraphEdge, GraphSource};
+    let mut genome = v3alpha1_founder_genome();
+    let idx = graph_index(&genome);
+    let node = &mut genome.nodes[idx];
+    let core = u16::try_from(node.input_refs.len()).unwrap();
+    node.input_refs
+        .push(InputReference::World(WorldInputKey::NearbyCreatureCore));
+    let def = graph_mut(node);
+    let sink = def
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+        .unwrap();
+    for slot in 0..2u16 {
+        let source = GraphSource::InputLeaf {
+            ref_idx: core,
+            sub_idx: 4 * slot + 3,
+        };
+        def.push_edge(sink, GraphEdge::new(source, 0.25));
+    }
+    let config = MutationConfig {
+        structured_heritable_refinement: true,
+        ..MutationConfig::default()
+    };
+    let all: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (result, _, refined) = apply_graph_event(
+        &mut genome,
+        GraphOperator::RefineHeritableStructure,
+        &mut TargetSelector::reachable_only(&all, 0.0),
+        &mut SmallRng::seed_from_u64(3),
+        &config,
+        2,
+    );
+    assert!(result.is_ok());
+    let key = crate::mutation::types::RefinementKey {
+        family: WorldInputKey::NearbyCreatureCore,
+        field: 3,
+    };
+    assert_eq!(refined, Some(key));
+    assert_eq!(key.as_key(), "NearbyCreatureCore:3");
+    let mut summary = MutationSummary::zero();
+    summary.record_refinement(key);
+    summary.record_refinement(key);
+    assert_eq!(summary.refinement_applications_by_key.get(&key), Some(&2));
 }
 
 #[test]
@@ -221,6 +270,7 @@ fn expected_delta(
         .collect();
     match op {
         MutationOperator::GraphAddRingGroup => Some(vec![9]),
+        MutationOperator::GraphAddDirectionPairGroup => Some(vec![13]),
         MutationOperator::GraphRemoveGroup => {
             Some(member_counts.iter().map(|n| -(n + 1)).collect())
         }
@@ -234,24 +284,37 @@ fn expected_delta(
     }
 }
 
-/// Adds one `Ring` group per entry of `groups` to the Graph `node`, all
-/// reading one appended occupied-ring reference, each with up to seven
-/// members dropped (a group keeps at least one).
-fn add_ring_groups(node: &mut NodeGenome, groups: &[(usize, u8, f32, u8)]) {
+/// One generated group: kind, offset, scale, the members to drop (a bit per
+/// member, the first always kept) and the shape (0 a `Ring`, 1 or 2 a
+/// `DirectionPair` on that pair index minus one).
+type GroupSpec = (usize, u8, f32, u16, u8);
+
+/// Adds one group per entry of `groups` to the Graph `node`: a `Ring` reads
+/// an appended occupied-ring reference, a `DirectionPair` an appended
+/// occupancy summary; each with members dropped (a group keeps at least
+/// one).
+fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
     let ring = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
         .push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
+    let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+    let summary = ring + 1;
+    node.input_refs.push(area.clone());
     let def = graph_mut(node);
-    for &(kind, offset, scale, drop) in groups {
-        let id = def.add_group(
-            Shape::Ring { ring_ref: ring },
-            DirectedVoteKind::ALL[kind],
-            offset,
-        );
+    for &(kind, offset, scale, drop, shape) in groups {
+        let kind = DirectedVoteKind::ALL[kind];
+        let id = match shape {
+            0 => def.add_group(Shape::Ring { ring_ref: ring }, kind, offset),
+            _ => {
+                let pair = shape - 1;
+                let layout = area.direction_pairs()[usize::from(pair)];
+                def.add_pair_group(summary, pair, layout, kind, offset)
+            }
+        };
         def.group_mut(id).set_scale(scale);
         let members: Vec<_> = def.members(id).collect();
-        for (channel, occurrence) in members.into_iter().enumerate().rev().skip(1) {
-            if drop & (1 << channel) != 0 {
+        for (index, occurrence) in members.into_iter().enumerate().rev() {
+            if index > 0 && drop & (1 << index) != 0 {
                 def.remove_edge(occurrence);
             }
         }
@@ -261,14 +324,14 @@ fn add_ring_groups(node: &mut NodeGenome, groups: &[(usize, u8, f32, u8)]) {
 /// The founder with ring groups on both Graph nodes — node 1 is routed from
 /// node 0, so Topology copies and swaps reach a grouped backend — and an
 /// appended VM node routed from node 1, so VM events have a target.
-fn grouped_mixed_genome(groups: &[Vec<(usize, u8, f32, u8)>; 2]) -> CreatureGenome {
+fn grouped_mixed_genome(groups: &[Vec<GroupSpec>; 2]) -> CreatureGenome {
     let mut genome = v3alpha1_founder_genome();
     let graphs: Vec<usize> = (0..genome.nodes.len())
         .filter(|&i| matches!(genome.nodes[i].backend_def, BackendDef::Graph(_)))
         .collect();
     assert_eq!(graphs.len(), 2, "the founder carries two Graph nodes");
     for (&idx, groups) in graphs.iter().zip(groups) {
-        add_ring_groups(&mut genome.nodes[idx], groups);
+        add_groups(&mut genome.nodes[idx], groups);
     }
     let vm_id = NodeId::new(genome.nodes.iter().map(|n| n.node_id.0).max().unwrap() + 1);
     genome.nodes[graphs[1]].targets.push(RouteTarget {
@@ -294,15 +357,16 @@ proptest! {
     /// random events of all four domains, the mesh layer's share drawn over
     /// [0, 1]: every applied event leaves every Graph backend valid, the gate
     /// never rejects one, and each group operator changes `genome_size` by
-    /// its declared amount (`AddRingGroup` +9, `RemoveGroup` −(n + 1), a last
+    /// its declared amount (`AddRingGroup` +9, `AddDirectionPairGroup` +13,
+    /// `RemoveGroup` −(n + 1), a last
     /// member's `RemoveGraphEdge` −2, the three record edits 0).
     #[test]
     fn every_applied_event_keeps_the_graph_invariants(
         seed in any::<u64>(),
         mesh_layer_probability in 0.0f64..=1.0,
         groups in [
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, 0u8..=u8::MAX), 0..4),
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, 0u8..=u8::MAX), 0..4),
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..3), 0..4),
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..3), 0..4),
         ],
     ) {
         let mut genome = grouped_mixed_genome(&groups);

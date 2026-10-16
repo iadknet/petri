@@ -263,8 +263,12 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // precondition. Re-seeded by T25.F02 (740 -> 2733): the uniform size
     // rule lowers the carrying cost and the mutation draw count, and 2733 is
     // the first seed from 740 whose tick-50 state meets the precondition;
-    // the old size rule and anchor 97 restore 740.
-    let mut sim = seed_simulation(cfg, 2733);
+    // the old size rule and anchor 97 restore 740. Re-seeded by T25.F04
+    // commit 1 (2733 -> 3249): `AddDirectionPairGroup` joins the Graph
+    // default arm and remaps every Graph draw; 3249 is the first seed from
+    // 2733 that passes both the unlowered and the lowered-cap case; removing
+    // the catalog entry restores 2733.
+    let mut sim = seed_simulation(cfg, 3249);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {

@@ -18,8 +18,9 @@ use crate::mutation::graph::{group, refinement, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
 
-const GROUP_OPERATORS: [GraphOperator; 5] = [
+const GROUP_OPERATORS: [GraphOperator; 6] = [
     GraphOperator::AddRingGroup,
+    GraphOperator::AddDirectionPairGroup,
     GraphOperator::AlterGroupScale,
     GraphOperator::ShiftGroupOffset,
     GraphOperator::RetargetGroupKind,
@@ -34,6 +35,14 @@ fn food(t: u16) -> InputReference {
     InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
         t,
     )))
+}
+
+fn area_barrier() -> InputReference {
+    InputReference::World(WorldInputKey::AreaBarrierSummary)
+}
+
+fn area_food(t: u16) -> InputReference {
+    InputReference::World(WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(t)))
 }
 
 /// The refs every grouped fixture reads: rings at 0 and 2.
@@ -84,11 +93,12 @@ fn id(index: usize) -> GroupId {
 }
 
 #[test]
-fn the_catalog_keeps_five_operators_at_their_edge_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 28);
+fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
+    assert_eq!(GraphOperator::ALL.len(), 29);
+    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 62);
     assert_eq!(&GraphOperator::ALL[23..], &GROUP_OPERATORS);
     let weights = GROUP_OPERATORS.map(GraphOperator::weight);
-    assert_eq!(weights, [2, 4, 2, 2, 2]);
+    assert_eq!(weights, [2, 2, 4, 2, 2, 2]);
     let default_arm: u16 = GraphOperator::ALL
         .iter()
         .filter(|op| {
@@ -99,12 +109,13 @@ fn the_catalog_keeps_five_operators_at_their_edge_tiers() {
         })
         .map(|op| u16::from(op.weight()))
         .sum();
-    assert_eq!(default_arm, 56);
+    assert_eq!(default_arm, 58);
     let keys = GROUP_OPERATORS.map(|op| graph_operator_key(op).as_key());
     assert_eq!(
         keys,
         [
             "Graph.AddRingGroup",
+            "Graph.AddDirectionPairGroup",
             "Graph.AlterGroupScale",
             "Graph.ShiftGroupOffset",
             "Graph.RetargetGroupKind",
@@ -118,10 +129,16 @@ fn the_catalog_keeps_five_operators_at_their_edge_tiers() {
         .filter(|op| op.complexity_effect().is_decreasing())
         .collect();
     assert_eq!(admitted, vec![GraphOperator::RemoveGroup]);
-    assert_eq!(
-        GraphOperator::AddRingGroup.complexity_effect(),
-        ComplexityEffect::Increasing
-    );
+    for add in [
+        GraphOperator::AddRingGroup,
+        GraphOperator::AddDirectionPairGroup,
+    ] {
+        assert_eq!(add.complexity_effect(), ComplexityEffect::Increasing);
+    }
+    let pair = GraphOperator::ALL
+        .iter()
+        .position(|&op| op == GraphOperator::AddDirectionPairGroup);
+    assert_eq!(pair, Some(24), "directly after AddRingGroup");
     for op in GROUP_OPERATORS {
         assert_eq!(
             op.complexity_effect(),
@@ -141,6 +158,7 @@ fn applicability_follows_rings_groups_and_hosting() {
     let plain = CgpGraphBackendDef::new_with_fixed_outputs;
     let none = genome(vec![InputReference::ActionVotes], plain());
     let ring = genome(vec![InputReference::ActionVotes, barrier()], plain());
+    let pair = genome(vec![InputReference::ActionVotes, area_barrier()], plain());
     let grouped = genome(refs(), three());
     // A graph missing a direction sink hosts no new group, while the group
     // it carries stays an edit site.
@@ -149,15 +167,17 @@ fn applicability_follows_rings_groups_and_hosting() {
     edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::StealEnergy(3)));
     });
-    assert!(!partial.can_host_ring_group());
+    assert!(!partial.can_host_group());
     let unhosted = genome(refs(), partial);
     for op in GROUP_OPERATORS {
         let applies = |g: &CreatureGenome| !GraphMutator::applicable_indices(g, op).is_empty();
-        let add = op == GraphOperator::AddRingGroup;
+        let add_ring = op == GraphOperator::AddRingGroup;
+        let add_pair = op == GraphOperator::AddDirectionPairGroup;
         assert!(!applies(&none), "{op:?}");
-        assert_eq!(applies(&ring), add, "{op:?}");
-        assert!(applies(&grouped), "{op:?}");
-        assert_eq!(applies(&unhosted), !add, "{op:?}");
+        assert_eq!(applies(&ring), add_ring, "{op:?}");
+        assert_eq!(applies(&pair), add_pair, "{op:?}");
+        assert_eq!(applies(&grouped), !add_pair, "{op:?}");
+        assert_eq!(applies(&unhosted), !add_ring && !add_pair, "{op:?}");
     }
     let vm = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -387,4 +407,176 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     );
     assert_eq!(node, before);
     assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>());
+}
+
+// ── `AddDirectionPairGroup` (T25.F04) ───────────────────────────────────────
+
+fn nearby_core() -> InputReference {
+    InputReference::World(WorldInputKey::NearbyCreatureCore)
+}
+
+/// Three draws in order — the pair over the flat list `(ref_idx ascending,
+/// pair ascending)`, the kind, the offset — and no further draw.
+#[test]
+fn add_pair_draws_pair_then_kind_then_offset_and_is_born_silent() {
+    let refs = vec![
+        InputReference::ActionVotes,
+        nearby_core(),
+        barrier(),
+        area_food(1),
+        area_barrier(),
+    ];
+    // NearbyCreatureCore: 4 pairs; AreaFoodSummary 2; AreaBarrierSummary 2.
+    let flat: Vec<(u16, u8)> = (0..4)
+        .map(|p| (1, p))
+        .chain((0..2).map(|p| (3, p)))
+        .chain((0..2).map(|p| (4, p)))
+        .collect();
+    for seed in 0..64 {
+        let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        group::add_pair(&mut node, &mut rng).unwrap();
+        let (ref_idx, pair) = flat[expected.gen_range(0..flat.len())];
+        let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
+        let offset = expected.gen_range(0..8u8);
+        let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
+        let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
+        want.add_pair_group(ref_idx, pair, layout, kind, offset);
+        assert_eq!(graph(&node), &want);
+        assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
+        assert!(validate_graph(&node).is_ok());
+        let def = graph(&node);
+        assert_eq!(def.groups()[0].scale(), 0.0);
+        assert_eq!(def.members(id(0)).count(), 12);
+    }
+}
+
+/// `AddDirectionPairGroup` spends no draw and skips on a graph that cannot
+/// host a group, and on a node declaring no pair.
+#[test]
+fn add_pair_skips_without_a_draw_without_a_site() {
+    let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
+    edit_sinks(&mut partial, |sinks| {
+        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Move(5)));
+    });
+    for mut node in [
+        graph_node(vec![area_barrier()], partial),
+        graph_node(
+            vec![barrier(), InputReference::ActionVotes],
+            CgpGraphBackendDef::new_with_fixed_outputs(),
+        ),
+    ] {
+        let before = node.clone();
+        let mut rng = SmallRng::seed_from_u64(9);
+        let mut untouched = SmallRng::seed_from_u64(9);
+        assert_eq!(
+            group::add_pair(&mut node, &mut rng),
+            Err(MutationSkipReason::NoApplicableTarget)
+        );
+        assert_eq!(node, before);
+        assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>());
+    }
+}
+
+/// The dispatcher reaches `add_pair` with the same draws.
+#[test]
+fn the_mutator_dispatches_add_direction_pair_group() {
+    let refs = vec![area_food(0), barrier()];
+    for seed in 0..16 {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![graph_node(refs.clone(), three())],
+        };
+        let mut direct = graph_node(refs.clone(), three());
+        GraphMutator::apply_to_node(
+            &mut genome,
+            GraphOperator::AddDirectionPairGroup,
+            0,
+            &mut SmallRng::seed_from_u64(seed),
+            &MutationConfig::default(),
+            1,
+        )
+        .unwrap();
+        group::add_pair(&mut direct, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        assert_eq!(graph(&genome.nodes[0]), graph(&direct), "seed {seed}");
+        assert_eq!(graph(&direct).groups().len(), 4);
+    }
+}
+
+/// The unit operators pick one group uniformly over a list mixing both
+/// shapes and keep their draws.
+#[test]
+fn unit_operators_pick_uniformly_over_both_shapes() {
+    let refs = vec![barrier(), area_food(0)];
+    let mixed = || {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+        let layout = refs[1].direction_pairs()[1];
+        let id = def.add_pair_group(1, 1, layout, DirectedVoteKind::Reproduce, 6);
+        def.group_mut(id).set_scale(0.25);
+        def
+    };
+    let mut seen = [false; 2];
+    for seed in 0..64 {
+        let before = mixed();
+        let mut node = graph_node(refs.clone(), before.clone());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        group::shift_offset(graph_mut(&mut node), &mut rng).unwrap();
+        let idx = expected.gen_range(0..2);
+        seen[idx] = true;
+        let step = if expected.gen_bool(0.5) { 1 } else { 7 };
+        let record = before.groups()[idx];
+        let mut want = before.clone();
+        want.relocate_group(id(idx), record.kind(), (record.offset() + step) % 8);
+        assert_eq!(graph(&node), &want);
+        assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
+        assert!(validate_graph(&node).is_ok());
+
+        let mut node = graph_node(refs.clone(), before.clone());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        group::alter_scale(graph_mut(&mut node), &mut rng).unwrap();
+        let idx = expected.gen_range(0..2);
+        let mut scale = before.groups()[idx].scale();
+        crate::mutation::graph::operators::perturb_weight(&mut scale, &mut expected);
+        let mut want = before.clone();
+        want.group_mut(id(idx)).set_scale(scale);
+        assert_eq!(graph(&node), &want);
+
+        let mut node = graph_node(refs.clone(), before.clone());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        group::retarget_kind(graph_mut(&mut node), &mut rng).unwrap();
+        assert!(validate_graph(&node).is_ok());
+
+        let mut node = graph_node(refs.clone(), before.clone());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        group::remove(graph_mut(&mut node), &mut rng).unwrap();
+        let mut want = before;
+        want.remove_group(id(expected.gen_range(0..2)));
+        assert_eq!(graph(&node), &want);
+        assert!(validate_graph(&node).is_ok());
+    }
+    assert_eq!(seen, [true, true]);
+}
+
+/// A pair reference at index 65,535 is a site; one at 65,536 is not.
+#[test]
+fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
+    let mut refs = vec![InputReference::ActionVotes; usize::from(u16::MAX)];
+    refs.push(area_barrier());
+    let mut last = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
+    refs.insert(0, InputReference::ActionVotes);
+    let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
+    assert_eq!(
+        group::add_pair(&mut last, &mut SmallRng::seed_from_u64(0)),
+        Ok(())
+    );
+    assert_eq!(graph(&last).groups()[0].shape().ref_idx(), u16::MAX);
+    assert_eq!(
+        group::add_pair(&mut past, &mut SmallRng::seed_from_u64(0)),
+        Err(MutationSkipReason::NoApplicableTarget)
+    );
 }

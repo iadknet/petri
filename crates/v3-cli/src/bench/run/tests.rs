@@ -580,7 +580,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // anchor 97 restore seed 4. T25.F02 commit 2 (default rate 0.005 ->
     // 0.0060625): seed 11 goes extinct at tick 91; seed 9 is the lowest of
     // 0..=60 that survives (9, 37, 45 and 50 do). Rate 0.005 restores seed 11.
-    params.seeds = vec![9];
+    // T25.F04 commit 1 (`AddDirectionPairGroup` remaps every Graph draw):
+    // seed 9 goes extinct; seed 25 is the lowest of 0..=200 that survives
+    // (25, 28, 37, 50, 53 and 64 are the first six). Removing the catalog
+    // entry restores seed 9.
+    params.seeds = vec![25];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

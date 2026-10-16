@@ -22,7 +22,7 @@ const EVAL_RS_SHA256 = "7633522e8358e69eca347c5b29321ba1b109bc41cd7f3b4f20777136
 // source (`compose(own, scale, pattern)`) the renderer's edgeGroups and the
 // inspector's member-weight fallback mirror. When group.rs changes, review
 // both, then update this fingerprint.
-const GROUP_RS_SHA256 = "33e4a4c91a6d1505582ef56bcb719af7a12a03412c0a0a677c62a64849b73763";
+const GROUP_RS_SHA256 = "2050558fb7b35ec06be3b7db9cd7d4167928820a214e96e02f2c8f5560cdf845";
 
 type Rgb = [number, number, number];
 interface PetriViz {
@@ -128,6 +128,37 @@ describe.each(["petri-viz.js", "petri-viz.min.js"])("petri-visuals renderer %s",
 		expect(host.textContent).toContain("2/8 ●○●○○○○○");
 		expect(host.textContent).toContain("Move[NE] +0.50, Move[SE] +0.75");
 		expect(host.textContent).not.toContain("Move[E]");
+	});
+
+	it("votes a pair group's members at scale times the compass plus correction", () => {
+		const host = document.createElement("div");
+		const pair = { family: "Food", x: "nearestDx", y: "nearestDy" };
+		viz.mount(host, {
+			views: [
+				{
+					nodes: [],
+					edgeGroups: [
+						{ pair, kind: "Move", offset: 0, scale: 1 },
+						{
+							pair,
+							kind: "Move",
+							offset: 0,
+							scale: 1,
+							members: ["x:E", "y:N"],
+							own: { "x:E": 0.25 },
+						},
+					],
+					// The thing lies due east: x = 1, y = 0.
+					ticks: [{ name: "t", values: {}, pairs: { Food: [1, 0] } }],
+				},
+			],
+			startTick: 0,
+		});
+		expect(host.textContent).toContain("Pair Food.nearestDx/nearestDy");
+		expect(host.textContent).toContain("12/12 ●●●●●●●●●●●●");
+		expect(host.textContent).toContain("Move[NE] +0.71, Move[E] +1.00, Move[SE] +0.71");
+		expect(host.textContent).toContain("2/12 ○●○○○○●○○○○○");
+		expect(host.textContent).toContain("Move[E] +1.25");
 	});
 
 	it.each(KINDS.map((kind) => [JSON.stringify(kind), kind] as const))(

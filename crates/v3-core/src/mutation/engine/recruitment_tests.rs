@@ -61,7 +61,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // the event keys and the genome text of every group-creating draw change
     // (12816372541544823979 -> 7833229115364439623); reverting the commit
     // restores.
-    assert_eq!(hash, 7833229115364439623, "pin of the recruitment-Off path");
+    // Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+    // default arm (weight 56 -> 58) and remaps every Graph draw
+    // (7833229115364439623 -> 4902026005096458209); removing the catalog
+    // entry alone restores.
+    assert_eq!(hash, 4902026005096458209, "pin of the recruitment-Off path");
 }
 
 #[test]

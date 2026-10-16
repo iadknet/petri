@@ -708,3 +708,55 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
     // The ordinary food consumer is untouched.
     assert_eq!(after.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
 }
+
+/// Masking a pair reference redirects every member of its `DirectionPair`
+/// group to the missing reference, so every member reads zero, while the
+/// group, its memberships and every member's genomic weight survive
+/// bitwise: the pattern resolves from the group's reference (T25.F04).
+#[test]
+fn masking_a_pair_reference_zeroes_every_member_read() {
+    use crate::creature::genome::cgp::GraphSource;
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
+    let refs = vec![area.clone(), food_here()];
+    let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
+    let BackendDef::Graph(def) = &mut node.backend_def else {
+        unreachable!()
+    };
+    let id = def.add_pair_group(0, 1, area.direction_pairs()[1], DirectedVoteKind::Move, 3);
+    def.group_mut(id).set_scale(0.75);
+    let genome = genome(vec![node]);
+    let family = channel(&area, 0).family;
+    let ablated = super::consumers::ablated(&genome, |c| c.family == family);
+    assert_eq!(ablated.genome_size(), genome.genome_size());
+    assert_eq!(ablated.complexity(), genome.complexity());
+    let (BackendDef::Graph(before), BackendDef::Graph(after)) =
+        (&genome.nodes[0].backend_def, &ablated.nodes[0].backend_def)
+    else {
+        unreachable!()
+    };
+    assert_eq!(after.groups(), before.groups());
+    let bits = |rows: Vec<Box<[f32]>>| -> Vec<Vec<u32>> {
+        rows.iter()
+            .map(|row| row.iter().map(|w| w.to_bits()).collect())
+            .collect()
+    };
+    assert_eq!(
+        bits(after.sink_weight_rows(&refs)),
+        bits(before.sink_weight_rows(&refs))
+    );
+    let mut redirected = 0;
+    for (old, new) in before.edges().zip(after.edges()) {
+        assert_eq!(new.membership(), old.membership());
+        if old.membership().is_some() {
+            redirected += 1;
+            let GraphSource::InputLeaf { ref_idx, .. } = new.source() else {
+                unreachable!("members read leaves")
+            };
+            assert!(refs.get(usize::from(ref_idx)).is_none(), "reads zero");
+        } else {
+            assert_eq!(new.source(), old.source());
+        }
+    }
+    assert_eq!(redirected, 12);
+}

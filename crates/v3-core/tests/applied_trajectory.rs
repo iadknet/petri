@@ -75,6 +75,13 @@
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
 //! commit, genome bytes included (a81e66c5..., gestation rate 0.0
 //! 17189f7a...); reverting the commit restores both old digests.
+//! Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+//! default arm (weight 56 -> 58) and remaps every Graph draw, moving all four
+//! digests (sampled 545c5490... -> f9778798..., gestation rate 0.0
+//! b5c8617d... -> ac6b54b7...; guard 2d0116fe... -> 45759536..., rate 0.0
+//! 61b219b0... -> 0ec61ea2...). With `mutation.per_unit_rate` 0 the sampled
+//! run is byte-identical across the commit (a93d6b87..., gestation rate 0.0
+//! 527a14e0...), and removing the catalog entry alone restores all four.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -86,11 +93,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "545c54907f7961aedaebc61b2ebc69323a4cb3698edb25d65497b4e8d8757ef4"
+        "f9778798f63c2f2aeff6a66897d4a894506fab9f4f4697e1cc2347e286757dc7"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "b5c8617d1cb47bc21e81c8c446e46201fd54dd6ce8c682e80034fac4e32a5c47"
+        "ac6b54b79cd94f1909b393c38b1d8e46e9a94b89a030ce23c0b174d1d3b38eec"
     );
 }
 
@@ -163,11 +170,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "2d0116fe148332cc867c1f248a75f5242c3fe7418ab03e08c35176c60e68d121"
+        "457595366f477a697819566ea05000618c0dcf30ec250e6691bac04d375eed43"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "61b219b00c29b1fba91b9ae355b68caaffea3a50ce29e58ae96530b1cf163991"
+        "0ec61ea283f6747aaf3d0f5d0e284fe8307358e0388d3eaedc05f84b53f3cdc8"
     );
 }
 

@@ -1,5 +1,153 @@
 use crate::contracts::OrdinaryFoodTypeId;
 
+// ── Compound sub-field index constants ──────────────────────────────────────
+// Per v3-sensor-spec.md Section 5. Prevents magic-number indexing in assembly.
+
+/// `AreaFoodSummary` sub-field indices (width 7).
+pub mod food_idx {
+    pub const TOTAL_RATIO: usize = 0;
+    pub const GRADIENT_X: usize = 1;
+    pub const GRADIENT_Y: usize = 2;
+    pub const NEAREST_DX: usize = 3;
+    pub const NEAREST_DY: usize = 4;
+    pub const NEAREST_DIST: usize = 5;
+    pub const MAX_VALUE: usize = 6;
+}
+
+/// `AreaBarrierSummary` sub-field indices (width 7).
+pub mod barrier_idx {
+    pub const DENSITY_RATIO: usize = 0;
+    pub const BLOCKED_ADJACENT_RATIO: usize = 1;
+    pub const GRADIENT_X: usize = 2;
+    pub const GRADIENT_Y: usize = 3;
+    pub const NEAREST_DX: usize = 4;
+    pub const NEAREST_DY: usize = 5;
+    pub const NEAREST_DIST: usize = 6;
+}
+
+/// `AreaOccupancySummary` sub-field indices (width 7).
+pub mod occupancy_idx {
+    pub const COUNT_RATIO: usize = 0;
+    pub const CENTER_X: usize = 1;
+    pub const CENTER_Y: usize = 2;
+    pub const NEAREST_DX: usize = 3;
+    pub const NEAREST_DY: usize = 4;
+    pub const NEAREST_DIST: usize = 5;
+    pub const CROWDING_RATIO: usize = 6;
+}
+
+/// `NearbyCreatureCore` per-slot field count and offsets.
+pub mod core_idx {
+    pub const FIELDS_PER_SLOT: usize = 4;
+    pub const PRESENT: usize = 0;
+    pub const REL_X: usize = 1;
+    pub const REL_Y: usize = 2;
+    pub const DIST: usize = 3;
+}
+
+/// `NearbyCreatureVitals` per-slot field count and offsets.
+pub mod vitals_idx {
+    pub const FIELDS_PER_SLOT: usize = 2;
+    pub const ENERGY_RATIO: usize = 0;
+    pub const REPRODUCE_READY: usize = 1;
+}
+
+/// `NearbyCreatureIdentity` per-slot field count and offsets.
+pub mod identity_idx {
+    pub const FIELDS_PER_SLOT: usize = 3;
+    pub const KIN_AFFINITY: usize = 0;
+    pub const LINEAGE_MATCH: usize = 1;
+    pub const PHENOTYPE_SIMILARITY: usize = 2;
+}
+
+/// One `(x, y)` offset a world family senses toward a thing, and the thing's
+/// plain facts (amount, distance, presence): what a `DirectionPair` edge
+/// group reads and recruitment's pair case wires (T25.F04). Field indices of
+/// the family's compound layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct DirectionPair {
+    /// The `x` offset field (right positive).
+    pub x: u16,
+    /// The `y` offset field (down positive).
+    pub y: u16,
+    /// The same thing's plain facts, in wiring order.
+    pub facts: &'static [u16],
+}
+
+// Field indices are `usize` for array indexing; every one is below 16.
+const fn pair(x: usize, y: usize, facts: &'static [u16]) -> DirectionPair {
+    DirectionPair {
+        x: x as u16,
+        y: y as u16,
+        facts,
+    }
+}
+
+const FOOD_FACTS: &[u16] = &[
+    food_idx::TOTAL_RATIO as u16,
+    food_idx::NEAREST_DIST as u16,
+    food_idx::MAX_VALUE as u16,
+];
+const FOOD_PAIRS: &[DirectionPair] = &[
+    pair(food_idx::GRADIENT_X, food_idx::GRADIENT_Y, FOOD_FACTS),
+    pair(food_idx::NEAREST_DX, food_idx::NEAREST_DY, FOOD_FACTS),
+];
+const BARRIER_FACTS: &[u16] = &[
+    barrier_idx::DENSITY_RATIO as u16,
+    barrier_idx::BLOCKED_ADJACENT_RATIO as u16,
+    barrier_idx::NEAREST_DIST as u16,
+];
+const BARRIER_PAIRS: &[DirectionPair] = &[
+    pair(
+        barrier_idx::GRADIENT_X,
+        barrier_idx::GRADIENT_Y,
+        BARRIER_FACTS,
+    ),
+    pair(
+        barrier_idx::NEAREST_DX,
+        barrier_idx::NEAREST_DY,
+        BARRIER_FACTS,
+    ),
+];
+const OCCUPANCY_FACTS: &[u16] = &[
+    occupancy_idx::COUNT_RATIO as u16,
+    occupancy_idx::NEAREST_DIST as u16,
+    occupancy_idx::CROWDING_RATIO as u16,
+];
+const OCCUPANCY_PAIRS: &[DirectionPair] = &[
+    pair(
+        occupancy_idx::CENTER_X,
+        occupancy_idx::CENTER_Y,
+        OCCUPANCY_FACTS,
+    ),
+    pair(
+        occupancy_idx::NEAREST_DX,
+        occupancy_idx::NEAREST_DY,
+        OCCUPANCY_FACTS,
+    ),
+];
+
+/// Slot `k` of `NearbyCreatureCore`'s fields at `offset`.
+const fn core_field(k: usize, offset: usize) -> u16 {
+    (k * core_idx::FIELDS_PER_SLOT + offset) as u16
+}
+const fn core_facts(k: usize) -> [u16; 2] {
+    [
+        core_field(k, core_idx::PRESENT),
+        core_field(k, core_idx::DIST),
+    ]
+}
+const CORE_FACTS: [[u16; 2]; 4] = [core_facts(0), core_facts(1), core_facts(2), core_facts(3)];
+/// Slot `k`: `(rel_x, rel_y)`, facts presence and distance.
+const fn core_slot(k: usize) -> DirectionPair {
+    DirectionPair {
+        x: core_field(k, core_idx::REL_X),
+        y: core_field(k, core_idx::REL_Y),
+        facts: &CORE_FACTS[k],
+    }
+}
+const CORE_PAIRS: &[DirectionPair] = &[core_slot(0), core_slot(1), core_slot(2), core_slot(3)];
+
 /// Identifies a world-state spatial sensor input.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -71,6 +219,20 @@ impl WorldInputKey {
             self,
             Self::NeighborFoodRing { .. } | Self::NeighborBarrierRing | Self::NeighborOccupiedRing
         )
+    }
+
+    /// The `(x, y)` offset pairs this family declares (T25.F04): two for each
+    /// area summary, one per ranked slot of `NearbyCreatureCore`, none for
+    /// every other key. Depends on the variant only, never on a food type.
+    #[must_use]
+    pub const fn direction_pairs(self) -> &'static [DirectionPair] {
+        match self {
+            Self::AreaFoodSummary { .. } => FOOD_PAIRS,
+            Self::AreaBarrierSummary => BARRIER_PAIRS,
+            Self::AreaOccupancySummary => OCCUPANCY_PAIRS,
+            Self::NearbyCreatureCore => CORE_PAIRS,
+            _ => &[],
+        }
     }
 
     /// Returns the typed food index for food-specific world keys, or `None` otherwise.
@@ -162,12 +324,157 @@ impl InputReference {
     pub const fn is_ring(&self) -> bool {
         matches!(self, Self::World(key) if key.is_neighbor_ring())
     }
+
+    /// The `(x, y)` pairs this reference declares (T25.F04): its world
+    /// key's [`WorldInputKey::direction_pairs`], none for a non-world
+    /// reference.
+    #[must_use]
+    pub const fn direction_pairs(&self) -> &'static [DirectionPair] {
+        match self {
+            Self::World(key) => key.direction_pairs(),
+            _ => &[],
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::contracts::OrdinaryFoodTypeId;
+
+    fn every_world_key() -> Vec<WorldInputKey> {
+        let food = (0..3).map(OrdinaryFoodTypeId::new);
+        crate::creature::sensor_census::world_input_key_universe(food)
+            .into_iter()
+            .collect()
+    }
+
+    #[test]
+    fn every_declared_pair_has_distinct_fields_below_the_width() {
+        for key in every_world_key() {
+            for pair in key.direction_pairs() {
+                let mut fields = vec![pair.x, pair.y];
+                fields.extend_from_slice(pair.facts);
+                assert!(fields.iter().all(|&f| f < key.compound_width()), "{key:?}");
+                let mut sorted = fields.clone();
+                sorted.sort_unstable();
+                sorted.dedup();
+                assert_eq!(sorted.len(), fields.len(), "{key:?}: {pair:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_four_layouts_declare_their_pairs_and_facts() {
+        let food = WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(2));
+        let layouts = [
+            (food, vec![(1, 2, vec![0, 5, 6]), (3, 4, vec![0, 5, 6])]),
+            (
+                WorldInputKey::AreaBarrierSummary,
+                vec![(2, 3, vec![0, 1, 6]), (4, 5, vec![0, 1, 6])],
+            ),
+            (
+                WorldInputKey::AreaOccupancySummary,
+                vec![(1, 2, vec![0, 5, 6]), (3, 4, vec![0, 5, 6])],
+            ),
+            (
+                WorldInputKey::NearbyCreatureCore,
+                (0..4u16)
+                    .map(|k| (4 * k + 1, 4 * k + 2, vec![4 * k, 4 * k + 3]))
+                    .collect(),
+            ),
+        ];
+        for (key, want) in layouts {
+            let got: Vec<_> = key
+                .direction_pairs()
+                .iter()
+                .map(|pair| (pair.x, pair.y, pair.facts.to_vec()))
+                .collect();
+            assert_eq!(got, want, "{key:?}");
+        }
+        let declaring = every_world_key()
+            .into_iter()
+            .filter(|key| !key.direction_pairs().is_empty())
+            .map(WorldInputKey::as_key)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            declaring,
+            [
+                "AreaBarrierSummary",
+                "AreaFoodSummary",
+                "AreaOccupancySummary",
+                "NearbyCreatureCore"
+            ]
+            .into()
+        );
+        assert!(InputReference::ActionVotes.direction_pairs().is_empty());
+        assert_eq!(
+            InputReference::World(food).direction_pairs(),
+            food.direction_pairs()
+        );
+    }
+
+    #[test]
+    fn the_moved_index_modules_match_the_compound_widths() {
+        let area = [
+            food_idx::MAX_VALUE,
+            barrier_idx::NEAREST_DIST,
+            occupancy_idx::CROWDING_RATIO,
+        ];
+        assert!(area.iter().all(|&last| last + 1 == 7));
+        assert_eq!(
+            core_idx::FIELDS_PER_SLOT * 4,
+            usize::from(WorldInputKey::NearbyCreatureCore.compound_width())
+        );
+        assert_eq!(
+            vitals_idx::FIELDS_PER_SLOT * 4,
+            usize::from(WorldInputKey::NearbyCreatureVitals.compound_width())
+        );
+        assert_eq!(
+            identity_idx::FIELDS_PER_SLOT * 4,
+            usize::from(WorldInputKey::NearbyCreatureIdentity.compound_width())
+        );
+        assert_eq!(
+            crate::sensors::perception::food_idx::NEAREST_DY,
+            food_idx::NEAREST_DY
+        );
+    }
+
+    #[test]
+    fn every_swap_alternative_keeps_the_pairs() {
+        for food_types in 1..=3 {
+            for key in every_world_key() {
+                let reference = InputReference::World(key);
+                for alternative in
+                    crate::mutation::input_ref::swap_alternatives(&reference, food_types)
+                {
+                    assert_eq!(
+                        alternative.direction_pairs(),
+                        reference.direction_pairs(),
+                        "{reference:?} -> {alternative:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_frontend_fixture_equals_the_declared_pairs() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../frontend/src/components/inspector/directionPairs.json"
+        ))
+        .expect("fixture parses");
+        let mut declared = serde_json::Map::new();
+        for key in every_world_key() {
+            if !key.direction_pairs().is_empty() {
+                declared.insert(
+                    key.as_key().to_owned(),
+                    serde_json::to_value(key.direction_pairs()).expect("serializes"),
+                );
+            }
+        }
+        assert_eq!(fixture, serde_json::Value::Object(declared));
+    }
 
     #[test]
     fn world_input_keys_constructible() {

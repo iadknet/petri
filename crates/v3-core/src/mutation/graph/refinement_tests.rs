@@ -187,6 +187,56 @@ fn refinement_never_steps_a_member() {
     ));
 }
 
+/// Two `NearbyCreatureCore` pair groups on slots 0 and 1 into one kind at
+/// one offset put slot 0's and slot 1's `rel_x` members on the same sinks —
+/// the shape of a ranked-slot set — yet refinement infers no set from them
+/// and, beside a real slot set, never steps one (T25.F04). An application
+/// reports the stepped set's `(family, field)`.
+#[test]
+fn refinement_never_steps_a_pair_member_and_reports_its_key() {
+    let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+    let add_pairs = |node: &mut NodeGenome, ref_idx: u16| {
+        for slot in 0..2u8 {
+            let layout = core.direction_pairs()[usize::from(slot)];
+            let id =
+                graph_mut(node).add_pair_group(ref_idx, slot, layout, DirectedVoteKind::Move, 0);
+            graph_mut(node).group_mut(id).set_scale(0.5);
+        }
+    };
+    let mut only_pairs = node();
+    only_pairs.input_refs.push(core.clone());
+    add_pairs(&mut only_pairs, 0);
+    assert!(all_sets(&only_pairs).is_empty());
+    assert!(!has_inferred_set(
+        graph(&only_pairs),
+        &only_pairs.input_refs
+    ));
+
+    let mut fixture = core_slots(0b0011);
+    add_pairs(&mut fixture, 0);
+    assert_eq!(all_sets(&fixture).len(), 1);
+    let members = |genome: &NodeGenome| -> Vec<GraphEdge> {
+        let def = graph(genome);
+        def.edges()
+            .filter(|edge| edge.membership().is_some())
+            .copied()
+            .collect()
+    };
+    let before = members(&fixture);
+    assert_eq!(before.len(), 24);
+    let expected = crate::mutation::types::RefinementKey {
+        family: WorldInputKey::NearbyCreatureCore,
+        field: all_sets(&fixture)[0].key.field,
+    };
+    for seed in 0..32 {
+        let mut refined = fixture.clone();
+        let key = refine(&mut refined, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        assert_eq!(key, expected);
+        assert_eq!(members(&refined), before);
+        assert_eq!(graph(&refined).groups(), graph(&fixture).groups());
+    }
+}
+
 #[test]
 fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_set() {
     let mut node = core_slots(0b1111);

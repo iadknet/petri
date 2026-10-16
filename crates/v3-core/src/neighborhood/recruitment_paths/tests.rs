@@ -2699,8 +2699,8 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
     assert_eq!(lineage.classification, LineageClass::CensoredAt64);
 }
 
-/// S0 arm 12 (`graph_prepared` / Drift) batch 22 lineage 0 retains its F06
-/// discovery (module 2) at generation 7 and deletes that module at depth 47,
+/// S0 arm 12 (`graph_prepared` / Drift) batch 1 lineage 3 retains its F06
+/// discovery (module 2) at generation 6 and deletes that module at depth 137,
 /// so the T13.F06 retention reading at +256 is `Deleted` with no score loss
 /// even though the founder modules at the same creation depth are still
 /// present. Fixture re-pinned at T25.F02 commit 1 (draw count through
@@ -2711,7 +2711,13 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// `docs/progress/readings/t25-f02.md`. The batch lies past the S0 panel's
 /// four batches: `lineage` seeds by position and `batches` only bounds the
 /// panel. Rate 0.005 restores batch 7 lineage 7; the old size rule and rate
-/// 0.005 together restore batch 2 lineage 2.
+/// 0.005 together restore batch 2 lineage 2. Re-pinned at T25.F04 commit 1
+/// (`AddDirectionPairGroup` remaps every Graph draw; batch 22 lineage 0 now
+/// reads `NoLongerUseful`): batch 1 lineage 3 is the first `Deleted`
+/// lineage of arm 12 in batch, lineage order (batches 0-40, lineages 0-15,
+/// discovery 9, followup 256), the search recorded in
+/// `docs/progress/readings/t25-f04.md`; removing the catalog entry restores
+/// batch 22 lineage 0.
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
     // The pinned lineage is the default rate's; check it before the 263-
@@ -2719,7 +2725,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
     assert_eq!(
         crate::config::MutationConfig::default().per_unit_rate,
         0.006_062_5,
-        "the batch 22 lineage 0 fixture is pinned at the default rate 0.0060625"
+        "the batch 1 lineage 3 fixture is pinned at the default rate 0.0060625"
     );
     let sizes = Sizes {
         batches: 4,
@@ -2734,12 +2740,12 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         ("graph_prepared", Policy::Drift)
     );
 
-    let lineage = assay.lineage(12, 22, 0);
+    let lineage = assay.lineage(12, 1, 3);
 
     let retention = lineage.retention.as_ref().unwrap();
-    assert_eq!(retention.discovery.generation, 7);
+    assert_eq!(retention.discovery.generation, 6);
     assert_eq!(retention.discovery.module.node, NodeId::new(2));
-    assert_eq!(retention.at_generation, 263);
+    assert_eq!(retention.at_generation, 262);
     assert_eq!(
         (retention.outcome, retention.score_loss),
         (RetentionOutcome::Deleted, None)
@@ -2750,7 +2756,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .iter()
         .find(|module| module.module.node == NodeId::new(2))
         .unwrap();
-    assert_eq!(module.module.deleted_depth, Some(47));
+    assert_eq!(module.module.deleted_depth, Some(137));
     assert!(!module.module.is_present());
     assert!(last
         .modules

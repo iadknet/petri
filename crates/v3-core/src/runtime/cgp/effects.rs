@@ -79,7 +79,7 @@ pub(crate) fn apply_cgp_graph_effects(
                     .iter()
                     .zip(sink.inputs.iter())
                     .all(|(weight, edge)| {
-                        weight.to_bits() == def.edge_weight(edge, input_refs).to_bits()
+                        weight.to_bits() == def.edge_weight(edge, sink.kind, input_refs).to_bits()
                     }),
             "the weight table is the genome's: rebuild runtime state after editing the genome"
         );

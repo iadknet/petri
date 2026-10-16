@@ -510,3 +510,244 @@ fn an_exhausted_visit_stages_no_member_term() {
     let (side, _, _) = visit(&group_only(), 0.0, false);
     assert!(side.dispatch_effects().0.iter().all(|&v| v == 0.0));
 }
+
+// ── Direction-pair groups (T25.F04) ─────────────────────────────────────────
+
+mod pair {
+    use super::*;
+    use crate::config::WorldEdgeMode;
+    use crate::contracts::{CreatureId, Position};
+    use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::state::CreatureState;
+    use crate::kernel::WorldState;
+    use crate::sensors::perception::PerceptionConfig;
+    use crate::sensors::reducers::assemble_perception;
+    use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
+    use slotmap::SlotMap;
+
+    /// What one fixture world holds besides the observer.
+    #[derive(Clone, Copy, Debug)]
+    enum Thing {
+        Food,
+        Barrier,
+        Creature,
+    }
+
+    const ORIGIN: (u16, u16) = (10, 10);
+
+    fn at(dx: i32, dy: i32) -> Position {
+        Position::new(
+            u16::try_from(i32::from(ORIGIN.0) + dx).unwrap(),
+            u16::try_from(i32::from(ORIGIN.1) + dy).unwrap(),
+        )
+    }
+
+    fn creature(id: CreatureId, position: Position) -> CreatureState {
+        CreatureState::new(
+            id,
+            v3alpha1_founder_genome(),
+            position,
+            50.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; 16],
+        )
+    }
+
+    /// The perception of an observer at `ORIGIN` on a 20×20 wrapped world
+    /// holding `thing` at each of `cells`.
+    fn perceive(thing: Thing, cells: &[(i32, i32)]) -> SensorSnapshot {
+        let mut world = WorldState::new(20, 20, WorldEdgeMode::Wrap);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let origin = at(0, 0);
+        let observer = creatures.insert_with_key(|id| creature(id, origin));
+        world.place_creature(origin, observer);
+        for &(dx, dy) in cells {
+            let cell = at(dx, dy);
+            match thing {
+                Thing::Food => world.set_food(cell, 1.0),
+                Thing::Barrier => world.set_barrier(cell, true),
+                Thing::Creature => {
+                    let other = creatures.insert_with_key(|id| creature(id, cell));
+                    world.place_creature(cell, other);
+                }
+            }
+        }
+        let config = PerceptionConfig::default();
+        let visible =
+            compute_visible_cells(origin, &world, get_visibility_table(config.vision_radius));
+        let mut sensors = sensors();
+        sensors.perception = assemble_perception(
+            observer,
+            &creatures[observer],
+            visible.cells(),
+            &world,
+            &creatures,
+            &config,
+        );
+        sensors
+    }
+
+    /// `kind`'s eight direction votes of a graph holding one pair group on
+    /// `refs[0]`'s pair `pair` at `offset`, scale 1.
+    fn direction_votes(
+        reference: &InputReference,
+        pair: u8,
+        kind: DirectedVoteKind,
+        offset: u8,
+        sensors: &SensorSnapshot,
+    ) -> [f32; 8] {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let layout = reference.direction_pairs()[usize::from(pair)];
+        let id = def.add_pair_group(0, pair, layout, kind, offset);
+        def.group_mut(id).set_scale(1.0);
+        let votes = effects_at(&def, std::slice::from_ref(reference), sensors)
+            .side
+            .dispatch_effects()
+            .0;
+        std::array::from_fn(|d| votes[kind.sink(d as u8).index()])
+    }
+
+    fn argmax(votes: &[f32; 8]) -> usize {
+        let best = votes.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let winners: Vec<_> = (0..8).filter(|&d| votes[d] == best).collect();
+        assert_eq!(winners.len(), 1, "a unique argmax: {votes:?}");
+        winners[0]
+    }
+
+    /// Each pair of each area family and slot 0 of `NearbyCreatureCore`.
+    fn cases() -> Vec<(Thing, InputReference, u8)> {
+        let food =
+            InputReference::World(WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(0)));
+        let barrier = InputReference::World(WorldInputKey::AreaBarrierSummary);
+        let crowd = InputReference::World(WorldInputKey::AreaOccupancySummary);
+        let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+        vec![
+            (Thing::Food, food.clone(), 0),
+            (Thing::Food, food, 1),
+            (Thing::Barrier, barrier.clone(), 0),
+            (Thing::Barrier, barrier, 1),
+            (Thing::Creature, crowd.clone(), 0),
+            (Thing::Creature, crowd, 1),
+            (Thing::Creature, core, 0),
+        ]
+    }
+
+    fn check_each_direction(offset: u8) {
+        for (thing, reference, pair) in cases() {
+            for (d, direction) in Direction::ALL.into_iter().enumerate() {
+                let sensors = perceive(thing, &[direction.delta()]);
+                for kind in DirectedVoteKind::ALL {
+                    let votes = direction_votes(&reference, pair, kind, offset, &sensors);
+                    assert_eq!(
+                        argmax(&votes),
+                        (d + usize::from(offset)) % 8,
+                        "{thing:?} {reference:?} pair {pair} {kind:?} toward {direction:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_pair_group_at_offset_0_votes_toward_a_thing_at_each_direction() {
+        check_each_direction(0);
+    }
+
+    #[test]
+    fn a_pair_group_at_offset_4_votes_away_from_a_thing_at_each_direction() {
+        check_each_direction(4);
+    }
+
+    /// Slots 1–3: `k` nearer creatures off the tested direction rank the
+    /// target `k`-th; only slot `k`'s pair is grouped, so the vote follows
+    /// the target alone.
+    #[test]
+    fn a_nearby_creature_slot_pair_votes_toward_its_ranked_creature() {
+        let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+        for k in 1..4u8 {
+            for (d, direction) in Direction::ALL.into_iter().enumerate() {
+                let (dx, dy) = direction.delta();
+                // The target two steps out; `k` nearer ones on adjacent cells
+                // at other directions.
+                let mut cells = vec![(2 * dx, 2 * dy)];
+                cells.extend(
+                    Direction::ALL
+                        .into_iter()
+                        .filter(|&other| other != direction)
+                        .take(usize::from(k))
+                        .map(Direction::delta),
+                );
+                let sensors = perceive(Thing::Creature, &cells);
+                for offset in [0u8, 4] {
+                    let votes = direction_votes(&core, k, DirectedVoteKind::Move, offset, &sensors);
+                    assert_eq!(
+                        argmax(&votes),
+                        (d + usize::from(offset)) % 8,
+                        "slot {k} toward {direction:?} at offset {offset}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn perception_strategy() -> impl Strategy<Value = [f32; 7]> {
+        prop::array::uniform7(-1.0f32..1.0)
+    }
+
+    proptest! {
+        /// A pair group (scale `s`, corrections `c_i`) votes bitwise as its
+        /// twelve ungrouped edges of weight `compose(c_i, s, pattern_i)` in
+        /// the I10 position, beside edges of other kinds.
+        #[test]
+        fn a_pair_group_equals_its_twelve_edges(
+            area in perception_strategy(),
+            kind in kind_strategy(),
+            offset in 0u8..8,
+            pair in 0u8..2,
+            scale in -4.0f32..4.0,
+            corrections in prop::collection::vec(-4.0f32..4.0, 12),
+            others in prop::collection::vec((0usize..27, -4.0f32..4.0), 0..4),
+        ) {
+            let mut sensors = sensors();
+            sensors.perception.area_barrier = area;
+            let refs = [InputReference::World(WorldInputKey::AreaBarrierSummary)];
+            let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
+            for (sink, w) in others {
+                let vote = VoteSink::from_index(sink).unwrap();
+                if DirectedVoteKind::of_sink(vote).is_some_and(|(k, _)| k == kind) {
+                    continue;
+                }
+                wire(&mut base, OutputSinkKind::ActionVote(vote), edge(memory(0, true), w));
+            }
+            let mut grouped = base.clone();
+            let layout = refs[0].direction_pairs()[usize::from(pair)];
+            let id = grouped.add_pair_group(0, pair, layout, kind, offset);
+            grouped.group_mut(id).set_scale(scale);
+            let members: Vec<_> = grouped.members(id).collect();
+            prop_assert_eq!(members.len(), 12);
+            for (occurrence, &own) in members.iter().zip(&corrections) {
+                grouped.edge_mut(*occurrence).set_weight(own);
+            }
+            let mut wired = base;
+            for occurrence in grouped.members(id) {
+                let member = grouped.edge_at(occurrence);
+                let EdgeSurface::SinkInput(sink) = occurrence.surface else {
+                    unreachable!("members are sink edges")
+                };
+                wire(
+                    &mut wired,
+                    grouped.output_sinks()[sink].kind,
+                    edge(member.source(), grouped.genomic_weight(occurrence, &refs)),
+                );
+            }
+            let a = effects_at(&grouped, &refs, &sensors).side.dispatch_effects().0;
+            let b = effects_at(&wired, &refs, &sensors).side.dispatch_effects().0;
+            prop_assert_eq!(a.map(f32::to_bits), b.map(f32::to_bits));
+        }
+    }
+}

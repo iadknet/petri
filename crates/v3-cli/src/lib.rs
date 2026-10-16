@@ -205,12 +205,21 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count() as u64;
-                groups += graph.groups().len() as u64;
+                // `Ring` groups only (T25.F04: a pair group is read by the
+                // `pair_groups` block).
+                let ring = |id: usize| {
+                    matches!(
+                        graph.groups()[id].shape(),
+                        v3_core::creature::genome::cgp::Shape::Ring { .. }
+                    )
+                };
+                groups += (0..graph.groups().len()).filter(|&id| ring(id)).count() as u64;
                 members += graph
                     .output_sinks()
                     .iter()
                     .flat_map(|sink| sink.inputs.iter())
-                    .filter(|edge| edge.membership().is_some())
+                    .filter_map(|edge| edge.membership())
+                    .filter(|membership| ring(membership.group.index()))
                     .count() as u64;
             }
         }

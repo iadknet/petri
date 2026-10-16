@@ -541,6 +541,7 @@ fn counters(f: &mut Families, s: &SimStats) {
         mutation_not_applicable_target_total,
         graph_edges_detached_total,
         groups_removed_total,
+        pair_group_inherited_nonzero_births_total,
         mesh_hops_total,
         vm_steps_total,
         graph_relax_iters_total,
@@ -789,6 +790,26 @@ fn mutations(f: &mut Families, s: &SimStats) {
                 .map(|(input, count)| (input.as_key().to_owned(), *count))
                 .collect()
         },
+    );
+
+    // T25.F04: committed refinement applications by the stepped set.
+    let mut refined: BTreeMap<(&'static str, u16), u64> = BTreeMap::new();
+    for (key, count) in &s.refinement_applications_total_by_key {
+        *refined.entry((key.family.as_key(), key.field)).or_default() += count;
+    }
+    f.push(
+        run_name("refinement_applications_total_by_key"),
+        Kind::Sum,
+        "",
+        refined.into_iter().map(|((family, field), count)| {
+            (
+                vec![
+                    ("petri.world_input", family.to_owned()),
+                    ("petri.field", field.to_string()),
+                ],
+                count.into(),
+            )
+        }),
     );
 
     value_families(

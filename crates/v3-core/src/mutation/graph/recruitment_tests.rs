@@ -468,12 +468,12 @@ fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
         let full = node();
         let hosting = Admission::new(&full.input_refs, graph(&full)).families(arm, 2);
-        assert!(graph(&full).can_host_ring_group());
+        assert!(graph(&full).can_host_group());
         let mut partial = node();
         edit_sinks(graph_mut(&mut partial), |sinks| {
             sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Reproduce(4)));
         });
-        assert!(!graph(&partial).can_host_ring_group());
+        assert!(!graph(&partial).can_host_group());
         let without = Admission::new(&partial.input_refs, graph(&partial)).families(arm, 2);
         let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
         assert!(hosting.iter().any(is_ring));

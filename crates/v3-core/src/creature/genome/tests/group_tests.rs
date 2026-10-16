@@ -103,7 +103,7 @@ proptest! {
             .groups()
             .iter()
             .map(|group| {
-                let Shape::Ring { ring_ref } = group.shape();
+                let ring_ref = group.shape().ref_idx();
                 refs[usize::from(ring_ref)].clone()
             })
             .collect();
@@ -112,7 +112,7 @@ proptest! {
         def.reindex_input_refs_after_removal(removed);
         prop_assert_eq!(def.groups().len(), expected.len());
         for (group, reference) in def.groups().iter().zip(&expected) {
-            let Shape::Ring { ring_ref } = group.shape();
+            let ring_ref = group.shape().ref_idx();
             prop_assert_eq!(&after_refs[usize::from(ring_ref)], reference);
         }
         let node = NodeGenome {
@@ -147,7 +147,7 @@ proptest! {
                 .unwrap();
         }
         let node = &mut genome.nodes[idx];
-        let Shape::Ring { ring_ref } = graph_mut(node).groups()[0].shape();
+        let ring_ref = graph_mut(node).groups()[0].shape().ref_idx();
         prop_assert_eq!(
             &node.input_refs[usize::from(ring_ref)],
             &InputReference::World(WorldInputKey::NeighborBarrierRing)

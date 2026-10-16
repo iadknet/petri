@@ -2661,6 +2661,93 @@ async fn get_creature_graph_weights_carry_member_genomic_weights() {
     assert!(body.get("genome").is_some());
 }
 
+/// `graph_weights` (T25.F04): one entry per actual member of a
+/// `DirectionPair` group — twelve at birth, eleven after a removal — at its
+/// genomic weight `scale × compass + own`; the genome names the shape.
+#[tokio::test]
+async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
+    use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::creature::genome::BackendDef;
+
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let edit = |remove_one: bool| {
+        let state = state.clone();
+        async move {
+            let mut handle = state.sim.lock().await;
+            let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+            let node = creature
+                .genome
+                .nodes
+                .iter_mut()
+                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
+            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs.push(area.clone());
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let group = def.add_pair_group(
+                ref_idx,
+                0,
+                area.direction_pairs()[0],
+                DirectedVoteKind::Move,
+                0,
+            );
+            def.group_mut(group).set_scale(2.0);
+            if remove_one {
+                let member = def.members(group).next().unwrap();
+                def.remove_edge(member);
+            }
+        }
+    };
+    edit(false).await;
+    let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["protocol_version"], "v3alpha7");
+    let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
+    assert_eq!(edges.len(), 12, "{body}");
+    let mut genomic: Vec<f64> = edges
+        .iter()
+        .map(|edge| edge["genomic"].as_f64().unwrap())
+        .collect();
+    genomic.sort_by(f64::total_cmp);
+    let diagonal = f64::from(2.0 * std::f32::consts::FRAC_1_SQRT_2);
+    assert_eq!(
+        genomic,
+        [
+            -2.0, -2.0, -diagonal, -diagonal, -diagonal, -diagonal, diagonal, diagonal, diagonal,
+            diagonal, 2.0, 2.0
+        ]
+    );
+    let shapes: Vec<&serde_json::Value> = body["genome"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|node| node["backend_def"]["Graph"]["groups"].as_array())
+        .flatten()
+        .map(|group| &group["shape"]["DirectionPair"])
+        .collect();
+    assert_eq!(shapes.len(), 1, "{body}");
+    assert_eq!(shapes[0]["pair"], 0);
+
+    edit(true).await;
+    let (_, body) = do_request(router(state), get_req(&uri)).await;
+    let nodes = body["graph_weights"].as_array().unwrap();
+    let edges = nodes[0]["edges"].as_array().unwrap();
+    assert_eq!(
+        edges.len(),
+        12 + 11,
+        "two groups: twelve and eleven members"
+    );
+}
+
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]

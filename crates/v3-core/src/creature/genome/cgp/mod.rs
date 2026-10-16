@@ -20,7 +20,9 @@ pub use container::{
     EdgeOccurrence, EdgeSurface, GraphInvariantViolation, GroupMut, OutputSink, OutputSinks,
 };
 pub use edge::{GraphEdge, GraphSource, Membership};
-pub use group::{compose, detach, ring_offset, Group, GroupId, Shape};
+pub use group::{
+    compose, detach, pair_birth_members, pair_relative, ring_offset, Group, GroupId, Shape,
+};
 
 // ── Compute layer ───────────────────────────────────────────────────────────
 
