@@ -1105,8 +1105,10 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// At the old 0.54 coverage GNU/Linux needed a separate pin because
 /// fertility generation's `f32::exp` rounds differently from macOS (identical
 /// positions and births, different digests). Under full coverage macOS aarch64
-/// and GNU/Linux aarch64 produce the same digest, so the platform branch was
-/// removed; reintroduce it if a split reappears. x86_64 is not measured here.
+/// and GNU/Linux aarch64 produce the same digest. Since T02.F08's partial
+/// bites (`bite_modifier`'s `f32::powf`) GNU/Linux x86_64 splits again
+/// (identical births, different digests), so [`platform_digest`] carries a
+/// separate x86_64 pin measured on the `ubuntu-24.04` CI runner.
 /// Reproducibility is scoped to locked versions/platform per
 /// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
@@ -1126,17 +1128,43 @@ fn founder_only_trajectory_digest_is_pinned() {
         (
             91,
             0,
-            "63650331ad3dfb2b0b6ef85079a86671fb014f5be0ef2dfd445c719c369e85b7".to_owned()
+            platform_digest(
+                "63650331ad3dfb2b0b6ef85079a86671fb014f5be0ef2dfd445c719c369e85b7",
+                "c6d8c806f500d34c4648ecdbe7942adddc9a94ad0138551e343029f1cc741a88"
+            )
         )
     );
+}
+
+/// The founder-only trajectory at gestation rate 0.0, pinned like
+/// [`founder_only_trajectory_digest_is_pinned`].
+#[test]
+fn founder_only_trajectory_without_gestation_is_pinned() {
     assert_eq!(
         founder_only_trajectory(Some(0.0)),
         (
             94,
             0,
-            "3a9d028b4fa039161ab47fc719c957cd0fff9c4ddaa88b9c58265a13695b75b8".to_owned()
+            platform_digest(
+                "3a9d028b4fa039161ab47fc719c957cd0fff9c4ddaa88b9c58265a13695b75b8",
+                "ed256c6b450e61a586720ab39bb6b3d678ad264cdee09b9692c4c84888af5062"
+            )
         )
     );
+}
+
+/// The pinned digest for this platform: GNU/Linux x86_64 rounds libm calls
+/// differently from macOS aarch64 and GNU/Linux aarch64, which share a digest.
+fn platform_digest(default: &str, linux_x86_64: &str) -> String {
+    if cfg!(all(
+        target_arch = "x86_64",
+        target_os = "linux",
+        target_env = "gnu"
+    )) {
+        linux_x86_64.to_owned()
+    } else {
+        default.to_owned()
+    }
 }
 
 /// Births, final population and trajectory digest of the founder-only run,
@@ -1155,7 +1183,10 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
         (
             89,
             0,
-            "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f".to_owned()
+            platform_digest(
+                "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f",
+                "73f3ae652d91a994ac10470e6134353087df26173e1192aa6c9e16f5848fe604"
+            )
         )
     );
 }
