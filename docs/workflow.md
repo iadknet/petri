@@ -23,14 +23,14 @@ Claude:
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
 | Mutation specialist | Opus 5.5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
 | Spec challenger | Codex Sol (`gpt-6.1-sol`), effort `high`, read-only, fresh thread per round | run by the spec owner; see "Codex channel" |
-| Reviewer | Codex Sol (`gpt-6.1-sol`), effort `high`, read-only, fresh thread | run by the orchestrator; checklist `.claude/agents/roadmap-reviewer.md` |
+| Reviewers | three Codex Sol (`gpt-6.1-sol`) jobs, effort `high`, read-only, fresh threads, one lens skill each | run by the orchestrator; see "Review" |
 
 The orchestrator delegates, verifies, and integrates; the thinking that needs
 the frontier model — writing the spec and resolving requirement questions
 during implementation — lives in one persistent Fable spec owner, resumed by
 `SendMessage`. Independent judgment comes from a different model family:
 Codex Sol challenges the spec adversarially before it is committed and
-performs the final diff review.
+performs the final diff review through three lens skills.
 `.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
 The intended advisor effort is `medium`, but neither Claude Code nor the API
 exposes an advisor effort setting, so that intent is recorded here and not
@@ -117,7 +117,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, as the spec's Verification Plan declares them, the benchmark profile runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Sol high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, as the spec's Verification Plan declares them, the benchmark profile runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as three fresh read-only Codex Sol high jobs, one lens skill each, through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -188,11 +188,32 @@ round's output file, and commit the plan
 only when that verdict is `ready` or every open blocking finding carries a
 rebuttal that round accepted.
 
+**Preparatory refactoring.** While writing the spec, the spec owner applies
+`$refactor-audit` in preparatory mode to the modules the feature will change,
+so the feature fixes a deficiency instead of working around it. Each
+`in-feature` refactor becomes a `Decision:` note, part of the feature's scope,
+and an Implementation Task the implementer's brief carries. An `accept`
+workaround gets a `Deferred:` note naming the row or reason that pays it, and
+an Implementation Task to write its `WORKAROUND(TNN.FNN): <intended design>`
+comment at the site. A `prerequisite` refactor or a `re-plan` finding is a
+blocker: the spec owner reports it, and the user decides. When the user approves
+a prerequisite row, the orchestrator adds it and the feature's dependency on it
+to the track roadmap on main, runs `make roadmap-check`, commits that planning
+change, and stops; the prerequisite then runs as its own feature before this
+one resumes.
+
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
 Codex Sol `high` job through the Codex channel. Its brief names the spec
 path, the original requirement, the roadmap contract, the feature's track row,
 dependency rows, and matching Notes entries, and asks Codex to break confidence
-that the spec is ready to implement. The attack surface is contradiction with
+that the spec is ready to implement, applying `$architecture-review` to the
+spec's decomposition and module placement and checking that the preparatory
+refactors it declares leave the feature no unmarked workaround. The brief asks
+for that skill's step-back challenge: whether the feature is a patch on a
+larger structural deficiency that a bigger change should address. Codex reports
+one as `blocking: step-back:` with its evidence. Only the user can choose
+between the patch and the bigger change, so an upheld step-back finding follows
+the blocker rule; the spec owner never rebuts it on its own authority. The attack surface is contradiction with
 the roadmap row or requirement, scope widened or narrowed, acceptance criteria
 that cannot be tested, claims about current code that the code does not
 support, missing invariants and edge cases, determinism, the natural-analog
@@ -349,25 +370,47 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 ### Review
 
-Run the final diff review as a fresh Codex Sol `high` job through the Codex
-channel. Its brief gives the worktree path, the feature ID, the spec path, and
-the spec sections the review needs: Goal, Inputs and Invariants, Telemetry,
-Verification, and Performance and Goal Impact when the feature is subject to
-it. It tells
-Codex to read the Review section of this file and
-`.claude/agents/roadmap-reviewer.md` as its checklist, ignoring that file's
-front matter, and to report one finding per line starting `P1:`, `P2:`, or
-`P3:` with file, line, issue, and smallest fix, followed by what it could not
-verify. The reviewer reads the feature's own track row and the
-matching track Notes entries, not the whole track. It never edits, never runs
-builds or tests, and never consults the spec owner. Do not reuse a spec
-challenge thread for this review. Quote the output file path and the findings in your own
+Run the final diff review as three fresh Codex Sol `high` jobs through the
+Codex channel, started together, one lens skill each. The skills live in
+`~/.agents/skills/`, where Codex loads them by name; they are user-level, so a
+host without them cannot run this step:
+
+| Lens | Skill | The brief adds |
+| --- | --- | --- |
+| Correctness | `$adversarial-code-review` | lens 1; the spec sections Goal, Inputs and Invariants, Telemetry, Verification, and Performance and Goal Impact when the feature is subject to it; the Review section of this file |
+| Design | `$architecture-review` | lens 2; the spec's Goal and Inputs and Invariants sections |
+| Code health | `$code-health-review` | lens 3; the spec's Goal section and its `Decision:` and `Deferred:` notes |
+
+Each brief also names `.claude/agents/roadmap-reviewer.md` as the project
+checklist, ignoring its front matter, and its lens section there. The design
+and code-health briefs name any later roadmap feature expected to extend the
+touched code, since their P2 test depends on it and they do not read the
+roadmap.
+
+Every brief gives the worktree path, the feature ID and the spec path, and
+asks for one finding per line starting `P1:`, `P2:`, or `P3:` with file, line,
+issue, and smallest fix, followed by what it could not verify. The design brief
+also allows ungraded `step-back:` lines, listed first. The design and
+code-health briefs tell Codex to start from the diff's code hunks and not to
+read the touched `docs/` files, the workflow documents, the roadmap row or the
+telemetry template: those are the correctness lens's inputs,
+and reading them in every job multiplies the cost. No reviewer edits, runs
+builds or tests, or consults the spec owner. Do not reuse a spec challenge
+thread for a review. Quote each output file path and the findings in your own
 message.
 
-Only a P1 finding blocks progress. P2 and P3 are advisory and are recorded as
-deferred review findings in the spec's "Notes for AI Agents" without expanding
-scope; a maintainability P2 on code a later feature will extend is worth one
-remediation pass, not scope creep. Allow one post-review remediation pass, given
+Only a P1 finding blocks progress. The design lens raises P1 only for a
+breach of a boundary `AGENTS.md` or the checklist's Petri boundaries list
+states, or for a module import cycle; the code-health lens raises P1 only
+for an unmarked workaround. A design-lens `step-back:` finding never blocks
+closure and is never remediated in the feature: record it as a `Deferred:`
+note and report it to the user at closure. P2 and P3 are advisory and are
+recorded as deferred review findings in the spec's "Notes for AI Agents"
+without expanding scope; a design or code-health P2 on code a later feature
+will extend is worth one remediation pass, not scope creep. Refactors of code
+the feature does not touch are never review findings: they come from an
+on-demand `$refactor-audit` area-mode run over one crate area, whose
+candidates become roadmap rows. Allow one post-review remediation pass, given
 to a fresh implementer with a brief naming the finding, the files, and the spec
 sections to update. Never silently waive a required check.
 
@@ -753,7 +796,7 @@ Agents": the `/usage` totals at closure (ask the user; `/usage` is a user
 command), each implementer brief's self-reported advisor consult count and the
 number of passes, the number of spec-owner resumes after the Plan step, the
 number of Codex challenge rounds with the final verdict, and the Codex
-reviewer's finding counts by severity. Telemetry only, never a success
+reviewers' finding counts by lens and severity. Telemetry only, never a success
 criterion.
 
 ## Codex, rationale, and history

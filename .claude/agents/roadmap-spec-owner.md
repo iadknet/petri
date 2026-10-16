@@ -44,7 +44,10 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Use the `research-first-planning`, `spec-writing`, and `spec-review` skills
   (via the Skill tool) to write the spec at
   `docs/specs/roadmap/tnn-fnn-<slug>.md` from `_feature-template.md` and
-  perform one readiness review. Declare the spec's Verification Plan: the
+  perform one readiness review. Apply `refactor-audit` in preparatory mode
+  as the workflow's "Preparatory refactoring" paragraph defines, so the
+  feature does not work around a deficiency it could fix. Declare the spec's
+  Verification Plan: the
   cheapest benchmark profiles and mutation-gate line that answer the
   feature's question, each with a one-sentence reason. Your self-review is not
   independent validation; the Codex challenge loop is.
