@@ -254,7 +254,7 @@ named value:
 | Commit | Pins | Mechanism | Restoring check |
 | --- | --- | --- | --- |
 | 1 | the catalog bijection test (28 / 56 / 61 → 29 / 58 / 62); `applied_trajectory.rs` four digests; `baseline_worlds.rs` digest; `mutation/engine/recruitment_tests.rs` (the supply pin its comment at `:49` explains); `mutation/graph/recruitment_tests.rs:223` and its regression file; the slow-tier and `--lib` recruitment-paths rows; the v3-cli trajectory fixtures (re-searched with every assertion and oracle unchanged, a weakened assertion being a requirement change for the spec owner); the gate and world-set deterministic blocks; the fixture seeds `reproduce_updates_domain_and_operator_mutation_stats` (100 → 101), `tick/tests/gestation.rs` lowered-cap identity (2733 → 3249) and `window_seam.rs` VM founders (21 → 24, `telemetry-seams`), assertions unchanged; the recruitment-paths known-deleting lineage (arm 12 batch 22 lineage 0 → batch 1 lineage 3, the first `Deleted` lineage of arm 12 in batch, lineage order, oracle unchanged; ratified by the spec owner 2026-10-16) | draw stream: the new weighted operator remaps every default-arm Graph draw (invariant 13); recruitment untouched | simulation state: with mutation off every trajectory of every genome is byte-identical across the commit (the founder-only viability siblings, and an `applied_trajectory.rs` sampled run with `mutation.per_unit_rate` 0); with mutation on, reverting the catalog entry alone restores every moved pin to its merge-base value (the implementer records old and new values per pin in the readings); a pin that moves under mutation off, or that hashes genome text and moves with mutation off, is reported to the spec owner. Reports: the `pair_groups` field and the `mutation_supply` map are expected additions, not pin movements |
-| 2 | the same pin set, re-pinned again | draw stream: recruitment's pair draw and plan (invariant 9) | the same mutation-off check; with mutation on, reverting the pair case alone restores every pin to its commit-1 value (old and new values recorded per pin) |
+| 2 | the same pin set, re-pinned again, except the slow-tier recruitment-paths rows, which were re-pinned once on the final code (`5c4b4d57`) and are attributed to commits 1 and 2 jointly (spec-owner ruling, 2026-10-16: the F03 precedent re-pinned the tier once on final code; the mutation-off check holds for both commits; a per-commit tier run would attribute an experiment pin on which no decision rests) | draw stream: recruitment's pair draw and plan (invariant 9) | the same mutation-off check; with mutation on, reverting the pair case alone restores every `--lib` and fixture pin to its commit-1 value (old and new values recorded per pin); the slow-tier rows' before and after values are recorded in the readings without a per-commit split |
 | 1 | `v3-server` detail-response tests and frontend fixtures naming the protocol version | `v3alpha7` | reverting the constant restores every value |
 
 **Measured verdict.** Pending.
@@ -296,3 +296,8 @@ named value:
 - Decision: (user, 2026-10-15) goal-long runs at most once or twice per
   track; F04 is the T25 carrier after F02 and takes F03's deferred
   40,000-tick ring readings on its run.
+- Exception: (spec owner, 2026-10-16) the slow-tier recruitment-paths rows
+  were re-pinned once on the final code, attributed to commits 1 and 2
+  jointly rather than one cause per commit; the Graph Drift discovery drop
+  (18 → 14) is a draw-stream reading inside the predeclaration, with no
+  per-proposal cause dump.
