@@ -81,23 +81,42 @@ proptest! {
         prop_assert!(validate_graph(&genome.nodes[idx]).is_ok());
     }
 
-    /// Removing a reference no group addresses keeps every group (and its
-    /// members) on the same `InputReference`.
+    /// Removing a reference no group addresses keeps every group of either
+    /// shape (and its members) on the same `InputReference` (T25.F03,
+    /// T25.F04).
     #[test]
     fn reindex_keeps_each_group_on_its_reference(
         mut refs in prop::collection::vec(reference_strategy(), 2..8),
-        picks in prop::collection::vec((any::<prop::sample::Index>(), 0usize..3, 0u8..8), 0..4),
+        picks in prop::collection::vec(
+            (any::<prop::sample::Index>(), 0usize..3, 0u8..8, any::<bool>()),
+            0..4,
+        ),
         removed in any::<prop::sample::Index>(),
     ) {
         refs.push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let removed = removed.index(refs.len() - 1) as u16;
-        let rings: Vec<u16> = (0..refs.len() as u16)
-            .filter(|&i| i != removed && refs[usize::from(i)].is_ring())
-            .collect();
+        refs.push(InputReference::World(WorldInputKey::AreaOccupancySummary));
+        let removed = removed.index(refs.len() - 2) as u16;
+        let sites = |pair: bool| -> Vec<u16> {
+            (0..refs.len() as u16)
+                .filter(|&i| i != removed)
+                .filter(|&i| {
+                    let reference = &refs[usize::from(i)];
+                    if pair { !reference.direction_pairs().is_empty() } else { reference.is_ring() }
+                })
+                .collect()
+        };
+        let (rings, pairs) = (sites(false), sites(true));
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        for (index, kind, offset) in &picks {
-            let ring_ref = rings[index.index(rings.len())];
-            def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::ALL[*kind], *offset);
+        for (index, kind, offset, pair) in &picks {
+            let kind = DirectedVoteKind::ALL[*kind];
+            if *pair {
+                let ref_idx = pairs[index.index(pairs.len())];
+                let layout = refs[usize::from(ref_idx)].direction_pairs()[0];
+                def.add_pair_group(ref_idx, 0, layout, kind, *offset);
+            } else {
+                let ring_ref = rings[index.index(rings.len())];
+                def.add_group(Shape::Ring { ring_ref }, kind, *offset);
+            }
         }
         let expected: Vec<InputReference> = def
             .groups()
@@ -124,8 +143,8 @@ proptest! {
         prop_assert!(validate_graph(&node).is_ok());
     }
 
-    /// `Prune` never deletes a group's ring, and every group reads the same
-    /// reference after it.
+    /// `Prune` never deletes a group's ring or pair reference, and every
+    /// group reads the same reference after it.
     #[test]
     fn prune_keeps_each_group_on_its_reference(
         extra in prop::collection::vec(reference_strategy(), 1..6),
@@ -140,7 +159,13 @@ proptest! {
         node.input_refs
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
         graph_mut(node).add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, offset);
+        let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+        let summary = node.input_refs.len() as u16;
+        node.input_refs.push(area.clone());
+        let layout = area.direction_pairs()[1];
+        graph_mut(node).add_pair_group(summary, 1, layout, DirectedVoteKind::StealEnergy, offset);
         prop_assert!(!prunable_indices(node).contains(&usize::from(ring)));
+        prop_assert!(!prunable_indices(node).contains(&usize::from(summary)));
         let mut rng = SmallRng::seed_from_u64(seed);
         while InputRefOperator::Prune.applies_to(&genome.nodes[idx], 1) {
             InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, idx, &mut rng, 1)
@@ -152,6 +177,8 @@ proptest! {
             &node.input_refs[usize::from(ring_ref)],
             &InputReference::World(WorldInputKey::NeighborBarrierRing)
         );
+        let pair_ref = graph_mut(node).groups()[1].shape().ref_idx();
+        prop_assert_eq!(&node.input_refs[usize::from(pair_ref)], &area);
         prop_assert!(validate_graph(node).is_ok());
     }
 }
