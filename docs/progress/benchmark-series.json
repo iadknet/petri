@@ -75,7 +75,8 @@
       "docs/progress/features/t11-f30-kind-drives.json",
       "docs/progress/features/input-mechanism-defaults.json",
       "docs/progress/features/t25-f02-uniform-genome-size.json",
-      "docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json"
+      "docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json",
+      "docs/progress/features/t25-f04-direction-pair-groups.json"
     ]
   },
   "goal": {
@@ -191,7 +192,8 @@
       "docs/progress/features/t11-f30-kind-drives-goal.json",
       "docs/progress/features/input-mechanism-defaults-goal.json",
       "docs/progress/features/t25-f02-uniform-genome-size-goal.json",
-      "docs/progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json"
+      "docs/progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json",
+      "docs/progress/features/t25-f04-direction-pair-groups-goal.json"
     ]
   },
   "goal_worlds_long": {

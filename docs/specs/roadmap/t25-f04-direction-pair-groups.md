@@ -181,7 +181,10 @@ Tests written first (file → test):
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred (full list here).
-- [ ] Benchmark profiles: summaries at
+- [ ] Benchmark profiles (gate and goal summaries and series entries
+      committed; goal-long summary over 1 MiB and not committed, open; raw
+      hashes, byte counts, exits and verdicts in the readings and the
+      Performance section): summaries at
       `docs/progress/features/t25-f04-direction-pair-groups.json` (gate),
       `...-goal.json`, `...-goal-long.json`; local raw hash/byte count and
       verification time checked, series entry points to the summary, no
@@ -257,12 +260,33 @@ named value:
 | 2 | the same pin set, re-pinned again, except the slow-tier recruitment-paths rows, which were re-pinned once on the final code (`5c4b4d57`) and are attributed to commits 1 and 2 jointly (spec-owner ruling, 2026-10-16: the F03 precedent re-pinned the tier once on final code; the mutation-off check holds for both commits; a per-commit tier run would attribute an experiment pin on which no decision rests) | draw stream: recruitment's pair draw and plan (invariant 9) | the same mutation-off check; with mutation on, reverting the pair case alone restores every `--lib` and fixture pin to its commit-1 value (old and new values recorded per pin); the slow-tier rows' before and after values are recorded in the readings without a per-commit split |
 | 1 | `v3-server` detail-response tests and frontend fixtures naming the protocol version | `v3alpha7` | reverting the constant restores every value |
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-16, HEAD `7be062bb`, one run each).**
+
+- Gate: CLI exit 0, outer 0, `severe=false`, wall clock -8.55% against F03
+  (ok); `plasticity_updates` +49.06% (flag, under the 50% severe line).
+- Goal: CLI exit 3, outer `make` 2, `severe=true`: `decided_passes` +263.3%
+  against F03 (severe), `vm_steps` +19.8% and `plasticity_updates` +11.4%
+  (flags); wall clock -5.32% (ok). `pair_groups.groups > 0` on all three
+  worlds; mean genome size fell on seeds 11 and 22 (the predeclared small
+  rise is not met there). A trajectory severe for the user to decide.
+- Goal-long: CLI exit 3, outer `make` 2, `severe=true` against both
+  references (`decided_passes` +179.3% against the epoch baseline,
+  `plasticity_updates` +54.1% against F02's goal-long); wall clock +22.4%
+  and +5.1% (ok). No extinction. Success Criterion 4 reading: met on all
+  three worlds (`inherited_nonzero_births_total` rises over 30,000 to
+  40,000 by 581,501 / 250,513 / 954,569 and `groups_nonzero >= 1` at all 101
+  samples, minimum 4,543 / 4,019 / 18,728). F03's ring readings:
+  `mean_ring_group_members` 7.73 / 7.75 / 7.66 (below 8), detached edges
+  and removed groups above 0 on every world; the comparison of
+  `ring_group_carriers` with F02's `projection_carriers` was not made.
+- The goal-long summary is 1,070,196 bytes, over the 1 MiB tracked-file
+  limit, so it is not committed (no series entry); see the readings.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f04-direction-pair-groups.json),
   [goal](../../progress/features/t25-f04-direction-pair-groups-goal.json),
-  [goal-long](../../progress/features/t25-f04-direction-pair-groups-goal-long.json).
+  goal-long `docs/progress/features/t25-f04-direction-pair-groups-goal-long.json`
+  (local only, untracked, SHA-256 `1a5e0440...5557ed` in the readings).
 - Full readings: [`docs/progress/readings/t25-f04.md`](../../progress/readings/t25-f04.md).
 
 ## Success Criteria
