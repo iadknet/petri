@@ -169,8 +169,15 @@ Tests written first (file → test):
       `pair_group_inherited_nonzero_births_total` in `always_names` and
       names `refinement_applications_by_key_total` among the families the
       seed-7 workload gives no key to (it goes extinct by tick ~800).
-- [ ] `make rust-test-slow` -> the recruitment-paths rows re-pinned, one
-      cause per commit -> result.
+- [x] `make rust-test-slow` -> exit 0 (`3 passed` v3-core experiment
+      pins, `6 passed` lab runs), log
+      `~/.local/share/petri-tools/slow/t25-f04/rust-test-slow-2026-10-15.log`.
+      Two recruitment-paths pins re-pinned on the final code (Graph Drift
+      `[18, 14, 12, 8]` -> `[14, 11, 10, 6]`, Selection `[18; 4]` ->
+      `[14; 4]`, VM Drift `[22, 15, 15, 7]` -> `[22, 16, 16, 7]`; cost
+      selection graph 16/16 -> 15/15, VM 20/20 -> 21/21); the two commits'
+      causes are not separated (the tier was not run at commit 1); the
+      readings file records old and new values.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred (full list here).
