@@ -591,7 +591,8 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
 /// Persistence checkpoint fields the page reads, each kept whole, and
 /// `mean_wired_sinks` (T25.F02), `mean_ring_groups` and
 /// `mean_ring_group_members` (T25.F03) and `pair_groups` (T25.F04), which
-/// the page does not read but the readings do.
+/// the page does not read but the readings do; `keep_sample` projects
+/// `pair_groups` further.
 const KEPT_SAMPLE_FIELDS: [&str; 16] = [
     "tick",
     "population",
@@ -609,6 +610,19 @@ const KEPT_SAMPLE_FIELDS: [&str; 16] = [
     "occupancy_grid",
     "sensor_census",
     "pair_groups",
+];
+/// `pair_groups` aggregates every checkpoint keeps; `rows` is kept only on
+/// each world's last checkpoint (T25.F04).
+const KEPT_PAIR_GROUP_FIELDS: [&str; 9] = [
+    "version",
+    "creatures",
+    "carriers",
+    "groups",
+    "groups_nonzero",
+    "groups_unreachable",
+    "members",
+    "add_applied_total",
+    "inherited_nonzero_births_total",
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
 /// `action_attempts` (T16.F02), `ring_rules` (T11.F31), and `drives` and
@@ -703,14 +717,38 @@ fn keep_neighborhood(source: &Value) -> Value {
     })
 }
 
+/// Project a checkpoint; `last` keeps its `pair_groups.rows`.
+fn keep_sample(source: &Value, last: bool) -> Value {
+    keep_object(source, |sample| {
+        let mut out = pick(sample, &KEPT_SAMPLE_FIELDS);
+        keep_field(&mut out, sample, "pair_groups", |groups| {
+            keep_object(groups, |groups| {
+                let mut out = pick(groups, &KEPT_PAIR_GROUP_FIELDS);
+                if last {
+                    keep_field(&mut out, groups, "rows", Value::clone);
+                }
+                out
+            })
+        });
+        out
+    })
+}
+
 fn keep_persistence(source: &Value) -> Value {
     let keep_row = |row: &Value| {
         keep_object(row, |row| {
             let mut out = pick(row, &KEPT_PERSISTENCE_FIELDS);
             keep_field(&mut out, row, "samples", |samples| {
-                keep_rows(samples, |sample| {
-                    keep_object(sample, |sample| pick(sample, &KEPT_SAMPLE_FIELDS))
-                })
+                match samples.as_array() {
+                    Some(samples) => Value::Array(
+                        samples
+                            .iter()
+                            .enumerate()
+                            .map(|(i, sample)| keep_sample(sample, i + 1 == samples.len()))
+                            .collect(),
+                    ),
+                    None => samples.clone(),
+                }
             });
             out
         })
@@ -1312,21 +1350,38 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
 mod tests {
     use super::*;
 
-    /// T25.F04: a checkpoint's `pair_groups` block survives the summary
-    /// projection whole.
+    /// T25.F04: every checkpoint keeps the `pair_groups` aggregates, and
+    /// `rows` survives only on each world's last checkpoint.
     #[test]
-    fn pair_groups_are_kept_by_the_summary_projection() {
-        let block = json!({"version": "pair-groups-v1", "groups": 2,
-            "rows": [{"family": "AreaFoodSummary", "kind": "Move", "offset": 0}]});
-        let persistence = json!({"per_seed": [{"seed": 1, "samples": [
-            {"tick": 100, "pair_groups": block, "dropped": 1},
-            {"tick": 200, "pair_groups": null}
-        ]}]});
+    fn pair_groups_keep_rows_only_on_the_last_sample() {
+        let aggregates = json!({"version": "pair-groups-v1", "creatures": 5,
+            "carriers": 3, "groups": 2, "groups_nonzero": 1, "groups_unreachable": 0,
+            "members": 24, "add_applied_total": 7, "inherited_nonzero_births_total": 4});
+        let mut block = aggregates.clone();
+        block["rows"] = json!([{"family": "AreaFoodSummary", "kind": "Move", "offset": 0}]);
+        block["unknown"] = json!(1);
+        let persistence = json!({"per_seed": [
+            {"seed": 1, "samples": [
+                {"tick": 100, "pair_groups": block, "dropped": 1},
+                {"tick": 200, "pair_groups": null},
+                {"tick": 300, "pair_groups": block}
+            ]},
+            {"seed": 2, "samples": [
+                {"tick": 100, "pair_groups": block},
+                {"tick": 200, "pair_groups": null}
+            ]}
+        ]});
         let kept = keep_persistence(&persistence);
-        let samples = &kept["per_seed"][0]["samples"];
-        assert_eq!(samples[0]["pair_groups"], block);
-        assert!(samples[0].get("dropped").is_none());
-        assert_eq!(samples[1]["pair_groups"], Value::Null);
+        let first = &kept["per_seed"][0]["samples"];
+        assert_eq!(first[0]["pair_groups"], aggregates);
+        assert!(first[0].get("dropped").is_none());
+        assert_eq!(first[1]["pair_groups"], Value::Null);
+        let mut last = aggregates.clone();
+        last["rows"] = block["rows"].clone();
+        assert_eq!(first[2]["pair_groups"], last);
+        let extinct = &kept["per_seed"][1]["samples"];
+        assert_eq!(extinct[0]["pair_groups"], aggregates);
+        assert_eq!(extinct[1]["pair_groups"], Value::Null);
     }
 
     /// T25.F04: the refinement-by-key map rides inside `mutation_supply`,
