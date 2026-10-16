@@ -156,15 +156,19 @@ Tests written first (file → test):
 
 ## Verification
 
-- [x] Viability first: `cargo test -p v3-core --test viability` -> 29 passed
-      before each commit; the founder-only digests do not move.
-- [x] Focused tests: the tests-first table -> `cargo test --workspace
-      --no-fail-fast` (v3-core lib 2,164 with `telemetry-seams`, every
-      integration binary, v3-cli, v3-server, v3-lab, v3-telemetry) all
-      passed at each commit; `cargo clippy --workspace --all-targets -- -D
-      warnings` clean; `cd frontend && npx vitest run` -> 98 files, 634
-      tests passed. Old and new value of every re-pin, three of them not
-      predeclared (fixture seeds), in the readings file.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 29
+      passed at HEAD; the founder-only digests do not move.
+- [x] Focused tests: the tests-first table -> `cargo test -p v3-core -p
+      v3-cli -p v3-telemetry -p v3-server -p v3-lab` (v3-core lib 2,164)
+      all passed; `cargo clippy --workspace --all-targets -- -D warnings`
+      clean; `cargo fmt --all -- --check` clean; `cd frontend && npx tsc
+      --noEmit -p .` clean, `npx biome check src` clean, `npx vitest run`
+      -> 98 files, 633 tests passed. Old and new value of every re-pin,
+      three of them not predeclared (fixture seeds), in the readings file.
+- [x] `scripts/telemetry-dashboards-check` lists
+      `pair_group_inherited_nonzero_births_total` in `always_names` and
+      names `refinement_applications_by_key_total` among the families the
+      seed-7 workload gives no key to (it goes extinct by tick ~800).
 - [ ] `make rust-test-slow` -> the recruitment-paths rows re-pinned, one
       cause per commit -> result.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
