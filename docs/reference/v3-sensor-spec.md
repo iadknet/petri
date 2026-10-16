@@ -360,6 +360,26 @@ Ranking order:
 
 Only visible non-self creatures participate.
 
+### 5.7 Direction pairs (T25.F04)
+
+The layouts above are declared once in `contracts::inputs` (the `food_idx`,
+`barrier_idx`, `occupancy_idx`, `core_idx`, `vitals_idx` and `identity_idx`
+modules, re-exported from `sensors::perception`). Beside them,
+`WorldInputKey::direction_pairs()` names each `(x, y)` offset a family senses
+toward a thing and that thing's plain facts, which a `DirectionPair` edge
+group reads (graph backend spec, "Direction-pair edge groups"):
+
+| Family | Pairs `(x, y)` | Facts |
+| --- | --- | --- |
+| `AreaFoodSummary` (any food type) | `(gradient_x, gradient_y)` 1, 2; `(nearest_dx, nearest_dy)` 3, 4 | 0, 5, 6 |
+| `AreaBarrierSummary` | 2, 3; 4, 5 | 0, 1, 6 |
+| `AreaOccupancySummary` | `(center_x, center_y)` 1, 2; 3, 4 | 0, 5, 6 |
+| `NearbyCreatureCore` | slot `k`: `(rel_x, rel_y)` `4k+1`, `4k+2` | `4k`, `4k+3` |
+
+Every other key declares none. Eligibility depends on the variant only, so
+every `InputRef.Swap` alternative of a pair-declaring reference declares the
+same pairs.
+
 ---
 
 ## 6. Field Definitions and Normalization

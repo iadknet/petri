@@ -126,16 +126,16 @@ test.
 
 ## Implementation Tasks
 
-- [ ] **Commit 1 (the shape and the operator), tests first** (table
+- [x] **Commit 1 (the shape and the operator), tests first** (table
       below): invariants 1–8 and 10–13 in the order declaration → compass
       and pattern → container → operator → counter and block → readers,
       server, inspector and petri-visuals; recruitment untouched. Re-pins
       by the catalog draw stream only.
-- [ ] **Commit 2 (recruitment's pair case), tests first**: invariant 9.
+- [x] **Commit 2 (recruitment's pair case), tests first**: invariant 9.
       Re-pins by the recruitment draw and plan only.
-- [ ] No text-only commit: no existing genome text changes. A later commit
+- [x] No text-only commit: no existing genome text changes. A later commit
       that moves no pin (inspector, viz, docs) may be split off.
-- [ ] Reference specs rewritten for two shapes (Inputs table, last row);
+- [x] Reference specs rewritten for two shapes (Inputs table, last row);
       `docs/progress/benchmark-series.json` gains no entry unless a
       definition changes (none is predeclared); `docs/benchmark-artifacts.md`
       untouched.
@@ -156,9 +156,15 @@ Tests written first (file → test):
 
 ## Verification
 
-- [ ] Viability first: `cargo test -p v3-core --test viability` -> result.
-- [ ] Focused tests: the tests-first table -> `cargo test -p v3-core`,
-      `-p v3-cli`, `-p v3-server`, `-p v3-lab`, `cd frontend && npm test` -> results.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 29 passed
+      before each commit; the founder-only digests do not move.
+- [x] Focused tests: the tests-first table -> `cargo test --workspace
+      --no-fail-fast` (v3-core lib 2,164 with `telemetry-seams`, every
+      integration binary, v3-cli, v3-server, v3-lab, v3-telemetry) all
+      passed at each commit; `cargo clippy --workspace --all-targets -- -D
+      warnings` clean; `cd frontend && npx vitest run` -> 98 files, 634
+      tests passed. Old and new value of every re-pin, three of them not
+      predeclared (fixture seeds), in the readings file.
 - [ ] `make rust-test-slow` -> the recruitment-paths rows re-pinned, one
       cause per commit -> result.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
