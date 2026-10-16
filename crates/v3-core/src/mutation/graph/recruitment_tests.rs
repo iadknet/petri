@@ -221,7 +221,10 @@ proptest! {
         }
         // A ring family landing on a directed vote sink becomes one silent
         // `Ring` group of eight born-0 members in place of its edges
-        // (T25.F03).
+        // (T25.F03); a pair family under WholeFamily, one silent
+        // `DirectionPair` group of twelve born-0 members over the kind's eight
+        // direction sinks plus its facts into the kind's drive: 15 edges for an
+        // area family, 14 for a creature slot (T25.F04).
         let grouped = after_graph.groups().len() - before_graph.groups().len();
         prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
@@ -232,9 +235,20 @@ proptest! {
             prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {
             prop_assert_eq!(grouped, 1);
-            prop_assert_eq!((changed, added), (8, 8));
             let id = crate::creature::genome::cgp::GroupId::new(0);
-            prop_assert_eq!(after_graph.members(id).count(), 8);
+            match after_graph.groups()[0].shape() {
+                crate::creature::genome::cgp::Shape::Ring { .. } => {
+                    prop_assert_eq!((changed, added), (8, 8));
+                    prop_assert_eq!(after_graph.members(id).count(), 8);
+                }
+                crate::creature::genome::cgp::Shape::DirectionPair { .. } => {
+                    prop_assert!(whole);
+                    prop_assert_eq!(changed, 9);
+                    prop_assert!(added == 15 || added == 14, "{}", added);
+                    prop_assert!((1..=30).contains(&added));
+                    prop_assert_eq!(after_graph.members(id).count(), 12);
+                }
+            }
         }
         prop_assert_eq!(after_graph.compute_nodes(), before_graph.compute_nodes());
         prop_assert_eq!(&fixture.targets, &before.targets);
@@ -476,12 +490,227 @@ fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
         assert!(!graph(&partial).can_host_group());
         let without = Admission::new(&partial.input_refs, graph(&partial)).families(arm, 2);
         let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
+        // Under WholeFamily the pair case's preflight drops pair-declaring
+        // families too (T25.F04, `pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive`).
+        let pair_plan = |family: &SourceFamily| {
+            arm == Arm::WholeFamily
+                && matches!(family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty())
+        };
         assert!(hosting.iter().any(is_ring));
         assert!(!without.iter().any(is_ring));
         let others: Vec<_> = hosting
             .into_iter()
-            .filter(|family| !is_ring(family))
+            .filter(|family| !is_ring(family) && !pair_plan(family))
             .collect();
         assert_eq!(without, others);
+    }
+}
+
+// ── The pair case (T25.F04) ─────────────────────────────────────────────────
+
+fn area_food() -> InputReference {
+    InputReference::World(crate::contracts::WorldInputKey::area_food_summary(
+        crate::contracts::OrdinaryFoodTypeId::new(0),
+    ))
+}
+
+fn nearby_core() -> InputReference {
+    InputReference::World(crate::contracts::WorldInputKey::NearbyCreatureCore)
+}
+
+/// The edges of `kind`'s drive sink.
+fn drive_edges(
+    def: &CgpGraphBackendDef,
+    kind: crate::creature::genome::vote::DirectedVoteKind,
+) -> Vec<GraphEdge> {
+    def.sink(OutputSinkKind::ActionVote(kind.drive()))
+        .unwrap()
+        .inputs
+        .to_vec()
+}
+
+#[test]
+fn a_pair_family_on_a_directed_sink_becomes_one_group_and_its_facts_into_the_drive() {
+    use crate::creature::genome::cgp::{GroupId, Shape};
+    use crate::creature::genome::vote::DirectedVoteKind;
+    for (reference, pair, facts) in [
+        (area_food(), 1u8, vec![0u16, 5, 6]),
+        (nearby_core(), 2, vec![8, 11]),
+    ] {
+        let mut fixture = node();
+        recruit_source_with_pair(
+            &mut fixture,
+            &SourceFamily::Input(reference.clone()),
+            Arm::WholeFamily,
+            VoteSink::StealEnergy(3),
+            pair,
+        )
+        .unwrap();
+        assert_eq!(fixture.input_refs, vec![reference.clone()]);
+        let def = graph(&fixture);
+        assert_eq!(def.groups().len(), 1);
+        let group = def.groups()[0];
+        assert_eq!(
+            (group.shape(), group.kind(), group.offset(), group.scale()),
+            (
+                Shape::DirectionPair { ref_idx: 0, pair },
+                DirectedVoteKind::StealEnergy,
+                3,
+                0.0
+            )
+        );
+        assert_eq!(def.members(GroupId::new(0)).count(), 12);
+        let drive: Vec<_> = drive_edges(def, DirectedVoteKind::StealEnergy);
+        let want: Vec<_> = facts
+            .iter()
+            .map(|&sub_idx| {
+                GraphEdge::new(
+                    GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx,
+                    },
+                    0.0,
+                )
+            })
+            .collect();
+        assert_eq!(drive, want, "the facts in order, born 0, ungrouped");
+        assert_eq!(def.edges().count(), 12 + facts.len());
+        assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
+        let node_genome = fixture.clone();
+        assert_eq!(
+            crate::creature::genome::cgp::validate_graph(&node_genome),
+            Ok(())
+        );
+    }
+}
+
+#[test]
+fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family() {
+    // SingleChannel on a directed sink: one ordinary edge.
+    let mut single = node();
+    recruit_source(
+        &mut single,
+        &SourceFamily::Input(area_food()),
+        Arm::SingleChannel,
+        4,
+        VoteSink::Move(2),
+    )
+    .unwrap();
+    assert!(graph(&single).groups().is_empty());
+    assert_eq!(graph(&single).edges().count(), 1);
+    // WholeFamily on an undirected destination: the whole-family edges.
+    let mut whole = node();
+    recruit_source(
+        &mut whole,
+        &SourceFamily::Input(area_food()),
+        Arm::WholeFamily,
+        0,
+        VoteSink::Eat,
+    )
+    .unwrap();
+    assert!(graph(&whole).groups().is_empty());
+    assert_eq!(graph(&whole).edges().count(), 7);
+}
+
+/// `recruit`'s draws under `WholeFamily`: the family, the destination, and
+/// only for a pair-declaring family landing on a directed sink, one pair
+/// `gen_range(0..pairs)`; nothing after.
+#[test]
+fn the_pair_case_draws_family_then_destination_then_pair() {
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let mut paired = 0;
+    for seed in 0..512 {
+        let mut fixture = node();
+        let mut rng = SmallRng::seed_from_u64(seed);
+        recruit(&mut fixture, Arm::WholeFamily, 2, &mut rng).unwrap();
+
+        let mut replay = SmallRng::seed_from_u64(seed);
+        let base = node();
+        let admission = Admission::new(&base.input_refs, graph(&base));
+        let families = admission.families(Arm::WholeFamily, 2);
+        let family = families.choose(&mut replay).unwrap().clone();
+        let sites = destinations(graph(&base));
+        let destination = *sites.choose(&mut replay).unwrap();
+        let OutputSinkKind::ActionVote(vote) = graph(&base).output_sinks()[destination].kind else {
+            unreachable!("destinations are vote sinks")
+        };
+        let pairs = match &family {
+            SourceFamily::Input(reference) => reference.direction_pairs().len(),
+            _ => 0,
+        };
+        let mut expected = base.clone();
+        if pairs > 0 && DirectedVoteKind::of_sink(vote).is_some() {
+            let pair = u8::try_from(replay.gen_range(0..pairs)).unwrap();
+            recruit_source_with_pair(&mut expected, &family, Arm::WholeFamily, vote, pair).unwrap();
+            paired += 1;
+        } else {
+            recruit_source(&mut expected, &family, Arm::WholeFamily, 0, vote).unwrap();
+        }
+        assert_eq!(fixture, expected, "seed {seed}");
+        assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
+    }
+    assert!(paired > 0, "some seed takes the pair case");
+}
+
+/// The preflight: under `WholeFamily`, pair-declaring families leave the
+/// universe when the graph cannot host a group or any kind's drive sink is
+/// absent; under `SingleChannel` they stay.
+#[test]
+fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let declares = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty());
+    let full = node();
+    let hosting = Admission::new(&full.input_refs, graph(&full)).families(Arm::WholeFamily, 2);
+    assert!(hosting.iter().any(declares));
+    let no_direction = {
+        let mut partial = node();
+        edit_sinks(graph_mut(&mut partial), |sinks| {
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Move(6)));
+        });
+        partial
+    };
+    for kind in DirectedVoteKind::ALL {
+        let mut no_drive = node();
+        edit_sinks(graph_mut(&mut no_drive), |sinks| {
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(kind.drive()));
+        });
+        assert!(graph(&no_drive).can_host_group());
+        for fixture in [&no_drive, &no_direction] {
+            let whole =
+                Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::WholeFamily, 2);
+            assert!(!whole.iter().any(declares), "{kind:?}");
+            let others: Vec<_> = hosting
+                .iter()
+                .filter(|family| !declares(family))
+                .filter(|family| {
+                    graph(fixture).can_host_group()
+                        || !matches!(family, SourceFamily::Input(reference) if reference.is_ring())
+                })
+                .cloned()
+                .collect();
+            assert_eq!(whole, others);
+            let single =
+                Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::SingleChannel, 2);
+            assert!(single.iter().any(declares));
+        }
+    }
+}
+
+/// F03's ring admission is untouched by the pair case: ring families stay in
+/// the universe whenever the graph can host a group, a missing drive sink
+/// included.
+#[test]
+fn ring_admission_is_unchanged_by_the_pair_case() {
+    use crate::creature::genome::vote::DirectedVoteKind;
+    let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
+    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
+        let mut no_drive = node();
+        edit_sinks(graph_mut(&mut no_drive), |sinks| {
+            sinks.retain(|sink| {
+                sink.kind != OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive())
+            });
+        });
+        let families = Admission::new(&no_drive.input_refs, graph(&no_drive)).families(arm, 2);
+        assert_eq!(families.iter().filter(|f| is_ring(f)).count(), 4, "{arm:?}");
     }
 }

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use rand::{seq::SliceRandom, Rng};
 
 use crate::config::NeutralInputRecruitment as Arm;
-use crate::contracts::InputReference;
+use crate::contracts::{DirectionPair, InputReference};
 use crate::creature::genome::cgp::{
     ring_offset, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
 };
@@ -28,23 +28,58 @@ struct Plan {
     /// The ring declared or found, and the drawn channel, when the family is
     /// a neighbor ring.
     ring: Option<(u16, u16)>,
+    /// The reference declared or found and the pairs it declares, when the
+    /// family declares direction pairs and the arm is `WholeFamily`
+    /// (T25.F04).
+    pairs: Option<(u16, &'static [DirectionPair])>,
+}
+
+/// The `(kind, direction)` of the directed vote sink at `destination`.
+fn directed(def: &CgpGraphBackendDef, destination: usize) -> Option<(DirectedVoteKind, u8)> {
+    match def.output_sinks()[destination].kind {
+        OutputSinkKind::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
+        _ => None,
+    }
 }
 
 impl Plan {
+    /// How many pairs the pair case draws over at `destination`: the
+    /// family's declared pairs when the plan is a pair plan landing on a
+    /// directed sink, `None` otherwise (no draw).
+    fn pair_count(&self, def: &CgpGraphBackendDef, destination: usize) -> Option<usize> {
+        let (_, pairs) = self.pairs?;
+        directed(def, destination).map(|_| pairs.len())
+    }
+
     /// Append the plan at `destination`. A ring family landing on a directed
     /// vote sink `K(d)` becomes one silent `Ring` group on `ref_idx` into `K`
     /// at offset `(d − channel) mod 8`, eight members at own weight 0 and
-    /// scale 0, in place of its edges (T25.F03); every other plan appends its
-    /// edges at weight 0.
-    fn append(self, node: &mut NodeGenome, destination: usize) {
+    /// scale 0, in place of its edges (T25.F03). A pair plan landing on
+    /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` group
+    /// at offset `d` (twelve members) plus one born-0 edge into `Drive K` per
+    /// fact of the pair, in `facts` order (T25.F04). Every other plan appends
+    /// its edges at weight 0.
+    fn append(self, node: &mut NodeGenome, destination: usize, pair: Option<u8>) {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("admission requires a Graph backend")
         };
         node.input_refs.extend(self.declarations);
-        let directed = match def.output_sinks()[destination].kind {
-            OutputSinkKind::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
-            _ => None,
-        };
+        let directed = directed(def, destination);
+        if let (Some((ref_idx, pairs)), Some((kind, d)), Some(pair)) = (self.pairs, directed, pair)
+        {
+            let layout = pairs[usize::from(pair)];
+            def.add_pair_group(ref_idx, pair, layout, kind, d);
+            let drive = def
+                .sink_surface(OutputSinkKind::ActionVote(kind.drive()))
+                .expect("the preflight admits a pair family only beside every drive sink");
+            for &sub_idx in layout.facts {
+                def.push_edge(
+                    drive,
+                    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 0.0),
+                );
+            }
+            return;
+        }
         if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
             let channel =
                 u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
@@ -74,11 +109,20 @@ struct Admission<'a> {
     /// ([`CgpGraphBackendDef::can_host_group`]); when not, ring families
     /// leave the universe, so a drawn ring plan always completes.
     hosts_ring_group: bool,
+    /// Whether a pair family's group and facts edges can be placed: a group
+    /// can be hosted and every kind's `Drive` sink is present (T25.F04);
+    /// when not, pair-declaring families leave the `WholeFamily` universe.
+    hosts_pair_plan: bool,
 }
 
 impl<'a> Admission<'a> {
     fn new(references: &'a [InputReference], def: &CgpGraphBackendDef) -> Self {
         let hosts_ring_group = def.can_host_group();
+        let hosts_pair_plan = hosts_ring_group
+            && DirectedVoteKind::ALL.into_iter().all(|kind| {
+                def.sink_surface(OutputSinkKind::ActionVote(kind.drive()))
+                    .is_some()
+            });
         let mut existing = HashMap::new();
         for (index, reference) in references.iter().enumerate().take(65536) {
             existing
@@ -102,6 +146,7 @@ impl<'a> Admission<'a> {
             next: references.len(),
             append_end,
             hosts_ring_group,
+            hosts_pair_plan,
         }
     }
 
@@ -113,8 +158,10 @@ impl<'a> Admission<'a> {
             declarations: vec![],
             sources: vec![],
             ring: None,
+            pairs: None,
         };
         let mut ring = None;
+        let mut pairs = None;
         let mut declare = |reference: &InputReference| {
             if let Some(&index) = self.existing.get(reference) {
                 return Some(index);
@@ -140,6 +187,9 @@ impl<'a> Admission<'a> {
                 let ref_idx = declare(reference)?;
                 if reference.is_ring() {
                     ring = Some((ref_idx, channel));
+                }
+                if arm == Arm::WholeFamily && !reference.direction_pairs().is_empty() {
+                    pairs = Some((ref_idx, reference.direction_pairs()));
                 }
                 if arm == Arm::SingleChannel {
                     plan.sources.push(GraphSource::InputLeaf {
@@ -181,6 +231,7 @@ impl<'a> Admission<'a> {
             }
         }
         plan.ring = ring;
+        plan.pairs = pairs;
         Some(plan)
     }
 
@@ -195,6 +246,11 @@ impl<'a> Admission<'a> {
                     )
             })
             .filter(|reference| self.hosts_ring_group || !reference.is_ring())
+            .filter(|reference| {
+                arm != Arm::WholeFamily
+                    || self.hosts_pair_plan
+                    || reference.direction_pairs().is_empty()
+            })
             .map(SourceFamily::Input)
             .collect();
         if arm == Arm::WholeFamily {
@@ -255,11 +311,16 @@ pub(super) fn recruit(
         .plan(family, arm, channel)
         .expect("preflighted source");
     let destination = *sites.choose(rng).expect("present vote sink");
-    plan.append(node, destination);
+    // The pair case's only draw (T25.F04), after the destination.
+    let pair = plan
+        .pair_count(def, destination)
+        .map(|count| u8::try_from(rng.gen_range(0..count)).expect("few pairs"));
+    plan.append(node, destination, pair);
     Ok(())
 }
 
-/// Explicit access fixture using the same preflight and append as mutation.
+/// Explicit access fixture using the same preflight and append as mutation;
+/// a pair plan on a directed sink takes pair 0.
 #[cfg(test)]
 pub(crate) fn recruit_source(
     node: &mut NodeGenome,
@@ -267,6 +328,31 @@ pub(crate) fn recruit_source(
     arm: Arm,
     channel: u16,
     vote: VoteSink,
+) -> Result<(), MutationSkipReason> {
+    place(node, family, arm, channel, vote, 0)
+}
+
+/// [`recruit_source`] under `WholeFamily` choosing the pair the pair case
+/// draws (T25.F04).
+#[cfg(test)]
+pub(crate) fn recruit_source_with_pair(
+    node: &mut NodeGenome,
+    family: &SourceFamily,
+    arm: Arm,
+    vote: VoteSink,
+    pair: u8,
+) -> Result<(), MutationSkipReason> {
+    place(node, family, arm, 0, vote, pair)
+}
+
+#[cfg(test)]
+fn place(
+    node: &mut NodeGenome,
+    family: &SourceFamily,
+    arm: Arm,
+    channel: u16,
+    vote: VoteSink,
+    pair: u8,
 ) -> Result<(), MutationSkipReason> {
     let BackendDef::Graph(def) = &node.backend_def else {
         return Err(MutationSkipReason::NoApplicableTarget);
@@ -278,7 +364,8 @@ pub(crate) fn recruit_source(
     let plan = Admission::new(&node.input_refs, def)
         .plan(family, arm, channel)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    plan.append(node, destination);
+    let pair = plan.pair_count(def, destination).map(|_| pair);
+    plan.append(node, destination, pair);
     Ok(())
 }
 
