@@ -138,7 +138,7 @@ fn bus(
                 continue;
             };
             for edge in sink.inputs.iter() {
-                let weight = def.edge_weight(edge, refs);
+                let weight = def.edge_weight(edge, sink.kind, refs);
                 if !carries(weight) {
                     continue;
                 }
@@ -189,7 +189,7 @@ impl RingRuleCensus {
                     continue;
                 }
                 for edge in sink.inputs.iter() {
-                    let weight = def.edge_weight(edge, refs);
+                    let weight = def.edge_weight(edge, sink.kind, refs);
                     if !carries(weight) {
                         continue;
                     }
@@ -226,7 +226,9 @@ impl RingRuleCensus {
                 }
             }
             for (index, group) in def.groups().iter().enumerate() {
-                let Shape::Ring { ring_ref } = group.shape();
+                let Shape::Ring { ring_ref } = group.shape() else {
+                    continue;
+                };
                 let members = def
                     .members(crate::creature::genome::cgp::GroupId::new(
                         u16::try_from(index).expect("groups below u16::MAX"),
@@ -256,7 +258,12 @@ impl RingRuleCensus {
             .enumerate()
             .filter(|(idx, _)| !reachable.contains(idx))
             .filter_map(|(_, node)| match &node.backend_def {
-                BackendDef::Graph(def) => Some(def.groups().len() as u64),
+                BackendDef::Graph(def) => Some(
+                    def.groups()
+                        .iter()
+                        .filter(|group| matches!(group.shape(), Shape::Ring { .. }))
+                        .count() as u64,
+                ),
                 BackendDef::Vm(_) => None,
             })
             .sum::<u64>();

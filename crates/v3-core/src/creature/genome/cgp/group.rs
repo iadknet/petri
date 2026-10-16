@@ -5,7 +5,7 @@
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
 use super::{CgpGraphBackendDef, EdgeOccurrence};
-use crate::contracts::InputReference;
+use crate::contracts::{compass_x, compass_y, DirectionPair, InputReference};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 
 /// Index of a group in its graph's `groups` list.
@@ -36,6 +36,38 @@ pub enum Shape {
     /// Members: ring cell `c` of `input_refs[ring_ref]` into sink
     /// `K[(c + offset) mod 8]`; pattern 1.
     Ring { ring_ref: u16 },
+    /// Members (T25.F04): the `x` and `y` fields of pair `pair` of
+    /// `input_refs[ref_idx]` (`WorldInputKey::direction_pairs`) into sink
+    /// `K[d]` at pattern `compass_x((d − offset) mod 8)` and
+    /// `compass_y(...)`: at a positive scale the group votes toward the
+    /// sensed offset.
+    DirectionPair { ref_idx: u16, pair: u8 },
+}
+
+impl Shape {
+    /// The `input_refs` index the shape reads.
+    #[inline]
+    #[must_use]
+    pub const fn ref_idx(self) -> u16 {
+        match self {
+            Self::Ring { ring_ref } => ring_ref,
+            Self::DirectionPair { ref_idx, .. } => ref_idx,
+        }
+    }
+
+    /// The pair a `DirectionPair` shape names, when its reference declares
+    /// it; `None` for a `Ring` or an unresolvable pair.
+    #[must_use]
+    pub fn resolve_pair(self, input_refs: &[InputReference]) -> Option<DirectionPair> {
+        let Self::DirectionPair { ref_idx, pair } = self else {
+            return None;
+        };
+        input_refs
+            .get(usize::from(ref_idx))?
+            .direction_pairs()
+            .get(usize::from(pair))
+            .copied()
+    }
 }
 
 /// One edge group's record. Fields are written only through the container's
@@ -52,11 +84,15 @@ pub struct Group {
 }
 
 impl Group {
-    /// The group's pattern at a member: 1 for a `Ring` group whose
-    /// `ring_ref` resolves to a ring of `input_refs`, 0 otherwise. Resolved
-    /// from the shape reference, never from the member's own source.
+    /// The group's pattern at the member reading field `sub_idx` on a sink
+    /// of direction `direction`: 1 for a `Ring` group whose `ring_ref`
+    /// resolves to a ring of `input_refs` (the coordinate ignored); for a
+    /// `DirectionPair` whose pair resolves, `compass_x((direction − offset)
+    /// mod 8)` at the pair's `x` field and `compass_y(...)` at its `y`
+    /// field; 0 otherwise, a `direction >= 8` included. Resolved from the
+    /// shape reference, never from the member's own source.
     #[must_use]
-    pub fn pattern(&self, input_refs: &[InputReference]) -> f32 {
+    pub fn pattern(&self, input_refs: &[InputReference], sub_idx: u16, direction: u8) -> f32 {
         match self.shape {
             Shape::Ring { ring_ref } => {
                 if input_refs
@@ -64,6 +100,22 @@ impl Group {
                     .is_some_and(InputReference::is_ring)
                 {
                     1.0
+                } else {
+                    0.0
+                }
+            }
+            Shape::DirectionPair { .. } => {
+                let Some(pair) = self.shape.resolve_pair(input_refs) else {
+                    return 0.0;
+                };
+                if direction >= VOTE_DIRECTION_COUNT {
+                    return 0.0;
+                }
+                let relative = pair_relative(direction, self.offset);
+                if sub_idx == pair.x {
+                    compass_x(relative)
+                } else if sub_idx == pair.y {
+                    compass_y(relative)
                 } else {
                     0.0
                 }
@@ -106,12 +158,7 @@ pub fn detach(
     occurrence: EdgeOccurrence,
     input_refs: &[InputReference],
 ) -> (EdgeOccurrence, bool) {
-    let group = def
-        .edge_at(occurrence)
-        .membership()
-        .expect("detach: a member")
-        .group;
-    let pattern = def.groups()[group.index()].pattern(input_refs);
+    let pattern = def.member_pattern(occurrence, input_refs);
     def.detach_at(occurrence, pattern)
 }
 
@@ -121,6 +168,27 @@ pub fn detach(
 pub const fn ring_offset(d: u8, channel: u8) -> u8 {
     let n = VOTE_DIRECTION_COUNT;
     (d % n + n - channel % n) % n
+}
+
+/// A `DirectionPair` member's relative direction on a sink of direction `d`
+/// in a group at `offset`: `(d − offset) mod 8`.
+#[must_use]
+pub const fn pair_relative(d: u8, offset: u8) -> u8 {
+    ring_offset(d, offset)
+}
+
+/// The `(field, direction)` members a new `DirectionPair` group on `pair` at
+/// `offset` materializes: every one whose pattern is non-zero, `x` at the
+/// relative directions NE, E, SE, SW, W, NW and `y` at N, NE, SE, S, SW, NW —
+/// twelve.
+pub fn pair_birth_members(pair: DirectionPair, offset: u8) -> impl Iterator<Item = (u16, u8)> {
+    let n = VOTE_DIRECTION_COUNT;
+    (0..n).flat_map(move |relative| {
+        let d = (relative + offset % n) % n;
+        let x = (compass_x(relative) != 0.0).then_some((pair.x, d));
+        let y = (compass_y(relative) != 0.0).then_some((pair.y, d));
+        x.into_iter().chain(y)
+    })
 }
 
 /// The only composition formula: a member's genomic weight from its own

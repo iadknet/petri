@@ -1,4 +1,5 @@
-//! The edge-group operators (T25.F03): one creates a silent `Ring` group,
+//! The edge-group operators (T25.F03, T25.F04): two create a silent group
+//! (`Ring`, `DirectionPair`),
 //! four change an existing group through its record.
 
 use rand::Rng;
@@ -23,9 +24,52 @@ fn ring_indices(input_refs: &[InputReference]) -> impl Iterator<Item = u16> + '_
 }
 
 /// Whether `AddRingGroup` has a site: a ring at an index ≤ 65,535 and a
-/// graph that can host a group ([`CgpGraphBackendDef::can_host_ring_group`]).
+/// graph that can host a group ([`CgpGraphBackendDef::can_host_group`]).
 pub(super) fn can_add(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
-    def.can_host_ring_group() && ring_indices(input_refs).next().is_some()
+    def.can_host_group() && ring_indices(input_refs).next().is_some()
+}
+
+/// The node's declared pairs a group can name (T25.F04), the flat list
+/// `(ref_idx ascending, pair ascending)`: every pair of every reference at
+/// an index representable as `u16`.
+fn pair_sites(input_refs: &[InputReference]) -> impl Iterator<Item = (u16, u8)> + '_ {
+    input_refs
+        .iter()
+        .take(usize::from(u16::MAX) + 1)
+        .enumerate()
+        .flat_map(|(idx, reference)| {
+            let ref_idx = u16::try_from(idx).expect("index within u16");
+            (0..reference.direction_pairs().len())
+                .map(move |pair| (ref_idx, u8::try_from(pair).expect("few pairs")))
+        })
+}
+
+/// Whether `AddDirectionPairGroup` has a site: a pair-declaring reference at
+/// an index ≤ 65,535 and a graph that can host a group.
+pub(super) fn can_add_pair(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
+    def.can_host_group() && pair_sites(input_refs).next().is_some()
+}
+
+/// `AddDirectionPairGroup` (T25.F04): three draws in order — one pair
+/// uniformly over the flat list `(ref_idx ascending, pair ascending)`, the
+/// kind over `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent
+/// `DirectionPair` group: twelve members at own weight 0 and scale 0.
+/// Duplicates are allowed.
+pub(crate) fn add_pair(
+    node: &mut NodeGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let (def, input_refs) = graph_node(node)?;
+    let sites: Vec<(u16, u8)> = pair_sites(input_refs).collect();
+    if sites.is_empty() || !def.can_host_group() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let (ref_idx, pair) = sites[rng.gen_range(0..sites.len())];
+    let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
+    let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
+    let layout = input_refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
+    def.add_pair_group(ref_idx, pair, layout, kind, offset);
+    Ok(())
 }
 
 /// Whether the unit operators have a site: at least one group.
@@ -49,7 +93,7 @@ fn graph_node(
 pub(crate) fn add(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let rings: Vec<u16> = ring_indices(input_refs).collect();
-    if rings.is_empty() || !def.can_host_ring_group() {
+    if rings.is_empty() || !def.can_host_group() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let ring_ref = rings[rng.gen_range(0..rings.len())];

@@ -164,10 +164,16 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 18157138273463701869 -> 8851126832724384691 by the draw stream; mutation
 /// off leaves every founder trajectory byte-identical (the viability
 /// siblings); reverting the commit restores both old values.
+/// Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+/// default arm (weight 56 -> 58) and remaps every Graph draw (default
+/// 13875145475904938210 -> 8823525590455763780, rate 0.0
+/// 2420636156610368321 -> 13485370972105497157); removing the catalog entry
+/// alone restores both old values, and mutation off leaves every founder
+/// trajectory byte-identical (the viability siblings).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 13875145475904938210);
-    assert_eq!(short_run_identity(Some(0.0)), 2420636156610368321);
+    assert_eq!(short_run_identity(None), 8823525590455763780);
+    assert_eq!(short_run_identity(Some(0.0)), 13485370972105497157);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

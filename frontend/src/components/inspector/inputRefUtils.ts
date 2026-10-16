@@ -75,6 +75,43 @@ function nearestOffset(axis: "x" | "y", thing: string, none: string): string {
 	return `${axis.toUpperCase()} offset to the nearest ${thing}, as a fraction of vision radius (${sign}).${none}`;
 }
 
+/** One `(x, y)` offset pair a world family declares and the thing's facts. */
+export interface DirectionPair {
+	x: number;
+	y: number;
+	facts: readonly number[];
+}
+
+/**
+ * The hand mirror of `WorldInputKey::direction_pairs()` (T25.F04), pinned
+ * against it through `directionPairs.json`.
+ */
+export const DIRECTION_PAIRS: Record<string, readonly DirectionPair[]> = {
+	AreaFoodSummary: [
+		{ x: 1, y: 2, facts: [0, 5, 6] },
+		{ x: 3, y: 4, facts: [0, 5, 6] },
+	],
+	AreaBarrierSummary: [
+		{ x: 2, y: 3, facts: [0, 1, 6] },
+		{ x: 4, y: 5, facts: [0, 1, 6] },
+	],
+	AreaOccupancySummary: [
+		{ x: 1, y: 2, facts: [0, 5, 6] },
+		{ x: 3, y: 4, facts: [0, 5, 6] },
+	],
+	NearbyCreatureCore: [0, 1, 2, 3].map((slot) => ({
+		x: 4 * slot + 1,
+		y: 4 * slot + 2,
+		facts: [4 * slot, 4 * slot + 3],
+	})),
+};
+
+/** The pairs `ref` declares; none for a non-world reference. */
+export function directionPairs(ref: InputReference | undefined): readonly DirectionPair[] {
+	if (ref === undefined || typeof ref !== "object" || !("World" in ref)) return [];
+	return DIRECTION_PAIRS[parseWorldInputRef(ref.World).key] ?? [];
+}
+
 /** Area summary sub-fields, in the index order of `perception.rs`. */
 const AREA_FIELDS: Record<string, readonly SubField[]> = {
 	AreaFoodSummary: [

@@ -576,4 +576,38 @@ mod tests {
             );
         }
     }
+
+    /// A pair group's members are vote edges (T25.F04): its `x` and `y`
+    /// fields are on the vote surface, the family's other fields are not.
+    #[test]
+    fn pair_group_member_channels_are_on_the_vote_surface() {
+        let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+        let layout = area.direction_pairs()[1];
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_pair_group(0, 1, layout, DirectedVoteKind::StealEnergy, 5);
+        let node = NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![area.clone()],
+            backend_def: BackendDef::Graph(def),
+            targets: Vec::new(),
+        };
+        let surface = vote_surface_channels(&node);
+        for field in 0..area_width(&area) {
+            let Addressed::Channel(addressed) = addressed(&area, field) else {
+                panic!("a summary field is in width")
+            };
+            assert_eq!(
+                surface.contains(&addressed),
+                field == layout.x || field == layout.y,
+                "{field}"
+            );
+        }
+    }
+
+    fn area_width(reference: &InputReference) -> u16 {
+        let InputReference::World(key) = reference else {
+            unreachable!("a world reference")
+        };
+        key.compound_width()
+    }
 }

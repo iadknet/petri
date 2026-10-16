@@ -11,6 +11,7 @@ pub mod drives;
 mod indicators;
 pub mod input_use;
 pub mod mutation_effects;
+pub mod pair_groups;
 mod profiles;
 pub mod ring_rules;
 mod run;

@@ -858,3 +858,20 @@ fn a_touching_selection_is_censored_or_resolved_in_the_touching_counts() {
     );
     assert_eq!(row.retention.depths_touching, [[0, 0, 1], [0, 0, 1]]);
 }
+
+/// A node whose only vote edges are a pair group's members votes through
+/// them (T25.F04): a `Move` pair group makes it a motor node.
+#[test]
+fn a_node_voting_only_through_pair_members_is_a_motor_node() {
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+    for (kind, motor) in [
+        (DirectedVoteKind::Move, true),
+        (DirectedVoteKind::Reproduce, false),
+    ] {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 6);
+        let genome = one_node(node(0, vec![area.clone()], BackendDef::Graph(def)));
+        assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
+    }
+}

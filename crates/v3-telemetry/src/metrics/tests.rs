@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use proptest::prelude::*;
 use prost::Message as _;
 use v3_core::config::OrdinaryFoodTypeId;
+use v3_core::contracts::WorldInputKey;
 use v3_core::creature::sensor_census::{
     world_input_key_label, world_input_key_universe, SensorUseRow,
 };
@@ -164,6 +165,16 @@ fn populated() -> SimStats {
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
     }
+    for (family, width) in [
+        (WorldInputKey::NearbyCreatureCore, 4),
+        (WorldInputKey::NearbyCreatureVitals, 4),
+        (WorldInputKey::NearbyCreatureIdentity, 4),
+    ] {
+        for field in 0..width {
+            s.refinement_applications_total_by_key
+                .insert(v3_core::mutation::types::RefinementKey { family, field }, 1);
+        }
+    }
     for class in BirthEdgeClass::ALL {
         s.mutation_value_totals_by_birth_edge_class
             .insert(class, MutationValueTotals::default());
@@ -306,6 +317,7 @@ fn run_families(families: &mut Vec<Family>) {
         "mutation_not_applicable_target",
         "graph_edges_detached",
         "groups_removed",
+        "pair_group_inherited_nonzero_births",
         "mesh_hops",
         "vm_steps",
         "graph_relax_iters",
@@ -502,6 +514,24 @@ fn mutation_families(families: &mut Vec<Family>) {
                     str::to_owned,
                 ),
             ),
+        ],
+    ));
+    families.push((
+        "petri.run.refinement_applications_by_key".to_owned(),
+        MonotonicSum,
+        vec![
+            (
+                "petri.world_input",
+                strings(
+                    [
+                        "NearbyCreatureCore",
+                        "NearbyCreatureVitals",
+                        "NearbyCreatureIdentity",
+                    ],
+                    str::to_owned,
+                ),
+            ),
+            ("petri.field", strings(0..4, |field: u16| field.to_string())),
         ],
     ));
     for (field, kind) in [

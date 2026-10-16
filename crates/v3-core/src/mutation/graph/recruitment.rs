@@ -71,14 +71,14 @@ struct Admission<'a> {
     next: usize,
     append_end: usize,
     /// Whether a ring family's group can be created
-    /// ([`CgpGraphBackendDef::can_host_ring_group`]); when not, ring families
+    /// ([`CgpGraphBackendDef::can_host_group`]); when not, ring families
     /// leave the universe, so a drawn ring plan always completes.
     hosts_ring_group: bool,
 }
 
 impl<'a> Admission<'a> {
     fn new(references: &'a [InputReference], def: &CgpGraphBackendDef) -> Self {
-        let hosts_ring_group = def.can_host_ring_group();
+        let hosts_ring_group = def.can_host_group();
         let mut existing = HashMap::new();
         for (index, reference) in references.iter().enumerate().take(65536) {
             existing

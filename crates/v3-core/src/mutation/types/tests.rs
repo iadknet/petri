@@ -252,6 +252,7 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphRecruitNeutralInput
             | MutationOperator::GraphRefineHeritableStructure
             | MutationOperator::GraphAddRingGroup
+            | MutationOperator::GraphAddDirectionPairGroup
             | MutationOperator::GraphAlterGroupScale
             | MutationOperator::GraphShiftGroupOffset
             | MutationOperator::GraphRetargetGroupKind
@@ -370,6 +371,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
                 MutationOperator::GraphRefineHeritableStructure
             }
             GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
+            GraphOperator::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
             GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
             GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
             GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,

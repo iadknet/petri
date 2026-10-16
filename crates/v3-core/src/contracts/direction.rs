@@ -55,9 +55,52 @@ impl Direction {
     }
 }
 
+/// The unit compass's `x` component at direction index `d` (mod 8):
+/// `Direction::ALL[d].delta().0` normalized, exactly `0.0`, `±1.0` or
+/// `±FRAC_1_SQRT_2` (T25.F04).
+#[must_use]
+pub fn compass_x(d: u8) -> f32 {
+    let (dx, dy) = Direction::ALL[usize::from(d % 8)].delta();
+    let scale = if dx != 0 && dy != 0 {
+        std::f32::consts::FRAC_1_SQRT_2
+    } else {
+        1.0
+    };
+    dx as f32 * scale
+}
+
+/// The unit compass's `y` component at direction index `d`:
+/// `compass_x((d + 6) mod 8)`, the normalized `dy` (T25.F04).
+#[must_use]
+pub fn compass_y(d: u8) -> f32 {
+    compass_x((d % 8 + 6) % 8)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn py_equals_normalized_delta_dy() {
+        for (d, direction) in (0u8..).zip(Direction::ALL) {
+            let (dx, dy) = direction.delta();
+            let norm = ((dx * dx + dy * dy) as f32).sqrt();
+            assert!((compass_x(d) - dx as f32 / norm).abs() <= f32::EPSILON);
+            assert!((compass_y(d) - dy as f32 / norm).abs() <= f32::EPSILON);
+            let len = compass_x(d).hypot(compass_y(d));
+            assert!((len - 1.0).abs() <= f32::EPSILON, "row {d} norm {len}");
+            for value in [compass_x(d), compass_y(d)] {
+                assert!([
+                    0.0,
+                    1.0,
+                    -1.0,
+                    std::f32::consts::FRAC_1_SQRT_2,
+                    -std::f32::consts::FRAC_1_SQRT_2
+                ]
+                .contains(&value));
+            }
+        }
+    }
 
     #[test]
     fn direction_all_has_eight_entries() {

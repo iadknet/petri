@@ -11,7 +11,7 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome};
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::types::{MutationSkipReason, RefinementKey};
 
 /// The key of an inferred set: one creature-sensor field across its ranked
 /// slots, into one vote sink.
@@ -122,7 +122,12 @@ pub(super) fn has_inferred_set(def: &CgpGraphBackendDef, references: &[InputRefe
     !inferred_sets(def, references).is_empty()
 }
 
-pub(crate) fn refine(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+/// Step one inferred set; returns the stepped set's `(family, field)`
+/// (T25.F04: applications are counted by key).
+pub(crate) fn refine(
+    node: &mut NodeGenome,
+    rng: &mut impl Rng,
+) -> Result<RefinementKey, MutationSkipReason> {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         return Err(MutationSkipReason::NoApplicableTarget);
     };
@@ -131,7 +136,11 @@ pub(crate) fn refine(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), Mu
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let selected = &sets[rng.gen_range(0..sets.len())];
-    apply_step(def, selected, rng.gen_range(-0.1f32..=0.1))
+    apply_step(def, selected, rng.gen_range(-0.1f32..=0.1))?;
+    Ok(RefinementKey {
+        family: selected.key.family,
+        field: selected.key.field,
+    })
 }
 
 fn apply_step(

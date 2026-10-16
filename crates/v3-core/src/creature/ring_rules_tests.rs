@@ -291,3 +291,30 @@ fn a_ring_group_on_an_unreachable_node_is_counted_apart() {
     assert_eq!(census.ring_groups_unreachable, 1);
     assert!(census.rule_rows().is_empty());
 }
+
+/// A `DirectionPair` group (T25.F04) is no ring group: the census counts
+/// neither its record, its members nor a rule from it, reachable or not.
+#[test]
+fn ring_rules_ignore_a_pair_group() {
+    let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
+    let pair_def = || {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = def.add_pair_group(0, 1, area.direction_pairs()[1], DirectedVoteKind::Move, 0);
+        def.group_mut(id).set_scale(1.0);
+        def
+    };
+    let census = census_of(&[single(pair_def(), vec![area.clone()])]);
+    assert_eq!(census.ring_groups, 0);
+    assert_eq!(census.ring_group_members, 0);
+    assert_eq!(census.ring_group_carriers, 0);
+    assert!(census.ring_group_rows().is_empty());
+    assert!(census.rule_rows().is_empty());
+    // An unreachable node's pair group is not an unreachable ring group.
+    let mut genome = single(
+        CgpGraphBackendDef::new_with_fixed_outputs(),
+        vec![area.clone()],
+    );
+    genome.nodes.push(node(1, vec![area.clone()], pair_def()));
+    let census = census_of(&[genome]);
+    assert_eq!(census.ring_groups_unreachable, 0);
+}

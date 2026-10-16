@@ -62,6 +62,53 @@ describe("EdgeGroupList", () => {
 		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(7);
 	});
 
+	it("lists a pair group's fields, kind, offset, scale and members over twelve with holes", () => {
+		// AreaFoodSummary pair 1 is (nearestDx 3, nearestDy 4); a Move group at
+		// offset 2 without its x member at relative E (sink 4), plus a
+		// hand-built zero-pattern x member at relative N (sink 2).
+		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
+			kind: { ActionVote: { Move: d } },
+			inputs: [] as GraphEdge[],
+		}));
+		const birth: [number, number][] = [
+			...[1, 2, 3, 5, 6, 7].map((r): [number, number] => [3, r]),
+			...[0, 1, 3, 4, 5, 7].map((r): [number, number] => [4, r]),
+		];
+		for (const [field, relative] of birth) {
+			if (field === 3 && relative === 2) continue;
+			sinks[(relative + 2) % 8]?.inputs.push(leaf(0, field, 0, 0));
+		}
+		sinks[2]?.inputs.push(leaf(0, 3, 0.125, 0));
+		render(
+			<EdgeGroupList
+				graphDef={{
+					compute_nodes: [],
+					output_sinks: sinks,
+					groups: [
+						{
+							shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
+							kind: "Move",
+							offset: 2,
+							scale: 1,
+						},
+					],
+				}}
+				inputRefs={[{ World: { AreaFoodSummary: { type_idx: 0 } } }]}
+				graphWeights={null}
+			/>,
+		);
+		const row = screen.getByTestId("edge-group");
+		expect(row).toHaveTextContent("Pair");
+		expect(row).toHaveTextContent("nearestDx/nearestDy #0");
+		expect(row).toHaveTextContent("offset 2");
+		expect(row).toHaveTextContent("scale=1.000");
+		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("11/12 ●○●●●●●●●●●● +1");
+		const members = screen.getAllByTestId("edge-group-member");
+		expect(members).toHaveLength(12);
+		expect(members.filter((m) => m.textContent?.includes("(zero pattern)"))).toHaveLength(1);
+		expect(members.some((m) => m.textContent?.includes("y:N → Move[E]"))).toBe(true);
+	});
+
 	it("renders nothing without groups", () => {
 		const { container } = render(
 			<EdgeGroupList

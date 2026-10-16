@@ -27,6 +27,23 @@ pub struct GroupEdits {
     pub groups_removed: u32,
 }
 
+/// The `(family, field)` of the inferred set one applied
+/// `RefineHeritableStructure` stepped (T25.F04): a creature-sensor field
+/// across its ranked slots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RefinementKey {
+    pub family: WorldInputKey,
+    pub field: u16,
+}
+
+impl RefinementKey {
+    /// The transport key `"<family.as_key()>:<field>"`.
+    #[must_use]
+    pub fn as_key(self) -> String {
+        format!("{}:{}", self.family.as_key(), self.field)
+    }
+}
+
 /// Reason a mutation event was skipped.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
@@ -244,6 +261,7 @@ pub enum MutationOperator {
     GraphRecruitNeutralInput,
     GraphRefineHeritableStructure,
     GraphAddRingGroup,
+    GraphAddDirectionPairGroup,
     GraphAlterGroupScale,
     GraphShiftGroupOffset,
     GraphRetargetGroupKind,
@@ -312,6 +330,7 @@ impl MutationOperator {
             Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
             Self::GraphRefineHeritableStructure => "Graph.RefineHeritableStructure",
             Self::GraphAddRingGroup => "Graph.AddRingGroup",
+            Self::GraphAddDirectionPairGroup => "Graph.AddDirectionPairGroup",
             Self::GraphAlterGroupScale => "Graph.AlterGroupScale",
             Self::GraphShiftGroupOffset => "Graph.ShiftGroupOffset",
             Self::GraphRetargetGroupKind => "Graph.RetargetGroupKind",
@@ -379,6 +398,7 @@ impl MutationOperator {
             | Self::GraphMutateTraceDecay
             | Self::GraphRecruitNeutralInput
             | Self::GraphAddRingGroup
+            | Self::GraphAddDirectionPairGroup
             | Self::GraphAlterGroupScale
             | Self::GraphShiftGroupOffset
             | Self::GraphRetargetGroupKind
@@ -437,7 +457,8 @@ impl MutationOperator {
             | Self::GraphEnableHebbian
             | Self::GraphEnableRewardModulation
             | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingGroup => ComplexityEffect::Increasing,
+            | Self::GraphAddRingGroup
+            | Self::GraphAddDirectionPairGroup => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
@@ -467,7 +488,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 61] {
+    pub const fn all() -> [Self; 62] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -522,6 +543,7 @@ impl MutationOperator {
             Self::GraphRecruitNeutralInput,
             Self::GraphRefineHeritableStructure,
             Self::GraphAddRingGroup,
+            Self::GraphAddDirectionPairGroup,
             Self::GraphAlterGroupScale,
             Self::GraphShiftGroupOffset,
             Self::GraphRetargetGroupKind,
@@ -642,6 +664,9 @@ pub struct MutationSummary {
     /// Edge groups committed events removed (T25.F03): `RemoveGroup`, and a
     /// last member's removal or detach.
     pub groups_removed: u32,
+    /// Committed `RefineHeritableStructure` applications keyed by the
+    /// stepped set (T25.F04).
+    pub refinement_applications_by_key: HashMap<RefinementKey, u32>,
 }
 
 impl MutationSummary {
@@ -671,6 +696,7 @@ impl MutationSummary {
             vote_edge_classes: Vec::new(),
             graph_edges_detached: 0,
             groups_removed: 0,
+            refinement_applications_by_key: HashMap::new(),
         }
     }
 
@@ -678,6 +704,11 @@ impl MutationSummary {
     pub fn record_group_edits(&mut self, edits: GroupEdits) {
         self.graph_edges_detached += edits.detached;
         self.groups_removed += edits.groups_removed;
+    }
+
+    /// Record one committed refinement application on `key`'s set.
+    pub fn record_refinement(&mut self, key: RefinementKey) {
+        *self.refinement_applications_by_key.entry(key).or_insert(0) += 1;
     }
 
     /// Record the class of a vote-sink edge an applied event pushed.

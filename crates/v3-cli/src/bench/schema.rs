@@ -1079,6 +1079,14 @@ pub struct MutationSupply {
     /// Edge groups committed events removed (T25.F03); absent in reports
     /// stored before T25.F03.
     pub groups_removed_total: u64,
+    /// Births whose committed genome holds an inherited `DirectionPair` group
+    /// with `|scale| > 1e-3` (T25.F04); absent in reports stored before
+    /// T25.F04.
+    pub pair_group_inherited_nonzero_births_total: u64,
+    /// Committed `RefineHeritableStructure` applications keyed
+    /// `"<family>:<field>"` (T25.F04); absent in reports stored before
+    /// T25.F04.
+    pub refinement_applications_by_key: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

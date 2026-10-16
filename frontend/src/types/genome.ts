@@ -113,13 +113,18 @@ export interface OutputSink {
 /** A directed vote kind an edge group votes for (T25.F03). */
 export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy";
 
-/** The geometry an edge group's members fit (T25.F03). */
-export type GroupShape = { Ring: { ring_ref: number } };
+/** The geometry an edge group's members fit (T25.F03, T25.F04). */
+export type GroupShape =
+	| { Ring: { ring_ref: number } }
+	| { DirectionPair: { ref_idx: number; pair: number } };
 
 /**
  * One edge-group record (T25.F03). A `Ring` group's members are sink edges:
  * ring cell `c` of `input_refs[ring_ref]` into `kind`'s direction
- * `(c + offset) mod 8`, each at genomic weight `scale + own_weight`.
+ * `(c + offset) mod 8`, each at genomic weight `scale + own_weight`. A
+ * `DirectionPair` group's (T25.F04) read the `x` and `y` fields of pair
+ * `pair` of `input_refs[ref_idx]` into `kind[d]` at the compass component of
+ * `(d - offset) mod 8`, each at `scale × pattern + own_weight`.
  */
 export interface EdgeGroup {
 	shape: GroupShape;

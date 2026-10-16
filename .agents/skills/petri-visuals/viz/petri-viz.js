@@ -202,13 +202,34 @@
 		return `<svg width="${L.W}" viewBox="0 0 ${L.W} ${L.H}" height="${L.H}" style="display:block" role="img" aria-label="Graph"><defs>${defs}</defs>${groups}${edges}${nodes}</svg>`;
 	}
 	// v3-core cgp/group.rs compose(own, scale, pattern): a Ring member's
-	// pattern is 1, so its weight is scale + own.
+	// pattern is 1, so its weight is scale + own; a DirectionPair member's is
+	// the compass component of its relative direction (d - offset) mod 8.
 	const compose = (own, scale, pattern) => scale * pattern + own;
+	const DIAG = Math.SQRT1_2;
+	const CX = [0, DIAG, 1, DIAG, 0, -DIAG, -1, -DIAG];
+	const compass = (field, r) => (field === "x" ? CX[r] : CX[(r + 6) % 8]);
+	// The twelve birth members of a pair group: x where compass x != 0, then y.
+	const PAIR_BIRTH = ["x", "y"].flatMap((f) => DN.map((_, r) => [f, r]).filter(([, r]) => compass(f, r) !== 0));
+	function pairRow(g, off, R, tick) {
+		const p = g.pair || {};
+		const cells = g.members ? g.members.map((m) => { const [f, d] = String(m).split(":"); return [f, DN.indexOf(d)]; }) : PAIR_BIRTH;
+		const present = new Set(cells.map(([f, r]) => `${f}:${r}`));
+		let row = `<span>Pair ${esc(p.family)}.${esc(p.x)}/${esc(p.y)}</span><span style="color:${MUTED}">${esc(g.kind)}</span><span>offset ${off}</span><span>scale=${Number(g.scale).toFixed(3)}</span><span style="color:${rgba(TINT.gm, 1)}">${PAIR_BIRTH.filter(([f, r]) => present.has(`${f}:${r}`)).length}/12 ${PAIR_BIRTH.map(([f, r]) => (present.has(`${f}:${r}`) ? "●" : "○")).join("")}</span>`;
+		const xy = R && own(tick.pairs, p.family);
+		if (xy) {
+			const vote = DN.map(() => 0);
+			for (const [f, r] of cells) vote[(r + off) % 8] += compose(Number(own(g.own || {}, `${f}:${DN[r]}`) || 0), Number(g.scale), compass(f, r)) * Number(xy[f === "x" ? 0 : 1]);
+			const out = DN.map((d, i) => (Math.abs(vote[i]) > 0.004 ? `${g.kind}[${d}] ${signed(vote[i])}` : "")).filter(Boolean);
+			row += `<span style="color:${VALUE}">→ ${esc(out.join(", ") || "nothing")}</span>`;
+		}
+		return row;
+	}
 	function edgeGroupsHtml(view, R, tick) {
 		const gs = view.edgeGroups || [];
 		if (!gs.length) return "";
 		return `<div class="pv-h">${esc(view.edgeGroupsTitle || "Edge groups")} (${gs.length})</div>` + gs.map((g) => {
 			const off = ((Math.round(g.offset || 0) % 8) + 8) % 8, cells = R && own(tick.rings, g.ring);
+			if (g.pair) return `<div class="pv-rl">${pairRow(g, off, R, tick)}${g.note ? `<span style="color:${MUTED}">${esc(g.note)}</span>` : ""}</div>`;
 			const own8 = (c) => Number(own(g.own || {}, DN[c]) || 0);
 			const present = g.members ? g.members.map((m) => DN.indexOf(m)) : [0, 1, 2, 3, 4, 5, 6, 7];
 			let row = `<span>${esc(g.ring)}</span><span style="color:${MUTED}">${esc(g.kind)}</span><span>offset ${off}</span><span>scale=${Number(g.scale).toFixed(3)}</span><span style="color:${rgba(TINT.gm, 1)}">${present.length}/8 ${DN.map((_, c) => (present.includes(c) ? "●" : "○")).join("")}</span>`;

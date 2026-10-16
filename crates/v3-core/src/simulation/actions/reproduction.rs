@@ -122,6 +122,31 @@ impl ReproductionInvalidTargetCause {
 ///
 /// Returns `Conceived` or why the attempt was rejected.
 #[must_use]
+/// The inheritance witness (T25.F04): the child's committed genome holds a
+/// `DirectionPair` group with `|scale| > 1e-3` and no event of the birth
+/// could have created a group (no committed `Graph.AddDirectionPairGroup`
+/// or `Graph.RecruitNeutralInput`), so every pair group it carries came from
+/// the parent's genome.
+pub(crate) fn inherits_nonzero_pair_group(
+    child: &crate::creature::genome::CreatureGenome,
+    summary: &crate::mutation::types::MutationSummary,
+) -> bool {
+    use crate::creature::genome::cgp::Shape;
+    use crate::creature::genome::BackendDef;
+    use crate::mutation::types::MutationOperator as Op;
+    let created = [Op::GraphAddDirectionPairGroup, Op::GraphRecruitNeutralInput]
+        .iter()
+        .any(|op| summary.applied_by_operator.get(op).is_some_and(|&n| n > 0));
+    !created
+        && child.nodes.iter().any(|node| match &node.backend_def {
+            BackendDef::Graph(def) => def.groups().iter().any(|group| {
+                matches!(group.shape(), Shape::DirectionPair { .. })
+                    && group.scale().abs() > crate::creature::drives::PATH_WEIGHT_FLOOR
+            }),
+            BackendDef::Vm(_) => false,
+        })
+}
+
 pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,
@@ -475,6 +500,14 @@ fn spawn_child(
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
     sim.stats.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
     sim.stats.groups_removed_total += u64::from(summary.groups_removed);
+    for (key, count) in &summary.refinement_applications_by_key {
+        *sim.stats
+            .refinement_applications_total_by_key
+            .entry(*key)
+            .or_insert(0) += u64::from(*count);
+    }
+    sim.stats.pair_group_inherited_nonzero_births_total +=
+        u64::from(inherits_nonzero_pair_group(&child_genome, &summary));
     let mut child_birth_mutation_operators: Vec<_> =
         summary.applied_by_operator.keys().copied().collect();
     child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
@@ -1263,5 +1296,112 @@ mod tests {
         }
         assert!(detached.is_some(), "no birth detached a member");
         assert!(removed.is_some(), "no birth removed a group");
+    }
+
+    /// The founder with an area-barrier reference and one `DirectionPair`
+    /// group at `scale` on its Graph node.
+    fn pair_grouped_founder(scale: f32) -> crate::creature::genome::CreatureGenome {
+        use crate::contracts::{InputReference, WorldInputKey};
+        use crate::creature::founder::v3alpha1_founder_genome;
+        use crate::creature::genome::vote::DirectedVoteKind;
+
+        let mut genome = v3alpha1_founder_genome();
+        let node = genome
+            .nodes
+            .iter_mut()
+            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("the founder carries a Graph node");
+        let reference = InputReference::World(WorldInputKey::AreaBarrierSummary);
+        let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+        let layout = reference.direction_pairs()[0];
+        node.input_refs.push(reference);
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!("a Graph node")
+        };
+        let id = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 3);
+        def.group_mut(id).set_scale(scale);
+        genome
+    }
+
+    fn applied(
+        ops: &[crate::mutation::types::MutationOperator],
+    ) -> crate::mutation::types::MutationSummary {
+        let mut summary = crate::mutation::types::MutationSummary::zero();
+        for &op in ops {
+            summary.attempted_by_operator.insert(op, 1);
+            summary.applied_by_operator.insert(op, 1);
+        }
+        summary
+    }
+
+    #[test]
+    fn the_inheritance_witness_counts_an_inherited_nonzero_pair_group_only() {
+        use crate::mutation::types::MutationOperator as Op;
+        let nonzero = pair_grouped_founder(0.5);
+        let zero = pair_grouped_founder(1e-3);
+        // No creation event and a nonzero inherited group: counted.
+        assert!(inherits_nonzero_pair_group(&nonzero, &applied(&[])));
+        assert!(inherits_nonzero_pair_group(
+            &nonzero,
+            &applied(&[Op::GraphAlterGroupScale])
+        ));
+        // A committed creation event: not counted, even with a nonzero group.
+        for op in [Op::GraphAddDirectionPairGroup, Op::GraphRecruitNeutralInput] {
+            assert!(!inherits_nonzero_pair_group(&nonzero, &applied(&[op])));
+        }
+        // A rolled-back creation event (attempted, skipped) does not suppress.
+        let mut rolled_back = applied(&[]);
+        rolled_back
+            .attempted_by_operator
+            .insert(Op::GraphAddDirectionPairGroup, 1);
+        rolled_back
+            .skipped_by_operator
+            .insert(Op::GraphAddDirectionPairGroup, 1);
+        assert!(inherits_nonzero_pair_group(&nonzero, &rolled_back));
+        // A scale at or below the floor, and no pair group at all: not counted.
+        assert!(!inherits_nonzero_pair_group(&zero, &applied(&[])));
+        assert!(!inherits_nonzero_pair_group(
+            &crate::creature::founder::v3alpha1_founder_genome(),
+            &applied(&[])
+        ));
+    }
+
+    /// A mutation-free birth from a parent carrying a nonzero pair group
+    /// reaches the run's witness total.
+    #[test]
+    fn an_unmutated_birth_of_a_pair_group_carrier_counts_once() {
+        use crate::config::SimulationConfig;
+        use crate::simulation::seed_simulation;
+        use rand::SeedableRng;
+
+        let mut cfg = SimulationConfig::default();
+        cfg.population.initial_creatures = 1;
+        cfg.mutation.per_unit_rate = 0.0;
+        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
+        let mut sim = seed_simulation(cfg, 83);
+        let parent_id = sim.creatures.keys().next().unwrap();
+        let parent = &mut sim.creatures[parent_id];
+        parent.genome = pair_grouped_founder(-0.25);
+        parent.age = sim.config.energy.lifecycle.min_reproduce_age;
+        parent.energy = 10000.0;
+        let direction = Direction::ALL
+            .into_iter()
+            .find(|&direction| {
+                sim.world
+                    .resolve_neighbor(sim.creatures[parent_id].position, direction)
+                    .is_some_and(|p| sim.world.is_valid_target_cell(p))
+            })
+            .unwrap();
+        assert_eq!(
+            apply_reproduce(
+                parent_id,
+                &mut sim,
+                direction,
+                10.0,
+                &mut rand::rngs::SmallRng::seed_from_u64(1)
+            ),
+            ReproductionActionResult::Conceived
+        );
+        assert_eq!(sim.stats.pair_group_inherited_nonzero_births_total, 1);
     }
 }

@@ -200,3 +200,19 @@ fn a_group_is_not_a_fanout() {
     let members = moves(grouped);
     assert_eq!((members.fanouts, members.fanout_edges), (0, 0));
 }
+
+/// A `DirectionPair` group's members (T25.F04) send one source to six
+/// directions each, yet are no fan-out; its facts edges into a drive are
+/// drive edges once they carry.
+#[test]
+fn pair_members_are_not_a_fanout() {
+    use crate::contracts::{InputReference, WorldInputKey};
+    let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = def.add_pair_group(0, 0, area.direction_pairs()[0], DirectedVoteKind::Move, 2);
+    def.group_mut(id).set_scale(1.0);
+    let mut genome = graph_genome(def);
+    genome.nodes[0].input_refs = vec![area];
+    let moves = census_of(&[genome]).kinds[DirectedVoteKind::Move.index()];
+    assert_eq!((moves.fanouts, moves.fanout_edges), (0, 0));
+}

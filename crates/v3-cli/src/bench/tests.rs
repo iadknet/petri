@@ -125,8 +125,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // rule and anchor 97 restore seed 6. Moved from 19 to 59 by T25.F02
     // commit 2 (default rate 0.005 -> 0.0060625): seed 19 goes extinct at
     // tick 159; seed 59 is the only one of 0..=60 that survives the horizon.
-    // Rate 0.005 restores seed 19.
-    const SEED: u64 = 59;
+    // Rate 0.005 restores seed 19. Moved from 59 to 14 by T25.F04 commit 1:
+    // `AddDirectionPairGroup` remaps every Graph draw and seed 59 goes extinct
+    // before the horizon; 14 is the lowest of 0..=400 that survives it (14,
+    // 42, 93, 158, 175 and 201 are the first six), and removing the catalog
+    // entry restores seed 59.
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -199,9 +203,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // 151 and seed 14 survives (see the post-tick-state test). T11.F30: seed
     // 14 goes extinct at tick 194 and seed 207 survives. T25.F02: seed 6
     // goes extinct at tick 112 and seed 19 survives; at the T25.F02 rate
-    // seed 19 goes extinct at tick 159 and seed 59 survives (see the
+    // seed 19 goes extinct at tick 159 and seed 59 survives; T25.F04 commit
+    // 1: seed 59 goes extinct and seed 14 survives (see the
     // post-tick-state test).
-    const SEED: u64 = 59;
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -333,8 +338,10 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // the horizon over more than one cell; the old size rule and anchor 97
     // restore seed 6. The T25.F02 rate moved it from 19 to 59: seed 19 goes
     // extinct at tick 159, and seed 59 is the only one of 0..=60 that
-    // survives the horizon; rate 0.005 restores seed 19.
-    const SEED: u64 = 59;
+    // survives the horizon; rate 0.005 restores seed 19. T25.F04 commit 1
+    // moved it from 59 to 14: seed 59 goes extinct before the horizon, and
+    // seed 14 is the lowest of 0..=400 that survives it.
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

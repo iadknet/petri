@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { EdgeGroup, GraphBackendDef, InputReference } from "../../types/genome.ts";
+import type {
+	EdgeGroup,
+	GraphBackendDef,
+	InputReference,
+	OutputSinkKind,
+} from "../../types/genome.ts";
 import { directionName } from "./directions.ts";
-import { formatInputRef } from "./inputRefUtils.ts";
+import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
 
 const RING_CHANNELS = 8;
+
+/**
+ * The twelve `(field, relative direction)` coordinates a new pair group
+ * materializes (T25.F04): `x` where the compass `x` is non-zero (NE, E, SE,
+ * SW, W, NW), `y` where the compass `y` is (N, NE, SE, S, SW, NW).
+ */
+const PAIR_BIRTH: readonly (readonly ["x" | "y", number])[] = [
+	...[1, 2, 3, 5, 6, 7].map((d) => ["x", d] as const),
+	...[0, 1, 3, 4, 5, 7].map((d) => ["y", d] as const),
+];
 
 interface EdgeGroupListProps {
 	graphDef: GraphBackendDef;
@@ -14,7 +29,10 @@ interface EdgeGroupListProps {
 }
 
 export interface GroupMember {
+	/** The field the member reads: a ring cell, or a pair's `x` or `y`. */
 	channel: number;
+	/** The direction of the sink the member sits on, when it is one. */
+	direction: number | undefined;
 	sink: number;
 	edge: number;
 	ownWeight: number;
@@ -22,8 +40,19 @@ export interface GroupMember {
 	genomic: number | undefined;
 }
 
-/** The ring a group reads, or its dangling index. */
-function ringLabel(refIdx: number, inputRefs: InputReference[]): string {
+/** The direction of a directed vote sink. */
+function sinkDirection(kind: OutputSinkKind | undefined): number | undefined {
+	if (kind === undefined || !("ActionVote" in kind)) return undefined;
+	const vote = kind.ActionVote;
+	if (typeof vote !== "object") return undefined;
+	if ("Move" in vote) return vote.Move;
+	if ("Reproduce" in vote) return vote.Reproduce;
+	if ("StealEnergy" in vote) return vote.StealEnergy;
+	return undefined;
+}
+
+/** The reference a group reads, or its dangling index. */
+function refLabel(refIdx: number, inputRefs: InputReference[]): string {
 	const ref = inputRefs[refIdx];
 	return ref === undefined ? `ref ${refIdx} (missing)` : formatInputRef(ref);
 }
@@ -45,6 +74,7 @@ export function collectGroupMembers(
 			if (group === undefined || !members[group] || !("InputLeaf" in edge.source)) return;
 			members[group].push({
 				channel: edge.source.InputLeaf.sub_idx,
+				direction: sinkDirection(sink.kind),
 				sink: sinkIndex,
 				edge: edgeIndex,
 				ownWeight: edge.own_weight,
@@ -55,20 +85,21 @@ export function collectGroupMembers(
 	return members;
 }
 
-function GroupRow({
-	group,
-	index,
-	members,
-	inputRefs,
+function memberWeights(member: GroupMember): string {
+	return `own=${member.ownWeight.toFixed(3)}${
+		member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""
+	}`;
+}
+
+/** A row's header and member lines, collapsible and open by default. */
+function GroupRowShell({
+	header,
+	children,
 }: {
-	group: EdgeGroup;
-	index: number;
-	members: GroupMember[];
-	inputRefs: InputReference[];
+	header: ReactNode;
+	children: ReactNode;
 }) {
 	const [open, setOpen] = useState(true);
-	const present = new Set(members.map((member) => member.channel));
-	const byChannel = [...members].sort((a, b) => a.channel - b.channel);
 	return (
 		<li data-testid="edge-group" className="space-y-0.5">
 			<button
@@ -78,43 +109,134 @@ function GroupRow({
 				className="flex w-full flex-wrap gap-2 text-left hover:text-slate-100"
 			>
 				<span aria-hidden="true">{open ? "▾" : "▸"}</span>
-				<span>
-					Ring {ringLabel(group.shape.Ring.ring_ref, inputRefs)} #{index}
-				</span>
-				<span className="text-slate-400">{group.kind}</span>
-				<span
-					title={`Each ring cell votes ${group.kind} toward the direction ${group.offset} steps clockwise from that cell (0 = same, 4 = opposite).`}
-				>
-					offset {group.offset}
-				</span>
-				<span>scale={group.scale.toFixed(3)}</span>
-				<span data-testid="edge-group-members" title="Members present, by ring cell">
-					{present.size}/{RING_CHANNELS}{" "}
-					{Array.from({ length: RING_CHANNELS }, (_, channel) =>
-						present.has(channel) ? "●" : "○",
-					).join("")}
-				</span>
+				{header}
 			</button>
-			{open ? (
-				<ul className="ml-4 space-y-0.5 text-slate-400">
-					{byChannel.map((member) => (
-						<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
-							cell {directionName(member.channel)} → {group.kind}[
-							{directionName(member.channel + group.offset)}] own=
-							{member.ownWeight.toFixed(3)}
-							{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
-						</li>
-					))}
-				</ul>
-			) : null}
+			{open ? <ul className="ml-4 space-y-0.5 text-slate-400">{children}</ul> : null}
 		</li>
 	);
 }
 
+function RingRow({
+	group,
+	ringRef,
+	index,
+	members,
+	inputRefs,
+}: {
+	group: EdgeGroup;
+	ringRef: number;
+	index: number;
+	members: GroupMember[];
+	inputRefs: InputReference[];
+}) {
+	const present = new Set(members.map((member) => member.channel));
+	const byChannel = [...members].sort((a, b) => a.channel - b.channel);
+	return (
+		<GroupRowShell
+			header={
+				<>
+					<span>
+						Ring {refLabel(ringRef, inputRefs)} #{index}
+					</span>
+					<span className="text-slate-400">{group.kind}</span>
+					<span
+						title={`Each ring cell votes ${group.kind} toward the direction ${group.offset} steps clockwise from that cell (0 = same, 4 = opposite).`}
+					>
+						offset {group.offset}
+					</span>
+					<span>scale={group.scale.toFixed(3)}</span>
+					<span data-testid="edge-group-members" title="Members present, by ring cell">
+						{present.size}/{RING_CHANNELS}{" "}
+						{Array.from({ length: RING_CHANNELS }, (_, channel) =>
+							present.has(channel) ? "●" : "○",
+						).join("")}
+					</span>
+				</>
+			}
+		>
+			{byChannel.map((member) => (
+				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
+					cell {directionName(member.channel)} → {group.kind}[
+					{directionName(member.channel + group.offset)}] {memberWeights(member)}
+				</li>
+			))}
+		</GroupRowShell>
+	);
+}
+
+function PairRow({
+	group,
+	refIdx,
+	pair,
+	index,
+	members,
+	inputRefs,
+}: {
+	group: EdgeGroup;
+	refIdx: number;
+	pair: number;
+	index: number;
+	members: GroupMember[];
+	inputRefs: InputReference[];
+}) {
+	const ref = inputRefs[refIdx];
+	const fields = directionPairs(ref)[pair];
+	const label =
+		ref === undefined || fields === undefined
+			? `${refLabel(refIdx, inputRefs)} pair ${pair}`
+			: `${describeInputRef(ref, fields.x).label}/${
+					describeInputRef(ref, fields.y).label.split(".").pop() ?? fields.y
+				}`;
+	const role = (member: GroupMember): "x" | "y" | "?" =>
+		member.channel === fields?.x ? "x" : member.channel === fields?.y ? "y" : "?";
+	const relative = (member: GroupMember) =>
+		member.direction === undefined ? undefined : (member.direction - group.offset + 8) % 8;
+	const coordinate = (member: GroupMember) => `${role(member)}:${relative(member)}`;
+	const present = new Set(members.map(coordinate));
+	const birth = new Set(PAIR_BIRTH.map(([field, d]) => `${field}:${d}`));
+	const extra = members.filter((member) => !birth.has(coordinate(member)));
+	return (
+		<GroupRowShell
+			header={
+				<>
+					<span>
+						Pair {label} #{index}
+					</span>
+					<span className="text-slate-400">{group.kind}</span>
+					<span
+						title={`Votes ${group.kind} toward the sensed offset, rotated ${group.offset} steps clockwise (0 = toward, 4 = away).`}
+					>
+						offset {group.offset}
+					</span>
+					<span>scale={group.scale.toFixed(3)}</span>
+					<span
+						data-testid="edge-group-members"
+						title="Members present over the twelve birth coordinates: x at NE E SE SW W NW, then y at N NE SE S SW NW (relative to the offset)"
+					>
+						{PAIR_BIRTH.filter(([field, d]) => present.has(`${field}:${d}`)).length}/
+						{PAIR_BIRTH.length}{" "}
+						{PAIR_BIRTH.map(([field, d]) => (present.has(`${field}:${d}`) ? "●" : "○")).join("")}
+						{extra.length > 0 ? ` +${extra.length}` : ""}
+					</span>
+				</>
+			}
+		>
+			{members.map((member) => (
+				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
+					{role(member)}:{directionName(relative(member) ?? 0)} → {group.kind}[
+					{directionName(member.direction ?? 0)}] {memberWeights(member)}
+					{birth.has(coordinate(member)) ? "" : " (zero pattern)"}
+				</li>
+			))}
+		</GroupRowShell>
+	);
+}
+
 /**
- * A Graph node's edge groups (T25.F03): one row per group with its shape,
- * kind, offset, scale and the members present over eight (holes shown), each
- * row expandable to its member edges and open by default.
+ * A Graph node's edge groups (T25.F03, T25.F04): one row per group with its
+ * shape, kind, offset, scale and the members present over its birth
+ * coordinates (holes shown), each row expandable to its member edges and
+ * open by default.
  */
 export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupListProps) {
 	const groups = graphDef.groups ?? [];
@@ -126,16 +248,30 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 				Edge groups ({groups.length})
 			</h4>
 			<ul className="space-y-1 font-mono text-[10px] text-slate-300">
-				{groups.map((group, index) => (
-					<GroupRow
-						// biome-ignore lint/suspicious/noArrayIndexKey: a GroupId is the group's index
-						key={index}
-						group={group}
-						index={index}
-						members={members[index] ?? []}
-						inputRefs={inputRefs}
-					/>
-				))}
+				{groups.map((group, index) =>
+					"Ring" in group.shape ? (
+						<RingRow
+							// biome-ignore lint/suspicious/noArrayIndexKey: a GroupId is the group's index
+							key={index}
+							group={group}
+							ringRef={group.shape.Ring.ring_ref}
+							index={index}
+							members={members[index] ?? []}
+							inputRefs={inputRefs}
+						/>
+					) : (
+						<PairRow
+							// biome-ignore lint/suspicious/noArrayIndexKey: a GroupId is the group's index
+							key={index}
+							group={group}
+							refIdx={group.shape.DirectionPair.ref_idx}
+							pair={group.shape.DirectionPair.pair}
+							index={index}
+							members={members[index] ?? []}
+							inputRefs={inputRefs}
+						/>
+					),
+				)}
 			</ul>
 		</section>
 	);

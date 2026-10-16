@@ -274,6 +274,7 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                                 "shannon_entropy_nats",
                                 "sensor_census",
                                 "occupancy_grid",
+                                "pair_groups",
                             ],
                         )
                         .as_object()
@@ -589,9 +590,9 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
 ];
 /// Persistence checkpoint fields the page reads, each kept whole, and
 /// `mean_wired_sinks` (T25.F02), `mean_ring_groups` and
-/// `mean_ring_group_members` (T25.F03), which the page does not read but the
-/// readings do.
-const KEPT_SAMPLE_FIELDS: [&str; 15] = [
+/// `mean_ring_group_members` (T25.F03) and `pair_groups` (T25.F04), which
+/// the page does not read but the readings do.
+const KEPT_SAMPLE_FIELDS: [&str; 16] = [
     "tick",
     "population",
     "mean_energy",
@@ -607,6 +608,7 @@ const KEPT_SAMPLE_FIELDS: [&str; 15] = [
     "grazing_modifier_mean",
     "occupancy_grid",
     "sensor_census",
+    "pair_groups",
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
 /// `action_attempts` (T16.F02), `ring_rules` (T11.F31), and `drives` and
@@ -1309,6 +1311,36 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// T25.F04: a checkpoint's `pair_groups` block survives the summary
+    /// projection whole.
+    #[test]
+    fn pair_groups_are_kept_by_the_summary_projection() {
+        let block = json!({"version": "pair-groups-v1", "groups": 2,
+            "rows": [{"family": "AreaFoodSummary", "kind": "Move", "offset": 0}]});
+        let persistence = json!({"per_seed": [{"seed": 1, "samples": [
+            {"tick": 100, "pair_groups": block, "dropped": 1},
+            {"tick": 200, "pair_groups": null}
+        ]}]});
+        let kept = keep_persistence(&persistence);
+        let samples = &kept["per_seed"][0]["samples"];
+        assert_eq!(samples[0]["pair_groups"], block);
+        assert!(samples[0].get("dropped").is_none());
+        assert_eq!(samples[1]["pair_groups"], Value::Null);
+    }
+
+    /// T25.F04: the refinement-by-key map rides inside `mutation_supply`,
+    /// which the case projection keeps whole.
+    #[test]
+    fn a_committed_refinement_count_survives_summary_projection() {
+        let case = json!({"case": "c", "mutation_supply": {
+            "events_applied_total": 3,
+            "pair_group_inherited_nonzero_births_total": 2,
+            "refinement_applications_by_key": {"NearbyCreatureCore:3": 1}
+        }});
+        let kept = keep_case(&case);
+        assert_eq!(kept["mutation_supply"], case["mutation_supply"]);
+    }
 
     #[test]
     fn mesh_summary_counts_every_measured_genome_field() {
