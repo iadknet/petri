@@ -335,13 +335,13 @@ edited):
 - Decision: (user, 2026-10-15) goal-long runs at most once or twice per
   track; F04 is the T25 carrier after F02 and takes F03's deferred
   40,000-tick ring readings on its run.
-- Decision: (user, 2026-10-16) the goal `decided_passes` severe (+263.3%
-  against F03), the goal-long `decided_passes` severe (+179.3% against the
-  epoch) and the goal-long `plasticity_updates` severe (+54.1% against
-  F02's goal-long) were accepted ("Accept and re-pin") and the gate and
-  goal epochs are re-pinned to this feature in the closing commit.
-- Exception: (spec owner, 2026-10-16) the slow-tier recruitment-paths rows
-  were re-pinned once on the final code, attributed to commits 1 and 2
-  jointly rather than one cause per commit; the Graph Drift discovery drop
-  (18 → 14) is a draw-stream reading inside the predeclaration, with no
-  per-proposal cause dump.
+- Decision: (user, 2026-10-16) the `decided_passes` severes (goal +263.3%
+  vs F03, goal-long +179.3% vs epoch) and the goal-long `plasticity_updates`
+  severe (+54.1% vs F02) accepted, "Accept and re-pin"; gate and goal
+  epochs re-pinned to this feature in the closing commit.
+- Deferred: (Codex review P2, 2026-10-16) the readings said "clean tree"
+  against `dirty: true` on the goal and goal-long summaries; corrected to
+  the per-profile flags and their cause (readings, "Benchmark profiles").
+- Exception: (spec owner, 2026-10-16) the slow-tier rows were re-pinned
+  once on the final code, attributed to commits 1 and 2 jointly; the
+  Graph Drift drop (18 → 14) is inside the predeclaration, no cause dump.
