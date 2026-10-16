@@ -200,7 +200,8 @@
     "series": "goal-worlds-long-v1",
     "epoch_baseline": "docs/progress/features/t25-f02-uniform-genome-size-base-goal-long.json",
     "closed": [
-      "docs/progress/features/t25-f02-uniform-genome-size-goal-long.json"
+      "docs/progress/features/t25-f02-uniform-genome-size-goal-long.json",
+      "docs/progress/features/t25-f04-direction-pair-groups-goal-long.json"
     ]
   }
 }

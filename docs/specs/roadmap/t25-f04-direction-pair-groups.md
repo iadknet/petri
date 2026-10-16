@@ -181,10 +181,12 @@ Tests written first (file → test):
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred (full list here).
-- [ ] Benchmark profiles (gate and goal summaries and series entries
-      committed; goal-long summary over 1 MiB and not committed, open; raw
-      hashes, byte counts, exits and verdicts in the readings and the
-      Performance section): summaries at
+- [x] Benchmark profiles (gate, goal and goal-long summaries and their
+      series entries committed; the goal-long summary converted from its
+      raw report with `v3-cli bench-summarize` after the `pair_groups`
+      projection, 485,544 bytes, raw hash unchanged; raw hashes, byte
+      counts, exits and verdicts in the readings and the Performance
+      section): summaries at
       `docs/progress/features/t25-f04-direction-pair-groups.json` (gate),
       `...-goal.json`, `...-goal-long.json`; local raw hash/byte count and
       verification time checked, series entry points to the summary, no
@@ -279,8 +281,6 @@ named value:
   `mean_ring_group_members` 7.73 / 7.75 / 7.66 (below 8), detached edges
   and removed groups above 0 on every world; the comparison of
   `ring_group_carriers` with F02's `projection_carriers` was not made.
-- The goal-long summary is 1,070,196 bytes, over the 1 MiB tracked-file
-  limit, so it is not committed (no series entry); see the readings.
 
 Spec-owner ruling on the verdict (2026-10-16; the predeclaration is not
 edited):
@@ -299,8 +299,7 @@ edited):
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f04-direction-pair-groups.json),
   [goal](../../progress/features/t25-f04-direction-pair-groups-goal.json),
-  goal-long `docs/progress/features/t25-f04-direction-pair-groups-goal-long.json`
-  (local only, untracked, SHA-256 `1a5e0440...5557ed` in the readings).
+  [goal-long](../../progress/features/t25-f04-direction-pair-groups-goal-long.json).
 - Full readings: [`docs/progress/readings/t25-f04.md`](../../progress/readings/t25-f04.md).
 
 ## Success Criteria
