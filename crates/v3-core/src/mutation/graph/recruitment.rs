@@ -36,10 +36,7 @@ struct Plan {
 
 /// The `(kind, direction)` of the directed vote sink at `destination`.
 fn directed(def: &CgpGraphBackendDef, destination: usize) -> Option<(DirectedVoteKind, u8)> {
-    match def.output_sinks()[destination].kind {
-        OutputSinkKind::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
-        _ => None,
-    }
+    def.output_sinks()[destination].kind.direction()
 }
 
 impl Plan {

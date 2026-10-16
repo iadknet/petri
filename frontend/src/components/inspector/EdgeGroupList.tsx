@@ -20,6 +20,8 @@ const PAIR_BIRTH: readonly (readonly ["x" | "y", number])[] = [
 	...[1, 2, 3, 5, 6, 7].map((d) => ["x", d] as const),
 	...[0, 1, 3, 4, 5, 7].map((d) => ["y", d] as const),
 ];
+const PAIR_BIRTH_KEYS = PAIR_BIRTH.map(([field, d]) => `${field}:${d}`);
+const PAIR_BIRTH_SET = new Set(PAIR_BIRTH_KEYS);
 
 interface EdgeGroupListProps {
 	graphDef: GraphBackendDef;
@@ -193,8 +195,8 @@ function PairRow({
 		member.direction === undefined ? undefined : (member.direction - group.offset + 8) % 8;
 	const coordinate = (member: GroupMember) => `${role(member)}:${relative(member)}`;
 	const present = new Set(members.map(coordinate));
-	const birth = new Set(PAIR_BIRTH.map(([field, d]) => `${field}:${d}`));
-	const extra = members.filter((member) => !birth.has(coordinate(member)));
+	const presentAtBirth = PAIR_BIRTH_KEYS.map((key) => present.has(key));
+	const extra = members.filter((member) => !PAIR_BIRTH_SET.has(coordinate(member)));
 	return (
 		<GroupRowShell
 			header={
@@ -213,9 +215,8 @@ function PairRow({
 						data-testid="edge-group-members"
 						title="Members present over the twelve birth coordinates: x at NE E SE SW W NW, then y at N NE SE S SW NW (relative to the offset)"
 					>
-						{PAIR_BIRTH.filter(([field, d]) => present.has(`${field}:${d}`)).length}/
-						{PAIR_BIRTH.length}{" "}
-						{PAIR_BIRTH.map(([field, d]) => (present.has(`${field}:${d}`) ? "●" : "○")).join("")}
+						{presentAtBirth.filter(Boolean).length}/{PAIR_BIRTH.length}{" "}
+						{presentAtBirth.map((here) => (here ? "●" : "○")).join("")}
 						{extra.length > 0 ? ` +${extra.length}` : ""}
 					</span>
 				</>
@@ -225,7 +226,7 @@ function PairRow({
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
 					{role(member)}:{directionName(relative(member) ?? 0)} → {group.kind}[
 					{directionName(member.direction ?? 0)}] {memberWeights(member)}
-					{birth.has(coordinate(member)) ? "" : " (zero pattern)"}
+					{PAIR_BIRTH_SET.has(coordinate(member)) ? "" : " (zero pattern)"}
 				</li>
 			))}
 		</GroupRowShell>

@@ -106,22 +106,6 @@ impl ReproductionInvalidTargetCause {
     }
 }
 
-/// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
-///
-/// `energy_transfer_fraction` is the share of the parent's post-cost energy
-/// the child starts with, in [0, 1] (T17.F01); the litter is capped at
-/// `default_offspring_energy` and refused under `initial_energy`.
-///
-/// Step 0 (T16.F02) debits the attempt effort,
-/// `action_effort(reproduce_attempt_cost)`, before any gate; a rejected
-/// attempt pays that effort and nothing more. Steps 1 to 8 then run at
-/// conception on the post-effort energy. When every gate passes the parent
-/// carries a pending birth delivered after `gestation_ticks` (T03.F12) by
-/// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) runs Steps 9 to 14
-/// at once, the pre-feature engine.
-///
-/// Returns `Conceived` or why the attempt was rejected.
-#[must_use]
 /// The inheritance witness (T25.F04): the child's committed genome holds a
 /// `DirectionPair` group with `|scale| > 1e-3` and no event of the birth
 /// could have created a group (no committed `Graph.AddDirectionPairGroup`
@@ -147,6 +131,22 @@ pub(crate) fn inherits_nonzero_pair_group(
         })
 }
 
+/// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
+///
+/// `energy_transfer_fraction` is the share of the parent's post-cost energy
+/// the child starts with, in [0, 1] (T17.F01); the litter is capped at
+/// `default_offspring_energy` and refused under `initial_energy`.
+///
+/// Step 0 (T16.F02) debits the attempt effort,
+/// `action_effort(reproduce_attempt_cost)`, before any gate; a rejected
+/// attempt pays that effort and nothing more. Steps 1 to 8 then run at
+/// conception on the post-effort energy. When every gate passes the parent
+/// carries a pending birth delivered after `gestation_ticks` (T03.F12) by
+/// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) runs Steps 9 to 14
+/// at once, the pre-feature engine.
+///
+/// Returns `Conceived` or why the attempt was rejected.
+#[must_use]
 pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,

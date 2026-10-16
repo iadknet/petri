@@ -311,14 +311,6 @@ fn member_direction(group: &Group, channel: u16) -> u8 {
     ((u16::from(group.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT)) as u8
 }
 
-/// The direction of a direction sink, `None` for any other sink.
-fn sink_direction(kind: OutputSinkKind) -> Option<(Kind, u8)> {
-    match kind {
-        OutputSinkKind::ActionVote(vote) => Kind::of_sink(vote),
-        _ => None,
-    }
-}
-
 /// Check every graph invariant (I2–I10) of `node`'s graph against its input
 /// references: at `GenomeFile::load` and in the mutation gate. A VM node
 /// passes.
@@ -525,19 +517,11 @@ impl CgpGraphBackendDef {
     ) -> f32 {
         match edge.membership {
             None => edge.own_weight,
-            Some(membership) => {
-                let group = &self.groups[membership.group.index()];
-                let sub_idx = match edge.source {
-                    GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
-                    _ => u16::MAX,
-                };
-                let direction = sink_direction(sink).map_or(u8::MAX, |(_, d)| d);
-                compose(
-                    edge.own_weight,
-                    group.scale,
-                    group.pattern(input_refs, sub_idx, direction),
-                )
-            }
+            Some(membership) => compose(
+                edge.own_weight,
+                self.groups[membership.group.index()].scale,
+                self.pattern_at(edge, sink, input_refs),
+            ),
         }
     }
 
@@ -548,16 +532,31 @@ impl CgpGraphBackendDef {
         occurrence: EdgeOccurrence,
         input_refs: &[InputReference],
     ) -> f32 {
-        let edge = self.edge_at(occurrence);
-        let Membership { group } = edge.membership.expect("member_pattern: a member");
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             panic!("member_pattern: only a sink edge is a member");
         };
+        self.pattern_at(
+            self.edge_at(occurrence),
+            self.output_sinks[sink].kind,
+            input_refs,
+        )
+    }
+
+    /// The pattern of member `edge` on a sink of kind `sink`: its group's at
+    /// the member's field and the sink's direction (`u16::MAX` / `u8::MAX`,
+    /// pattern 0 for a pair group, when either is absent).
+    fn pattern_at(
+        &self,
+        edge: &GraphEdge,
+        sink: OutputSinkKind,
+        input_refs: &[InputReference],
+    ) -> f32 {
+        let Membership { group } = edge.membership.expect("pattern_at: a member");
         let sub_idx = match edge.source {
             GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
             _ => u16::MAX,
         };
-        let direction = sink_direction(self.output_sinks[sink].kind).map_or(u8::MAX, |(_, d)| d);
+        let direction = sink.direction().map_or(u8::MAX, |(_, d)| d);
         self.groups[group.index()].pattern(input_refs, sub_idx, direction)
     }
 
@@ -1064,7 +1063,7 @@ impl CgpGraphBackendDef {
         let old = self.groups[group.index()];
         let mut moved = Vec::with_capacity(usize::from(2 * n));
         for sink in &mut self.output_sinks.0 {
-            let direction = sink_direction(sink.kind).map_or(0, |(_, d)| d);
+            let direction = sink.kind.direction().map_or(0, |(_, d)| d);
             sink.inputs.0.retain(|edge| {
                 let member = edge.is_member_of(group);
                 if member {
@@ -1150,11 +1149,11 @@ impl CgpGraphBackendDef {
     /// Insert member `edge` on its group's direction-`direction` sink in the
     /// I10 position.
     fn insert_member(&mut self, edge: GraphEdge, direction: u8) {
-        let (group, _) = Self::member_key(&edge).expect("a member");
+        let key = Self::member_key(&edge);
+        let (group, _) = key.expect("a member");
         let sink = self
             .direction_sink(self.groups[group.index()].kind, direction)
             .expect("a group's graph carries every direction sink");
-        let key = Self::member_key(&edge);
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
             .iter()
@@ -1235,7 +1234,9 @@ impl CgpGraphBackendDef {
                 let Some(record) = self.groups.get(group.index()) else {
                     return Err(V::GroupIdOutOfRange);
                 };
-                let on_kind = sink_direction(sink.kind)
+                let on_kind = sink
+                    .kind
+                    .direction()
                     .filter(|&(kind, _)| kind == record.kind)
                     .map(|(_, d)| d);
                 let reads_shape_ref = matches!(
