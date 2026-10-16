@@ -217,7 +217,8 @@ petri_tick_sensor_read
 # Families over maps that hold only the keys a run met: those the workload
 # (seed 7, T ticks, telemetry/overhead-world.json) gives a key. It gives none
 # to mutation_events_skipped_total_by_operator,
-# mutation_skip_reasons_total_by_operator or four of the six reader-state
+# mutation_skip_reasons_total_by_operator,
+# refinement_applications_by_key_total or four of the six reader-state
 # maps; a change in simulation behavior can change this list.
 keyed_names='
 petri_run_mutation_events_attempted_by_domain_total
@@ -228,7 +229,6 @@ petri_run_mutation_events_skipped_by_reason_total
 petri_run_mutation_operator_funnel_total
 petri_run_mutation_added_node_input_classes_by_operator_total
 petri_run_mutation_added_node_world_inputs_by_operator_total
-petri_run_refinement_applications_by_key_total
 petri_run_mutation_value_carriers_observed_total
 petri_run_mutation_value_survival_ticks_sum_total
 petri_run_mutation_value_offspring_spawned_sum_total
