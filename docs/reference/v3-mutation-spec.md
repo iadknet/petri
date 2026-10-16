@@ -485,7 +485,9 @@ added/removed/retyped — only their edges are evolvable.
 
   The ring key (one ring, kind and offset across direction sinks) is gone
   since T25.F03: a ring map is an explicit `Ring` edge group, refined through
-  `AlterGroupScale`.
+  `AlterGroupScale`. No set includes a member of either group shape. Every
+  committed application is counted by the stepped set's `(family, field)`
+  (`SimStats.refinement_applications_total_by_key`, T25.F04).
 
   Sets need at least two distinct homologous positions, with at most four
   members. A duplicate semantic position excludes its whole
@@ -568,26 +570,43 @@ added/removed/retyped — only their edges are evolvable.
   new draw. Other families and destinations are unchanged: a ring family
   landing on a kind drive (T11.F30) appends its zero-weight edges as on `Eat`,
   never a group. The family universe drops ring families when the graph
-  cannot host a group (`can_host_ring_group`: all 24 direction sinks and
+  cannot host a group (`can_host_group`: all 24 direction sinks and
   fewer than `u16::MAX` groups), so a drawn ring plan always completes. A
   dangling member reference bounds admission as any dangling leaf does.
 
+  Pair case (T25.F04): under WholeFamily, a pair-declaring family (sensor
+  spec Section 5.7) landing on a directed sink `K(d)` draws one pair
+  `gen_range(0..direction_pairs().len())` after the destination (the only new
+  draw; for `NearbyCreatureCore` the pair is the slot) and creates one silent
+  `DirectionPair` group at offset `d` (twelve members) plus one born-0
+  ungrouped edge into `Drive K` per fact of the pair, in facts order: 15
+  edges for an area family, 14 for a creature slot. The reference is declared
+  once and shared. SingleChannel keeps its one-edge plan and draws, an
+  undirected destination its whole-family edges. The WholeFamily universe
+  drops pair-declaring families when the graph cannot host a group or any
+  kind's `Drive` sink is absent, so a drawn pair plan always completes; ring
+  admission is unchanged.
+
 - Edge-group operators (T25.F03), at the catalog positions and weights of the
   T11.F31 ring projection operators they replace, after
-  `RefineHeritableStructure`; the default-arm total weight is 56. A group is
-  a record `{shape: Ring {ring_ref}, kind, offset, scale}` plus its member
-  sink edges (graph backend spec, "Ring edge groups"); the unit operators edit
-  the record and move members with it.
+  `RefineHeritableStructure`, with `AddDirectionPairGroup` (T25.F04)
+  directly after `AddRingGroup`; the default-arm total weight is 58. A group
+  is a record `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind,
+  offset, scale}` plus its member sink edges (graph backend spec, "Ring edge
+  groups" and "Direction-pair edge groups"); the unit operators pick one
+  group uniformly over both shapes, edit the record and move members with
+  it.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
   | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); `Δgenome_size` +9 | Increasing |
+  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 (duplicates allowed); `Δgenome_size` +13 | Increasing |
   | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
   | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
   | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink | Neutral |
   | `RemoveGroup` | 2 | same | the group; removes the record and every member, renumbering higher `GroupId`s; `Δgenome_size` −(n + 1) for n members | Decreasing |
 
-  Restricted size pressure admits only `RemoveGroup` of the five. A shift or
+  Restricted size pressure admits only `RemoveGroup` of the six. A shift or
   retarget re-inserts each member at its new sink in the I10 position, so it
   and its inverse return an equal genome. A born-connected `InputRef.Add`
   ring landing on a direction sink stays one ordinary edge (T20.F16

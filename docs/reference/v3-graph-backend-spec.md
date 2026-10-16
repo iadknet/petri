@@ -313,7 +313,7 @@ weight is its `own_weight`.
   per `(group, source, target)`; a group has at least one member;
   `input_refs[ring_ref]` is a ring and `offset < 8`; within a sink,
   independent edges come first in insertion order, then members sorted by
-  `(GroupId, channel)` (I10).
+  `(GroupId, sub_idx)` (I10; a `Ring` member's channel).
 - Members are summed with the sink's other edges at their genomic weights,
   sequentially in the I10 order: the runtime reads one weight per sink edge
   from the table `GraphRuntimeState::for_genome` builds at construction. A
@@ -329,6 +329,35 @@ weight is its `own_weight`.
   Structured refinement never steps a member.
 - The VM has no group (T11.F18 parity exemption): a VM node reaches one by
   `SwapNodeBackend` to Graph.
+
+### Direction-pair edge groups (T25.F04)
+
+A `DirectionPair` group `{shape: DirectionPair {ref_idx, pair}, kind K,
+offset k, scale s}` reads pair `pair` of `input_refs[ref_idx]` (a `World` key's
+`direction_pairs()`, sensor spec Section 5.7): a member reads
+`InputLeaf { ref_idx, x }` or `InputLeaf { ref_idx, y }` and sits on a
+direction sink `K(d)`; its coordinate is `(field, d)`. Its pattern is
+`compass_x((d − k) mod 8)` for the `x` field and `compass_y((d − k) mod 8)`
+for the `y` field, `compass_x(d)` being `Direction::ALL[d].delta().0`
+normalized (exactly 0, ±1 or ±1/√2) and `compass_y(d) = compass_x((d + 6)
+mod 8)`; any other field, a direction past 7 or an unresolvable pair reads 0.
+At `s > 0` and `k = 0` the group votes toward the sensed offset, at `k = 4`
+away from it. The weight formula is the `Ring` group's `compose`; the pattern
+resolves from the group's `ref_idx` and the member's sink, so
+`edge_weight(edge, sink, input_refs)` and `genomic_weight(occurrence, …)`
+take the sink.
+
+- Creation materializes the twelve non-zero-pattern members (`x` at relative
+  NE, E, SE, SW, W, NW; `y` at N, NE, SE, S, SW, NW) at own weight 0 and scale
+  0: thirteen `genome_size()` units, silent. A member on a zero-pattern
+  direction is valid (a loaded genome may carry one) and never created.
+- Invariants as for `Ring`, keyed by `(sub_idx, direction)` instead of the
+  ring channel: `input_refs[ref_idx]` declares `pair` and every member reads
+  its `x` or `y` field (`validate_graph`); at most two members per sink.
+- Shift and retarget move a member on `K(d)` to `K'((d + k' − k) mod 8)`,
+  keeping every member's relative coordinate (holes and zero-pattern members
+  included), so an edit and its inverse return an equal genome. Detach,
+  removal and the last member's removal behave as for `Ring`.
 
 ---
 
