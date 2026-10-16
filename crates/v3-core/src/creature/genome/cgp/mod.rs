@@ -6,7 +6,7 @@
 
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::vote::{
-    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
+    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
 
 mod container;
@@ -112,6 +112,18 @@ pub enum OutputSinkKind {
     /// Overwrite `action_params[field.index()]` (T11.F27), read when a pass
     /// commits `field.kind()` (T19.F04).
     ActionParam(ActionParamField),
+}
+
+impl OutputSinkKind {
+    /// The `(kind, direction)` of a directed vote sink, `None` for any other
+    /// sink.
+    #[must_use]
+    pub const fn direction(self) -> Option<(DirectedVoteKind, u8)> {
+        match self {
+            Self::ActionVote(vote) => DirectedVoteKind::of_sink(vote),
+            _ => None,
+        }
+    }
 }
 
 /// Number of CustomOutput sinks in the fixed catalog.
