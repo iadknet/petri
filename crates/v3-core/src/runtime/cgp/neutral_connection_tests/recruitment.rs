@@ -65,6 +65,34 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                     assert_eq!(votes.iter().filter(|&&vote| vote != 0.0).count(), 8);
                     continue;
                 }
+                let pair = arm == Arm::WholeFamily
+                    && matches!(&family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty());
+                if let (true, Some((kind, _))) = (pair, DirectedVoteKind::of_sink(vote)) {
+                    // A pair family under WholeFamily landing on a directed
+                    // sink is one silent `DirectionPair` group plus its facts
+                    // into the kind's drive (T25.F04), refined through the
+                    // scale: one step moves only the kind's direction votes.
+                    let def = graph(&node);
+                    assert_eq!(def.groups().len(), 1);
+                    assert_eq!(def.groups()[0].scale(), 0.0);
+                    assert_eq!(def.edges().filter(|e| e.membership().is_some()).count(), 12);
+                    let drive = def.sink(OutputSinkKind::ActionVote(kind.drive())).unwrap();
+                    assert_eq!(drive.inputs.len(), 3);
+                    assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
+                    let mut refined = node.clone();
+                    group::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
+                        .unwrap();
+                    let votes = effects(graph(&refined), &refined.input_refs, 0.5)
+                        .side
+                        .dispatch_effects()
+                        .0;
+                    let moved: Vec<usize> = (0..votes.len()).filter(|&i| votes[i] != 0.0).collect();
+                    assert!(!moved.is_empty(), "{arm:?} {vote:?}");
+                    assert!(moved
+                        .iter()
+                        .all(|&i| (0..8).any(|d| kind.sink(d).index() == i)));
+                    continue;
+                }
                 assert!(graph(&node).groups().is_empty());
                 let mut refined = node.clone();
                 alter_edge_weight_in_def(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
