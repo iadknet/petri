@@ -6,7 +6,7 @@ use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 /// Number of ranked nearby-creature slots.
 pub const NEARBY_SLOTS: usize = nearby_idx::SLOTS;
 /// Channels of the `NearbyCreature` family.
-pub const NEARBY_WIDTH: usize = nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT;
+pub const NEARBY_WIDTH: usize = nearby_idx::WIDTH;
 
 // The compound sub-field index constants live with the layouts they index in
 // `contracts::inputs` (T25.F04); re-exported here so every reader compiles
