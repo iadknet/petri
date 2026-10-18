@@ -48,10 +48,6 @@ fn correspondence(
         WorldInputKey::NearbyCreature => {
             // Ranked slots; field identity, not slot rank, is repeated.
             let width = nearby_idx::FIELDS_PER_SLOT as u16;
-            debug_assert_eq!(
-                usize::from(family.compound_width()),
-                nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT
-            );
             Some((
                 SlotKey {
                     family,

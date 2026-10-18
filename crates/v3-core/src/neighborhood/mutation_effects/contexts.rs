@@ -6,7 +6,7 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use crate::sensors::perception::SensorSnapshot;
+use crate::sensors::perception::{nearby_idx, SensorSnapshot};
 use crate::simulation::{assemble_full_sensor_inputs, Simulation};
 
 use super::super::battery::Scenario;
@@ -46,7 +46,7 @@ const AREA_FOOD: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit]
 const AREA_BARRIER: [Range; 7] = [Unit, Unit, Signed, Signed, Signed, Signed, Unit];
 const AREA_OCCUPANCY: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit];
 /// One `NearbyCreature` slot, in `nearby_idx` order, cycled over the slots.
-const NEARBY_SLOT: [Range; 9] = [
+const NEARBY_SLOT: [Range; nearby_idx::FIELDS_PER_SLOT] = [
     Binary, Signed, Signed, Unit, Unit, Binary, Unit, Binary, Unit,
 ];
 /// `PreviousOutcome` read ranges by `OutcomeChannel`: EnergyDelta [-1, 1],

@@ -544,15 +544,7 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
 fn can_host_group_needs_every_direction_sink_and_capacity() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     assert!(def.can_host_group());
-    def.groups = vec![
-        Group {
-            shape: ring(),
-            kind: DirectedVoteKind::Move,
-            offset: 0,
-            scale: 0.0,
-        };
-        usize::from(u16::MAX)
-    ];
+    def.exhaust_group_capacity();
     assert!(!def.can_host_group());
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     crate::creature::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {

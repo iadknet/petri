@@ -41,6 +41,8 @@ pub mod occupancy_idx {
 pub mod nearby_idx {
     pub const SLOTS: usize = 4;
     pub const FIELDS_PER_SLOT: usize = 9;
+    /// The family's channel count.
+    pub const WIDTH: usize = SLOTS * FIELDS_PER_SLOT;
     pub const PRESENT: usize = 0;
     pub const REL_X: usize = 1;
     pub const REL_Y: usize = 2;
@@ -275,7 +277,7 @@ impl WorldInputKey {
             Self::NeighborFoodRing { .. }
             | Self::NeighborBarrierRing
             | Self::NeighborOccupiedRing => 8,
-            Self::NearbyCreature => (nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT) as u16,
+            Self::NearbyCreature => nearby_idx::WIDTH as u16,
             _ => 1,
         }
     }
@@ -475,10 +477,6 @@ mod tests {
         assert_eq!(
             nearby_idx::PHENOTYPE_SIMILARITY + 1,
             nearby_idx::FIELDS_PER_SLOT
-        );
-        assert_eq!(
-            nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT,
-            usize::from(WorldInputKey::NearbyCreature.compound_width())
         );
         assert_eq!(WorldInputKey::NearbyCreature.compound_width(), 36);
         assert_eq!(
