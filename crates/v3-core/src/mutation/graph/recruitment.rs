@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use rand::{seq::SliceRandom, Rng};
 
 use crate::config::NeutralInputRecruitment as Arm;
-use crate::contracts::{DirectionPair, InputReference};
+use crate::contracts::{DirectionPair, InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
     ring_offset, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
 };
@@ -285,7 +285,10 @@ impl<'a> Admission<'a> {
                     || self.hosts_pair_plan
                     || reference.direction_pairs().is_empty()
             })
-            .map(SourceFamily::Input)
+            .flat_map(|reference| {
+                let entries = universe_entries(&reference);
+                std::iter::repeat_n(SourceFamily::Input(reference), entries)
+            })
             .collect();
         if arm == Arm::WholeFamily {
             families.push(SourceFamily::Upstream);
@@ -293,6 +296,21 @@ impl<'a> Admission<'a> {
         families.extend([SourceFamily::Memory(false), SourceFamily::Memory(true)]);
         families.retain(|family| self.plan(family, arm, 0).is_some());
         families
+    }
+}
+
+/// How many entries `reference` takes in recruitment's family universe:
+/// three for `NearbyCreature`, one per family it replaced, so its draw share
+/// equals the three families' combined share (T25.F05; the sampler's three
+/// buckets are a separate draw); one for every other reference.
+fn universe_entries(reference: &InputReference) -> usize {
+    if matches!(
+        reference,
+        InputReference::World(WorldInputKey::NearbyCreature)
+    ) {
+        3
+    } else {
+        1
     }
 }
 

@@ -1342,5 +1342,21 @@ impl CgpGraphBackendDef {
 }
 
 #[cfg(test)]
+impl CgpGraphBackendDef {
+    /// Fill the group table to its `u16::MAX`-record limit with memberless
+    /// records, so [`Self::can_host_group`] is false on an otherwise full
+    /// sink catalog (a preflight fixture; such a def fails `EmptyGroup`).
+    pub(crate) fn exhaust_group_capacity(&mut self) {
+        let record = Group {
+            shape: Shape::Ring { ring_ref: 0 },
+            kind: Kind::Move,
+            offset: 0,
+            scale: 0.0,
+        };
+        self.groups = vec![record; usize::from(u16::MAX)];
+    }
+}
+
+#[cfg(test)]
 #[path = "container_tests.rs"]
 mod tests;

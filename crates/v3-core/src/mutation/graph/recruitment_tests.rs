@@ -277,9 +277,9 @@ fn admissible_sampling_pool_contains_all_declared_families_and_channels() {
     let fixture = node();
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
     let single = admission.families(Arm::SingleChannel, 2);
-    assert_eq!(single.len(), 46);
+    assert_eq!(single.len(), 48);
     let whole = admission.families(Arm::WholeFamily, 2);
-    assert_eq!(whole.len(), 22);
+    assert_eq!(whole.len(), 24);
     for reference in input_reference_universe(2) {
         assert!(single.contains(&SourceFamily::Input(reference.clone())));
         if !matches!(
@@ -718,9 +718,42 @@ fn the_pair_case_draws_family_then_destination_then_pair() {
     );
 }
 
+/// The merged creature family is three entries of recruitment's family
+/// universe under both arms, one per family it replaced (T25.F05), while
+/// `input_reference_universe` lists it once; every other entry appears once.
+#[test]
+fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
+    let nearby_family = SourceFamily::Input(nearby());
+    assert_eq!(
+        input_reference_universe(2)
+            .iter()
+            .filter(|reference| **reference == nearby())
+            .count(),
+        1
+    );
+    let full = node();
+    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
+        let families = Admission::new(&full.input_refs, graph(&full)).families(arm, 2);
+        assert_eq!(
+            families.iter().filter(|f| **f == nearby_family).count(),
+            3,
+            "{arm:?}"
+        );
+        for family in families.iter().filter(|f| **f != nearby_family) {
+            assert_eq!(
+                families.iter().filter(|f| *f == family).count(),
+                1,
+                "{arm:?}: {family:?} once"
+            );
+        }
+    }
+}
+
 /// The preflight: under `WholeFamily`, pair-declaring families leave the
 /// universe when the graph cannot host a group or any kind's drive sink is
-/// absent; under `SingleChannel` they stay.
+/// absent; under `SingleChannel` they stay. All three entries of the merged
+/// family leave together, on a partial sink catalog and on an exhausted
+/// group table alike (T25.F05).
 #[test]
 fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
     use crate::creature::genome::vote::DirectedVoteKind;
@@ -759,6 +792,19 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
                 Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::SingleChannel, 2);
             assert!(single.iter().any(declares));
         }
+    }
+    let mut exhausted = node();
+    graph_mut(&mut exhausted).exhaust_group_capacity();
+    assert!(!graph(&exhausted).can_host_group());
+    let nearby_family = SourceFamily::Input(nearby());
+    for fixture in [&no_direction, &exhausted] {
+        let whole =
+            Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::WholeFamily, 2);
+        assert!(!whole.contains(&nearby_family), "no merged entry remains");
+        assert!(!whole.iter().any(declares));
+        let single =
+            Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::SingleChannel, 2);
+        assert_eq!(single.iter().filter(|f| **f == nearby_family).count(), 3);
     }
 }
 

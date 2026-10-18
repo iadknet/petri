@@ -90,6 +90,12 @@
 //! ac6b54b7... -> e9374ffc...); the guard digests hold. With
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
 //! commit (a93d6b87..., gestation rate 0.0 527a14e0...).
+//! Re-pinned by T25.F05 commit 2 after two agreeing runs: recruitment's
+//! family universe lists `NearbyCreature` three times, which remaps every
+//! recruitment family draw and moves the two sampled digests (326c6267... ->
+//! b6aa8164..., gestation rate 0.0 e9374ffc... -> f251417b...); the guard
+//! digests hold, and with `mutation.per_unit_rate` 0 the sampled run is
+//! byte-identical (a93d6b87..., gestation rate 0.0 527a14e0...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -101,11 +107,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "326c62673d1eedb1fe665989c057ddc52d866755bb12e16782d69c20ae276e54"
+        "b6aa8164a1c22e130563cb4f085605cb67184fdbdbe9079fce782cf952c7f1d7"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "e9374ffc39c3252330d2aba9dfd11ea4a3ddf347ded69c6747cb156cc16cb536"
+        "f251417bc304254b5c3b6ce688301a34a0b053c471f83d6407a865c1b65d218d"
     );
 }
 
