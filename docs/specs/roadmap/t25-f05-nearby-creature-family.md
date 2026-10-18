@@ -49,7 +49,7 @@ changes.
 | Sensors | `sensors/perception.rs:7` (`NEARBY_SLOTS`), `:23-58` (`PerceptionSnapshot` three arrays), `:67-77` (`is_extended_key`), `:132-134` (`resolve_compound`); `reducers.rs:307-421` (`rank_nearby_creatures`, `fill_nearby_banks` returning a 3-tuple); `reads.rs:17-40` (`UNTYPED_BITS` 7, bits 4–6) | The values and their one array. |
 | Sampler and recruitment | `mutation/sampling.rs:26-57` (27 buckets, 10–12 the three families), tests `:110-200` (`catalog_draw`); `mutation/graph/recruitment.rs:42-50` (`pair_count`: a draw only on a directed sink), `:62-96` (`append`), `:150-233` (`plan`: `WholeFamily` expands every field), `:235-258` (`families` from `input_reference_universe`), `:277-320` (`recruit`: family, channel, destination, pair); `recruitment_tests.rs:200-260` (the 1..=30 bound), `:619-657` (draw order); `mutation/input_ref/mod.rs:42-63` (`input_reference_universe` from `WorldInputKey::universe`, once per key) | The slot draw, the weighting site, the bound. |
 | Refinement | `mutation/graph/refinement.rs:17-62` (`SlotKey`, `correspondence`: `width = compound_width() / 4`, `field = channel % width`, `slot = channel / width`); `mutation/types` `RefinementKey {family, field}` | The re-key: one arm, nine fields. |
-| Readers | `contracts/inputs.rs` (`WorldInputKey::universe`: seven untyped keys; beside the type so mutation does not depend on the census), `creature/sensor_census.rs` (`world_input_key_label`); `neighborhood/input_use/catalog.rs:15-45` (`Family`, `input-use-v1`), `input_use/mod.rs:48`; `neighborhood/mutation_effects/contexts.rs:18-34` (`AUTHORED_CONTEXTS` 24, `CHANNEL_GROUPS` 8, three nearby groups), `:46-48`, `:70-84` (`set_group`), `mutation_effects/mod.rs:44-45` (`VERSION`, `COVERAGE_VERSION`); `mutation/types/mod.rs:157-173` (`MutationAddedNodeInputClass::Neighbor`); `creature/genome/mesh_annotations.rs:170-185` (`MeshReadClass::Neighbor`); `crates/v3-lab/src/readings.rs:465-483` (`census_covers`), `v3-lab/src/summary.rs:21` (`GENOME_FORMAT` 2); `runtime/trace/domain.rs:190-205` (`PerceptionDebugSnapshot`); `crates/v3-telemetry/src/windows.rs:471-473` (`petri.nearby_*` span attributes), `metrics.rs:1020-1031` (sensor gauges keyed by `world_input_key_label`), `metrics/tests.rs:168-172, :505-530, :908`, `tests.rs:1339`; `crates/v3-cli/tests/telemetry.rs:619-631`; `crates/v3-server/src/transport/sample_protocol.rs:93-100`, `sample_assembler.rs:55`, `types.rs:5` (`v3alpha7`) | Each reader's post-change expectation (table below). |
+| Readers | `contracts/inputs.rs` (`WorldInputKey::universe`, beside the type so mutation does not depend on the census), `creature/sensor_census.rs` (`world_input_key_label`); `neighborhood/input_use/catalog.rs:15-45` (`Family`, `input-use-v1`), `input_use/mod.rs:48`; `neighborhood/mutation_effects/contexts.rs:18-34` (`AUTHORED_CONTEXTS` 24, `CHANNEL_GROUPS` 8, three nearby groups), `:46-48`, `:70-84` (`set_group`), `mutation_effects/mod.rs:44-45` (`VERSION`, `COVERAGE_VERSION`); `mutation/types/mod.rs:157-173` (`MutationAddedNodeInputClass::Neighbor`); `creature/genome/mesh_annotations.rs:170-185` (`MeshReadClass::Neighbor`); `crates/v3-lab/src/readings.rs:465-483` (`census_covers`), `v3-lab/src/summary.rs:21` (`GENOME_FORMAT` 2); `runtime/trace/domain.rs:190-205` (`PerceptionDebugSnapshot`); `crates/v3-telemetry/src/windows.rs:471-473` (`petri.nearby_*` span attributes), `metrics.rs:1020-1031` (sensor gauges keyed by `world_input_key_label`), `metrics/tests.rs:168-172, :505-530, :908`, `tests.rs:1339`; `crates/v3-cli/tests/telemetry.rs:619-631`; `crates/v3-server/src/transport/sample_protocol.rs:93-100`, `sample_assembler.rs:55`, `types.rs:5` (`v3alpha7`) | Each reader's post-change expectation (table below). |
 | Frontend | `frontend/src/components/inspector/inputRefUtils.ts:38-62` (labels, descriptions), `:91-107` (`DIRECTION_PAIRS`), `:155-176` (`NEARBY_FIELDS`, `NEARBY_SLOTS`), `:390`; `directionPairs.json` (pinned both sides by `the_frontend_fixture_equals_the_declared_pairs` and a frontend test); `inputRefUtils.test.ts:146-177`; `types/trace.ts:19-21` | The hand mirror, one family. |
 | Pins | `tests/viability.rs` founder-only digests (must not move: the founder declares no creature family), `tests/baseline_worlds.rs`, `tests/applied_trajectory.rs`, `mutation/engine/recruitment_tests.rs` supply pin, `mutation/graph/recruitment_tests.rs:223` and its regression file, the slow-tier and `--lib` recruitment-paths rows, the v3-cli trajectory fixtures, the gate and world-set deterministic blocks, `docs/progress/benchmark-series.json` (gate and goal epochs at F04) | The predeclared re-pins (Performance section). |
 | Reference specs | `docs/reference/v3-sensor-spec.md` §1 (`:54-56`), §3.1 (`:106-108`), §5.4–5.7, §6.4–6.5; `v3-mutation-spec.md:577-588` (pair case), `:637-650` (sampler table); `v3-server-api-protocol-spec.md` §2 (`:53-70`) and the perception payload | Every sentence that names a creature family, rewritten for one. |
@@ -163,21 +163,16 @@ Closure:
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-core --test viability` first (30
-      passed, founder-only digests held), `cargo test -p v3-core` (the
-      layout pin, partition, sampler, draw order, universe weighting,
-      refinement fixtures), `cargo test -p v3-telemetry`,
-      `cargo test -p v3-server`, `cargo test -p v3-lab`,
-      `cargo test -p v3-cli`, frontend `npm test`, clippy, fmt and
-      `cargo check` clean on `842bf12f` -> results and the tree each ran on
-      in [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
-- [x] Refactor rerun on `7aadb463` (one recruitment append path,
-      `WorldInputKey::universe` in `contracts`): viability 30 passed,
-      `applied_trajectory` 2 passed with digests unchanged (no behavior
-      change, so the `e1134dc0` benchmark summaries stand),
-      `cargo test -p v3-core`, `-p v3-cli`, `-p v3-telemetry` pass, clippy
-      `-D warnings`, `cargo fmt --all --check` and `cargo check --workspace
-      --all-targets` clean.
+- [x] Focused tests on `7aadb463`: `cargo test -p v3-core --test
+      viability` first (30 passed, founder-only digests held),
+      `cargo test -p v3-core --test applied_trajectory` (2 passed, digests
+      unchanged, so the `e1134dc0` benchmark summaries stand),
+      `cargo test -p v3-core` (the layout pin, partition, sampler, draw
+      order, universe weighting, refinement fixtures), `cargo test -p
+      v3-telemetry`, `cargo test -p v3-cli`, clippy `-D warnings`, fmt and
+      `cargo check` clean; `cargo test -p v3-server`, `cargo test -p
+      v3-lab` and frontend `npm test` pass on `842bf12f` -> results in
+      [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
 - [ ] `make check` -> exit 0 on the final code.
 - [x] `make rust-test-slow` -> exit 0 on `7aadb463`, re-pinned rows
       recorded in the readings file.
