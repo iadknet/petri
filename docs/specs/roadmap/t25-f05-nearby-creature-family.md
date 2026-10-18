@@ -163,12 +163,14 @@ Closure:
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-core` (the layout pin, partition,
-      sampler, draw order, universe weighting, refinement fixtures),
-      `cargo test -p v3-telemetry`, `cargo test -p v3-server`,
-      `cargo test -p v3-lab`, `cargo test -p v3-cli`, frontend
-      `npm test` -> results in
-      [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
+- [x] Focused tests: `cargo test -p v3-core --test viability` first (30
+      passed, founder-only digests held), `cargo test -p v3-core` (the
+      layout pin, partition, sampler, draw order, universe weighting,
+      refinement fixtures), `cargo test -p v3-telemetry`,
+      `cargo test -p v3-server`, `cargo test -p v3-lab`,
+      `cargo test -p v3-cli`, frontend `npm test`, clippy, fmt and
+      `cargo check` clean on `842bf12f` -> results and the tree each ran on
+      in [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
 - [ ] `make check` -> exit 0 on the final code.
 - [x] `make rust-test-slow` -> exit 0 on the final code, re-pinned rows
       recorded in the readings file.
