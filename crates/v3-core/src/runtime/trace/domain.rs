@@ -189,9 +189,26 @@ pub struct PerceptionDebugSnapshot {
     pub area_food: [f32; 7],
     pub area_barrier: [f32; 7],
     pub area_occupancy: [f32; 7],
-    pub nearby_core: [f32; 16],
-    pub nearby_vitals: [f32; 8],
-    pub nearby_identity: [f32; 12],
+    /// The `NearbyCreature` family, 4 slots × 9 fields (T25.F05).
+    #[serde(serialize_with = "serialize_array")]
+    pub nearby: [f32; 36],
+}
+
+/// Serialize an array of any length as a sequence: serde derives arrays only
+/// up to 32 elements, and `NearbyCreature` is 36 wide.
+///
+/// # Errors
+///
+/// Whatever the serializer returns.
+pub fn serialize_array<S, T, const N: usize>(
+    values: &[T; N],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+    T: Serialize,
+{
+    serializer.collect_seq(values)
 }
 
 impl From<&PerceptionSnapshot> for PerceptionDebugSnapshot {
@@ -200,9 +217,7 @@ impl From<&PerceptionSnapshot> for PerceptionDebugSnapshot {
             area_food: p.area_food,
             area_barrier: p.area_barrier,
             area_occupancy: p.area_occupancy,
-            nearby_core: p.nearby_core,
-            nearby_vitals: p.nearby_vitals,
-            nearby_identity: p.nearby_identity,
+            nearby: p.nearby,
         }
     }
 }
@@ -410,15 +425,15 @@ mod tests {
     fn perception_debug_snapshot_from_perception_snapshot() {
         let mut p = PerceptionSnapshot::zero();
         p.area_food[0] = 0.5;
-        p.nearby_core[3] = 0.8;
-        p.nearby_identity[11] = 0.9;
+        p.nearby[3] = 0.8;
+        p.nearby[35] = 0.9;
         let debug = PerceptionDebugSnapshot::from(&p);
         assert!((debug.area_food[0] - 0.5).abs() < f32::EPSILON);
         assert_eq!(debug.area_barrier, [0.0; 7]);
         assert_eq!(debug.area_occupancy, [0.0; 7]);
-        assert!((debug.nearby_core[3] - 0.8).abs() < f32::EPSILON);
-        assert_eq!(debug.nearby_vitals, [0.0; 8]);
-        assert!((debug.nearby_identity[11] - 0.9).abs() < f32::EPSILON);
+        assert!((debug.nearby[3] - 0.8).abs() < f32::EPSILON);
+        assert_eq!(debug.nearby[4..35], [0.0; 31]);
+        assert!((debug.nearby[35] - 0.9).abs() < f32::EPSILON);
     }
 
     #[test]

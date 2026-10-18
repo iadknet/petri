@@ -577,12 +577,17 @@ added/removed/retyped — only their edges are evolvable.
   Pair case (T25.F04): under WholeFamily, a pair-declaring family (sensor
   spec Section 5.7) landing on a directed sink `K(d)` draws one pair
   `gen_range(0..direction_pairs().len())` after the destination (the only new
-  draw; for `NearbyCreatureCore` the pair is the slot) and creates one silent
-  `DirectionPair` group at offset `d` (twelve members) plus one born-0
-  ungrouped edge into `Drive K` per fact of the pair, in facts order: 15
-  edges for an area family, 14 for a creature slot. The reference is declared
-  once and shared. SingleChannel keeps its one-edge plan and draws, an
-  undirected destination its whole-family edges. The WholeFamily universe
+  draw) and creates one silent `DirectionPair` group at offset `d` (twelve
+  members) plus one born-0 ungrouped edge into `Drive K` per fact of the
+  pair, in facts order: 15 edges for an area family, 19 for a creature slot.
+  The reference is declared once and shared. SingleChannel keeps its
+  one-edge plan and draws, an area family on an undirected destination its
+  whole-family edges. `NearbyCreature`, whose pairs are its slots
+  (`slot_pairs()`, T25.F05), takes the pair draw on every destination: on a
+  directed sink the pair case above wires a whole neighbor, its offset to the
+  eight direction votes and its seven other fields to the drive; on any other
+  sink the drawn slot's nine channels `9k..9k+9`, ascending and born 0,
+  never the family's 36. The WholeFamily universe
   drops pair-declaring families when the graph cannot host a group or any
   kind's `Drive` sink is absent, so a drawn pair plan always completes; ring
   admission is unchanged.
@@ -644,7 +649,7 @@ added/removed/retyped — only their edges are evolvable.
   | 5, 6 | `DynamicIntrospection(EnergyCurrent)`, `(EnergyConsumedThisTick)` | none |
   | 7 | `ActionQueue` | none |
   | 8 | `AreaFoodSummary` | food type, with more than one food type |
-  | 9 to 13 | `AreaBarrierSummary`, `NearbyCreatureCore`, `NearbyCreatureVitals`, `NearbyCreatureIdentity`, `AreaOccupancySummary` | none |
+  | 9 to 13 | `AreaBarrierSummary`, `NearbyCreature` (10, 11 and 12, T25.F05), `AreaOccupancySummary` | none |
   | 14 to 18 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
   | 19 to 26 | `UpstreamSlot` | the slot |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no

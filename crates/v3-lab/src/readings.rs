@@ -471,9 +471,7 @@ fn census_covers(family: Family) -> bool {
             | Family::NeighborOccupiedRing
             | Family::AreaFoodSummary(_)
             | Family::AreaBarrierSummary
-            | Family::NearbyCreatureCore
-            | Family::NearbyCreatureVitals
-            | Family::NearbyCreatureIdentity
+            | Family::NearbyCreature
             | Family::AreaOccupancySummary
             | Family::ActionVotes
             | Family::PreviousPassVotes

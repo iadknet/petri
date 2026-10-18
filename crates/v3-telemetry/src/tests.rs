@@ -1335,10 +1335,7 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     assert_eq!(value("petri.tick.sensor_wired", "FoodHere:0"), population);
     assert_eq!(value("petri.tick.sensor_read", "FoodHere:0"), thinkers);
     assert!(thinkers > 0.0);
-    assert_eq!(
-        value("petri.tick.sensor_declared", "NearbyCreatureCore"),
-        0.0
-    );
+    assert_eq!(value("petri.tick.sensor_declared", "NearbyCreature"), 0.0);
 }
 
 #[test]

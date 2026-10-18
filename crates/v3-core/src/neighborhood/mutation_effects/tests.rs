@@ -267,7 +267,7 @@ fn authored_contexts_set_only_their_channel_group_in_production_ranges() {
             context.sensors.local.food_here,
             original.sensors.local.food_here
         );
-        let group = index % 8;
+        let group = index % contexts::CHANNEL_GROUPS.len();
         if group != 0 {
             assert_eq!(context.sensors.local.neighbor_barrier, [0.0; 8]);
         }

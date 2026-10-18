@@ -16,9 +16,8 @@ export interface PerceptionDebugSnapshot {
 	area_food: number[];
 	area_barrier: number[];
 	area_occupancy: number[];
-	nearby_core: number[];
-	nearby_vitals: number[];
-	nearby_identity: number[];
+	/** `NearbyCreature`: 4 slots × 9 fields. */
+	nearby: number[];
 }
 
 export interface VmStepTrace {

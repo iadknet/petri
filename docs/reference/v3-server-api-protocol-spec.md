@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha7 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha8 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha7 protocol-version posture;
+- v3alpha8 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,12 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha7"`.
-- Breaking payload changes require protocol-version bump. `v3alpha7`
+- Canonical value: `"v3alpha8"`.
+- Breaking payload changes require protocol-version bump. `v3alpha8`
+  (T25.F05) merged the three creature families into one genome key
+  `{"World": "NearbyCreature"}` of 36 channels and replaced the
+  `debug_perception` arrays `nearby_core`, `nearby_vitals` and
+  `nearby_identity` with one `nearby` array of 36. `v3alpha7`
   (T25.F04) gave a genome group the `DirectionPair` shape
   (`{"DirectionPair": {"ref_idx", "pair"}}`) beside `Ring`, whose members
   `graph_weights` lists one entry each. `v3alpha6`
@@ -102,7 +106,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha7 shape):
+Request (conceptual v3alpha8 shape):
 
 ```json
 {
@@ -237,7 +241,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -258,7 +262,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "running",
   "tick": 123
 }
@@ -273,7 +277,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "paused",
   "tick": 123
 }
@@ -302,7 +306,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -315,7 +319,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -369,7 +373,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -418,7 +422,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "paused",
   "config": {
     "population": {
@@ -561,7 +565,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -592,7 +596,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -605,7 +609,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -616,7 +620,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -650,7 +654,9 @@ Execution-sampler rules:
 - when the request did not ask for perception debugging,
   `debug_perception` is `null`
 - when the request asked for perception debugging, `debug_perception` contains
-  the extended-perception snapshot for that tick
+  the extended-perception snapshot for that tick: `area_food`, `area_barrier`
+  and `area_occupancy` (7 each) and `nearby` (36, the `NearbyCreature`
+  layout of sensor spec Section 5.4)
 - sampler route payload is `route { kind, raw_value, resolved_target_index }`
 - VM trace route scalar field is `final_route_value`
 - Graph trace payload includes effect-phase structural records:
@@ -711,7 +717,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -749,7 +755,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha7"`. |
+| `protocol_version` | string | Always `"v3alpha8"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -805,7 +811,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -913,7 +919,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha7
+  performance, but must document the throttle policy. The default v3alpha8
   behavior is per-tick emission.
 
 Ordering rules:
@@ -930,7 +936,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha7",
+  "protocol_version": "v3alpha8",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -956,7 +962,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha7)
+## 7. Out-of-Scope API Surfaces (v3alpha8)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -978,7 +984,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha7 server transport/API semantics.
+This file remains canonical for v3alpha8 server transport/API semantics.
 
 ---
 

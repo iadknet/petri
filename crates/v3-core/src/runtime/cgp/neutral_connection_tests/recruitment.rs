@@ -201,7 +201,7 @@ fn neutral_recruitment_native_work_charges_activation_but_no_per_edge_price() {
                         } else {
                             CgpGraphBackendDef::new_with_fixed_outputs()
                         },
-                        vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+                        vec![InputReference::World(WorldInputKey::NearbyCreature)],
                     );
                     let mut recruited = original.clone();
                     recruit_source(&mut recruited, &family, arm, 0, VoteSink::Eat).unwrap();

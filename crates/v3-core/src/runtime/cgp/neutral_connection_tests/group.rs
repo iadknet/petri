@@ -20,7 +20,7 @@ fn rings() -> Vec<InputReference> {
         food_ring(),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
         InputReference::World(WorldInputKey::NeighborOccupiedRing),
-        InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        InputReference::World(WorldInputKey::NearbyCreature),
     ]
 }
 
@@ -619,13 +619,13 @@ mod pair {
         winners[0]
     }
 
-    /// Each pair of each area family and slot 0 of `NearbyCreatureCore`.
+    /// Each pair of each area family and slot 0 of `NearbyCreature`.
     fn cases() -> Vec<(Thing, InputReference, u8)> {
         let food =
             InputReference::World(WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(0)));
         let barrier = InputReference::World(WorldInputKey::AreaBarrierSummary);
         let crowd = InputReference::World(WorldInputKey::AreaOccupancySummary);
-        let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+        let core = InputReference::World(WorldInputKey::NearbyCreature);
         vec![
             (Thing::Food, food.clone(), 0),
             (Thing::Food, food, 1),
@@ -668,7 +668,7 @@ mod pair {
     /// the target alone.
     #[test]
     fn a_nearby_creature_slot_pair_votes_toward_its_ranked_creature() {
-        let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+        let core = InputReference::World(WorldInputKey::NearbyCreature);
         for k in 1..4u8 {
             for (d, direction) in Direction::ALL.into_iter().enumerate() {
                 let (dx, dy) = direction.delta();

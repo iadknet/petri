@@ -1,10 +1,10 @@
 //! Mutation-effect attribution and observation coverage (T11.F26).
 //!
-//! `mutation-effects-v1` runs single-event diagnostic proposals from three
+//! `mutation-effects-v2` runs single-event diagnostic proposals from three
 //! parent cohorts (the canonical founder, the drift walk's birth lineages at
 //! its last checkpoint, and a draw of a world's selected genomes) and
 //! attributes each applied proposal by comparing traced `neighborhood-v2`
-//! executions of parent and child. `neighborhood-coverage-v1` re-reads a
+//! executions of parent and child. `neighborhood-coverage-v2` re-reads a
 //! fixed sample of battery-silent pairs on contexts and histories the
 //! battery lacks, beside three controls.
 //!
@@ -41,8 +41,8 @@ pub use contexts::Group;
 use contexts::{recorded_contexts, Extension};
 use records::{run_panel_executions, PanelExecution, TracedBattery};
 
-pub const VERSION: &str = "mutation-effects-v1";
-pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v1";
+pub const VERSION: &str = "mutation-effects-v2";
+pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v2";
 /// Proposal seed: `PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER * cohort +
 /// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`, where
 /// `parent_index` is the parent's zero-based ordinal within its cohort, not
@@ -853,7 +853,7 @@ pub struct WorldInputs<'a> {
     pub world_seed: u64,
 }
 
-/// One world's complete `mutation-effects-v1` and `neighborhood-coverage-v1`
+/// One world's complete `mutation-effects-v2` and `neighborhood-coverage-v2`
 /// reading.
 #[must_use]
 pub fn observe(

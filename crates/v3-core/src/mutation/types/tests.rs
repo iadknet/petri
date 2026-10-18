@@ -65,8 +65,8 @@ fn world_input_key_keys_are_stable() {
         "AreaFoodSummary"
     );
     assert_eq!(
-        crate::contracts::WorldInputKey::NearbyCreatureIdentity.as_key(),
-        "NearbyCreatureIdentity"
+        crate::contracts::WorldInputKey::NearbyCreature.as_key(),
+        "NearbyCreature"
     );
 }
 

@@ -5,7 +5,7 @@
 use rand::Rng;
 use std::collections::HashMap;
 
-use crate::contracts::{InputReference, WorldInputKey};
+use crate::contracts::{nearby_idx, InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind,
 };
@@ -45,11 +45,13 @@ fn correspondence(
         return None;
     }
     match family {
-        WorldInputKey::NearbyCreatureCore
-        | WorldInputKey::NearbyCreatureVitals
-        | WorldInputKey::NearbyCreatureIdentity => {
-            // Four ranked slots; field identity, not slot rank, is repeated.
-            let width = family.compound_width() / 4;
+        WorldInputKey::NearbyCreature => {
+            // Ranked slots; field identity, not slot rank, is repeated.
+            let width = nearby_idx::FIELDS_PER_SLOT as u16;
+            debug_assert_eq!(
+                usize::from(family.compound_width()),
+                nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT
+            );
             Some((
                 SlotKey {
                     family,

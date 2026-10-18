@@ -18,7 +18,7 @@ fn fixture(weight: f32) -> CreatureGenome {
             GraphEdge::new(
                 GraphSource::InputLeaf {
                     ref_idx: 0,
-                    sub_idx: slot * 4,
+                    sub_idx: slot * 9,
                 },
                 weight,
             ),
@@ -28,7 +28,7 @@ fn fixture(weight: f32) -> CreatureGenome {
         entry_node_id: NodeId::new(7),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(7),
-            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreature)],
             backend_def: BackendDef::Graph(def),
             targets: vec![],
         }],

@@ -250,13 +250,11 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
 }
 
 /// The extended-perception attributes of a two-food-type tick span.
-const PERCEPTION_KEYS: [&str; 8] = [
+const PERCEPTION_KEYS: [&str; 6] = [
     "petri.area_food",
     "petri.area_barrier",
     "petri.area_occupancy",
-    "petri.nearby_core",
-    "petri.nearby_vitals",
-    "petri.nearby_identity",
+    "petri.nearby",
     "petri.area_food.0",
     "petri.area_food.1",
 ];

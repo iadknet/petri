@@ -4,14 +4,14 @@ use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
 /// Number of ranked nearby-creature slots.
-pub const NEARBY_SLOTS: usize = 4;
+pub const NEARBY_SLOTS: usize = nearby_idx::SLOTS;
+/// Channels of the `NearbyCreature` family.
+pub const NEARBY_WIDTH: usize = nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT;
 
 // The compound sub-field index constants live with the layouts they index in
 // `contracts::inputs` (T25.F04); re-exported here so every reader compiles
 // unchanged.
-pub use crate::contracts::{
-    barrier_idx, core_idx, food_idx, identity_idx, occupancy_idx, vitals_idx,
-};
+pub use crate::contracts::{barrier_idx, food_idx, nearby_idx, occupancy_idx};
 
 /// Fixed-width extended perception snapshot assembled from the frozen world state.
 ///
@@ -32,12 +32,10 @@ pub struct PerceptionSnapshot {
     /// Area occupancy summary: [count_ratio, center_x, center_y, nearest_dx,
     ///   nearest_dy, nearest_dist, crowding_ratio]
     pub area_occupancy: [f32; 7],
-    /// Nearby creature core: 4 slots × [present, rel_x, rel_y, dist]
-    pub nearby_core: [f32; 16],
-    /// Nearby creature vitals: 4 slots × [energy_ratio, reproduce_ready]
-    pub nearby_vitals: [f32; 8],
-    /// Nearby creature identity: 4 slots × [kin_affinity, lineage_match, phenotype_similarity]
-    pub nearby_identity: [f32; 12],
+    /// Nearby creatures: 4 slots × [present, rel_x, rel_y, dist,
+    ///   energy_ratio, reproduce_ready, kin_affinity, lineage_match,
+    ///   phenotype_similarity], laid out by [`nearby_idx`].
+    pub nearby: [f32; NEARBY_WIDTH],
 }
 
 impl PerceptionSnapshot {
@@ -49,9 +47,7 @@ impl PerceptionSnapshot {
             typed_area_food: Vec::new(),
             area_barrier: [0.0; 7],
             area_occupancy: [0.0; 7],
-            nearby_core: [0.0; 16],
-            nearby_vitals: [0.0; 8],
-            nearby_identity: [0.0; 12],
+            nearby: [0.0; NEARBY_WIDTH],
         }
     }
 
@@ -71,9 +67,7 @@ impl PerceptionSnapshot {
             WorldInputKey::AreaFoodSummary { .. }
                 | WorldInputKey::AreaBarrierSummary
                 | WorldInputKey::AreaOccupancySummary
-                | WorldInputKey::NearbyCreatureCore
-                | WorldInputKey::NearbyCreatureVitals
-                | WorldInputKey::NearbyCreatureIdentity
+                | WorldInputKey::NearbyCreature
         )
     }
 }
@@ -129,9 +123,7 @@ impl SensorSnapshot {
                 .unwrap_or(0.0),
             WorldInputKey::AreaBarrierSummary => self.perception.area_barrier[idx],
             WorldInputKey::AreaOccupancySummary => self.perception.area_occupancy[idx],
-            WorldInputKey::NearbyCreatureCore => self.perception.nearby_core[idx],
-            WorldInputKey::NearbyCreatureVitals => self.perception.nearby_vitals[idx],
-            WorldInputKey::NearbyCreatureIdentity => self.perception.nearby_identity[idx],
+            WorldInputKey::NearbyCreature => self.perception.nearby[idx],
             WorldInputKey::NeighborFoodRing { type_idx } => {
                 self.typed_local_food.neighbor_food(*type_idx, idx)
             }
@@ -220,9 +212,7 @@ mod tests {
         assert_eq!(snap.area_food, [0.0; 7]);
         assert_eq!(snap.area_barrier, [0.0; 7]);
         assert_eq!(snap.area_occupancy, [0.0; 7]);
-        assert_eq!(snap.nearby_core, [0.0; 16]);
-        assert_eq!(snap.nearby_vitals, [0.0; 8]);
-        assert_eq!(snap.nearby_identity, [0.0; 12]);
+        assert_eq!(snap.nearby, [0.0; 36]);
     }
 
     #[test]
@@ -233,7 +223,7 @@ mod tests {
             }
         ));
         assert!(PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::NearbyCreatureIdentity
+            &WorldInputKey::NearbyCreature
         ));
         assert!(!PerceptionSnapshot::is_extended_key(
             &WorldInputKey::FoodHere {
@@ -267,16 +257,8 @@ mod tests {
             p.area_occupancy.len()
         );
         assert_eq!(
-            WorldInputKey::NearbyCreatureCore.compound_width() as usize,
-            p.nearby_core.len()
-        );
-        assert_eq!(
-            WorldInputKey::NearbyCreatureVitals.compound_width() as usize,
-            p.nearby_vitals.len()
-        );
-        assert_eq!(
-            WorldInputKey::NearbyCreatureIdentity.compound_width() as usize,
-            p.nearby_identity.len()
+            WorldInputKey::NearbyCreature.compound_width() as usize,
+            p.nearby.len()
         );
 
         // Ring sensor arrays on StaticInputs

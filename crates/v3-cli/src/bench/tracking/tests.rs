@@ -685,7 +685,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.pair_group_inherited_nonzero_births_total = 5;
     stats.refinement_applications_total_by_key.insert(
         v3_core::mutation::types::RefinementKey {
-            family: v3_core::contracts::WorldInputKey::NearbyCreatureCore,
+            family: v3_core::contracts::WorldInputKey::NearbyCreature,
             field: 3,
         },
         4,
@@ -747,10 +747,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             graph_edges_detached_total: 8,
             groups_removed_total: 2,
             pair_group_inherited_nonzero_births_total: 5,
-            refinement_applications_by_key: BTreeMap::from([(
-                "NearbyCreatureCore:3".to_string(),
-                4
-            )]),
+            refinement_applications_by_key: BTreeMap::from([("NearbyCreature:3".to_string(), 4)]),
         })
     );
     assert_eq!(
@@ -1355,7 +1352,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 groups_removed_total: 1,
                 pair_group_inherited_nonzero_births_total: 3,
                 refinement_applications_by_key: BTreeMap::from([(
-                    "NearbyCreatureVitals:0".to_string(),
+                    "NearbyCreature:4".to_string(),
                     2,
                 )]),
             }),

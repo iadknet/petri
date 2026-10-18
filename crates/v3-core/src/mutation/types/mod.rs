@@ -167,9 +167,7 @@ impl From<&InputReference> for MutationAddedNodeInputClass {
                 WorldInputKey::NeighborOccupiedRing | WorldInputKey::AreaOccupancySummary => {
                     Self::Occupancy
                 }
-                WorldInputKey::NearbyCreatureCore
-                | WorldInputKey::NearbyCreatureVitals
-                | WorldInputKey::NearbyCreatureIdentity => Self::Neighbor,
+                WorldInputKey::NearbyCreature => Self::Neighbor,
             },
             InputReference::StaticIntrospection(_)
             | InputReference::DynamicIntrospection(_)

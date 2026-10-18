@@ -411,8 +411,8 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
 
 // ── `AddDirectionPairGroup` (T25.F04) ───────────────────────────────────────
 
-fn nearby_core() -> InputReference {
-    InputReference::World(WorldInputKey::NearbyCreatureCore)
+fn nearby() -> InputReference {
+    InputReference::World(WorldInputKey::NearbyCreature)
 }
 
 /// Three draws in order — the pair over the flat list `(ref_idx ascending,
@@ -421,12 +421,12 @@ fn nearby_core() -> InputReference {
 fn add_pair_draws_pair_then_kind_then_offset_and_is_born_silent() {
     let refs = vec![
         InputReference::ActionVotes,
-        nearby_core(),
+        nearby(),
         barrier(),
         area_food(1),
         area_barrier(),
     ];
-    // NearbyCreatureCore: 4 pairs; AreaFoodSummary 2; AreaBarrierSummary 2.
+    // NearbyCreature: 4 pairs; AreaFoodSummary 2; AreaBarrierSummary 2.
     let flat: Vec<(u16, u8)> = (0..4)
         .map(|p| (1, p))
         .chain((0..2).map(|p| (3, p)))

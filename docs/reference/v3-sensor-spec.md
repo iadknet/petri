@@ -51,9 +51,7 @@ Compound inputs in v3alpha1:
 - `World(AreaFoodSummary { type_idx })` — 7 sub-values
 - `World(AreaBarrierSummary)` — 7 sub-values
 - `World(AreaOccupancySummary)` — 7 sub-values
-- `World(NearbyCreatureCore)` — 16 sub-values
-- `World(NearbyCreatureVitals)` — 8 sub-values
-- `World(NearbyCreatureIdentity)` — 12 sub-values
+- `World(NearbyCreature)` — 36 sub-values
 - `ActionVotes`, `PreviousPassVotes` — 30 sub-values (Section 3.6)
 - `CommitCounts` — 4 sub-values (Section 3.6)
 - `PreviousOutcome` — 4 sub-values (Section 3.7)
@@ -103,9 +101,7 @@ pub enum WorldInputKey {
     AreaFoodSummary { type_idx: OrdinaryFoodTypeId },
     AreaBarrierSummary,
     AreaOccupancySummary,
-    NearbyCreatureCore,
-    NearbyCreatureVitals,
-    NearbyCreatureIdentity,
+    NearbyCreature,
 }
 ```
 
@@ -272,7 +268,7 @@ Barrier visibility rule:
   barrier summaries
 - cells beyond it on that ray are hidden
 
-Hidden entities contribute nothing to area summaries or nearby-creature banks.
+Hidden entities contribute nothing to area summaries or the nearby-creature bank.
 
 ---
 
@@ -323,34 +319,23 @@ is computed for a single configured ordinary-food type.
 | 5 | `nearest_dist` |
 | 6 | `crowding_ratio` |
 
-### 5.4 `NearbyCreatureCore`
+### 5.4 `NearbyCreature`
 
-4 ranked slots × 4 fields = `16`
-
-Per-slot order:
-- `present`
-- `rel_x`
-- `rel_y`
-- `dist`
-
-### 5.5 `NearbyCreatureVitals`
-
-4 ranked slots × 2 fields = `8`
+4 ranked slots × 9 fields = `36` (T25.F05: one family where
+`NearbyCreatureCore`, `NearbyCreatureVitals` and `NearbyCreatureIdentity`
+stood, every field at its former value). Slot `k` field `f` is channel
+`9k + f` (`nearby_idx::SLOTS`, `nearby_idx::FIELDS_PER_SLOT`).
 
 Per-slot order:
-- `energy_ratio`
-- `reproduce_ready`
-
-### 5.6 `NearbyCreatureIdentity`
-
-4 ranked slots × 3 fields = `12`
-
-Per-slot order:
-- `kin_affinity`
-- `lineage_match`
-- `phenotype_similarity`
-
-All nearby-creature banks share the same slot ordering.
+- 0 `present`
+- 1 `rel_x`
+- 2 `rel_y`
+- 3 `dist`
+- 4 `energy_ratio`
+- 5 `reproduce_ready`
+- 6 `kin_affinity`
+- 7 `lineage_match`
+- 8 `phenotype_similarity`
 
 Ranking order:
 1. ascending Euclidean distance
@@ -363,8 +348,8 @@ Only visible non-self creatures participate.
 ### 5.7 Direction pairs (T25.F04)
 
 The layouts above are declared once in `contracts::inputs` (the `food_idx`,
-`barrier_idx`, `occupancy_idx`, `core_idx`, `vitals_idx` and `identity_idx`
-modules, re-exported from `sensors::perception`). Beside them,
+`barrier_idx`, `occupancy_idx` and `nearby_idx` modules, re-exported from
+`sensors::perception`). Beside them,
 `WorldInputKey::direction_pairs()` names each `(x, y)` offset a family senses
 toward a thing and that thing's plain facts, which a `DirectionPair` edge
 group reads (graph backend spec, "Direction-pair edge groups"):
@@ -374,9 +359,11 @@ group reads (graph backend spec, "Direction-pair edge groups"):
 | `AreaFoodSummary` (any food type) | `(gradient_x, gradient_y)` 1, 2; `(nearest_dx, nearest_dy)` 3, 4 | 0, 5, 6 |
 | `AreaBarrierSummary` | 2, 3; 4, 5 | 0, 1, 6 |
 | `AreaOccupancySummary` | `(center_x, center_y)` 1, 2; 3, 4 | 0, 5, 6 |
-| `NearbyCreatureCore` | slot `k`: `(rel_x, rel_y)` `4k+1`, `4k+2` | `4k`, `4k+3` |
+| `NearbyCreature` | slot `k`: `(rel_x, rel_y)` `9k+1`, `9k+2` | `9k`, `9k+3` to `9k+8` |
 
-Every other key declares none. Eligibility depends on the variant only, so
+Every other key declares none. `NearbyCreature`'s four pairs partition its
+layout, one pair per slot, so `WorldInputKey::slot_pairs()` is true for it
+alone and a drawn pair names a whole neighbor (T25.F05). Eligibility depends on the variant only, so
 every `InputRef.Swap` alternative of a pair-declaring reference declares the
 same pairs.
 
@@ -419,14 +406,14 @@ Area-summary denominator rule:
 - `crowding_ratio = sum(1.0 - dist_norm) / max_other_candidate_cells`
 - nearest fields use the nearest visible non-self creature
 
-### 6.4 Nearby Creature Vitals
+### 6.4 Nearby Creature Vitals (`NearbyCreature` fields 4–5)
 
 - `energy_ratio = clamp(target.energy / energy.lifecycle.max_energy, 0.0, 1.0)`
 - `reproduce_ready = 1.0` if
   `target.energy >= energy.lifecycle.min_reproduce_energy` and
   `target.age >= energy.lifecycle.min_reproduce_age`, else `0.0`
 
-### 6.5 Nearby Creature Identity
+### 6.5 Nearby Creature Identity (`NearbyCreature` fields 6–8)
 
 - `lineage_match = 1.0` if lineage IDs match, else `0.0`
 - `kin_affinity = 1.0 - (popcount(observer.kin_tag ^ target.kin_tag) / 32.0)`

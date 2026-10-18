@@ -16,13 +16,13 @@ use std::time::Instant;
 /// direction sinks form no set since T25.F03 (a ring map is an explicit
 /// group, refined through its scale).
 fn fixture() -> CreatureGenome {
-    let key = WorldInputKey::NearbyCreatureCore;
+    let key = WorldInputKey::NearbyCreature;
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     for i in 0..4u16 {
         wire(
             &mut def,
             OutputSinkKind::ActionVote(VoteSink::Eat),
-            edge(leaf(0, i * 4), if i == 0 { 0.025 } else { 0.0 }),
+            edge(leaf(0, i * 9), if i == 0 { 0.025 } else { 0.0 }),
         );
     }
     CreatureGenome {
@@ -78,7 +78,7 @@ fn native_run(
             let GraphSource::InputLeaf { sub_idx, .. } = edge.source() else {
                 panic!("fixture leaf")
             };
-            let input = snapshot.perception.nearby_core[usize::from(sub_idx)];
+            let input = snapshot.perception.nearby[usize::from(sub_idx)];
             assert!(input > 0.0);
             expected[vote.index()] += edge.own_weight() * input;
         }
@@ -403,10 +403,10 @@ fn structured_refinement_engineering_panel() {
                 energy += after.2;
                 records.push(serde_json::json!({"seed":seed,"selected":selected,"changed":changed,"selected_members":selected_members,"changed_members":new.iter().zip(&old).enumerate().filter_map(|(index,(a,b))| (a!=b).then_some(index)).collect::<Vec<_>>(),"requested_norm":requested,"actual_norm":norm,"exception_preserved":exception_preserved,"vote_changes":vote_changes,"vote_delta_norm":vote_norm}));
             }
-            rows.push(serde_json::json!({"layout":"nearby_core_present_eat","arm":format!("{arm:?}"),"attempted":256,"applied":256,"skipped":0,"numeric_rejections":0,"selected_node":0,"selected_groups":if matches!(arm,Arm::Scalar){0}else{256},"selected_coefficients":touches,"changed_coefficients":changes,"unchanged_proposals":unchanged_proposals,"requested_norm_max":requested_max,"actual_norm_mean":norm_sum/256.0,"actual_norm_max":norm_max,"exceptions_preserved":preserved,"changed_vote_coefficients":vote_change_sum,"vote_delta_norm_mean":vote_norm_sum/256.0,"genomic_units":original.genome_size(),"net_units":0,"native_graph_visits":visits,"plasticity_updates":0,"native_graph_energy":energy,"elapsed_seconds":arm_started.elapsed().as_secs_f64(),"proposals":records}));
+            rows.push(serde_json::json!({"layout":"nearby_present_eat","arm":format!("{arm:?}"),"attempted":256,"applied":256,"skipped":0,"numeric_rejections":0,"selected_node":0,"selected_groups":if matches!(arm,Arm::Scalar){0}else{256},"selected_coefficients":touches,"changed_coefficients":changes,"unchanged_proposals":unchanged_proposals,"requested_norm_max":requested_max,"actual_norm_mean":norm_sum/256.0,"actual_norm_max":norm_max,"exceptions_preserved":preserved,"changed_vote_coefficients":vote_change_sum,"vote_delta_norm_mean":vote_norm_sum/256.0,"genomic_units":original.genome_size(),"net_units":0,"native_graph_visits":visits,"plasticity_updates":0,"native_graph_energy":energy,"elapsed_seconds":arm_started.elapsed().as_secs_f64(),"proposals":records}));
         }
     }
-    let evidence=serde_json::to_string_pretty(&serde_json::json!({"proposals":1536,"seed_start":29_005_000,"seed_end_exclusive":29_005_256,"learning":false,"inputs":{"food_ring":sensors().typed_local_food.neighbor_food_by_type[0],"nearby_core_present":[sensors().perception.nearby_core[0],sensors().perception.nearby_core[4],sensors().perception.nearby_core[8],sensors().perception.nearby_core[12]]},"rows":rows,"elapsed_seconds":started.elapsed().as_secs_f64(),"verdicts":{"slots":"correctness_pass"}})).unwrap();
+    let evidence=serde_json::to_string_pretty(&serde_json::json!({"proposals":1536,"seed_start":29_005_000,"seed_end_exclusive":29_005_256,"learning":false,"inputs":{"food_ring":sensors().typed_local_food.neighbor_food_by_type[0],"nearby_present":[sensors().perception.nearby[0],sensors().perception.nearby[9],sensors().perception.nearby[18],sensors().perception.nearby[27]]},"rows":rows,"elapsed_seconds":started.elapsed().as_secs_f64(),"verdicts":{"slots":"correctness_pass"}})).unwrap();
     assert!(evidence.len() <= 10 * 1024 * 1024);
     println!("{evidence}");
     assert!(started.elapsed().as_secs_f64() < 60.0);

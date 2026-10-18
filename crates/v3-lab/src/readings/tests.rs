@@ -188,7 +188,7 @@ fn a_child_adds_its_birth_to_its_parents_ancestry() {
 }
 
 /// The founder plus a dead compute node reading a fresh
-/// `NearbyCreatureIdentity` reference on the entry node: structural but
+/// `NearbyCreature` reference on the entry node: structural but
 /// never read.
 fn with_unread_family(genome: &CreatureGenome) -> CreatureGenome {
     let mut genome = genome.clone();
@@ -200,7 +200,7 @@ fn with_unread_family(genome: &CreatureGenome) -> CreatureGenome {
     let node = &mut genome.nodes[entry];
     let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs.push(InputReference::World(
-        v3_core::contracts::WorldInputKey::NearbyCreatureIdentity,
+        v3_core::contracts::WorldInputKey::NearbyCreature,
     ));
     let BackendDef::Graph(graph) = &mut node.backend_def else {
         panic!("the founder entry is a graph node");
@@ -234,7 +234,7 @@ fn ablation_separates_read_from_unread_families() {
     };
     assert!(ticks > 0);
     let find = |label: &str| causal.iter().find(|c| c.family == label).unwrap();
-    let unread = find("NearbyCreatureIdentity");
+    let unread = find("NearbyCreature");
     assert_eq!((unread.causal, unread.score_delta), (false, 0.0));
     assert!(find("NeighborFoodRing:0").causal, "the food ring steers");
     for reading in &causal {
@@ -596,6 +596,28 @@ fn a_genome_file_breaking_a_graph_invariant_is_refused() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// A genome file stored before T25.F05 (format 2, three creature families)
+/// or earlier is refused by the format guard (T25.F05).
+#[test]
+fn a_genome_file_of_an_earlier_format_is_refused() {
+    let dir = std::env::temp_dir().join(format!("petri-lab-format-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("old.json");
+    assert_eq!(crate::summary::GENOME_FORMAT, 3);
+    for format in [1, 2] {
+        let mut file =
+            crate::GenomeFile::new(v3_core::creature::founder::v3alpha1_founder_genome());
+        file.genome_format = format;
+        std::fs::write(&path, serde_json::to_vec(&file).unwrap()).unwrap();
+        let error = crate::GenomeFile::load(&path).unwrap_err();
+        assert!(
+            format!("{error}").contains(&format!("genome_format {format} is not 3")),
+            "{error}"
+        );
+    }
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 #[test]
 fn a_ring_read_only_through_a_group_is_causal() {
     let setup = setup(100, 100.0);
@@ -899,7 +921,7 @@ fn a_dead_world_read_is_structural_but_not_live() {
     let unread = shape
         .families
         .iter()
-        .find(|f| f.family == "NearbyCreatureIdentity")
+        .find(|f| f.family == "NearbyCreature")
         .unwrap();
     assert_eq!((unread.structural, unread.live), (true, Some(false)));
 }
