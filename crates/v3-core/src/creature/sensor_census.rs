@@ -14,9 +14,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, OrdinaryFoodTypeId, WorldInputKey,
-};
+use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
 use crate::creature::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
@@ -238,29 +236,6 @@ impl CreatureSensorCensus {
     }
 }
 
-/// Every world input key a world with these ordinary food types can present:
-/// the five unparameterized keys plus the three food-parameterized families,
-/// once per food type. A key absent from a census is then distinguishable from
-/// a key this world does not have.
-#[must_use]
-pub fn world_input_key_universe(
-    food_types: impl IntoIterator<Item = OrdinaryFoodTypeId>,
-) -> BTreeSet<WorldInputKey> {
-    let mut keys = BTreeSet::from([
-        WorldInputKey::NeighborBarrierRing,
-        WorldInputKey::NeighborOccupiedRing,
-        WorldInputKey::AreaBarrierSummary,
-        WorldInputKey::AreaOccupancySummary,
-        WorldInputKey::NearbyCreature,
-    ]);
-    for type_idx in food_types {
-        keys.insert(WorldInputKey::food_here(type_idx));
-        keys.insert(WorldInputKey::neighbor_food_ring(type_idx));
-        keys.insert(WorldInputKey::area_food_summary(type_idx));
-    }
-    keys
-}
-
 /// Report label for a world input key: the transport key, with the food type
 /// appended for the food-parameterized families so they stay distinct.
 #[must_use]
@@ -274,7 +249,7 @@ pub fn world_input_key_label(key: WorldInputKey) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{DynamicIntrospectionKey, NodeId};
+    use crate::contracts::{DynamicIntrospectionKey, NodeId, OrdinaryFoodTypeId};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::test_support::push_sink;
@@ -776,10 +751,10 @@ mod tests {
 
     #[test]
     fn the_key_universe_is_five_plus_three_per_food_type_with_labelled_families() {
-        let one = world_input_key_universe([FOOD_0]);
+        let one = WorldInputKey::universe([FOOD_0]);
         assert_eq!(one.len(), 8);
 
-        let two = world_input_key_universe([FOOD_0, FOOD_1]);
+        let two = WorldInputKey::universe([FOOD_0, FOOD_1]);
         assert_eq!(two.len(), 11);
         assert!(two.is_superset(&one));
 
@@ -981,7 +956,7 @@ mod tests {
             ),
         ) {
             use crate::sensors::reads::WorldReads;
-            let catalog = world_input_key_universe([FOOD_0, FOOD_1]);
+            let catalog = WorldInputKey::universe([FOOD_0, FOOD_1]);
             let built: Vec<Built> = creatures
                 .iter()
                 .map(|(refs, leaves, read_keys)| {
@@ -1035,7 +1010,7 @@ mod tests {
         fn the_key_universe_covers_every_food_type_once(count in 1usize..6) {
             let types: Vec<OrdinaryFoodTypeId> =
                 (0..count).map(|i| OrdinaryFoodTypeId::new(i as u16)).collect();
-            let universe = world_input_key_universe(types.iter().copied());
+            let universe = WorldInputKey::universe(types.iter().copied());
 
             prop_assert_eq!(universe.len(), 5 + 3 * count);
             for type_idx in types {

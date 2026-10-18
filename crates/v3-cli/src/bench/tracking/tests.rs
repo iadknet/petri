@@ -51,7 +51,7 @@ fn census_for(population: u64) -> SensorCensus {
     use v3_core::config::OrdinaryFoodTypeId;
     let food_here = WorldInputKey::food_here(OrdinaryFoodTypeId::new(0));
     SensorCensus {
-        world_inputs: world_input_key_universe([OrdinaryFoodTypeId::new(0)])
+        world_inputs: WorldInputKey::universe([OrdinaryFoodTypeId::new(0)])
             .into_iter()
             .map(|key| WorldInputCensusRow {
                 key: world_input_key_label(key),

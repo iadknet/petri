@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::contracts::OrdinaryFoodTypeId;
 
 // ── Compound sub-field index constants ──────────────────────────────────────
@@ -68,7 +70,8 @@ pub struct DirectionPair {
     pub facts: &'static [u16],
 }
 
-// Field indices are `usize` for array indexing; every one is below 16.
+// Field indices are `usize` for array indexing; the largest
+// (`nearby_idx::WIDTH - 1`, 35) fits `u16`, so the casts are lossless.
 const fn pair(x: usize, y: usize, facts: &'static [u16]) -> DirectionPair {
     DirectionPair {
         x: x as u16,
@@ -186,6 +189,26 @@ pub enum WorldInputKey {
 }
 
 impl WorldInputKey {
+    /// Every world input key a world with these ordinary food types can
+    /// present: the five unparameterized keys plus the three
+    /// food-parameterized families, once per food type.
+    #[must_use]
+    pub fn universe(food_types: impl IntoIterator<Item = OrdinaryFoodTypeId>) -> BTreeSet<Self> {
+        let mut keys = BTreeSet::from([
+            Self::NeighborBarrierRing,
+            Self::NeighborOccupiedRing,
+            Self::AreaBarrierSummary,
+            Self::AreaOccupancySummary,
+            Self::NearbyCreature,
+        ]);
+        for type_idx in food_types {
+            keys.insert(Self::food_here(type_idx));
+            keys.insert(Self::neighbor_food_ring(type_idx));
+            keys.insert(Self::area_food_summary(type_idx));
+        }
+        keys
+    }
+
     /// Construct a typed food-here key for the given food type.
     #[must_use]
     pub const fn food_here(type_idx: OrdinaryFoodTypeId) -> Self {
@@ -366,9 +389,7 @@ mod tests {
 
     fn every_world_key() -> Vec<WorldInputKey> {
         let food = (0..3).map(OrdinaryFoodTypeId::new);
-        crate::creature::sensor_census::world_input_key_universe(food)
-            .into_iter()
-            .collect()
+        WorldInputKey::universe(food).into_iter().collect()
     }
 
     #[test]

@@ -66,8 +66,8 @@ impl Plan {
     /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` group
     /// at offset `d` (twelve members) plus one born-0 edge into `Drive K` per
     /// fact of the pair, in `facts` order (T25.F04). A slot plan landing
-    /// elsewhere appends the drawn slot's channels ascending, born 0
-    /// (T25.F05). Every other plan appends its edges at weight 0.
+    /// elsewhere takes the drawn slot's channels, ascending, as its sources
+    /// (T25.F05). Every other plan appends its sources at weight 0.
     fn append(self, node: &mut NodeGenome, destination: usize, pair: Option<u8>) {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("admission requires a Graph backend")
@@ -90,6 +90,17 @@ impl Plan {
             }
             return;
         }
+        if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
+            let channel =
+                u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
+            def.add_group(
+                Shape::Ring { ring_ref: ref_idx },
+                kind,
+                ring_offset(d, channel),
+            );
+            return;
+        }
+        let mut sources = self.sources;
         if let Some(PairPlan {
             ref_idx,
             pairs,
@@ -102,25 +113,13 @@ impl Plan {
                 .chain(layout.facts.iter().copied())
                 .collect();
             channels.sort_unstable();
-            for sub_idx in channels {
-                def.push_edge(
-                    EdgeSurface::SinkInput(destination),
-                    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 0.0),
-                );
-            }
-            return;
-        }
-        if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
-            let channel =
-                u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
-            def.add_group(
-                Shape::Ring { ring_ref: ref_idx },
-                kind,
-                ring_offset(d, channel),
+            sources.extend(
+                channels
+                    .into_iter()
+                    .map(|sub_idx| GraphSource::InputLeaf { ref_idx, sub_idx }),
             );
-            return;
         }
-        for source in self.sources {
+        for source in sources {
             def.push_edge(
                 EdgeSurface::SinkInput(destination),
                 GraphEdge::new(source, 0.0),

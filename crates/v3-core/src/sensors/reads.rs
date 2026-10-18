@@ -161,7 +161,6 @@ impl FromIterator<WorldInputKey> for WorldKeySet {
 mod tests {
     use super::*;
     use crate::contracts::OrdinaryFoodTypeId;
-    use crate::creature::sensor_census::world_input_key_universe;
     use proptest::prelude::*;
 
     #[test]
@@ -203,7 +202,7 @@ mod tests {
             food_types in 1u16..=60,
             picks in proptest::collection::vec(any::<bool>(), 5 + 3 * 60),
         ) {
-            let universe: Vec<_> = world_input_key_universe(
+            let universe: Vec<_> = WorldInputKey::universe(
                 (0..food_types).map(OrdinaryFoodTypeId::new),
             )
             .into_iter()

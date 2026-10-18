@@ -8,7 +8,8 @@ use super::run::{build_report, run_deterministic, run_one_seed};
 use super::schema::Report;
 use super::tracking::{OccupancyGrid, PopulationReadings, SensorCensus, WorldTracking};
 use crate::six;
-use v3_core::creature::sensor_census::{world_input_key_label, world_input_key_universe};
+use v3_core::contracts::WorldInputKey;
+use v3_core::creature::sensor_census::world_input_key_label;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELLS_PER_AXIS;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
 use v3_core::simulation::{run_tick, seed_simulation};
@@ -219,7 +220,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
     // Assert: every checkpoint carries a census, and every census carries
     // the world's whole key universe in key order.
-    let expected_keys: Vec<String> = world_input_key_universe(
+    let expected_keys: Vec<String> = WorldInputKey::universe(
         oracle
             .world
             .food()

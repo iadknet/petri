@@ -4,9 +4,7 @@ use proptest::prelude::*;
 use prost::Message as _;
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::WorldInputKey;
-use v3_core::creature::sensor_census::{
-    world_input_key_label, world_input_key_universe, SensorUseRow,
-};
+use v3_core::creature::sensor_census::{world_input_key_label, SensorUseRow};
 use v3_core::mutation::{
     BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
     MutationOperatorFunnel, MutationSkipReason,
@@ -146,7 +144,7 @@ fn populated() -> SimStats {
     for reason in skip {
         s.mutation_events_skipped_by_reason.insert(reason, 1);
     }
-    let inputs = world_input_key_universe(types);
+    let inputs = WorldInputKey::universe(types);
     for operator in MutationOperator::all() {
         s.mutation_events_attempted_total_by_operator
             .insert(operator, 1);
@@ -741,7 +739,7 @@ fn label_sets(attributes: &[(&'static str, Vec<String>)]) -> BTreeSet<BTreeMap<S
 /// One row per key of a two-food-type catalog, with distinct counts: the
 /// `i`-th key is declared by `3i + 3`, wired by `2i + 2` and read by `i`.
 fn sensor_rows() -> Vec<SensorUseRow> {
-    world_input_key_universe([OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1)])
+    WorldInputKey::universe([OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1)])
         .into_iter()
         .zip(0u64..)
         .map(|(key, i)| SensorUseRow {
