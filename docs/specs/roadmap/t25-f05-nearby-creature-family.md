@@ -180,8 +180,9 @@ Closure:
 - [ ] Benchmark profiles: summaries at
       `docs/progress/features/t25-f05-nearby-creature-family.json` (gate)
       and `t25-f05-nearby-creature-family-goal.json`, local raw hash/byte
-      count and verification time checked, series entry points to the
-      summary, no new full report staged.
+      count and verification time checked (done at `e1134dc0`, both
+      `severe=false`, see Performance and Goal Impact), series entry points
+      to the summary (left to closure), no new full report staged.
 
 ## Performance and Goal Impact
 
@@ -249,7 +250,36 @@ identity of every genome with a creature reference, `GENOME_FORMAT`,
 mutation-on digests and the recruitment rows again. The founder-only
 viability digests do not move under either.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Both profiles ran once at `e1134dc0` (release build,
+`make bench PROFILE=<p> FEATURE=t25-f05-nearby-creature-family`, bench-wait
+preflight), CLI exit 0 and outer (`make`) exit 0 for each (sources: the
+summaries' `measurement_evidence.cli_exit` and the absence of a `make` Error
+line), `severe=false` on both, against F04's stored summaries.
+
+- Gate: wall clock 0.0026547 ms per creature-tick against 0.0027416 (-3.17%,
+  no wall-clock flag); one counter flag, pass_cap_hits +32.66% (below the 50%
+  severe line); every other counter within +-14%.
+- Goal: wall clock 0.0087726 against 0.0092266 (-4.92%); one counter flag,
+  pass_cap_hits +20.97%; no other flag or severe (plasticity_updates -41.65%
+  and decided_passes -63.59% are decreases, level ok). Mean genome size fell
+  on all three worlds (100.79, 106.58, 116.30 against 103.01, 148.68,
+  129.38). No world went extinct; seed 22 ends with one surviving clade and
+  a minimum population of 5.
+- Merged-family share: wired prevalence of `NearbyCreature` is 11.40%,
+  49.47% and 14.58% against F04's largest single row 5.30%, 1.86% and 6.62%
+  (ratios 2.15, 26.6, 2.20), so the half-of-F04 floor is not crossed on any
+  world. Pair-group count is 61, 33 and 35 against F04's `NearbyCreatureCore`
+  146, 0 and 32: seed 11 is below half (0.42), seed 33 is not (1.09), seed 22
+  has a zero baseline and takes no part in the floor, so the floor (below
+  half on every positive-baseline world) does not fire.
+- `refinement_applications_by_key` is empty on all three worlds.
+- Closure re-pins the gate and goal epochs in `benchmark-series.json` to
+  these two summaries (not done by the benchmark run).
+
+| Profile | Raw file, bytes, SHA-256 | Summary bytes, SHA-256 |
+| --- | --- | --- |
+| gate | `.bench-artifacts/t25-f05-nearby-creature-family/gate.json`, 107,685, `1f426dbf3aa0258be23423c923b7a862428cefbe5ad4551f5c66035652b7610d` | 20,840, `cc6611186467d6eeb497ba66006b33e598d65b8bd5874de29f583c2a31e32f6e` |
+| goal | `.bench-artifacts/t25-f05-nearby-creature-family/goal.json`, 682,343,830, `4f89502265cd56c10c2b82bc0309d88cb6de4b319cf3feb08cba0e7687b14386` | 401,266, `22acbd11c0d826e085c2b3c7debf3435d7dd0f7591200f432b2e0689d0062600` |
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t25-f05-nearby-creature-family.json),
