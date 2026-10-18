@@ -124,33 +124,33 @@ Two behavior commits so every moved pin has one cause.
 
 Commit 1, the merge:
 
-- [ ] Tests first, while the three families exist: the layout pin
+- [x] Tests first, while the three families exist: the layout pin
       (invariant 2) over the real reducer; then the sampler index test
       (invariant 5), the partition test (invariant 3), the draw-order
       replay extended with the slot draw on an undirected destination
       (invariant 6), the `Slots` fixtures at `field = channel mod 9`
       (invariant 8), the frontend fixture test and the field-name parity
       test (readers table, Inspector row).
-- [ ] `contracts::inputs`: `NearbyCreature`, `nearby_idx`, the four slot
+- [x] `contracts::inputs`: `NearbyCreature`, `nearby_idx`, the four slot
       pairs, `slot_pairs`, `compound_width` 36; delete the three variants
       and index modules; `sensors::reducers` writes against `nearby_idx`.
-- [ ] Sensors: `PerceptionSnapshot.nearby`, `fill_nearby_banks`,
+- [x] Sensors: `PerceptionSnapshot.nearby`, `fill_nearby_banks`,
       `resolve_compound`, `is_extended_key`, `WorldReads` bits.
-- [ ] Sampler (invariant 5); recruitment's slot rule (invariant 6);
+- [x] Sampler (invariant 5); recruitment's slot rule (invariant 6);
       refinement re-key (invariant 8); catalog, classes, census universe and
       label, mutation-effects contexts and versions, lab `census_covers` and
       `GENOME_FORMAT` 3 (invariants 9, 11).
-- [ ] Trace domain, telemetry window attribute and metrics tests, server
+- [x] Trace domain, telemetry window attribute and metrics tests, server
       payload and `v3alpha8`, frontend (`inputRefUtils.ts`,
       `directionPairs.json`, `types/trace.ts`, tests), the v3-cli telemetry
       test's attribute list.
-- [ ] Reference specs (readers table, last row).
-- [ ] Re-pin the predeclared pins moved by this commit; record each in the
+- [x] Reference specs (readers table, last row).
+- [x] Re-pin the predeclared pins moved by this commit; record each in the
       readings file's re-pin table with its mechanism.
 
 Commit 2, the recruitment universe:
 
-- [ ] `Admission::families` lists the family three times (invariant 7) with
+- [x] `Admission::families` lists the family three times (invariant 7) with
       its full-sink test and the partial-sink and exhausted-capacity cases;
       re-pin the pins moved by this commit.
 
@@ -163,14 +163,14 @@ Closure:
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core` (the layout pin, partition,
+- [x] Focused tests: `cargo test -p v3-core` (the layout pin, partition,
       sampler, draw order, universe weighting, refinement fixtures),
       `cargo test -p v3-telemetry`, `cargo test -p v3-server`,
       `cargo test -p v3-lab`, `cargo test -p v3-cli`, frontend
       `npm test` -> results in
       [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
 - [ ] `make check` -> exit 0 on the final code.
-- [ ] `make rust-test-slow` -> exit 0 on the final code, re-pinned rows
+- [x] `make rust-test-slow` -> exit 0 on the final code, re-pinned rows
       recorded in the readings file.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
       summary line, output path, and every survivor resolved as killed,
