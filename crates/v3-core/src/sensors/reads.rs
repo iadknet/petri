@@ -15,10 +15,10 @@ use std::sync::Mutex;
 use crate::contracts::WorldInputKey;
 
 /// Keys without a food type, one bit each.
-const UNTYPED_BITS: u32 = 7;
+const UNTYPED_BITS: u32 = 5;
 /// Bits per food type: `FoodHere`, `NeighborFoodRing`, `AreaFoodSummary`.
 const BITS_PER_FOOD_TYPE: u32 = 3;
-/// Inline words: the untyped keys and the first 40 food types. Higher food
+/// Inline words: the untyped keys and the first 41 food types. Higher food
 /// types spill into a sorted set, so every valid key has a bit.
 const WORDS: usize = 2;
 const INLINE_BITS: u32 = WORDS as u32 * 64;
@@ -33,9 +33,7 @@ fn bit(key: WorldInputKey) -> u32 {
         WorldInputKey::NeighborOccupiedRing => 1,
         WorldInputKey::AreaBarrierSummary => 2,
         WorldInputKey::AreaOccupancySummary => 3,
-        WorldInputKey::NearbyCreatureCore => 4,
-        WorldInputKey::NearbyCreatureVitals => 5,
-        WorldInputKey::NearbyCreatureIdentity => 6,
+        WorldInputKey::NearbyCreature => 4,
         WorldInputKey::FoodHere { type_idx } => typed(type_idx.get(), 0),
         WorldInputKey::NeighborFoodRing { type_idx } => typed(type_idx.get(), 1),
         WorldInputKey::AreaFoodSummary { type_idx } => typed(type_idx.get(), 2),
@@ -108,7 +106,7 @@ impl PartialEq for WorldReads {
 
 /// A compact set of world input keys: the keys a mesh run resolved, or the
 /// keys a genome declares or wires (cached at birth). Inline for the first
-/// 40 food types; higher ones spill to the heap.
+/// 41 food types; higher ones spill to the heap.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WorldKeySet {
     words: [u64; WORDS],
@@ -171,18 +169,18 @@ mod tests {
         let reads = WorldReads::default();
         assert!(reads.set().is_empty());
 
-        reads.mark(WorldInputKey::NearbyCreatureCore);
-        reads.mark(WorldInputKey::NearbyCreatureCore);
+        reads.mark(WorldInputKey::NearbyCreature);
+        reads.mark(WorldInputKey::NearbyCreature);
 
         let set = reads.set();
-        assert!(set.contains(WorldInputKey::NearbyCreatureCore));
-        assert!(!set.contains(WorldInputKey::NearbyCreatureVitals));
+        assert!(set.contains(WorldInputKey::NearbyCreature));
+        assert!(!set.contains(WorldInputKey::AreaOccupancySummary));
         assert!(!set.is_empty());
     }
 
     #[test]
     fn food_types_past_the_inline_words_spill_and_are_still_recorded() {
-        for type_idx in [39u16, 40, 41, 1_000, u16::MAX] {
+        for type_idx in [40u16, 41, 42, 1_000, u16::MAX] {
             let key = WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(type_idx));
             let other = WorldInputKey::food_here(OrdinaryFoodTypeId::new(type_idx));
             let reads = WorldReads::default();
@@ -203,7 +201,7 @@ mod tests {
         #[test]
         fn marks_read_back_exactly_over_the_key_universe(
             food_types in 1u16..=60,
-            picks in proptest::collection::vec(any::<bool>(), 7 + 3 * 60),
+            picks in proptest::collection::vec(any::<bool>(), 5 + 3 * 60),
         ) {
             let universe: Vec<_> = world_input_key_universe(
                 (0..food_types).map(OrdinaryFoodTypeId::new),

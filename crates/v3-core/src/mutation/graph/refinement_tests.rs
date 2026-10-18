@@ -59,34 +59,32 @@ fn ring(family: WorldInputKey, kind: DirectedVoteKind, offset: u8, mask: u8) -> 
     }
     node
 }
-/// One field's ranked slots wired to `vote`, one edge per slot in `mask`.
-fn masked_slots(
-    family: WorldInputKey,
-    width: u16,
-    field: u16,
-    vote: VoteSink,
-    mask: u8,
-) -> NodeGenome {
+/// `NearbyCreature`'s fields per slot: slot `k` field `f` is channel `9k + f`.
+const WIDTH: u16 = crate::contracts::nearby_idx::FIELDS_PER_SLOT as u16;
+/// One `NearbyCreature` field's ranked slots wired to `vote`, one edge per
+/// slot in `mask`.
+fn masked_slots(field: u16, vote: VoteSink, mask: u8) -> NodeGenome {
     let mut node = node();
-    node.input_refs.push(InputReference::World(family));
+    node.input_refs
+        .push(InputReference::World(WorldInputKey::NearbyCreature));
     for slot in 0..4 {
         if mask & (1 << slot) != 0 {
             wire(
                 &mut node,
                 vote,
                 0,
-                slot * width + field,
+                slot * WIDTH + field,
                 f32::from(slot) / 100.0,
             );
         }
     }
     node
 }
-fn slots(family: WorldInputKey, width: u16, field: u16, vote: VoteSink) -> NodeGenome {
-    masked_slots(family, width, field, vote, 0b1111)
+fn slots(field: u16, vote: VoteSink) -> NodeGenome {
+    masked_slots(field, vote, 0b1111)
 }
 fn core_slots(mask: u8) -> NodeGenome {
-    masked_slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat, mask)
+    masked_slots(0, VoteSink::Eat, mask)
 }
 fn all_sets(node: &NodeGenome) -> Vec<InferredSet> {
     inferred_sets(graph(node), &node.input_refs)
@@ -114,29 +112,24 @@ fn ring_channel_edges_form_no_inferred_set() {
 
 #[test]
 fn every_nearby_field_and_vote_has_its_own_slot_set() {
-    for (family, width) in [
-        (WorldInputKey::NearbyCreatureCore, 4),
-        (WorldInputKey::NearbyCreatureVitals, 2),
-        (WorldInputKey::NearbyCreatureIdentity, 3),
-    ] {
-        for field in 0..width {
-            for vote in VoteSink::all() {
-                let node = slots(family, width, field, vote);
-                let sets = all_sets(&node);
-                assert_eq!(sets.len(), 1);
-                assert!(matches!(
-                    sets[0].key,
-                    SlotKey { family: f, field: c, .. } if f == family && c == field
-                ));
-                assert_eq!(
-                    sets[0]
-                        .members
-                        .iter()
-                        .map(|m| m.position)
-                        .collect::<Vec<_>>(),
-                    [0, 1, 2, 3]
-                );
-            }
+    let family = WorldInputKey::NearbyCreature;
+    for field in 0..WIDTH {
+        for vote in VoteSink::all() {
+            let node = slots(field, vote);
+            let sets = all_sets(&node);
+            assert_eq!(sets.len(), 1);
+            assert!(matches!(
+                sets[0].key,
+                SlotKey { family: f, field: c, .. } if f == family && c == field
+            ));
+            assert_eq!(
+                sets[0]
+                    .members
+                    .iter()
+                    .map(|m| m.position)
+                    .collect::<Vec<_>>(),
+                [0, 1, 2, 3]
+            );
         }
     }
 }
@@ -187,14 +180,14 @@ fn refinement_never_steps_a_member() {
     ));
 }
 
-/// Two `NearbyCreatureCore` pair groups on slots 0 and 1 into one kind at
+/// Two `NearbyCreature` pair groups on slots 0 and 1 into one kind at
 /// one offset put slot 0's and slot 1's `rel_x` members on the same sinks —
 /// the shape of a ranked-slot set — yet refinement infers no set from them
 /// and, beside a real slot set, never steps one (T25.F04). An application
 /// reports the stepped set's `(family, field)`.
 #[test]
 fn refinement_never_steps_a_pair_member_and_reports_its_key() {
-    let core = InputReference::World(WorldInputKey::NearbyCreatureCore);
+    let core = InputReference::World(WorldInputKey::NearbyCreature);
     let add_pairs = |node: &mut NodeGenome, ref_idx: u16| {
         for slot in 0..2u8 {
             let layout = core.direction_pairs()[usize::from(slot)];
@@ -225,7 +218,7 @@ fn refinement_never_steps_a_pair_member_and_reports_its_key() {
     let before = members(&fixture);
     assert_eq!(before.len(), 24);
     let expected = crate::mutation::types::RefinementKey {
-        family: WorldInputKey::NearbyCreatureCore,
+        family: WorldInputKey::NearbyCreature,
         field: all_sets(&fixture)[0].key.field,
     };
     for seed in 0..32 {
@@ -259,7 +252,7 @@ fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_set() {
     wire(&mut node, VoteSink::Eat, 0, 0, 0.0);
     assert!(all_sets(&node).is_empty());
     wire(&mut node, VoteSink::Move(0), 0, 1, 0.0);
-    wire(&mut node, VoteSink::Move(0), 0, 5, 0.0);
+    wire(&mut node, VoteSink::Move(0), 0, WIDTH + 1, 0.0);
     assert_eq!(all_sets(&node).len(), 1);
     edit_sinks(graph_mut(&mut node), |sinks| {
         let sink = sinks
@@ -273,7 +266,7 @@ fn duplicate_semantic_positions_and_nonfinite_weights_exclude_only_their_set() {
 
 #[test]
 fn repeated_slot_sink_occurrences_are_independent_sets() {
-    let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
+    let mut node = slots(0, VoteSink::Eat);
     edit_sinks(graph_mut(&mut node), |sinks| {
         let duplicate = sinks
             .iter()
@@ -301,11 +294,7 @@ fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_sets() {
     for reference in input_reference_universe(2) {
         if matches!(
             reference,
-            InputReference::World(
-                WorldInputKey::NearbyCreatureCore
-                    | WorldInputKey::NearbyCreatureVitals
-                    | WorldInputKey::NearbyCreatureIdentity
-            )
+            InputReference::World(WorldInputKey::NearbyCreature)
         ) {
             continue;
         }
@@ -319,14 +308,14 @@ fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_sets() {
     }
     // Out-of-range channels and an undeclared reference.
     let mut node = core_slots(0);
-    for (reference, channel) in [(0, 16), (0, 20), (1, 0), (1, 4)] {
+    for (reference, channel) in [(0, 4 * WIDTH), (0, 5 * WIDTH), (1, 0), (1, WIDTH)] {
         wire(&mut node, VoteSink::Eat, reference, channel, 0.0);
     }
     // A sink outside the vote catalog.
     edit_sinks(graph_mut(&mut node), |sinks| {
         sinks.push(SinkDraft {
             kind: OutputSinkKind::ActionVote(VoteSink::Move(8)),
-            inputs: [0, 4]
+            inputs: [0, WIDTH]
                 .map(|sub_idx| {
                     GraphEdge::new(
                         GraphSource::InputLeaf {
@@ -340,7 +329,10 @@ fn unsupported_inputs_invalid_addresses_and_nonvote_sinks_do_not_form_sets() {
         });
     });
     assert!(all_sets(&node).is_empty());
-    let mut node = slots(WorldInputKey::NearbyCreatureVitals, 2, 0, VoteSink::Eat);
+    let mut node = slots(
+        crate::contracts::nearby_idx::ENERGY_RATIO as u16,
+        VoteSink::Eat,
+    );
     edit_sinks(graph_mut(&mut node), |sinks| {
         for sink in sinks.iter_mut().filter(|sink| !sink.inputs.is_empty()) {
             sink.kind = OutputSinkKind::CustomOutput(0);
@@ -416,8 +408,8 @@ fn fields_banks_and_rings_never_mix() {
             1,
         ))),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
-        InputReference::World(WorldInputKey::NearbyCreatureCore),
-        InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        InputReference::World(WorldInputKey::NearbyCreature),
+        InputReference::World(WorldInputKey::AreaBarrierSummary),
     ];
     for (reference, channel, vote) in [
         (0, 0, VoteSink::Move(0)),
@@ -425,7 +417,7 @@ fn fields_banks_and_rings_never_mix() {
         (2, 2, VoteSink::Move(2)),
         (0, 3, VoteSink::Move(4)),
         (3, 0, VoteSink::Eat),
-        (3, 5, VoteSink::Eat),
+        (3, WIDTH + 1, VoteSink::Eat),
         (4, 2, VoteSink::Eat),
     ] {
         wire(&mut node, vote, reference, channel, 0.0);
@@ -433,10 +425,10 @@ fn fields_banks_and_rings_never_mix() {
     assert!(all_sets(&node).is_empty());
     wire(&mut node, VoteSink::Move(7), 0, 7, 0.0);
     assert!(all_sets(&node).is_empty());
-    wire(&mut node, VoteSink::Eat, 3, 8, 0.0);
+    wire(&mut node, VoteSink::Eat, 3, 2 * WIDTH, 0.0);
     assert_eq!(all_sets(&node).len(), 1);
-    // Out-of-range nearby channels do not contaminate the valid core set.
-    wire(&mut node, VoteSink::Eat, 3, 16, f32::NAN);
+    // Out-of-range nearby channels do not contaminate the valid set.
+    wire(&mut node, VoteSink::Eat, 3, 4 * WIDTH, f32::NAN);
     assert_eq!(all_sets(&node).len(), 1);
 }
 
@@ -444,7 +436,7 @@ fn fields_banks_and_rings_never_mix() {
 fn every_set_has_selection_support_and_a_draw_matches_one_atomic_step() {
     let mut fixture = core_slots(0b1111);
     for slot in 0..4 {
-        wire(&mut fixture, VoteSink::Move(3), 0, slot * 4 + 1, 0.25);
+        wire(&mut fixture, VoteSink::Move(3), 0, slot * WIDTH + 1, 0.25);
     }
     let sets = all_sets(&fixture);
     assert_eq!(sets.len(), 2);
@@ -492,7 +484,7 @@ proptest! {
 #[test]
 fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
     for scalar in [-0.1, 0.1] {
-        let mut node = slots(WorldInputKey::NearbyCreatureCore, 4, 0, VoteSink::Eat);
+        let mut node = slots(0, VoteSink::Eat);
         let old: Vec<_> = graph(&node).edges().map(|e| e.own_weight()).collect();
         let set = all_sets(&node).remove(0);
         apply_step(graph_mut(&mut node), &set, scalar).unwrap();
@@ -522,10 +514,9 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
 
 proptest! {
     #[test]
-    fn sparse_slots_follow_ranked_fields_without_rotation_or_regrowth(mask in 0u8..16, bank in 0usize..3, field in any::<u16>(), vote in 0usize..27, seed in any::<u64>()) {
-        let (family,width)=[(WorldInputKey::NearbyCreatureCore,4),(WorldInputKey::NearbyCreatureVitals,2),(WorldInputKey::NearbyCreatureIdentity,3)][bank];
-        let field=field % width;
-        let mut node=masked_slots(family,width,field,VoteSink::from_index(vote).unwrap(), mask);
+    fn sparse_slots_follow_ranked_fields_without_rotation_or_regrowth(mask in 0u8..16, field in any::<u16>(), vote in 0usize..27, seed in any::<u64>()) {
+        let field=field % WIDTH;
+        let mut node=masked_slots(field,VoteSink::from_index(vote).unwrap(), mask);
         let before=node.clone(); let count=mask.count_ones() as usize;
         let sets=all_sets(&node);
         prop_assert_eq!(sets.len(),usize::from(count>=2));

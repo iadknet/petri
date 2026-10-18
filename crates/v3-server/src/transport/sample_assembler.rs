@@ -52,9 +52,7 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
                 area_food: p.area_food,
                 area_barrier: p.area_barrier,
                 area_occupancy: p.area_occupancy,
-                nearby_core: p.nearby_core,
-                nearby_vitals: p.nearby_vitals,
-                nearby_identity: p.nearby_identity,
+                nearby: p.nearby,
             }),
         hops: tick
             .hops

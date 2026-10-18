@@ -114,7 +114,7 @@ proptest! {
         let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, vec![])] };
         let before = genome.genome_size();
         let source = if add_declaration {
-            genome.nodes[0].input_refs.push(InputReference::World(WorldInputKey::NearbyCreatureVitals));
+            genome.nodes[0].input_refs.push(InputReference::World(WorldInputKey::NearbyCreature));
             leaf(0, 7)
         } else { memory(15, true) };
         wire(graph_mut(&mut genome.nodes[0]), kind, edge(source, 0.0));

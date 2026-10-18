@@ -165,15 +165,10 @@ fn populated() -> SimStats {
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
     }
-    for (family, width) in [
-        (WorldInputKey::NearbyCreatureCore, 4),
-        (WorldInputKey::NearbyCreatureVitals, 4),
-        (WorldInputKey::NearbyCreatureIdentity, 4),
-    ] {
-        for field in 0..width {
-            s.refinement_applications_total_by_key
-                .insert(v3_core::mutation::types::RefinementKey { family, field }, 1);
-        }
+    let family = WorldInputKey::NearbyCreature;
+    for field in 0..9 {
+        s.refinement_applications_total_by_key
+            .insert(v3_core::mutation::types::RefinementKey { family, field }, 1);
     }
     for class in BirthEdgeClass::ALL {
         s.mutation_value_totals_by_birth_edge_class
@@ -507,9 +502,7 @@ fn mutation_families(families: &mut Vec<Family>) {
                         "AreaFoodSummary",
                         "AreaBarrierSummary",
                         "AreaOccupancySummary",
-                        "NearbyCreatureCore",
-                        "NearbyCreatureVitals",
-                        "NearbyCreatureIdentity",
+                        "NearbyCreature",
                     ],
                     str::to_owned,
                 ),
@@ -522,16 +515,9 @@ fn mutation_families(families: &mut Vec<Family>) {
         vec![
             (
                 "petri.world_input",
-                strings(
-                    [
-                        "NearbyCreatureCore",
-                        "NearbyCreatureVitals",
-                        "NearbyCreatureIdentity",
-                    ],
-                    str::to_owned,
-                ),
+                strings(["NearbyCreature"], str::to_owned),
             ),
-            ("petri.field", strings(0..4, |field: u16| field.to_string())),
+            ("petri.field", strings(0..9, |field: u16| field.to_string())),
         ],
     ));
     for (field, kind) in [
@@ -905,7 +891,7 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
         value(
             "petri.run.refinement_applications_by_key",
             &[
-                ("petri.world_input", "NearbyCreatureCore"),
+                ("petri.world_input", "NearbyCreature"),
                 ("petri.field", "0")
             ]
         ),

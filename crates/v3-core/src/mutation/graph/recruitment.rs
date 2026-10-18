@@ -28,10 +28,20 @@ struct Plan {
     /// The ring declared or found, and the drawn channel, when the family is
     /// a neighbor ring.
     ring: Option<(u16, u16)>,
-    /// The reference declared or found and the pairs it declares, when the
-    /// family declares direction pairs and the arm is `WholeFamily`
-    /// (T25.F04).
-    pairs: Option<(u16, &'static [DirectionPair])>,
+    /// The pair plan, when the family declares direction pairs and the arm
+    /// is `WholeFamily` (T25.F04).
+    pairs: Option<PairPlan>,
+}
+
+/// The reference declared or found and the pairs it declares. A family whose
+/// pairs are its slots ([`InputReference::slot_pairs`], T25.F05) carries no
+/// whole-family sources: its plan resolves to one drawn slot on every
+/// destination.
+#[derive(Clone, Copy)]
+struct PairPlan {
+    ref_idx: u16,
+    pairs: &'static [DirectionPair],
+    slots: bool,
 }
 
 /// The `(kind, direction)` of the directed vote sink at `destination`.
@@ -42,10 +52,11 @@ fn directed(def: &CgpGraphBackendDef, destination: usize) -> Option<(DirectedVot
 impl Plan {
     /// How many pairs the pair case draws over at `destination`: the
     /// family's declared pairs when the plan is a pair plan landing on a
-    /// directed sink, `None` otherwise (no draw).
+    /// directed sink, or a slot plan on any destination (T25.F05); `None`
+    /// otherwise (no draw).
     fn pair_count(&self, def: &CgpGraphBackendDef, destination: usize) -> Option<usize> {
-        let (_, pairs) = self.pairs?;
-        directed(def, destination).map(|_| pairs.len())
+        let plan = self.pairs?;
+        (plan.slots || directed(def, destination).is_some()).then_some(plan.pairs.len())
     }
 
     /// Append the plan at `destination`. A ring family landing on a directed
@@ -54,15 +65,17 @@ impl Plan {
     /// scale 0, in place of its edges (T25.F03). A pair plan landing on
     /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` group
     /// at offset `d` (twelve members) plus one born-0 edge into `Drive K` per
-    /// fact of the pair, in `facts` order (T25.F04). Every other plan appends
-    /// its edges at weight 0.
+    /// fact of the pair, in `facts` order (T25.F04). A slot plan landing
+    /// elsewhere appends the drawn slot's channels ascending, born 0
+    /// (T25.F05). Every other plan appends its edges at weight 0.
     fn append(self, node: &mut NodeGenome, destination: usize, pair: Option<u8>) {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("admission requires a Graph backend")
         };
         node.input_refs.extend(self.declarations);
         let directed = directed(def, destination);
-        if let (Some((ref_idx, pairs)), Some((kind, d)), Some(pair)) = (self.pairs, directed, pair)
+        if let (Some(PairPlan { ref_idx, pairs, .. }), Some((kind, d)), Some(pair)) =
+            (self.pairs, directed, pair)
         {
             let layout = pairs[usize::from(pair)];
             def.add_pair_group(ref_idx, pair, layout, kind, d);
@@ -72,6 +85,26 @@ impl Plan {
             for &sub_idx in layout.facts {
                 def.push_edge(
                     drive,
+                    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 0.0),
+                );
+            }
+            return;
+        }
+        if let Some(PairPlan {
+            ref_idx,
+            pairs,
+            slots: true,
+        }) = self.pairs
+        {
+            let layout = pairs[usize::from(pair.expect("a slot plan always draws its slot"))];
+            let mut channels: Vec<u16> = [layout.x, layout.y]
+                .into_iter()
+                .chain(layout.facts.iter().copied())
+                .collect();
+            channels.sort_unstable();
+            for sub_idx in channels {
+                def.push_edge(
+                    EdgeSurface::SinkInput(destination),
                     GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 0.0),
                 );
             }
@@ -186,14 +219,18 @@ impl<'a> Admission<'a> {
                     ring = Some((ref_idx, channel));
                 }
                 if arm == Arm::WholeFamily && !reference.direction_pairs().is_empty() {
-                    pairs = Some((ref_idx, reference.direction_pairs()));
+                    pairs = Some(PairPlan {
+                        ref_idx,
+                        pairs: reference.direction_pairs(),
+                        slots: reference.slot_pairs(),
+                    });
                 }
                 if arm == Arm::SingleChannel {
                     plan.sources.push(GraphSource::InputLeaf {
                         ref_idx,
                         sub_idx: channel,
                     });
-                } else {
+                } else if !reference.slot_pairs() {
                     plan.sources.extend(
                         (0..width).map(|sub_idx| GraphSource::InputLeaf { ref_idx, sub_idx }),
                     );
@@ -308,7 +345,8 @@ pub(super) fn recruit(
         .plan(family, arm, channel)
         .expect("preflighted source");
     let destination = *sites.choose(rng).expect("present vote sink");
-    // The pair case's only draw (T25.F04), after the destination.
+    // The pair case's only draw (T25.F04), after the destination: on a
+    // directed sink, or on every destination for a slot family (T25.F05).
     let pair = plan
         .pair_count(def, destination)
         .map(|count| u8::try_from(rng.gen_range(0..count)).expect("few pairs"));
@@ -317,7 +355,7 @@ pub(super) fn recruit(
 }
 
 /// Explicit access fixture using the same preflight and append as mutation;
-/// a pair plan on a directed sink takes pair 0.
+/// a pair plan that draws a pair takes pair 0.
 #[cfg(test)]
 pub(crate) fn recruit_source(
     node: &mut NodeGenome,

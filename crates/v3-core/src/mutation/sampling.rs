@@ -10,7 +10,7 @@ use crate::runtime::OUTPUT_SLOT_COUNT;
 ///
 /// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (1) +
 /// DynamicIntrospection (2) + ActionQueue (1) + Area summaries (3) +
-/// Nearby creature (3) + decision state (5, T19.F05) + UpstreamSlot (8
+/// Nearby creature (3 buckets, one family) + decision state (5, T19.F05) + UpstreamSlot (8
 /// weighted slots) = 27 total.
 pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
     random_input_reference_for_food_types(rng, 1)
@@ -42,9 +42,9 @@ pub(crate) fn random_input_reference_for_food_types(
             type_idx: sample_food_type_id(food_type_count, rng),
         }),
         9 => InputReference::World(WorldInputKey::AreaBarrierSummary),
-        10 => InputReference::World(WorldInputKey::NearbyCreatureCore),
-        11 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        12 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        // The 36-wide family keeps the three buckets its three 7-to-16-wide
+        // predecessors held (T25.F05, D13).
+        10..=12 => InputReference::World(WorldInputKey::NearbyCreature),
         13 => InputReference::World(WorldInputKey::AreaOccupancySummary),
         14 => InputReference::ActionVotes,
         15 => InputReference::PreviousPassVotes,
@@ -178,6 +178,32 @@ mod tests {
                 );
                 assert_eq!(rng.draws, 1, "index {index}");
             }
+        }
+    }
+
+    /// Indices 10, 11 and 12 each draw the merged creature family with the
+    /// key draw alone (T25.F05).
+    #[test]
+    fn typed_sampler_draws_the_merged_family_at_three_indices() {
+        for index in 10_u64..=12 {
+            for food_type_count in [1, 3] {
+                let mut rng = CountingStepRng::new(catalog_draw(index));
+                assert_eq!(
+                    random_input_reference_for_food_types(&mut rng, food_type_count),
+                    InputReference::World(WorldInputKey::NearbyCreature)
+                );
+                assert_eq!(rng.draws, 1, "index {index}");
+            }
+        }
+        for (index, expected) in [
+            (9_u64, WorldInputKey::AreaBarrierSummary),
+            (13, WorldInputKey::AreaOccupancySummary),
+        ] {
+            let mut rng = CountingStepRng::new(catalog_draw(index));
+            assert_eq!(
+                random_input_reference_for_food_types(&mut rng, 1),
+                InputReference::World(expected)
+            );
         }
     }
 

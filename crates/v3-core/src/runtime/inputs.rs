@@ -434,22 +434,22 @@ mod tests {
     }
 
     #[test]
-    fn extended_key_nearby_core_routes_correctly() {
+    fn extended_key_nearby_position_routes_correctly() {
         let mut ss = make_sensor_snapshot(0.0);
-        ss.perception.nearby_core[0] = 1.0; // present
-        ss.perception.nearby_core[3] = 0.75; // dist
+        ss.perception.nearby[0] = 1.0; // present
+        ss.perception.nearby[3] = 0.75; // dist
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let present = resolve_input(
-            &InputReference::World(WorldInputKey::NearbyCreatureCore),
+            &InputReference::World(WorldInputKey::NearbyCreature),
             0,
             &ctx,
         );
         assert!((present - 1.0).abs() < f32::EPSILON);
 
         let dist = resolve_input(
-            &InputReference::World(WorldInputKey::NearbyCreatureCore),
+            &InputReference::World(WorldInputKey::NearbyCreature),
             3,
             &ctx,
         );
@@ -459,13 +459,13 @@ mod tests {
     #[test]
     fn extended_key_identity_routes_correctly() {
         let mut ss = make_sensor_snapshot(0.0);
-        ss.perception.nearby_identity[0] = 0.9; // kin_affinity slot 0
+        ss.perception.nearby[6] = 0.9; // kin_affinity slot 0
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let v = resolve_input(
-            &InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-            0,
+            &InputReference::World(WorldInputKey::NearbyCreature),
+            6,
             &ctx,
         );
         assert!((v - 0.9).abs() < f32::EPSILON);
@@ -483,9 +483,7 @@ mod tests {
             },
             WorldInputKey::AreaBarrierSummary,
             WorldInputKey::AreaOccupancySummary,
-            WorldInputKey::NearbyCreatureCore,
-            WorldInputKey::NearbyCreatureVitals,
-            WorldInputKey::NearbyCreatureIdentity,
+            WorldInputKey::NearbyCreature,
         ];
 
         for key in &keys {

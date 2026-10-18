@@ -1419,7 +1419,7 @@ mod tests {
         use crate::simulation::seed_simulation;
         use rand::SeedableRng;
 
-        // The founder with two NearbyCreatureCore slots of one field wired to
+        // The founder with two NearbyCreature slots of one field wired to
         // `Eat`: an inferred set refinement can step.
         let mut genome = v3alpha1_founder_genome();
         let node = genome
@@ -1429,7 +1429,7 @@ mod tests {
             .expect("the founder carries a Graph node");
         let core = u16::try_from(node.input_refs.len()).unwrap();
         node.input_refs
-            .push(InputReference::World(WorldInputKey::NearbyCreatureCore));
+            .push(InputReference::World(WorldInputKey::NearbyCreature));
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("a Graph node")
         };
@@ -1439,7 +1439,7 @@ mod tests {
         for slot in 0..2u16 {
             let source = GraphSource::InputLeaf {
                 ref_idx: core,
-                sub_idx: 4 * slot + 3,
+                sub_idx: 9 * slot + 3,
             };
             def.push_edge(sink, GraphEdge::new(source, 0.25));
         }

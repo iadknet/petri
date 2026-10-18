@@ -1,4 +1,4 @@
-//! The `neighborhood-coverage-v1` contexts (T11.F26): recorded terminal-world
+//! The `neighborhood-coverage-v2` contexts (T11.F26): recorded terminal-world
 //! snapshots, authored contexts that set one channel group `neighborhood-v2`
 //! leaves at zero, and long sequences over them. Any change to these rules
 //! bumps [`super::COVERAGE_VERSION`].
@@ -21,17 +21,15 @@ pub const SEQUENCES: usize = 4;
 pub const SEQUENCE_TICKS: usize = 32;
 /// Sequence ticks `1..=EARLY_TICKS` report apart from the later ticks.
 pub const EARLY_TICKS: usize = 4;
-/// Authored context `i` sets group `i mod 8`; every group is zero in
+/// Authored context `i` sets group `i mod 6`; every group is zero in
 /// `neighborhood-v2`.
-pub const CHANNEL_GROUPS: [&str; 8] = [
+pub const CHANNEL_GROUPS: [&str; 6] = [
     "neighbor barriers",
     "previous outcomes",
     "area food and typed area food",
     "area barrier",
     "area occupancy",
-    "nearby core",
-    "nearby vitals",
-    "nearby identity",
+    "nearby creatures",
 ];
 
 /// A field's production range, drawn uniformly (binary fields from {0, 1}).
@@ -47,9 +45,10 @@ use Range::{Binary, NonPositive, Signed, Unit};
 const AREA_FOOD: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit];
 const AREA_BARRIER: [Range; 7] = [Unit, Unit, Signed, Signed, Signed, Signed, Unit];
 const AREA_OCCUPANCY: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit];
-const CORE_SLOT: [Range; 4] = [Binary, Signed, Signed, Unit];
-const VITALS_SLOT: [Range; 2] = [Unit, Binary];
-const IDENTITY_SLOT: [Range; 3] = [Unit, Binary, Unit];
+/// One `NearbyCreature` slot, in `nearby_idx` order, cycled over the slots.
+const NEARBY_SLOT: [Range; 9] = [
+    Binary, Signed, Signed, Unit, Unit, Binary, Unit, Binary, Unit,
+];
 /// `PreviousOutcome` read ranges by `OutcomeChannel`: EnergyDelta [-1, 1],
 /// ActionSuccess [0, 1], DamageDelta [-1, 0], OffspringSuccess {0, 1}.
 const OUTCOMES: [Range; 4] = [Signed, Unit, NonPositive, Binary];
@@ -78,14 +77,12 @@ fn set_group(sensors: &mut SensorSnapshot, group: usize, rng: &mut SmallRng) {
         }
         3 => fill(&mut perception.area_barrier, &AREA_BARRIER, rng),
         4 => fill(&mut perception.area_occupancy, &AREA_OCCUPANCY, rng),
-        5 => fill(&mut perception.nearby_core, &CORE_SLOT, rng),
-        6 => fill(&mut perception.nearby_vitals, &VITALS_SLOT, rng),
-        _ => fill(&mut perception.nearby_identity, &IDENTITY_SLOT, rng),
+        _ => fill(&mut perception.nearby, &NEARBY_SLOT, rng),
     }
 }
 
 /// The 24 authored contexts: context `i` copies `neighborhood-v2` snapshot
-/// `i` (energy included) and sets channel group `i mod 8` from
+/// `i` (energy included) and sets channel group `i mod 6` from
 /// `SmallRng::seed_from_u64(AUTHORED_SEED_BASE + i)`. Not guaranteed
 /// realizable in any world.
 pub(in crate::neighborhood) fn authored_contexts(battery: &Battery) -> Vec<Scenario> {

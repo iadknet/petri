@@ -150,9 +150,7 @@ fn swap_alternatives_follow_the_kind_table() {
         InputReference::World(WorldInputKey::AreaBarrierSummary),
         InputReference::World(WorldInputKey::NeighborOccupiedRing),
         InputReference::World(WorldInputKey::AreaOccupancySummary),
-        InputReference::World(WorldInputKey::NearbyCreatureCore),
-        InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        InputReference::World(WorldInputKey::NearbyCreature),
         InputReference::ActionQueue,
         InputReference::CommitCounts,
         InputReference::PreviousOutcome,
@@ -585,15 +583,7 @@ fn random_input_reference_covers_all_categories() {
             InputReference::World(WorldInputKey::AreaOccupancySummary) => {
                 "AreaOccupancySummary".to_string()
             }
-            InputReference::World(WorldInputKey::NearbyCreatureCore) => {
-                "NearbyCreatureCore".to_string()
-            }
-            InputReference::World(WorldInputKey::NearbyCreatureVitals) => {
-                "NearbyCreatureVitals".to_string()
-            }
-            InputReference::World(WorldInputKey::NearbyCreatureIdentity) => {
-                "NearbyCreatureIdentity".to_string()
-            }
+            InputReference::World(WorldInputKey::NearbyCreature) => "NearbyCreature".to_string(),
             InputReference::StaticIntrospection(_) => "StaticIntrospection".to_string(),
             InputReference::DynamicIntrospection(_) => "DynamicIntrospection".to_string(),
             InputReference::UpstreamSlot(_) => "UpstreamSlot".to_string(),
@@ -605,12 +595,13 @@ fn random_input_reference_covers_all_categories() {
         };
         categories.insert(cat);
     }
-    // 18 categories: 8 original + 6 extended perception families + the four
-    // decision-state compounds (T19.F05; `HopsThisTick` is a dynamic key).
+    // 16 categories: 8 original + 4 extended perception families (one
+    // `NearbyCreature`, T25.F05) + the four decision-state compounds
+    // (T19.F05; `HopsThisTick` is a dynamic key).
     assert_eq!(
         categories.len(),
-        18,
-        "all 18 input reference categories must be reachable; got {:?}",
+        16,
+        "all 16 input reference categories must be reachable; got {:?}",
         categories
     );
 }
@@ -1305,16 +1296,14 @@ fn reindex_noop_on_empty_vm_program() {
 
 #[test]
 fn extended_perception_families_reachable_in_pool() {
-    let mut found = [false; 6]; // Food, Barrier, Occupancy, Core, Vitals, Identity
+    let mut found = [false; 4]; // Food, Barrier, Occupancy, Nearby
     for seed in 0u64..5000 {
         let mut r = rng(seed);
         match random_input_reference(&mut r) {
             InputReference::World(WorldInputKey::AreaFoodSummary { .. }) => found[0] = true,
             InputReference::World(WorldInputKey::AreaBarrierSummary) => found[1] = true,
             InputReference::World(WorldInputKey::AreaOccupancySummary) => found[2] = true,
-            InputReference::World(WorldInputKey::NearbyCreatureCore) => found[3] = true,
-            InputReference::World(WorldInputKey::NearbyCreatureVitals) => found[4] = true,
-            InputReference::World(WorldInputKey::NearbyCreatureIdentity) => found[5] = true,
+            InputReference::World(WorldInputKey::NearbyCreature) => found[3] = true,
             _ => {}
         }
         if found.iter().all(|&f| f) {
@@ -1325,9 +1314,7 @@ fn extended_perception_families_reachable_in_pool() {
         "AreaFoodSummary",
         "AreaBarrierSummary",
         "AreaOccupancySummary",
-        "NearbyCreatureCore",
-        "NearbyCreatureVitals",
-        "NearbyCreatureIdentity",
+        "NearbyCreature",
     ];
     for (i, &f) in found.iter().enumerate() {
         assert!(

@@ -143,10 +143,23 @@ describe("formatInputRefWithSubIndex", () => {
 	});
 
 	it("names nearby-creature fields by rank, nearest first", () => {
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureCore" }, 0)).toBe("Nearest1.present");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureCore" }, 7)).toBe("Nearest2.dist");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureVitals" }, 1)).toBe("Nearest1.ready");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreatureIdentity" }, 3)).toBe("Nearest2.kin");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 0)).toBe("Nearest1.present");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 12)).toBe("Nearest2.dist");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 5)).toBe("Nearest1.ready");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 13)).toBe("Nearest2.energy");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 15)).toBe("Nearest2.kin");
+	});
+
+	it("names the nine nearby-creature fields of every rank in layout order", () => {
+		const fields = ["present", "dx", "dy", "dist", "energy", "ready", "kin", "lineage", "similar"];
+		for (let channel = 0; channel < 36; channel++) {
+			const slot = Math.floor(channel / 9);
+			expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, channel)).toBe(
+				`Nearest${slot + 1}.${fields[channel % 9]}`,
+			);
+		}
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 35)).toBe("Nearest4.similar");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 36)).toBe("Nearby[36]");
 	});
 
 	it("names decision-state and queue sub-values", () => {
@@ -174,7 +187,7 @@ describe("describeInputRef", () => {
 
 	it("explains every ring direction and nearby rank", () => {
 		expect(describeInputRef({ World: "NeighborOccupiedRing" }, 4).description).toMatch(/south/i);
-		expect(describeInputRef({ World: "NearbyCreatureCore" }, 4).description).toMatch(/2nd-nearest/);
+		expect(describeInputRef({ World: "NearbyCreature" }, 9).description).toMatch(/2nd-nearest/);
 	});
 });
 

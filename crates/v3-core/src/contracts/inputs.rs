@@ -36,28 +36,20 @@ pub mod occupancy_idx {
     pub const CROWDING_RATIO: usize = 6;
 }
 
-/// `NearbyCreatureCore` per-slot field count and offsets.
-pub mod core_idx {
-    pub const FIELDS_PER_SLOT: usize = 4;
+/// `NearbyCreature` layout (T25.F05): `SLOTS` ranked slots of
+/// `FIELDS_PER_SLOT` fields; slot `k` field `f` is channel `k * FIELDS_PER_SLOT + f`.
+pub mod nearby_idx {
+    pub const SLOTS: usize = 4;
+    pub const FIELDS_PER_SLOT: usize = 9;
     pub const PRESENT: usize = 0;
     pub const REL_X: usize = 1;
     pub const REL_Y: usize = 2;
     pub const DIST: usize = 3;
-}
-
-/// `NearbyCreatureVitals` per-slot field count and offsets.
-pub mod vitals_idx {
-    pub const FIELDS_PER_SLOT: usize = 2;
-    pub const ENERGY_RATIO: usize = 0;
-    pub const REPRODUCE_READY: usize = 1;
-}
-
-/// `NearbyCreatureIdentity` per-slot field count and offsets.
-pub mod identity_idx {
-    pub const FIELDS_PER_SLOT: usize = 3;
-    pub const KIN_AFFINITY: usize = 0;
-    pub const LINEAGE_MATCH: usize = 1;
-    pub const PHENOTYPE_SIMILARITY: usize = 2;
+    pub const ENERGY_RATIO: usize = 4;
+    pub const REPRODUCE_READY: usize = 5;
+    pub const KIN_AFFINITY: usize = 6;
+    pub const LINEAGE_MATCH: usize = 7;
+    pub const PHENOTYPE_SIMILARITY: usize = 8;
 }
 
 /// One `(x, y)` offset a world family senses toward a thing, and the thing's
@@ -127,26 +119,45 @@ const OCCUPANCY_PAIRS: &[DirectionPair] = &[
     ),
 ];
 
-/// Slot `k` of `NearbyCreatureCore`'s fields at `offset`.
-const fn core_field(k: usize, offset: usize) -> u16 {
-    (k * core_idx::FIELDS_PER_SLOT + offset) as u16
-}
-const fn core_facts(k: usize) -> [u16; 2] {
-    [
-        core_field(k, core_idx::PRESENT),
-        core_field(k, core_idx::DIST),
-    ]
-}
-const CORE_FACTS: [[u16; 2]; 4] = [core_facts(0), core_facts(1), core_facts(2), core_facts(3)];
-/// Slot `k`: `(rel_x, rel_y)`, facts presence and distance.
-const fn core_slot(k: usize) -> DirectionPair {
-    DirectionPair {
-        x: core_field(k, core_idx::REL_X),
-        y: core_field(k, core_idx::REL_Y),
-        facts: &CORE_FACTS[k],
+/// A slot's facts: every field but the offset pair, in layout order.
+const NEARBY_FACT_FIELDS: [usize; nearby_idx::FIELDS_PER_SLOT - 2] = [
+    nearby_idx::PRESENT,
+    nearby_idx::DIST,
+    nearby_idx::ENERGY_RATIO,
+    nearby_idx::REPRODUCE_READY,
+    nearby_idx::KIN_AFFINITY,
+    nearby_idx::LINEAGE_MATCH,
+    nearby_idx::PHENOTYPE_SIMILARITY,
+];
+const NEARBY_FACTS: [[u16; NEARBY_FACT_FIELDS.len()]; nearby_idx::SLOTS] = {
+    let mut facts = [[0; NEARBY_FACT_FIELDS.len()]; nearby_idx::SLOTS];
+    let mut k = 0;
+    while k < nearby_idx::SLOTS {
+        let mut f = 0;
+        while f < NEARBY_FACT_FIELDS.len() {
+            facts[k][f] = (k * nearby_idx::FIELDS_PER_SLOT + NEARBY_FACT_FIELDS[f]) as u16;
+            f += 1;
+        }
+        k += 1;
     }
-}
-const CORE_PAIRS: &[DirectionPair] = &[core_slot(0), core_slot(1), core_slot(2), core_slot(3)];
+    facts
+};
+/// Slot `k`: `(rel_x, rel_y)`, facts the slot's seven other fields; the
+/// four pairs partition the layout.
+const NEARBY_PAIRS: [DirectionPair; nearby_idx::SLOTS] = {
+    let mut pairs = [pair(0, 0, &[]); nearby_idx::SLOTS];
+    let mut k = 0;
+    while k < nearby_idx::SLOTS {
+        let base = k * nearby_idx::FIELDS_PER_SLOT;
+        pairs[k] = pair(
+            base + nearby_idx::REL_X,
+            base + nearby_idx::REL_Y,
+            &NEARBY_FACTS[k],
+        );
+        k += 1;
+    }
+    pairs
+};
 
 /// Identifies a world-state spatial sensor input.
 #[derive(
@@ -167,12 +178,9 @@ pub enum WorldInputKey {
     AreaBarrierSummary,
     /// Compound: area occupancy summary (7 sub-values). See v3-sensor-spec.md Section 5.3.
     AreaOccupancySummary,
-    /// Compound: nearby creature core (4 slots × 4 fields = 16 sub-values). See v3-sensor-spec.md Section 5.4.
-    NearbyCreatureCore,
-    /// Compound: nearby creature vitals (4 slots × 2 fields = 8 sub-values). See v3-sensor-spec.md Section 5.5.
-    NearbyCreatureVitals,
-    /// Compound: nearby creature identity (4 slots × 3 fields = 12 sub-values). See v3-sensor-spec.md Section 5.6.
-    NearbyCreatureIdentity,
+    /// Compound: the nearby creatures (4 slots × 9 fields = 36 sub-values,
+    /// laid out by [`nearby_idx`]). See v3-sensor-spec.md Section 5.4.
+    NearbyCreature,
 }
 
 impl WorldInputKey {
@@ -205,9 +213,7 @@ impl WorldInputKey {
             Self::AreaFoodSummary { .. } => "AreaFoodSummary",
             Self::AreaBarrierSummary => "AreaBarrierSummary",
             Self::AreaOccupancySummary => "AreaOccupancySummary",
-            Self::NearbyCreatureCore => "NearbyCreatureCore",
-            Self::NearbyCreatureVitals => "NearbyCreatureVitals",
-            Self::NearbyCreatureIdentity => "NearbyCreatureIdentity",
+            Self::NearbyCreature => "NearbyCreature",
         }
     }
 
@@ -222,17 +228,26 @@ impl WorldInputKey {
     }
 
     /// The `(x, y)` offset pairs this family declares (T25.F04): two for each
-    /// area summary, one per ranked slot of `NearbyCreatureCore`, none for
-    /// every other key. Depends on the variant only, never on a food type.
+    /// area summary, one per ranked slot of `NearbyCreature`, none for every
+    /// other key. Depends on the variant only, never on a food type.
     #[must_use]
     pub const fn direction_pairs(self) -> &'static [DirectionPair] {
         match self {
             Self::AreaFoodSummary { .. } => FOOD_PAIRS,
             Self::AreaBarrierSummary => BARRIER_PAIRS,
             Self::AreaOccupancySummary => OCCUPANCY_PAIRS,
-            Self::NearbyCreatureCore => CORE_PAIRS,
+            Self::NearbyCreature => &NEARBY_PAIRS,
             _ => &[],
         }
+    }
+
+    /// Whether this family's pairs partition its layout, one pair per slot
+    /// (T25.F05): every channel in exactly one pair's `{x, y} ∪ facts`, so
+    /// a drawn pair names a whole slot. `NearbyCreature` only; pinned
+    /// against [`Self::direction_pairs`] and [`Self::compound_width`].
+    #[must_use]
+    pub const fn slot_pairs(self) -> bool {
+        matches!(self, Self::NearbyCreature)
     }
 
     /// Returns the typed food index for food-specific world keys, or `None` otherwise.
@@ -260,9 +275,7 @@ impl WorldInputKey {
             Self::NeighborFoodRing { .. }
             | Self::NeighborBarrierRing
             | Self::NeighborOccupiedRing => 8,
-            Self::NearbyCreatureCore => 16,
-            Self::NearbyCreatureVitals => 8,
-            Self::NearbyCreatureIdentity => 12,
+            Self::NearbyCreature => (nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT) as u16,
             _ => 1,
         }
     }
@@ -335,6 +348,13 @@ impl InputReference {
             _ => &[],
         }
     }
+
+    /// Whether this reference's pairs are its slots (T25.F05): its world
+    /// key's [`WorldInputKey::slot_pairs`], false for a non-world reference.
+    #[must_use]
+    pub const fn slot_pairs(&self) -> bool {
+        matches!(self, Self::World(key) if key.slot_pairs())
+    }
 }
 
 #[cfg(test)]
@@ -378,9 +398,13 @@ mod tests {
                 vec![(1, 2, vec![0, 5, 6]), (3, 4, vec![0, 5, 6])],
             ),
             (
-                WorldInputKey::NearbyCreatureCore,
+                WorldInputKey::NearbyCreature,
                 (0..4u16)
-                    .map(|k| (4 * k + 1, 4 * k + 2, vec![4 * k, 4 * k + 3]))
+                    .map(|k| {
+                        let base = 9 * k;
+                        let facts = [0, 3, 4, 5, 6, 7, 8].map(|f| base + f).to_vec();
+                        (base + 1, base + 2, facts)
+                    })
                     .collect(),
             ),
         ];
@@ -403,7 +427,7 @@ mod tests {
                 "AreaBarrierSummary",
                 "AreaFoodSummary",
                 "AreaOccupancySummary",
-                "NearbyCreatureCore"
+                "NearbyCreature"
             ]
             .into()
         );
@@ -411,6 +435,32 @@ mod tests {
         assert_eq!(
             InputReference::World(food).direction_pairs(),
             food.direction_pairs()
+        );
+    }
+
+    /// `slot_pairs` is true exactly where the pairs partition the layout:
+    /// every channel in exactly one pair's `{x, y} ∪ facts` (T25.F05).
+    #[test]
+    fn slot_pairs_holds_exactly_where_the_pairs_partition_the_layout() {
+        let mut slotted = Vec::new();
+        for key in every_world_key() {
+            let mut covered = vec![0u32; usize::from(key.compound_width())];
+            for pair in key.direction_pairs() {
+                for &field in [pair.x, pair.y].iter().chain(pair.facts) {
+                    covered[usize::from(field)] += 1;
+                }
+            }
+            let partitions =
+                !key.direction_pairs().is_empty() && covered.iter().all(|&count| count == 1);
+            assert_eq!(key.slot_pairs(), partitions, "{key:?}");
+            if key.slot_pairs() {
+                slotted.push(key.as_key());
+            }
+        }
+        assert_eq!(slotted, ["NearbyCreature"]);
+        assert_eq!(
+            WorldInputKey::NearbyCreature.direction_pairs().len(),
+            nearby_idx::SLOTS
         );
     }
 
@@ -423,17 +473,14 @@ mod tests {
         ];
         assert!(area.iter().all(|&last| last + 1 == 7));
         assert_eq!(
-            core_idx::FIELDS_PER_SLOT * 4,
-            usize::from(WorldInputKey::NearbyCreatureCore.compound_width())
+            nearby_idx::PHENOTYPE_SIMILARITY + 1,
+            nearby_idx::FIELDS_PER_SLOT
         );
         assert_eq!(
-            vitals_idx::FIELDS_PER_SLOT * 4,
-            usize::from(WorldInputKey::NearbyCreatureVitals.compound_width())
+            nearby_idx::SLOTS * nearby_idx::FIELDS_PER_SLOT,
+            usize::from(WorldInputKey::NearbyCreature.compound_width())
         );
-        assert_eq!(
-            identity_idx::FIELDS_PER_SLOT * 4,
-            usize::from(WorldInputKey::NearbyCreatureIdentity.compound_width())
-        );
+        assert_eq!(WorldInputKey::NearbyCreature.compound_width(), 36);
         assert_eq!(
             crate::sensors::perception::food_idx::NEAREST_DY,
             food_idx::NEAREST_DY
@@ -509,9 +556,7 @@ mod tests {
             }),
             InputReference::World(WorldInputKey::AreaBarrierSummary),
             InputReference::World(WorldInputKey::AreaOccupancySummary),
-            InputReference::World(WorldInputKey::NearbyCreatureCore),
-            InputReference::World(WorldInputKey::NearbyCreatureVitals),
-            InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+            InputReference::World(WorldInputKey::NearbyCreature),
             InputReference::World(WorldInputKey::NeighborFoodRing {
                 type_idx: OrdinaryFoodTypeId::default(),
             }),

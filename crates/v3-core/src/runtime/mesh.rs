@@ -2098,8 +2098,8 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![
-                    InputReference::World(WorldInputKey::NearbyCreatureCore),
-                    InputReference::World(WorldInputKey::NearbyCreatureVitals),
+                    InputReference::World(WorldInputKey::NearbyCreature),
+                    InputReference::World(WorldInputKey::AreaBarrierSummary),
                 ],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 2,
@@ -2124,8 +2124,8 @@ mod tests {
 
         let reads = reads_after_run(&genome);
 
-        assert!(reads.contains(WorldInputKey::NearbyCreatureCore));
-        assert!(!reads.contains(WorldInputKey::NearbyCreatureVitals));
+        assert!(reads.contains(WorldInputKey::NearbyCreature));
+        assert!(!reads.contains(WorldInputKey::AreaBarrierSummary));
     }
 
     #[test]
@@ -2186,7 +2186,7 @@ mod tests {
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         use crate::creature::sensor_census::creature_sensor_census;
-        let key = WorldInputKey::NearbyCreatureIdentity;
+        let key = WorldInputKey::NearbyCreature;
         let vm = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

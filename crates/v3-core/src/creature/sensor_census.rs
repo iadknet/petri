@@ -239,7 +239,7 @@ impl CreatureSensorCensus {
 }
 
 /// Every world input key a world with these ordinary food types can present:
-/// the seven unparameterized keys plus the three food-parameterized families,
+/// the five unparameterized keys plus the three food-parameterized families,
 /// once per food type. A key absent from a census is then distinguishable from
 /// a key this world does not have.
 #[must_use]
@@ -251,9 +251,7 @@ pub fn world_input_key_universe(
         WorldInputKey::NeighborOccupiedRing,
         WorldInputKey::AreaBarrierSummary,
         WorldInputKey::AreaOccupancySummary,
-        WorldInputKey::NearbyCreatureCore,
-        WorldInputKey::NearbyCreatureVitals,
-        WorldInputKey::NearbyCreatureIdentity,
+        WorldInputKey::NearbyCreature,
     ]);
     for type_idx in food_types {
         keys.insert(WorldInputKey::food_here(type_idx));
@@ -471,7 +469,7 @@ mod tests {
                 );
                 graph
             },
-            vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+            vec![InputReference::World(WorldInputKey::NearbyCreature)],
         );
 
         assert!(
@@ -641,16 +639,16 @@ mod tests {
         let census = census_of(&graph_node(
             graph,
             vec![
-                InputReference::World(WorldInputKey::NearbyCreatureVitals),
-                InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+                InputReference::World(WorldInputKey::NearbyCreature),
+                InputReference::World(WorldInputKey::AreaBarrierSummary),
             ],
         ));
 
         assert_eq!(
             census.world_inputs,
             BTreeSet::from([
-                WorldInputKey::NearbyCreatureVitals,
-                WorldInputKey::NearbyCreatureIdentity,
+                WorldInputKey::NearbyCreature,
+                WorldInputKey::AreaBarrierSummary,
             ])
         );
     }
@@ -777,12 +775,12 @@ mod tests {
     }
 
     #[test]
-    fn the_key_universe_is_seven_plus_three_per_food_type_with_labelled_families() {
+    fn the_key_universe_is_five_plus_three_per_food_type_with_labelled_families() {
         let one = world_input_key_universe([FOOD_0]);
-        assert_eq!(one.len(), 10);
+        assert_eq!(one.len(), 8);
 
         let two = world_input_key_universe([FOOD_0, FOOD_1]);
-        assert_eq!(two.len(), 13);
+        assert_eq!(two.len(), 11);
         assert!(two.is_superset(&one));
 
         assert_eq!(
@@ -818,8 +816,8 @@ mod tests {
     #[test]
     fn declared_inputs_are_the_world_refs_of_reachable_nodes_only_once_each() {
         let refs = vec![
-            InputReference::World(WorldInputKey::NearbyCreatureCore),
-            InputReference::World(WorldInputKey::NearbyCreatureCore),
+            InputReference::World(WorldInputKey::NearbyCreature),
+            InputReference::World(WorldInputKey::NearbyCreature),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::ActionVotes,
         ];
@@ -827,7 +825,7 @@ mod tests {
 
         assert_eq!(
             creature_declared_world_inputs(&genome, &mesh_reachable_nodes(&genome)),
-            BTreeSet::from([WorldInputKey::NearbyCreatureCore]),
+            BTreeSet::from([WorldInputKey::NearbyCreature]),
             "an unwired reference is declared; a non-world reference is not"
         );
         assert!(
@@ -849,9 +847,7 @@ mod tests {
             Just(WorldInputKey::NeighborOccupiedRing),
             Just(WorldInputKey::AreaBarrierSummary),
             Just(WorldInputKey::AreaOccupancySummary),
-            Just(WorldInputKey::NearbyCreatureCore),
-            Just(WorldInputKey::NearbyCreatureVitals),
-            Just(WorldInputKey::NearbyCreatureIdentity),
+            Just(WorldInputKey::NearbyCreature),
         ]
     }
 
@@ -1041,7 +1037,7 @@ mod tests {
                 (0..count).map(|i| OrdinaryFoodTypeId::new(i as u16)).collect();
             let universe = world_input_key_universe(types.iter().copied());
 
-            prop_assert_eq!(universe.len(), 7 + 3 * count);
+            prop_assert_eq!(universe.len(), 5 + 3 * count);
             for type_idx in types {
                 prop_assert!(universe.contains(&WorldInputKey::food_here(type_idx)));
                 prop_assert!(universe.contains(&WorldInputKey::neighbor_food_ring(type_idx)));

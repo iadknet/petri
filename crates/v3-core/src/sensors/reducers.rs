@@ -7,8 +7,8 @@ use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::CreatureId;
 use crate::creature::state::CreatureState;
 use crate::sensors::perception::{
-    barrier_idx, core_idx, food_idx, identity_idx, occupancy_idx, vitals_idx, PerceptionConfig,
-    PerceptionSnapshot, NEARBY_SLOTS,
+    barrier_idx, food_idx, nearby_idx, occupancy_idx, PerceptionConfig, PerceptionSnapshot,
+    NEARBY_SLOTS, NEARBY_WIDTH,
 };
 use crate::sensors::visibility::VisibleCell;
 
@@ -63,7 +63,7 @@ pub fn assemble_perception(
         max_dist,
     );
 
-    let (nearby_core, nearby_vitals, nearby_identity) = rank_nearby_creatures(
+    let nearby = rank_nearby_creatures(
         visible,
         world,
         observer_id,
@@ -79,9 +79,7 @@ pub fn assemble_perception(
         typed_area_food,
         area_barrier,
         area_occupancy,
-        nearby_core,
-        nearby_vitals,
-        nearby_identity,
+        nearby,
     }
 }
 
@@ -298,7 +296,7 @@ struct NearbyCandidate {
     chebyshev_dist: i32,
 }
 
-/// Rank visible non-self creatures and fill core/vitals/identity banks.
+/// Rank visible non-self creatures and fill the `NearbyCreature` bank.
 ///
 /// Per v3-sensor-spec.md Section 5.4–5.6:
 /// - 4 ranked slots, ascending by euclidean → chebyshev → (dy,dx) → creature_id
@@ -313,7 +311,7 @@ fn rank_nearby_creatures(
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
-) -> ([f32; 16], [f32; 8], [f32; 12]) {
+) -> [f32; NEARBY_WIDTH] {
     let mut candidates: Vec<NearbyCandidate> = Vec::new();
     for cell in visible {
         if cell.dx == 0 && cell.dy == 0 {
@@ -358,44 +356,41 @@ fn fill_nearby_banks(
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
-) -> ([f32; 16], [f32; 8], [f32; 12]) {
-    let mut core = [0.0f32; 16];
-    let mut vitals = [0.0f32; 8];
-    let mut identity = [0.0f32; 12];
+) -> [f32; NEARBY_WIDTH] {
+    let mut nearby = [0.0f32; NEARBY_WIDTH];
 
     for (slot, candidate) in candidates.iter().take(NEARBY_SLOTS).enumerate() {
         let Some(target) = creatures.get(candidate.creature_id) else {
             continue;
         };
+        let fields = &mut nearby
+            [slot * nearby_idx::FIELDS_PER_SLOT..(slot + 1) * nearby_idx::FIELDS_PER_SLOT];
 
-        // Core fields
-        let base = slot * core_idx::FIELDS_PER_SLOT;
-        core[base + core_idx::PRESENT] = 1.0;
-        core[base + core_idx::REL_X] = if r > 0.0 {
+        // Position
+        fields[nearby_idx::PRESENT] = 1.0;
+        fields[nearby_idx::REL_X] = if r > 0.0 {
             candidate.dx as f32 / r
         } else {
             0.0
         };
-        core[base + core_idx::REL_Y] = if r > 0.0 {
+        fields[nearby_idx::REL_Y] = if r > 0.0 {
             candidate.dy as f32 / r
         } else {
             0.0
         };
-        core[base + core_idx::DIST] = if max_dist > 0.0 {
+        fields[nearby_idx::DIST] = if max_dist > 0.0 {
             candidate.euclidean_dist / max_dist
         } else {
             0.0
         };
 
-        // Vitals fields
-        let vbase = slot * vitals_idx::FIELDS_PER_SLOT;
-        vitals[vbase + vitals_idx::ENERGY_RATIO] = if config.max_energy > 0.0 {
+        // Vitals
+        fields[nearby_idx::ENERGY_RATIO] = if config.max_energy > 0.0 {
             (target.energy / config.max_energy).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        vitals[vbase + vitals_idx::REPRODUCE_READY] = if target.energy
-            >= config.min_reproduce_energy
+        fields[nearby_idx::REPRODUCE_READY] = if target.energy >= config.min_reproduce_energy
             && target.age >= config.min_reproduce_age
         {
             1.0
@@ -403,21 +398,20 @@ fn fill_nearby_banks(
             0.0
         };
 
-        // Identity fields
-        let ibase = slot * identity_idx::FIELDS_PER_SLOT;
-        identity[ibase + identity_idx::KIN_AFFINITY] =
+        // Identity
+        fields[nearby_idx::KIN_AFFINITY] =
             compute_kin_affinity(observer.identity.kin_tag, target.identity.kin_tag);
-        identity[ibase + identity_idx::LINEAGE_MATCH] =
+        fields[nearby_idx::LINEAGE_MATCH] =
             if observer.identity.lineage_id == target.identity.lineage_id {
                 1.0
             } else {
                 0.0
             };
-        identity[ibase + identity_idx::PHENOTYPE_SIMILARITY] =
+        fields[nearby_idx::PHENOTYPE_SIMILARITY] =
             compute_phenotype_similarity(&observer.phenotype_channels, &target.phenotype_channels);
     }
 
-    (core, vitals, identity)
+    nearby
 }
 
 /// Compute kin affinity: `1.0 - popcount(a ^ b) / 32.0`, clamped to `[0.0, 1.0]`.
@@ -693,7 +687,7 @@ mod tests {
         let config = PerceptionConfig::default();
         let observer = &creatures[observer_id];
 
-        let (core, vitals, _identity) = rank_nearby_creatures(
+        let nearby = rank_nearby_creatures(
             visible.cells(),
             &world,
             observer_id,
@@ -705,20 +699,20 @@ mod tests {
         );
 
         // Slot 0 should be the nearer creature
-        assert!((core[core_idx::PRESENT] - 1.0).abs() < f32::EPSILON);
-        assert!((core[core_idx::REL_X] - 1.0 / 3.0).abs() < 1e-5);
+        assert!((nearby[nearby_idx::PRESENT] - 1.0).abs() < f32::EPSILON);
+        assert!((nearby[nearby_idx::REL_X] - 1.0 / 3.0).abs() < 1e-5);
 
         // Slot 1 should be the farther creature
-        let slot1_base = core_idx::FIELDS_PER_SLOT;
-        assert!((core[slot1_base + core_idx::PRESENT] - 1.0).abs() < f32::EPSILON);
-        assert!((core[slot1_base + core_idx::REL_X] - 2.0 / 3.0).abs() < 1e-5);
+        let slot1_base = nearby_idx::FIELDS_PER_SLOT;
+        assert!((nearby[slot1_base + nearby_idx::PRESENT] - 1.0).abs() < f32::EPSILON);
+        assert!((nearby[slot1_base + nearby_idx::REL_X] - 2.0 / 3.0).abs() < 1e-5);
 
         // Slot 2+ should be empty
-        let slot2_base = 2 * core_idx::FIELDS_PER_SLOT;
-        assert!((core[slot2_base + core_idx::PRESENT] - 0.0).abs() < f32::EPSILON);
+        let slot2_base = 2 * nearby_idx::FIELDS_PER_SLOT;
+        assert!((nearby[slot2_base + nearby_idx::PRESENT] - 0.0).abs() < f32::EPSILON);
 
         // Vitals slot 0: near creature energy = 30/200 = 0.15
-        assert!((vitals[vitals_idx::ENERGY_RATIO] - 30.0 / 200.0).abs() < 1e-5);
+        assert!((nearby[nearby_idx::ENERGY_RATIO] - 30.0 / 200.0).abs() < 1e-5);
     }
 
     #[test]
@@ -752,7 +746,7 @@ mod tests {
         let config = PerceptionConfig::default();
         let observer = &creatures[observer_id];
 
-        let (core, _, _) = rank_nearby_creatures(
+        let nearby = rank_nearby_creatures(
             visible.cells(),
             &world,
             observer_id,
@@ -763,19 +757,19 @@ mod tests {
             (18.0f32).sqrt(),
         );
 
-        let slot = |index: usize, field: usize| core[index * core_idx::FIELDS_PER_SLOT + field];
+        let slot = |index: usize, field: usize| nearby[index * nearby_idx::FIELDS_PER_SLOT + field];
 
-        assert!((slot(0, core_idx::REL_X) - 0.0).abs() < 1e-5);
-        assert!((slot(0, core_idx::REL_Y) - (-1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(0, nearby_idx::REL_X) - 0.0).abs() < 1e-5);
+        assert!((slot(0, nearby_idx::REL_Y) - (-1.0 / 3.0)).abs() < 1e-5);
 
-        assert!((slot(1, core_idx::REL_X) - (-1.0 / 3.0)).abs() < 1e-5);
-        assert!((slot(1, core_idx::REL_Y) - 0.0).abs() < 1e-5);
+        assert!((slot(1, nearby_idx::REL_X) - (-1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(1, nearby_idx::REL_Y) - 0.0).abs() < 1e-5);
 
-        assert!((slot(2, core_idx::REL_X) - (1.0 / 3.0)).abs() < 1e-5);
-        assert!((slot(2, core_idx::REL_Y) - 0.0).abs() < 1e-5);
+        assert!((slot(2, nearby_idx::REL_X) - (1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(2, nearby_idx::REL_Y) - 0.0).abs() < 1e-5);
 
-        assert!((slot(3, core_idx::REL_X) - 0.0).abs() < 1e-5);
-        assert!((slot(3, core_idx::REL_Y) - (1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(3, nearby_idx::REL_X) - 0.0).abs() < 1e-5);
+        assert!((slot(3, nearby_idx::REL_Y) - (1.0 / 3.0)).abs() < 1e-5);
     }
 
     #[test]
@@ -808,7 +802,7 @@ mod tests {
         // No barriers, no neighbors
         assert!((snap.area_barrier[barrier_idx::DENSITY_RATIO] - 0.0).abs() < f32::EPSILON);
         assert!((snap.area_occupancy[occupancy_idx::COUNT_RATIO] - 0.0).abs() < f32::EPSILON);
-        assert!((snap.nearby_core[core_idx::PRESENT] - 0.0).abs() < f32::EPSILON);
+        assert!((snap.nearby[nearby_idx::PRESENT] - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -880,7 +874,7 @@ mod tests {
         let max_candidate_cells = (2.0 * r + 1.0) * (2.0 * r + 1.0);
         let max_other_candidate_cells = max_candidate_cells - 1.0;
         let max_dist = (2.0 * r * r).sqrt();
-        let (nearby_core, nearby_vitals, nearby_identity) = rank_nearby_creatures(
+        let nearby = rank_nearby_creatures(
             visible.cells(),
             &world,
             observer_id,
@@ -919,9 +913,7 @@ mod tests {
                 max_other_candidate_cells,
                 max_dist,
             ),
-            nearby_core,
-            nearby_vitals,
-            nearby_identity,
+            nearby,
         };
 
         let actual = assemble_perception(
@@ -934,6 +926,99 @@ mod tests {
         );
 
         assert_eq!(actual, expected);
+    }
+
+    /// Slot `k`'s nine merged fields, in `nearby_idx` order.
+    fn merged_slot(snap: &PerceptionSnapshot, k: usize) -> Vec<f32> {
+        let width = nearby_idx::FIELDS_PER_SLOT;
+        snap.nearby[k * width..(k + 1) * width].to_vec()
+    }
+
+    /// The layout pin (T25.F05 invariant 2): slot `k`'s position, vitals and
+    /// identity at channels `9k..9k+9`, each field at its F04 value, written
+    /// before the three banks merged and kept as the pin of the same values.
+    #[test]
+    fn merged_nearby_creature_equals_core_vitals_identity_per_slot() {
+        let mut world = make_world(20, 20);
+        let origin = crate::contracts::Position::new(10, 10);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_identity = CreatureIdentityState {
+            lineage_id: 42,
+            kin_tag: 0xAAAA_AAAA,
+        };
+        let observer_id = creatures
+            .insert_with_key(|id| make_creature(id, origin, 50.0, observer_identity, [0; 6]));
+        world.place_creature(origin, observer_id);
+        // Slot 0: one cell east, same lineage, one kin bit apart, of age.
+        let near = crate::contracts::Position::new(11, 10);
+        let near_identity = CreatureIdentityState {
+            lineage_id: 42,
+            kin_tag: 0xAAAA_AAAB,
+        };
+        let near_id =
+            creatures.insert_with_key(|id| make_creature(id, near, 30.0, near_identity, [51; 6]));
+        creatures[near_id].age = 25;
+        world.place_creature(near, near_id);
+        // Slot 1: two west and one south, another lineage, every kin bit
+        // apart, under age.
+        let far = crate::contracts::Position::new(8, 11);
+        let far_identity = CreatureIdentityState {
+            lineage_id: 7,
+            kin_tag: 0x5555_5555,
+        };
+        let far_id = creatures.insert_with_key(|id| {
+            make_creature(id, far, 160.0, far_identity, [255, 0, 0, 0, 0, 0])
+        });
+        world.place_creature(far, far_id);
+
+        let config = PerceptionConfig::default();
+        let visible = compute_visible_cells(origin, &world, get_visibility_table(5));
+        let snap = assemble_perception(
+            observer_id,
+            &creatures[observer_id],
+            visible.cells(),
+            &world,
+            &creatures,
+            &config,
+        );
+
+        let max_dist = 50.0f32.sqrt();
+        let want = [
+            vec![
+                1.0,
+                0.2,
+                0.0,
+                1.0 / max_dist,
+                30.0 / 200.0,
+                1.0,
+                31.0 / 32.0,
+                1.0,
+                1.0 - 51.0 / 255.0,
+            ],
+            vec![
+                1.0,
+                -0.4,
+                0.2,
+                5.0f32.sqrt() / max_dist,
+                160.0 / 200.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0 - 42.5 / 255.0,
+            ],
+            vec![0.0; 9],
+            vec![0.0; 9],
+        ];
+        for (k, want) in want.iter().enumerate() {
+            let got = merged_slot(&snap, k);
+            assert_eq!(got.len(), 9);
+            for (field, (got, want)) in got.iter().zip(want).enumerate() {
+                assert!(
+                    (got - want).abs() < 1e-6,
+                    "slot {k} field {field}: {got} vs {want}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -974,13 +1059,11 @@ mod tests {
         );
 
         // Same lineage → lineage_match = 1.0
-        assert!((snap.nearby_identity[identity_idx::LINEAGE_MATCH] - 1.0).abs() < f32::EPSILON);
+        assert!((snap.nearby[nearby_idx::LINEAGE_MATCH] - 1.0).abs() < f32::EPSILON);
         // Same kin_tag → kin_affinity = 1.0
-        assert!((snap.nearby_identity[identity_idx::KIN_AFFINITY] - 1.0).abs() < f32::EPSILON);
+        assert!((snap.nearby[nearby_idx::KIN_AFFINITY] - 1.0).abs() < f32::EPSILON);
         // Same phenotype → phenotype_similarity = 1.0
-        assert!(
-            (snap.nearby_identity[identity_idx::PHENOTYPE_SIMILARITY] - 1.0).abs() < f32::EPSILON
-        );
+        assert!((snap.nearby[nearby_idx::PHENOTYPE_SIMILARITY] - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1024,7 +1107,7 @@ mod tests {
             &config,
         );
         assert_eq!(
-            snap_underage.nearby_vitals[vitals_idx::REPRODUCE_READY],
+            snap_underage.nearby[nearby_idx::REPRODUCE_READY],
             0.0,
             "underage creature should not be marked reproduce_ready"
         );
@@ -1039,7 +1122,7 @@ mod tests {
             &config,
         );
         assert_eq!(
-            snap_of_age.nearby_vitals[vitals_idx::REPRODUCE_READY],
+            snap_of_age.nearby[nearby_idx::REPRODUCE_READY],
             1.0,
             "age+energy eligible creature should be reproduce_ready"
         );

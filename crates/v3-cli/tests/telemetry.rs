@@ -621,9 +621,7 @@ fn a_window_exports_its_creature_ticks_events_and_genome() {
             "petri.area_food",
             "petri.area_barrier",
             "petri.area_occupancy",
-            "petri.nearby_core",
-            "petri.nearby_vitals",
-            "petri.nearby_identity",
+            "petri.nearby",
             "petri.area_food.0",
             "petri.area_food.1",
         ] {

@@ -1,4 +1,4 @@
-//! The per-world `input_use` block (T20.F01, `input-use-v1`): the input-use
+//! The per-world `input_use` block (T20.F01, `input-use-v2`): the input-use
 //! funnel per T11.F26 cohort, family and channel, projected from
 //! `v3_core::neighborhood::input_use`.
 //!

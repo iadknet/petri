@@ -178,9 +178,7 @@ fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
         WorldInputKey::NeighborOccupiedRing | WorldInputKey::AreaOccupancySummary => {
             MeshReadClass::Occupancy
         }
-        WorldInputKey::NearbyCreatureCore
-        | WorldInputKey::NearbyCreatureVitals
-        | WorldInputKey::NearbyCreatureIdentity => MeshReadClass::Neighbor,
+        WorldInputKey::NearbyCreature => MeshReadClass::Neighbor,
     }
 }
 
@@ -266,7 +264,7 @@ mod tests {
         // CN1 (Constant) disconnected (dead)
         let reachable_graph = NodeGenome {
             node_id: NodeId::new(1),
-            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreature)],
             targets: vec![],
             backend_def: BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()

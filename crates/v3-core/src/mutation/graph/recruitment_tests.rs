@@ -73,7 +73,13 @@ fn every_legal_reference_and_memory_bank_has_canonical_access() {
             && !matches!(reference, InputReference::UpstreamSlot(_))
         {
             let plan = admission.plan(&family, Arm::WholeFamily, 0).unwrap();
-            assert_eq!(plan.sources.len(), width as usize);
+            // A slot family resolves one slot at append (T25.F05).
+            let whole = if reference.slot_pairs() { 0 } else { width };
+            assert_eq!(plan.sources.len(), whole as usize);
+            assert_eq!(
+                plan.pairs.is_some(),
+                !reference.direction_pairs().is_empty()
+            );
         }
     }
     let fixture = node();
@@ -224,7 +230,7 @@ proptest! {
         // (T25.F03); a pair family under WholeFamily, one silent
         // `DirectionPair` group of twelve born-0 members over the kind's eight
         // direction sinks plus its facts into the kind's drive: 15 edges for an
-        // area family, 14 for a creature slot (T25.F04).
+        // area family (T25.F04), 19 for a creature slot (T25.F05).
         let grouped = after_graph.groups().len() - before_graph.groups().len();
         prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
@@ -244,7 +250,7 @@ proptest! {
                 crate::creature::genome::cgp::Shape::DirectionPair { .. } => {
                     prop_assert!(whole);
                     prop_assert_eq!(changed, 9);
-                    prop_assert!(added == 15 || added == 14, "{}", added);
+                    prop_assert!(added == 15 || added == 19, "{}", added);
                     prop_assert!((1..=30).contains(&added));
                     prop_assert_eq!(after_graph.members(id).count(), 12);
                 }
@@ -271,9 +277,9 @@ fn admissible_sampling_pool_contains_all_declared_families_and_channels() {
     let fixture = node();
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
     let single = admission.families(Arm::SingleChannel, 2);
-    assert_eq!(single.len(), 48);
+    assert_eq!(single.len(), 46);
     let whole = admission.families(Arm::WholeFamily, 2);
-    assert_eq!(whole.len(), 24);
+    assert_eq!(whole.len(), 22);
     for reference in input_reference_universe(2) {
         assert!(single.contains(&SourceFamily::Input(reference.clone())));
         if !matches!(
@@ -514,8 +520,8 @@ fn area_food() -> InputReference {
     ))
 }
 
-fn nearby_core() -> InputReference {
-    InputReference::World(crate::contracts::WorldInputKey::NearbyCreatureCore)
+fn nearby() -> InputReference {
+    InputReference::World(crate::contracts::WorldInputKey::NearbyCreature)
 }
 
 /// The edges of `kind`'s drive sink.
@@ -535,7 +541,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_group_and_its_facts_into_the_dri
     use crate::creature::genome::vote::DirectedVoteKind;
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
-        (nearby_core(), 2, vec![8, 11]),
+        (nearby(), 2, vec![18, 21, 22, 23, 24, 25, 26]),
     ] {
         let mut fixture = node();
         recruit_source_with_pair(
@@ -612,13 +618,65 @@ fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family
     assert_eq!(graph(&whole).edges().count(), 7);
 }
 
+/// A slot family under `WholeFamily` on an undirected destination wires the
+/// drawn slot's nine channels ascending, born 0, never the family's 36
+/// (T25.F05); under `SingleChannel` it keeps one edge.
+#[test]
+fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
+    for slot in 0..4u8 {
+        let mut whole = node();
+        recruit_source_with_pair(
+            &mut whole,
+            &SourceFamily::Input(nearby()),
+            Arm::WholeFamily,
+            VoteSink::Eat,
+            slot,
+        )
+        .unwrap();
+        assert_eq!(whole.input_refs, vec![nearby()]);
+        let def = graph(&whole);
+        assert!(def.groups().is_empty());
+        let eat: Vec<_> = def
+            .sink(OutputSinkKind::ActionVote(VoteSink::Eat))
+            .unwrap()
+            .inputs
+            .to_vec();
+        let base = 9 * u16::from(slot);
+        let want: Vec<_> = (base..base + 9)
+            .map(|sub_idx| {
+                GraphEdge::new(
+                    GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx,
+                    },
+                    0.0,
+                )
+            })
+            .collect();
+        assert_eq!(eat, want, "slot {slot}");
+        assert_eq!(def.edges().count(), 9);
+        assert_eq!(crate::creature::genome::cgp::validate_graph(&whole), Ok(()));
+    }
+    let mut single = node();
+    recruit_source(
+        &mut single,
+        &SourceFamily::Input(nearby()),
+        Arm::SingleChannel,
+        35,
+        VoteSink::Eat,
+    )
+    .unwrap();
+    assert_eq!(graph(&single).edges().count(), 1);
+}
+
 /// `recruit`'s draws under `WholeFamily`: the family, the destination, and
-/// only for a pair-declaring family landing on a directed sink, one pair
-/// `gen_range(0..pairs)`; nothing after.
+/// for a pair-declaring family landing on a directed sink, or a slot family
+/// landing anywhere (T25.F05), one pair `gen_range(0..pairs)`; nothing after.
 #[test]
 fn the_pair_case_draws_family_then_destination_then_pair() {
     use crate::creature::genome::vote::DirectedVoteKind;
     let mut paired = 0;
+    let mut undirected_slots = 0;
     for seed in 0..512 {
         let mut fixture = node();
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -634,15 +692,19 @@ fn the_pair_case_draws_family_then_destination_then_pair() {
         let OutputSinkKind::ActionVote(vote) = graph(&base).output_sinks()[destination].kind else {
             unreachable!("destinations are vote sinks")
         };
-        let pairs = match &family {
-            SourceFamily::Input(reference) => reference.direction_pairs().len(),
-            _ => 0,
+        let (pairs, slots) = match &family {
+            SourceFamily::Input(reference) => {
+                (reference.direction_pairs().len(), reference.slot_pairs())
+            }
+            _ => (0, false),
         };
+        let directed = DirectedVoteKind::of_sink(vote).is_some();
         let mut expected = base.clone();
-        if pairs > 0 && DirectedVoteKind::of_sink(vote).is_some() {
+        if pairs > 0 && (directed || slots) {
             let pair = u8::try_from(replay.gen_range(0..pairs)).unwrap();
             recruit_source_with_pair(&mut expected, &family, Arm::WholeFamily, vote, pair).unwrap();
             paired += 1;
+            undirected_slots += usize::from(!directed);
         } else {
             recruit_source(&mut expected, &family, Arm::WholeFamily, 0, vote).unwrap();
         }
@@ -650,6 +712,10 @@ fn the_pair_case_draws_family_then_destination_then_pair() {
         assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
     }
     assert!(paired > 0, "some seed takes the pair case");
+    assert!(
+        undirected_slots > 0,
+        "some seed draws a slot on an undirected destination"
+    );
 }
 
 /// The preflight: under `WholeFamily`, pair-declaring families leave the

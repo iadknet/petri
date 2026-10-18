@@ -153,7 +153,7 @@ fn a_committed_refinement_reports_its_key() {
     let node = &mut genome.nodes[idx];
     let core = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
-        .push(InputReference::World(WorldInputKey::NearbyCreatureCore));
+        .push(InputReference::World(WorldInputKey::NearbyCreature));
     let def = graph_mut(node);
     let sink = def
         .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
@@ -161,7 +161,7 @@ fn a_committed_refinement_reports_its_key() {
     for slot in 0..2u16 {
         let source = GraphSource::InputLeaf {
             ref_idx: core,
-            sub_idx: 4 * slot + 3,
+            sub_idx: 9 * slot + 3,
         };
         def.push_edge(sink, GraphEdge::new(source, 0.25));
     }
@@ -180,11 +180,11 @@ fn a_committed_refinement_reports_its_key() {
     );
     assert!(result.is_ok());
     let key = crate::mutation::types::RefinementKey {
-        family: WorldInputKey::NearbyCreatureCore,
+        family: WorldInputKey::NearbyCreature,
         field: 3,
     };
     assert_eq!(refined, Some(key));
-    assert_eq!(key.as_key(), "NearbyCreatureCore:3");
+    assert_eq!(key.as_key(), "NearbyCreature:3");
     let mut summary = MutationSummary::zero();
     summary.record_refinement(key);
     summary.record_refinement(key);

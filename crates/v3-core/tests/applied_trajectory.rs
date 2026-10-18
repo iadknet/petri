@@ -82,6 +82,14 @@
 //! 61b219b0... -> 0ec61ea2...). With `mutation.per_unit_rate` 0 the sampled
 //! run is byte-identical across the commit (a93d6b87..., gestation rate 0.0
 //! 527a14e0...), and removing the catalog entry alone restores all four.
+//! Re-pinned by T25.F05 commit 1 after two agreeing runs: the three creature
+//! families merge into one 36-wide `NearbyCreature` reference, so the
+//! sampler's draws at indices 11 and 12 and recruitment's slot draw change
+//! and a creature reference serializes under one tag, which moves the two
+//! sampled digests (f9778798... -> 326c6267..., gestation rate 0.0
+//! ac6b54b7... -> e9374ffc...); the guard digests hold. With
+//! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
+//! commit (a93d6b87..., gestation rate 0.0 527a14e0...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -93,11 +101,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "f9778798f63c2f2aeff6a66897d4a894506fab9f4f4697e1cc2347e286757dc7"
+        "326c62673d1eedb1fe665989c057ddc52d866755bb12e16782d69c20ae276e54"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "ac6b54b79cd94f1909b393c38b1d8e46e9a94b89a030ce23c0b174d1d3b38eec"
+        "e9374ffc39c3252330d2aba9dfd11ea4a3ddf347ded69c6747cb156cc16cb536"
     );
 }
 

@@ -59,9 +59,7 @@ fn sensors() -> SensorSnapshot {
             typed_area_food: vec![ramp(0.0), ramp(0.5)],
             area_barrier: ramp(0.125),
             area_occupancy: ramp(0.25),
-            nearby_core: ramp(0.0),
-            nearby_vitals: ramp(0.125),
-            nearby_identity: ramp(0.25),
+            nearby: ramp(0.0),
         },
     }
 }
@@ -164,18 +162,7 @@ fn reference_cases() -> Vec<(InputReference, Vec<f32>)> {
             R::World(W::AreaOccupancySummary),
             s.perception.area_occupancy.to_vec(),
         ),
-        (
-            R::World(W::NearbyCreatureCore),
-            s.perception.nearby_core.to_vec(),
-        ),
-        (
-            R::World(W::NearbyCreatureVitals),
-            s.perception.nearby_vitals.to_vec(),
-        ),
-        (
-            R::World(W::NearbyCreatureIdentity),
-            s.perception.nearby_identity.to_vec(),
-        ),
+        (R::World(W::NearbyCreature), s.perception.nearby.to_vec()),
         (
             R::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             vec![10.0],
@@ -402,7 +389,7 @@ fn active_graph() -> CgpGraphBackendDef {
 fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs() {
     let mut original = graph_node(
         active_graph(),
-        vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
+        vec![InputReference::World(WorldInputKey::NearbyCreature)],
     );
     original.targets.push(RouteTarget {
         target_id: NodeId::new(0),
@@ -415,7 +402,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
         recruit_source(
             &mut silent,
-            &SourceFamily::Input(InputReference::World(WorldInputKey::NearbyCreatureCore)),
+            &SourceFamily::Input(InputReference::World(WorldInputKey::NearbyCreature)),
             WholeFamily,
             0,
             vote,

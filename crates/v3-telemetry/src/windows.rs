@@ -468,9 +468,7 @@ fn tick_attributes(a: &mut Attributes, record: &TickTrace) {
         a.doubles("petri.area_food", &p.area_food);
         a.doubles("petri.area_barrier", &p.area_barrier);
         a.doubles("petri.area_occupancy", &p.area_occupancy);
-        a.doubles("petri.nearby_core", &p.nearby_core);
-        a.doubles("petri.nearby_vitals", &p.nearby_vitals);
-        a.doubles("petri.nearby_identity", &p.nearby_identity);
+        a.doubles("petri.nearby", &p.nearby);
     }
     a.double("petri.energy_start", record.energy_before);
     a.double("petri.energy_after_cognition", record.energy_after);

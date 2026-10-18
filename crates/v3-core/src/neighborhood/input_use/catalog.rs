@@ -1,4 +1,4 @@
-//! The `input-use-v1` catalog: the 19 named input families the mutation
+//! The `input-use-v2` catalog: the 17 named input families the mutation
 //! engine draws, `UpstreamSlot` (one channel per slot), and the separate
 //! shared-memory inventory, with the channel each read actually addresses
 //! under `runtime::inputs::resolve_input`.
@@ -23,9 +23,7 @@ pub enum Family {
     ActionQueue,
     AreaFoodSummary(u16),
     AreaBarrierSummary,
-    NearbyCreatureCore,
-    NearbyCreatureVitals,
-    NearbyCreatureIdentity,
+    NearbyCreature,
     AreaOccupancySummary,
     ActionVotes,
     PreviousPassVotes,
@@ -61,9 +59,7 @@ impl Family {
                 }
                 WorldInputKey::AreaBarrierSummary => Self::AreaBarrierSummary,
                 WorldInputKey::AreaOccupancySummary => Self::AreaOccupancySummary,
-                WorldInputKey::NearbyCreatureCore => Self::NearbyCreatureCore,
-                WorldInputKey::NearbyCreatureVitals => Self::NearbyCreatureVitals,
-                WorldInputKey::NearbyCreatureIdentity => Self::NearbyCreatureIdentity,
+                WorldInputKey::NearbyCreature => Self::NearbyCreature,
             },
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks) => Self::AgeTicks,
             InputReference::DynamicIntrospection(key) => match key {

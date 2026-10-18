@@ -1391,7 +1391,7 @@ mod tests {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
             "pair_group_inherited_nonzero_births_total": 2,
-            "refinement_applications_by_key": {"NearbyCreatureCore:3": 1}
+            "refinement_applications_by_key": {"NearbyCreature:3": 1}
         }});
         let kept = keep_case(&case);
         assert_eq!(kept["mutation_supply"], case["mutation_supply"]);
