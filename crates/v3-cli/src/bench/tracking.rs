@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use v3_core::creature::sensor_census::{
-    creature_sensor_census, world_input_key_label, world_input_key_universe, DecisionInputKey,
+    creature_sensor_census, world_input_key_label, DecisionInputKey,
 };
 use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 
@@ -911,7 +911,7 @@ impl SensorCensus {
     /// Census the living population from post-tick state. Pure structure: it
     /// reads genomes and cached reachability and executes no brain.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        let mut world_inputs: BTreeMap<WorldInputKey, u64> = world_input_key_universe(
+        let mut world_inputs: BTreeMap<WorldInputKey, u64> = WorldInputKey::universe(
             sim.world
                 .food()
                 .food_types()

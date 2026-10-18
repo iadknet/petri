@@ -11,7 +11,6 @@ use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, O
 use crate::creature::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
 use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
-use crate::creature::sensor_census::world_input_key_universe;
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
@@ -44,7 +43,7 @@ pub fn input_ref_kind(reference: &InputReference) -> InputRefKind {
 pub(crate) fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
     let capped = food_type_count.clamp(1, usize::from(u16::MAX) + 1);
     let food_types = (0..capped).map(|idx| OrdinaryFoodTypeId::new(idx as u16));
-    world_input_key_universe(food_types)
+    WorldInputKey::universe(food_types)
         .into_iter()
         .map(InputReference::World)
         .chain([

@@ -1340,7 +1340,8 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
 
 #[test]
 fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
-    use v3_core::creature::sensor_census::{world_input_key_label, world_input_key_universe};
+    use v3_core::contracts::WorldInputKey;
+    use v3_core::creature::sensor_census::world_input_key_label;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1352,7 +1353,7 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
 
     let snapshot = &receiver.snapshots()[0];
-    let catalog = world_input_key_universe(
+    let catalog = WorldInputKey::universe(
         sim.world
             .food()
             .food_types()
