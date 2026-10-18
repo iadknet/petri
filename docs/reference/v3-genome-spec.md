@@ -72,7 +72,10 @@ A graph edge serializes as `{source, own_weight, membership?}` and a graph
 backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
 offset, scale}]` (T25.F03); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
-with no conversion path. The lab's genome files are `genome_format` 2.
+with no conversion path. A genome from before T25.F05 that names
+`NearbyCreatureCore`, `NearbyCreatureVitals` or `NearbyCreatureIdentity`
+fails to deserialize too; the one `NearbyCreature` reference (36 channels)
+replaces them. The lab's genome files are `genome_format` 3.
 A serialized genome from before T11.F27 that carries an old parameter sink
 (`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam { slot_idx, .. }`
 fails to deserialize; there is no conversion path. A pre-T11.F27 genome with
