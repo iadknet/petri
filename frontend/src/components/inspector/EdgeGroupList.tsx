@@ -1,12 +1,9 @@
 import { type ReactNode, useState } from "react";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type {
-	EdgeGroup,
-	GraphBackendDef,
-	InputReference,
-	OutputSinkKind,
-} from "../../types/genome.ts";
+import type { EdgeGroup, GraphBackendDef, InputReference } from "../../types/genome.ts";
+import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { directionName } from "./directions.ts";
+import { composeTerms, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
 import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
 
 const RING_CHANNELS = 8;
@@ -40,17 +37,6 @@ export interface GroupMember {
 	ownWeight: number;
 	/** The server's genomic weight, when the payload carries it. */
 	genomic: number | undefined;
-}
-
-/** The direction of a directed vote sink. */
-function sinkDirection(kind: OutputSinkKind | undefined): number | undefined {
-	if (kind === undefined || !("ActionVote" in kind)) return undefined;
-	const vote = kind.ActionVote;
-	if (typeof vote !== "object") return undefined;
-	if ("Move" in vote) return vote.Move;
-	if ("Reproduce" in vote) return vote.Reproduce;
-	if ("StealEnergy" in vote) return vote.StealEnergy;
-	return undefined;
 }
 
 /** The reference a group reads, or its dangling index. */
@@ -87,32 +73,80 @@ export function collectGroupMembers(
 	return members;
 }
 
-function memberWeights(member: GroupMember): string {
-	return `own=${member.ownWeight.toFixed(3)}${
-		member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""
-	}`;
+/** A member's weights, its composition from the group in a tooltip. */
+function MemberWeights({
+	member,
+	group,
+	inputRefs,
+}: {
+	member: GroupMember;
+	group: EdgeGroup;
+	inputRefs: InputReference[];
+}) {
+	const pattern = memberPattern(group, inputRefs, member.channel, member.direction);
+	return (
+		<Tip
+			content={
+				<>
+					<span className="block text-slate-400">scale × pattern + correction</span>
+					<span className="block font-mono">
+						{composeTerms(member.ownWeight, group.scale, pattern)}
+					</span>
+				</>
+			}
+		>
+			own={member.ownWeight.toFixed(3)}
+			{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
+		</Tip>
+	);
 }
 
-/** A row's header and member lines, collapsible and open by default. */
+/** Group facts shared by both shapes, each explained in a tooltip. */
+function GroupFacts({ group, offsetTip }: { group: EdgeGroup; offsetTip: string }) {
+	return (
+		<>
+			<span className="text-slate-400">{group.kind}</span>
+			<Tip content={offsetTip}>offset {group.offset}</Tip>
+			<Tip content="The group's shared weight: each member's weight is scale × its pattern + its own correction.">
+				scale={group.scale.toFixed(3)}
+			</Tip>
+		</>
+	);
+}
+
+/** "1 step" or "n steps". */
+function steps(n: number): string {
+	return `${n} step${n === 1 ? "" : "s"}`;
+}
+
+/**
+ * A row's header and member lines, collapsible and open by default. Only
+ * the name toggles; the facts beside it carry their own tooltips.
+ */
 function GroupRowShell({
-	header,
+	name,
+	facts,
 	children,
 }: {
-	header: ReactNode;
+	name: ReactNode;
+	facts: ReactNode;
 	children: ReactNode;
 }) {
 	const [open, setOpen] = useState(true);
 	return (
 		<li data-testid="edge-group" className="space-y-0.5">
-			<button
-				type="button"
-				aria-expanded={open}
-				onClick={() => setOpen((value) => !value)}
-				className="flex w-full flex-wrap gap-2 text-left hover:text-slate-100"
-			>
-				<span aria-hidden="true">{open ? "▾" : "▸"}</span>
-				{header}
-			</button>
+			<div className="flex flex-wrap gap-2">
+				<button
+					type="button"
+					aria-expanded={open}
+					onClick={() => setOpen((value) => !value)}
+					className="flex gap-2 text-left hover:text-slate-100"
+				>
+					<span aria-hidden="true">{open ? "▾" : "▸"}</span>
+					{name}
+				</button>
+				{facts}
+			</div>
 			{open ? <ul className="ml-4 space-y-0.5 text-slate-400">{children}</ul> : null}
 		</li>
 	);
@@ -135,31 +169,34 @@ function RingRow({
 	const byChannel = [...members].sort((a, b) => a.channel - b.channel);
 	return (
 		<GroupRowShell
-			header={
+			name={
+				<span>
+					Ring {refLabel(ringRef, inputRefs)} #{index}
+				</span>
+			}
+			facts={
 				<>
-					<span>
-						Ring {refLabel(ringRef, inputRefs)} #{index}
-					</span>
-					<span className="text-slate-400">{group.kind}</span>
-					<span
-						title={`Each ring cell votes ${group.kind} toward the direction ${group.offset} steps clockwise from that cell (0 = same, 4 = opposite).`}
+					<GroupFacts
+						group={group}
+						offsetTip={`Each ring cell votes ${group.kind} toward the direction ${steps(group.offset)} clockwise from that cell (0 = same, 4 = opposite).`}
+					/>
+					<Tip
+						data-testid="edge-group-members"
+						content="Members present, by ring cell from N clockwise (● present, ○ hole)."
 					>
-						offset {group.offset}
-					</span>
-					<span>scale={group.scale.toFixed(3)}</span>
-					<span data-testid="edge-group-members" title="Members present, by ring cell">
 						{present.size}/{RING_CHANNELS}{" "}
 						{Array.from({ length: RING_CHANNELS }, (_, channel) =>
 							present.has(channel) ? "●" : "○",
 						).join("")}
-					</span>
+					</Tip>
 				</>
 			}
 		>
 			{byChannel.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
 					cell {directionName(member.channel)} → {group.kind}[
-					{directionName(member.channel + group.offset)}] {memberWeights(member)}
+					{directionName(member.channel + group.offset)}]{" "}
+					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
 				</li>
 			))}
 		</GroupRowShell>
@@ -199,33 +236,35 @@ function PairRow({
 	const extra = members.filter((member) => !PAIR_BIRTH_SET.has(coordinate(member)));
 	return (
 		<GroupRowShell
-			header={
+			name={
+				<span>
+					Pair {label} #{index}
+				</span>
+			}
+			facts={
 				<>
-					<span>
-						Pair {label} #{index}
-					</span>
-					<span className="text-slate-400">{group.kind}</span>
-					<span
-						title={`Votes ${group.kind} toward the sensed offset, rotated ${group.offset} steps clockwise (0 = toward, 4 = away).`}
-					>
-						offset {group.offset}
-					</span>
-					<span>scale={group.scale.toFixed(3)}</span>
-					<span
+					<GroupFacts
+						group={group}
+						offsetTip={`Votes ${group.kind} toward the sensed offset, rotated ${steps(group.offset)} clockwise (0 = toward, 4 = away).`}
+					/>
+					<Tip
 						data-testid="edge-group-members"
-						title="Members present over the twelve birth coordinates: x at NE E SE SW W NW, then y at N NE SE S SW NW (relative to the offset)"
+						content={`Members present over the twelve birth coordinates: x at NE E SE SW W NW, then y at N NE SE S SW NW, relative to the offset (● present, ○ hole${
+							extra.length > 0 ? `; +${extra.length} outside them, zero pattern` : ""
+						}).`}
 					>
 						{presentAtBirth.filter(Boolean).length}/{PAIR_BIRTH.length}{" "}
 						{presentAtBirth.map((here) => (here ? "●" : "○")).join("")}
 						{extra.length > 0 ? ` +${extra.length}` : ""}
-					</span>
+					</Tip>
 				</>
 			}
 		>
 			{members.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
 					{role(member)}:{directionName(relative(member) ?? 0)} → {group.kind}[
-					{directionName(member.direction ?? 0)}] {memberWeights(member)}
+					{directionName(member.direction ?? 0)}]{" "}
+					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
 					{PAIR_BIRTH_SET.has(coordinate(member)) ? "" : " (zero pattern)"}
 				</li>
 			))}

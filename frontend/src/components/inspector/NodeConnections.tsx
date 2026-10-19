@@ -1,4 +1,5 @@
 import type { InputReference, RouteTarget } from "../../types/genome.ts";
+import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { describeWholeInputRef } from "./inputRefUtils.ts";
 
 interface NodeConnectionsProps {
@@ -17,9 +18,9 @@ export function NodeConnections({ inputRefs, targets }: NodeConnectionsProps) {
 								const { label, description } = describeWholeInputRef(ref);
 								return (
 									// biome-ignore lint/suspicious/noArrayIndexKey: genome order is the identity
-									<span key={i} title={description || undefined}>
+									<span key={i}>
 										{i > 0 ? ", " : ""}
-										{label}
+										{description ? <Tip content={description}>{label}</Tip> : label}
 									</span>
 								);
 							})

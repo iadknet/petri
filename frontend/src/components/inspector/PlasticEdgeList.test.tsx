@@ -1,8 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { GraphBackendDef, PlasticityConfig } from "../../types/genome.ts";
-import { PlasticEdgeList, collectPlasticEdges, plasticityBadge } from "./PlasticEdgeList.tsx";
+import {
+	PlasticEdgeList,
+	collectPlasticEdges,
+	plasticityBadge,
+	plasticityDetail,
+} from "./PlasticEdgeList.tsx";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import { weightLabel } from "./graphInternalsEdges.tsx";
 
@@ -58,9 +63,24 @@ const weights: NodeGraphWeights = {
 };
 
 describe("PlasticEdgeList", () => {
-	it("names each edge's rule, pathway and inheritance", () => {
+	it("names each edge's rule, pathway, trace decay and inheritance", () => {
 		expect(plasticityBadge(hebbian)).toBe("Oja · hebbian · darwinian");
-		expect(plasticityBadge(rewarded)).toBe("Classic · reward EnergyDelta · lamarckian");
+		expect(plasticityBadge(rewarded)).toBe(
+			"Classic · reward EnergyDelta · decay 0.50 · lamarckian",
+		);
+	});
+
+	it("spells out every learning attribute for the badge's tooltip", () => {
+		expect(plasticityDetail(hebbian)).toEqual([
+			"Oja rule, learning rate 0.100, weight clamp ±2.00.",
+			"Hebbian: learns from co-activity alone.",
+			"Darwinian: offspring start from the genomic weight.",
+		]);
+		expect(plasticityDetail(rewarded)).toEqual([
+			"Classic rule, learning rate 0.100, weight clamp ±2.00.",
+			"Reward-modulated by EnergyDelta; its eligibility trace keeps 0.50 of itself each tick.",
+			"Lamarckian: offspring inherit the learned weight.",
+		]);
 	});
 
 	it("lists every plastic edge on both surfaces with its weights and badge", () => {
@@ -76,9 +96,11 @@ describe("PlasticEdgeList", () => {
 		const badges = screen.getAllByTestId("plasticity-badge").map((badge) => badge.textContent);
 		expect(badges).toEqual([
 			"Oja · hebbian · darwinian",
-			"Classic · reward EnergyDelta · lamarckian",
+			"Classic · reward EnergyDelta · decay 0.50 · lamarckian",
 		]);
 		expect(screen.getByText(/not initialized/)).toBeTruthy();
+		fireEvent.mouseEnter(screen.getAllByTestId("plasticity-badge")[1] as HTMLElement);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/eligibility trace keeps 0\.50/);
 	});
 
 	it("marks the applied weight unavailable without the runtime payload", () => {
@@ -115,6 +137,24 @@ describe("PlasticEdgeList", () => {
 				.filter((edge) => edge.edgeType === "compute_to_output")
 				.map((edge) => edge.weight),
 		).toEqual([null, 0.75]);
+	});
+
+	it("carries a plastic edge's learning and weights for its tooltip", () => {
+		const model = buildFullGraphModel(plastic(), [], weights);
+		const sinkEdge = model.edges.find((edge) => edge.id === "sink:0:0");
+		expect(sinkEdge?.plastic).toEqual({
+			config: rewarded,
+			genomic: 1.5,
+			applied: 1.25,
+			learned: 1.25,
+		});
+		expect(sinkEdge?.own).toBe(1.5);
+		expect(model.edges.find((edge) => edge.id === "sink:0:1")?.plastic).toBeUndefined();
+		const withoutPayload = buildFullGraphModel(plastic(), [], null);
+		expect(withoutPayload.edges.find((edge) => edge.id === "sink:0:0")?.plastic).toEqual({
+			config: rewarded,
+			genomic: 1.5,
+		});
 	});
 
 	it("labels an unavailable edge weight n/a and the unit weight not at all", () => {

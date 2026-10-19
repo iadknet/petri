@@ -1,7 +1,7 @@
 import { type Edge, MarkerType, type Node } from "@xyflow/react";
 import type { GraphInternalsNodeData } from "./GraphInternalsNode.tsx";
 import type { FullGraphModel } from "./graphFullModel.ts";
-import type { WeightEdgeData } from "./graphInternalsEdges.tsx";
+import type { EdgeTip, WeightEdgeData } from "./graphInternalsEdges.tsx";
 import type { LayoutOutput } from "./graphInternalsLayout.ts";
 import type { NodeTraceData } from "./graphTraceOverlay.ts";
 
@@ -41,6 +41,8 @@ export function buildGraphFlowScene(input: {
 			draggable: false,
 			connectable: false,
 			selectable: false,
+			// The node's own content is the tab stop that opens its tooltip.
+			focusable: false,
 			style: { width: pos.width, height: pos.height },
 			data: {
 				index: mn.arrayIndex,
@@ -84,6 +86,14 @@ export function buildGraphFlowScene(input: {
 			? `rgba(${tint.r},${tint.g},${tint.b},${opacity})`
 			: `rgba(148,163,184,${opacity})`;
 		const markerColor = me.isBackward ? `rgba(251,191,36,${opacity})` : strokeColor;
+		const tip: EdgeTip = {
+			source: sourceNode?.label ?? me.sourceId,
+			target: targetNode?.label ?? me.targetId,
+			weight: me.weight,
+			own: me.own,
+			...(me.member ? { member: me.member } : {}),
+			...(me.plastic ? { plastic: me.plastic } : {}),
+		};
 
 		if (me.isBackward) {
 			flowEdges.push({
@@ -105,6 +115,7 @@ export function buildGraphFlowScene(input: {
 					weight: me.weight,
 					opacity,
 					tint: tint ?? undefined,
+					tip,
 				},
 			});
 		} else {
@@ -128,6 +139,7 @@ export function buildGraphFlowScene(input: {
 					weight: me.weight,
 					opacity,
 					tint: tint ?? undefined,
+					tip,
 				},
 			});
 		}

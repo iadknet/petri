@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
 import { NodeConnections } from "./NodeConnections.tsx";
@@ -7,17 +7,20 @@ describe("NodeConnections", () => {
 	it("lists input refs by label, each explained in a tooltip", () => {
 		const inputRefs: InputReference[] = [{ World: "AreaBarrierSummary" }, { UpstreamSlot: 0 }];
 
-		render(
+		const { container } = render(
 			<NodeConnections
 				inputRefs={inputRefs}
 				targets={[{ target_id: 2, slot: 0, gate_bias: 0.0 }]}
 			/>,
 		);
 
-		const bus = screen.getByText(/Bus\[0\]/);
-		expect(bus.parentElement?.textContent).toBe("AreaBarrier, Bus[0]");
-		expect(screen.getByText("AreaBarrier").getAttribute("title")).toMatch(/barriers/);
-		expect(bus.getAttribute("title")).toMatch(/previous mesh node/);
+		const bus = screen.getByText("Bus[0]");
+		const labels = container.querySelectorAll("[tabindex='0']");
+		expect(Array.from(labels, (label) => label.textContent)).toEqual(["AreaBarrier", "Bus[0]"]);
+		expect(screen.getByText("AreaBarrier")).toHaveAccessibleDescription(/barriers/);
+		expect(bus).not.toHaveAttribute("title");
+		fireEvent.mouseEnter(bus);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/previous mesh node/);
 	});
 
 	it("renders target node IDs", () => {

@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { InputReference } from "../../types/genome.ts";
+import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { describeWholeInputRef, formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 interface InputsPanelProps {
@@ -17,17 +18,19 @@ export const InputsPanel = memo(function InputsPanel({
 				Inputs
 			</div>
 			<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
-				{inputRefs.map((ref, i) => (
-					<div key={`${formatInputRef(ref)}-${i}`} className="flex justify-between">
-						<span
-							style={{ color: inputRefColor(ref) }}
-							title={describeWholeInputRef(ref).description || undefined}
-						>
-							{formatInputRef(ref)}
-						</span>
-						<span className="text-slate-400">{(upstreamSlots[i] ?? 0).toFixed(2)}</span>
-					</div>
-				))}
+				{inputRefs.map((ref, i) => {
+					const { description } = describeWholeInputRef(ref);
+					const label = formatInputRef(ref);
+					return (
+						// biome-ignore lint/suspicious/noArrayIndexKey: genome order is the identity
+						<div key={`${label}-${i}`} className="flex justify-between">
+							<span style={{ color: inputRefColor(ref) }}>
+								{description ? <Tip content={description}>{label}</Tip> : label}
+							</span>
+							<span className="text-slate-400">{(upstreamSlots[i] ?? 0).toFixed(2)}</span>
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);

@@ -47,6 +47,23 @@ describe("EdgeGroupList", () => {
 		const members = screen.getAllByTestId("edge-group-member");
 		expect(members).toHaveLength(7);
 		expect(members[0]).toHaveTextContent("cell N → Move[NE] own=0.250 genomic=0.750");
+		fireEvent.mouseEnter(screen.getAllByText(/own=0\.250/)[0] as HTMLElement);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(
+			"scale × pattern + correction0.500 × 1.00 + 0.250 = 0.750",
+		);
+	});
+
+	it("explains the offset and the members glyphs in tooltips, outside the toggle", () => {
+		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} graphWeights={null} />);
+		const toggle = screen.getByRole("button");
+		const offset = screen.getByText("offset 1");
+		expect(toggle).not.toContainElement(offset);
+		expect(offset).not.toHaveAttribute("title");
+		fireEvent.mouseEnter(offset);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/1 step clockwise/);
+		fireEvent.mouseLeave(offset);
+		fireEvent.focus(screen.getByTestId("edge-group-members"));
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/by ring cell/);
 	});
 
 	it("collapses and reopens a group's member rows, open by default", () => {
@@ -107,6 +124,8 @@ describe("EdgeGroupList", () => {
 		expect(members).toHaveLength(12);
 		expect(members.filter((m) => m.textContent?.includes("(zero pattern)"))).toHaveLength(1);
 		expect(members.some((m) => m.textContent?.includes("y:N → Move[E]"))).toBe(true);
+		fireEvent.mouseEnter(screen.getByText(/own=0\.125/));
+		expect(screen.getByTestId("tooltip")).toHaveTextContent("1.000 × 0.00 + 0.125 = 0.125");
 	});
 
 	it("renders nothing without groups", () => {

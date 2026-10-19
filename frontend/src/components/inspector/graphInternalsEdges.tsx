@@ -1,10 +1,98 @@
 import { type EdgeProps, getBezierPath } from "@xyflow/react";
+import type { MouseEvent, PointerEvent } from "react";
+import { TipBubble, useTipAnchor } from "../config-panel/shared/Tooltip.tsx";
+import { plasticityDetail } from "./PlasticEdgeList.tsx";
+import { composeTerms } from "./edgeGroupWeights.ts";
+import type { GraphModelEdge } from "./graphFullModel.ts";
+
+/** An edge's tooltip facts: its endpoints' labels and the model's weights. */
+export interface EdgeTip extends Pick<GraphModelEdge, "weight" | "own" | "member" | "plastic"> {
+	source: string;
+	target: string;
+}
 
 export interface WeightEdgeData extends Record<string, unknown> {
 	/** `null` when the edge's weight in force is unavailable. */
 	weight: number | null;
 	opacity: number;
 	tint?: { r: number; g: number; b: number };
+	tip?: EdgeTip;
+}
+
+/** A plastic edge's weights: genomic, and applied when the payload carries it. */
+function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
+	const genomic = `genomic ${plastic.genomic.toFixed(3)}`;
+	if (plastic.applied === undefined) return `${genomic} · applied unavailable`;
+	return `${genomic} · applied ${plastic.applied.toFixed(3)}${
+		plastic.learned === undefined ? " (not initialized)" : ""
+	}`;
+}
+
+/** The tooltip body: endpoints, then a member's composition and a plastic edge's learning. */
+function EdgeTipContent({ tip }: { tip: EdgeTip }) {
+	const line = "block";
+	return (
+		<>
+			<span className={`${line} font-mono text-slate-100`}>
+				{tip.source} → {tip.target}
+			</span>
+			{tip.member ? (
+				<>
+					<span className={`${line} text-slate-400`}>
+						group #{tip.member.group} member: scale × pattern + correction
+					</span>
+					<span className={`${line} font-mono`}>
+						{composeTerms(tip.own, tip.member.scale, tip.member.pattern)}
+					</span>
+				</>
+			) : null}
+			{tip.plastic ? (
+				<>
+					<span className={`${line} font-mono`}>{plasticWeights(tip.plastic)}</span>
+					{plasticityDetail(tip.plastic.config).map((detail) => (
+						<span key={detail} className={`${line} text-slate-400`}>
+							{detail}
+						</span>
+					))}
+				</>
+			) : null}
+			{!tip.member && !tip.plastic ? (
+				<span className={`${line} font-mono`}>weight {tip.own.toFixed(3)}</span>
+			) : null}
+		</>
+	);
+}
+
+/**
+ * A wide invisible stroke along the edge that opens its tooltip at the
+ * pointer on hover or a tap. It sets its own pointer events: React Flow
+ * turns them off on an edge that is neither selectable nor clickable.
+ */
+function EdgeHit({ d, tip }: { d: string; tip: EdgeTip | undefined }) {
+	const { anchor, show, hide } = useTipAnchor();
+	if (tip === undefined) return null;
+	const open = (event: MouseEvent<SVGPathElement> | PointerEvent<SVGPathElement>) =>
+		show(new DOMRect(event.clientX, event.clientY, 0, 0));
+	return (
+		<>
+			<path
+				data-testid="edge-hit"
+				d={d}
+				fill="none"
+				stroke="transparent"
+				strokeWidth={10}
+				style={{ pointerEvents: "stroke", cursor: "help" }}
+				onMouseEnter={open}
+				onMouseLeave={hide}
+				onPointerDown={open}
+			/>
+			{anchor ? (
+				<TipBubble anchor={anchor}>
+					<EdgeTipContent tip={tip} />
+				</TipBubble>
+			) : null}
+		</>
+	);
 }
 
 /** The edge's weight label: `n/a` when unavailable, none at the unit weight. */
@@ -51,6 +139,7 @@ export function WeightEdge({
 				markerEnd={markerEnd as string}
 				style={style}
 			/>
+			<EdgeHit d={edgePath} tip={edgeData?.tip} />
 			{label !== null ? (
 				<text
 					x={labelX}
@@ -120,6 +209,7 @@ export function BackwardWeightEdge({
 				markerEnd={markerEnd as string}
 				style={{ stroke: strokeColor }}
 			/>
+			<EdgeHit d={edgePath} tip={edgeData?.tip} />
 			{label !== null ? (
 				<text
 					x={labelX}

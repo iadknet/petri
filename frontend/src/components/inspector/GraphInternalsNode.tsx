@@ -1,11 +1,12 @@
 import { Handle, type NodeProps, Position } from "@xyflow/react";
 import { memo } from "react";
+import { useTipTrigger } from "../config-panel/shared/Tooltip.tsx";
 import type { NodeCategory } from "./graphNodeCategories.ts";
 
 export interface GraphInternalsNodeData extends Record<string, unknown> {
 	index: number;
 	kindLabel: string;
-	/** Native tooltip: the full label and what the node does. */
+	/** The tooltip's explanation under the full label: what the node does. */
 	description?: string;
 	subtitle?: string;
 	category: NodeCategory;
@@ -56,11 +57,17 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 	const isDashed = data.category === "constant";
 	const isStateful = data.category === "stateful";
 	const hasRouteTargets = data.routeTargets && data.routeTargets.length > 0;
+	const { triggerProps, tip } = useTipTrigger();
 
+	// React Flow turns pointer events off on a node that is neither selectable
+	// nor draggable; the content opts back in so hover opens its tooltip.
 	return (
 		<div
-			title={data.description ? `${data.kindLabel}\n${data.description}` : data.kindLabel}
-			className={`flex flex-col justify-center h-full rounded px-1.5 text-[9px] font-mono leading-none transition-all ${
+			data-testid="graph-node"
+			// biome-ignore lint/a11y/noNoninteractiveTabindex: focus opens the node's tooltip
+			tabIndex={0}
+			{...triggerProps}
+			className={`pointer-events-auto flex cursor-help focus-visible:outline-1 focus-visible:outline-sky-400 flex-col justify-center h-full rounded px-1.5 text-[9px] font-mono leading-none transition-all ${
 				data.isLive ? "" : "opacity-35"
 			}`}
 			style={{
@@ -151,6 +158,12 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 					))}
 				</div>
 			) : null}
+			{tip(
+				<>
+					<span className="block font-mono text-slate-100">{data.kindLabel}</span>{" "}
+					{data.description ? <span className="block">{data.description}</span> : null}
+				</>,
+			)}
 		</div>
 	);
 });

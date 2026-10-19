@@ -795,6 +795,6 @@ describe("ConfigPanel", () => {
 		const [help] = screen.getAllByRole("button", { name: "About this setting" });
 		fireEvent.mouseEnter(help!);
 		fireEvent.click(help!);
-		expect(screen.getByTestId("config-tooltip")).toBeInTheDocument();
+		expect(screen.getByTestId("tooltip")).toBeInTheDocument();
 	});
 });
