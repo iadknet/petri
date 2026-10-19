@@ -819,6 +819,30 @@ fn a_non_learning_graph_allocates_no_learned_state() {
         .has_learning());
 }
 
+/// Learned-state equality is the learned slots: two births of one genome
+/// are equal, and a visit that moves a weight makes them differ.
+#[test]
+fn learned_states_differ_once_a_visit_moves_a_learned_weight() {
+    let def = graph(HebbianRule::Classic, 1.0, 0.5);
+    let untouched = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
+    let mut visited = GraphRuntimeState::for_genome(&genome(&def), Vec::new());
+    assert_eq!(untouched.learned(), visited.learned());
+    begin(&mut visited);
+    visit(
+        &def,
+        &mut visited,
+        1.0,
+        &mut 100.0,
+        &RuntimeConfig::default(),
+    );
+    assert!(learned_at(&visited, 0).is_some());
+    assert_ne!(untouched.learned(), visited.learned());
+    assert_ne!(
+        visited.learned(),
+        &crate::runtime::plasticity::LearnedState::default()
+    );
+}
+
 /// A pure Hebbian sink edge with `learning_rate` `eta` and clamp 10.
 fn hebbian_sink(eta: f32) -> PlasticityConfig {
     PlasticityConfig {

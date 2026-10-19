@@ -221,3 +221,45 @@ fn carriers_count_creatures_not_edges() {
     assert_eq!(census.edges[HEBBIAN][COMPUTE].edges, 4);
     assert_eq!(census.edges_by_inheritance, [0, 4]);
 }
+
+/// The keyed readers the telemetry export walks name every cell, rule and
+/// inheritance in key order with its own count, and the surface totals sum
+/// both pathways of each surface.
+#[test]
+fn the_keyed_readers_carry_every_count_under_its_key() {
+    let cell = |edges, drift_sum, at_clamp| PlasticEdges {
+        edges,
+        drift_sum,
+        at_clamp,
+    };
+    let census = PlasticityCensus {
+        creatures: 4,
+        carriers: 3,
+        edges: [
+            [cell(1, 0.5, 2), cell(2, 0.25, 3)],
+            [cell(3, 0.125, 5), cell(4, 2.0, 7)],
+        ],
+        edges_by_rule: [11, 12, 13, 14],
+        edges_by_inheritance: [21, 22],
+    };
+
+    let cells: Vec<_> = census.cells().collect();
+    assert_eq!(
+        cells,
+        vec![
+            ("hebbian", "compute", cell(1, 0.5, 2)),
+            ("hebbian", "sink", cell(2, 0.25, 3)),
+            ("reward_modulated", "compute", cell(3, 0.125, 5)),
+            ("reward_modulated", "sink", cell(4, 2.0, 7)),
+        ]
+    );
+    let rules: Vec<_> = census.rule_counts().collect();
+    let expected: Vec<_> = RULES.iter().map(|&rule| rule_key(rule)).zip(11..).collect();
+    assert_eq!(rules, expected);
+    assert_eq!(rules.len(), 4);
+    let inheritance: Vec<_> = census.inheritance_counts().collect();
+    assert_eq!(inheritance, vec![("darwinian", 21), ("lamarckian", 22)]);
+    // Every term is exact in binary.
+    let totals: Vec<_> = census.surface_totals().collect();
+    assert_eq!(totals, vec![("compute", 0.625, 7), ("sink", 2.25, 10)]);
+}
