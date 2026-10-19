@@ -4,6 +4,7 @@ import type {
 	GraphEdge,
 	GraphSource,
 	InputReference,
+	Membership,
 	OutputSinkKind,
 	PlasticityConfig,
 	Scope,
@@ -56,12 +57,20 @@ export interface GraphModelEdge {
 	plastic?: PlasticFacts;
 }
 
-export interface MemberComposition {
+/**
+ * How a member learns when plastic (T25.F07): its scope and its group's
+ * `inherit_scale`, which governs a group learner's inheritance in place of
+ * its inert `lamarckian` flag.
+ */
+export interface MemberLearning {
+	scope: Scope;
+	inheritScale: boolean;
+}
+
+export interface MemberComposition extends MemberLearning {
 	group: number;
 	scale: number;
 	pattern: number;
-	/** How the member learns when plastic (T25.F07). */
-	scope: Scope;
 	/** The weight in force, when the payload carries it; else unavailable. */
 	applied?: number;
 }
@@ -71,8 +80,10 @@ export interface PlasticFacts {
 	genomic: number;
 	/** The weight in force, when the payload carries it. */
 	applied?: number;
-	/** The learned weight, once the edge is initialized. */
+	/** The learned own quantity, once initialized; never for a group-scope member. */
 	learned?: number;
+	/** Whether the learner is initialized, as `learnerInitialized`. */
+	initialized: boolean;
 }
 
 /** The field a non-leaf member reads: none (v3-core's `u16::MAX`). */
@@ -166,12 +177,37 @@ export function edgeWeightLookup(
 	return (surface, container, edge) => weights.get(`${surface}:${container}:${edge}`);
 }
 
+/** A lookup of each group's learned scale in `graph_weights`; absent for an uninitialized scale slot. */
+export function learnedScaleLookup(
+	graphWeights: NodeGraphWeights | null,
+): (group: number) => number | undefined {
+	const learned = new Map(
+		(graphWeights?.scales ?? []).map((scale) => [scale.group, scale.learned]),
+	);
+	return (group) => learned.get(group);
+}
+
+/**
+ * Whether a learner is initialized (T25.F07): a group-scope member stores no
+ * own quantity, so it is by its group's scale slot; any other learner by its own.
+ */
+export function learnerInitialized(
+	membership: Membership | undefined,
+	entry: EdgeGenomicWeight | undefined,
+	learnedScale: (group: number) => number | undefined,
+): boolean {
+	return membership?.scope === "Group"
+		? learnedScale(membership.group) !== undefined
+		: entry?.learned !== undefined;
+}
+
 export function buildFullGraphModel(
 	graphDef: GraphBackendDef,
 	inputRefs: InputReference[],
 	graphWeights: NodeGraphWeights | null = null,
 ): FullGraphModel {
 	const weightEntry = edgeWeightLookup(graphWeights);
+	const learnedScale = learnedScaleLookup(graphWeights);
 	const factsOf =
 		(surface: "compute" | "sink", container: number, sink?: OutputSinkKind) =>
 		(edge: GraphEdge, index: number): EdgeFacts => {
@@ -191,6 +227,7 @@ export function buildFullGraphModel(
 								sinkDirection(sink),
 							),
 							scope: edge.membership.scope,
+							inheritScale: group.inherit_scale,
 							...applied,
 						}
 					: undefined;
@@ -200,6 +237,7 @@ export function buildFullGraphModel(
 						genomic: entry?.genomic ?? edge.own_weight,
 						...applied,
 						...(entry?.learned === undefined ? {} : { learned: entry.learned }),
+						initialized: learnerInitialized(edge.membership, entry, learnedScale),
 					}
 				: undefined;
 			// A listed edge is drawn at the weight in force (T25.F06, T25.F07);

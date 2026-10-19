@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Position } from "@xyflow/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
+import type { GraphBackendDef } from "../../types/genome.ts";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import {
@@ -51,7 +52,7 @@ describe("graph edge tooltips", () => {
 			target: "Move[NE]",
 			weight: 0.75,
 			own: 0.25,
-			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge" },
+			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge", inheritScale: false },
 		});
 		expect(tip).toHaveTextContent("group #2 member");
 		expect(tip).toHaveTextContent("scale × pattern + correction");
@@ -76,6 +77,7 @@ describe("graph edge tooltips", () => {
 					},
 					genomic: 1.5,
 					applied: 1.25,
+					initialized: false,
 				},
 			},
 			BackwardWeightEdge,
@@ -95,10 +97,59 @@ describe("graph edge tooltips", () => {
 			plastic: {
 				config: { rule: "Oja", learning_rate: 0.1, weight_clamp: 2, lamarckian: false },
 				genomic: 1.5,
+				initialized: false,
 			},
 		});
 		expect(tip).toHaveTextContent("genomic 1.500 · applied unavailable");
 		expect(tip).toHaveTextContent("Hebbian");
+	});
+
+	it("shows an initialized group learner's scope and scale inheritance", () => {
+		const graphDef: GraphBackendDef = {
+			compute_nodes: [],
+			output_sinks: [
+				{
+					kind: { ActionVote: { Move: 1 } },
+					inputs: [
+						{
+							source: { InputLeaf: { ref_idx: 1, sub_idx: 0 } },
+							own_weight: 0.25,
+							plasticity: { rule: "Oja", learning_rate: 0.1, weight_clamp: 2, lamarckian: true },
+							membership: { group: 0, scope: "Group" },
+						},
+					],
+				},
+			],
+			groups: [
+				{
+					shape: { Ring: { ring_ref: 1 } },
+					kind: "Move",
+					offset: 1,
+					scale: 0.5,
+					inherit_scale: false,
+				},
+			],
+		};
+		const model = buildFullGraphModel(
+			graphDef,
+			[{ World: "FoodHere" }, { World: "NeighborBarrierRing" }],
+			{
+				node_id: 0,
+				scales: [{ group: 0, genomic: 0.5, learned: 0.8 }],
+				edges: [{ surface: "sink", container: 0, edge: 0, genomic: 0.25, applied: 1.05 }],
+			},
+		);
+		const edge = model.edges.find((candidate) => candidate.id === "sink:0:0");
+		expect(edge?.plastic?.initialized).toBe(true);
+		expect(edge?.plastic?.learned).toBeUndefined();
+		expect(edge?.member?.inheritScale).toBe(false);
+		if (edge === undefined) throw new Error("the member is drawn");
+		const tip = hover({ ...edge, source: "OccRing.N", target: "Move[NE]" });
+		expect(tip).toHaveTextContent("genomic 0.250 · applied 1.050");
+		expect(tip).not.toHaveTextContent("not initialized");
+		expect(tip).toHaveTextContent(/shared scale/);
+		expect(tip).toHaveTextContent(/genomic scale/);
+		expect(tip).not.toHaveTextContent(/inherit the learned weight/);
 	});
 
 	it("closes when the pointer leaves", () => {

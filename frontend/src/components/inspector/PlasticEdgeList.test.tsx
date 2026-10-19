@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { GraphBackendDef, PlasticityConfig } from "../../types/genome.ts";
+import type { GraphBackendDef, InputReference, PlasticityConfig } from "../../types/genome.ts";
 import {
 	PlasticEdgeList,
 	collectPlasticEdges,
@@ -62,6 +62,44 @@ const weights: NodeGraphWeights = {
 	],
 };
 
+const refs: InputReference[] = [{ World: "FoodHere" }, { World: "NeighborBarrierRing" }];
+
+/** A ring group's one member on `Move[1]`, a group-scope learner. */
+function groupLearner(lamarckian: boolean, inheritScale: boolean): GraphBackendDef {
+	return {
+		compute_nodes: [],
+		output_sinks: [
+			{
+				kind: { ActionVote: { Move: 1 } },
+				inputs: [
+					{
+						source: { InputLeaf: { ref_idx: 1, sub_idx: 0 } },
+						own_weight: 0.25,
+						plasticity: { ...hebbian, lamarckian },
+						membership: { group: 0, scope: "Group" },
+					},
+				],
+			},
+		],
+		groups: [
+			{
+				shape: { Ring: { ring_ref: 1 } },
+				kind: "Move",
+				offset: 1,
+				scale: 0.5,
+				inherit_scale: inheritScale,
+			},
+		],
+	};
+}
+
+/** The group learner's payload: no own quantity, the scale slot uninitialized. */
+const groupWeights: NodeGraphWeights = {
+	node_id: 0,
+	scales: [{ group: 0, genomic: 0.5 }],
+	edges: [{ surface: "sink", container: 0, edge: 0, genomic: 0.25, applied: 0.75 }],
+};
+
 describe("PlasticEdgeList", () => {
 	it("names each edge's rule, pathway, trace decay and inheritance", () => {
 		expect(plasticityBadge(hebbian)).toBe("Oja · hebbian · darwinian");
@@ -71,10 +109,66 @@ describe("PlasticEdgeList", () => {
 	});
 
 	it("names a member's scope in the badge and its tooltip", () => {
-		expect(plasticityBadge(hebbian, "Group")).toBe("Oja · hebbian · darwinian · group scope");
-		expect(plasticityBadge(hebbian, "Edge")).toBe("Oja · hebbian · darwinian · edge scope");
-		expect(plasticityDetail(hebbian, "Group")[0]).toMatch(/shared scale/);
+		const group = { scope: "Group", inheritScale: false } as const;
+		const edge = { scope: "Edge", inheritScale: false } as const;
+		expect(plasticityBadge(hebbian, group)).toBe("Oja · hebbian · darwinian · group scope");
+		expect(plasticityBadge(hebbian, edge)).toBe("Oja · hebbian · darwinian · edge scope");
+		expect(plasticityDetail(hebbian, group)[0]).toMatch(/shared scale/);
 		expect(plasticityDetail(hebbian)).toHaveLength(3);
+	});
+
+	it("explains a group learner's inheritance by inherit_scale, not its lamarckian flag", () => {
+		const lamarckian = { ...hebbian, lamarckian: true };
+		const darwinianScale = { scope: "Group", inheritScale: false } as const;
+		expect(plasticityBadge(lamarckian, darwinianScale)).toBe(
+			"Oja · hebbian · darwinian · group scope",
+		);
+		const detail = plasticityDetail(lamarckian, darwinianScale);
+		expect(detail.at(-1)).toMatch(/genomic scale/);
+		expect(detail.at(-1)).toMatch(/Lamarckian flag is inert/);
+		expect(detail.join(" ")).not.toMatch(/inherit the learned weight/);
+		const inheritedScale = { scope: "Group", inheritScale: true } as const;
+		expect(plasticityBadge(hebbian, inheritedScale)).toBe(
+			"Oja · hebbian · lamarckian · group scope",
+		);
+		expect(plasticityDetail(hebbian, inheritedScale).at(-1)).toMatch(/learned scale/);
+		// An edge learner keeps its own flag.
+		expect(plasticityBadge(lamarckian, { scope: "Edge", inheritScale: false })).toBe(
+			"Oja · hebbian · lamarckian · edge scope",
+		);
+	});
+
+	it("infers a group learner's initialization from its group's learned scale", () => {
+		const scales = [{ group: 0, genomic: 0.5, learned: 0.8 }];
+		const learned = { ...groupWeights, scales };
+		const [row] = collectPlasticEdges(groupLearner(true, false), refs, learned);
+		expect(row?.initialized).toBe(true);
+		expect(row?.learned).toBeUndefined();
+		render(
+			<PlasticEdgeList
+				graphDef={groupLearner(true, false)}
+				inputRefs={refs}
+				graphWeights={learned}
+			/>,
+		);
+		expect(screen.getByTestId("plastic-edge")).not.toHaveTextContent("not initialized");
+		const badge = screen.getByTestId("plasticity-badge");
+		expect(badge).toHaveTextContent("darwinian · group scope");
+		fireEvent.mouseEnter(badge);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/genomic scale/);
+	});
+
+	it("marks a group learner uninitialized while its scale slot is", () => {
+		const [row] = collectPlasticEdges(groupLearner(true, false), refs, groupWeights);
+		expect(row?.initialized).toBe(false);
+		render(
+			<PlasticEdgeList
+				graphDef={groupLearner(true, false)}
+				inputRefs={refs}
+				graphWeights={groupWeights}
+			/>,
+		);
+		expect(screen.getByTestId("plastic-edge")).toHaveTextContent("not initialized");
 	});
 
 	it("spells out every learning attribute for the badge's tooltip", () => {
@@ -154,6 +248,7 @@ describe("PlasticEdgeList", () => {
 			genomic: 1.5,
 			applied: 1.25,
 			learned: 1.25,
+			initialized: true,
 		});
 		expect(sinkEdge?.own).toBe(1.5);
 		expect(model.edges.find((edge) => edge.id === "sink:0:1")?.plastic).toBeUndefined();
@@ -161,6 +256,7 @@ describe("PlasticEdgeList", () => {
 		expect(withoutPayload.edges.find((edge) => edge.id === "sink:0:0")?.plastic).toEqual({
 			config: rewarded,
 			genomic: 1.5,
+			initialized: false,
 		});
 	});
 

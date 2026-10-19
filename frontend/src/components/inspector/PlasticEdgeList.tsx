@@ -4,11 +4,15 @@ import type {
 	GraphEdge,
 	InputReference,
 	PlasticityConfig,
-	Scope,
 } from "../../types/genome.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { scopeLabel } from "./edgeGroupWeights.ts";
-import { edgeWeightLookup } from "./graphFullModel.ts";
+import {
+	type MemberLearning,
+	edgeWeightLookup,
+	learnedScaleLookup,
+	learnerInitialized,
+} from "./graphFullModel.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
 interface PlasticEdgeListProps {
@@ -27,34 +31,57 @@ export interface PlasticEdgeRow {
 	/** What the edge reads. */
 	source: string;
 	config: PlasticityConfig;
-	/** A member's scope (T25.F07); absent for an ungrouped edge. */
-	scope: Scope | undefined;
+	/** A member's scope and its group's `inherit_scale` (T25.F07); absent for an ungrouped edge. */
+	member: MemberLearning | undefined;
 	genomic: number;
 	/** The weight in force, when the payload carries it. */
 	applied: number | undefined;
 	/** The learned own quantity, once initialized; never for a group-scope member. */
 	learned: number | undefined;
+	/** Whether the learner is initialized, as `learnerInitialized`. */
+	initialized: boolean;
+}
+
+/**
+ * Whether offspring inherit the learned state: at group scope the group's
+ * `inherit_scale`, the edge's `lamarckian` flag being inert (T25.F07).
+ */
+function inheritsLearned(config: PlasticityConfig, member?: MemberLearning): boolean {
+	return member?.scope === "Group" ? member.inheritScale : config.lamarckian;
 }
 
 /**
  * The per-edge plasticity badge: rule, pathway, trace decay and inheritance
  * (T25.F06), and a member's scope (T25.F07).
  */
-export function plasticityBadge(config: PlasticityConfig, scope?: Scope): string {
+export function plasticityBadge(config: PlasticityConfig, member?: MemberLearning): string {
 	const pathway = config.modulation
 		? `reward ${config.modulation.reward_source} · decay ${config.modulation.trace_decay.toFixed(2)}`
 		: "hebbian";
-	const badge = `${config.rule} · ${pathway} · ${config.lamarckian ? "lamarckian" : "darwinian"}`;
-	return scope === undefined ? badge : `${badge} · ${scopeLabel(scope)}`;
+	const inheritance = inheritsLearned(config, member) ? "lamarckian" : "darwinian";
+	const badge = `${config.rule} · ${pathway} · ${inheritance}`;
+	return member === undefined ? badge : `${badge} · ${scopeLabel(member.scope)}`;
+}
+
+/** The inheritance sentence: a group learner's follows its group's `inherit_scale`. */
+function inheritanceDetail(config: PlasticityConfig, member?: MemberLearning): string {
+	if (member?.scope === "Group") {
+		return member.inheritScale
+			? "Inherits the scale: offspring start from the group's learned scale (the Lamarckian flag is inert at group scope)."
+			: "Darwinian scale: offspring start from the group's genomic scale (the Lamarckian flag is inert at group scope).";
+	}
+	return config.lamarckian
+		? "Lamarckian: offspring inherit the learned weight."
+		: "Darwinian: offspring start from the genomic weight.";
 }
 
 /** The badge spelled out, one sentence per attribute, for its tooltip. */
-export function plasticityDetail(config: PlasticityConfig, scope?: Scope): string[] {
+export function plasticityDetail(config: PlasticityConfig, member?: MemberLearning): string[] {
 	const scoped =
-		scope === undefined
+		member === undefined
 			? []
 			: [
-					scope === "Group"
+					member.scope === "Group"
 						? "Group scope: learns for its group, moving the group's shared scale."
 						: "Edge scope: learns its own correction on top of the group term.",
 				];
@@ -64,17 +91,18 @@ export function plasticityDetail(config: PlasticityConfig, scope?: Scope): strin
 		config.modulation
 			? `Reward-modulated by ${config.modulation.reward_source}; its eligibility trace keeps ${config.modulation.trace_decay.toFixed(2)} of itself each tick.`
 			: "Hebbian: learns from co-activity alone.",
-		config.lamarckian
-			? "Lamarckian: offspring inherit the learned weight."
-			: "Darwinian: offspring start from the genomic weight.",
+		inheritanceDetail(config, member),
 	];
 }
 
 /** The badge with its spelled-out attributes in a tooltip. */
-export function PlasticityBadge({ config, scope }: { config: PlasticityConfig; scope?: Scope }) {
+export function PlasticityBadge({
+	config,
+	member,
+}: { config: PlasticityConfig; member?: MemberLearning }) {
 	return (
 		<Tip
-			content={plasticityDetail(config, scope).map((line) => (
+			content={plasticityDetail(config, member).map((line) => (
 				<span key={line} className="block">
 					{line}
 				</span>
@@ -82,7 +110,7 @@ export function PlasticityBadge({ config, scope }: { config: PlasticityConfig; s
 			plain
 			className="rounded bg-violet-500/15 px-1 text-violet-200"
 		>
-			<span data-testid="plasticity-badge">{plasticityBadge(config, scope)}</span>
+			<span data-testid="plasticity-badge">{plasticityBadge(config, member)}</span>
 		</Tip>
 	);
 }
@@ -94,6 +122,7 @@ export function collectPlasticEdges(
 	graphWeights: NodeGraphWeights | null,
 ): PlasticEdgeRow[] {
 	const weightEntry = edgeWeightLookup(graphWeights);
+	const learnedScale = learnedScaleLookup(graphWeights);
 	const rows: PlasticEdgeRow[] = [];
 	const visit = (
 		surface: "compute" | "sink",
@@ -111,10 +140,14 @@ export function collectPlasticEdges(
 				target,
 				source: describeGraphSource(edge.source, inputRefs).label,
 				config: edge.plasticity,
-				scope: edge.membership?.scope,
+				member: edge.membership && {
+					scope: edge.membership.scope,
+					inheritScale: graphDef.groups?.[edge.membership.group]?.inherit_scale ?? false,
+				},
 				genomic: entry?.genomic ?? edge.own_weight,
 				applied: entry?.applied,
 				learned: entry?.learned,
+				initialized: learnerInitialized(edge.membership, entry, learnedScale),
 			});
 		});
 	};
@@ -132,7 +165,7 @@ function rowWeights(row: PlasticEdgeRow): string {
 	const genomic = `genomic=${row.genomic.toFixed(3)}`;
 	if (row.applied === undefined) return `${genomic} applied=unavailable`;
 	return `${genomic} applied=${row.applied.toFixed(3)}${
-		row.learned === undefined ? " (not initialized)" : ""
+		row.initialized ? "" : " (not initialized)"
 	}`;
 }
 
@@ -159,7 +192,7 @@ export function PlasticEdgeList({ graphDef, inputRefs, graphWeights }: PlasticEd
 						<span>
 							{row.source} → {row.target}
 						</span>
-						<PlasticityBadge config={row.config} scope={row.scope} />
+						<PlasticityBadge config={row.config} member={row.member} />
 						<span className="text-slate-400">{rowWeights(row)}</span>
 					</li>
 				))}

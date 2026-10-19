@@ -9,9 +9,7 @@ use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-use crate::mutation::engine::{
-    graph_operator_key, input_ref_operator_key, topology_operator_key, vm_operator_key,
-};
+use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSets;
@@ -47,7 +45,7 @@ impl ProductionEvent {
     pub fn operator(self) -> MutationOperator {
         match self {
             Self::Topology(op) => topology_operator_key(op),
-            Self::Graph(op) => graph_operator_key(op),
+            Self::Graph(op) => op.operator(),
             Self::Vm(op) => vm_operator_key(op),
             Self::InputRef(op) => input_ref_operator_key(op),
         }

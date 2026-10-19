@@ -72,7 +72,13 @@ describe("buildFullGraphModel edge-group members", () => {
 		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
 		expect(member?.own).toBe(0);
-		expect(member?.member).toEqual({ group: 0, scale: 0.5, pattern: 1, scope: "Edge" });
+		expect(member?.member).toEqual({
+			group: 0,
+			scale: 0.5,
+			pattern: 1,
+			scope: "Edge",
+			inheritScale: false,
+		});
 		expect(model.edges.find((edge) => edge.id === "sink:0:0")?.member).toBeUndefined();
 	});
 

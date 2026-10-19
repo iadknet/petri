@@ -12,7 +12,7 @@ use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
-    BirthEdgeClass, MutationSkipReason, RefinementKey, TargetReachability,
+    BirthEdgeClass, MutationOperator, MutationSkipReason, RefinementKey, TargetReachability,
 };
 
 /// What an applied Graph event reports beside its reachability.
@@ -155,42 +155,49 @@ impl GraphOperator {
         sum
     };
 
-    /// Whether this operator increases, decreases, or preserves genome complexity.
+    /// The engine's operator key for this operator: the one table every
+    /// per-operator classification of a Graph operator reads.
+    #[must_use]
+    pub const fn operator(self) -> MutationOperator {
+        match self {
+            Self::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
+            Self::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
+            Self::MutateGraphOperatorParam => MutationOperator::GraphMutateGraphOperatorParam,
+            Self::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
+            Self::RemoveInternalGraphNode => MutationOperator::GraphRemoveInternalGraphNode,
+            Self::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
+            Self::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
+            Self::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
+            Self::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
+            Self::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
+            Self::CopySubgraph => MutationOperator::GraphCopySubgraph,
+            Self::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
+            Self::EnableHebbian => MutationOperator::GraphEnableHebbian,
+            Self::DisableHebbian => MutationOperator::GraphDisableHebbian,
+            Self::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
+            Self::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
+            Self::ToggleHebbianLamarckian => MutationOperator::GraphToggleHebbianLamarckian,
+            Self::EnableRewardModulation => MutationOperator::GraphEnableRewardModulation,
+            Self::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
+            Self::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
+            Self::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
+            Self::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
+            Self::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
+            Self::AddRingGroup => MutationOperator::GraphAddRingGroup,
+            Self::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
+            Self::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
+            Self::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
+            Self::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
+            Self::RemoveGroup => MutationOperator::GraphRemoveGroup,
+            Self::SetScope => MutationOperator::GraphSetScope,
+        }
+    }
+
+    /// Whether this operator increases, decreases, or preserves genome
+    /// complexity, as its [`MutationOperator`] classifies it.
     #[must_use]
     pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        use crate::mutation::types::ComplexityEffect;
-        match self {
-            Self::AddInternalGraphNode
-            | Self::AddGraphEdge
-            | Self::CopyInternalNode
-            | Self::CopySubgraph
-            | Self::CopyEdgeBundle
-            | Self::EnableHebbian
-            | Self::EnableRewardModulation
-            | Self::RecruitNeutralInput
-            | Self::AddRingGroup
-            | Self::AddDirectionPairGroup => ComplexityEffect::Increasing,
-            Self::RemoveInternalGraphNode
-            | Self::RemoveGraphEdge
-            | Self::RemoveGroup
-            | Self::DisableHebbian
-            | Self::DisableRewardModulation => ComplexityEffect::Decreasing,
-            Self::AlterGraphEdgeWeight
-            | Self::RefineHeritableStructure
-            | Self::SwapGraphOperator
-            | Self::MutateGraphOperatorParam
-            | Self::RetargetGraphEdge
-            | Self::GraphRawFieldMutation
-            | Self::MutateHebbianRule
-            | Self::MutateHebbianRate
-            | Self::ToggleHebbianLamarckian
-            | Self::MutateRewardSource
-            | Self::MutateTraceDecay
-            | Self::AlterGroupScale
-            | Self::ShiftGroupOffset
-            | Self::RetargetGroupKind
-            | Self::SetScope => ComplexityEffect::Neutral,
-        }
+        self.operator().complexity_effect()
     }
 
     /// Whether configuration admits this operator before any sampling.
@@ -446,19 +453,20 @@ impl GraphMutator {
                     .ok_or(MutationSkipReason::NoApplicableTarget)?;
                 group::add_pair(node, rng)
             }
-            GraphOperator::AlterGroupScale
-            | GraphOperator::ShiftGroupOffset
-            | GraphOperator::RetargetGroupKind
-            | GraphOperator::RemoveGroup
-            | GraphOperator::SetScope => {
-                let def = operators::graph_def_mut(genome, node_idx)?;
-                match op {
-                    GraphOperator::AlterGroupScale => group::alter_scale(def, rng),
-                    GraphOperator::ShiftGroupOffset => group::shift_offset(def, rng),
-                    GraphOperator::RetargetGroupKind => group::retarget_kind(def, rng),
-                    GraphOperator::SetScope => hebbian::set_scope_in_def(def, rng),
-                    _ => group::remove(def, rng),
-                }
+            GraphOperator::AlterGroupScale => {
+                group::alter_scale(operators::graph_def_mut(genome, node_idx)?, rng)
+            }
+            GraphOperator::ShiftGroupOffset => {
+                group::shift_offset(operators::graph_def_mut(genome, node_idx)?, rng)
+            }
+            GraphOperator::RetargetGroupKind => {
+                group::retarget_kind(operators::graph_def_mut(genome, node_idx)?, rng)
+            }
+            GraphOperator::RemoveGroup => {
+                group::remove(operators::graph_def_mut(genome, node_idx)?, rng)
+            }
+            GraphOperator::SetScope => {
+                hebbian::set_scope_in_def(operators::graph_def_mut(genome, node_idx)?, rng)
             }
         }
     }

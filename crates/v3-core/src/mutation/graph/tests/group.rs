@@ -16,7 +16,6 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef,
 };
-use crate::mutation::engine::graph_operator_key;
 use crate::mutation::graph::{group, refinement, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
@@ -163,11 +162,11 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         ComplexityEffect::Neutral
     );
     assert_eq!(
-        graph_operator_key(GraphOperator::SetScope).as_key(),
+        GraphOperator::SetScope.operator().as_key(),
         "Graph.SetScope"
     );
     assert_eq!(
-        graph_operator_key(GraphOperator::SetScope).complexity_effect(),
+        GraphOperator::SetScope.operator().complexity_effect(),
         ComplexityEffect::Neutral
     );
     let weights = GROUP_OPERATORS.map(GraphOperator::weight);
@@ -183,7 +182,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .map(|op| u16::from(op.weight()))
         .sum();
     assert_eq!(default_arm, 60);
-    let keys = GROUP_OPERATORS.map(|op| graph_operator_key(op).as_key());
+    let keys = GROUP_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
         keys,
         [
@@ -215,7 +214,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
     for op in GROUP_OPERATORS {
         assert_eq!(
             op.complexity_effect(),
-            graph_operator_key(op).complexity_effect(),
+            op.operator().complexity_effect(),
             "{op:?}"
         );
         assert!(op.enabled(&MutationConfig::default()));
@@ -492,8 +491,9 @@ fn nearby() -> InputReference {
     InputReference::World(WorldInputKey::NearbyCreature)
 }
 
-/// Three draws in order — the pair over the flat list `(ref_idx ascending,
-/// pair ascending)`, the kind, the offset — and no further draw.
+/// The three shape draws in order — the pair over the flat list `(ref_idx
+/// ascending, pair ascending)`, the kind, the offset — then the learning
+/// draws `replay_learning` replays, and no further draw.
 #[test]
 fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() {
     let refs = vec![
