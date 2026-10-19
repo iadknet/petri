@@ -375,7 +375,6 @@ fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_gra
     grown.append_compute_node(crate::creature::genome::cgp::ComputeNode::new(
         crate::creature::genome::cgp::ComputeNodeKind::Add,
         Vec::new(),
-        None,
     ));
     let operator = MutationOperator::GraphAddInternalGraphNode;
 
@@ -1794,7 +1793,6 @@ proptest::proptest! {
 #[test]
 fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind};
-    use crate::simulation::actions::cgp_reproduction::capture_def_seeds;
     use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);
     let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
@@ -1809,7 +1807,6 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
             },
             0.5,
         )],
-        None,
     ));
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;
@@ -1819,7 +1816,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         let BackendDef::Graph(def) = &mut tracked.nodes[0].backend_def else {
             unreachable!()
         };
-        capture_def_seeds(def, &[Box::new([0.75])]);
+        def.seed_compute_rows(vec![vec![Some(0.75)]]);
         let mut plain_rng = rng(seed);
         let mut tracked_rng = rng(seed);
         let plain_summary = apply_events(&mut plain, &config, &[0], &mut plain_rng, 6);
@@ -1834,13 +1831,14 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         assert_eq!(plain_rng.next_u64(), tracked_rng.next_u64());
         for node in &tracked.nodes {
             if let BackendDef::Graph(def) = &node.backend_def {
-                if let Some(weights) = def
-                    .birth_seeds()
-                    .and_then(crate::creature::genome::cgp::BirthSeeds::rows)
-                {
-                    assert_eq!(weights.len(), def.compute_nodes().len());
-                    for (row, node) in weights.iter().zip(def.compute_nodes()) {
+                if let Some(seeds) = def.birth_seeds() {
+                    assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
+                    for (row, node) in seeds.compute_rows().iter().zip(def.compute_nodes()) {
                         assert_eq!(row.len(), node.inputs.len());
+                    }
+                    assert_eq!(seeds.sink_rows().len(), def.output_sinks().len());
+                    for (row, sink) in seeds.sink_rows().iter().zip(def.output_sinks()) {
+                        assert_eq!(row.len(), sink.inputs.len());
                     }
                 }
             }
@@ -1850,7 +1848,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
         unreachable!()
     };
-    capture_def_seeds(def, &[Box::new([0.75])]);
+    def.seed_compute_rows(vec![vec![Some(0.75)]]);
     let before = original.clone();
     assert_eq!(
         apply_graph_event(
@@ -1869,9 +1867,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         unreachable!()
     };
     assert_eq!(
-        def.birth_seeds(),
-        Some(&crate::creature::genome::cgp::BirthSeeds::Rows(vec![vec![
-            Some(0.75)
-        ]]))
+        def.birth_seeds().map(|seeds| seeds.compute_rows().to_vec()),
+        Some(vec![vec![Some(0.75)]])
     );
 }

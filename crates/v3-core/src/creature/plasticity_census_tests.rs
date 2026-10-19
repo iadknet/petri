@@ -5,10 +5,14 @@ use crate::config::FounderProfile;
 use crate::contracts::NodeId;
 use crate::creature::founder::founder_genome;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::cgp::test_support::plastic_node;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    validate_graph, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, GraphEdge,
+    GraphInvariantViolation, GraphSource, OutputSinkKind,
 };
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{NodeGenome, OutcomeChannel, RewardModulationConfig};
+use crate::creature::state::GraphRuntimeState;
 
 fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> PlasticityConfig {
     PlasticityConfig {
@@ -24,7 +28,7 @@ fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> Plast
 }
 
 fn node(plasticity: Option<PlasticityConfig>, weights: &[f32]) -> ComputeNode {
-    ComputeNode::new(
+    plastic_node(
         ComputeNodeKind::Add,
         weights
             .iter()
@@ -43,9 +47,7 @@ fn node(plasticity: Option<PlasticityConfig>, weights: &[f32]) -> ComputeNode {
     )
 }
 
-fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def = def.with_compute_nodes(compute_nodes);
+fn genome_of(def: CgpGraphBackendDef) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -57,61 +59,71 @@ fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
     }
 }
 
-/// Learned weights for a one-node genome, one slice per compute node.
-fn learned(per_compute_node: &[&[f32]]) -> Vec<Vec<Box<[f32]>>> {
-    vec![per_compute_node
-        .iter()
-        .map(|weights| weights.to_vec().into_boxed_slice())
-        .collect()]
+fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
+    genome_of(CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(compute_nodes))
+}
+
+/// The learned state of `genome` with its plastic slots of mesh node 0, in
+/// canonical order, set to `learned` (the backend visited), or unvisited
+/// when `learned` is `None`.
+fn learned_state(genome: &CreatureGenome, learned: Option<&[f32]>) -> GraphRuntimeState {
+    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
+    for (slot, &value) in learned.unwrap_or(&[]).iter().enumerate() {
+        state.learned.set_slot(0, slot, value, 0.0);
+    }
+    state
 }
 
 fn census_of(
     genome: &CreatureGenome,
     reachable: &[usize],
-    weights: &LearnedWeights,
+    learned: Option<&[f32]>,
 ) -> PlasticityCensus {
-    PlasticityCensus::observe([(genome, reachable, weights)])
+    let state = learned_state(genome, learned);
+    PlasticityCensus::observe([(genome, reachable, state.learned())])
 }
 
-fn kind(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> usize {
-    PlasticityKind {
-        rule,
-        reward_modulated,
-        lamarckian,
-    }
-    .index()
-}
+const HEBBIAN: usize = 0;
+const REWARD: usize = 1;
+const COMPUTE: usize = 0;
+const SINK: usize = 1;
 
 #[test]
-fn every_kind_sits_at_its_index_under_distinct_keys() {
-    let mut keys = BTreeSet::new();
-    for (i, kind) in PlasticityKind::ALL.iter().enumerate() {
-        assert_eq!(kind.index(), i);
-        keys.insert((kind.rule_key(), kind.learning_key(), kind.inheritance_key()));
+fn every_attribute_key_is_distinct() {
+    let rules: BTreeSet<_> = RULES.iter().map(|&rule| rule_key(rule)).collect();
+    assert_eq!(rules.len(), RULES.len());
+    for keys in [LEARNING_KEYS, SURFACE_KEYS, INHERITANCE_KEYS] {
+        assert_ne!(keys[0], keys[1]);
     }
-    assert_eq!(keys.len(), PlasticityKind::ALL.len());
+    for (index, &rule) in RULES.iter().enumerate() {
+        let kind = PlasticityKind::of(&plastic(rule, false, false));
+        assert_eq!(kind.rule_index(), index);
+    }
 }
 
 #[test]
 fn the_founder_carries_no_plasticity() {
     let genome = founder_genome(FounderProfile::default());
     let reachable = mesh_reachable_nodes(&genome);
-    let census = census_of(&genome, &reachable, &[]);
+    let census = census_of(&genome, &reachable, None);
     assert_eq!(census.creatures, 1);
     assert_eq!(census.carriers, 0);
-    assert!(census
-        .kinds
-        .iter()
-        .all(|row| *row == PlasticEdges::default()));
+    assert_eq!(
+        census,
+        PlasticityCensus {
+            creatures: 1,
+            ..PlasticityCensus::default()
+        }
+    );
 }
 
 #[test]
 fn drift_and_clamp_read_the_learned_weights() {
     let config = plastic(HebbianRule::Classic, false, false);
     let genome = graph_genome(vec![node(Some(config), &[0.5, -0.25, 1.0])]);
-    let census = census_of(&genome, &[0], &learned(&[&[0.75, -2.0, 1.0]]));
+    let census = census_of(&genome, &[0], Some(&[0.75, -2.0, 1.0]));
 
-    let row = census.kinds[kind(HebbianRule::Classic, false, false)];
+    let row = census.edges[HEBBIAN][COMPUTE];
     assert_eq!(census.carriers, 1);
     assert_eq!(row.edges, 3);
     // 0.25 + 1.75 + 0; every term is exact in binary.
@@ -119,34 +131,36 @@ fn drift_and_clamp_read_the_learned_weights() {
     assert_eq!(row.at_clamp, 1);
 }
 
+/// An uninitialized edge (its backend never visited, no seed) is counted
+/// but exposes no learned value: no drift and never at its clamp, even
+/// when its genomic weight is beyond the clamp.
 #[test]
-fn an_uninitialized_edge_reads_its_genome_weight() {
-    // Beyond the clamp in the genome, but never learned: no drift, not at clamp.
+fn an_uninitialized_edge_has_no_drift_and_is_never_at_its_clamp() {
     let config = plastic(HebbianRule::Classic, false, false);
     let genome = graph_genome(vec![node(Some(config), &[5.0])]);
-    for weights in [vec![], learned(&[&[]])] {
-        let census = census_of(&genome, &[0], &weights);
-        let row = census.kinds[kind(HebbianRule::Classic, false, false)];
-        assert_eq!((census.carriers, row.edges, row.at_clamp), (1, 1, 0));
-        assert_eq!(row.drift_sum, 0.0);
-    }
+    let census = census_of(&genome, &[0], None);
+    let row = census.edges[HEBBIAN][COMPUTE];
+    assert_eq!((census.carriers, row.edges, row.at_clamp), (1, 1, 0));
+    assert_eq!(row.drift_sum, 0.0);
 }
 
+/// The census reads the stored clamp, which I1 keeps in `[0.01, 10]`: a
+/// clamp beyond it is rejected at the load boundary instead of being
+/// normalized by the reader.
 #[test]
-fn the_clamp_is_the_runtime_clamp_not_the_genome_value() {
-    let mut config = plastic(HebbianRule::Oja, false, false);
-    config.weight_clamp = 50.0;
-    let genome = graph_genome(vec![node(Some(config), &[0.0, 0.0])]);
-    let census = census_of(&genome, &[0], &learned(&[&[-10.0, 9.0]]));
+fn an_out_of_range_clamp_is_rejected_at_the_load_boundary() {
+    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false}}]}],"output_sinks":[]}"#;
+    let def: CgpGraphBackendDef = serde_json::from_str(json).unwrap();
+    let node = genome_of(def).nodes.remove(0);
     assert_eq!(
-        census.kinds[kind(HebbianRule::Oja, false, false)].at_clamp,
-        1
+        validate_graph(&node),
+        Err(GraphInvariantViolation::PlasticityOutOfRange)
     );
 }
 
 #[test]
-fn edges_land_in_their_kind_and_plain_nodes_are_not_plastic() {
-    let genome = graph_genome(vec![
+fn edges_land_in_their_pathway_surface_rule_and_inheritance() {
+    let mut genome = graph_genome(vec![
         node(
             Some(plastic(HebbianRule::Covariance, true, true)),
             &[0.1, 0.2],
@@ -154,30 +168,37 @@ fn edges_land_in_their_kind_and_plain_nodes_are_not_plastic() {
         node(None, &[0.3, 0.4, 0.5]),
         node(Some(plastic(HebbianRule::Oja, false, false)), &[0.6]),
     ]);
-    let census = census_of(&genome, &[0], &[]);
-    let covariance = kind(HebbianRule::Covariance, true, true);
-    let oja = kind(HebbianRule::Oja, false, false);
+    let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+        unreachable!()
+    };
+    let vote = def
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+        .unwrap();
+    def.push_edge(vote, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
+    def.edge_mut(EdgeOccurrence::new(vote, 0))
+        .set_plasticity(Some(plastic(HebbianRule::Oja, true, false)));
+    let census = census_of(&genome, &[0], None);
     assert_eq!(census.carriers, 1);
-    for (i, row) in census.kinds.iter().enumerate() {
-        let expected = match i {
-            _ if i == covariance => 2,
-            _ if i == oja => 1,
-            _ => 0,
-        };
-        assert_eq!(row.edges, expected, "{:?}", PlasticityKind::ALL[i]);
-    }
+    assert_eq!(census.edges[REWARD][COMPUTE].edges, 2);
+    assert_eq!(census.edges[HEBBIAN][COMPUTE].edges, 1);
+    assert_eq!(census.edges[REWARD][SINK].edges, 1);
+    assert_eq!(census.edges[HEBBIAN][SINK].edges, 0);
+    assert_eq!(census.edges_by_rule, [0, 2, 0, 2]);
+    assert_eq!(census.edges_by_inheritance, [2, 2]);
 }
 
 #[test]
 fn unreachable_nodes_are_not_read() {
     let config = plastic(HebbianRule::Classic, false, false);
     let genome = graph_genome(vec![node(Some(config), &[0.5])]);
-    let census = census_of(&genome, &[], &learned(&[&[2.0]]));
-    assert_eq!((census.creatures, census.carriers), (1, 0));
-    assert!(census
-        .kinds
-        .iter()
-        .all(|row| *row == PlasticEdges::default()));
+    let census = census_of(&genome, &[], Some(&[2.0]));
+    assert_eq!(
+        census,
+        PlasticityCensus {
+            creatures: 1,
+            ..PlasticityCensus::default()
+        }
+    );
 }
 
 #[test]
@@ -185,14 +206,14 @@ fn carriers_count_creatures_not_edges() {
     let config = plastic(HebbianRule::AntiHebb, false, true);
     let carrier = graph_genome(vec![node(Some(config), &[0.1, 0.2])]);
     let plain = graph_genome(vec![node(None, &[0.1])]);
+    let carrier_state = learned_state(&carrier, None);
+    let plain_state = learned_state(&plain, None);
     let census = PlasticityCensus::observe([
-        (&carrier, [0].as_slice(), [].as_slice()),
-        (&carrier, [0].as_slice(), [].as_slice()),
-        (&plain, [0].as_slice(), [].as_slice()),
+        (&carrier, [0].as_slice(), carrier_state.learned()),
+        (&carrier, [0].as_slice(), carrier_state.learned()),
+        (&plain, [0].as_slice(), plain_state.learned()),
     ]);
     assert_eq!((census.creatures, census.carriers), (3, 2));
-    assert_eq!(
-        census.kinds[kind(HebbianRule::AntiHebb, false, true)].edges,
-        4
-    );
+    assert_eq!(census.edges[HEBBIAN][COMPUTE].edges, 4);
+    assert_eq!(census.edges_by_inheritance, [0, 4]);
 }

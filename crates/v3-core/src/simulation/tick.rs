@@ -9,12 +9,10 @@ use rayon::prelude::*;
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
-use crate::creature::genome::{BackendDef, OUTCOME_CHANNEL_COUNT};
+use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::runtime::mesh::execute_creature_mesh;
-use crate::runtime::plasticity::reward::apply_reward_modulated_updates;
-use crate::runtime::plasticity::traces::has_any_reward_modulated;
 use crate::runtime::trace::domain::{
     PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
 };
@@ -220,9 +218,7 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
-        creature
-            .graph_runtime
-            .begin_tick(&creature.genome.nodes, creature.age);
+        creature.graph_runtime.begin_tick(creature.age);
         advance_shared_memory(
             &mut creature.shared_memory,
             &mut creature.prev_shared_memory,
@@ -405,7 +401,7 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
     for (id, sensors) in assemble_sensor_inputs(sim, &ids) {
         let creature = &sim.creatures[id];
         let mut prepared = creature.graph_runtime.clone();
-        prepared.begin_tick(&creature.genome.nodes, creature.age);
+        prepared.begin_tick(creature.age);
         let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
                         previous: &[f32; 16]| {
             execute_creature_mesh(
@@ -473,7 +469,7 @@ fn observe_action_queue(
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
     let mut graph_runtime = creature.graph_runtime.clone();
-    graph_runtime.begin_tick(&creature.genome.nodes, creature.age);
+    graph_runtime.begin_tick(creature.age);
     execute_creature_mesh(
         &creature.genome,
         sensors,
@@ -1265,58 +1261,32 @@ fn run_phase_2(
 /// Every living creature stores this tick's outcome signal bank as its
 /// `previous_outcome` (T19.F05): energy now minus the post-Phase-0 snapshot,
 /// before the zero floor; a creature born this tick has no
-/// record and stores zeros. For each creature with reward-modulated graph
-/// nodes, the same bank then drives three-factor weight updates using
-/// eligibility traces.
+/// record and stores zeros. For each creature with a reward-modulated edge,
+/// the same bank then drives the three-factor update of every initialized
+/// reward-modulated edge from its eligibility trace (T25.F06).
 fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
     use super::energy_accounting::applied_debit;
 
-    // Collect IDs to avoid borrow conflict (need &mut creature + &sim.config).
-    let ids: Vec<CreatureId> = sim.creatures.keys().collect();
-    for id in ids {
-        let Some(creature) = sim.creatures.get_mut(id) else {
-            continue;
-        };
-
+    for (id, creature) in sim.creatures.iter_mut() {
         // Newborns spawned this tick have no outcome record.
         let signals = outcome_acc.compute_signal_bank(id, creature.energy);
         creature.previous_outcome = signals
             .as_ref()
             .map_or([0.0; OUTCOME_CHANNEL_COUNT], |bank| bank.signals);
 
-        // Check if any mesh node has reward-modulated plasticity.
-        let has_reward = creature.genome.nodes.iter().any(|node| {
-            if let BackendDef::Graph(ref def) = node.backend_def {
-                has_any_reward_modulated(def)
-            } else {
-                false
-            }
-        });
-        let Some(signals) = signals.filter(|_| has_reward) else {
+        let learned = &mut creature.graph_runtime.learned;
+        let Some(signals) = signals.filter(|_| learned.has_reward_modulated()) else {
             continue;
         };
-
-        // Apply reward-modulated updates per mesh node.
-        for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
-            if let BackendDef::Graph(ref def) = node.backend_def {
-                if has_any_reward_modulated(def) {
-                    let (update_count, changed_count) = apply_reward_modulated_updates(
-                        def,
-                        node_idx,
-                        &mut creature.graph_runtime.plasticity_weights,
-                        &creature.graph_runtime.eligibility_traces,
-                        &signals,
-                    );
-                    sim.stats.plasticity_updates_total += u64::from(update_count);
-                    sim.stats.reward_modulated_updates_total += u64::from(update_count);
-                    sim.stats.plasticity_changes_total += u64::from(changed_count);
-                    sim.stats.reward_modulated_changes_total += u64::from(changed_count);
-                }
-            }
-        }
+        let (update_count, changed_count) = learned.apply_reward(&signals);
+        sim.stats.plasticity_updates_total += u64::from(update_count);
+        sim.stats.reward_modulated_updates_total += u64::from(update_count);
+        sim.stats.plasticity_changes_total += u64::from(changed_count);
+        sim.stats.reward_modulated_changes_total += u64::from(changed_count);
         // Floor energy at 0.0 — same invariant as Phase 2 action costs. Learning
         // is free (T25.F02), so the floor is its own step: it reaches exactly
-        // the creatures with an outcome bank and a reward-modulated node.
+        // the creatures with an outcome bank and a reward-modulated edge.
+
         let before = creature.energy;
         creature.energy = creature.energy.max(0.0);
         sim.stats.energy_flows.zero_floor_credit += applied_debit(creature.energy, before);
@@ -1542,7 +1512,6 @@ mod final_action_observation_tests {
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::DecayIntegrator(0.0),
                             vec![],
-                            None,
                         )])
                         .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
                             crate::creature::genome::cgp::OutputSinkKind::ActionVote(
@@ -1607,8 +1576,6 @@ mod final_action_observation_tests {
         creature.shared_memory[1] = 0.25;
         creature.prev_shared_memory[0] = 0.75;
         creature.graph_runtime.node_state = vec![vec![0.5]];
-        creature.graph_runtime.plasticity_weights = vec![vec![Box::new([0.25])]];
-        creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.125])]];
         creature.graph_runtime.scratch_prev = vec![1.0];
         creature.graph_runtime.scratch_curr = vec![2.0];
         creature.graph_runtime.scratch_backup = vec![3.0];
@@ -1643,12 +1610,8 @@ mod final_action_observation_tests {
             graph_state_before.node_state
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.plasticity_weights,
-            graph_state_before.plasticity_weights
-        );
-        assert_eq!(
-            sim.creatures[id].graph_runtime.eligibility_traces,
-            graph_state_before.eligibility_traces
+            sim.creatures[id].graph_runtime.learned(),
+            graph_state_before.learned()
         );
         assert_eq!(
             sim.creatures[id].graph_runtime.scratch_prev,
@@ -1725,11 +1688,12 @@ mod final_action_observation_tests {
                 unreachable!()
             };
             *def = def.clone().with_compute_nodes(vec![
-                ComputeNode::new(kind, vec![edge], None),
-                ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![], None),
+                ComputeNode::new(kind, vec![edge]),
+                ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![]),
             ]);
-            def.set_node_plasticity(
-                0,
+            crate::creature::genome::cgp::test_support::set_surface_plasticity(
+                def,
+                crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
                 Some(crate::creature::genome::PlasticityConfig {
                     rule: crate::creature::genome::HebbianRule::Classic,
                     learning_rate: 0.5,
@@ -1744,8 +1708,7 @@ mod final_action_observation_tests {
             creature.genome = genome;
             creature.graph_runtime =
                 crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
-            creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.5]), Box::new([])]];
-            creature.graph_runtime.plasticity_weights = vec![vec![Box::new([1.0]), Box::new([])]];
+            creature.graph_runtime.learned.set_slot(0, 0, 1.0, 0.5);
             creature.prev_shared_memory[0] = 1.0;
             creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
             creature.graph_runtime.node_outputs = vec![vec![1.0, 0.0]];
@@ -1767,14 +1730,7 @@ mod final_action_observation_tests {
                 }
             }
             let creature = &sim.creatures[id];
-            assert_eq!(
-                creature.graph_runtime.eligibility_traces,
-                graph_before.eligibility_traces
-            );
-            assert_eq!(
-                creature.graph_runtime.plasticity_weights,
-                graph_before.plasticity_weights
-            );
+            assert_eq!(creature.graph_runtime.learned(), graph_before.learned());
             assert_eq!(creature.graph_runtime.node_state, graph_before.node_state);
             assert_eq!(
                 creature.graph_runtime.node_outputs,

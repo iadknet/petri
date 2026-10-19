@@ -23,7 +23,7 @@ use crate::runtime::trace::recording::ActiveTrace;
 use crate::simulation::{run_tick, Simulation};
 use slotmap::SlotMap;
 
-pub const VERSION: &str = "recruitment-paths-v2";
+pub const VERSION: &str = "recruitment-paths-v3";
 
 /// Only fixture world initialization differs from production defaults.
 #[must_use]

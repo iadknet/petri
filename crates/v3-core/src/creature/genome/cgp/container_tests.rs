@@ -2,6 +2,7 @@ use proptest::prelude::*;
 
 use super::*;
 use crate::contracts::InputReference;
+use crate::creature::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::creature::genome::cgp::{
     compose, detach, GroupId, Membership, Shape, FIRST_ACTION_VOTE_SINK,
 };
@@ -114,12 +115,12 @@ fn plastic() -> Option<PlasticityConfig> {
 /// one value per edge.
 fn seeded() -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
-        ComputeNode::new(
+        plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(leaf(0), 0.5), GraphEdge::new(leaf(1), 0.25)],
             plastic(),
         ),
-        ComputeNode::new(
+        plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.5)],
             plastic(),
@@ -129,17 +130,14 @@ fn seeded() -> CgpGraphBackendDef {
         EdgeSurface::SinkInput(0),
         GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
     );
-    def.seed_birth(BirthSeeds::Rows(vec![
-        vec![Some(1.0), Some(2.0)],
-        vec![Some(3.0)],
-    ]));
+    def.seed_compute_rows(vec![vec![Some(1.0), Some(2.0)], vec![Some(3.0)]]);
     def
 }
 
 fn rows(def: &CgpGraphBackendDef) -> Vec<Vec<Option<f32>>> {
     def.birth_seeds()
-        .and_then(BirthSeeds::rows)
         .expect("seed rows")
+        .compute_rows()
         .to_vec()
 }
 
@@ -153,7 +151,6 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
-            None,
         )])
         .with_output_sinks(vec![OutputSink::new(
             OutputSinkKind::CustomOutput(0),
@@ -167,9 +164,9 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
         format!("{def:?}"),
         "CgpGraphBackendDef { compute_nodes: [ComputeNode { kind: Add, inputs: \
          [GraphEdge { source: ComputeNode(0), own_weight: 0.5, plasticity: None, \
-         membership: None }], plasticity: None }], output_sinks: [OutputSink { kind: \
-         CustomOutput(0), inputs: [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, \
-         own_weight: 1.0, plasticity: None, membership: None }] }], groups: [] }"
+         membership: None }] }], output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
+         [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
+         plasticity: None, membership: None }] }], groups: [] }"
     );
 }
 
@@ -237,18 +234,14 @@ fn node_primitives_apply_the_seed_rules_of_the_sites_they_replace() {
     let mut inserted = seeded();
     inserted.insert_compute_node(
         1,
-        ComputeNode::new(
-            ComputeNodeKind::Add,
-            vec![GraphEdge::new(leaf(3), 1.0)],
-            None,
-        ),
+        ComputeNode::new(ComputeNodeKind::Add, vec![GraphEdge::new(leaf(3), 1.0)]),
     );
     assert_eq!(rows(&inserted)[1], vec![None]);
     assert_eq!(
         inserted.compute_nodes()[2].inputs[0].source(),
         GraphSource::ComputeNode(0)
     );
-    inserted.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None));
+    inserted.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, Vec::new()));
     assert_eq!(rows(&inserted).len(), 4);
     // Duplicate: the copy's row is its original's.
     let mut duplicated = seeded();
@@ -257,13 +250,13 @@ fn node_primitives_apply_the_seed_rules_of_the_sites_they_replace() {
     // Kind and plasticity writes leave the seeds alone.
     let mut rewritten = seeded();
     rewritten.set_compute_kind(0, ComputeNodeKind::Tanh);
-    rewritten.set_node_plasticity(1, None);
+    set_surface_plasticity(&mut rewritten, EdgeSurface::ComputeInput(1), None);
     assert_eq!(rows(&rewritten), rows(&seeded()));
 }
 
 #[test]
 fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
-    let identity = || ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None);
+    let identity = || ComputeNode::new(ComputeNodeKind::Add, Vec::new());
     // Compute consumer: the identity node is inserted at the consumer's index.
     let mut def = seeded();
     def.split_edge(compute(1, 0), identity());
@@ -275,9 +268,16 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
         def.compute_nodes()[1].inputs[0],
         GraphEdge::new(GraphSource::ComputeNode(0), 1.0)
     );
+    // The consumer keeps its weight and learning attributes; the identity
+    // edge is static (T25.F06 invariant 10).
+    let consumer = def.compute_nodes()[2].inputs[0];
     assert_eq!(
-        def.compute_nodes()[2].inputs[0],
-        GraphEdge::new(GraphSource::ComputeNode(1), 1.5)
+        (
+            consumer.source(),
+            consumer.own_weight(),
+            consumer.plasticity()
+        ),
+        (GraphSource::ComputeNode(1), 1.5, plastic())
     );
     // Sink consumer: the identity node is appended.
     let mut def = seeded();
@@ -290,16 +290,6 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
         def.output_sinks()[0].inputs[0].source(),
         GraphSource::ComputeNode(2)
     );
-}
-
-#[test]
-fn the_empty_form_carries_no_rows_through_any_edit() {
-    let mut def = seeded();
-    def.seed_birth(BirthSeeds::Empty);
-    def.push_edge(EdgeSurface::ComputeInput(0), GraphEdge::new(leaf(2), 1.0));
-    def.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None));
-    def.remove_compute_node(0);
-    assert_eq!(def.birth_seeds(), Some(&BirthSeeds::Empty));
 }
 
 #[test]
@@ -316,7 +306,7 @@ fn redirected_leaf_reads_change_no_seed() {
 #[should_panic(expected = "one seed row per compute node")]
 fn misaligned_seeds_are_a_debug_assertion() {
     let mut def = seeded();
-    def.seed_birth(BirthSeeds::Rows(vec![vec![Some(1.0), Some(2.0)]]));
+    def.seed_compute_rows(vec![vec![Some(1.0), Some(2.0)]]);
 }
 
 fn source_strategy() -> impl Strategy<Value = GraphSource> {
@@ -348,7 +338,7 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
                     nodes
                         .into_iter()
                         .map(|(inputs, learns)| {
-                            ComputeNode::new(
+                            plastic_node(
                                 ComputeNodeKind::Add,
                                 inputs,
                                 learns.then(plastic).flatten(),
@@ -373,9 +363,9 @@ proptest! {
     #[test]
     fn serde_round_trip_preserves_identity_and_drops_seeds(def in def_strategy()) {
         let mut seeded = def.clone();
-        seeded.seed_birth(BirthSeeds::Rows(
+        seeded.seed_compute_rows(
             def.compute_nodes().iter().map(|node| vec![Some(1.0); node.inputs.len()]).collect(),
-        ));
+        );
         let json = serde_json::to_string(&seeded).unwrap();
         prop_assert_eq!(&json, &serde_json::to_string(&def).unwrap());
         let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
@@ -620,11 +610,9 @@ fn validate_graph_rejects_each_broken_invariant() {
     );
     // I2: a compute-input member.
     let member = *def.edge_at(def.members(GroupId::new(0)).next().unwrap());
-    let compute = def.clone().with_compute_nodes(vec![ComputeNode::new(
-        ComputeNodeKind::Add,
-        vec![member],
-        None,
-    )]);
+    let compute = def
+        .clone()
+        .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, vec![member])]);
     assert_eq!(
         compute.check_local_invariants(),
         Err(GraphInvariantViolation::MemberOnComputeInput)
@@ -1260,5 +1248,318 @@ proptest! {
         prop_assert!(validate_graph(&pair_node(def.clone(), pair_refs())).is_ok());
         def.relocate_group(id, DirectedVoteKind::ALL[kind], offset);
         prop_assert_eq!(&def, &original);
+    }
+}
+
+// ── Learning attributes (T25.F06) ───────────────────────────────────────────
+
+fn learning_node(def: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> NodeGenome {
+    NodeGenome {
+        node_id: crate::contracts::NodeId(0),
+        input_refs,
+        backend_def: BackendDef::Graph(def),
+        targets: Vec::new(),
+    }
+}
+
+/// A `ClearSlot` edge never learns (its sum is ignored): it is not
+/// eligible, and `validate_graph` rejects a plastic one.
+#[test]
+fn clear_slot_edges_are_never_eligible() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(3)).unwrap();
+    let write = def.sink_surface(OutputSinkKind::WriteSlot(3)).unwrap();
+    def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
+    def.push_edge(write, GraphEdge::new(leaf(0), 1.0));
+    assert!(!def.can_learn(EdgeOccurrence::new(clear, 0)));
+    assert!(def.can_learn(EdgeOccurrence::new(write, 0)));
+    assert!(def.can_learn(compute_edge_free_occurrence()));
+    def.edge_mut(EdgeOccurrence::new(write, 0))
+        .set_plasticity(plastic());
+    assert_eq!(
+        validate_graph(&learning_node(def.clone(), Vec::new())),
+        Ok(())
+    );
+    let EdgeSurface::SinkInput(clear_index) = clear else {
+        unreachable!()
+    };
+    def.output_sinks.0[clear_index].inputs.0[0].plasticity = plastic();
+    assert_eq!(
+        validate_graph(&learning_node(def, Vec::new())),
+        Err(GraphInvariantViolation::IneligiblePlasticEdge)
+    );
+}
+
+/// Any compute-input occurrence may learn.
+fn compute_edge_free_occurrence() -> EdgeOccurrence {
+    compute(0, 0)
+}
+
+#[test]
+#[cfg(debug_assertions)]
+#[should_panic(expected = "neither a ClearSlot edge nor a member learns")]
+fn set_plasticity_on_a_clear_slot_edge_is_a_debug_assertion() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
+    def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
+    def.edge_mut(EdgeOccurrence::new(clear, 0))
+        .set_plasticity(plastic());
+}
+
+/// A group member stays static until T25.F07 gives it a scope: it is not
+/// eligible, and `validate_graph` rejects a plastic one.
+#[test]
+fn members_are_not_eligible_until_scope_exists() {
+    let (mut def, id) = grouped(DirectedVoteKind::Move, 1);
+    let member = def.members(id).next().unwrap();
+    assert!(!def.can_learn(member));
+    let independent = sink_occurrence(vote_sink(DirectedVoteKind::Move, 0), 0);
+    assert!(def.can_learn(independent));
+    def.edge_mut(independent).set_plasticity(plastic());
+    assert_eq!(
+        validate_graph(&learning_node(def.clone(), ring_refs())),
+        Ok(())
+    );
+    let EdgeSurface::SinkInput(sink) = member.surface else {
+        unreachable!()
+    };
+    def.output_sinks.0[sink].inputs.0[member.index].plasticity = plastic();
+    assert_eq!(
+        validate_graph(&learning_node(def, ring_refs())),
+        Err(GraphInvariantViolation::IneligiblePlasticEdge)
+    );
+}
+
+/// The node-level key is gone (T25.F06 invariant 1): a `ComputeNode` with
+/// `plasticity` is refused, and the edge-level key reads.
+#[test]
+fn a_node_level_plasticity_key_is_refused() {
+    let config = r#"{"rule":"Classic","learning_rate":0.1,"weight_clamp":5.0,"lamarckian":true}"#;
+    let node_level = format!(
+        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5}}],"plasticity":{config}}}"#
+    );
+    assert!(serde_json::from_str::<ComputeNode>(&node_level).is_err());
+    let edge_level = format!(
+        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5,"plasticity":{config}}}]}}"#
+    );
+    let node: ComputeNode = serde_json::from_str(&edge_level).unwrap();
+    assert_eq!(node.inputs[0].plasticity(), plastic());
+    assert_eq!(serde_json::to_string(&node).unwrap(), edge_level);
+}
+
+/// `plastic_edges` enumerates every plastic edge on both surfaces in
+/// canonical order, and nothing else.
+#[test]
+fn plastic_edges_enumerate_both_surfaces_in_canonical_order() {
+    let mut def = seeded();
+    let vote = EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 2));
+    def.push_edge(vote, GraphEdge::new(leaf(0), 1.0));
+    def.edge_mut(EdgeOccurrence::new(vote, 0))
+        .set_plasticity(plastic());
+    let sites: Vec<EdgeOccurrence> = def.plastic_edges().map(|(site, _)| site).collect();
+    assert_eq!(
+        sites,
+        vec![
+            compute(0, 0),
+            compute(0, 1),
+            compute(1, 0),
+            EdgeOccurrence::new(vote, 0)
+        ]
+    );
+    // `seeded`'s sink edge is static.
+    assert!(def
+        .plastic_edges()
+        .all(|(site, config)| Some(config) == def.edge_at(site).plasticity()));
+}
+
+/// One operation of the seed-row model.
+#[derive(Debug, Clone)]
+enum SeedOp {
+    PushCompute(usize),
+    PushSink(usize),
+    Remove(usize),
+    Split(usize),
+    SetWeight(usize),
+    SetSource(usize, bool),
+    SetPlasticity(usize),
+    AddGroup(u8),
+    Relocate(u8),
+    Detach,
+    RemoveGroup,
+    RemoveNode(usize),
+    Clone,
+}
+
+fn seed_op_strategy() -> impl Strategy<Value = SeedOp> {
+    prop_oneof![
+        (0usize..64).prop_map(SeedOp::PushCompute),
+        (0usize..64).prop_map(SeedOp::PushSink),
+        (0usize..64).prop_map(SeedOp::Remove),
+        (0usize..64).prop_map(SeedOp::Split),
+        (0usize..64).prop_map(SeedOp::SetWeight),
+        (0usize..64, any::<bool>()).prop_map(|(i, same)| SeedOp::SetSource(i, same)),
+        (0usize..64).prop_map(SeedOp::SetPlasticity),
+        (0u8..8).prop_map(SeedOp::AddGroup),
+        (0u8..8).prop_map(SeedOp::Relocate),
+        Just(SeedOp::Detach),
+        Just(SeedOp::RemoveGroup),
+        (0usize..64).prop_map(SeedOp::RemoveNode),
+        Just(SeedOp::Clone),
+    ]
+}
+
+/// The sink indices the model wires: two outputs, a write, three votes.
+fn model_sinks() -> [usize; 6] {
+    [
+        0,
+        1,
+        CUSTOM_OUTPUT_COUNT as usize + MAX_GATE_SLOTS,
+        vote_sink(DirectedVoteKind::Move, 0),
+        vote_sink(DirectedVoteKind::Move, 5),
+        vote_sink(DirectedVoteKind::Reproduce, 3),
+    ]
+}
+
+proptest! {
+    /// T25.F06 invariant 8, model-based: every edge carries a unique tag as
+    /// its own weight and, when seeded, the tag as its seed. Through any
+    /// sequence of primitives on both surfaces (push, remove, split, the
+    /// source and weight writes, group creation, relocation, detach and
+    /// removal, node removal, a draft's clone) each row
+    /// stays aligned with its edges (node duplication copies rows and is
+    /// pinned by `cgp_reproduction`'s copy-remove property): an edge's seed is its own tag exactly
+    /// while the model keeps the tag seeded, `None` otherwise.
+    #[test]
+    fn seed_rows_follow_their_edges_through_every_primitive(
+        ops in prop::collection::vec(seed_op_strategy(), 1..40),
+    ) {
+        let mut next_tag = 1000.0f32;
+        let mut fresh = || { next_tag += 1.0; next_tag };
+        let mut seeded_tags = std::collections::BTreeSet::new();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        for node in 0..3 {
+            let inputs = (0..2).map(|_| GraphEdge::new(leaf(0), fresh())).collect();
+            def.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, inputs));
+            if node > 0 {
+                def.push_edge(EdgeSurface::ComputeInput(node), GraphEdge::new(GraphSource::ComputeNode(node as u16 - 1), fresh()));
+            }
+        }
+        for sink in model_sinks() {
+            def.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(GraphSource::ComputeNode(2), fresh()));
+        }
+        // Seed every edge with its tag.
+        let tag_rows = |def: &CgpGraphBackendDef, surface_count: usize, surface: fn(usize) -> EdgeSurface| -> Vec<Vec<Option<f32>>> {
+            (0..surface_count)
+                .map(|i| def.surface_edges(surface(i)).iter().map(|e| Some(e.own_weight())).collect())
+                .collect()
+        };
+        let compute = tag_rows(&def, def.compute_nodes().len(), EdgeSurface::ComputeInput);
+        let sinks = tag_rows(&def, def.output_sinks().len(), EdgeSurface::SinkInput);
+        def.seed_birth(BirthSeeds::Rows { compute, sinks });
+        for edge in def.edges() {
+            seeded_tags.insert(edge.own_weight().to_bits());
+        }
+        let refs = ring_refs();
+        for op in ops {
+            let sites: Vec<EdgeOccurrence> = def.edge_sites().collect();
+            let pick = |i: usize| sites.get(i % sites.len().max(1)).copied();
+            let independent = |def: &CgpGraphBackendDef, site: EdgeOccurrence| def.edge_at(site).membership().is_none();
+            match op {
+                SeedOp::PushCompute(i) => {
+                    let n = def.compute_nodes().len();
+                    if n > 0 {
+                        def.push_edge(EdgeSurface::ComputeInput(i % n), GraphEdge::new(leaf(0), fresh()));
+                    }
+                }
+                SeedOp::PushSink(i) => {
+                    let sinks = model_sinks();
+                    def.push_edge(EdgeSurface::SinkInput(sinks[i % sinks.len()]), GraphEdge::new(leaf(0), fresh()));
+                }
+                SeedOp::Remove(i) => {
+                    if let Some(site) = pick(i) {
+                        seeded_tags.remove(&def.edge_at(site).own_weight().to_bits());
+                        def.remove_edge(site);
+                    }
+                }
+                SeedOp::Split(i) => {
+                    if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
+                        def.split_edge(site, ComputeNode::new(ComputeNodeKind::Add, Vec::new()));
+                    }
+                }
+                SeedOp::SetWeight(i) => {
+                    if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
+                        seeded_tags.remove(&def.edge_at(site).own_weight().to_bits());
+                        def.edge_mut(site).set_weight(fresh());
+                    }
+                }
+                SeedOp::SetSource(i, same) => {
+                    if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
+                        let current = def.edge_at(site).source();
+                        let source = if same { current } else { leaf(7) };
+                        let before = def.birth_seeds().and_then(|seeds| seeds.value(site));
+                        def.edge_mut(site).set_source(source);
+                        let after = def.birth_seeds().and_then(|seeds| seeds.value(site));
+                        if source == current {
+                            prop_assert_eq!(after, before, "a same-source write keeps the seed");
+                        } else {
+                            prop_assert_eq!(after, None, "a changed source clears the seed");
+                            seeded_tags.remove(&def.edge_at(site).own_weight().to_bits());
+                        }
+                    }
+                }
+                SeedOp::SetPlasticity(i) => {
+                    if let Some(site) = pick(i).filter(|&site| def.can_learn(site)) {
+                        let config = if def.edge_at(site).plasticity().is_some() { None } else { plastic() };
+                        def.edge_mut(site).set_plasticity(config);
+                    }
+                }
+                SeedOp::AddGroup(offset) => {
+                    if def.can_host_group() && def.groups().len() < 3 {
+                        def.add_group(ring(), DirectedVoteKind::Move, offset);
+                    }
+                }
+                SeedOp::Relocate(offset) => {
+                    if !def.groups().is_empty() {
+                        def.relocate_group(GroupId::new(0), DirectedVoteKind::Reproduce, offset);
+                    }
+                }
+                SeedOp::Detach => {
+                    if let Some(member) = def.groups().first().and_then(|_| def.members(GroupId::new(0)).next()) {
+                        let pattern = def.member_pattern(member, &refs);
+                        def.detach_at(member, pattern);
+                    }
+                }
+                SeedOp::RemoveGroup => {
+                    if !def.groups().is_empty() {
+                        def.remove_group(GroupId::new(0));
+                    }
+                }
+                SeedOp::RemoveNode(i) => {
+                    let n = def.compute_nodes().len();
+                    if n > 0 {
+                        let removed = i % n;
+                        for site in def.edge_sites() {
+                            let edge = def.edge_at(site);
+                            let doomed = site.surface == EdgeSurface::ComputeInput(removed)
+                                || edge.source() == GraphSource::ComputeNode(removed as u16);
+                            if doomed {
+                                seeded_tags.remove(&edge.own_weight().to_bits());
+                            }
+                        }
+                        def.remove_compute_node(removed);
+                    }
+                }
+                SeedOp::Clone => def = def.clone(),
+            }
+            let seeds = def.birth_seeds().expect("the draft keeps its seeds").clone();
+            prop_assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
+            prop_assert_eq!(seeds.sink_rows().len(), def.output_sinks().len());
+            for site in def.edge_sites() {
+                let tag = def.edge_at(site).own_weight();
+                let expected = seeded_tags.contains(&tag.to_bits()).then_some(tag);
+                prop_assert_eq!(seeds.value(site), expected, "{:?}", site);
+            }
+            prop_assert_eq!(validate_graph(&learning_node(def.clone(), refs.clone())), Ok(()));
+        }
     }
 }

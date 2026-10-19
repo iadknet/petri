@@ -25,7 +25,6 @@ fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackend
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Constant(value),
         Vec::new(),
-        None,
     ));
     // Wire the CustomOutput(custom_slot) sink to CN0
     if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {
@@ -49,7 +48,6 @@ fn cgp_passthrough_input_to_custom_output(
             GraphSource::InputLeaf { ref_idx, sub_idx },
             1.0,
         )],
-        None,
     ));
     // Wire CustomOutput(custom_slot) to CN0
     if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {

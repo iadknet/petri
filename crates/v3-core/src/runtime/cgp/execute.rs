@@ -1,13 +1,12 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::effects::{apply_cgp_graph_effects, CgpEffectsTrace};
+use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
-use crate::runtime::cgp::sources::collect_cgp_weighted_inputs;
+use crate::runtime::cgp::sources::{collect_cgp_weighted_inputs, resolve_source};
 use crate::runtime::inputs::ResolveCtx;
-use crate::runtime::plasticity::hebbian;
-use crate::runtime::plasticity::traces;
+use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
@@ -29,7 +28,18 @@ pub(crate) trait GraphTracer {
     );
     fn on_pass_end(&mut self, delta: f32);
     fn on_finish(&mut self, curr_outputs: &[f32], temporal_committed: bool);
-    fn on_effects(&mut self, effects: CgpEffectsTrace);
+    /// One sink of the effects pass, in catalog order: whether it is wired,
+    /// its weighted inputs and sum, and the value it applied.
+    fn on_sink(
+        &mut self,
+        wired: bool,
+        weighted_inputs: &[f32],
+        weighted_sum: f32,
+        applied: bool,
+        applied_value: f32,
+    );
+    /// The effects pass ran: the visit committed.
+    fn on_effects(&mut self);
 }
 
 /// Zero-cost tracer used by the production path.
@@ -55,7 +65,45 @@ impl GraphTracer for NoopTracer {
     #[inline]
     fn on_finish(&mut self, _: &[f32], _: bool) {}
     #[inline]
-    fn on_effects(&mut self, _: CgpEffectsTrace) {}
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+    #[inline]
+    fn on_effects(&mut self) {}
+}
+
+/// Collect a learning graph's weighted inputs of compute node `current_idx`
+/// into `buf`: each edge's ordered read times its applied weight, the read
+/// recorded as the pre sample of a plastic edge (T25.F06).
+#[inline]
+#[allow(clippy::too_many_arguments)]
+fn collect_learning_inputs(
+    edges: &[GraphEdge],
+    current_idx: usize,
+    node_count: usize,
+    prev_outputs: &[f32],
+    curr_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
+    learner: &mut Learner<'_>,
+    buf: &mut Vec<f32>,
+) {
+    buf.clear();
+    learner.begin_row();
+    buf.extend(edges.iter().map(|edge| {
+        let value = resolve_source(
+            &edge.source(),
+            current_idx,
+            node_count,
+            prev_outputs,
+            curr_outputs,
+            input_refs,
+            resolve_ctx,
+            shared_memory,
+            prev_shared_memory,
+        );
+        value * learner.weigh(edge.plasticity().is_some(), value, edge.own_weight())
+    }));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -104,17 +152,15 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     curr_outputs.clear();
     curr_outputs.resize(node_count, 0.0);
 
-    let use_plasticity = hebbian::has_any_hebbian(def);
-    if use_plasticity {
-        hebbian::ensure_hebbian_weights(def, node_idx, &mut graph_runtime.plasticity_weights);
-    }
-
-    let use_reward_modulated = traces::has_any_reward_modulated(def);
-    if use_reward_modulated {
-        traces::ensure_eligibility_traces(def, node_idx, &mut graph_runtime.eligibility_traces);
-    }
-
     let mut w_inputs_buf = std::mem::take(&mut graph_runtime.scratch_w_inputs);
+
+    // A learning graph (T25.F06): the backend counts as visited from its
+    // entry, before the pass-cost check, and every plastic edge's samples
+    // are recorded as the evaluation reads them.
+    let mut learner = graph_runtime.learned.learner(node_idx);
+    if let Some(learner) = &mut learner {
+        learner.enter();
+    }
 
     // The wire counter records entered graph visits, even when unaffordable.
     side_outputs.work_counters.graph_relax_iters += 1;
@@ -151,33 +197,27 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         return NodeResult::exhausted();
     }
 
-    let evaluation_energy = *energy;
-    // The tick's decision state, copied once per dispatch (T19.F05): nothing
-    // commits mid-dispatch, so every context below reads the same values,
-    // and the copies let the later contexts coexist with `&mut side_outputs`.
-    let votes = side_outputs.votes;
-    let previous_pass_votes = side_outputs.previous_pass_votes;
-    let commit_counts = side_outputs.commit_counts;
-    let mesh_hops = side_outputs.work_counters.mesh_hops;
+    // The tick's decision state (T19.F05): nothing commits mid-dispatch, so
+    // the evaluation and the effects read one context. Its borrows of the
+    // side outputs are disjoint from the fields the visit writes.
     let resolve_ctx = ResolveCtx {
         sensors,
         upstream_slots,
         energy: *energy,
         energy_consumed,
         action_queue: &side_outputs.action_queue,
-        votes: &votes,
-        previous_pass_votes: &previous_pass_votes,
-        commit_counts: &commit_counts,
-        mesh_hops,
+        votes: &side_outputs.votes,
+        previous_pass_votes: &side_outputs.previous_pass_votes,
+        commit_counts: &side_outputs.commit_counts,
+        mesh_hops: side_outputs.work_counters.mesh_hops,
     };
 
     for current_idx in 0..node_count {
         let node = &def.compute_nodes()[current_idx];
 
-        if use_plasticity && node.plasticity.is_some() {
-            let learned = &graph_runtime.plasticity_weights[node_idx][current_idx];
-            hebbian::collect_weighted_inputs_hebbian(
-                node,
+        match &mut learner {
+            Some(learner) => collect_learning_inputs(
+                &node.inputs,
                 current_idx,
                 node_count,
                 &prev_outputs,
@@ -186,11 +226,10 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
                 &resolve_ctx,
                 shared_memory,
                 prev_shared_memory,
-                learned,
+                learner,
                 &mut w_inputs_buf,
-            );
-        } else {
-            collect_cgp_weighted_inputs(
+            ),
+            None => collect_cgp_weighted_inputs(
                 &node.inputs,
                 current_idx,
                 node_count,
@@ -201,7 +240,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
                 shared_memory,
                 prev_shared_memory,
                 &mut w_inputs_buf,
-            );
+            ),
         }
         let wsum: f32 = w_inputs_buf.iter().sum();
 
@@ -214,6 +253,11 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             wsum,
             &mut node_state,
         ));
+        // The node's committed output is the post sample of its plastic
+        // input edges.
+        if let Some(learner) = &mut learner {
+            learner.end_row(curr_outputs[current_idx]);
+        }
 
         candidate_state[current_idx] = node_state;
 
@@ -236,33 +280,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 
     tracer.on_pass_end(delta);
 
-    if use_plasticity {
-        let queue_snapshot = side_outputs.action_queue.clone();
-        let post_ctx = ResolveCtx {
-            sensors,
-            upstream_slots,
-            energy: *energy,
-            energy_consumed,
-            action_queue: &queue_snapshot,
-            votes: &votes,
-            previous_pass_votes: &previous_pass_votes,
-            commit_counts: &commit_counts,
-            mesh_hops,
-        };
-        let (plasticity_update_count, plasticity_changed_count) = hebbian::apply_hebbian_updates(
-            def,
-            node_idx,
-            &mut graph_runtime.plasticity_weights,
-            &curr_outputs,
-            input_refs,
-            &post_ctx,
-            shared_memory,
-            prev_shared_memory,
-        );
-        side_outputs.work_counters.plasticity_updates += plasticity_update_count;
-        side_outputs.work_counters.plasticity_changes += plasticity_changed_count;
-    }
-
     if graph_runtime.node_state.len() <= node_idx {
         graph_runtime.node_state.resize_with(node_idx + 1, Vec::new);
     }
@@ -275,57 +292,33 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     graph_runtime.node_outputs[node_idx].clone_from(&curr_outputs);
     tracer.on_finish(&curr_outputs, true);
 
-    if use_reward_modulated {
-        let queue_snapshot = side_outputs.action_queue.clone();
-        let post_ctx = ResolveCtx {
-            sensors,
-            upstream_slots,
-            energy: evaluation_energy,
-            energy_consumed,
-            action_queue: &queue_snapshot,
-            votes: &votes,
-            previous_pass_votes: &previous_pass_votes,
-            commit_counts: &commit_counts,
-            mesh_hops,
-        };
-        traces::update_eligibility_traces(
-            def,
-            node_idx,
-            &mut graph_runtime.eligibility_traces,
-            &graph_runtime.plasticity_weights,
-            &prev_outputs,
-            &curr_outputs,
-            input_refs,
-            &post_ctx,
-            shared_memory,
-            prev_shared_memory,
-        );
-    }
-
-    let queue_snapshot = side_outputs.action_queue.clone();
-    let effects_resolve_ctx = ResolveCtx {
-        sensors,
-        upstream_slots,
-        energy: *energy,
-        energy_consumed,
-        action_queue: &queue_snapshot,
-        votes: &votes,
-        previous_pass_votes: &previous_pass_votes,
-        commit_counts: &commit_counts,
-        mesh_hops,
-    };
-    let (result, effects_trace) = apply_cgp_graph_effects(
+    let (result, contribution) = apply_cgp_graph_effects(
+        tracer,
         def,
         &graph_runtime.sink_weights[node_idx],
         &curr_outputs,
         input_refs,
-        &effects_resolve_ctx,
+        &resolve_ctx,
         upstream_slots,
-        side_outputs,
+        learner.as_mut(),
+        &mut w_inputs_buf,
+        &mut side_outputs.work_counters.shared_memory_writes_changed,
+        &mut side_outputs.action_params,
         shared_memory,
         prev_shared_memory,
     );
-    tracer.on_effects(effects_trace);
+    tracer.on_effects();
+
+    // Learning after the effects, from the samples the visit recorded and
+    // the weights in force at its start (T25.F06 invariant 6).
+    if let Some(learner) = learner {
+        let (updates, changes) = learner.commit();
+        side_outputs.work_counters.plasticity_updates += updates;
+        side_outputs.work_counters.plasticity_changes += changes;
+    }
+    // The visit reached its effects, so it commits (T19.F03): an exhausted
+    // visit returns before them and stages nothing.
+    side_outputs.stage_vote_contribution(&contribution);
 
     restore_scratch(
         graph_runtime,
@@ -431,7 +424,6 @@ mod work_counter_tests {
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
                             vec![],
-                            None,
                         )])
                         .with_output_sinks(vec![]),
                 ),
@@ -475,23 +467,25 @@ mod work_counter_tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![ComputeNode::new(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![GraphEdge::new(
-                                GraphSource::SharedMemory {
-                                    slot: 0,
-                                    previous: false,
-                                },
-                                1.0,
-                            )],
-                            Some(PlasticityConfig {
-                                rule: HebbianRule::Classic,
-                                learning_rate: 0.5,
-                                weight_clamp: 1.0,
-                                lamarckian: false,
-                                modulation: None,
-                            }),
-                        )])
+                        .with_compute_nodes(vec![
+                            crate::creature::genome::cgp::test_support::plastic_node(
+                                ComputeNodeKind::Constant(1.0),
+                                vec![GraphEdge::new(
+                                    GraphSource::SharedMemory {
+                                        slot: 0,
+                                        previous: false,
+                                    },
+                                    1.0,
+                                )],
+                                Some(PlasticityConfig {
+                                    rule: HebbianRule::Classic,
+                                    learning_rate: 0.5,
+                                    weight_clamp: 1.0,
+                                    lamarckian: false,
+                                    modulation: None,
+                                }),
+                            ),
+                        ])
                         .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
                             crate::creature::genome::cgp::OutputSinkKind::ActionVote(
                                 crate::creature::genome::vote::VoteSink::Terminate,
@@ -550,11 +544,9 @@ mod clock_tests {
                 },
                 1.0,
             )],
-            None,
         )];
         nodes.extend(
-            (0..disconnected)
-                .map(|_| ComputeNode::new(ComputeNodeKind::Oscillator(0.25), vec![], None)),
+            (0..disconnected).map(|_| ComputeNode::new(ComputeNodeKind::Oscillator(0.25), vec![])),
         );
         CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(nodes)
@@ -605,12 +597,12 @@ mod clock_tests {
             ..RuntimeConfig::default()
         };
         let mut energy = 100.0;
-        state.begin_tick(&[], 0);
+        state.begin_tick(0);
         assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 0.5);
         assert_eq!(visit(&def, &mut state, 2.0, &mut energy, &config).0, 1.25);
         assert_eq!(energy, 99.5);
-        state.begin_tick(&[], 0);
-        state.begin_tick(&[], 0); // no visit: sample and hold, no catch-up
+        state.begin_tick(0);
+        state.begin_tick(0); // no visit: sample and hold, no catch-up
         assert_eq!(state.node_outputs[0], [1.25]);
         assert_eq!(energy, 99.5);
         assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 1.125);
@@ -619,8 +611,9 @@ mod clock_tests {
     #[test]
     fn failed_revisits_preserve_temporal_commit_and_emit_no_effects() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        def.set_node_plasticity(
-            0,
+        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+            &mut def,
+            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -634,7 +627,7 @@ mod clock_tests {
             ..RuntimeConfig::default()
         };
         let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
-        state.begin_tick(&[], 0);
+        state.begin_tick(0);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         let committed_state = state.node_state.clone();
         let committed_outputs = state.node_outputs.clone();
@@ -655,8 +648,9 @@ mod clock_tests {
     #[test]
     fn exhausted_trace_reports_committed_outputs_and_candidate_status() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        def.set_node_plasticity(
-            0,
+        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+            &mut def,
+            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -706,7 +700,6 @@ mod clock_tests {
         def.append_compute_node(ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
-            None,
         ));
         def.edge_mut(crate::creature::genome::cgp::EdgeOccurrence::new(
             crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
@@ -716,8 +709,8 @@ mod clock_tests {
         let mut ordinary = crate::creature::genome::cgp::test_support::runtime_for(&def);
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {
-            ordinary.begin_tick(&[], 0);
-            traced.begin_tick(&[], 0);
+            ordinary.begin_tick(0);
+            traced.begin_tick(0);
             let mut energy = 100.0;
             let config = RuntimeConfig {
                 graph_node_base_cost: 0.25,
@@ -777,7 +770,7 @@ mod clock_tests {
                 _ => (old + 0.01 * input).clamp(0.1, 2.0),
             };
             let mut state = crate::creature::genome::cgp::test_support::runtime_for(&graph(kind, extra)); state.node_state = vec![vec![old]];
-            state.begin_tick(&[], 0);
+            state.begin_tick(0);
             let config = RuntimeConfig::default();
             let def = graph(kind, extra);
             let (_, side) = visit(&def, &mut state, input, &mut 100.0, &config);

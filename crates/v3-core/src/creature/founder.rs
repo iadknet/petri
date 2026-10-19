@@ -424,7 +424,7 @@ mod tests {
             perception: PerceptionSnapshot::zeroed(1),
         };
         let mut runtime = GraphRuntimeState::for_genome(genome, Vec::new());
-        runtime.begin_tick(&genome.nodes, age);
+        runtime.begin_tick(age);
         let config = RuntimeConfig {
             max_actions_per_turn: limit,
             ..RuntimeConfig::default()

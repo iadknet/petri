@@ -43,7 +43,7 @@ fn hop_charge(k: u32, allowance: u32, cost: f32) -> f32 {
 /// priority bid.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// `graph_runtime.begin_tick(&genome.nodes, age)`, which decays eligibility
+/// `graph_runtime.begin_tick(age)`, which decays eligibility
 /// once per world tick. A node may be dispatched any number of times within
 /// the tick on its live state (T19.F02); the per-pass cap `max_mesh_hops`
 /// bounds the routed hops of one pass and the per-tick hop ramp prices every
@@ -762,10 +762,10 @@ mod tests {
     #[test]
     fn compact_observation_preserves_complete_applied_outcomes_and_graph_state() {
         use crate::creature::genome::cgp::{
-            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+            CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
         };
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(ComputeNode::new(
+        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(
                 GraphSource::SharedMemory {
@@ -830,9 +830,9 @@ mod tests {
                 ..default_config()
             };
             for tick in 0..2 {
-                state.begin_tick(&genome.nodes, tick);
-                observed_state.begin_tick(&genome.nodes, tick);
-                traced_state.begin_tick(&genome.nodes, tick);
+                state.begin_tick(tick);
+                observed_state.begin_tick(tick);
+                traced_state.begin_tick(tick);
                 let plain = execute_creature_mesh_impl(
                     &genome,
                     &empty_sensor_snapshot(),
@@ -886,8 +886,7 @@ mod tests {
                 assert_eq!(memory, observed_memory);
                 assert_eq!(state.node_state, observed_state.node_state);
                 assert_eq!(state.node_outputs, observed_state.node_outputs);
-                assert_eq!(state.plasticity_weights, observed_state.plasticity_weights);
-                assert_eq!(state.eligibility_traces, observed_state.eligibility_traces);
+                assert_eq!(state.learned(), observed_state.learned());
                 // T11.F17: the dispatch record is mode-independent, and a
                 // second tick at a later age refreshes the same entries.
                 let executed = state.dispatch_record.executed_indices(tick, 1);
@@ -915,8 +914,7 @@ mod tests {
                 assert_eq!(state.scratch_w_inputs, observed_state.scratch_w_inputs);
                 assert_eq!(state.node_state, traced_state.node_state);
                 assert_eq!(state.node_outputs, traced_state.node_outputs);
-                assert_eq!(state.plasticity_weights, traced_state.plasticity_weights);
-                assert_eq!(state.eligibility_traces, traced_state.eligibility_traces);
+                assert_eq!(state.learned(), traced_state.learned());
                 assert_eq!(state.scratch_prev, traced_state.scratch_prev);
                 assert_eq!(state.scratch_curr, traced_state.scratch_curr);
                 assert_eq!(state.scratch_backup, traced_state.scratch_backup);
@@ -2223,7 +2221,6 @@ mod tests {
                                 },
                                 1.0,
                             )],
-                            None,
                         )])
                         .with_output_sinks(Vec::new()),
                 ),

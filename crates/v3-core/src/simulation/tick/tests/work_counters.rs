@@ -94,26 +94,28 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
             input_refs: vec![],
             backend_def: BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(vec![ComputeNode::new(
-                        ComputeNodeKind::Constant(1.0),
-                        vec![GraphEdge::new(
-                            GraphSource::SharedMemory {
-                                slot: 0,
-                                previous: false,
-                            },
-                            1.0,
-                        )],
-                        Some(PlasticityConfig {
-                            rule: HebbianRule::Classic,
-                            learning_rate: 0.5,
-                            weight_clamp: 1.0,
-                            lamarckian: false,
-                            modulation: Some(RewardModulationConfig {
-                                reward_source: OutcomeChannel::EnergyDelta,
-                                trace_decay: 0.9,
+                    .with_compute_nodes(vec![
+                        crate::creature::genome::cgp::test_support::plastic_node(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![GraphEdge::new(
+                                GraphSource::SharedMemory {
+                                    slot: 0,
+                                    previous: false,
+                                },
+                                1.0,
+                            )],
+                            Some(PlasticityConfig {
+                                rule: HebbianRule::Classic,
+                                learning_rate: 0.5,
+                                weight_clamp: 1.0,
+                                lamarckian: false,
+                                modulation: Some(RewardModulationConfig {
+                                    reward_source: OutcomeChannel::EnergyDelta,
+                                    trace_decay: 0.9,
+                                }),
                             }),
-                        }),
-                    )])
+                        ),
+                    ])
                     .with_output_sinks(vec![]),
             ),
             targets: vec![],
@@ -210,7 +212,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
     use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
     let edge = GraphEdge::new(GraphSource::ComputeNode(0), 0.5);
     let node = |edges, modulated: bool| {
-        ComputeNode::new(
+        crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Constant(1.0),
             vec![edge; edges],
             Some(PlasticityConfig {
@@ -234,7 +236,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
             backend_def: BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![
-                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
                         node(hebbian_edges, false),
                         node(reward_edges, true),
                     ])
@@ -271,12 +273,12 @@ fn production_learning_splits_accumulate_and_observations_leave_them_unchanged()
                 ]
             );
             let before = cognition_totals(&sim.stats);
-            let weights = sim.creatures[id].graph_runtime.plasticity_weights.clone();
+            let weights = sim.creatures[id].graph_runtime.learned().clone();
             let memory = sim.creatures[id].shared_memory;
             crate::simulation::observe_final_actions(&sim);
             crate::simulation::observe_temporal_actions(&sim);
             assert_eq!(cognition_totals(&sim.stats), before);
-            assert_eq!(sim.creatures[id].graph_runtime.plasticity_weights, weights);
+            assert_eq!(sim.creatures[id].graph_runtime.learned(), &weights);
             assert_eq!(sim.creatures[id].shared_memory, memory);
         }
     }

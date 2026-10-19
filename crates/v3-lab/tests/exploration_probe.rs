@@ -499,7 +499,6 @@ fn restored(plateau: &CreatureGenome) -> CreatureGenome {
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        None,
     ));
     set_sink_inputs(
         def,

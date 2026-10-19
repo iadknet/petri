@@ -487,7 +487,6 @@ mod tests {
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(0.0),
                         vec![],
-                        None,
                     )])
                     .with_output_sinks(vec![OutputSink::new(
                         OutputSinkKind::RouterGate(0),
@@ -578,7 +577,6 @@ mod tests {
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(9.0),
                         vec![],
-                        None,
                     )])
                     .with_output_sinks(vec![
                         OutputSink::new(
@@ -661,7 +659,6 @@ mod tests {
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
                             vec![],
-                            None,
                         )])
                         .with_output_sinks(vec![
                             OutputSink::new(
@@ -788,7 +785,6 @@ mod tests {
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
                             vec![],
-                            None,
                         )])
                         .with_output_sinks(vec![]),
                 ),
@@ -837,23 +833,25 @@ mod tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![ComputeNode::new(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![GraphEdge::new(
-                                GraphSource::SharedMemory {
-                                    slot: 0,
-                                    previous: false,
-                                },
-                                1.0,
-                            )],
-                            Some(PlasticityConfig {
-                                rule: HebbianRule::Classic,
-                                learning_rate: 0.5,
-                                weight_clamp: 1.0,
-                                lamarckian: false,
-                                modulation: None,
-                            }),
-                        )])
+                        .with_compute_nodes(vec![
+                            crate::creature::genome::cgp::test_support::plastic_node(
+                                ComputeNodeKind::Constant(1.0),
+                                vec![GraphEdge::new(
+                                    GraphSource::SharedMemory {
+                                        slot: 0,
+                                        previous: false,
+                                    },
+                                    1.0,
+                                )],
+                                Some(PlasticityConfig {
+                                    rule: HebbianRule::Classic,
+                                    learning_rate: 0.5,
+                                    weight_clamp: 1.0,
+                                    lamarckian: false,
+                                    modulation: None,
+                                }),
+                            ),
+                        ])
                         .with_output_sinks(vec![OutputSink::new(
                             OutputSinkKind::ActionVote(VoteSink::Eat),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],

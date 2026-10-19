@@ -93,6 +93,38 @@ fn pair_groups_for(tick: u64) -> crate::bench::pair_groups::PairGroups {
     crate::bench::pair_groups::PairGroups::census(std::iter::empty(), tick, tick * 2)
 }
 
+/// A plasticity census of `population` creatures carrying no plastic edge:
+/// every row present at zero (T25.F06).
+fn plasticity_for(population: u64) -> PlasticityCensusBlock {
+    let row = |learning: &str, surface: &str| PlasticEdgeRow {
+        learning: learning.to_owned(),
+        surface: surface.to_owned(),
+        edges: 0,
+        drift_sum: six(0.0),
+        at_clamp: 0,
+    };
+    let keys = |keys: &[&str]| {
+        keys.iter()
+            .map(|key| PlasticKeyRow {
+                key: (*key).to_owned(),
+                edges: 0,
+            })
+            .collect()
+    };
+    PlasticityCensusBlock {
+        creatures: population,
+        carriers: 0,
+        edges: vec![
+            row("hebbian", "compute"),
+            row("hebbian", "sink"),
+            row("reward_modulated", "compute"),
+            row("reward_modulated", "sink"),
+        ],
+        edges_by_rule: keys(&["classic", "oja", "anti_hebb", "covariance"]),
+        edges_by_inheritance: keys(&["darwinian", "lamarckian"]),
+    }
+}
+
 /// The reading `PopulationReadings::observe` produces for an empty
 /// population: zero means that never reach the report, no surviving clade,
 /// undefined entropy, and an all-zero census.
@@ -109,6 +141,7 @@ fn empty_readings() -> PopulationReadings {
         sensor_census: census_for(0),
         occupancy_grid: grid_for(0),
         pair_groups: None,
+        plasticity_census: plasticity_for(0),
     }
 }
 
@@ -132,6 +165,7 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         sensor_census: census_for(population),
         occupancy_grid: grid_for(population),
         pair_groups: Some(pair_groups_for(tick)),
+        plasticity_census: plasticity_for(population),
     }
 }
 
@@ -300,7 +334,6 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Constant(0.0),
             vec![],
-            None,
         )])
         .with_output_sinks(vec![sink(GraphSource::ComputeNode(0))]);
     let mut shared_memory_reader = inert.clone();
@@ -487,6 +520,7 @@ proptest! {
             sensor_census: Some(census_for(population)),
             occupancy_grid: Some(grid_for(population)),
             pair_groups: None,
+            plasticity_census: Some(plasticity_for(population)),
             tracking: WorldTracking::default(),
         };
 
@@ -507,6 +541,7 @@ proptest! {
         prop_assert_eq!(&decoded.shannon_entropy_nats, &sample.shannon_entropy_nats);
         prop_assert_eq!(&decoded.sensor_census, &sample.sensor_census);
         prop_assert_eq!(&decoded.occupancy_grid, &sample.occupancy_grid);
+        prop_assert_eq!(&decoded.plasticity_census, &sample.plasticity_census);
         prop_assert_eq!(&decoded.tracking, &sample.tracking);
 
         let mut stripped: serde_json::Value =
@@ -523,6 +558,7 @@ proptest! {
             "shannon_entropy_nats",
             "sensor_census",
             "occupancy_grid",
+            "plasticity_census",
         ] {
             object.remove(key);
         }
@@ -1314,6 +1350,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         sensor_census: Some(census_for(5)),
         occupancy_grid: Some(grid_for(5)),
         pair_groups: Some(pair_groups_for(100)),
+        plasticity_census: Some(plasticity_for(5)),
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],

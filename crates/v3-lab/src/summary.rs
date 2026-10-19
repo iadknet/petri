@@ -20,7 +20,7 @@ pub const SUMMARY_VERSION_MIN: u32 = 2;
 /// channels replaces the three creature families); 2 since T25.F03
 /// (`own_weight`, edge membership and groups replace `weight` and ring
 /// projections).
-pub const GENOME_FORMAT: u32 = 3;
+pub const GENOME_FORMAT: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Summary {

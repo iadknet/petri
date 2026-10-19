@@ -278,9 +278,8 @@ mod tests {
                                 },
                                 1.0,
                             )],
-                            None,
                         ),
-                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![], None),
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
                     ])
                     .with_output_sinks(vec![OutputSink::new(
                         OutputSinkKind::RouterGate(0),

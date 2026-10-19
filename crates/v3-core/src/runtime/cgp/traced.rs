@@ -2,7 +2,6 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
 use crate::runtime::trace::domain::{
     kind_label, GraphNodeEvalTrace, GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
@@ -86,9 +85,24 @@ impl GraphTracer for RecordingTracer {
         self.temporal_committed = temporal_committed;
     }
 
-    fn on_effects(&mut self, effects: CgpEffectsTrace) {
-        self.output_sinks = effects.output_sinks;
+    fn on_sink(
+        &mut self,
+        wired: bool,
+        weighted_inputs: &[f32],
+        weighted_sum: f32,
+        applied: bool,
+        applied_value: f32,
+    ) {
+        self.output_sinks.push(GraphOutputSinkTrace {
+            wired,
+            weighted_inputs: weighted_inputs.to_vec(),
+            weighted_sum,
+            applied,
+            applied_value,
+        });
     }
+
+    fn on_effects(&mut self) {}
 }
 
 #[allow(clippy::too_many_arguments)]

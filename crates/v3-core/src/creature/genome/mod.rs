@@ -166,11 +166,11 @@ pub const OUTCOME_CHANNEL_COUNT: usize = 4;
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RewardModulationConfig {
     pub reward_source: OutcomeChannel,
-    /// Eligibility retention per world tick, clamped to [0.0, 1.0] at runtime.
+    /// Eligibility retention per world tick, in [0.0, 1.0] (I1).
     pub trace_decay: f32,
 }
 
-/// Per-node plasticity configuration stored in the genome.
+/// One edge's learning attributes (T25.F06), stored on the `GraphEdge`.
 ///
 /// Governs both pure Hebbian and reward-modulated (three-factor) learning.
 /// When `modulation` is `None`, this is pure Hebbian learning. When `Some`,
@@ -179,9 +179,9 @@ pub struct RewardModulationConfig {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlasticityConfig {
     pub rule: HebbianRule,
-    /// Learning rate, applied once per weight update and clamped to [0.0, 1.0].
+    /// Learning rate, applied once per weight update, in [0.0, 1.0] (I1).
     pub learning_rate: f32,
-    /// Symmetric weight clamp magnitude, clamped to [0.01, 10.0] at runtime.
+    /// Symmetric weight clamp magnitude, in [0.01, 10.0] (I1).
     pub weight_clamp: f32,
     /// If true, offspring inherit learned weights (Lamarckian); otherwise
     /// offspring start from genome birth weights (Darwinian).
@@ -189,6 +189,21 @@ pub struct PlasticityConfig {
     /// Reward modulation config. `None` = pure Hebbian (default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modulation: Option<RewardModulationConfig>,
+}
+
+impl PlasticityConfig {
+    /// I1 for plasticity (T25.F06): every value finite, the learning rate and
+    /// trace decay in `[0, 1]` and the weight clamp in `[0.01, 10]`. The
+    /// enable draws and perturbation laws keep it by construction; the load
+    /// boundary checks it ([`cgp::validate_graph`]).
+    #[must_use]
+    pub fn in_range(&self) -> bool {
+        (0.0..=1.0).contains(&self.learning_rate)
+            && (0.01..=10.0).contains(&self.weight_clamp)
+            && self
+                .modulation
+                .is_none_or(|modulation| (0.0..=1.0).contains(&modulation.trace_decay))
+    }
 }
 
 // ── Top-level genome types ────────────────────────────────────────────────────
@@ -605,7 +620,6 @@ mod tests {
                     },
                     1.0,
                 )],
-                None,
             ),
             ComputeNode::new(
                 ComputeNodeKind::Sigmoid,
@@ -619,7 +633,6 @@ mod tests {
                         -0.3,
                     ),
                 ],
-                None,
             ),
         ]);
         let genome = CreatureGenome {
@@ -646,7 +659,6 @@ mod tests {
         cgp = cgp.with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Constant(1.0),
             vec![],
-            None,
         )]);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -999,7 +1011,6 @@ mod tests {
                     GraphEdge::new(leaf(2, 3), 1.0),
                     GraphEdge::new(GraphSource::ComputeNode(0), 0.5),
                 ],
-                None,
             ),
         ]);
         let mut backend = BackendDef::Graph(cgp);

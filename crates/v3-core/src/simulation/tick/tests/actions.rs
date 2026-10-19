@@ -624,14 +624,14 @@ fn energy_floor_at_zero_after_action_execution() {
 #[test]
 fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
     use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use crate::creature::genome::{
         HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
     for lamarckian in [false, true] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.append_compute_node(ComputeNode::new(
+        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Constant(1.0),
             vec![GraphEdge::new(
                 GraphSource::SharedMemory {
@@ -663,18 +663,31 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
         sim.config.mutation.per_unit_rate = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];
-        sim.creatures[parent].graph_runtime.plasticity_weights = vec![vec![Box::new([1.5])]];
+        sim.creatures[parent]
+            .graph_runtime
+            .learned
+            .set_slot(0, 0, 1.5, 3.0);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         let _ = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(sim.creatures.len(), 2, "reproduction must actually succeed");
         let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
-        assert!(child.graph_runtime.eligibility_traces.is_empty());
+        // A child's credit starts at zero: no trace before its first visit
+        // unless its Lamarckian slot is seeded, then a zero one (T25.F06).
+        let child_traces: Vec<_> = child
+            .graph_runtime
+            .learned()
+            .edges(0)
+            .map(|e| e.trace)
+            .collect();
+        assert_eq!(child_traces, vec![lamarckian.then_some(0.0)]);
         assert_eq!(child.age, 0);
-        assert_eq!(
-            sim.creatures[parent].graph_runtime.eligibility_traces[0][0][0],
-            3.0
-        );
+        let parent_traces: Vec<_> = sim.creatures[parent]
+            .graph_runtime
+            .learned()
+            .edges(0)
+            .map(|e| e.trace)
+            .collect();
+        assert_eq!(parent_traces, vec![Some(3.0)]);
     }
 }
 

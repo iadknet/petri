@@ -2,7 +2,7 @@ pub mod action_decode;
 pub(crate) mod cgp;
 pub mod inputs;
 pub mod mesh;
-pub(crate) mod plasticity;
+pub mod plasticity;
 pub(crate) mod routing;
 pub mod trace;
 pub mod traced_mesh;

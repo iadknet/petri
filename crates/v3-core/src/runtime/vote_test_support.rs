@@ -102,7 +102,6 @@ impl GraphBuilder {
                 .iter()
                 .map(|&(source, weight)| GraphEdge::new(source, weight))
                 .collect(),
-            None,
         ));
         GraphSource::ComputeNode(index)
     }
@@ -246,7 +245,7 @@ pub(crate) fn run_tick_heading(
     let mut states: [GraphRuntimeState; 3] =
         std::array::from_fn(|_| GraphRuntimeState::for_genome(genome, Vec::new()));
     for state in &mut states {
-        state.begin_tick(&genome.nodes, 0);
+        state.begin_tick(0);
     }
     let [plain_state, observed_state, traced_state] = &mut states;
     let [plain_energy, observed_energy, traced_energy] = &mut energies;

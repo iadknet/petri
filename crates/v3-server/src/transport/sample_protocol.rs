@@ -185,6 +185,9 @@ pub struct GraphTracePayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct GraphOutputSinkTracePayload {
     pub wired: bool,
+    /// Each edge's value times its applied weight, in sink order (T25.F06);
+    /// empty for an unwired sink.
+    pub weighted_inputs: Vec<f32>,
     pub weighted_sum: f32,
     pub applied: bool,
     pub applied_value: f32,

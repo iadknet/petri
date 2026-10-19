@@ -343,7 +343,6 @@ mod tests {
             graph.append_compute_node(ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![leaf(0), leaf(0)],
-                None,
             ));
             push_sink(
                 &mut graph,
@@ -388,7 +387,7 @@ mod tests {
         let graph = {
             let mut graph = empty_graph();
             // CN0 feeds nothing: no sink wires it.
-            graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)], None));
+            graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)]));
             graph
         };
         let census = census_of(&graph_node(
@@ -540,7 +539,7 @@ mod tests {
         ];
         for kind in stateful_kinds {
             let mut graph = empty_graph();
-            graph.append_compute_node(ComputeNode::new(kind, vec![], None));
+            graph.append_compute_node(ComputeNode::new(kind, vec![]));
             push_sink(
                 &mut graph,
                 OutputSink::new(
@@ -556,7 +555,7 @@ mod tests {
         }
 
         let mut graph = empty_graph();
-        graph.append_compute_node(ComputeNode::new(
+        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
             vec![],
             Some(PlasticityConfig {
@@ -588,7 +587,6 @@ mod tests {
         graph.append_compute_node(ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![],
-            None,
         ));
         let census = census_of(&graph_node(graph, vec![]));
 

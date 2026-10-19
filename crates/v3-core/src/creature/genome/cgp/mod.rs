@@ -262,7 +262,6 @@ mod tests {
                 },
                 1.0,
             )],
-            None,
         ));
 
         // Wire an output sink
@@ -309,7 +308,7 @@ mod tests {
             ComputeNodeKind::Sigmoid,
             ComputeNodeKind::Relu,
         ] {
-            def.append_compute_node(ComputeNode::new(kind, Vec::new(), None));
+            def.append_compute_node(ComputeNode::new(kind, Vec::new()));
         }
 
         // Compute node 2 (Relu) has edge to node 1 (Sigmoid)
@@ -393,7 +392,6 @@ mod tests {
                 },
                 1.0,
             )],
-            None,
         ));
 
         def.append_compute_node(ComputeNode::new(
@@ -405,7 +403,6 @@ mod tests {
                 },
                 0.5,
             )],
-            None,
         ));
 
         // Remove node 0 (Add)
@@ -428,11 +425,10 @@ mod tests {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // Two compute nodes: 0 (Sigmoid), 1 (Relu), Relu reads Sigmoid.
-        def.append_compute_node(ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new(), None));
+        def.append_compute_node(ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new()));
         def.append_compute_node(ComputeNode::new(
             ComputeNodeKind::Relu,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            None,
         ));
         def.push_edge(
             EdgeSurface::SinkInput(0),
@@ -448,7 +444,7 @@ mod tests {
         );
 
         // Insert a new node at index 1 (between Sigmoid and Relu).
-        def.insert_compute_node(1, ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None));
+        def.insert_compute_node(1, ComputeNode::new(ComputeNodeKind::Add, Vec::new()));
 
         assert_eq!(def.compute_nodes().len(), 3);
         assert_eq!(def.compute_nodes()[0].kind, ComputeNodeKind::Sigmoid);
@@ -483,10 +479,9 @@ mod tests {
         def.append_compute_node(ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            None,
         ));
 
-        def.insert_compute_node(0, ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None));
+        def.insert_compute_node(0, ComputeNode::new(ComputeNodeKind::Add, Vec::new()));
 
         assert_eq!(def.compute_nodes().len(), 2);
         // The self-loop now refers to the shifted node's own new index (1).
@@ -500,11 +495,11 @@ mod tests {
     fn insert_compute_node_at_and_remove_compute_node_at_are_inverse_on_indices() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         for kind in [ComputeNodeKind::Add, ComputeNodeKind::Sigmoid] {
-            def.append_compute_node(ComputeNode::new(kind, Vec::new(), None));
+            def.append_compute_node(ComputeNode::new(kind, Vec::new()));
         }
         let before = def.clone();
 
-        def.insert_compute_node(1, ComputeNode::new(ComputeNodeKind::Relu, Vec::new(), None));
+        def.insert_compute_node(1, ComputeNode::new(ComputeNodeKind::Relu, Vec::new()));
         def.remove_compute_node(1);
 
         assert_eq!(def, before);
@@ -534,7 +529,6 @@ mod tests {
                 ),
                 GraphEdge::new(GraphSource::ComputeNode(0), 0.5),
             ],
-            None,
         ));
         def.push_edge(
             EdgeSurface::SinkInput(0),

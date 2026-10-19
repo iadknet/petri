@@ -6,6 +6,7 @@ import type { GraphBackendDef, InputReference, RouteTarget } from "../../types/g
 import type { GraphTrace } from "../../types/trace.ts";
 import { EdgeGroupList } from "./EdgeGroupList.tsx";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
+import { PlasticEdgeList } from "./PlasticEdgeList.tsx";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import { BackwardWeightEdge, WeightEdge } from "./graphInternalsEdges.tsx";
@@ -179,6 +180,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 				</ReactFlowProvider>
 			</div>
 			<EdgeGroupList graphDef={graphDef} inputRefs={inputRefs} graphWeights={graphWeights} />
+			<PlasticEdgeList graphDef={graphDef} inputRefs={inputRefs} graphWeights={graphWeights} />
 		</div>
 	);
 });

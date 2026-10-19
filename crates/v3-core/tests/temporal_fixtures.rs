@@ -336,11 +336,7 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
 /// `SharedMemory { slot: 0, previous: true }` and is wired to `WriteSlot(1)`.
 fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.append_compute_node(ComputeNode::new(
-        ComputeNodeKind::Constant(0.6),
-        Vec::new(),
-        None,
-    ));
+    def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(0.6), Vec::new()));
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Add,
         vec![GraphEdge::new(
@@ -350,7 +346,6 @@ fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
             },
             1.0,
         )],
-        None,
     ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 0);
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(1), 1);
@@ -378,15 +373,10 @@ fn wire_custom_write_slot(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, so
 /// D1's genome: `Constant(1.0)` feeding a `DecayIntegrator(0.5)`.
 fn decay_integrator_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.append_compute_node(ComputeNode::new(
-        ComputeNodeKind::Constant(1.0),
-        Vec::new(),
-        None,
-    ));
+    def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::DecayIntegrator(0.5),
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        None,
     ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -409,7 +399,6 @@ fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenom
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Oscillator(0.25),
         Vec::new(),
-        None,
     ));
     genome
 }
@@ -419,18 +408,13 @@ fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenom
 /// `WriteSlot(0)`.
 fn backward_edge_recurrence_graph_genome() -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.append_compute_node(ComputeNode::new(
-        ComputeNodeKind::Constant(1.0),
-        Vec::new(),
-        None,
-    ));
+    def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Add,
         vec![
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        None,
     ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 1);
     CreatureGenome {
@@ -470,25 +454,25 @@ fn reward_modulated_node_genome_impl(
     wire_action: bool,
 ) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.append_compute_node(ComputeNode::new(
-        ComputeNodeKind::Constant(1.0),
-        Vec::new(),
-        None,
-    ));
+    def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Add,
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        Some(PlasticityConfig {
-            rule: HebbianRule::Classic,
-            learning_rate: 0.5,
-            weight_clamp: 10.0,
-            lamarckian: false,
-            modulation: Some(RewardModulationConfig {
-                reward_source,
-                trace_decay: 0.5,
-            }),
-        }),
     ));
+    def.edge_mut(v3_core::creature::genome::cgp::EdgeOccurrence::new(
+        v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(1),
+        0,
+    ))
+    .set_plasticity(Some(PlasticityConfig {
+        rule: HebbianRule::Classic,
+        learning_rate: 0.5,
+        weight_clamp: 10.0,
+        lamarckian: false,
+        modulation: Some(RewardModulationConfig {
+            reward_source,
+            trace_decay: 0.5,
+        }),
+    }));
     if wire_action {
         let surface = def
             .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
@@ -1080,8 +1064,12 @@ fn e1_exact_one_edge_update_immediate_reward() {
     let expected_gain = eta * signal * pre * post; // 0.5
     let expected_weight = 1.0 + expected_gain; // genome weight 1.0 + gain
 
-    let trace = creature.graph_runtime.eligibility_traces[0][1][0];
-    let weight = creature.graph_runtime.plasticity_weights[0][1][0];
+    let trace = plastic_edge(creature, 0)
+        .trace
+        .expect("an initialized trace");
+    let weight = plastic_edge(creature, 0)
+        .learned
+        .expect("an initialized weight");
     assert!(
         (trace - expected_trace).abs() < 1e-6,
         "eligibility trace after tick1 should be pre*post = {expected_trace}, got {trace}"
@@ -1091,6 +1079,19 @@ fn e1_exact_one_edge_update_immediate_reward() {
         "plasticity weight after tick1 should show the single learning-rate application \
          (eta * signal * pre * post = {expected_gain} added to the genome weight), got {weight}"
     );
+}
+
+/// The one plastic edge of mesh node `node` through the learned state's view.
+fn plastic_edge(
+    creature: &v3_core::creature::state::CreatureState,
+    node: usize,
+) -> v3_core::runtime::plasticity::LearnedEdge {
+    creature
+        .graph_runtime
+        .learned()
+        .edges(node)
+        .next()
+        .expect("one plastic edge")
 }
 
 // ── E2: delayed reward, visited every tick ──────────────────────────────────
@@ -1123,8 +1124,12 @@ fn e2_delayed_reward_visited_every_tick() {
         let expected_weight = 1.0 + eta * 1.0 * expected_trace; // signal == 1.0 at the reward tick
 
         let creature = sim.creatures.get(target).expect("creature alive");
-        let trace = creature.graph_runtime.eligibility_traces[0][1][0];
-        let weight = creature.graph_runtime.plasticity_weights[0][1][0];
+        let trace = plastic_edge(creature, 0)
+            .trace
+            .expect("an initialized trace");
+        let weight = plastic_edge(creature, 0)
+            .learned
+            .expect("an initialized weight");
         assert!(
             (trace - expected_trace).abs() < 1e-5,
             "delay {delay}: trace at the reward tick should match the elapsed-tick \
@@ -1194,7 +1199,9 @@ fn e3_skipped_module_visits() {
     );
 
     let creature = sim.creatures.get(target).expect("alive");
-    let trace_1 = creature.graph_runtime.eligibility_traces[1][1][0];
+    let trace_1 = plastic_edge(creature, 1)
+        .trace
+        .expect("an initialized trace");
     let eta = 0.5f32;
     let expected_trace_1 = 1.0; // decay*0 + pre(1.0)*post(1.0)
     assert!(
@@ -1202,7 +1209,9 @@ fn e3_skipped_module_visits() {
         "tick1 trace should be pre*post = {expected_trace_1}, got {trace_1}"
     );
     let mut expected_weight = 1.0 + eta * signal_1 * trace_1;
-    let weight_1 = creature.graph_runtime.plasticity_weights[1][1][0];
+    let weight_1 = plastic_edge(creature, 1)
+        .learned
+        .expect("an initialized weight");
     assert!(
         (weight_1 - expected_weight).abs() < 1e-4,
         "tick1 weight should be genome weight + eta*signal*trace = {expected_weight}, \
@@ -1231,7 +1240,9 @@ fn e3_skipped_module_visits() {
         );
 
         let creature = sim.creatures.get(target).expect("alive");
-        let trace_now = creature.graph_runtime.eligibility_traces[1][1][0];
+        let trace_now = plastic_edge(creature, 1)
+            .trace
+            .expect("an initialized trace");
         let expected_trace = trace_1 * 0.5f32.powi((skipped_tick - 1) as i32);
         assert!(
             (trace_now - expected_trace).abs() < 1e-9,
@@ -1239,7 +1250,9 @@ fn e3_skipped_module_visits() {
         );
 
         expected_weight += eta * signal * expected_trace;
-        let weight_now = creature.graph_runtime.plasticity_weights[1][1][0];
+        let weight_now = plastic_edge(creature, 1)
+            .learned
+            .expect("an initialized weight");
         assert!(
             (weight_now - expected_weight).abs() < 1e-4,
             "reward learning should move the weight on a skipped tick \
@@ -1270,13 +1283,8 @@ fn e4_trace_visited_twice_per_tick_adds_twice() {
     );
     let mut expected_trace = 0.0f32;
     for tick_num in 1..=3 {
-        let weight = sim.creatures[target]
-            .graph_runtime
-            .plasticity_weights
-            .get(1)
-            .and_then(|module| module.get(1))
-            .and_then(|edges| edges.first())
-            .copied()
+        let weight = plastic_edge(&sim.creatures[target], 1)
+            .learned
             .unwrap_or(1.0);
         let tick = run_one_traced_tick(&mut sim, target);
         assert_eq!(
@@ -1285,7 +1293,9 @@ fn e4_trace_visited_twice_per_tick_adds_twice() {
             "entry, module, entry, module, entry, exit"
         );
         expected_trace = 0.5 * expected_trace + 2.0 * weight;
-        let trace = sim.creatures[target].graph_runtime.eligibility_traces[1][1][0];
+        let trace = plastic_edge(&sim.creatures[target], 1)
+            .trace
+            .expect("an initialized trace");
         assert!(
             (trace - expected_trace).abs() < 1e-5,
             "tick {tick_num}: expected trace {expected_trace}, got {trace}"
@@ -1320,12 +1330,10 @@ fn one_step_stateful_genome(node1_kind: ComputeNodeKind, input: f32) -> Creature
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Constant(input),
         Vec::new(),
-        None,
     ));
     def.append_compute_node(ComputeNode::new(
         node1_kind,
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        None,
     ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -1363,7 +1371,7 @@ proptest! {
             let prev_shared_memory = [0.0f32; 16];
             let mut graph_runtime = GraphRuntimeState::for_genome(&genome, Vec::new());
             graph_runtime.node_state.push(vec![0.0, state]);
-            graph_runtime.begin_tick(&genome.nodes, 0);
+            graph_runtime.begin_tick(0);
 
             let _ = execute_creature_mesh(
                 &genome,

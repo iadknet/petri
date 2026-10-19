@@ -30,12 +30,18 @@ export interface GraphModelEdge {
 	id: string;
 	sourceId: string;
 	targetId: string;
-	/** The edge's genomic weight: a member's is the server's `graph_weights` value. */
+	/**
+	 * The weight drawn: a member's genomic weight (the server's
+	 * `graph_weights` value), a plastic edge's applied weight (T25.F06), else
+	 * its own weight.
+	 */
 	weight: number;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
 	isBackward: boolean;
 	/** Whether the edge is an edge-group member (T25.F03), drawn dashed. */
 	isMember: boolean;
+	/** Whether the edge carries learning attributes (T25.F06). */
+	isPlastic: boolean;
 }
 
 /**
@@ -103,6 +109,7 @@ function collectEdgesFromSources(
 				edgeType,
 				isBackward,
 				isMember: edge.membership !== undefined,
+				isPlastic: edge.plasticity !== undefined,
 			});
 		} else {
 			const inId = inputNodeId(source);
@@ -116,6 +123,7 @@ function collectEdgesFromSources(
 					edgeType,
 					isBackward: false,
 					isMember: edge.membership !== undefined,
+					isPlastic: edge.plasticity !== undefined,
 				});
 			}
 		}
@@ -128,17 +136,20 @@ export function buildFullGraphModel(
 	inputRefs: InputReference[],
 	graphWeights: NodeGraphWeights | null = null,
 ): FullGraphModel {
-	const genomic = new Map(
+	const weights = new Map(
 		(graphWeights?.edges ?? []).map((entry) => [
 			`${entry.surface}:${entry.container}:${entry.edge}`,
-			entry.genomic,
+			entry,
 		]),
 	);
 	const weightOf =
-		(surface: "compute" | "sink", container: number) => (edge: GraphEdge, index: number) =>
-			edge.membership
-				? memberWeight(graphDef, edge, genomic.get(`${surface}:${container}:${index}`))
-				: edge.own_weight;
+		(surface: "compute" | "sink", container: number) => (edge: GraphEdge, index: number) => {
+			const entry = weights.get(`${surface}:${container}:${index}`);
+			if (edge.membership) return memberWeight(graphDef, edge, entry?.genomic);
+			// A plastic edge is drawn at the weight in force (T25.F06).
+			if (edge.plasticity) return entry?.applied ?? edge.own_weight;
+			return edge.own_weight;
+		};
 	const nodes: GraphModelNode[] = [];
 	const allEdges: GraphModelEdge[] = [];
 	const inputNodeIds = new Set<string>();

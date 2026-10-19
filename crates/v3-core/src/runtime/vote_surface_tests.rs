@@ -88,7 +88,6 @@ fn voting_graph_node(
                 .with_compute_nodes(vec![ComputeNode::new(
                     ComputeNodeKind::Constant(value),
                     vec![],
-                    None,
                 )])
                 .with_output_sinks(
                     sinks
@@ -153,7 +152,7 @@ fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run 
     let mut energy = energy;
     let mut memory = [0.0; 16];
     let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
-    state.begin_tick(&genome.nodes, 0);
+    state.begin_tick(0);
     let (output, _, passes) = execute_creature_mesh_traced(
         genome,
         &sensors(),
@@ -487,7 +486,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 GraphRuntimeState::for_genome(&genome, Vec::new()),
             ];
             for state in &mut states {
-                state.begin_tick(&genome.nodes, 0);
+                state.begin_tick(0);
             }
             let plain = execute_creature_mesh_impl(
                 &genome,

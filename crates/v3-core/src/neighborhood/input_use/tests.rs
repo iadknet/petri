@@ -172,7 +172,7 @@ fn an_executed_read_into_a_custom_output_has_no_effect() {
 
 #[test]
 fn a_structurally_dead_compute_node_still_reads_its_inputs() {
-    let dead = ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0, 0)], None);
+    let dead = ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0, 0)]);
     let parent = Fixture::new().read(&genome(vec![graph_node(
         0,
         vec![food_here()],

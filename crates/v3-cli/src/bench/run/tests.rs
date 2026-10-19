@@ -396,7 +396,7 @@ fn recruitment_paths_is_goal_only_and_historical_absence_is_unmeasured() {
         .recruitment_paths
         .defined()
         .unwrap();
-    assert_eq!(reading.version, "recruitment-paths-v2");
+    assert_eq!(reading.version, "recruitment-paths-v3");
     assert_eq!(reading.total_proposals, reading.sizes.proposals());
     assert!(goal.environment.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
     for name in ["gate", "sweep", "synthetic"] {

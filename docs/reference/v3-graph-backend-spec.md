@@ -69,7 +69,6 @@ pub struct Group {
 pub struct ComputeNode {
     pub kind: ComputeNodeKind,
     pub inputs: Vec<GraphEdge>,
-    pub plasticity: Option<PlasticityConfig>,
 }
 
 pub struct OutputSink {
@@ -80,15 +79,17 @@ pub struct OutputSink {
 pub struct GraphEdge {
     source: GraphSource,
     own_weight: f32,                 // JSON key `own_weight`
+    plasticity: Option<PlasticityConfig>, // Section 13; omitted when None
     membership: Option<Membership>,  // { group: GroupId }; omitted when None
-}
+}                                    // 36 bytes (T25.F06)
 ```
 
 Design choice: edges are co-located with each node/sink for linear,
 cache-friendly evaluation. Fixed structural outputs are stored in separate
 Vecs to prevent topology mutations from affecting them. Fields are private;
 the container (`cgp/container.rs`) is the only writer and keeps the birth
-seeds and the group invariants aligned. A group's members are ordinary sink
+seeds and the group invariants aligned; `EdgeMut::set_plasticity` is the only
+writer of an edge's learning attributes. A group's members are ordinary sink
 edges (Section 6). Equality, the `Debug` genome identity and JSON cover every
 heritable field and nothing else (`Debug` prints `groups` unconditionally);
 the `cgp` genome types deny unknown JSON fields.
@@ -257,7 +258,7 @@ and equal native execution context, the appended zero preserves the complete
 visit vote contribution, incumbent output slots, route scores, parameters,
 shared memory, and carried temporal and plasticity state. Equality is exact
 numeric equality, allowing signed zero; no tolerance conceals changed votes.
-Sink weights remain inherited coefficients outside compute-node plasticity.
+The appended zero edge is static: it carries no learning attributes.
 
 An already active graph with unchanged compute nodes pays the same native
 charge. At adequate budgets its committed actions and carried state agree
@@ -371,10 +372,12 @@ Section 3). No graph output terminates the tick.
 
 ## 8. Evaluation Order and Per-Visit Clock
 
-Phase 0 calls `graph_runtime.begin_tick(&genome.nodes, age)`, also used by
-neighborhood sequences, standalone multi-tick callers, and cloned
-observations. It records the dispatch record's age and decays initialized
-eligibility once; it snapshots nothing (T19.F02). Internal time is counted in
+Phase 0 calls `graph_runtime.begin_tick(age)`, also used by neighborhood
+sequences, standalone multi-tick callers, and cloned observations. It records
+the dispatch record's age and decays every eligibility trace once; it
+snapshots nothing (T19.F02). A learning graph's visited flag is set at visit
+entry, before the pass-cost check, and stays set for the creature's life
+(Section 13). Internal time is counted in
 visits and world time in ticks: a module's state advances once per visit,
 however many visits a tick's pass makes, and the per-pass hop cap and the
 per-tick hop ramp bound and price those visits. A visit is entered when the
@@ -410,10 +413,13 @@ source resolves to `0.0` as any out-of-range compute source does.
 ### Phase 1: Value outputs
 
 Iterate `output_sinks`. For each sink with non-empty `inputs`:
-- Gather `wsum = sum(resolve_source(edge.source) * genomic_weight(edge))`,
-  sequentially in the sink's edge order, the weight read from the runtime
-  weight table (Section 6), using current-visit `curr_outputs` for
-  `ComputeNode` sources.
+- Gather `wsum = sum(resolve_source(edge.source) * applied_weight(edge))`,
+  sequentially in the sink's edge order, using current-visit `curr_outputs`
+  for `ComputeNode` sources and shared memory as earlier sinks wrote it. The
+  applied weight is a plastic edge's learned weight, else the genomic weight
+  from the runtime weight table (Section 6). On a learning graph each plastic
+  edge records the value the sum read as its pre sample and the sink's
+  `sanitize_f32(wsum)` as its post sample (Section 13).
 - Write to target:
   - `CustomOutput(slot)`: `output_slots[slot] = wsum` (slot < 12).
   - `RouterOutput`: emit `RouteDecision::CgpNormalized { raw_value: wsum }`.
@@ -433,7 +439,11 @@ its effects stages its vote contribution; an exhausted visit stages nothing.
 Graph sampler traces include post-evaluation structural-layer records in
 addition to the single entered evaluation:
 - `output_sinks: Vec<GraphOutputSinkTrace>` (1:1 with `output_sinks`)
-  - fields: `wired`, `weighted_sum`, `applied`, `applied_value`
+  - fields: `wired`, `weighted_inputs` (each edge's value times its applied
+    weight, in sink order, as the node trace carries them; empty when
+    unwired), `weighted_sum`, `applied`, `applied_value`
+  - built only when the tracer records; the production pass allocates
+    nothing per visit
 
 The pass records (votes, effective votes, committed action, end reason) are
 on the tick trace (`v3-server-api-protocol-spec.md`).
@@ -504,13 +514,13 @@ counted in the per-visit energy cost. They are evaluated once post-evaluation.
 
 ### PlasticityConfig
 
-Per-node learning configuration (applies to compute nodes only):
+Per-edge learning attributes (T25.F06), on `GraphEdge.plasticity`:
 
 ```rust
 pub struct PlasticityConfig {
     pub rule: HebbianRule,        // Classic, Oja, AntiHebb, Covariance
-    pub learning_rate: f32,
-    pub weight_clamp: f32,
+    pub learning_rate: f32,       // [0, 1]
+    pub weight_clamp: f32,        // [0.01, 10]
     pub lamarckian: bool,
     pub modulation: Option<RewardModulationConfig>,
 }
@@ -521,74 +531,94 @@ pub struct RewardModulationConfig {
 }
 ```
 
-When `modulation` is `None`: pure Hebbian learning (weight updates applied
-during Phase 1 post-evaluation pass).
+Every edge on either surface may be plastic except an edge of a `ClearSlot`
+sink (its sum is ignored) and, until T25.F07, a group member;
+`validate_graph` rejects both and any value outside the ranges above (I1),
+which the mutation draws and perturbations keep by construction. The laws
+read the stored values; no runtime clamp normalizes them. A learning
+attribute carries no genome unit. `CgpGraphBackendDef::plastic_edges()`
+enumerates the plastic edges in canonical (`edge_sites`) order and is the
+one definition of "carries learning".
 
-When `modulation` is `Some`: reward-modulated three-factor learning (eligibility
-traces updated during Phase 1; weight updates deferred to Phase 2.5).
+When `modulation` is `None`: pure Hebbian learning, applied after the
+effects of each committed visit. When `Some`: reward-modulated three-factor
+learning, the eligibility trace updated per committed visit and the weight
+in Phase 2.5.
 
-### Runtime state
+### Learned state
 
-Plasticity weights (`plasticity_weights`) and eligibility traces
-(`eligibility_traces`) are stored parallel to `node_state` in
-`GraphRuntimeState`. Both use `Vec<Vec<Box<[f32]>>>` layout — one `Box<[f32]>`
-per compute node, one `f32` per input edge.
+`GraphRuntimeState::for_genome(genome, seeds)` is the only constructor and
+builds the learned state once (`runtime::plasticity::LearnedState`): per
+mesh node, the plastic-edge slots over both surfaces in canonical order, a
+learned own weight per slot, a trace per reward-modulated slot and a visited
+flag. A graph without a plastic edge allocates no learned state and runs the
+static loops. `applied_weight(occurrence)` is the only resolver: a plastic
+edge's learned weight, else the genomic weight. Readers use the read-only
+view, which yields per plastic edge `(occurrence, genomic, learned, trace,
+bound, kind)`, `learned` and `trace` present only for an initialized slot.
 
-- Plasticity weights are lazy-initialized from each genome edge weight on first use.
-- Eligibility traces are lazy-initialized to `0.0` on first use.
-- Offspring start with empty traces and temporal state. The final child node's
-  `lamarckian` flag enables learned-weight inheritance by connection occurrence,
-  including faithful copies and index repairs. See
-  [reproduction inheritance](v3-reproduction-spec.md#graph-state) for new/reset
-  edges and absent parent values. A materialized inherited slice has exactly the
-  final input count; nodes with no available inherited values remain lazy.
-- Birth correspondence is temporary, excluded from serialization and genome
-  equality, and consumed before spawn. Runtime weight layout remains unchanged.
+- A slot is initialized when its backend has been visited (the flag is set at
+  visit entry, a failed visit included) or when it was seeded at birth.
+  Reward, `capture()` and the view's `learned` read initialized slots only.
+- A Lamarckian plastic edge with a birth seed starts at the seed clamped by
+  the child's edge clamp, initialized; every other plastic edge (a Darwinian
+  one with a seed included) starts at its genomic weight and stays
+  uninitialized until its backend's first visit. Traces start at zero. See
+  [reproduction inheritance](v3-reproduction-spec.md#graph-state).
+- Birth seeds are temporary, excluded from serialization and genome
+  equality, and consumed by the constructor.
 
-### Eligibility trace clock and activity (Phases 0 and 1)
+### Samples, order and the Hebbian laws (per committed visit)
 
-At world-tick start, every initialized reward-modulated edge decays once,
-including modules never visited this tick, and is never rolled back:
+On a learning graph the executor records, for every plastic edge, the pre
+value its evaluation used — a compute edge's ordered read (lower sources this
+visit's outputs, self and higher the last committed) and a sink edge's value
+as the sink sum read it (Section 9) — and the post value: the node's
+committed output, or the sink's `sanitize_f32(wsum)`. No source is
+re-resolved after evaluation. Evaluation reads the applied weight in force
+at visit start. After the effects, each pure-Hebbian edge's change is
+computed from its samples and visit-start weight `w` with its own rule and
+rate, then applied in canonical order, each bounded by its own clamp:
 
 ```text
-trace <- clamp(trace_decay, 0, 1) * trace          (once per world tick)
-trace <- trace + activity(pre, post, weight)        (per successful visit)
+Classic    dw = eta * pre * post
+Oja        dw = eta * post * (pre - w * post)
+AntiHebb   dw = -eta * pre * post
+Covariance dw = eta * (pre - 0.5) * (post - 0.5)
+w <- clamp(w + dw, -weight_clamp, weight_clamp)
 ```
 
-Each successful visit adds its activity (T19.F02); a module dispatched twice
-in one tick adds twice, bounded by the per-pass hop cap. A skipped tick
-leaves only the decay. A module first initialized this tick starts from
-zero. Lambda 0 forgets prior credit; lambda 1 retains it. An isolated pulse
-is discounted by lambda^d after d skipped ticks. Clock bookkeeping never
-initializes unvisited weights/traces or adds energy/work charges.
+On a recurrent compute edge the pre value is the committed value the
+evaluation read (T25.F06; the retired replay read this visit's output). A
+failed visit changes no learned value or trace.
 
-Activity excludes learning rate: Classic `pre*post`, Oja
-`post*(pre-weight*post)`, AntiHebb `-pre*post`, Covariance
-`(pre-0.5)*(post-0.5)`. It uses the unweighted source actually evaluated,
-the node's resulting output and effective evaluation weight. Lower-index
-sources use current-visit outputs; self/higher sources use the last committed
-outputs. Input context includes evaluation-time energy, which pure Hebbian
-updates no longer change (T25.F02). Pure Hebbian updates retain their
-existing semantics.
+### Eligibility trace clock and activity
 
-Commit activity only after the evaluation's pass cost is affordable,
-before graph effects. A failed visit leaves the trace untouched, whatever
-earlier visits added this tick. Elapsed-time decay is never rolled back.
-Existing charges and work counters still apply.
+```text
+trace <- trace_decay * trace                        (once per world tick, begin_tick)
+trace <- trace + activity(pre, post, w)             (per committed visit)
+```
+
+Activity excludes the learning rate: Classic `pre*post`, Oja
+`post*(pre-w*post)`, AntiHebb `-pre*post`, Covariance `(pre-0.5)*(post-0.5)`,
+from the same samples. A module dispatched twice in one tick adds twice,
+bounded by the per-pass hop cap; a skipped tick leaves only the decay. Lambda
+0 forgets prior credit; lambda 1 retains it; an isolated pulse is discounted
+by lambda^d after d skipped ticks. Input context includes evaluation-time
+energy. Learning charges no energy or work (T25.F02).
 
 ### Reward-modulated weight update (Phase 2.5)
 
 ```text
-dw = learning_rate * outcome_signal[reward_source] * trace[edge]
+dw = learning_rate * outcome_signal[reward_source] * trace
 new_weight = clamp(weight + dw, -weight_clamp, weight_clamp)
 ```
 
-Learning rate is clamped to [0,1] and weight-clamp magnitude to [0.01,10].
 Eta applies once: unit activity/reward at eta 0.5 yields trace 1 and delta
 0.5. At lambda 0 and unit reward, a feed-forward edge matches its pure
 Hebbian update. Phase 2.5 updates every initialized modulated edge each tick,
-even on skipped visits or zero deltas, and counts each update; learning
-charges no energy (T25.F02). Reward does not clear eligibility.
+even on skipped visits or zero deltas, and counts each update; a seeded
+modulated slot counts from birth. Reward does not clear eligibility.
 
 ---
 

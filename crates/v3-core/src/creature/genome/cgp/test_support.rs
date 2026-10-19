@@ -4,7 +4,8 @@
 //! builder.
 
 use super::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    OutputSink, OutputSinkKind,
 };
 use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, PlasticityConfig};
@@ -22,7 +23,6 @@ pub(crate) struct SinkDraft {
 pub(crate) struct NodeDraft {
     pub kind: ComputeNodeKind,
     pub inputs: Vec<GraphEdge>,
-    pub plasticity: Option<PlasticityConfig>,
 }
 
 /// Edit `def`'s sink catalog as drafts; the def keeps its compute nodes,
@@ -56,15 +56,52 @@ pub(crate) fn edit_compute_nodes(
         .map(|node| NodeDraft {
             kind: node.kind,
             inputs: node.inputs.to_vec(),
-            plasticity: node.plasticity,
         })
         .collect();
     edit(&mut drafts);
     let nodes = drafts
         .into_iter()
-        .map(|draft| ComputeNode::new(draft.kind, draft.inputs, draft.plasticity))
+        .map(|draft| ComputeNode::new(draft.kind, draft.inputs))
         .collect();
     *def = def.clone().with_compute_nodes(nodes);
+}
+
+/// `edges`, each carrying `config` (T25.F06), written through the only
+/// writer, [`super::EdgeMut::set_plasticity`], on a scratch compute node.
+pub(crate) fn with_plasticity(
+    edges: Vec<GraphEdge>,
+    config: Option<PlasticityConfig>,
+) -> Vec<GraphEdge> {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, edges)]);
+    let surface = EdgeSurface::ComputeInput(0);
+    for index in 0..def.surface_edges(surface).len() {
+        def.edge_mut(EdgeOccurrence::new(surface, index))
+            .set_plasticity(config);
+    }
+    def.surface_edges(surface).to_vec()
+}
+
+/// A compute node of `kind` whose `inputs` each carry `config`: the former
+/// per-node plasticity fixture, now on every input edge.
+pub(crate) fn plastic_node(
+    kind: ComputeNodeKind,
+    inputs: Vec<GraphEdge>,
+    config: Option<PlasticityConfig>,
+) -> ComputeNode {
+    ComputeNode::new(kind, with_plasticity(inputs, config))
+}
+
+/// Set `config` on every edge of `surface` of `def`.
+pub(crate) fn set_surface_plasticity(
+    def: &mut CgpGraphBackendDef,
+    surface: EdgeSurface,
+    config: Option<PlasticityConfig>,
+) {
+    for index in 0..def.surface_edges(surface).len() {
+        def.edge_mut(EdgeOccurrence::new(surface, index))
+            .set_plasticity(config);
+    }
 }
 
 /// `edge` with its weight replaced.

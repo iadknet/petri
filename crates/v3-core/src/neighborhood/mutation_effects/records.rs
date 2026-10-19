@@ -166,10 +166,23 @@ fn graph_state(
     runtime: &GraphRuntimeState,
 ) -> BTreeMap<NodeId, NodeState> {
     let row = |values: Option<&Vec<f32>>| trimmed(vec![bits_of(values.map_or(&[], Vec::as_slice))]);
-    let rows = |values: Option<&Vec<Box<[f32]>>>| {
-        trimmed(values.map_or_else(Vec::new, |rows| {
-            rows.iter().map(|row| bits_of(row)).collect()
-        }))
+    // The learned values and traces of the initialized plastic edges, in
+    // canonical order, through the learned state's view (T25.F06).
+    let learned = |index: usize| {
+        let values: Vec<f32> = runtime
+            .learned()
+            .edges(index)
+            .filter_map(|edge| edge.learned)
+            .collect();
+        trimmed(vec![bits_of(&values)])
+    };
+    let traces = |index: usize| {
+        let values: Vec<f32> = runtime
+            .learned()
+            .edges(index)
+            .filter_map(|edge| edge.trace)
+            .collect();
+        trimmed(vec![bits_of(&values)])
     };
     genome
         .nodes
@@ -179,8 +192,8 @@ fn graph_state(
             let entry: NodeState = [
                 row(runtime.node_state.get(index)),
                 row(runtime.node_outputs.get(index)),
-                rows(runtime.plasticity_weights.get(index)),
-                rows(runtime.eligibility_traces.get(index)),
+                learned(index),
+                traces(index),
             ];
             entry
                 .iter()
@@ -334,9 +347,6 @@ mod tests {
             none,
             graph_state(&two, &runtime(vec![Vec::new(), Vec::new()]))
         );
-        let mut placeholders = GraphRuntimeState::for_genome(&genome(&[0]), Vec::new());
-        placeholders.plasticity_weights = vec![vec![Box::from([])], Vec::new()];
-        assert_eq!(none, graph_state(&two, &placeholders));
         assert_ne!(none, graph_state(&two, &runtime(vec![vec![0.0]])));
         assert_ne!(
             graph_state(&two, &runtime(vec![vec![0.0]])),

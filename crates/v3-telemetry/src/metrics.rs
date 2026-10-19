@@ -24,7 +24,9 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::plasticity_census::{PlasticEdges, PlasticityCensus, PlasticityKind};
+use v3_core::creature::plasticity_census::{
+    rule_key, PlasticityCensus, INHERITANCE_KEYS, LEARNING_KEYS, RULES, SURFACE_KEYS,
+};
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
@@ -175,7 +177,7 @@ impl Census {
             (
                 &c.genome,
                 &*c.cached_reachable_nodes,
-                c.graph_runtime.plasticity_weights.as_slice(),
+                c.graph_runtime.learned(),
             )
         }));
         Self {
@@ -1033,41 +1035,107 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
             }),
         );
     }
-    let plasticity = &census.plasticity;
+    plasticity_values(f, &census.plasticity);
+}
+
+/// The plasticity census families (T25.F06): at most two attributes per
+/// family; the edges by pathway and surface, by rule and by inheritance, and
+/// drift and at-clamp by surface.
+fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
+    let sampled = Kind::Gauge { sampled: true };
     f.scalar(
         "petri.tick.plasticity_carriers".to_owned(),
         sampled,
         plasticity.carriers,
     );
-    type Read = fn(&PlasticEdges) -> Value;
-    let fields: [(&str, Read); 3] = [
-        ("plastic_edges", |row| row.edges.into()),
-        ("plastic_edge_drift", |row| row.drift_sum.into()),
-        ("plastic_edges_at_clamp", |row| row.at_clamp.into()),
-    ];
-    for (name, read) in fields {
-        f.push(
-            format!("petri.tick.{name}"),
-            sampled,
-            "",
-            PlasticityKind::ALL
-                .iter()
-                .zip(&plasticity.kinds)
-                .map(|(kind, row)| {
-                    (
-                        vec![
-                            ("petri.plasticity_rule", kind.rule_key().to_owned()),
-                            ("petri.plasticity_learning", kind.learning_key().to_owned()),
-                            (
-                                "petri.plasticity_inheritance",
-                                kind.inheritance_key().to_owned(),
-                            ),
-                        ],
-                        read(row),
-                    )
-                }),
-        );
-    }
+    let cells = || {
+        LEARNING_KEYS
+            .iter()
+            .enumerate()
+            .flat_map(move |(learning, &learning_key)| {
+                SURFACE_KEYS
+                    .iter()
+                    .enumerate()
+                    .map(move |(surface, &surface_key)| {
+                        (
+                            learning_key,
+                            surface_key,
+                            plasticity.edges[learning][surface],
+                        )
+                    })
+            })
+    };
+    f.push(
+        "petri.tick.plastic_edges".to_owned(),
+        sampled,
+        "",
+        cells().map(|(learning, surface, cell)| {
+            (
+                vec![
+                    ("petri.plasticity_learning", learning.to_owned()),
+                    ("petri.surface", surface.to_owned()),
+                ],
+                cell.edges.into(),
+            )
+        }),
+    );
+    f.push(
+        "petri.tick.plastic_edges_by_rule".to_owned(),
+        sampled,
+        "",
+        RULES
+            .iter()
+            .zip(plasticity.edges_by_rule)
+            .map(|(&rule, edges)| {
+                (
+                    vec![("petri.plasticity_rule", rule_key(rule).to_owned())],
+                    edges.into(),
+                )
+            }),
+    );
+    f.push(
+        "petri.tick.plastic_edges_by_inheritance".to_owned(),
+        sampled,
+        "",
+        INHERITANCE_KEYS
+            .iter()
+            .zip(plasticity.edges_by_inheritance)
+            .map(|(&inheritance, edges)| {
+                (
+                    vec![("petri.plasticity_inheritance", inheritance.to_owned())],
+                    edges.into(),
+                )
+            }),
+    );
+    let by_surface = |surface: usize| {
+        let (hebbian, reward) = (plasticity.edges[0][surface], plasticity.edges[1][surface]);
+        (
+            hebbian.drift_sum + reward.drift_sum,
+            hebbian.at_clamp + reward.at_clamp,
+        )
+    };
+    f.push(
+        "petri.tick.plastic_edge_drift".to_owned(),
+        sampled,
+        "",
+        SURFACE_KEYS.iter().enumerate().map(|(surface, &key)| {
+            (
+                vec![("petri.surface", key.to_owned())],
+                by_surface(surface).0.into(),
+            )
+        }),
+    );
+    f.push(
+        "petri.tick.plastic_edges_at_clamp".to_owned(),
+        sampled,
+        "",
+        SURFACE_KEYS.iter().enumerate().map(|(surface, &key)| {
+            (
+                vec![("petri.surface", key.to_owned())],
+                by_surface(surface).1.into(),
+            )
+        }),
+    );
 }
 
 /// The `petri.drive_kind` attribute value of a directed kind.

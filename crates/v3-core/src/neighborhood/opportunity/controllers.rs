@@ -149,7 +149,7 @@ impl Author<'_> {
             .collect();
         self.nodes += 1;
         self.graph
-            .append_compute_node(ComputeNode::new(kind, inputs, None));
+            .append_compute_node(ComputeNode::new(kind, inputs));
         GraphSource::ComputeNode((self.graph.compute_nodes().len() - 1) as u16)
     }
 

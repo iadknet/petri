@@ -1,20 +1,22 @@
 //! The plasticity census: how many creatures carry plasticity, of which kind,
 //! and how far learning has moved those weights from the genome.
 //!
-//! Reachable Graph nodes only. A plastic edge is an input edge of a compute
-//! node with `plasticity: Some(_)`, keyed by rule, learning pathway (pure
-//! Hebbian or reward-modulated) and inheritance (Lamarckian or Darwinian).
-//! Its learned weight is the creature's `plasticity_weights` entry when the
-//! runtime has initialized one, else the genome weight, as the runtime reads
-//! it. Drift is `|learned - genome|`: lifetime learning on a Darwinian edge;
-//! on a Lamarckian edge it also carries what ancestors learned. An edge sits
-//! at its clamp when an initialized learned weight reaches the node's runtime
-//! clamp, which every write saturates to exactly.
+//! Reachable Graph nodes only. A plastic edge is an edge on either surface
+//! with learning attributes (T25.F06), keyed by learning pathway (pure
+//! Hebbian or reward-modulated) and surface (compute or sink), and counted
+//! separately by rule and by inheritance (Lamarckian or Darwinian). The
+//! census reads the learned state's view: drift is `|learned - genomic|`
+//! over initialized edges (lifetime learning on a Darwinian edge; on a
+//! Lamarckian edge it also carries what ancestors learned), and an
+//! initialized edge sits at its clamp when its learned weight reaches the
+//! edge's clamp, which every write saturates to exactly.
 //!
-//! Pure structure and state: it reads genomes, cached reachability and learned
-//! weights and executes no brain.
+//! Pure structure and state: it reads genomes, cached reachability and
+//! learned state and executes no brain.
 
+use crate::creature::genome::cgp::EdgeSurface;
 use crate::creature::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig};
+use crate::runtime::plasticity::LearnedState;
 
 /// One plastic edge kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,36 +26,18 @@ pub struct PlasticityKind {
     pub lamarckian: bool,
 }
 
-const RULES: [HebbianRule; 4] = [
+/// The four rules, in census order.
+pub const RULES: [HebbianRule; 4] = [
     HebbianRule::Classic,
     HebbianRule::Oja,
     HebbianRule::AntiHebb,
     HebbianRule::Covariance,
 ];
 
-const KINDS: usize = RULES.len() * 4;
-
 impl PlasticityKind {
-    /// Every kind, in [`Self::index`] order.
-    pub const ALL: [Self; KINDS] = {
-        let mut all = [Self {
-            rule: HebbianRule::Classic,
-            reward_modulated: false,
-            lamarckian: false,
-        }; KINDS];
-        let mut i = 0;
-        while i < KINDS {
-            all[i] = Self {
-                rule: RULES[i / 4],
-                reward_modulated: i % 4 >= 2,
-                lamarckian: i % 2 == 1,
-            };
-            i += 1;
-        }
-        all
-    };
-
-    fn of(config: &PlasticityConfig) -> Self {
+    /// The kind of an edge with learning attributes `config`.
+    #[must_use]
+    pub fn of(config: &PlasticityConfig) -> Self {
         Self {
             rule: config.rule,
             reward_modulated: config.modulation.is_some(),
@@ -61,74 +45,69 @@ impl PlasticityKind {
         }
     }
 
-    /// Position in [`Self::ALL`].
+    /// Position of the rule in [`RULES`].
     #[must_use]
-    pub const fn index(self) -> usize {
-        let rule = match self.rule {
+    pub const fn rule_index(self) -> usize {
+        match self.rule {
             HebbianRule::Classic => 0,
             HebbianRule::Oja => 1,
             HebbianRule::AntiHebb => 2,
             HebbianRule::Covariance => 3,
-        };
-        rule * 4 + (self.reward_modulated as usize) * 2 + self.lamarckian as usize
-    }
-
-    #[must_use]
-    pub const fn rule_key(self) -> &'static str {
-        match self.rule {
-            HebbianRule::Classic => "classic",
-            HebbianRule::Oja => "oja",
-            HebbianRule::AntiHebb => "anti_hebb",
-            HebbianRule::Covariance => "covariance",
-        }
-    }
-
-    #[must_use]
-    pub const fn learning_key(self) -> &'static str {
-        if self.reward_modulated {
-            "reward_modulated"
-        } else {
-            "hebbian"
-        }
-    }
-
-    #[must_use]
-    pub const fn inheritance_key(self) -> &'static str {
-        if self.lamarckian {
-            "lamarckian"
-        } else {
-            "darwinian"
         }
     }
 }
 
-/// One kind's plastic edges over a population.
+/// The `petri.plasticity_rule` key of `rule`.
+#[must_use]
+pub const fn rule_key(rule: HebbianRule) -> &'static str {
+    match rule {
+        HebbianRule::Classic => "classic",
+        HebbianRule::Oja => "oja",
+        HebbianRule::AntiHebb => "anti_hebb",
+        HebbianRule::Covariance => "covariance",
+    }
+}
+
+/// The `petri.plasticity_learning` keys, by pathway index (0 pure Hebbian,
+/// 1 reward-modulated).
+pub const LEARNING_KEYS: [&str; 2] = ["hebbian", "reward_modulated"];
+
+/// The `petri.surface` keys, by surface index (0 compute, 1 sink).
+pub const SURFACE_KEYS: [&str; 2] = ["compute", "sink"];
+
+/// The `petri.plasticity_inheritance` keys, by inheritance index (0
+/// Darwinian, 1 Lamarckian).
+pub const INHERITANCE_KEYS: [&str; 2] = ["darwinian", "lamarckian"];
+
+/// One (pathway, surface) cell's plastic edges over a population.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PlasticEdges {
     pub edges: u64,
-    /// Sum of `|learned - genome|` over the edges.
+    /// Sum of `|learned - genomic|` over the initialized edges.
     pub drift_sum: f64,
-    /// Edges whose initialized learned weight sits at the node's clamp.
+    /// Initialized edges whose learned weight sits at the edge's clamp.
     pub at_clamp: u64,
 }
 
-/// The census of one population, per kind in [`PlasticityKind::ALL`] order.
+/// The census of one population.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PlasticityCensus {
     pub creatures: u64,
-    /// Creatures with at least one reachable plastic edge.
+    /// Creatures with at least one plastic edge on a reachable node.
     pub carriers: u64,
-    pub kinds: [PlasticEdges; KINDS],
+    /// Indexed `[pathway][surface]` ([`LEARNING_KEYS`], [`SURFACE_KEYS`]).
+    pub edges: [[PlasticEdges; 2]; 2],
+    /// Edge counts per rule, in [`RULES`] order.
+    pub edges_by_rule: [u64; 4],
+    /// Edge counts per inheritance, in [`INHERITANCE_KEYS`] order.
+    pub edges_by_inheritance: [u64; 2],
 }
-
-/// A creature's learned weights, `[mesh node][compute node][edge]`.
-pub type LearnedWeights = [Vec<Box<[f32]>>];
 
 impl PlasticityCensus {
     /// Census `creatures`, each a genome, its reachable node indices and its
-    /// learned weights.
+    /// learned state.
     pub fn observe<'a>(
-        creatures: impl IntoIterator<Item = (&'a CreatureGenome, &'a [usize], &'a LearnedWeights)>,
+        creatures: impl IntoIterator<Item = (&'a CreatureGenome, &'a [usize], &'a LearnedState)>,
     ) -> Self {
         let mut census = Self::default();
         for (genome, reachable, learned) in creatures {
@@ -141,39 +120,37 @@ impl PlasticityCensus {
         &mut self,
         genome: &CreatureGenome,
         reachable: &[usize],
-        learned: &LearnedWeights,
+        learned: &LearnedState,
     ) {
         self.creatures += 1;
         let mut carries = false;
         for &node_idx in reachable {
-            let Some(BackendDef::Graph(def)) = genome.nodes.get(node_idx).map(|n| &n.backend_def)
-            else {
+            if !matches!(
+                genome.nodes.get(node_idx).map(|n| &n.backend_def),
+                Some(BackendDef::Graph(_))
+            ) {
                 continue;
-            };
-            for (compute_idx, compute) in def.compute_nodes().iter().enumerate() {
-                let Some(config) = &compute.plasticity else {
+            }
+            for edge in learned.edges(node_idx) {
+                carries = true;
+                let kind = edge.kind;
+                let surface = match edge.occurrence.surface {
+                    EdgeSurface::ComputeInput(_) => 0,
+                    EdgeSurface::SinkInput(_) => 1,
+                };
+                self.edges_by_rule[kind.rule_index()] += 1;
+                self.edges_by_inheritance[usize::from(kind.lamarckian)] += 1;
+                let cell = &mut self.edges[usize::from(kind.reward_modulated)][surface];
+                cell.edges += 1;
+                let Some(weight) = edge.learned else {
                     continue;
                 };
-                carries |= !compute.inputs.is_empty();
-                // The runtime's bounds (runtime/plasticity), which every write saturates to.
-                let clamp = config.weight_clamp.clamp(0.01, 10.0);
-                let weights = learned
-                    .get(node_idx)
-                    .and_then(|node| node.get(compute_idx))
-                    .map_or(&[][..], |weights| &weights[..]);
-                let row = &mut self.kinds[PlasticityKind::of(config).index()];
-                for (edge, genomic) in compute.inputs.iter().enumerate() {
-                    row.edges += 1;
-                    let Some(&weight) = weights.get(edge) else {
-                        continue;
-                    };
-                    let drift = f64::from((weight - genomic.own_weight()).abs());
-                    // A non-finite weight would poison the population sum.
-                    if drift.is_finite() {
-                        row.drift_sum += drift;
-                    }
-                    row.at_clamp += u64::from(weight.abs() >= clamp);
+                let drift = f64::from((weight - edge.genomic).abs());
+                // A non-finite weight would poison the population sum.
+                if drift.is_finite() {
+                    cell.drift_sum += drift;
                 }
+                cell.at_clamp += u64::from(weight.abs() >= edge.bound);
             }
         }
         self.carriers += u64::from(carries);

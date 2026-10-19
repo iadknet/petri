@@ -354,7 +354,6 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Add,
             vec![leaf(3), leaf(0)],
-            None,
         )])
         .with_output_sinks(vec![
             OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(2)]),
@@ -842,8 +841,9 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
             panic!("the founder decision node is a Graph node");
         };
-        def.set_node_plasticity(
-            0,
+        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+            def,
+            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
             Some(crate::creature::genome::PlasticityConfig {
                 rule: crate::creature::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -857,7 +857,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
             .iter()
             .map(|node| vec![Some(0.25); node.inputs.len()])
             .collect();
-        def.seed_birth(crate::creature::genome::cgp::BirthSeeds::Rows(rows));
+        def.seed_compute_rows(rows);
     }
     let before_def = graph_def(&base.nodes[1]).clone();
     assert_eq!(before_def.output_sinks().len(), 98, "a full sink catalog");
@@ -884,8 +884,8 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
             "seed {seed}"
         );
         assert_eq!(
-            after_def.birth_seeds(),
-            before_def.birth_seeds(),
+            after_def.birth_seeds().map(|seeds| seeds.compute_rows()),
+            before_def.birth_seeds().map(|seeds| seeds.compute_rows()),
             "seed {seed}"
         );
         assert_eq!(

@@ -78,7 +78,10 @@ From T14.F05, cumulative `SimStats` observations distinguish assignments from
 changes while preserving existing work accounting:
 
 - `plasticity_updates_total` counts Hebbian plus reward-modulated edge
-  assignments, including unchanged results; `hebbian_updates_total` and
+  assignments, including unchanged results, one per plastic edge on either
+  surface (T25.F06): per committed visit for a pure-Hebbian edge, per
+  initialized modulated edge per tick for a reward-modulated one (a seeded
+  modulated slot counts from birth); `hebbian_updates_total` and
   `reward_modulated_updates_total` partition it.
 - `plasticity_changes_total` counts assignments whose final clamped `f32`
   weight is unequal (`!=`) to the immediately prior weight. Its partitions are

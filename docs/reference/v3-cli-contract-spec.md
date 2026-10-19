@@ -173,10 +173,19 @@ flattened tracking fields. It copies cumulative `SimStats` counters:
 `v3-evolution-observability-spec.md`; assignments, changed weights, and changed
 memory writes do not establish useful learning or memory capability.
 
+From T25.F06 every persistence checkpoint sample carries
+`plasticity_census` beside `sensor_census`: `creatures`, `carriers`
+(creatures with a plastic edge on either surface of a reachable node),
+`edges` rows `{learning, surface, edges, drift_sum, at_clamp}` for the four
+(pathway, surface) cells, `edges_by_rule` and `edges_by_inheritance` rows
+`{key, edges}`, every row present. Drift and at-clamp read initialized edges
+only. The block is absent in samples stored before T25.F06.
+
 Beside `goal_indicators.memory_sensitivity`, optional `structural_companions`
 carries `per_seed` rows with `seed`, `final_creature_count`,
 `reads_shared_memory`, `writes_shared_memory`, `has_stateful_compute_node`, and
-`has_plasticity`. Each count uses the existing mesh-reachable
+`has_plasticity` (a plastic edge on either surface of a reachable node,
+T25.F06). Each count uses the existing mesh-reachable
 `structural_companions` predicate on every final living creature observed for
 memory sensitivity. The four flags overlap; an observed empty population has
 zero counts. They describe structural exposure, without an executed-path or

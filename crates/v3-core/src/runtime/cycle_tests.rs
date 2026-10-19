@@ -85,7 +85,6 @@ fn graph_node(id: u32, target_ids: &[u32]) -> NodeGenome {
                 .with_compute_nodes(vec![ComputeNode::new(
                     ComputeNodeKind::Constant(1.0),
                     vec![],
-                    None,
                 )])
                 .with_output_sinks(vec![]),
         ),
@@ -239,7 +238,7 @@ fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost()
             ];
             for tick in 0..2 {
                 for state in &mut states {
-                    state.begin_tick(&g.nodes, tick);
+                    state.begin_tick(tick);
                 }
                 let plain = execute_creature_mesh_impl(
                     &g,

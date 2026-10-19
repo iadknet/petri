@@ -25,7 +25,7 @@ use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, EdgeSurface, GraphEdge};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
@@ -128,7 +128,7 @@ fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> C
     );
     let vote_start = def.output_sinks().len() - size.vote_sinks;
     for _ in 0..size.compute_nodes {
-        def.append_compute_node(ComputeNode::new(
+        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             random_compute_node_kind(rng),
             Vec::new(),
             plasticity(rng),
