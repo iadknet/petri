@@ -274,6 +274,23 @@ fn authored_contexts_set_only_their_channel_group_in_production_ranges() {
         if group != 1 {
             assert_eq!(context.sensors.local.previous_outcome, [0.0; 4]);
         }
+        let (set, kept) = (&context.sensors.perception, &original.sensors.perception);
+        assert_eq!(
+            group == 2,
+            set.area_food != kept.area_food,
+            "context {index}"
+        );
+        assert_eq!(
+            group == 3,
+            set.area_barrier != kept.area_barrier,
+            "context {index}"
+        );
+        assert_eq!(
+            group == 4,
+            set.area_occupancy != kept.area_occupancy,
+            "context {index}"
+        );
+        assert_eq!(group == 5, set.nearby != kept.nearby, "context {index}");
     }
     let outcomes = authored[1].sensors.local.previous_outcome;
     assert!((-1.0..=1.0).contains(&outcomes[0]));
