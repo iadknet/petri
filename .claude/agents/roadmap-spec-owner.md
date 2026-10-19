@@ -41,10 +41,10 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Read each document once and work from what you read. When a Bash result is
   spilled to a `tool-results/*.txt` file, re-run the command narrowed rather
   than reading the saved file, and never read the same spilled file twice.
-- Use the `research-first-planning`, `spec-writing`, and `spec-review` skills
-  (via the Skill tool) to write the spec at
-  `docs/specs/roadmap/tnn-fnn-<slug>.md` from `_feature-template.md` and
-  perform one readiness review. Apply `refactor-audit` in preparatory mode
+- Use the `research-first-planning` and `spec-writing` skills (via the Skill
+  tool) to write the spec at `docs/specs/roadmap/tnn-fnn-<slug>.md` from
+  `_feature-template.md`, and run your one `spec-review` readiness review
+  after the Codex design round and before the readiness rounds. Apply `refactor-audit` in preparatory mode
   as the workflow's "Preparatory refactoring" paragraph defines, so the
   feature does not work around a deficiency it could fix. Declare the spec's
   Verification Plan: the
@@ -52,11 +52,13 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   feature's question, each with a one-sentence reason. Your self-review is not
   independent validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
-  defines it: up to three rounds, each a fresh read-only Codex Sol `high`
+  defines it: a `plan-design-review` design round, then `spec-review`
+  readiness rounds, up to three rounds in all, each a fresh read-only Codex Sol `high`
   `codex exec` job started in the background, with the
   brief written outside the worktree. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the
-  requirement, or the code — not in your own authorship. Record every round's
+  requirement, or the code — not in your own authorship — except the
+  workflow's user-owned findings, which you report instead. Record every round's
   findings and dispositions in one table in `docs/progress/readings/<id>.md`.
   A new blocking finding first raised in round 3 is not fixed silently: report
   it as unresolved.
