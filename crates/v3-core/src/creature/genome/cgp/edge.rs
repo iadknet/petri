@@ -7,6 +7,7 @@
 //! with every write.
 
 use super::group::GroupId;
+use crate::creature::genome::PlasticityConfig;
 
 /// Tagged source for edge addressing. Replaces bare `source_idx: u16`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -29,6 +30,8 @@ pub struct Membership {
 
 /// Weighted edge in the graph. Inside a group, `own_weight` is a correction
 /// on top of the group term, born 0; outside one it is the genomic weight.
+/// `plasticity` is the edge's learning attributes (T25.F06): `None` for a
+/// static edge.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GraphEdge {
@@ -36,12 +39,15 @@ pub struct GraphEdge {
     pub(super) own_weight: f32,
     /// Omitted from JSON when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) plasticity: Option<PlasticityConfig>,
+    /// Omitted from JSON when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) membership: Option<Membership>,
 }
 
-// A 6-byte source, a 4-byte weight and a 4-byte membership, 16 bytes at
-// 4-byte alignment (T25.F03).
-const _: () = assert!(std::mem::size_of::<GraphEdge>() == 16);
+// A 6-byte source, a 4-byte weight, a 20-byte plasticity and a 4-byte
+// membership, 36 bytes at 4-byte alignment (T25.F03, T25.F06).
+const _: () = assert!(std::mem::size_of::<GraphEdge>() == 36);
 
 impl GraphEdge {
     /// A static, ungrouped edge.
@@ -51,6 +57,7 @@ impl GraphEdge {
         Self {
             source,
             own_weight,
+            plasticity: None,
             membership: None,
         }
     }
@@ -68,6 +75,13 @@ impl GraphEdge {
     #[must_use]
     pub const fn own_weight(&self) -> f32 {
         self.own_weight
+    }
+
+    /// The edge's learning attributes, `None` for a static edge.
+    #[inline]
+    #[must_use]
+    pub const fn plasticity(&self) -> Option<PlasticityConfig> {
+        self.plasticity
     }
 
     /// The group this edge belongs to, if any.

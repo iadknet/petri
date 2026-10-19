@@ -21,6 +21,7 @@ fn def_fields_are_exhaustively_accounted_for() {
     let GraphEdge {
         source: _,
         own_weight: _,
+        plasticity: _,
         membership: _,
     } = GraphEdge::new(leaf(0), 0.0);
     let Group {
@@ -40,8 +41,25 @@ fn def_fields_are_exhaustively_accounted_for() {
 }
 
 #[test]
-fn a_graph_edge_is_sixteen_bytes() {
-    assert_eq!(std::mem::size_of::<GraphEdge>(), 16);
+fn a_graph_edge_is_thirty_six_bytes() {
+    assert_eq!(std::mem::size_of::<GraphEdge>(), 36);
+}
+
+/// The edge's plasticity key round-trips and is omitted when `None`
+/// (T25.F06, invariant 1).
+#[test]
+fn edge_plasticity_round_trips_and_is_omitted_when_none() {
+    let static_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5}"#;
+    let edge: GraphEdge = serde_json::from_str(static_json).unwrap();
+    assert!(edge.plasticity().is_none());
+    assert_eq!(serde_json::to_string(&edge).unwrap(), static_json);
+
+    let plastic_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"modulation":{"reward_source":"DamageDelta","trace_decay":0.75}}}"#;
+    let edge: GraphEdge = serde_json::from_str(plastic_json).unwrap();
+    let plasticity = edge.plasticity().expect("the key is read");
+    assert_eq!(plasticity.rule, HebbianRule::Oja);
+    assert!(plasticity.lamarckian);
+    assert_eq!(serde_json::to_string(&edge).unwrap(), plastic_json);
 }
 
 #[test]
@@ -148,10 +166,10 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
     assert_eq!(
         format!("{def:?}"),
         "CgpGraphBackendDef { compute_nodes: [ComputeNode { kind: Add, inputs: \
-         [GraphEdge { source: ComputeNode(0), own_weight: 0.5, membership: None }], \
-         plasticity: None }], output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
-         [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
-         membership: None }] }], groups: [] }"
+         [GraphEdge { source: ComputeNode(0), own_weight: 0.5, plasticity: None, \
+         membership: None }], plasticity: None }], output_sinks: [OutputSink { kind: \
+         CustomOutput(0), inputs: [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, \
+         own_weight: 1.0, plasticity: None, membership: None }] }], groups: [] }"
     );
 }
 
@@ -1015,6 +1033,7 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
             sub_idx: PX,
         },
         own_weight: 0.25,
+        plasticity: None,
         membership: Some(Membership { group: id }),
     });
     resort(&mut def, sink);

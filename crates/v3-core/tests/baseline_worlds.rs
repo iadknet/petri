@@ -170,10 +170,16 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 2420636156610368321 -> 13485370972105497157); removing the catalog entry
 /// alone restores both old values, and mutation off leaves every founder
 /// trajectory byte-identical (the viability siblings).
+/// Re-pinned by T25.F06 commit 1 (text only): every edge's `Debug` text
+/// names `plasticity: None` (default 8823525590455763780 ->
+/// 2982706514543609827, rate 0.0 13485370972105497157 ->
+/// 17059281914674739098). The hash without genome text is unchanged at the
+/// merge base and after the commit (default 13644968153452489784, rate 0.0
+/// 821082946294985330).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 8823525590455763780);
-    assert_eq!(short_run_identity(Some(0.0)), 13485370972105497157);
+    assert_eq!(short_run_identity(None), 2982706514543609827);
+    assert_eq!(short_run_identity(Some(0.0)), 17059281914674739098);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.
