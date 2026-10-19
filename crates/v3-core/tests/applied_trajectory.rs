@@ -104,8 +104,10 @@
 //! The sampled digests move (b6aa8164... -> bc6cee03..., gestation rate 0.0
 //! f251417b... -> bde1dbeb...) and the rate-0.0 guard moves (0ec61ea2... ->
 //! a8ef1c4a...); the default guard holds. With `mutation.per_unit_rate` 0
-//! the sampled run without learned-state bytes is byte-identical across the
-//! commit (633e120e..., gestation rate 0.0 f49b5c17...).
+//! the sampled run with learned-state bytes moves once, by that empty-state
+//! representation alone (a93d6b87... -> bd8dca14..., gestation rate 0.0
+//! 527a14e0... -> d3b71fcd...), and without them is byte-identical across
+//! the commit (633e120e..., gestation rate 0.0 f49b5c17...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;

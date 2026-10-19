@@ -139,6 +139,13 @@
       "before": "mean ring projections per creature",
       "after": "mean_ring_groups (Ring edge groups per creature) and mean_ring_group_members (members per group, null with no group)",
       "comparison": "a projection is a full group of eight members; member erosion lowers members per group, which mean_projections could not show"
+    },
+    {
+      "feature": "T25.F06",
+      "counter": "plasticity_updates (and plasticity_changes, hebbian_updates, hebbian_changes, reward_modulated_updates, reward_modulated_changes)",
+      "before": "one per input edge of a plastic compute node per committed visit (Hebbian) or per initialized modulated compute edge per tick; a seeded child counts none until its traces exist",
+      "after": "one per plastic edge on either surface per committed visit (Hebbian) or per initialized modulated edge per tick, a seeded reward-modulated slot from birth",
+      "comparison": "sink edges and seeded slots count where they did not, and each enable now lands on one edge where it covered a node's fan-in, so per-creature-tick rates are not like-for-like across F06"
     }
   ],
   "goal_worlds": {
