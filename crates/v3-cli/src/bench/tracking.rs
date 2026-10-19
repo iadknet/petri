@@ -892,7 +892,11 @@ pub struct PlasticityCensusBlock {
     pub edges: Vec<PlasticEdgeRow>,
     pub edges_by_rule: Vec<PlasticKeyRow>,
     pub edges_by_inheritance: Vec<PlasticKeyRow>,
+    /// Since T25.F07; empty in a report stored before it.
+    #[serde(default)]
     pub edges_by_scope: Vec<PlasticKeyRow>,
+    /// Since T25.F07; empty in a report stored before it.
+    #[serde(default)]
     pub scales: Vec<LearnedScaleRow>,
 }
 
