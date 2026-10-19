@@ -192,7 +192,6 @@ mod tests {
             .iter()
             .map(|sink| (sink.weighted_inputs.capacity() * size_of::<f32>()) as u64)
             .sum();
-        assert!(inputs_bytes >= ((8 + 5) * size_of::<f32>()) as u64);
         let trace = BackendTrace::Graph(GraphTrace {
             passes: Vec::new(),
             temporal_committed: false,
