@@ -108,8 +108,8 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
             continue;
         }
 
-        // Members are ordinary sink edges at their genomic weights (T25.F03),
-        // summed in the sink's I10 order.
+        // Members are ordinary sink edges at their applied weights (T25.F03,
+        // T25.F07), summed in the sink's I10 order.
         let wsum = edges_wsum(
             sink_idx,
             &sink.inputs,

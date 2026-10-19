@@ -379,10 +379,12 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
             GraphOperator::SetScope => MutationOperator::GraphSetScope,
         };
+        // `complexity_effect` delegates to `operator()`, so pinning the
+        // mapping pins the classification.
         assert_eq!(
-            mo.complexity_effect(),
-            graph.complexity_effect(),
-            "MutationOperator and GraphOperator disagree for {:?}",
+            mo,
+            graph.operator(),
+            "GraphOperator maps {:?} to the wrong MutationOperator",
             graph
         );
     }

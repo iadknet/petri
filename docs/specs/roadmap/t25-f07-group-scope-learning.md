@@ -173,17 +173,18 @@ are `a_non_member_draws_no_coin`,
 `group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale` and
 `validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge`.
 
-Verification run (build and self-review, 2026-10-19; `make check`,
-benchmarks, mutation and the slow tier not run):
+Verification run (build, self-review and review remediation, 2026-10-19;
+`make check`, benchmarks, mutation and the slow tier not run):
 
 | Command | Result |
 | --- | --- |
 | `cargo test -p v3-core --test viability` (first, each commit) | 30 passed; founder-only digests unchanged |
 | `cargo test --workspace --no-fail-fast` (build commits) | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry), awaiting the gate and goal re-pin |
-| `cargo test -p v3-core` (after the self-review cleanup) | every suite passes (lib 2,187 passed, 10 ignored) |
+| `cargo test -p v3-core` (at head) | every suite passes (lib 2,187 passed, 10 ignored); every replay, draw-order, trajectory and catalog pin unchanged by the `GraphOperator::operator()` table and the flattened group dispatch |
+| `cargo test -p v3-cli --lib`; `cargo test -p v3-cli --bins --test cli` (at head) | 159 passed, 2 ignored; 18 and 13 passed: the v3-cli trajectory and deterministic fixtures unchanged |
 | `PROPTEST_CASES=2000 cargo test -p v3-core --lib seed_rows_follow` | pass |
 | `cargo clippy --workspace --all-targets`; `cargo fmt --all --check`; `cargo check --workspace --all-targets` | clean |
-| frontend `tsc --noEmit -p .`; `vitest run`; `biome check src` | clean; 103 files, 666 tests pass; biome no errors (4 `noArrayIndexKey` warnings in untouched `config-panel/startup` files) |
+| frontend `npx tsc -b --noEmit`; `npx vitest run`; `npx biome check src` | clean; 103 files, 670 tests pass (a group learner's initialization from its scale slot and its `inherit_scale` inheritance pinned in `PlasticEdgeList.test.tsx` and `graphInternalsEdges.test.tsx`); biome no errors (4 `noArrayIndexKey` warnings in untouched `config-panel/startup` files) |
 
 Identity checks: commit 1 leaves every hash without genome text and every
 rate-0 fixture unchanged (`recruitment_tests`, `baseline_worlds`,

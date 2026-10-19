@@ -24,7 +24,7 @@ function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
 	const genomic = `genomic ${plastic.genomic.toFixed(3)}`;
 	if (plastic.applied === undefined) return `${genomic} · applied unavailable`;
 	return `${genomic} · applied ${plastic.applied.toFixed(3)}${
-		plastic.learned === undefined ? " (not initialized)" : ""
+		plastic.initialized ? "" : " (not initialized)"
 	}`;
 }
 
@@ -63,7 +63,7 @@ function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 			{tip.plastic ? (
 				<>
 					<span className={`${line} font-mono`}>{plasticWeights(tip.plastic)}</span>
-					{plasticityDetail(tip.plastic.config).map((detail) => (
+					{plasticityDetail(tip.plastic.config, tip.member).map((detail) => (
 						<span key={detail} className={`${line} text-slate-400`}>
 							{detail}
 						</span>

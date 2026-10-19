@@ -297,7 +297,7 @@ impl MutationEngine {
                             let idx =
                                 select_weighted_index(&available, |op| op.weight() as u16, rng);
                             let op = available[idx];
-                            let operator = graph_operator_key(op);
+                            let operator = op.operator();
                             let tracked_before =
                                 if operator_requires_added_node_input_tracking(operator)
                                     || (cfg!(test) && op == GraphOperator::RecruitNeutralInput)
@@ -801,41 +801,6 @@ pub(crate) fn vm_operator_key(op: VmOperator) -> MutationOperator {
         VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
         VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
         VmOperator::VmMutatePairedSlotAddress => MutationOperator::VmMutatePairedSlotAddress,
-    }
-}
-
-pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
-    match op {
-        GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
-        GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
-        GraphOperator::MutateGraphOperatorParam => MutationOperator::GraphMutateGraphOperatorParam,
-        GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
-        GraphOperator::RemoveInternalGraphNode => MutationOperator::GraphRemoveInternalGraphNode,
-        GraphOperator::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
-        GraphOperator::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
-        GraphOperator::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
-        GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
-        GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
-        GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
-        GraphOperator::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
-        GraphOperator::EnableHebbian => MutationOperator::GraphEnableHebbian,
-        GraphOperator::DisableHebbian => MutationOperator::GraphDisableHebbian,
-        GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
-        GraphOperator::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
-        GraphOperator::ToggleHebbianLamarckian => MutationOperator::GraphToggleHebbianLamarckian,
-        GraphOperator::EnableRewardModulation => MutationOperator::GraphEnableRewardModulation,
-        GraphOperator::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
-        GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
-        GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-        GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-        GraphOperator::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
-        GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
-        GraphOperator::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
-        GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
-        GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
-        GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
-        GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
-        GraphOperator::SetScope => MutationOperator::GraphSetScope,
     }
 }
 

@@ -4,6 +4,7 @@ import type { EdgeGroup, GraphBackendDef, InputReference, Scope } from "../../ty
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { directionName } from "./directions.ts";
 import { composeTerms, memberPattern, scopeLabel, sinkDirection } from "./edgeGroupWeights.ts";
+import { learnedScaleLookup } from "./graphFullModel.ts";
 import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
 
 const RING_CHANNELS = 8;
@@ -323,9 +324,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 	const groups = graphDef.groups ?? [];
 	if (groups.length === 0) return null;
 	const members = collectGroupMembers(graphDef, graphWeights);
-	const learned = new Map(
-		(graphWeights?.scales ?? []).map((scale) => [scale.group, scale.learned]),
-	);
+	const learned = learnedScaleLookup(graphWeights);
 	return (
 		<section aria-label="Edge groups" className="mt-2">
 			<h4 className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -342,7 +341,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
-							learnedScale={learned.get(index)}
+							learnedScale={learned(index)}
 						/>
 					) : (
 						<PairRow
@@ -354,7 +353,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
-							learnedScale={learned.get(index)}
+							learnedScale={learned(index)}
 						/>
 					),
 				)}
