@@ -1,9 +1,17 @@
 import { type EdgeProps, getBezierPath } from "@xyflow/react";
 
 export interface WeightEdgeData extends Record<string, unknown> {
-	weight: number;
+	/** `null` when the edge's weight in force is unavailable. */
+	weight: number | null;
 	opacity: number;
 	tint?: { r: number; g: number; b: number };
+}
+
+/** The edge's weight label: `n/a` when unavailable, none at the unit weight. */
+export function weightLabel(data: WeightEdgeData | undefined): string | null {
+	if (data === undefined) return null;
+	if (data.weight === null) return "n/a";
+	return Math.abs(data.weight - 1.0) > 0.01 ? data.weight.toFixed(2) : null;
 }
 
 export function WeightEdge({
@@ -28,9 +36,8 @@ export function WeightEdge({
 	});
 
 	const edgeData = data as WeightEdgeData | undefined;
-	const weight = edgeData?.weight ?? 1;
 	const tint = edgeData?.tint;
-	const showWeight = Math.abs(weight - 1.0) > 0.01;
+	const label = weightLabel(edgeData);
 
 	const labelFill = tint ? `rgba(${tint.r},${tint.g},${tint.b},0.6)` : "rgba(148,163,184,0.6)";
 
@@ -44,7 +51,7 @@ export function WeightEdge({
 				markerEnd={markerEnd as string}
 				style={style}
 			/>
-			{showWeight ? (
+			{label !== null ? (
 				<text
 					x={labelX}
 					y={labelY - 6}
@@ -52,7 +59,7 @@ export function WeightEdge({
 					className="text-[8px] font-mono"
 					fill={labelFill}
 				>
-					{weight.toFixed(2)}
+					{label}
 				</text>
 			) : null}
 		</>
@@ -69,10 +76,9 @@ export function BackwardWeightEdge({
 	markerEnd,
 }: EdgeProps) {
 	const edgeData = data as WeightEdgeData | undefined;
-	const weight = edgeData?.weight ?? 1;
-	const opacity = edgeData?.opacity ?? Math.max(0.2, Math.min(Math.abs(weight), 1));
+	const opacity = edgeData?.opacity ?? 1;
 	const tint = edgeData?.tint;
-	const showWeight = Math.abs(weight - 1.0) > 0.01;
+	const label = weightLabel(edgeData);
 
 	const strokeColor = tint
 		? `rgba(${tint.r},${tint.g},${tint.b},${opacity})`
@@ -114,7 +120,7 @@ export function BackwardWeightEdge({
 				markerEnd={markerEnd as string}
 				style={{ stroke: strokeColor }}
 			/>
-			{showWeight ? (
+			{label !== null ? (
 				<text
 					x={labelX}
 					y={labelY - 6}
@@ -122,7 +128,7 @@ export function BackwardWeightEdge({
 					className="text-[8px] font-mono"
 					fill={labelFill}
 				>
-					{weight.toFixed(2)}
+					{label}
 				</text>
 			) : null}
 		</>

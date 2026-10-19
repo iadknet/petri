@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNodeKind, GraphSource, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNodeKind, EdgeSurface, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::mesh_annotations::{
     classify_input_ref, MeshReadClass, MeshWriteClass,
@@ -27,26 +27,19 @@ pub(crate) fn derive_cgp_annotations(
 ) -> (Vec<MeshReadClass>, Vec<MeshWriteClass>, bool, Vec<usize>) {
     let mut read_classes = BTreeSet::new();
     let mut write_classes = BTreeSet::new();
-    let mut has_stateful_behavior = false;
 
     let live_indices = cgp_live_compute_indices(def);
 
     // Learning (T25.F06): a plastic edge into a live compute node or a
-    // wired sink.
-    if def
-        .output_sinks()
-        .iter()
-        .any(|sink| sink.inputs.iter().any(|edge| edge.plasticity().is_some()))
-    {
-        has_stateful_behavior = true;
-    }
+    // sink (a sink with an edge is wired).
+    let mut has_stateful_behavior = def.plastic_edges().any(|(site, _)| match site.surface {
+        EdgeSurface::ComputeInput(i) => live_indices.contains(&i),
+        EdgeSurface::SinkInput(_) => true,
+    });
 
     // Stateful flags from live compute nodes
     for &idx in &live_indices {
         let node = &def.compute_nodes()[idx];
-        if node.inputs.iter().any(|edge| edge.plasticity().is_some()) {
-            has_stateful_behavior = true;
-        }
         match &node.kind {
             ComputeNodeKind::DecayIntegrator(_)
             | ComputeNodeKind::Momentum(_)

@@ -96,6 +96,7 @@ Options weighed, the primary sources and the preparatory refactor audit:
 | `petri.tick.plastic_edges_by_inheritance` | gauge | the same edges by inheritance | `petri.plasticity_inheritance` |
 | `petri.tick.plastic_edge_drift`, `petri.tick.plastic_edges_at_clamp` | gauge | sum of `|learned − genomic|` over initialized plastic edges; initialized edges at their clamp | `petri.surface` |
 | `petri.run.plasticity_updates`, `plasticity_changes`, `hebbian_updates`, `hebbian_changes`, `reward_modulated_updates`, `reward_modulated_changes` | counter | invariant 12 (names unchanged, both surfaces) | `petri.run_id` |
+| `GraphOutputSinkTrace.weighted_inputs` | trace observation | each sink edge's value times its applied weight, as the sink sum read it; recorded only when the hop's tracer records (never on the production `NoopTracer` path) | under the existing trace window byte budget (`TraceBudget.max_bytes`, 4 MiB for telemetry windows), counted at buffer capacity by `size.rs::graph_heap`; adds 4 B (`f32`) per sink input edge, static or plastic, of each recorded sink |
 | Recorded configuration | — | none added: no config value or mechanism switch; the `reward_learning` phase span is unchanged | — |
 
 ## Verification Plan
@@ -202,7 +203,9 @@ the goal run reports whether sink edges become plastic at all.
 | `plasticity/tests.rs:512-530` (decay −1 and 2) and `plasticity_census_tests.rs:136-146` (clamp 50) become `validate_graph` rejection tests; `set_plasticity` debug-asserts I1 | invariant 1 |
 | the zero-energy floor at cost 0, reached through a reward-modulated sink edge | invariant 6 |
 | `size_of::<GraphEdge>() == 36`; the serde round trip with and without `plasticity`; a node-level key refused | invariant 1 |
-| `graph_weights` carries `applied` and `learned` for a plastic edge and neither for a static member; the frontend model draws a plastic edge at `applied` | invariant 14 |
+| `graph_weights` carries `applied` and `learned` for a plastic edge and neither for a static member; the frontend model draws a plastic edge at `applied`, and without the payload shows it `applied=unavailable` (weight `null`, labelled `n/a`) instead of a fallback | invariant 14 |
+| `graph_heap_counts_every_sink_weighted_input_buffer` (`trace/size.rs`) | the sink `weighted_inputs` trace observation counts against the trace byte budget |
+| `a_live_stateful_compute_node_is_stateful_and_plasticity_alone_is_not` (fixture asserts it carries a plastic edge from a world input) | plasticity is not a stateful read in the sensor census |
 | `tests/viability.rs` founder-only digests unmoved across both commits; `applied_trajectory.rs` byte-identical at rate 0 | invariant 13 |
 
 ## Performance and Goal Impact
@@ -285,3 +288,5 @@ zero.
 - Deferred: the long-run reading (retention of plastic sink edges, vote-edge
   drift over 40,000 ticks) to the next goal-long carrier; T25's carriers
   (F02, F04) are spent.
+- Deferred: review finding (P3) `container.rs` `BirthSeeds` is a single-variant enum that could be a struct; kept because the spec names its `Rows` form.
+- Deferred: review finding (P3) `graphFullModel.ts` `GraphModelEdge.isPlastic` is populated but read only by a test.

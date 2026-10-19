@@ -55,7 +55,7 @@ fn effects_at(
     let mut memory = ramp(0.0);
     let mut side = side();
     let (result, contribution) = apply_cgp_graph_effects(
-        &mut crate::runtime::cgp::execute::NoopTracer,
+        &mut crate::runtime::cgp::tracer::NoopTracer,
         def,
         &def.sink_weight_rows(refs),
         &[0.5; 3],

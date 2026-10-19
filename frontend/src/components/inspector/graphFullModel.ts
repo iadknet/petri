@@ -33,9 +33,10 @@ export interface GraphModelEdge {
 	/**
 	 * The weight drawn: a member's genomic weight (the server's
 	 * `graph_weights` value), a plastic edge's applied weight (T25.F06), else
-	 * its own weight.
+	 * its own weight. `null` for a plastic edge whose applied weight the
+	 * payload does not carry: runtime state the UI does not invent.
 	 */
-	weight: number;
+	weight: number | null;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
 	isBackward: boolean;
 	/** Whether the edge is an edge-group member (T25.F03), drawn dashed. */
@@ -82,7 +83,7 @@ function computeBaseWidth(label: string): number {
 
 function collectEdgesFromSources(
 	edges: GraphEdge[],
-	weightOf: (edge: GraphEdge, index: number) => number,
+	weightOf: (edge: GraphEdge, index: number) => number | null,
 	targetId: string,
 	targetArrayIndex: number,
 	targetType: "compute" | "output",
@@ -155,7 +156,7 @@ export function buildFullGraphModel(
 			const entry = weightEntry(surface, container, index);
 			if (edge.membership) return memberWeight(graphDef, edge, entry?.genomic);
 			// A plastic edge is drawn at the weight in force (T25.F06).
-			if (edge.plasticity) return entry?.applied ?? edge.own_weight;
+			if (edge.plasticity) return entry?.applied ?? null;
 			return edge.own_weight;
 		};
 	const nodes: GraphModelNode[] = [];

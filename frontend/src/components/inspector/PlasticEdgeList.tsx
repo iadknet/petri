@@ -76,9 +76,11 @@ export function collectPlasticEdges(
 	return rows;
 }
 
+/** The row's weights; without the runtime payload the applied weight is unavailable. */
 function rowWeights(row: PlasticEdgeRow): string {
-	const applied = row.applied ?? row.genomic;
-	return `genomic=${row.genomic.toFixed(3)} applied=${applied.toFixed(3)}${
+	const genomic = `genomic=${row.genomic.toFixed(3)}`;
+	if (row.applied === undefined) return `${genomic} applied=unavailable`;
+	return `${genomic} applied=${row.applied.toFixed(3)}${
 		row.learned === undefined ? " (not initialized)" : ""
 	}`;
 }

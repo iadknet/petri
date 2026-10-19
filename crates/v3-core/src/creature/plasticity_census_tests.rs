@@ -12,9 +12,11 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, RewardModulationConfig,
+    BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, PlasticityConfig,
+    RewardModulationConfig,
 };
 use crate::creature::state::GraphRuntimeState;
+use crate::runtime::plasticity::PlasticityKind;
 
 fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> PlasticityConfig {
     PlasticityConfig {

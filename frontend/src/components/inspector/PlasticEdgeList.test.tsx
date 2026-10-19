@@ -4,6 +4,7 @@ import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { GraphBackendDef, PlasticityConfig } from "../../types/genome.ts";
 import { PlasticEdgeList, collectPlasticEdges, plasticityBadge } from "./PlasticEdgeList.tsx";
 import { buildFullGraphModel } from "./graphFullModel.ts";
+import { weightLabel } from "./graphInternalsEdges.tsx";
 
 const hebbian: PlasticityConfig = {
 	rule: "Oja",
@@ -80,6 +81,16 @@ describe("PlasticEdgeList", () => {
 		expect(screen.getByText(/not initialized/)).toBeTruthy();
 	});
 
+	it("marks the applied weight unavailable without the runtime payload", () => {
+		render(<PlasticEdgeList graphDef={plastic()} inputRefs={[]} graphWeights={null} />);
+		const rows = screen.getAllByTestId("plastic-edge").map((row) => row.textContent ?? "");
+		expect(rows).toHaveLength(2);
+		for (const row of rows) {
+			expect(row).toContain("applied=unavailable");
+			expect(row).not.toContain("not initialized");
+		}
+	});
+
 	it("renders nothing for a graph without a plastic edge", () => {
 		const { container } = render(
 			<PlasticEdgeList
@@ -103,6 +114,13 @@ describe("PlasticEdgeList", () => {
 			withoutPayload.edges
 				.filter((edge) => edge.edgeType === "compute_to_output")
 				.map((edge) => edge.weight),
-		).toEqual([1.5, 0.75]);
+		).toEqual([null, 0.75]);
+	});
+
+	it("labels an unavailable edge weight n/a and the unit weight not at all", () => {
+		expect(weightLabel({ weight: null, opacity: 0.2 })).toBe("n/a");
+		expect(weightLabel({ weight: 1, opacity: 1 })).toBeNull();
+		expect(weightLabel({ weight: 0.75, opacity: 0.75 })).toBe("0.75");
+		expect(weightLabel(undefined)).toBeNull();
 	});
 });

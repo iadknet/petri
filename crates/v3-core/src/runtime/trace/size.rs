@@ -51,6 +51,11 @@ fn graph_heap(trace: &GraphTrace) -> u64 {
             .sum::<u64>()
         + buffer(&trace.final_outputs)
         + buffer(&trace.output_sinks)
+        + trace
+            .output_sinks
+            .iter()
+            .map(|sink| buffer(&sink.weighted_inputs))
+            .sum::<u64>()
 }
 
 impl BackendTrace {
@@ -157,5 +162,44 @@ impl TickReserve {
             events: u32::try_from(actions).unwrap_or(u32::MAX),
             bytes: bytes as u64,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::trace::domain::GraphOutputSinkTrace;
+
+    fn sink(capacity: usize, len: usize) -> GraphOutputSinkTrace {
+        let mut weighted_inputs = Vec::with_capacity(capacity);
+        weighted_inputs.extend(std::iter::repeat_n(0.5_f32, len));
+        GraphOutputSinkTrace {
+            wired: len > 0,
+            weighted_inputs,
+            weighted_sum: 0.0,
+            applied: false,
+            applied_value: 0.0,
+        }
+    }
+
+    /// Each sink's weighted-input buffer (T25.F06) counts at its capacity,
+    /// spare slots included, on top of the sink records themselves.
+    #[test]
+    fn graph_heap_counts_every_sink_weighted_input_buffer() {
+        let output_sinks = vec![sink(8, 3), sink(0, 0), sink(5, 5)];
+        let sinks_bytes = (output_sinks.capacity() * size_of::<GraphOutputSinkTrace>()) as u64;
+        let inputs_bytes: u64 = output_sinks
+            .iter()
+            .map(|sink| (sink.weighted_inputs.capacity() * size_of::<f32>()) as u64)
+            .sum();
+        assert!(inputs_bytes >= ((8 + 5) * size_of::<f32>()) as u64);
+        let trace = BackendTrace::Graph(GraphTrace {
+            passes: Vec::new(),
+            temporal_committed: false,
+            final_outputs: Vec::new(),
+            output_sinks,
+        });
+
+        assert_eq!(trace.heap_bytes(), sinks_bytes + inputs_bytes);
     }
 }

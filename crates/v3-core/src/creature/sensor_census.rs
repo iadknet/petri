@@ -557,7 +557,7 @@ mod tests {
         let mut graph = empty_graph();
         graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
-            vec![],
+            vec![leaf(0)],
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -573,7 +573,14 @@ mod tests {
                 vec![edge(GraphSource::ComputeNode(0))],
             ),
         );
-        let census = census_of(&graph_node(graph, vec![]));
+        assert!(
+            graph.plastic_edges().next().is_some(),
+            "the fixture carries a plastic edge from a world input"
+        );
+        let census = census_of(&graph_node(
+            graph,
+            vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
+        ));
 
         assert!(
             !census.reads_any_stateful(),

@@ -2,12 +2,15 @@
 //!
 //! Submodules:
 //! - `rules`: the four Hebbian laws and the three-factor update
+//! - `kind`: the plastic-edge kind descriptor
 //! - `learned`: the learned state built at birth, the visit's learner and
 //!   the read-only view
 
+mod kind;
 mod learned;
 pub(crate) mod rules;
 
+pub use kind::{PlasticityKind, RULES};
 pub(crate) use learned::Learner;
 pub use learned::{LearnedEdge, LearnedState};
 

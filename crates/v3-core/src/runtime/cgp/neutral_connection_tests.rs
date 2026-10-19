@@ -219,7 +219,7 @@ fn effects(def: &CgpGraphBackendDef, refs: &[InputReference], source_memory: f32
     memory[15] = source_memory;
     let mut side = side();
     let (result, contribution) = apply_cgp_graph_effects(
-        &mut crate::runtime::cgp::execute::NoopTracer,
+        &mut crate::runtime::cgp::tracer::NoopTracer,
         def,
         &def.sink_weight_rows(refs),
         &[0.5; 3],

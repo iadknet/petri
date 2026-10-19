@@ -15,47 +15,8 @@
 //! learned state and executes no brain.
 
 use crate::creature::genome::cgp::EdgeSurface;
-use crate::creature::genome::{HebbianRule, PlasticityConfig};
-use crate::runtime::plasticity::LearnedState;
-
-/// One plastic edge kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PlasticityKind {
-    pub rule: HebbianRule,
-    pub reward_modulated: bool,
-    pub lamarckian: bool,
-}
-
-/// The four rules, in census order.
-pub const RULES: [HebbianRule; 4] = [
-    HebbianRule::Classic,
-    HebbianRule::Oja,
-    HebbianRule::AntiHebb,
-    HebbianRule::Covariance,
-];
-
-impl PlasticityKind {
-    /// The kind of an edge with learning attributes `config`.
-    #[must_use]
-    pub fn of(config: &PlasticityConfig) -> Self {
-        Self {
-            rule: config.rule,
-            reward_modulated: config.modulation.is_some(),
-            lamarckian: config.lamarckian,
-        }
-    }
-
-    /// Position of the rule in [`RULES`].
-    #[must_use]
-    pub const fn rule_index(self) -> usize {
-        match self.rule {
-            HebbianRule::Classic => 0,
-            HebbianRule::Oja => 1,
-            HebbianRule::AntiHebb => 2,
-            HebbianRule::Covariance => 3,
-        }
-    }
-}
+use crate::creature::genome::HebbianRule;
+use crate::runtime::plasticity::{LearnedState, RULES};
 
 /// The `petri.plasticity_rule` key of `rule`.
 #[must_use]
