@@ -185,8 +185,8 @@ A feature whose Verification Plan (the shared contract's "Verification plan"
 in the Benchmark gate section) declares no benchmark profile spawns no
 benchmark specialist. For a telemetry feature, the persistent implementer runs
 the parent comparison and overhead check in its verification pass.
-Otherwise, after the implementer has finished benchmark-affecting work and before final
-review, spawn `roadmap_benchmark_specialist` with `model: gpt-5.6-terra`,
+Otherwise, after the final review and any post-review remediation and before
+the mutation gate, spawn `roadmap_benchmark_specialist` with `model: gpt-5.6-terra`,
 `reasoning_effort: high`, and `fork_turns: none`. Give it the absolute worktree
 and spec paths, feature ID and slug, the exact commands for the profiles the
 spec's Verification Plan declares, and only the spec's Verification and Performance and Goal Impact

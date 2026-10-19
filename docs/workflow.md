@@ -341,6 +341,11 @@ Verify each agent's reported commands and results rather than taking them on
 faith; if brief 2's report does not mention the simplify pass, send it back
 before review.
 
+**Order after implementation.** Review, then any post-review remediation, then
+the declared benchmark profiles, then the mutation gate, then closure. Both
+gates measure the code that ships, so neither runs before the review can still
+change it.
+
 **Mutation gate.** This is a closure gate, not an implementation step. It runs
 only when the spec's [Verification Plan](#verification-plan) declares it, and
 then **once, after the review and any post-review remediation are complete**, on
@@ -409,7 +414,7 @@ host without them cannot run this step:
 
 | Lens | Skill | The brief adds |
 | --- | --- | --- |
-| Correctness | `$adversarial-code-review` | lens 1; the spec sections Goal, Inputs and Invariants, Telemetry, Verification, and Performance and Goal Impact when the feature is subject to it; the Review section of this file |
+| Correctness | `$adversarial-code-review` | lens 1; the spec sections Goal, Inputs and Invariants, Telemetry, Verification, and the Performance predeclaration when the feature is subject to it; the Review section of this file |
 | Design | `$architecture-review` | lens 2; the spec's Goal and Inputs and Invariants sections |
 | Code health | `$code-health-review` | lens 3; the spec's Goal section and its `Decision:` and `Deferred:` notes |
 
@@ -471,17 +476,17 @@ Plan step ran before 2026-09-29 has no Telemetry section, and the reviewer
 does not require one.
 
 **Spec claim spot-check.** The reviewer picks at least three claims from the
-spec's Verification and Performance sections — a command result, a stored-report
-path, and a specific number — and checks each against the diff or the stored
+spec's Verification section — a command result, a file or test the diff adds,
+and a specific number — and checks each against the diff or the stored
 file. A claim it cannot check is reported as unverified, never assumed true. An
 untruthful claim is P1 under the existing spec-truthfulness rule.
 
 (Both were recorded as user decisions on 2026-09-05 alongside the one-goal-run
 rule below, but never reached this contract until 2026-09-09.)
 
-The reviewer does not audit the mutation record: the gate runs after this review,
-so there is nothing final to audit yet. **The orchestrator audits it at the
-closure gate instead**, against the diff and, where readable, against the
+The reviewer audits neither the benchmark reports nor the mutation record: both
+gates run after this review, so there is nothing final to audit yet. **The
+orchestrator audits both at the closure gate instead**; the mutation record against the diff and, where readable, against the
 `missed.txt` and `timeout.txt` in the recorded output path. A missing survivor
 list, or a `#[mutants::skip]` or `exclude_re` without justification, is a waived
 check and blocks closure. An unresolved survivor blocks closure until it is
@@ -563,7 +568,8 @@ A closure that runs no profile adds no benchmark summary and no series entry,
 so later comparisons reference the last measured closure; the ordinary
 benchmark tests inside `make check` still run. A closure that runs a profile
 completes the spec's Performance and Goal Impact section, and a severe compute
-regression without a predeclared, justified cost is a P1. Never weaken a
+regression without a predeclared, justified cost blocks closure until the user
+accepts it or remediation removes it. Never weaken a
 threshold or edit a stored baseline to make a feature pass.
 
 **The long goal profile** (`make bench PROFILE=goal-long`) runs the three goal
@@ -678,8 +684,8 @@ cleanup command, and a T21 spec that adds a trace predeclares its projected
 size per run and its per-run cap. The stack's Compose file, configuration,
 dashboard definitions and cleanup script are source.
 
-After the implementer has finished benchmark-affecting work and before final
-review, delegate the profiles the spec's Verification Plan declares to a fresh
+After the review and any post-review remediation are complete, and before the
+mutation gate, delegate the profiles the spec's Verification Plan declares to a fresh
 `roadmap-benchmark-specialist`. Give it the worktree and spec paths, feature ID
 and slug, exact commands, and only the spec's Verification and Performance and
 Goal Impact sections. It owns the runs, local raw artifacts, committed summaries
@@ -688,10 +694,12 @@ the recorded CLI and observed outer-process exit statuses with their sources,
 `severe` flag, threshold verdict, raw/summary byte counts and paths. It
 does not change thresholds or baselines, remediate code, or interpret unexpected
 results into a new requirement. Route those results through the orchestrator to
-the spec owner and a fresh implementer as appropriate. If later production
-remediation invalidates a report, return only the affected final-code
-measurement to a fresh benchmark specialist before closure; this is not a
-second determinism check.
+the spec owner and a fresh implementer as appropriate. If production
+remediation after the run invalidates a report, return only the affected
+final-code measurement to a fresh benchmark specialist before closure; this is
+not a second determinism check. A production fix prompted by a benchmark result
+goes back through review at the severity it warrants, as a production-code
+mutation kill does.
 
 From T11.F14 onward, the evolved-neighborhood observation cap is **180 seconds
 per goal-profile run, summed across seeds**
@@ -787,6 +795,10 @@ the full suite was just run on the same code), and commit. Then:
    `Not applicable: telemetry feature`, the reviewer accepted the
    no-behavior-change claim, and the parent comparison and the overhead check
    are each recorded with a result or a `not applicable` reason.
+   When benchmark profiles are declared, audit their records against the
+   Performance and Goal Impact section: every declared profile ran on the final
+   code, and every severe compute regression is predeclared and justified or
+   accepted by the user.
    When the mutation gate is declared, audit its record: the
    summary line and output path in the spec's Verification section, every
    survivor resolved as killed, equivalent, or deferred, and `missed.txt` /
