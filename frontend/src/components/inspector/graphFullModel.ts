@@ -4,7 +4,10 @@ import type {
 	GraphEdge,
 	GraphSource,
 	InputReference,
+	OutputSinkKind,
+	PlasticityConfig,
 } from "../../types/genome.ts";
+import { compose, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
 import {
@@ -43,22 +46,34 @@ export interface GraphModelEdge {
 	isMember: boolean;
 	/** Whether the edge carries learning attributes (T25.F06). */
 	isPlastic: boolean;
+	/** The edge's own weight: a member's correction. */
+	own: number;
+	/** A member's composition: genomic = scale × pattern + own (T25.F03). */
+	member?: MemberComposition;
+	/** A plastic edge's learning and weights (T25.F06). */
+	plastic?: PlasticFacts;
 }
 
-/**
- * A member's genomic weight: the server's `graph_weights` value, or v3-core's
- * `compose(own, scale, 1)` for a `Ring` member (`cgp/group.rs`) when the
- * payload is missing. Never its own weight alone.
- */
-function memberWeight(
-	graphDef: GraphBackendDef,
-	edge: GraphEdge,
-	genomic: number | undefined,
-): number {
-	if (genomic !== undefined) return genomic;
-	const group = edge.membership ? graphDef.groups?.[edge.membership.group] : undefined;
-	return (group?.scale ?? 0) + edge.own_weight;
+export interface MemberComposition {
+	group: number;
+	scale: number;
+	pattern: number;
 }
+
+export interface PlasticFacts {
+	config: PlasticityConfig;
+	genomic: number;
+	/** The weight in force, when the payload carries it. */
+	applied?: number;
+	/** The learned weight, once the edge is initialized. */
+	learned?: number;
+}
+
+/** The field a non-leaf member reads: none (v3-core's `u16::MAX`). */
+const NO_FIELD = 0xffff;
+
+/** What the model knows of an edge beyond its endpoints. */
+type EdgeFacts = Pick<GraphModelEdge, "weight" | "own" | "member" | "plastic">;
 
 export interface FullGraphModel {
 	nodes: GraphModelNode[];
@@ -83,7 +98,7 @@ function computeBaseWidth(label: string): number {
 
 function collectEdgesFromSources(
 	edges: GraphEdge[],
-	weightOf: (edge: GraphEdge, index: number) => number | null,
+	factsOf: (edge: GraphEdge, index: number) => EdgeFacts,
 	targetId: string,
 	targetArrayIndex: number,
 	targetType: "compute" | "output",
@@ -106,7 +121,7 @@ function collectEdgesFromSources(
 				id: `${edgePrefix}:${i}`,
 				sourceId,
 				targetId,
-				weight: weightOf(edge, i),
+				...factsOf(edge, i),
 				edgeType,
 				isBackward,
 				isMember: edge.membership !== undefined,
@@ -120,7 +135,7 @@ function collectEdgesFromSources(
 					id: `${edgePrefix}:${i}`,
 					sourceId: inId,
 					targetId,
-					weight: weightOf(edge, i),
+					...factsOf(edge, i),
 					edgeType,
 					isBackward: false,
 					isMember: edge.membership !== undefined,
@@ -151,13 +166,47 @@ export function buildFullGraphModel(
 	graphWeights: NodeGraphWeights | null = null,
 ): FullGraphModel {
 	const weightEntry = edgeWeightLookup(graphWeights);
-	const weightOf =
-		(surface: "compute" | "sink", container: number) => (edge: GraphEdge, index: number) => {
+	const factsOf =
+		(surface: "compute" | "sink", container: number, sink?: OutputSinkKind) =>
+		(edge: GraphEdge, index: number): EdgeFacts => {
 			const entry = weightEntry(surface, container, index);
-			if (edge.membership) return memberWeight(graphDef, edge, entry?.genomic);
-			// A plastic edge is drawn at the weight in force (T25.F06).
-			if (edge.plasticity) return entry?.applied ?? null;
-			return edge.own_weight;
+			const group = edge.membership ? graphDef.groups?.[edge.membership.group] : undefined;
+			const member =
+				edge.membership && group
+					? {
+							group: edge.membership.group,
+							scale: group.scale,
+							// As v3-core's `pattern_at`: a non-leaf member reads no field.
+							pattern: memberPattern(
+								group,
+								inputRefs,
+								"InputLeaf" in edge.source ? edge.source.InputLeaf.sub_idx : NO_FIELD,
+								sinkDirection(sink),
+							),
+						}
+					: undefined;
+			const plastic = edge.plasticity
+				? {
+						config: edge.plasticity,
+						genomic: entry?.genomic ?? edge.own_weight,
+						...(entry?.applied === undefined ? {} : { applied: entry.applied }),
+						...(entry?.learned === undefined ? {} : { learned: entry.learned }),
+					}
+				: undefined;
+			// A member is drawn at its genomic weight: the server's, else
+			// composed as v3-core's `compose` (`cgp/group.rs`), never its own
+			// weight alone; a plastic edge at the weight in force (T25.F06).
+			const weight = member
+				? (entry?.genomic ?? compose(edge.own_weight, member.scale, member.pattern))
+				: plastic
+					? (plastic.applied ?? null)
+					: edge.own_weight;
+			return {
+				weight,
+				own: edge.own_weight,
+				...(member ? { member } : {}),
+				...(plastic ? { plastic } : {}),
+			};
 		};
 	const nodes: GraphModelNode[] = [];
 	const allEdges: GraphModelEdge[] = [];
@@ -235,7 +284,7 @@ export function buildFullGraphModel(
 		allEdges.push(
 			...collectEdgesFromSources(
 				cn.inputs,
-				weightOf("compute", i),
+				factsOf("compute", i),
 				`cn:${i}`,
 				i,
 				"compute",
@@ -252,7 +301,7 @@ export function buildFullGraphModel(
 		allEdges.push(
 			...collectEdgesFromSources(
 				sink.inputs,
-				weightOf("sink", i),
+				factsOf("sink", i, sink.kind),
 				`sink:${i}`,
 				i,
 				"output",

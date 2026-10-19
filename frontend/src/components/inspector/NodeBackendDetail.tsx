@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
+import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
@@ -82,15 +83,12 @@ export function NodeBackendDetail({
 								<span className="w-[5.5rem] shrink-0 truncate text-slate-400">
 									{readable.label}
 								</span>
-								<span
-									className="flex-1 truncate text-slate-200"
-									title={
-										readable.description
-											? `${readable.operands}\n${readable.description}`
-											: readable.operands
-									}
-								>
-									{readable.operands}
+								<span className="flex-1 truncate text-slate-200">
+									{readable.description ? (
+										<Tip content={readable.description}>{readable.operands}</Tip>
+									) : (
+										readable.operands
+									)}
 								</span>
 								{readable.badges.length > 0 ? (
 									<span className="shrink-0 text-[9px] uppercase text-cyan-400/70">

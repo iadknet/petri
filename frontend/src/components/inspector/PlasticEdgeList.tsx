@@ -5,6 +5,7 @@ import type {
 	InputReference,
 	PlasticityConfig,
 } from "../../types/genome.ts";
+import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { edgeWeightLookup } from "./graphFullModel.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
@@ -31,10 +32,42 @@ export interface PlasticEdgeRow {
 	learned: number | undefined;
 }
 
-/** The per-edge plasticity badge: rule, pathway and inheritance (T25.F06). */
+/** The per-edge plasticity badge: rule, pathway, trace decay and inheritance (T25.F06). */
 export function plasticityBadge(config: PlasticityConfig): string {
-	const pathway = config.modulation ? `reward ${config.modulation.reward_source}` : "hebbian";
+	const pathway = config.modulation
+		? `reward ${config.modulation.reward_source} · decay ${config.modulation.trace_decay.toFixed(2)}`
+		: "hebbian";
 	return `${config.rule} · ${pathway} · ${config.lamarckian ? "lamarckian" : "darwinian"}`;
+}
+
+/** The badge spelled out, one sentence per attribute, for its tooltip. */
+export function plasticityDetail(config: PlasticityConfig): string[] {
+	return [
+		`${config.rule} rule, learning rate ${config.learning_rate.toFixed(3)}, weight clamp ±${config.weight_clamp.toFixed(2)}.`,
+		config.modulation
+			? `Reward-modulated by ${config.modulation.reward_source}; its eligibility trace keeps ${config.modulation.trace_decay.toFixed(2)} of itself each tick.`
+			: "Hebbian: learns from co-activity alone.",
+		config.lamarckian
+			? "Lamarckian: offspring inherit the learned weight."
+			: "Darwinian: offspring start from the genomic weight.",
+	];
+}
+
+/** The badge with its spelled-out attributes in a tooltip. */
+export function PlasticityBadge({ config }: { config: PlasticityConfig }) {
+	return (
+		<Tip
+			content={plasticityDetail(config).map((line) => (
+				<span key={line} className="block">
+					{line}
+				</span>
+			))}
+			plain
+			className="rounded bg-violet-500/15 px-1 text-violet-200"
+		>
+			<span data-testid="plasticity-badge">{plasticityBadge(config)}</span>
+		</Tip>
+	);
 }
 
 /** Every plastic edge of `graphDef` on both surfaces, in canonical order. */
@@ -108,12 +141,7 @@ export function PlasticEdgeList({ graphDef, inputRefs, graphWeights }: PlasticEd
 						<span>
 							{row.source} → {row.target}
 						</span>
-						<span
-							data-testid="plasticity-badge"
-							className="rounded bg-violet-500/15 px-1 text-violet-200"
-						>
-							{plasticityBadge(row.config)}
-						</span>
+						<PlasticityBadge config={row.config} />
 						<span className="text-slate-400">{rowWeights(row)}</span>
 					</li>
 				))}

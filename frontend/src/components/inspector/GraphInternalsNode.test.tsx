@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { GraphInternalsNode, type GraphInternalsNodeData } from "./GraphInternalsNode.tsx";
@@ -40,19 +40,26 @@ function props(data: Partial<GraphInternalsNodeData>): ComponentProps<typeof Gra
 }
 
 describe("GraphInternalsNode", () => {
-	it("shows the full label and its explanation as a tooltip", () => {
+	it("explains the full label in a tooltip on hover", () => {
 		render(
 			<GraphInternalsNode {...props({ description: "Share of the view that is barrier." })} />,
 		);
-		const node = screen.getByText("AreaBarrier.density").closest("[title]");
-		expect(node?.getAttribute("title")).toBe(
-			"AreaBarrier.density\nShare of the view that is barrier.",
+		const node = screen.getByTestId("graph-node");
+		expect(node).not.toHaveAttribute("title");
+		// Its React Flow wrapper has pointer events off; the content opts back in.
+		expect(node).toHaveClass("pointer-events-auto");
+		expect(node).toHaveAccessibleDescription(
+			"AreaBarrier.density Share of the view that is barrier.",
+		);
+		fireEvent.mouseEnter(node);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(
+			"AreaBarrier.density Share of the view that is barrier.",
 		);
 	});
 
 	it("falls back to the label alone without a description", () => {
 		render(<GraphInternalsNode {...props({})} />);
-		const node = screen.getByText("AreaBarrier.density").closest("[title]");
-		expect(node?.getAttribute("title")).toBe("AreaBarrier.density");
+		fireEvent.focus(screen.getByTestId("graph-node"));
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/^AreaBarrier\.density$/);
 	});
 });

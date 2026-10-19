@@ -51,6 +51,42 @@ describe("buildFullGraphModel edge-group members", () => {
 		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
 		expect(model.edges.find((edge) => edge.id === "sink:0:1")?.weight).toBe(0.5);
 	});
+
+	it("carries a member's composition for its tooltip", () => {
+		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
+		const member = model.edges.find((edge) => edge.id === "sink:0:1");
+		expect(member?.own).toBe(0);
+		expect(member?.member).toEqual({ group: 0, scale: 0.5, pattern: 1 });
+		expect(model.edges.find((edge) => edge.id === "sink:0:0")?.member).toBeUndefined();
+	});
+
+	it("composes a pair member at its pattern, not 1, when the payload is missing", () => {
+		// AreaFoodSummary pair 0 is (gradX 1, gradY 2); sink E at offset 0 has
+		// pattern compass_x(E) = 1 for x and compass_y(E) = 0 for y; sink W
+		// has compass_x(W) = -1.
+		const model = buildFullGraphModel(
+			makeGraphDef({
+				output_sinks: [
+					{
+						kind: { ActionVote: { Move: 6 } },
+						inputs: [{ ...inputEdge(0, 1, 0.25), membership: { group: 0 } }],
+					},
+				],
+				groups: [
+					{
+						shape: { DirectionPair: { ref_idx: 0, pair: 0 } },
+						kind: "Move",
+						offset: 0,
+						scale: 0.5,
+					},
+				],
+			}),
+			[{ World: "AreaFoodSummary" }],
+		);
+		const member = model.edges.find((edge) => edge.id === "sink:0:0");
+		expect(member?.member?.pattern).toBe(-1);
+		expect(member?.weight).toBe(-0.25);
+	});
 });
 
 describe("buildFullGraphModel", () => {
