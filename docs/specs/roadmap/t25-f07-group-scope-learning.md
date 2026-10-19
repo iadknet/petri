@@ -279,3 +279,5 @@ Thresholds, baselines and epochs untouched; the closing commit re-pins.
 - Decision: the four plasticity laws, the four outcome channels, the clamps, the draw ranges and the Lamarckian seed rule are unchanged (T25.F06); the shared credit is one pattern-weighted change to the scale, bounded once (user, 2026-10-13).
 - Decision: refactors R1–R6 in the readings file are in-feature scope; no `WORKAROUND(T25.F07)` marker is written.
 - Deferred: the 40,000-tick reading of learned scales (retention, drift) goes to the next goal-long carrier; T25's carriers are F02 and F04 (user, 2026-10-15).
+- Decision: the user accepted the goal `pass_cap_hits` severe (+61.0%, Confluence +129.8%) as a trajectory reading, and the gate and goal-worlds epochs are re-pinned to the F07 summaries (user, 2026-10-19).
+- Decision: the user accepted the compute delta unmeasured: the gate and goal wall clock (+51.5%, +92.9%) ran on a different, loaded host and carry no comparison; no rerun or interleaved pair is taken (user, 2026-10-19).
