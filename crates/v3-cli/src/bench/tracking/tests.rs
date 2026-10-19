@@ -19,6 +19,7 @@ fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
     sim.stats.hebbian_changes_total = 2;
     sim.stats.reward_modulated_updates_total = 11;
     sim.stats.reward_modulated_changes_total = 5;
+    sim.stats.plasticity_scale_snaps_total = 3;
     sim.stats.shared_memory_writes_changed_total = 23;
     let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let value = serde_json::to_value(&terminal).unwrap();
@@ -28,7 +29,7 @@ fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
             "plasticity_updates_total": 19, "plasticity_changes_total": 7,
             "hebbian_updates_total": 8, "hebbian_changes_total": 2,
             "reward_modulated_updates_total": 11, "reward_modulated_changes_total": 5,
-            "shared_memory_writes_changed_total": 23,
+            "plasticity_scale_snaps_total": 3, "shared_memory_writes_changed_total": 23,
         })
     );
     let round_trip: WorldTracking = serde_json::from_value(value).unwrap();
@@ -122,6 +123,16 @@ fn plasticity_for(population: u64) -> PlasticityCensusBlock {
         ],
         edges_by_rule: keys(&["classic", "oja", "anti_hebb", "covariance"]),
         edges_by_inheritance: keys(&["darwinian", "lamarckian"]),
+        edges_by_scope: keys(&["ungrouped", "edge", "group"]),
+        scales: ["darwinian", "lamarckian"]
+            .iter()
+            .map(|inheritance| LearnedScaleRow {
+                inheritance: (*inheritance).to_owned(),
+                scales: 0,
+                drift_sum: six(0.0),
+                at_bound: 0,
+            })
+            .collect(),
     }
 }
 

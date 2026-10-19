@@ -147,6 +147,13 @@
       "before": "one per input edge of a plastic compute node per committed visit (Hebbian) or per initialized modulated compute edge per tick; a seeded child counts none until its traces exist",
       "after": "one per plastic edge on either surface per committed visit (Hebbian) or per initialized modulated edge per tick, a seeded reward-modulated slot from birth",
       "comparison": "sink edges and seeded slots count where they did not, and each enable now lands on one edge where it covered a node's fan-in, so per-creature-tick rates are not like-for-like across F06"
+    },
+    {
+      "feature": "T25.F07",
+      "counter": "plasticity_updates (and plasticity_changes, hebbian_updates, hebbian_changes, reward_modulated_updates, reward_modulated_changes); new plasticity_scale_snaps",
+      "before": "one per plastic edge per committed visit (Hebbian) or per initialized modulated edge per tick; a group member never learned",
+      "after": "a group member learns: an edge-scope member as an edge, a group-scope member one update per contribution to its group's scale (Phase 2.5 contributions gated on the scale slot), and a moved scale counts a change for every contributor; plasticity_scale_snaps counts scale writes whose stored value lay outside the bound",
+      "comparison": "group creation now draws a learning mode (two of three modes learn) for every member, so plastic edges and assignments per creature-tick rise where groups exist; rates are not like-for-like across F07"
     }
   ],
   "goal_worlds": {

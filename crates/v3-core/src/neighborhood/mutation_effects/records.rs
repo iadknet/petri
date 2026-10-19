@@ -167,12 +167,14 @@ fn graph_state(
 ) -> BTreeMap<NodeId, NodeState> {
     let row = |values: Option<&Vec<f32>>| trimmed(vec![bits_of(values.map_or(&[], Vec::as_slice))]);
     // The learned values and traces of the initialized plastic edges, in
-    // canonical order, through the learned state's view (T25.F06).
+    // canonical order, through the learned state's view (T25.F06), the
+    // initialized learned scales appended after the edge items (T25.F07).
     let learned = |index: usize| {
-        let values: Vec<f32> = runtime
-            .learned()
+        let view = runtime.learned();
+        let values: Vec<f32> = view
             .edges(index)
             .filter_map(|edge| edge.learned)
+            .chain(view.scales(index).filter_map(|scale| scale.learned))
             .collect();
         trimmed(vec![bits_of(&values)])
     };

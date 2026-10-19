@@ -515,7 +515,13 @@ fn push_edge_inserts_an_independent_edge_before_the_first_member() {
     assert_eq!(inputs.len(), 3);
     assert_eq!(inputs[0].source(), leaf(0));
     assert_eq!(inputs[1].source(), leaf(5));
-    assert_eq!(inputs[2].membership(), Some(Membership { group: id, scope: Scope::Edge }));
+    assert_eq!(
+        inputs[2].membership(),
+        Some(Membership {
+            group: id,
+            scope: Scope::Edge
+        })
+    );
 }
 
 #[test]
@@ -526,9 +532,11 @@ fn remove_group_leaves_no_member_and_renumbers_higher_groups() {
     let third = def.add_group(ring(), DirectedVoteKind::Move, 5);
     assert_eq!(def.remove_group(second), 8);
     assert_eq!(def.groups().len(), 2);
-    assert!(def
-        .edges()
-        .all(|edge| edge.membership() != Some(Membership { group: third, scope: Scope::Edge })));
+    assert!(def.edges().all(|edge| edge.membership()
+        != Some(Membership {
+            group: third,
+            scope: Scope::Edge
+        })));
     // The third group is now `GroupId(1)`, its members with it.
     let renumbered = GroupId::new(1);
     assert_eq!(def.groups()[1].offset(), 5);
@@ -572,7 +580,10 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
     let later = sink_occurrence(sink, 1);
     assert_eq!(
         def.edge_at(later).membership(),
-        Some(Membership { group: second, scope: Scope::Edge })
+        Some(Membership {
+            group: second,
+            scope: Scope::Edge
+        })
     );
     let (moved, removed) = detach(&mut def, later, &ring_refs());
     assert!(!removed);
@@ -585,7 +596,10 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
     );
     assert_eq!(
         def.edge_at(sink_occurrence(sink, 1)).membership(),
-        Some(Membership { group: first, scope: Scope::Edge })
+        Some(Membership {
+            group: first,
+            scope: Scope::Edge
+        })
     );
     assert_eq!(def.members(second).count(), 7);
 }
@@ -1066,7 +1080,10 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
         },
         own_weight: 0.25,
         plasticity: None,
-        membership: Some(Membership { group: id, scope: Scope::Edge }),
+        membership: Some(Membership {
+            group: id,
+            scope: Scope::Edge,
+        }),
     });
     resort(&mut def, sink);
     assert_eq!(def.check_local_invariants(), Ok(()));
@@ -1341,7 +1358,7 @@ fn compute_edge_free_occurrence() -> EdgeOccurrence {
 
 #[test]
 #[cfg(debug_assertions)]
-#[should_panic(expected = "neither a ClearSlot edge nor a member learns")]
+#[should_panic(expected = "a ClearSlot edge does not learn")]
 fn set_plasticity_on_a_clear_slot_edge_is_a_debug_assertion() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
@@ -1350,24 +1367,28 @@ fn set_plasticity_on_a_clear_slot_edge_is_a_debug_assertion() {
         .set_plasticity(plastic());
 }
 
-/// A group member stays static until T25.F07 gives it a scope: it is not
-/// eligible, and `validate_graph` rejects a plastic one.
+/// A member learns at its scope (T25.F07 invariant 1): it is eligible and
+/// a plastic member, at either scope, passes `validate_graph`; a plastic
+/// `ClearSlot` edge is still rejected.
 #[test]
-fn members_are_not_eligible_until_scope_exists() {
+fn validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 1);
-    let member = def.members(id).next().unwrap();
-    assert!(!def.can_learn(member));
-    let independent = sink_occurrence(vote_sink(DirectedVoteKind::Move, 0), 0);
-    assert!(def.can_learn(independent));
-    def.edge_mut(independent).set_plasticity(plastic());
+    let members: Vec<EdgeOccurrence> = def.members(id).collect();
+    assert!(members.iter().all(|&member| def.can_learn(member)));
+    def.edge_mut(members[0]).set_plasticity(plastic());
+    def.edge_mut(members[1]).set_plasticity(plastic());
+    def.edge_mut(members[1]).set_scope(Scope::Group);
     assert_eq!(
         validate_graph(&learning_node(def.clone(), ring_refs())),
         Ok(())
     );
-    let EdgeSurface::SinkInput(sink) = member.surface else {
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
+    def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
+    let EdgeSurface::SinkInput(sink) = clear else {
         unreachable!()
     };
-    def.output_sinks.0[sink].inputs.0[member.index].plasticity = plastic();
+    assert!(!def.can_learn(EdgeOccurrence::new(clear, 0)));
+    def.output_sinks.0[sink].inputs.0[0].plasticity = plastic();
     assert_eq!(
         validate_graph(&learning_node(def, ring_refs())),
         Err(GraphInvariantViolation::IneligiblePlasticEdge)
@@ -1430,6 +1451,9 @@ enum SeedOp {
     Relocate(u8),
     Detach,
     RemoveGroup,
+    SetScope(usize),
+    SetInheritScale,
+    SetScale,
     RemoveNode(usize),
     Clone,
 }
@@ -1447,6 +1471,9 @@ fn seed_op_strategy() -> impl Strategy<Value = SeedOp> {
         (0u8..8).prop_map(SeedOp::Relocate),
         Just(SeedOp::Detach),
         Just(SeedOp::RemoveGroup),
+        (0usize..64).prop_map(SeedOp::SetScope),
+        Just(SeedOp::SetInheritScale),
+        Just(SeedOp::SetScale),
         (0usize..64).prop_map(SeedOp::RemoveNode),
         Just(SeedOp::Clone),
     ]
@@ -1465,14 +1492,19 @@ fn model_sinks() -> [usize; 6] {
 }
 
 proptest! {
-    /// T25.F06 invariant 8, model-based: every edge carries a unique tag as
-    /// its own weight and, when seeded, the tag as its seed. Through any
+    /// T25.F06 invariant 8, T25.F07 invariant 6, model-based: every edge
+    /// carries a unique tag as its own weight and every group a unique tag
+    /// as its scale (in `(0.9, 1.5)`, so an integer own tag plus a scale tag
+    /// is unique too) and, when seeded, the tag as its seed. Through any
     /// sequence of primitives on both surfaces (push, remove, split, the
     /// source and weight writes, group creation, relocation, detach and
-    /// removal, node removal, a draft's clone) each row
-    /// stays aligned with its edges (node duplication copies rows and is
-    /// pinned by `cgp_reproduction`'s copy-remove property): an edge's seed is its own tag exactly
-    /// while the model keeps the tag seeded, `None` otherwise.
+    /// removal, scope, `inherit_scale` and scale writes, node removal, a
+    /// draft's clone) each row and the group slots stay aligned with their
+    /// edges and records (node duplication copies rows and is pinned by
+    /// `cgp_reproduction`'s copy-remove property): a seed is its own tag
+    /// exactly while the model keeps the tag seeded, `None` otherwise; a
+    /// detached member's seed is its composed weight when its edge or its
+    /// group was seeded.
     #[test]
     fn seed_rows_follow_their_edges_through_every_primitive(
         ops in prop::collection::vec(seed_op_strategy(), 1..40),
@@ -1491,7 +1523,18 @@ proptest! {
         for sink in model_sinks() {
             def.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(GraphSource::ComputeNode(2), fresh()));
         }
-        // Seed every edge with its tag.
+        // Two groups, every member and record tagged.
+        let tag_group = |def: &mut CgpGraphBackendDef, id: GroupId, fresh: &mut dyn FnMut() -> f32| {
+            for member in def.members(id).collect::<Vec<_>>() {
+                def.edge_mut(member).set_weight(fresh());
+            }
+            def.group_mut(id).set_scale(fresh() / 1024.0);
+        };
+        for (kind, offset) in [(DirectedVoteKind::Move, 2), (DirectedVoteKind::StealEnergy, 5)] {
+            let id = def.add_group(ring(), kind, offset);
+            tag_group(&mut def, id, &mut fresh);
+        }
+        // Seed every edge and group with its tag.
         let tag_rows = |def: &CgpGraphBackendDef, surface_count: usize, surface: fn(usize) -> EdgeSurface| -> Vec<Vec<Option<f32>>> {
             (0..surface_count)
                 .map(|i| def.surface_edges(surface(i)).iter().map(|e| Some(e.own_weight())).collect())
@@ -1499,10 +1542,13 @@ proptest! {
         };
         let compute = tag_rows(&def, def.compute_nodes().len(), EdgeSurface::ComputeInput);
         let sinks = tag_rows(&def, def.output_sinks().len(), EdgeSurface::SinkInput);
-        def.seed_birth(BirthSeeds::Rows { compute, sinks });
+        let groups = def.groups().iter().map(|group| Some(group.scale())).collect();
+        def.seed_birth(BirthSeeds::Rows { compute, sinks, groups });
         for edge in def.edges() {
             seeded_tags.insert(edge.own_weight().to_bits());
         }
+        let mut seeded_scales: std::collections::BTreeSet<u32> =
+            def.groups().iter().map(|group| group.scale().to_bits()).collect();
         let refs = ring_refs();
         for op in ops {
             let sites: Vec<EdgeOccurrence> = def.edge_sites().collect();
@@ -1559,7 +1605,9 @@ proptest! {
                 }
                 SeedOp::AddGroup(offset) => {
                     if def.can_host_group() && def.groups().len() < 3 {
-                        def.add_group(ring(), DirectedVoteKind::Move, offset);
+                        let id = def.add_group(ring(), DirectedVoteKind::Move, offset);
+                        prop_assert_eq!(def.birth_seeds().unwrap().group_value(id), None);
+                        tag_group(&mut def, id, &mut fresh);
                     }
                 }
                 SeedOp::Relocate(offset) => {
@@ -1570,12 +1618,38 @@ proptest! {
                 SeedOp::Detach => {
                     if let Some(member) = def.groups().first().and_then(|_| def.members(GroupId::new(0)).next()) {
                         let pattern = def.member_pattern(member, &refs);
-                        def.detach_at(member, pattern);
+                        let own = def.edge_at(member).own_weight();
+                        let scale = def.groups()[0].scale();
+                        let seeded = seeded_tags.remove(&own.to_bits()) || seeded_scales.contains(&scale.to_bits());
+                        let (detached, _) = def.detach_at(member, pattern);
+                        let composed = def.edge_at(detached).own_weight();
+                        prop_assert_eq!(composed, compose(own, scale, pattern));
+                        if seeded {
+                            seeded_tags.insert(composed.to_bits());
+                        }
                     }
                 }
                 SeedOp::RemoveGroup => {
                     if !def.groups().is_empty() {
                         def.remove_group(GroupId::new(0));
+                    }
+                }
+                SeedOp::SetScope(i) => {
+                    let members: Vec<EdgeOccurrence> = def.edge_sites().filter(|&site| !independent(&def, site)).collect();
+                    if let Some(&member) = members.get(i % members.len().max(1)) {
+                        let scope = def.edge_at(member).membership().unwrap().scope.other();
+                        def.edge_mut(member).set_scope(scope);
+                    }
+                }
+                SeedOp::SetInheritScale => {
+                    if let Some(group) = def.groups().first().copied() {
+                        def.group_mut(GroupId::new(0)).set_inherit_scale(!group.inherit_scale());
+                    }
+                }
+                SeedOp::SetScale => {
+                    if let Some(group) = def.groups().first().copied() {
+                        seeded_scales.remove(&group.scale().to_bits());
+                        def.group_mut(GroupId::new(0)).set_scale(fresh() / 1024.0);
                     }
                 }
                 SeedOp::RemoveNode(i) => {
@@ -1598,6 +1672,12 @@ proptest! {
             let seeds = def.birth_seeds().expect("the draft keeps its seeds").clone();
             prop_assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
             prop_assert_eq!(seeds.sink_rows().len(), def.output_sinks().len());
+            prop_assert_eq!(seeds.group_slots().len(), def.groups().len());
+            for (index, group) in def.groups().iter().enumerate() {
+                let tag = group.scale();
+                let expected = seeded_scales.contains(&tag.to_bits()).then_some(tag);
+                prop_assert_eq!(seeds.group_slots()[index], expected, "group {}", index);
+            }
             for site in def.edge_sites() {
                 let tag = def.edge_at(site).own_weight();
                 let expected = seeded_tags.contains(&tag.to_bits()).then_some(tag);
@@ -1606,4 +1686,146 @@ proptest! {
             prop_assert_eq!(validate_graph(&learning_node(def.clone(), refs.clone())), Ok(()));
         }
     }
+}
+
+/// Seed `def`'s draft: every edge row empty, `edges` and `groups` set.
+fn seed_with(
+    def: &mut CgpGraphBackendDef,
+    edges: &[(EdgeOccurrence, f32)],
+    groups: &[(GroupId, f32)],
+) {
+    let mut compute: Vec<Vec<Option<f32>>> = def
+        .compute_nodes()
+        .iter()
+        .map(|node| vec![None; node.inputs.len()])
+        .collect();
+    let mut sinks: Vec<Vec<Option<f32>>> = def
+        .output_sinks()
+        .iter()
+        .map(|sink| vec![None; sink.inputs.len()])
+        .collect();
+    for &(at, value) in edges {
+        let row = match at.surface {
+            EdgeSurface::ComputeInput(i) => &mut compute[i],
+            EdgeSurface::SinkInput(i) => &mut sinks[i],
+        };
+        row[at.index] = Some(value);
+    }
+    let mut slots = vec![None; def.groups().len()];
+    for &(group, value) in groups {
+        slots[group.index()] = Some(value);
+    }
+    def.seed_birth(BirthSeeds::Rows {
+        compute,
+        sinks,
+        groups: slots,
+    });
+}
+
+/// Invariant 6: a detached member's seed composes the edge's seed (or its
+/// own weight) with the group's seed (or its scale) at its pattern, with no
+/// clamp; with neither seed it keeps none; a last-member detach drops the
+/// group's slot.
+#[test]
+fn a_detached_member_composes_its_seed_with_the_learned_scale() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 0);
+    def.group_mut(id).set_scale(0.5);
+    let refs = pair_refs();
+    let all: Vec<EdgeOccurrence> = def.members(id).collect();
+    let (first, second) = (all[0], all[1]);
+    def.edge_mut(first).set_weight(0.25);
+    def.edge_mut(second).set_weight(-0.75);
+    seed_with(&mut def, &[(first, 9.0)], &[(id, 12.0)]);
+    let pattern = def.member_pattern(first, &refs);
+    let (at, removed) = def.detach_at(first, pattern);
+    assert!(!removed);
+    assert_eq!(
+        def.birth_seeds().unwrap().value(at),
+        Some(compose(9.0, 12.0, pattern)),
+        "both seeds, no clamp"
+    );
+    assert_eq!(def.edge_at(at).own_weight(), compose(0.25, 0.5, pattern));
+
+    let mut group_only = def.clone();
+    let second_at = group_only.members(id).next().unwrap();
+    assert_eq!(second_at, def.members(id).next().unwrap());
+    let pattern = group_only.member_pattern(second_at, &refs);
+    let own = group_only.edge_at(second_at).own_weight();
+    let (at, _) = group_only.detach_at(second_at, pattern);
+    assert_eq!(
+        group_only.birth_seeds().unwrap().value(at),
+        Some(compose(own, 12.0, pattern)),
+        "the group seed with the edge's own weight"
+    );
+
+    let mut neither = def.clone();
+    neither.group_mut(id).set_scale(0.5);
+    assert_eq!(neither.birth_seeds().unwrap().group_value(id), None);
+    let member = neither.members(id).next().unwrap();
+    let pattern = neither.member_pattern(member, &refs);
+    let (at, _) = neither.detach_at(member, pattern);
+    assert_eq!(neither.birth_seeds().unwrap().value(at), None);
+
+    // Detaching every member drops the group and its slot.
+    let mut last = def.clone();
+    while let Some(member) = last.groups().first().and_then(|_| last.members(id).next()) {
+        let pattern = last.member_pattern(member, &refs);
+        last.detach_at(member, pattern);
+    }
+    assert!(last.groups().is_empty());
+    assert!(last.birth_seeds().unwrap().group_slots().is_empty());
+}
+
+/// R5: a group with members at both scopes, distinct edge seeds and a group
+/// seed survives a relocation and its inverse unchanged, seeds included.
+#[test]
+fn a_mixed_scope_group_survives_a_relocation_and_its_inverse() {
+    let (mut def, id) = paired(DirectedVoteKind::Move, 3);
+    let all: Vec<EdgeOccurrence> = def.members(id).collect();
+    for (k, &member) in all.iter().enumerate() {
+        def.edge_mut(member).set_weight(k as f32 + 0.5);
+        if k % 2 == 1 {
+            def.edge_mut(member).set_scope(Scope::Group);
+        }
+    }
+    let edge_seeds: Vec<(EdgeOccurrence, f32)> = all
+        .iter()
+        .enumerate()
+        .map(|(k, &member)| (member, 100.0 + k as f32))
+        .collect();
+    seed_with(&mut def, &edge_seeds, &[(id, 7.5)]);
+    let before = def.clone();
+    let seeds_before = def.birth_seeds().unwrap().clone();
+    def.relocate_group(id, DirectedVoteKind::Reproduce, 6);
+    assert_eq!(
+        def.members(id).count(),
+        all.len(),
+        "scope never splits a group"
+    );
+    def.relocate_group(id, DirectedVoteKind::Move, 3);
+    assert_eq!(def, before);
+    assert_eq!(def.birth_seeds().unwrap(), &seeds_before);
+}
+
+/// `set_scope` and `set_inherit_scale` keep every seed; `set_scale` clears
+/// the group's.
+#[test]
+fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_group_seed() {
+    let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
+    let member = def.members(id).next().unwrap();
+    seed_with(&mut def, &[(member, 2.0)], &[(id, 3.0)]);
+    def.edge_mut(member).set_scope(Scope::Group);
+    def.group_mut(id).set_inherit_scale(true);
+    let seeds = def.birth_seeds().unwrap();
+    assert_eq!(
+        (seeds.value(member), seeds.group_value(id)),
+        (Some(2.0), Some(3.0))
+    );
+    assert!(def.groups()[id.index()].inherit_scale());
+    def.group_mut(id).set_scale(0.5);
+    let seeds = def.birth_seeds().unwrap();
+    assert_eq!(
+        (seeds.value(member), seeds.group_value(id)),
+        (Some(2.0), None)
+    );
 }

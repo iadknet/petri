@@ -119,6 +119,7 @@ impl GraphEdge {
     #[inline]
     #[must_use]
     pub fn is_member_of(&self, group: GroupId) -> bool {
-        self.membership.is_some_and(|membership| membership.group == group)
+        self.membership
+            .is_some_and(|membership| membership.group == group)
     }
 }

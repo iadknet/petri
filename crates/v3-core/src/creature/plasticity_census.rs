@@ -5,16 +5,20 @@
 //! with learning attributes (T25.F06), keyed by learning pathway (pure
 //! Hebbian or reward-modulated) and surface (compute or sink), and counted
 //! separately by rule and by inheritance (Lamarckian or Darwinian). The
-//! census reads the learned state's view: drift is `|learned - genomic|`
-//! over initialized edges (lifetime learning on a Darwinian edge; on a
-//! Lamarckian edge it also carries what ancestors learned), and an
-//! initialized edge sits at its clamp when its learned weight reaches the
-//! edge's clamp, which every write saturates to exactly.
+//! census reads the learned state's view: edge drift is `|learned -
+//! genomic|` over initialized own quantities (an ungrouped edge's weight, an
+//! edge-scope member's correction; lifetime learning on a Darwinian edge,
+//! on a Lamarckian edge also what ancestors learned), and an initialized
+//! own quantity sits at its clamp when it reaches the edge's clamp, which
+//! every write saturates to exactly. A group learner has no own quantity
+//! and adds neither (T25.F07). Every learner counts by scope; each scale
+//! slot counts once per group, by its `inherit_scale`, with its drift
+//! `|learned - genomic|` and whether it sits at its bound.
 //!
 //! Pure structure and state: it reads genomes, cached reachability and
 //! learned state and executes no brain.
 
-use crate::creature::genome::cgp::EdgeSurface;
+use crate::creature::genome::cgp::{EdgeSurface, Scope};
 use crate::creature::genome::HebbianRule;
 use crate::runtime::plasticity::{LearnedState, RULES};
 
@@ -37,8 +41,33 @@ pub const LEARNING_KEYS: [&str; 2] = ["hebbian", "reward_modulated"];
 pub const SURFACE_KEYS: [&str; 2] = ["compute", "sink"];
 
 /// The `petri.plasticity_inheritance` keys, by inheritance index (0
-/// Darwinian, 1 Lamarckian).
+/// Darwinian, 1 Lamarckian). A scale slot's inheritance is its group's
+/// `inherit_scale`.
 pub const INHERITANCE_KEYS: [&str; 2] = ["darwinian", "lamarckian"];
+
+/// The `petri.plasticity_scope` keys, by scope index (0 ungrouped, 1 edge,
+/// 2 group).
+pub const SCOPE_KEYS: [&str; 3] = ["ungrouped", "edge", "group"];
+
+/// The scope index of a learner of scope `scope` ([`SCOPE_KEYS`]).
+#[must_use]
+pub const fn scope_index(scope: Option<Scope>) -> usize {
+    match scope {
+        None => 0,
+        Some(Scope::Edge) => 1,
+        Some(Scope::Group) => 2,
+    }
+}
+
+/// One inheritance cell's learned scales over a population.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct LearnedScales {
+    pub scales: u64,
+    /// Sum of `|learned - genomic|` over the initialized scale slots.
+    pub drift_sum: f64,
+    /// Initialized scale slots whose learned scale sits at their bound.
+    pub at_bound: u64,
+}
 
 /// One (pathway, surface) cell's plastic edges over a population.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -62,6 +91,10 @@ pub struct PlasticityCensus {
     pub edges_by_rule: [u64; 4],
     /// Edge counts per inheritance, in [`INHERITANCE_KEYS`] order.
     pub edges_by_inheritance: [u64; 2],
+    /// Edge counts per scope, in [`SCOPE_KEYS`] order.
+    pub edges_by_scope: [u64; 3],
+    /// Scale slots per inheritance, in [`INHERITANCE_KEYS`] order.
+    pub scales: [LearnedScales; 2],
 }
 
 impl PlasticityCensus {
@@ -107,6 +140,16 @@ impl PlasticityCensus {
             .zip(self.edges_by_inheritance)
     }
 
+    /// Edge counts keyed by scope, in [`SCOPE_KEYS`] order.
+    pub fn scope_counts(&self) -> impl Iterator<Item = (&'static str, u64)> + '_ {
+        SCOPE_KEYS.iter().copied().zip(self.edges_by_scope)
+    }
+
+    /// Scale cells keyed by inheritance, in [`INHERITANCE_KEYS`] order.
+    pub fn scale_cells(&self) -> impl Iterator<Item = (&'static str, LearnedScales)> + '_ {
+        INHERITANCE_KEYS.iter().copied().zip(self.scales)
+    }
+
     /// Drift sum and at-clamp count per surface over both pathways, keyed
     /// in [`SURFACE_KEYS`] order.
     pub fn surface_totals(&self) -> impl Iterator<Item = (&'static str, f64, u64)> + '_ {
@@ -133,6 +176,7 @@ impl PlasticityCensus {
                 };
                 self.edges_by_rule[kind.rule_index()] += 1;
                 self.edges_by_inheritance[usize::from(kind.lamarckian)] += 1;
+                self.edges_by_scope[scope_index(edge.scope)] += 1;
                 let cell = &mut self.edges[usize::from(kind.reward_modulated)][surface];
                 cell.edges += 1;
                 let Some(weight) = edge.learned else {
@@ -144,6 +188,18 @@ impl PlasticityCensus {
                     cell.drift_sum += drift;
                 }
                 cell.at_clamp += u64::from(weight.abs() >= edge.bound);
+            }
+            for scale in learned.scales(node_idx) {
+                let cell = &mut self.scales[usize::from(scale.inherit_scale)];
+                cell.scales += 1;
+                let Some(value) = scale.learned else {
+                    continue;
+                };
+                let drift = f64::from((value - scale.genomic).abs());
+                if drift.is_finite() {
+                    cell.drift_sum += drift;
+                }
+                cell.at_bound += u64::from(value.abs() >= scale.bound);
             }
         }
         self.carriers += u64::from(carries);

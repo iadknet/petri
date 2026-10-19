@@ -56,10 +56,11 @@ pub enum GraphOperator {
     ShiftGroupOffset,
     RetargetGroupKind,
     RemoveGroup,
+    SetScope,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 30] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -89,6 +90,7 @@ impl GraphOperator {
         Self::ShiftGroupOffset,
         Self::RetargetGroupKind,
         Self::RemoveGroup,
+        Self::SetScope,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -129,12 +131,14 @@ impl GraphOperator {
             Self::ShiftGroupOffset => 2,
             Self::RetargetGroupKind => 2,
             Self::RemoveGroup => 2,
+            // T25.F07: after `RemoveGroup`, at the tier of a moderate edit.
+            Self::SetScope => 2,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 29,
+            Self::ALL.len() == 30,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -184,7 +188,8 @@ impl GraphOperator {
             | Self::MutateTraceDecay
             | Self::AlterGroupScale
             | Self::ShiftGroupOffset
-            | Self::RetargetGroupKind => ComplexityEffect::Neutral,
+            | Self::RetargetGroupKind
+            | Self::SetScope => ComplexityEffect::Neutral,
         }
     }
 
@@ -255,6 +260,7 @@ impl GraphOperator {
             | Self::ShiftGroupOffset
             | Self::RetargetGroupKind
             | Self::RemoveGroup => group::has_group(def),
+            Self::SetScope => hebbian::any_edge(def, hebbian::is_member),
         }
     }
 }
@@ -443,12 +449,14 @@ impl GraphMutator {
             GraphOperator::AlterGroupScale
             | GraphOperator::ShiftGroupOffset
             | GraphOperator::RetargetGroupKind
-            | GraphOperator::RemoveGroup => {
+            | GraphOperator::RemoveGroup
+            | GraphOperator::SetScope => {
                 let def = operators::graph_def_mut(genome, node_idx)?;
                 match op {
                     GraphOperator::AlterGroupScale => group::alter_scale(def, rng),
                     GraphOperator::ShiftGroupOffset => group::shift_offset(def, rng),
                     GraphOperator::RetargetGroupKind => group::retarget_kind(def, rng),
+                    GraphOperator::SetScope => hebbian::set_scope_in_def(def, rng),
                     _ => group::remove(def, rng),
                 }
             }

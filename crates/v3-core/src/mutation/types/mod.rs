@@ -264,6 +264,7 @@ pub enum MutationOperator {
     GraphShiftGroupOffset,
     GraphRetargetGroupKind,
     GraphRemoveGroup,
+    GraphSetScope,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -333,6 +334,7 @@ impl MutationOperator {
             Self::GraphShiftGroupOffset => "Graph.ShiftGroupOffset",
             Self::GraphRetargetGroupKind => "Graph.RetargetGroupKind",
             Self::GraphRemoveGroup => "Graph.RemoveGroup",
+            Self::GraphSetScope => "Graph.SetScope",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -400,7 +402,8 @@ impl MutationOperator {
             | Self::GraphAlterGroupScale
             | Self::GraphShiftGroupOffset
             | Self::GraphRetargetGroupKind
-            | Self::GraphRemoveGroup => MutationDomain::Graph,
+            | Self::GraphRemoveGroup
+            | Self::GraphSetScope => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -477,7 +480,8 @@ impl MutationOperator {
             | Self::GraphMutateTraceDecay
             | Self::GraphAlterGroupScale
             | Self::GraphShiftGroupOffset
-            | Self::GraphRetargetGroupKind => ComplexityEffect::Neutral,
+            | Self::GraphRetargetGroupKind
+            | Self::GraphSetScope => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -486,7 +490,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 62] {
+    pub const fn all() -> [Self; 63] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -546,6 +550,7 @@ impl MutationOperator {
             Self::GraphShiftGroupOffset,
             Self::GraphRetargetGroupKind,
             Self::GraphRemoveGroup,
+            Self::GraphSetScope,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,

@@ -2717,7 +2717,10 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// lineage of arm 12 in batch, lineage order (batches 0-40, lineages 0-15,
 /// discovery 9, followup 256), the search recorded in
 /// `docs/progress/readings/t25-f04.md`; removing the catalog entry restores
-/// batch 22 lineage 0.
+/// batch 22 lineage 0. At T25.F07 commit 2 (`SetScope` and the scope coin
+/// remap every Graph draw) batch 1 lineage 3 is still the first `Deleted`
+/// lineage of the same search, deleting its discovery at depth 112 (was
+/// 137).
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
     // The pinned lineage is the default rate's; check it before the 263-
@@ -2756,7 +2759,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .iter()
         .find(|module| module.module.node == NodeId::new(2))
         .unwrap();
-    assert_eq!(module.module.deleted_depth, Some(137));
+    assert_eq!(module.module.deleted_depth, Some(112));
     assert!(!module.module.is_present());
     assert!(last
         .modules

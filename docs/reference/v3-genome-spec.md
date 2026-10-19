@@ -138,7 +138,10 @@ misalignment across topology mutations.
 Within each mesh node, operator state, committed outputs and scratch
 buffers are indexed by compute node index. Learned state (T25.F06) is one
 slot per plastic edge over both surfaces in canonical order — a sink edge can
-learn — built once at birth (`v3-graph-backend-spec.md` Section 13). Fixed
+learn — and, since T25.F07, one scale slot per edge group with a
+group-scope learner, in `GroupId` order, built once at birth
+(`v3-graph-backend-spec.md` Section 13). A member's `scope` and a group's
+`inherit_scale` are genome fields; the learned scale is runtime state. Fixed
 structural outputs (the sinks) carry no operator state.
 
 ---

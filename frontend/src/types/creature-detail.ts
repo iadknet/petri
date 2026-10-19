@@ -23,16 +23,21 @@ export interface CreatureMeshAnnotation {
 	live_internal_node_indices?: number[];
 }
 
-/** One group's shared scale in `graph_weights` (T25.F03). */
+/**
+ * One group's shared scale in `graph_weights` (T25.F03): its genomic value
+ * and, for an initialized scale slot, its learned value (T25.F07).
+ */
 export interface GroupScaleWeight {
 	group: number;
 	genomic: number;
+	/** The learned scale; present for an initialized scale slot only. */
+	learned?: number;
 }
 
 /**
  * One member or plastic edge's weights in `graph_weights` (T25.F03,
- * T25.F06): its genomic weight, and for a plastic edge the weight in force
- * (`applied`) and, once initialized, its learned weight.
+ * T25.F06, T25.F07): its genomic weight, the weight in force (`applied`)
+ * and, for an initialized own quantity, its learned value.
  */
 export interface EdgeGenomicWeight {
 	surface: "compute" | "sink";
@@ -41,9 +46,12 @@ export interface EdgeGenomicWeight {
 	/** The index within that container's inputs. */
 	edge: number;
 	genomic: number;
-	/** The weight in force; present for a plastic edge only. */
-	applied?: number;
-	/** The learned weight; present for an initialized plastic edge only. */
+	/** The weight in force: own + scale × pattern, the learned scale when the group learns. */
+	applied: number;
+	/**
+	 * The learned own quantity (an ungrouped edge's weight, an edge-scope
+	 * member's correction); present once initialized, never for a group-scope member.
+	 */
 	learned?: number;
 }
 

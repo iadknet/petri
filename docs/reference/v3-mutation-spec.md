@@ -464,10 +464,24 @@ added/removed/retyped — only their edges are evolvable.
   two compute nodes or no edge-bearing node is not an applicable target)
 - The nine plasticity operators act on edges (T25.F06): each picks one edge
   uniformly among the edges matching its predicate, in `edge_sites` order over
-  both surfaces (count-then-select, one draw), writes it through
+  both surfaces (count-then-select, one draw), writes through
   `EdgeMut::set_plasticity`, and applies to a module when any edge matches. A
-  `ClearSlot` edge or a group member never matches. Weights and catalog
-  positions are unchanged; a learning attribute carries no genome unit.
+  `ClearSlot` edge never matches; a group member does (T25.F07). After the
+  pick a member draws the **scope coin** `gen_bool(0.5)`: false, the change
+  lands on the picked member; true, on every member of its group the
+  operator's predicate admits, the rest untouched with no draw; a non-member
+  draws no coin. Value draws follow the coin and are drawn once, and each
+  target applies the law to its own config: `EnableHebbian` writes one
+  config to every admitted (static) member; `EnableRewardModulation` sets one
+  modulation, each member keeping its rule, rate, clamp and flag;
+  `DisableRewardModulation` clears the modulation alone; `MutateHebbianRule`
+  and `MutateRewardSource` draw among the others of the picked edge's value
+  and write the drawn value; `ToggleHebbianLamarckian` writes the picked
+  edge's flipped flag; `MutateHebbianRate` and `MutateTraceDecay` draw one
+  `u = gen_range(-1.0..=1.0)` and each target steps its own value by its
+  branch (`× (1 + 0.3u)` above 0.01, else `+ 0.05u`, then `[0, 1]`). Weights
+  and catalog positions are unchanged; a learning attribute carries no
+  genome unit.
   Plasticity travels with its edge: retarget, split (the consumer keeps it,
   the identity edge is static), `CopyComputeNode`, `CopySubgraph` and
   `CopyEdgeBundle` copy it; `AddGraphEdge`, recruitment and group creation
@@ -482,6 +496,11 @@ added/removed/retyped — only their edges are evolvable.
 - `DisableRewardModulation` (a modulated edge: remove its modulation)
 - `MutateRewardSource` (a modulated edge: one of the other three channels)
 - `MutateTraceDecay` (a modulated edge: perturb `trace_decay`, kept in `[0, 1]`)
+- `SetScope` (T25.F07, key `Graph.SetScope`, weight 2, Neutral, after
+  `RemoveGroup` in the catalog; applies to a Graph node with a member): one
+  member uniformly in canonical order, the scope coin, then the other of the
+  picked member's scope written to it alone or to every member of its group;
+  no value draw. Scope carries no genome unit.
 - `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled by
   `mutation.structured_heritable_refinement`, true by default since
   2026-10-12 (omitted means true).
@@ -607,17 +626,26 @@ added/removed/retyped — only their edges are evolvable.
 - Edge-group operators (T25.F03), at the catalog positions and weights of the
   T11.F31 ring projection operators they replace, after
   `RefineHeritableStructure`, with `AddDirectionPairGroup` (T25.F04)
-  directly after `AddRingGroup`; the default-arm total weight is 58. A group
-  is a record `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind,
-  offset, scale}` plus its member sink edges (graph backend spec, "Ring edge
-  groups" and "Direction-pair edge groups"); the unit operators pick one
-  group uniformly over both shapes, edit the record and move members with
-  it.
+  directly after `AddRingGroup`, and `SetScope` (T25.F07) after
+  `RemoveGroup`; the default-arm total weight is 60. A group is a record
+  `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind, offset,
+  scale, inherit_scale}` plus its member sink edges, each with a `scope`
+  (graph backend spec, "Ring edge groups" and "Direction-pair edge groups");
+  the unit operators pick one group uniformly over both shapes, edit the
+  record and move members with it, scope included.
+
+  **Learned creation** (T25.F07): after its shape draws a creation operator
+  draws one mode `gen_range(0..3u8)` (0 static, 1 Hebbian, 2
+  reward-modulated); a learning mode draws one config by `EnableHebbian`'s
+  law (then `EnableRewardModulation`'s for mode 2) written to every member;
+  then one scope coin (`gen_bool(0.5)`, true `Group`) written to every
+  member; then one `inherit_scale` coin (`gen_bool(0.5)`). The pattern and
+  the scale are never randomized: a new group is silent.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
-  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); `Δgenome_size` +9 | Increasing |
-  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 (duplicates allowed); `Δgenome_size` +13 | Increasing |
+  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +9 | Increasing |
+  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +13 | Increasing |
   | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
   | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
   | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink | Neutral |

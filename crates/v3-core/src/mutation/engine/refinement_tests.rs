@@ -85,7 +85,9 @@ fn refinement_engine_accounts_one_event_under_normal_and_restricted_pressure() {
             ..MutationConfig::default()
         };
         let mut counts = [0, 0];
-        for seed in 0..512 {
+        // 1,024 seeds since T25.F07: `SetScope` remaps the Graph draws, and
+        // 512 seeds no longer reach an atomic numeric skip unrestricted.
+        for seed in 0..1024 {
             for weight in [0.0, 1_048_576.0] {
                 let original = fixture(weight);
                 let mut genome = original.clone();

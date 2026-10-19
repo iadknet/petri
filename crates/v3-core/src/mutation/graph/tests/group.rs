@@ -9,10 +9,13 @@ use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::test_support::edit_sinks;
 use crate::creature::genome::cgp::{
-    validate_graph, CgpGraphBackendDef, GroupId, OutputSinkKind, Shape,
+    validate_graph, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
+    RewardModulationConfig, VmBackendDef,
+};
 use crate::mutation::engine::graph_operator_key;
 use crate::mutation::graph::{group, refinement, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
@@ -92,11 +95,81 @@ fn id(index: usize) -> GroupId {
     GroupId::new(u16::try_from(index).unwrap())
 }
 
+/// Learned creation's draws, replayed from `rng` in their pinned order
+/// (T25.F07 invariant 7): one mode in `0..3`; for a learning mode the rule,
+/// rate, clamp and inheritance of `EnableHebbian`, then for mode 2 the
+/// channel and decay of `EnableRewardModulation`; one scope coin; one
+/// `inherit_scale` coin. Applied to group `group` of `want`; returns the
+/// mode.
+fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) -> u8 {
+    const RULES: [HebbianRule; 4] = [
+        HebbianRule::Classic,
+        HebbianRule::Oja,
+        HebbianRule::AntiHebb,
+        HebbianRule::Covariance,
+    ];
+    const CHANNELS: [OutcomeChannel; 4] = [
+        OutcomeChannel::EnergyDelta,
+        OutcomeChannel::ActionSuccess,
+        OutcomeChannel::DamageDelta,
+        OutcomeChannel::OffspringSuccess,
+    ];
+    let mode = rng.gen_range(0..3u8);
+    let config = (mode > 0).then(|| {
+        let rule = RULES[rng.gen_range(0..4)];
+        let learning_rate = rng.gen_range(0.01f32..0.2);
+        let weight_clamp = rng.gen_range(1.0f32..5.0);
+        let lamarckian = rng.gen_bool(0.5);
+        let modulation = (mode == 2).then(|| {
+            let reward_source = CHANNELS[rng.gen_range(0..4)];
+            RewardModulationConfig {
+                reward_source,
+                trace_decay: rng.gen_range(0.5f32..0.99),
+            }
+        });
+        PlasticityConfig {
+            rule,
+            learning_rate,
+            weight_clamp,
+            lamarckian,
+            modulation,
+        }
+    });
+    let scope = if rng.gen_bool(0.5) {
+        Scope::Group
+    } else {
+        Scope::Edge
+    };
+    let inherit_scale = rng.gen_bool(0.5);
+    for member in want.members(group).collect::<Vec<_>>() {
+        let mut edge = want.edge_mut(member);
+        edge.set_plasticity(config);
+        edge.set_scope(scope);
+    }
+    want.group_mut(group).set_inherit_scale(inherit_scale);
+    mode
+}
+
 #[test]
 fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 29);
-    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 62);
-    assert_eq!(&GraphOperator::ALL[23..], &GROUP_OPERATORS);
+    assert_eq!(GraphOperator::ALL.len(), 30);
+    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 63);
+    assert_eq!(&GraphOperator::ALL[23..29], &GROUP_OPERATORS);
+    // T25.F07: `SetScope` follows `RemoveGroup`, weight 2, neutral.
+    assert_eq!(GraphOperator::ALL[29], GraphOperator::SetScope);
+    assert_eq!(GraphOperator::SetScope.weight(), 2);
+    assert_eq!(
+        GraphOperator::SetScope.complexity_effect(),
+        ComplexityEffect::Neutral
+    );
+    assert_eq!(
+        graph_operator_key(GraphOperator::SetScope).as_key(),
+        "Graph.SetScope"
+    );
+    assert_eq!(
+        graph_operator_key(GraphOperator::SetScope).complexity_effect(),
+        ComplexityEffect::Neutral
+    );
     let weights = GROUP_OPERATORS.map(GraphOperator::weight);
     assert_eq!(weights, [2, 2, 4, 2, 2, 2]);
     let default_arm: u16 = GraphOperator::ALL
@@ -109,7 +182,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         })
         .map(|op| u16::from(op.weight()))
         .sum();
-    assert_eq!(default_arm, 58);
+    assert_eq!(default_arm, 60);
     let keys = GROUP_OPERATORS.map(|op| graph_operator_key(op).as_key());
     assert_eq!(
         keys,
@@ -198,8 +271,9 @@ fn applicability_follows_rings_groups_and_hosting() {
 }
 
 #[test]
-fn add_draws_ring_then_kind_then_offset_and_is_born_silent() {
+fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
     let refs = vec![InputReference::ActionVotes, food(1), barrier(), food(0)];
+    let mut modes = [false; 3];
     for seed in 0..64 {
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -210,11 +284,14 @@ fn add_draws_ring_then_kind_then_offset_and_is_born_silent() {
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
         let offset = expected.gen_range(0..8u8);
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-        want.add_group(Shape::Ring { ring_ref }, kind, offset);
+        let group = want.add_group(Shape::Ring { ring_ref }, kind, offset);
+        modes[usize::from(replay_learning(&mut want, group, &mut expected))] = true;
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         assert!(validate_graph(&node).is_ok());
+        assert_eq!(graph(&node).groups()[0].scale(), 0.0, "born silent");
     }
+    assert_eq!(modes, [true; 3], "every learning mode drawn");
 }
 
 #[test]
@@ -418,7 +495,7 @@ fn nearby() -> InputReference {
 /// Three draws in order — the pair over the flat list `(ref_idx ascending,
 /// pair ascending)`, the kind, the offset — and no further draw.
 #[test]
-fn add_pair_draws_pair_then_kind_then_offset_and_is_born_silent() {
+fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() {
     let refs = vec![
         InputReference::ActionVotes,
         nearby(),
@@ -442,7 +519,8 @@ fn add_pair_draws_pair_then_kind_then_offset_and_is_born_silent() {
         let offset = expected.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-        want.add_pair_group(ref_idx, pair, layout, kind, offset);
+        let group = want.add_pair_group(ref_idx, pair, layout, kind, offset);
+        replay_learning(&mut want, group, &mut expected);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         assert!(validate_graph(&node).is_ok());

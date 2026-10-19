@@ -583,8 +583,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // T25.F04 commit 1 (`AddDirectionPairGroup` remaps every Graph draw):
     // seed 9 goes extinct; seed 25 is the lowest of 0..=200 that survives
     // (25, 28, 37, 50, 53 and 64 are the first six). Removing the catalog
-    // entry restores seed 9.
-    params.seeds = vec![25];
+    // entry restores seed 9. T25.F07 commit 2 (learned group creation, the
+    // scope coin and `SetScope` remap every Graph draw): seed 25 goes
+    // extinct; seed 3 is the lowest of 0..=200 that survives (3, 28, 37, 45,
+    // 48 and 50 are the first six).
+    params.seeds = vec![3];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

@@ -28,6 +28,17 @@ function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
 	}`;
 }
 
+/**
+ * A member's weight in force and scope (T25.F07); without the payload the
+ * applied weight is unavailable (a static member of a learning group
+ * weighs through the learned scale).
+ */
+export function memberApplied(member: NonNullable<EdgeTip["member"]>): string {
+	const applied =
+		member.applied === undefined ? "applied unavailable" : `applied ${member.applied.toFixed(3)}`;
+	return `${applied} · scope ${member.scope}`;
+}
+
 /** The tooltip body: endpoints, then a member's composition and a plastic edge's learning. */
 function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 	const line = "block";
@@ -43,6 +54,9 @@ function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 					</span>
 					<span className={`${line} font-mono`}>
 						{composeTerms(tip.own, tip.member.scale, tip.member.pattern)}
+					</span>
+					<span className={`${line} font-mono`} data-testid="member-applied">
+						{memberApplied(tip.member)}
 					</span>
 				</>
 			) : null}

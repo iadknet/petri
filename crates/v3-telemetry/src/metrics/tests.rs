@@ -320,6 +320,7 @@ fn run_families(families: &mut Vec<Family>) {
         "hebbian_changes",
         "reward_modulated_updates",
         "reward_modulated_changes",
+        "plasticity_scale_snaps",
         "shared_memory_writes_changed",
         "creature_ticks",
         "mesh_dispatches_energy_exhausted",
@@ -723,6 +724,29 @@ fn tick_families(families: &mut Vec<Family>) {
     ));
     for field in ["plastic_edge_drift", "plastic_edges_at_clamp"] {
         families.push((format!("petri.tick.{field}"), Gauge, vec![surface()]));
+    }
+    // T25.F07: learners by scope and the learned scales by inheritance.
+    families.push((
+        "petri.tick.plastic_edges_by_scope".to_owned(),
+        Gauge,
+        vec![(
+            "petri.plasticity_scope",
+            strings(["ungrouped", "edge", "group"], str::to_owned),
+        )],
+    ));
+    for field in [
+        "learned_scales",
+        "learned_scale_drift",
+        "learned_scales_at_bound",
+    ] {
+        families.push((
+            format!("petri.tick.{field}"),
+            Gauge,
+            vec![(
+                "petri.plasticity_inheritance",
+                strings(["darwinian", "lamarckian"], str::to_owned),
+            )],
+        ));
     }
 }
 

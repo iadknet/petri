@@ -24,7 +24,7 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::plasticity_census::PlasticityCensus;
+use v3_core::creature::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
@@ -548,6 +548,7 @@ fn counters(f: &mut Families, s: &SimStats) {
         hebbian_changes_total,
         reward_modulated_updates_total,
         reward_modulated_changes_total,
+        plasticity_scale_snaps_total,
         shared_memory_writes_changed_total,
         creature_ticks_total,
         mesh_dispatches_energy_exhausted_total,
@@ -1034,9 +1035,10 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
     plasticity_values(f, &census.plasticity);
 }
 
-/// The plasticity census families (T25.F06): at most two attributes per
-/// family; the edges by pathway and surface, by rule and by inheritance, and
-/// drift and at-clamp by surface.
+/// The plasticity census families (T25.F06, T25.F07): at most two
+/// attributes per family; the edges by pathway and surface, by rule, by
+/// inheritance and by scope, drift and at-clamp by surface, and the learned
+/// scales, their drift and those at their bound by inheritance.
 fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
     let sampled = Kind::Gauge { sampled: true };
     f.scalar(
@@ -1079,6 +1081,43 @@ fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
                 edges.into(),
             )
         }),
+    );
+    f.push(
+        "petri.tick.plastic_edges_by_scope".to_owned(),
+        sampled,
+        "",
+        plasticity.scope_counts().map(|(scope, edges)| {
+            (
+                vec![("petri.plasticity_scope", scope.to_owned())],
+                edges.into(),
+            )
+        }),
+    );
+    let by_inheritance = |read: fn(&LearnedScales) -> Value| {
+        plasticity.scale_cells().map(move |(inheritance, cell)| {
+            (
+                vec![("petri.plasticity_inheritance", inheritance.to_owned())],
+                read(&cell),
+            )
+        })
+    };
+    f.push(
+        "petri.tick.learned_scales".to_owned(),
+        sampled,
+        "",
+        by_inheritance(|cell| cell.scales.into()),
+    );
+    f.push(
+        "petri.tick.learned_scale_drift".to_owned(),
+        sampled,
+        "",
+        by_inheritance(|cell| cell.drift_sum.into()),
+    );
+    f.push(
+        "petri.tick.learned_scales_at_bound".to_owned(),
+        sampled,
+        "",
+        by_inheritance(|cell| cell.at_bound.into()),
     );
     f.push(
         "petri.tick.plastic_edge_drift".to_owned(),

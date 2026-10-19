@@ -44,30 +44,35 @@ describe("buildFullGraphModel edge-group members", () => {
 		});
 	}
 
-	it("draws a member at the server's genomic weight, never its own", () => {
+	it("draws a member at the server's applied weight, never its own or its genomic one", () => {
+		// A static member of a learning group weighs through the learned scale
+		// (T25.F07): applied 0.9 while its genomic weight is 0.5.
 		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }], {
 			node_id: 0,
-			scales: [{ group: 0, genomic: 0.5 }],
-			edges: [{ surface: "sink", container: 0, edge: 1, genomic: 0.5 }],
+			scales: [{ group: 0, genomic: 0.5, learned: 0.9 }],
+			edges: [{ surface: "sink", container: 0, edge: 1, genomic: 0.5, applied: 0.9 }],
 		});
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
-		expect(member?.weight).toBe(0.5);
+		expect(member?.weight).toBe(0.9);
+		expect(member?.member?.applied).toBe(0.9);
 		expect(member?.isMember).toBe(true);
 		const independent = model.edges.find((edge) => edge.id === "sink:0:0");
 		expect(independent?.weight).toBe(0.25);
 		expect(independent?.isMember).toBe(false);
 	});
 
-	it("composes scale plus correction when the payload is missing", () => {
+	it("composes scale plus correction and marks the applied weight unavailable when the payload is missing", () => {
 		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
-		expect(model.edges.find((edge) => edge.id === "sink:0:1")?.weight).toBe(0.5);
+		const member = model.edges.find((edge) => edge.id === "sink:0:1");
+		expect(member?.weight).toBe(0.5);
+		expect(member?.member?.applied).toBeUndefined();
 	});
 
 	it("carries a member's composition for its tooltip", () => {
 		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
 		expect(member?.own).toBe(0);
-		expect(member?.member).toEqual({ group: 0, scale: 0.5, pattern: 1 });
+		expect(member?.member).toEqual({ group: 0, scale: 0.5, pattern: 1, scope: "Edge" });
 		expect(model.edges.find((edge) => edge.id === "sink:0:0")?.member).toBeUndefined();
 	});
 

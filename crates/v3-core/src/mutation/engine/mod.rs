@@ -835,6 +835,7 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
         GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
         GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
+        GraphOperator::SetScope => MutationOperator::GraphSetScope,
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
@@ -32,7 +32,7 @@ fn collect_learning_inputs(
     buf: &mut Vec<f32>,
 ) {
     buf.clear();
-    learner.begin_row();
+    learner.begin_row(EdgeSurface::ComputeInput(current_idx));
     buf.extend(edges.iter().map(|edge| {
         let value = resolve_source(
             &edge.source(),
@@ -45,7 +45,7 @@ fn collect_learning_inputs(
             shared_memory,
             prev_shared_memory,
         );
-        value * learner.weigh(edge.plasticity().is_some(), value, edge.own_weight())
+        value * learner.weigh(value, edge.own_weight())
     }));
 }
 
@@ -255,9 +255,10 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     // Learning after the effects, from the samples the visit recorded and
     // the weights in force at its start (T25.F06 invariant 6).
     if let Some(learner) = learner {
-        let (updates, changes) = learner.commit();
-        side_outputs.work_counters.plasticity_updates += updates;
-        side_outputs.work_counters.plasticity_changes += changes;
+        let counts = learner.commit();
+        side_outputs.work_counters.plasticity_updates += counts.updates;
+        side_outputs.work_counters.plasticity_changes += counts.changes;
+        side_outputs.work_counters.plasticity_scale_snaps += counts.scale_snaps;
     }
     // The visit reached its effects, so it commits (T19.F03): an exhausted
     // visit returns before them and stages nothing.

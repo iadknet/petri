@@ -64,6 +64,12 @@ pub struct Group {
     kind: DirectedVoteKind,          // Move | Reproduce | StealEnergy
     offset: u8,                      // always < 8
     scale: f32,                      // one shared weight, born 0
+    inherit_scale: bool,             // a parent's learned scale seeds the child (T25.F07), born false
+}
+
+pub struct Membership {
+    group: GroupId,
+    scope: Scope,                    // Edge | Group (T25.F07), born Edge
 }
 
 pub struct ComputeNode {
@@ -532,13 +538,22 @@ pub struct RewardModulationConfig {
 ```
 
 Every edge on either surface may be plastic except an edge of a `ClearSlot`
-sink (its sum is ignored) and, until T25.F07, a group member;
-`validate_graph` rejects both and any value outside the ranges above (I1),
-which the mutation draws and perturbations keep by construction. The laws
-read the stored values; no runtime clamp normalizes them. A learning
-attribute carries no genome unit. `CgpGraphBackendDef::plastic_edges()`
+sink (its sum is ignored); `validate_graph` rejects that case and any value
+outside the ranges above (I1), which the mutation draws and perturbations
+keep by construction. The laws read the stored values; no runtime clamp
+normalizes them. A learning attribute, a member's `scope` and a group's
+`inherit_scale` carry no genome unit. `CgpGraphBackendDef::plastic_edges()`
 enumerates the plastic edges in canonical (`edge_sites`) order and is the
 one definition of "carries learning".
+
+A plastic group member (T25.F07) learns at its `scope`: an **edge learner**
+(`Edge`) learns its own correction as an ungrouped edge learns its weight; a
+**group learner** (`Group`) learns for its group, crediting the group's one
+shared scale. A group with at least one group learner has a **scale slot**
+whose **bound** is the smallest `weight_clamp` among its group learners; a
+static member of such a group is a **passive member**, weighed through the
+learned scale. Scope never splits a group: membership compares the
+`GroupId` only.
 
 When `modulation` is `None`: pure Hebbian learning, applied after the
 effects of each committed visit. When `Some`: reward-modulated three-factor
@@ -549,21 +564,45 @@ in Phase 2.5.
 
 `GraphRuntimeState::for_genome(genome, seeds)` is the only constructor and
 builds the learned state once (`runtime::plasticity::LearnedState`): per
-mesh node, the plastic-edge slots over both surfaces in canonical order, a
-learned own weight per slot, a trace per reward-modulated slot and a visited
-flag. A graph without a plastic edge allocates no learned state and runs the
-static loops. `applied_weight(occurrence)` is the only resolver: a plastic
-edge's learned weight, else the genomic weight. Readers use the read-only
-view, which yields per plastic edge `(occurrence, genomic, learned, trace,
-bound, kind)`, `learned` and `trace` present only for an initialized slot.
+mesh node, the learner slots over both surfaces in canonical order, the
+scale slots in `GroupId` order (genomic scale, bound, learned scale, seeded
+flag), the passive members, a learned own quantity per ungrouped or edge
+learner (a group learner stores none), a trace per reward-modulated learner
+and a visited flag. A graph without a plastic edge allocates no learned
+state and runs the static loops. One composition gives every dynamic edge's
+**applied weight**:
 
-- A slot is initialized when its backend has been visited (the flag is set at
-  visit entry, a failed visit included) or when it was seeded at birth.
-  Reward, `capture()` and the view's `learned` read initialized slots only.
-- A Lamarckian plastic edge with a birth seed starts at the seed clamped by
-  the child's edge clamp, initialized; every other plastic edge (a Darwinian
-  one with a seed included) starts at its genomic weight and stays
-  uninitialized until its backend's first visit. Traces start at zero. See
+```text
+applied = own + scale × pattern
+own   = the learned own quantity when the learner has one, else the genomic own weight
+scale = the learned scale when the group has a scale slot, else the genomic scale
+pattern = 0 for an ungrouped edge
+```
+
+The executor's weighing, `applied_weight(occurrence)` (one edge, else the
+genomic weight), `applied_weights(node)` (every dynamic edge in canonical
+order) and the view agree; the applied weight is never clamped. The
+executor hands the learner each edge's occurrence and value and the learner
+decides whether the edge is a learner, a passive member or static. Readers
+use the read-only views: per plastic edge `(occurrence, genomic, learned,
+applied, trace, bound, kind, scope)`, where `genomic` is the genomic own
+weight (a member's correction), `learned` the initialized own quantity
+(always `None` for a group learner) and `trace` present only for an
+initialized learner; and per scale slot `(group, genomic, learned, bound,
+inherit_scale)`, `learned` present only for an initialized scale slot.
+
+- A learner slot is initialized when its backend has been visited (the flag
+  is set at visit entry, a failed visit included) or when it was seeded at
+  birth; a scale slot when its backend has been visited or its scale was
+  seeded. Reward, `capture()` and the views read initialized slots only, each
+  slot on its own.
+- A Lamarckian ungrouped or edge learner with a birth seed starts at the
+  seed clamped by the child's edge clamp, initialized; every other learner
+  (a Darwinian one with a seed, and a group learner, which ignores any seed
+  on its row) starts at its genomic own weight and stays uninitialized until
+  its backend's first visit. A scale slot starts at `clamp(seed, ±bound)`,
+  seeded, when the child group has `inherit_scale` and a seed, else at the
+  genomic scale. Traces start at zero. See
   [reproduction inheritance](v3-reproduction-spec.md#graph-state).
 - Birth seeds are temporary, excluded from serialization and genome
   equality, and consumed by the constructor.
@@ -576,17 +615,29 @@ visit's outputs, self and higher the last committed) and a sink edge's value
 as the sink sum read it (Section 9) — and the post value: the node's
 committed output, or the sink's `sanitize_f32(wsum)`. No source is
 re-resolved after evaluation. Evaluation reads the applied weight in force
-at visit start. After the effects, each pure-Hebbian edge's change is
-computed from its samples and visit-start weight `w` with its own rule and
-rate, then applied in canonical order, each bounded by its own clamp:
+at visit start. After the effects, each pure-Hebbian learner's change is
+computed from its samples and visit-start applied weight `w` with its own
+rule and rate, in canonical order: an ungrouped or edge learner applies it to
+its own quantity, bounded by its own clamp; a group learner adds `pattern ×
+dw` to its scale's accumulator. Then every scale with a contribution (a zero
+one included) is written once, scale slots in order:
 
 ```text
 Classic    dw = eta * pre * post
 Oja        dw = eta * post * (pre - w * post)
 AntiHebb   dw = -eta * pre * post
 Covariance dw = eta * (pre - 0.5) * (post - 0.5)
-w <- clamp(w + dw, -weight_clamp, weight_clamp)
+own   <- clamp(own + dw, -weight_clamp, weight_clamp)        (ungrouped or edge learner)
+scale <- clamp(scale + Σ pattern × dw, -bound, bound)        (once per scale per event)
 ```
+
+A static member contributes nothing; a member with a negative pattern
+contributes with the opposite sign of its `dw`, so the net change is the sum
+over contributors. A write whose stored value lay outside the bound (only an
+unseeded genomic scale's first write can) counts one `plasticity_scale_snaps`.
+`plasticity_updates` counts one per contributing learner per event and
+`plasticity_changes` one per contributor whose stored quantity changed (for a
+group learner its scale, so a moved scale counts every contributor).
 
 On a recurrent compute edge the pre value is the committed value the
 evaluation read (T25.F06; the retired replay read this visit's output). A
@@ -611,8 +662,13 @@ energy. Learning charges no energy or work (T25.F02).
 
 ```text
 dw = learning_rate * outcome_signal[reward_source] * trace
-new_weight = clamp(weight + dw, -weight_clamp, weight_clamp)
+new_own = clamp(own + dw, -weight_clamp, weight_clamp)            (ungrouped or edge learner)
+scale <- clamp(scale + Σ pattern × dw, -bound, bound)             (group learners, once per tick)
 ```
+
+A modulated learner changes no weight at a visit; a modulated group learner
+contributes only while its scale slot is initialized, and the scale is
+written once per backend's Phase 2.5 pass, as at a visit.
 
 Eta applies once: unit activity/reward at eta 0.5 yields trace 1 and delta
 0.5. At lambda 0 and unit reward, a feed-forward edge matches its pure

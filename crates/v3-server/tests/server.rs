@@ -2739,6 +2739,7 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
                 .map(|node| vec![None; node.inputs.len()])
                 .collect(),
             sinks,
+            groups: vec![None; def.groups().len()],
         };
         let mut node_seeds = vec![None; creature.genome.nodes.len()];
         node_seeds[node_idx] = Some(seeds);
@@ -2754,9 +2755,14 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
         .filter(|edge| edge["surface"] == "sink" && edge["container"] != vote)
         .collect();
     assert_eq!(members.len(), 8);
+    // Every listed edge carries `applied` (T25.F07): a static member of a
+    // group without a scale slot weighs at its genomic weight.
     assert!(members
         .iter()
-        .all(|edge| edge.get("applied").is_none() && edge.get("learned").is_none()));
+        .all(|edge| edge["applied"] == edge["genomic"] && edge.get("learned").is_none()));
+    assert!(body["graph_weights"][0]["scales"][0]
+        .get("learned")
+        .is_none());
     let compute = edges
         .iter()
         .find(|edge| edge["surface"] == "compute")
@@ -2771,6 +2777,115 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
     assert_eq!(voted["genomic"], 0.5);
     assert_eq!(voted["applied"], 1.25);
     assert_eq!(voted["learned"], 1.25);
+}
+
+/// `graph_weights` (T25.F07 invariant 12): a group with a group-scope
+/// learner lists its learned scale; every member, the passive ones
+/// included, carries `applied` through the learned scale, and only an
+/// edge-scope learner's initialized correction is `learned`.
+#[tokio::test]
+async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
+    use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
+    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::creature::genome::{BackendDef, HebbianRule, PlasticityConfig};
+    use v3_core::creature::state::GraphRuntimeState;
+
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let config = PlasticityConfig {
+        rule: HebbianRule::Classic,
+        learning_rate: 0.1,
+        weight_clamp: 4.0,
+        lamarckian: true,
+        modulation: None,
+    };
+    let members: Vec<EdgeOccurrence> = {
+        let mut handle = state.sim.lock().await;
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        let node_idx = creature
+            .genome
+            .nodes
+            .iter()
+            .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("a Graph node");
+        let node = &mut creature.genome.nodes[node_idx];
+        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!()
+        };
+        let id = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+        def.group_mut(id).set_scale(0.5);
+        def.group_mut(id).set_inherit_scale(true);
+        let members: Vec<EdgeOccurrence> = def.members(id).collect();
+        def.edge_mut(members[0]).set_weight(0.25);
+        def.edge_mut(members[0]).set_plasticity(Some(config));
+        def.edge_mut(members[1]).set_plasticity(Some(config));
+        def.edge_mut(members[1]).set_scope(Scope::Group);
+        let mut sinks: Vec<Vec<Option<f32>>> = def
+            .output_sinks()
+            .iter()
+            .map(|sink| vec![None; sink.inputs.len()])
+            .collect();
+        let EdgeSurface::SinkInput(sink) = members[0].surface else {
+            unreachable!()
+        };
+        sinks[sink][members[0].index] = Some(0.75);
+        let mut groups = vec![None; def.groups().len()];
+        groups[id.index()] = Some(1.5);
+        let seeds = BirthSeeds::Rows {
+            compute: def
+                .compute_nodes()
+                .iter()
+                .map(|node| vec![None; node.inputs.len()])
+                .collect(),
+            sinks,
+            groups,
+        };
+        let mut node_seeds = vec![None; creature.genome.nodes.len()];
+        node_seeds[node_idx] = Some(seeds);
+        creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
+        members
+    };
+
+    let (status, body) = do_request(router(state), get_req(&format!("{uri}?exclude=genome"))).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let entry = &body["graph_weights"][0];
+    let scales = entry["scales"].as_array().unwrap();
+    let scale = scales.last().expect("the new group's scale");
+    assert_eq!(scale["genomic"], 0.5);
+    assert_eq!(scale["learned"], 1.5);
+    let find = |at: EdgeOccurrence| {
+        let EdgeSurface::SinkInput(sink) = at.surface else {
+            unreachable!()
+        };
+        entry["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|edge| {
+                edge["surface"] == "sink" && edge["container"] == sink && edge["edge"] == at.index
+            })
+            .cloned()
+            .expect("a listed member")
+    };
+    let edge_learner = find(members[0]);
+    assert_eq!(edge_learner["genomic"], 0.75);
+    assert_eq!(edge_learner["applied"], 2.25);
+    assert_eq!(edge_learner["learned"], 0.75);
+    let group_learner = find(members[1]);
+    assert_eq!(group_learner["applied"], 1.5);
+    assert!(group_learner.get("learned").is_none());
+    let passive = find(members[2]);
+    assert_eq!(passive["genomic"], 0.5);
+    assert_eq!(passive["applied"], 1.5);
+    assert!(passive.get("learned").is_none());
 }
 
 /// `graph_weights` (T25.F04): one entry per actual member of a

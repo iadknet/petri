@@ -1,7 +1,7 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, OutputSinkKind};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
@@ -15,11 +15,13 @@ use crate::runtime::types::{
 
 /// One sink's weighted inputs into `buf` and their sum: each edge's value
 /// as the sink sum reads it, with shared memory as earlier sinks wrote it,
-/// times its applied weight. On a learning graph the value is a plastic
-/// edge's pre sample and the sink's sanitized sum its post sample (T25.F06).
+/// times its applied weight. On a learning graph (sink `sink`) the value is
+/// a learner's pre sample and the sink's sanitized sum its post sample
+/// (T25.F06).
 #[inline]
 #[allow(clippy::too_many_arguments)]
 fn edges_wsum(
+    sink: usize,
     edges: &[GraphEdge],
     weights: &[f32],
     compute_count: usize,
@@ -33,7 +35,7 @@ fn edges_wsum(
 ) -> f32 {
     buf.clear();
     if let Some(learner) = learner.as_deref_mut() {
-        learner.begin_row();
+        learner.begin_row(EdgeSurface::SinkInput(sink));
     }
     buf.extend(edges.iter().zip(weights).map(|(edge, &weight)| {
         let value = resolve_source_post_convergence(
@@ -46,7 +48,7 @@ fn edges_wsum(
             prev_shared_memory,
         );
         let weight = match learner.as_deref_mut() {
-            Some(learner) => learner.weigh(edge.plasticity().is_some(), value, weight),
+            Some(learner) => learner.weigh(value, weight),
             None => weight,
         };
         value * weight
@@ -90,7 +92,7 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
         def.output_sinks().len(),
         "the weight table has one row per sink"
     );
-    for (sink, weights) in def.output_sinks().iter().zip(sink_weights) {
+    for (sink_idx, (sink, weights)) in def.output_sinks().iter().zip(sink_weights).enumerate() {
         debug_assert!(
             weights.len() == sink.inputs.len()
                 && weights
@@ -109,6 +111,7 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
         // Members are ordinary sink edges at their genomic weights (T25.F03),
         // summed in the sink's I10 order.
         let wsum = edges_wsum(
+            sink_idx,
             &sink.inputs,
             weights,
             compute_count,
