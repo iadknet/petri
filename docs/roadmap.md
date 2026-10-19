@@ -65,7 +65,7 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   requests 0 energy (2026-10-12 probe).
 
 Priority order for new starts: T25.F01, T25.F02, T25.F03, T25.F04, T25.F05,
-T25.F06, T25.F07, T25.F08.
+T25.F06, T25.F07, T25.F08, T25.F09.
 
 - T25 was placed on 2026-10-13 at the user's direction from the
   [edge groups and learning design note](strategy/edge-groups-and-learning-design-2026-10-13.md),

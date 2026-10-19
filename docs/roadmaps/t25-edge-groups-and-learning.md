@@ -1,7 +1,7 @@
 # T25 — Edge Groups and Per-Edge Learning
 
 **Status**: In Progress
-**Last updated**: 2026-10-13
+**Last updated**: 2026-10-19
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -26,6 +26,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 - [ ] Learning mode, reward source, trace decay and the Lamarckian flag are per-edge heritable attributes on both surfaces; vote edges can learn; no cost knob or lazy initializer remains.
 - [ ] Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
 - [ ] Group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators with a bijection test.
+- [ ] A learned edge weight and a learned group scale relax toward their birth values at a heritable per-edge or per-group retention, the founder stays at no decay, and the goal run reads the retention distribution beside the plasticity census.
 
 ## Executable Features
 
@@ -45,6 +46,8 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
 - [ ] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.
+- [ ] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
+  - Goal: Early LTP decays back to baseline: a learned synapse and a learned group scale relax toward the value they were born with at a heritable rate, so learning that is no longer reinforced fades instead of wandering.
 
 ## Notes for AI Agents
 
@@ -62,6 +65,15 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   unchanged (the note's D14, option a). F02 lands the unit rule, the rate
   and the plasticity cost-chain deletion as three commits and runs one
   extra goal-long arm at rate 0.005 as the rate's counterfactual (D25).
+- Decided (user, 2026-10-19): F09 adds passive forgetting after F08, from
+  the [learned-weight decay research note](../strategy/weight-decay-research-2026-10-19.md)
+  (Section 5 is the contract sketch): `w ← b + ρ·(w − b)` once per world
+  tick on every plastic edge, `b` the slot's birth value (the clamped
+  Lamarckian seed, else the genomic weight clamped at construction), `ρ`
+  heritable in `[0, 1]` and mutated in log space, founder-neutral at
+  `ρ = 1`; the group scale F07 makes learnable decays toward its birth scale
+  by the same law. Decay toward the genomic weight, toward zero and an
+  energy cost on the deviation are rejected there.
 - Open: F08 decides the `GroupKey::Slots` refinement disposition from the
   refinement-by-key readings F04 and F05 record.
 - The chain is linear by design (D10): a later feature edits the same
@@ -77,5 +89,5 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   F04 gate + goal + goal-long, carrying F03's deferred 40,000-tick ring
   readings; F05 gate + goal; F06 gate + goal,
   viability first; F07 gate + goal, viability first; F08 gate + goal;
-  mutation gate and slow tests run on all eight. F03 and F06 land a
+  F09 gate + goal; mutation gate and slow tests run on all nine. F03 and F06 land a
   text-only commit (genome identity) before their behavior commit.
