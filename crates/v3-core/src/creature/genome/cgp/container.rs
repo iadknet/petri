@@ -1390,10 +1390,9 @@ impl CgpGraphBackendDef {
     // ── Internal helpers ────────────────────────────────────────────────────
 
     fn compute_seed_rows_mut(&mut self) -> Option<&mut Vec<Vec<Option<f32>>>> {
-        match &mut self.birth_seeds {
-            Some(BirthSeeds::Rows { compute, .. }) => Some(compute),
-            None => None,
-        }
+        self.birth_seeds
+            .as_mut()
+            .map(|BirthSeeds::Rows { compute, .. }| compute)
     }
 
     fn clear_seed(&mut self, occurrence: EdgeOccurrence) {

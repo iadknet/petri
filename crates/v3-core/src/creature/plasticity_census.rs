@@ -15,7 +15,7 @@
 //! learned state and executes no brain.
 
 use crate::creature::genome::cgp::EdgeSurface;
-use crate::creature::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig};
+use crate::creature::genome::{HebbianRule, PlasticityConfig};
 use crate::runtime::plasticity::LearnedState;
 
 /// One plastic edge kind.
@@ -104,33 +104,65 @@ pub struct PlasticityCensus {
 }
 
 impl PlasticityCensus {
-    /// Census `creatures`, each a genome, its reachable node indices and its
-    /// learned state.
+    /// Census `creatures`, each its reachable node indices and its learned
+    /// state (whose view is empty on a VM node).
     pub fn observe<'a>(
-        creatures: impl IntoIterator<Item = (&'a CreatureGenome, &'a [usize], &'a LearnedState)>,
+        creatures: impl IntoIterator<Item = (&'a [usize], &'a LearnedState)>,
     ) -> Self {
         let mut census = Self::default();
-        for (genome, reachable, learned) in creatures {
-            census.observe_one(genome, reachable, learned);
+        for (reachable, learned) in creatures {
+            census.observe_one(reachable, learned);
         }
         census
     }
 
-    fn observe_one(
-        &mut self,
-        genome: &CreatureGenome,
-        reachable: &[usize],
-        learned: &LearnedState,
-    ) {
+    /// Every (pathway, surface) cell with its keys, in [`LEARNING_KEYS`] then
+    /// [`SURFACE_KEYS`] order.
+    pub fn cells(&self) -> impl Iterator<Item = (&'static str, &'static str, PlasticEdges)> + '_ {
+        LEARNING_KEYS
+            .iter()
+            .zip(&self.edges)
+            .flat_map(|(&learning, row)| {
+                SURFACE_KEYS
+                    .iter()
+                    .zip(row)
+                    .map(move |(&surface, &cell)| (learning, surface, cell))
+            })
+    }
+
+    /// Edge counts keyed by rule, in [`RULES`] order.
+    pub fn rule_counts(&self) -> impl Iterator<Item = (&'static str, u64)> + '_ {
+        RULES
+            .iter()
+            .map(|&rule| rule_key(rule))
+            .zip(self.edges_by_rule)
+    }
+
+    /// Edge counts keyed by inheritance, in [`INHERITANCE_KEYS`] order.
+    pub fn inheritance_counts(&self) -> impl Iterator<Item = (&'static str, u64)> + '_ {
+        INHERITANCE_KEYS
+            .iter()
+            .copied()
+            .zip(self.edges_by_inheritance)
+    }
+
+    /// Drift sum and at-clamp count per surface over both pathways, keyed
+    /// in [`SURFACE_KEYS`] order.
+    pub fn surface_totals(&self) -> impl Iterator<Item = (&'static str, f64, u64)> + '_ {
+        SURFACE_KEYS.iter().enumerate().map(|(surface, &key)| {
+            let (hebbian, reward) = (self.edges[0][surface], self.edges[1][surface]);
+            (
+                key,
+                hebbian.drift_sum + reward.drift_sum,
+                hebbian.at_clamp + reward.at_clamp,
+            )
+        })
+    }
+
+    fn observe_one(&mut self, reachable: &[usize], learned: &LearnedState) {
         self.creatures += 1;
         let mut carries = false;
         for &node_idx in reachable {
-            if !matches!(
-                genome.nodes.get(node_idx).map(|n| &n.backend_def),
-                Some(BackendDef::Graph(_))
-            ) {
-                continue;
-            }
             for edge in learned.edges(node_idx) {
                 carries = true;
                 let kind = edge.kind;

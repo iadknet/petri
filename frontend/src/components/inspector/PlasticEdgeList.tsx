@@ -5,6 +5,7 @@ import type {
 	InputReference,
 	PlasticityConfig,
 } from "../../types/genome.ts";
+import { edgeWeightLookup } from "./graphFullModel.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
 interface PlasticEdgeListProps {
@@ -42,12 +43,7 @@ export function collectPlasticEdges(
 	inputRefs: InputReference[],
 	graphWeights: NodeGraphWeights | null,
 ): PlasticEdgeRow[] {
-	const weights = new Map(
-		(graphWeights?.edges ?? []).map((entry) => [
-			`${entry.surface}:${entry.container}:${entry.edge}`,
-			entry,
-		]),
-	);
+	const weightEntry = edgeWeightLookup(graphWeights);
 	const rows: PlasticEdgeRow[] = [];
 	const visit = (
 		surface: "compute" | "sink",
@@ -57,7 +53,7 @@ export function collectPlasticEdges(
 	) => {
 		inputs.forEach((edge, index) => {
 			if (!edge.plasticity) return;
-			const entry = weights.get(`${surface}:${container}:${index}`);
+			const entry = weightEntry(surface, container, index);
 			rows.push({
 				surface,
 				container,

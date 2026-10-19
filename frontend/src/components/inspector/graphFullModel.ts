@@ -1,4 +1,4 @@
-import type { NodeGraphWeights } from "../../types/creature-detail.ts";
+import type { EdgeGenomicWeight, NodeGraphWeights } from "../../types/creature-detail.ts";
 import type {
 	GraphBackendDef,
 	GraphEdge,
@@ -131,20 +131,28 @@ function collectEdgesFromSources(
 	return result;
 }
 
-export function buildFullGraphModel(
-	graphDef: GraphBackendDef,
-	inputRefs: InputReference[],
-	graphWeights: NodeGraphWeights | null = null,
-): FullGraphModel {
+/** A lookup of the server's `graph_weights` entry by surface, container and edge index. */
+export function edgeWeightLookup(
+	graphWeights: NodeGraphWeights | null,
+): (surface: "compute" | "sink", container: number, edge: number) => EdgeGenomicWeight | undefined {
 	const weights = new Map(
 		(graphWeights?.edges ?? []).map((entry) => [
 			`${entry.surface}:${entry.container}:${entry.edge}`,
 			entry,
 		]),
 	);
+	return (surface, container, edge) => weights.get(`${surface}:${container}:${edge}`);
+}
+
+export function buildFullGraphModel(
+	graphDef: GraphBackendDef,
+	inputRefs: InputReference[],
+	graphWeights: NodeGraphWeights | null = null,
+): FullGraphModel {
+	const weightEntry = edgeWeightLookup(graphWeights);
 	const weightOf =
 		(surface: "compute" | "sink", container: number) => (edge: GraphEdge, index: number) => {
-			const entry = weights.get(`${surface}:${container}:${index}`);
+			const entry = weightEntry(surface, container, index);
 			if (edge.membership) return memberWeight(graphDef, edge, entry?.genomic);
 			// A plastic edge is drawn at the weight in force (T25.F06).
 			if (edge.plasticity) return entry?.applied ?? edge.own_weight;

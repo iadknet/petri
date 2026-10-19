@@ -59,17 +59,21 @@ impl BackendLearning {
                 genomic: def.genomic_weight(occurrence, input_refs),
             })
             .collect();
-        let inherited = |slot: &Slot| {
-            seeds
-                .filter(|_| slot.config.lamarckian)
-                .and_then(|seeds| seeds.value(slot.occurrence))
-                .map(|seed| seed.clamp(-slot.config.weight_clamp, slot.config.weight_clamp))
-        };
+        let inherited: Vec<Option<f32>> = slots
+            .iter()
+            .map(|slot| {
+                seeds
+                    .filter(|_| slot.config.lamarckian)
+                    .and_then(|seeds| seeds.value(slot.occurrence))
+                    .map(|seed| seed.clamp(-slot.config.weight_clamp, slot.config.weight_clamp))
+            })
+            .collect();
         let learned = slots
             .iter()
-            .map(|slot| inherited(slot).unwrap_or(slot.genomic))
+            .zip(&inherited)
+            .map(|(slot, seed)| seed.unwrap_or(slot.genomic))
             .collect();
-        let seeded = slots.iter().map(|slot| inherited(slot).is_some()).collect();
+        let seeded = inherited.iter().map(Option::is_some).collect();
         let modulated: Box<[usize]> = slots
             .iter()
             .enumerate()
@@ -283,25 +287,24 @@ impl LearnedState {
     /// The read-only view of mesh node `node_idx`'s plastic edges, in
     /// canonical order.
     pub fn edges(&self, node_idx: usize) -> impl Iterator<Item = LearnedEdge> + '_ {
-        let backend = self.backends.get(node_idx);
-        let slots = backend.map_or(&[][..], |backend| &backend.slots[..]);
-        let mut modulated = 0;
-        slots.iter().enumerate().map(move |(index, slot)| {
-            let backend = backend.expect("a slot belongs to a backend");
-            let initialized = backend.initialized(index);
-            let trace = slot.config.modulation.map(|_| {
-                let trace = backend.traces[modulated];
-                modulated += 1;
-                trace
-            });
-            LearnedEdge {
-                occurrence: slot.occurrence,
-                genomic: slot.genomic,
-                learned: initialized.then_some(backend.learned[index]),
-                trace: trace.filter(|_| initialized),
-                bound: slot.config.weight_clamp,
-                kind: PlasticityKind::of(&slot.config),
-            }
+        self.backends.get(node_idx).into_iter().flat_map(|backend| {
+            let mut modulated = 0;
+            backend.slots.iter().enumerate().map(move |(index, slot)| {
+                let initialized = backend.initialized(index);
+                let trace = slot.config.modulation.map(|_| {
+                    let trace = backend.traces[modulated];
+                    modulated += 1;
+                    trace
+                });
+                LearnedEdge {
+                    occurrence: slot.occurrence,
+                    genomic: slot.genomic,
+                    learned: initialized.then_some(backend.learned[index]),
+                    trace: trace.filter(|_| initialized),
+                    bound: slot.config.weight_clamp,
+                    kind: PlasticityKind::of(&slot.config),
+                }
+            })
         })
     }
 

@@ -11,7 +11,9 @@ use crate::creature::genome::cgp::{
     GraphInvariantViolation, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{NodeGenome, OutcomeChannel, RewardModulationConfig};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, RewardModulationConfig,
+};
 use crate::creature::state::GraphRuntimeState;
 
 fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> PlasticityConfig {
@@ -80,7 +82,7 @@ fn census_of(
     learned: Option<&[f32]>,
 ) -> PlasticityCensus {
     let state = learned_state(genome, learned);
-    PlasticityCensus::observe([(genome, reachable, state.learned())])
+    PlasticityCensus::observe([(reachable, state.learned())])
 }
 
 const HEBBIAN: usize = 0;
@@ -209,9 +211,9 @@ fn carriers_count_creatures_not_edges() {
     let carrier_state = learned_state(&carrier, None);
     let plain_state = learned_state(&plain, None);
     let census = PlasticityCensus::observe([
-        (&carrier, [0].as_slice(), carrier_state.learned()),
-        (&carrier, [0].as_slice(), carrier_state.learned()),
-        (&plain, [0].as_slice(), plain_state.learned()),
+        ([0].as_slice(), carrier_state.learned()),
+        ([0].as_slice(), carrier_state.learned()),
+        ([0].as_slice(), plain_state.learned()),
     ]);
     assert_eq!((census.creatures, census.carriers), (3, 2));
     assert_eq!(census.edges[HEBBIAN][COMPUTE].edges, 4);
