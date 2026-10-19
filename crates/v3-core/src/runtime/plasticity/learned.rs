@@ -294,14 +294,18 @@ impl BackendLearning {
         }
     }
 
+    /// `own + scale × pattern` through the scale `term` reads.
+    fn composed(&self, own: f32, term: GroupTerm) -> f32 {
+        compose(own, self.term_scale(term), term.pattern)
+    }
+
     /// The applied weight of learner `slot`: `own + scale × pattern`, its
     /// own quantity alone when ungrouped (invariant 3).
     fn learner_applied(&self, slot: usize) -> f32 {
         let own = self.learned[slot];
-        match self.slots[slot].term {
-            None => own,
-            Some(term) => compose(own, self.term_scale(term), term.pattern),
-        }
+        self.slots[slot]
+            .term
+            .map_or(own, |term| self.composed(own, term))
     }
 
     /// The applied weight of a dynamic edge, the one composition the
@@ -311,11 +315,7 @@ impl BackendLearning {
             Dynamic::Learner(slot) => self.learner_applied(slot),
             Dynamic::Passive(index) => {
                 let passive = self.passive[index];
-                compose(
-                    passive.own,
-                    self.term_scale(passive.term),
-                    passive.term.pattern,
-                )
+                self.composed(passive.own, passive.term)
             }
         }
     }

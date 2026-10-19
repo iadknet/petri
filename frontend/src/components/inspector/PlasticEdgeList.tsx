@@ -7,6 +7,7 @@ import type {
 	Scope,
 } from "../../types/genome.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
+import { scopeLabel } from "./edgeGroupWeights.ts";
 import { edgeWeightLookup } from "./graphFullModel.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
@@ -44,7 +45,7 @@ export function plasticityBadge(config: PlasticityConfig, scope?: Scope): string
 		? `reward ${config.modulation.reward_source} · decay ${config.modulation.trace_decay.toFixed(2)}`
 		: "hebbian";
 	const badge = `${config.rule} · ${pathway} · ${config.lamarckian ? "lamarckian" : "darwinian"}`;
-	return scope === undefined ? badge : `${badge} · ${scope.toLowerCase()} scope`;
+	return scope === undefined ? badge : `${badge} · ${scopeLabel(scope)}`;
 }
 
 /** The badge spelled out, one sentence per attribute, for its tooltip. */

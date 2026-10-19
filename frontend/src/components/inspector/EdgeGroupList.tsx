@@ -3,7 +3,7 @@ import type { NodeGraphWeights } from "../../types/creature-detail.ts";
 import type { EdgeGroup, GraphBackendDef, InputReference, Scope } from "../../types/genome.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { directionName } from "./directions.ts";
-import { composeTerms, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
+import { composeTerms, memberPattern, scopeLabel, sinkDirection } from "./edgeGroupWeights.ts";
 import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
 
 const RING_CHANNELS = 8;
@@ -106,7 +106,7 @@ function MemberWeights({
 			own={member.ownWeight.toFixed(3)}
 			{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
 			{member.applied !== undefined ? ` applied=${member.applied.toFixed(3)}` : ""}
-			<span data-testid="edge-group-member-scope"> {member.scope.toLowerCase()} scope</span>
+			<span data-testid="edge-group-member-scope"> {scopeLabel(member.scope)}</span>
 		</Tip>
 	);
 }

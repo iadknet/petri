@@ -292,6 +292,17 @@ fn perturb(value: f32, u: f32) -> f32 {
     stepped.clamp(0.0, 1.0)
 }
 
+/// One of `all` other than `current`, uniformly: one draw over the others
+/// in `all` order.
+fn draw_other<T: Copy + PartialEq>(all: &[T], current: Option<T>, rng: &mut dyn RngCore) -> T {
+    let others: Vec<T> = all
+        .iter()
+        .copied()
+        .filter(|&value| Some(value) != current)
+        .collect();
+    others[rng.gen_range(0..others.len())]
+}
+
 fn draw_u(_: Option<PlasticityConfig>, rng: &mut dyn RngCore) -> f32 {
     rng.gen_range(-1.0f32..=1.0)
 }
@@ -340,15 +351,7 @@ pub(crate) fn mutate_hebbian_rule_in_def(
         is_plastic,
         rng,
         Law {
-            draw: |picked, rng| {
-                let current = picked.map(|picked| picked.rule);
-                let others: Vec<HebbianRule> = ALL_RULES
-                    .iter()
-                    .copied()
-                    .filter(|r| Some(*r) != current)
-                    .collect();
-                others[rng.gen_range(0..others.len())]
-            },
+            draw: |picked, rng| draw_other(&ALL_RULES, picked.map(|picked| picked.rule), rng),
             apply: |config, &rule| config.map(|config| PlasticityConfig { rule, ..config }),
         },
     )
@@ -458,12 +461,7 @@ pub(crate) fn mutate_reward_source_in_def(
                 let current = picked
                     .and_then(|picked| picked.modulation)
                     .map(|m| m.reward_source);
-                let others: Vec<OutcomeChannel> = ALL_CHANNELS
-                    .iter()
-                    .copied()
-                    .filter(|c| Some(*c) != current)
-                    .collect();
-                others[rng.gen_range(0..others.len())]
+                draw_other(&ALL_CHANNELS, current, rng)
             },
             apply: |config, &reward_source| {
                 config.map(|config| PlasticityConfig {
