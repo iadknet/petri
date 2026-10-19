@@ -98,6 +98,16 @@ whose row is unchecked in its track roadmap and whose dependencies are all
 checked. Compute it every time: the order carries no closure state, and this
 file records no current answer.
 
+**Plan a track or master change.** Before committing new, re-scoped or
+reordered rows in a track roadmap or `docs/roadmap.md`, or a change to a
+feature's dependencies or to the master's priority order, run one fresh read-only
+Codex Sol `high` job through the Codex channel applying `$plan-design-review` to
+the changed rows and any design note they cite: decomposition of the rows into
+features, their order and dependencies, domain boundaries, the step-back
+challenge, and the premises they inherit. Record its findings and dispositions
+in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
+`step-back:` and premise findings go to the user before the rows are committed.
+
 **Concurrent sessions.** Before launching, inspect `git worktree list` for
 existing Claude and Codex feature worktrees. An unchecked feature may already
 be in progress; do not assign it twice. If the next feature is already active,
@@ -177,16 +187,17 @@ pre-digest them: the point of the delegation is that the planning inputs never
 enter the orchestrator's context.
 
 The spec owner creates the flat feature spec at
-`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template, runs its own
-readiness review, and then runs the Codex challenge loop below. The spec
+`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template and runs the Codex
+challenge loop below, with its own `$spec-review` readiness review after the
+design round and before the readiness rounds. The spec
 declares its [Verification Plan](#verification-plan): which benchmark profiles
 and whether the mutation gate run, each with its reason. It then sets
 the spec to `In Progress`, promotes a `Planned` track and a `Planning` master,
 and runs `make roadmap-check`. Verify its report against the files — the spec
 exists, the statuses moved, the checker passed — read the final challenge
 round's output file, and commit the plan
-only when that verdict is `ready` or every open blocking finding carries a
-rebuttal that round accepted.
+only when round 2 or later has run and its verdict is `ready` or every open
+blocking finding carries a rebuttal that round accepted.
 
 **Preparatory refactoring.** While writing the spec, the spec owner applies
 `$refactor-audit` in preparatory mode to the modules the feature will change,
@@ -203,41 +214,52 @@ change, and stops; the prerequisite then runs as its own feature before this
 one resumes.
 
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
-Codex Sol `high` job through the Codex channel. Its brief names the spec
+Codex Sol `high` job through the Codex channel, whose brief names the spec
 path, the original requirement, the roadmap contract, the feature's track row,
-dependency rows, and matching Notes entries, and asks Codex to break confidence
-that the spec is ready to implement, applying `$architecture-review` to the
-spec's decomposition and module placement and checking that the preparatory
-refactors it declares leave the feature no unmarked workaround. The brief asks
-for that skill's step-back challenge: whether the feature is a patch on a
-larger structural deficiency that a bigger change should address. Codex reports
-one as `blocking: step-back:` with its evidence. Only the user can choose
-between the patch and the bigger change, so an upheld step-back finding follows
-the blocker rule; the spec owner never rebuts it on its own authority. The attack surface is contradiction with
-the roadmap row or requirement, scope widened or narrowed, acceptance criteria
-that cannot be tested, claims about current code that the code does not
-support, missing invariants and edge cases, determinism, the natural-analog
-rule, an unrealistic Performance predeclaration, a Verification Plan the
-change does not fit, and requirements that steer
-toward needless complexity. Each finding is `blocking` or `advisory`, cites
-the spec section and the evidence, and proposes a concrete change. The brief dictates the output format: one line
-per finding starting `blocking:` or `advisory:`, then a final line
-`verdict: ready` or `verdict: not-ready`.
+dependency rows, and matching Notes entries. Round 1 is the design round: it
+applies `$plan-design-review` only, to the decomposition of the components and
+of the implementation tasks, the domain boundaries, the step-back challenge, and
+the premises the spec inherits from earlier features and existing code, and it
+checks that the declared preparatory refactors leave no unmarked workaround.
+Round 2 is the readiness round: it applies `$spec-review`, confirms the round-1
+dispositions, and asks Codex to break confidence that the spec is ready to
+implement. Its attack surface is contradiction with the roadmap row or
+requirement, scope widened or narrowed, acceptance criteria that cannot be
+tested, claims about current code that the code does not support, missing
+invariants and edge cases, determinism, the natural-analog rule, an unrealistic
+Performance predeclaration, a Verification Plan the change does not fit, and
+requirements that steer toward needless complexity. Round 3 confirms round 2's
+fixes. Each finding is `blocking` or `advisory`, cites the spec section and the
+evidence, and proposes a concrete change. The brief dictates the output format:
+one line per finding starting `blocking:` or `advisory:`, then a final line
+`verdict: ready` or `verdict: not-ready`; round 1 adds the skill's assumptions
+table.
 
 The spec owner answers every blocking finding by editing the spec or writing a
 one-sentence rebuttal grounded in the roadmap row, the requirement, or the
-code. Rounds 2 and 3 carry the previous findings and their dispositions and
-ask Codex to confirm the fixes, accept or reject each rebuttal, and report only
-new blocking findings. The loop ends at a `ready` verdict, or when no blocking
-finding remains that Codex upholds. A blocking finding Codex still upholds
-after round 3, or a new one first raised in round 3, is an unresolved
-requirement: the spec owner reports it, and it
-follows the blocker rule when only the user can settle it. Advisory findings
-are adopted or dropped at the spec owner's judgment. The findings and
-dispositions of every round go in one table in
-`docs/progress/readings/<id>.md`, never in the spec; the spec carries only the
+code, except for the user-owned findings below. Rounds 2 and 3 carry the
+previous findings and their dispositions and ask Codex to confirm the fixes,
+accept or reject each rebuttal, and, in round 3, report only new blocking
+findings. The loop ends, from round 2 on, at a `ready` verdict or when no
+blocking finding remains that Codex upholds. A blocking finding Codex
+still upholds after round 3, or a new one first raised in round 3, is an
+unresolved requirement: the spec owner reports it, and it follows the blocker
+rule when only the user can settle it. Advisory findings are adopted or dropped
+at the spec owner's judgment. The findings and dispositions of every round go
+in one table in `docs/progress/readings/<id>.md`, never in the spec; the spec
+carries only the
 resulting requirements. Quote the spec owner's agent name or ID in your own
 message after the spawn so the resume address survives context compaction.
+
+**User-owned findings.** In any design review of a spec or roadmap, by Codex
+or by the spec owner's own `$plan-design-review`, two kinds of finding are the
+user's to decide: a `step-back:` finding, which asks whether the work should
+give way to a bigger change, and a blocking premise finding (`contradicted`,
+`stale` or `unrecorded`) whose fix would change the scope, a constraint, a
+boundary or an accepted tradeoff. A premise finding that only corrects a fact
+about the code is the spec owner's to fix. A disputed classification goes to
+the user. The spec owner reports user-owned findings under the blocker rule
+and never rebuts them on its own authority.
 
 **The spec owner stays on the feature.** It is the orchestrator's channel for
 requirement questions for the rest of the run. Resume it by `SendMessage`,
