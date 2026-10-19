@@ -151,9 +151,9 @@ the goal run reports whether sink edges become plastic at all.
       mutation-effects v3, census through the view, lab `expressed()`.
 - [x] Telemetry: the families, `metrics/tests.rs`, the dashboards check, the
       three panels.
-- [ ] Bench: `PersistenceSample.plasticity_census` (done, kept in the v1
-      and v2 summaries); the `counter_definition_changes` entry below,
-      appended to `benchmark-series.json` by the implementer (an entry in
+- [x] Bench: `PersistenceSample.plasticity_census`, kept in the v1 and v2
+      summaries; the `counter_definition_changes` entry below, appended to
+      `benchmark-series.json` (an entry in
       that list is spec content under invariant 12, not a baseline: no
       `epoch_baseline` line moves until closure re-pins them).
 
@@ -175,8 +175,9 @@ the goal run reports whether sink edges become plastic at all.
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-core` and the frontend tests ->
-      results in the readings file; the table below names what each pins.
+- [x] Focused tests: viability first, the touched crates' tests, fmt,
+      check, clippy and the frontend tests on the final code -> the readings
+      file's Verification results; the table below names what each pins.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, every survivor resolved.
 - [ ] `make rust-test-slow` on the final code.
