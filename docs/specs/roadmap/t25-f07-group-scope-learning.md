@@ -235,7 +235,32 @@ scale slots by inheritance, learned-scale drift and at-bound share (the
 snaps of genomic scales (`plasticity_scale_snaps` from the totals against
 the scale-slot count, the design note's §8 reading).
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-19, code `b6cdf8a2`).** Both profiles ran once
+(`make bench PROFILE=gate|goal FEATURE=t25-f07-group-scope-learning`) against
+the F06 epoch; both report `severe: true`. CLI exit 3 on each (source: summary
+`measurement_evidence.cli_exit`, v3-cli status on artifact-pair completion);
+observed outer `make` exit 2 on each (`Error 3`; the summaries record
+`outer_exit: null`). Gate: `plasticity_updates` 0.104622 against 0.012305
+(+750.24%, severe, the predeclared counter-definition change), `vm_steps`
++21.66% (flag); the rest ok. Goal: `plasticity_updates` 1.753745 against
+0.194897 (+799.83%, severe) and `pass_cap_hits` 0.003880 against 0.002410
+(+60.995851%, severe, a trajectory reading to report to the user; Confluence
++129.8%, Orchards +10.3%, Canyon +17.2%). Attribution: updates per plastic
+edge per visit is 0.20 to 0.53 per gate seed against F06's 0.34 to 0.68 (means
+0.347 and 0.475), the same order; the rise is the plastic edge count (5 to 9
+to 53 to 100 per seed), not the per-edge rate. Gate wall clock per
+creature-tick 0.0038113 against 0.0025164 (+51.5%) and goal 0.017143 against
+0.008888 (+92.9%): no wall comparison was produced (host name differs from the
+F06 reference) and the host was loaded (15-minute load average 64), so the
+predeclared +/-5% hypothesis is not confirmed and is reported, not
+interpreted. `reward_learning_ms` is above F06's (gate about +40%, goal 2x to
+4x), against the "at or below" hypothesis. `plasticity_scale_snaps_total` is 0
+in all three goal worlds (342, 145 and 146 scale slots at tick 2000; at-bound
+share 12.0%, 0%, 1.4%); the gate profile carries no snap total. Summaries:
+23,458 bytes (gate), 462,269 bytes (goal). Raw (ignored, not staged):
+116,721 bytes `d52068cd...0b`, 684,515,175 bytes `afd2470d...4e`; full hashes,
+per-seed readings, census by scope, scales and drift in the readings file.
+Thresholds, baselines and epochs untouched; the closing commit re-pins.
 
 - Summaries: [gate](../../progress/features/t25-f07-group-scope-learning.json),
   [goal](../../progress/features/t25-f07-group-scope-learning-goal.json).
