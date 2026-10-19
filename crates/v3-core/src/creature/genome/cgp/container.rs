@@ -10,7 +10,7 @@
 use std::fmt;
 use std::ops::Deref;
 
-use super::edge::Membership;
+use super::edge::{Membership, Scope};
 use super::edge::{GraphEdge, GraphSource};
 use super::group::{compose, pair_birth_members, Group, GroupId, Shape};
 use super::{
@@ -388,7 +388,7 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
     // `y` field.
     for sink in def.output_sinks.iter() {
         for edge in sink.inputs.iter() {
-            let Some(Membership { group }) = edge.membership else {
+            let Some(Membership { group, .. }) = edge.membership else {
                 continue;
             };
             let Some(pair) = def.groups[group.index()]
@@ -626,7 +626,7 @@ impl CgpGraphBackendDef {
         sink: OutputSinkKind,
         input_refs: &[InputReference],
     ) -> f32 {
-        let Membership { group } = edge.membership.expect("pattern_at: a member");
+        let Membership { group, .. } = edge.membership.expect("pattern_at: a member");
         let sub_idx = match edge.source {
             GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
             _ => u16::MAX,
@@ -878,7 +878,7 @@ impl CgpGraphBackendDef {
             }
             EdgeSurface::SinkInput(i) => {
                 let removed = self.output_sinks.0[i].inputs.0.remove(index);
-                if let Some(Membership { group }) = removed.membership {
+                if let Some(Membership { group, .. }) = removed.membership {
                     if self.members(group).next().is_none() {
                         self.drop_group_record(group);
                     }
@@ -1099,6 +1099,7 @@ impl CgpGraphBackendDef {
             kind,
             offset,
             scale: 0.0,
+            inherit_scale: false,
         });
         id
     }
@@ -1108,7 +1109,10 @@ impl CgpGraphBackendDef {
             source: GraphSource::InputLeaf { ref_idx, sub_idx },
             own_weight: 0.0,
             plasticity: None,
-            membership: Some(Membership { group }),
+            membership: Some(Membership {
+                group,
+                scope: Scope::Edge,
+            }),
         }
     }
 
@@ -1175,7 +1179,7 @@ impl CgpGraphBackendDef {
             .birth_seeds
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
-        let Membership { group } = edge.membership.expect("detach_at: the edge is a member");
+        let Membership { group, .. } = edge.membership.expect("detach_at: the edge is a member");
         edge.own_weight = compose(edge.own_weight, self.groups[group.index()].scale, pattern);
         edge.membership = None;
         let at = self.first_member(sink);
@@ -1212,7 +1216,7 @@ impl CgpGraphBackendDef {
     /// member's channel; a pair member's field, `x ≠ y`, so unique within a
     /// sink).
     fn member_key(edge: &GraphEdge) -> Option<(GroupId, u16)> {
-        let Membership { group } = edge.membership?;
+        let Membership { group, .. } = edge.membership?;
         let channel = match edge.source {
             GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
             _ => u16::MAX,
@@ -1268,7 +1272,7 @@ impl CgpGraphBackendDef {
         self.groups.remove(group.index());
         for sink in &mut self.output_sinks.0 {
             for edge in &mut sink.inputs.0 {
-                if let Some(Membership { group: id }) = &mut edge.membership {
+                if let Some(Membership { group: id, .. }) = &mut edge.membership {
                     debug_assert_ne!(*id, group, "the dropped group has no member");
                     if *id > group {
                         id.0 -= 1;
@@ -1479,6 +1483,7 @@ impl CgpGraphBackendDef {
             kind: Kind::Move,
             offset: 0,
             scale: 0.0,
+            inherit_scale: false,
         };
         self.groups = vec![record; usize::from(u16::MAX)];
     }

@@ -1,6 +1,6 @@
 //! Edge groups (T25.F03): one developmental program that wires a whole map.
 //!
-//! A [`Group`] is a record `{shape, kind, offset, scale}`; its members are
+//! A [`Group`] is a record `{shape, kind, offset, scale, inherit_scale}`; its members are
 //! real sink edges whose [`super::Membership`] names it. A member's genomic
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
@@ -81,6 +81,9 @@ pub struct Group {
     pub(super) offset: u8,
     /// One shared weight, born 0.
     pub(super) scale: f32,
+    /// Whether a parent's learned scale seeds the child's (T25.F07); born
+    /// false.
+    pub(super) inherit_scale: bool,
 }
 
 impl Group {
@@ -145,6 +148,13 @@ impl Group {
     #[must_use]
     pub const fn scale(&self) -> f32 {
         self.scale
+    }
+
+    /// Whether a parent's learned scale seeds the child's.
+    #[inline]
+    #[must_use]
+    pub const fn inherit_scale(&self) -> bool {
+        self.inherit_scale
     }
 }
 

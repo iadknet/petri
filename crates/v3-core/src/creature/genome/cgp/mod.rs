@@ -19,7 +19,7 @@ pub use container::{
     validate_graph, BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList, EdgeMut,
     EdgeOccurrence, EdgeSurface, GraphInvariantViolation, GroupMut, OutputSink, OutputSinks,
 };
-pub use edge::{GraphEdge, GraphSource, Membership};
+pub use edge::{GraphEdge, GraphSource, Membership, Scope};
 pub use group::{
     compose, detach, pair_birth_members, pair_relative, ring_offset, Group, GroupId, Shape,
 };

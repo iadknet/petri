@@ -29,7 +29,13 @@ describe("sinkDirection", () => {
 });
 
 describe("memberPattern", () => {
-	const ring: EdgeGroup = { shape: { Ring: { ring_ref: 1 } }, kind: "Move", offset: 2, scale: 0 };
+	const ring: EdgeGroup = {
+		shape: { Ring: { ring_ref: 1 } },
+		kind: "Move",
+		offset: 2,
+		scale: 0,
+		inherit_scale: false,
+	};
 
 	it("is 1 for a ring group whose ring resolves, 0 when it does not", () => {
 		const refs: InputReference[] = [{ World: "FoodHere" }, { World: "NeighborBarrierRing" }];
@@ -49,6 +55,7 @@ describe("memberPattern", () => {
 			kind: "Move",
 			offset: 1,
 			scale: 0,
+			inherit_scale: false,
 		};
 		// Sink E (2) at offset 1 is relative NE (1).
 		expect(memberPattern(group, refs, pair.x, 2)).toBeCloseTo(D);

@@ -65,7 +65,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // default arm (weight 56 -> 58) and remaps every Graph draw
     // (7833229115364439623 -> 4902026005096458209); removing the catalog
     // entry alone restores.
-    assert_eq!(hash, 4902026005096458209, "pin of the recruitment-Off path");
+    // Re-pinned by T25.F07 commit 1 (text only): every member's JSON names
+    // its `scope` and every group's its `inherit_scale`
+    // (4902026005096458209 -> 11853091526805612651); the hash without the
+    // genome JSON is 14048641739953688336 at the merge base and after the
+    // commit.
+    assert_eq!(hash, 11853091526805612651, "pin of the recruitment-Off path");
 }
 
 #[test]

@@ -80,7 +80,7 @@ pub struct GraphEdge {
     source: GraphSource,
     own_weight: f32,                 // JSON key `own_weight`
     plasticity: Option<PlasticityConfig>, // Section 13; omitted when None
-    membership: Option<Membership>,  // { group: GroupId }; omitted when None
+    membership: Option<Membership>,  // { group: GroupId, scope: Scope }; omitted when None
 }                                    // 36 bytes (T25.F06)
 ```
 

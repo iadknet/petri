@@ -20,12 +20,35 @@ pub enum GraphSource {
     ComputeNode(u16),
 }
 
+/// How a plastic member learns (T25.F07): for itself (`Edge`, its own
+/// correction) or for its group (`Group`, the group's one shared scale).
+/// Every member carries one; a static member's scope is inert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Scope {
+    Edge,
+    Group,
+}
+
+impl Scope {
+    /// The other scope.
+    #[inline]
+    #[must_use]
+    pub const fn other(self) -> Self {
+        match self {
+            Self::Edge => Self::Group,
+            Self::Group => Self::Edge,
+        }
+    }
+}
+
 /// A sink edge's membership in an edge group (T25.F03): the group it
-/// belongs to. Only sink edges carry one.
+/// belongs to and its learning scope (T25.F07). Only sink edges carry one.
+/// A group is identified by `group` alone: scope never splits it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Membership {
     pub group: GroupId,
+    pub scope: Scope,
 }
 
 /// Weighted edge in the graph. Inside a group, `own_weight` is a correction
@@ -46,7 +69,8 @@ pub struct GraphEdge {
 }
 
 // A 6-byte source, a 4-byte weight, a 20-byte plasticity and a 4-byte
-// membership, 36 bytes at 4-byte alignment (T25.F03, T25.F06).
+// membership (a 2-byte group and a 1-byte scope), 36 bytes at 4-byte
+// alignment (T25.F03, T25.F06, T25.F07).
 const _: () = assert!(std::mem::size_of::<GraphEdge>() == 36);
 
 impl GraphEdge {
@@ -91,10 +115,10 @@ impl GraphEdge {
         self.membership
     }
 
-    /// Whether this edge is a member of `group`.
+    /// Whether this edge is a member of `group`, whatever its scope.
     #[inline]
     #[must_use]
     pub fn is_member_of(&self, group: GroupId) -> bool {
-        self.membership == Some(Membership { group })
+        self.membership.is_some_and(|membership| membership.group == group)
     }
 }
