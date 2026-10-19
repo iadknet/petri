@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t25-f04-direction-pair-groups.json",
+    "epoch_baseline": "docs/progress/features/t25-f05-nearby-creature-family.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -76,7 +76,8 @@
       "docs/progress/features/input-mechanism-defaults.json",
       "docs/progress/features/t25-f02-uniform-genome-size.json",
       "docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json",
-      "docs/progress/features/t25-f04-direction-pair-groups.json"
+      "docs/progress/features/t25-f04-direction-pair-groups.json",
+      "docs/progress/features/t25-f05-nearby-creature-family.json"
     ]
   },
   "goal": {
@@ -142,7 +143,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t25-f04-direction-pair-groups-goal.json",
+    "epoch_baseline": "docs/progress/features/t25-f05-nearby-creature-family-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -193,7 +194,8 @@
       "docs/progress/features/input-mechanism-defaults-goal.json",
       "docs/progress/features/t25-f02-uniform-genome-size-goal.json",
       "docs/progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json",
-      "docs/progress/features/t25-f04-direction-pair-groups-goal.json"
+      "docs/progress/features/t25-f04-direction-pair-groups-goal.json",
+      "docs/progress/features/t25-f05-nearby-creature-family-goal.json"
     ]
   },
   "goal_worlds_long": {
