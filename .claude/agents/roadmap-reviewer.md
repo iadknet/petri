@@ -105,13 +105,14 @@ original roadmap row, not only against each other.
     and the endpoint;
   - telemetry capture, export and seams the diff adds sit behind
     `telemetry` and `telemetry-seams`.
-- Spec claim spot-check: pick at least three claims from the spec's Verification
-  and Performance sections — a command result, a stored-report path, and a
+- Spec claim spot-check: pick at least three claims from the spec's
+  Verification section — a command result, a file or test the diff adds, and a
   specific number — and check each against the diff or the stored file. Report
   any claim you could not check as unverified rather than assuming it.
-- Benchmark report and Performance and Goal Impact section when the feature is
-  subject to them; a severe compute regression without a predeclared, justified
-  cost is P1.
+- **Not** benchmark reports or measured Performance results. The declared
+  profiles run after this review, on the final code, and the orchestrator
+  audits them at closure. Do check that a feature subject to the Performance
+  section predeclares its expected cost.
 
 ## Lens 2: design and boundaries
 
