@@ -182,10 +182,11 @@ the goal run reports whether sink edges become plastic at all.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, every survivor resolved.
 - [ ] `make rust-test-slow` on the final code.
-- [ ] Gate and goal summaries at
+- [x] Gate and goal summaries at
       `docs/progress/features/t25-f06-learning-per-edge.json` and
       `-goal.json`, raw hash and byte count in the readings file, series
-      entries re-pinned, no full report staged.
+      entries added to `closed`, no full report staged. Goal ran `severe`
+      (`decided_passes`); the epoch re-pin stays with the closing commit.
 
 | Test | What it pins |
 | --- | --- |
@@ -250,7 +251,19 @@ question: a sink at-clamp share far above the compute surface's is the
 signal); occurrences of plastic sink edges reported per world, including
 zero.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate (`make bench PROFILE=gate`, exit 0, `severe` false):
+wall clock 0.0025164 ms per creature-tick, -5.21 % against the F05 epoch
+(ok, inside the 25 % flag threshold), so the 16 to 36 byte widening
+contingency does not trigger; `reward_learning_ms` fell from about 1.8 to 0.32;
+counter flags `vm_steps` +32.16 % and `decided_passes` +21.56 %, no severe.
+Goal (`make bench PROFILE=goal`, outer exit 2 from make, CLI exit 3, `severe`
+true): **`decided_passes` severe, +59.13 %** (0.004002 against 0.002515), a
+trajectory reading reported to the user (no predeclared direction); every
+other counter ok, wall clock +1.31 %, `plasticity_updates` -26.11 %
+(definition changed). Sink edges become plastic in all three worlds (296, 3
+and 98 at the last sample); the sink at-clamp share is not above the compute
+share at the last sample (seed 11 18.2 % against 20.8 %, seed 33 1.0 % against
+16.7 %). Numbers, hashes and byte counts: readings file, "Benchmark results".
 
 - Summaries: [gate](../../progress/features/t25-f06-learning-per-edge.json),
   [goal](../../progress/features/t25-f06-learning-per-edge-goal.json).
