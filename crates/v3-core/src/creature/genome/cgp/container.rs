@@ -1026,6 +1026,7 @@ impl CgpGraphBackendDef {
         GraphEdge {
             source: GraphSource::InputLeaf { ref_idx, sub_idx },
             own_weight: 0.0,
+            plasticity: None,
             membership: Some(Membership { group }),
         }
     }
