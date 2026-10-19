@@ -10,11 +10,10 @@
 //! for a child and exposed by the view.
 
 use super::rules::{activity, hebbian_delta, three_factor};
-use super::OutcomeSignalBank;
+use super::{OutcomeSignalBank, PlasticityKind};
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
 use crate::creature::genome::{BackendDef, CreatureGenome, PlasticityConfig};
-use crate::creature::plasticity_census::PlasticityKind;
 
 /// One plastic edge of a backend's layout.
 #[derive(Debug, Clone, Copy, PartialEq)]

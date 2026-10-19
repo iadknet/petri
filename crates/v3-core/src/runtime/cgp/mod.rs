@@ -7,6 +7,7 @@ mod f04_tests;
 mod neutral_connection_tests;
 pub(crate) mod sources;
 pub(crate) mod traced;
+pub(crate) mod tracer;
 
 pub(crate) use execute::execute_graph_node;
 pub(crate) use traced::execute_graph_node_traced;

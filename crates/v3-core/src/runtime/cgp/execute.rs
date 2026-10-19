@@ -1,74 +1,17 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
 use crate::runtime::cgp::sources::{collect_cgp_weighted_inputs, resolve_source};
+use crate::runtime::cgp::tracer::{GraphTracer, NoopTracer};
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
-
-/// Callback trait for instrumenting the ordered graph evaluation.
-#[allow(clippy::too_many_arguments)]
-pub(crate) trait GraphTracer {
-    fn on_pass_start(&mut self, pass: u32, pass_cost: f32, energy_after: f32);
-    fn on_node_eval(
-        &mut self,
-        node_index: usize,
-        kind: &ComputeNodeKind,
-        weighted_inputs: &[f32],
-        weighted_sum: f32,
-        state_before: f32,
-        state_after: f32,
-        output: f32,
-    );
-    fn on_pass_end(&mut self, delta: f32);
-    fn on_finish(&mut self, curr_outputs: &[f32], temporal_committed: bool);
-    /// One sink of the effects pass, in catalog order: whether it is wired,
-    /// its weighted inputs and sum, and the value it applied.
-    fn on_sink(
-        &mut self,
-        wired: bool,
-        weighted_inputs: &[f32],
-        weighted_sum: f32,
-        applied: bool,
-        applied_value: f32,
-    );
-    /// The effects pass ran: the visit committed.
-    fn on_effects(&mut self);
-}
-
-/// Zero-cost tracer used by the production path.
-pub(crate) struct NoopTracer;
-
-impl GraphTracer for NoopTracer {
-    #[inline]
-    fn on_pass_start(&mut self, _: u32, _: f32, _: f32) {}
-    #[inline]
-    fn on_node_eval(
-        &mut self,
-        _: usize,
-        _: &ComputeNodeKind,
-        _: &[f32],
-        _: f32,
-        _: f32,
-        _: f32,
-        _: f32,
-    ) {
-    }
-    #[inline]
-    fn on_pass_end(&mut self, _: f32) {}
-    #[inline]
-    fn on_finish(&mut self, _: &[f32], _: bool) {}
-    #[inline]
-    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
-    #[inline]
-    fn on_effects(&mut self) {}
-}
 
 /// Collect a learning graph's weighted inputs of compute node `current_idx`
 /// into `buf`: each edge's ordered read times its applied weight, the read
@@ -529,7 +472,7 @@ mod work_counter_tests {
 mod clock_tests {
     use super::*;
     use crate::creature::genome::cgp::{
-        ComputeNode, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+        ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::{HebbianRule, PlasticityConfig};
     use proptest::prelude::*;

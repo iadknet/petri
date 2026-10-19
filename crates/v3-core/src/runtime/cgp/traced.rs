@@ -2,7 +2,8 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
+use crate::runtime::cgp::execute::execute_graph_impl;
+use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::trace::domain::{
     kind_label, GraphNodeEvalTrace, GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
 };
