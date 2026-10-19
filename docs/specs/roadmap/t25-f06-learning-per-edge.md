@@ -179,8 +179,28 @@ the goal run reports whether sink edges become plastic at all.
 - [x] Focused tests: viability first, the touched crates' tests, fmt,
       check, clippy and the frontend tests on the final code -> the readings
       file's Verification results; the table below names what each pins.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
-      path, every survivor resolved.
+- [x] Fresh mutation gate, one run: `make rust-mutants-ci` at 302a6c77
+      against merge base 252a20a0 (Offload run 39206889124, four shards,
+      fresh). Summary: `rust-mutants-merge: 4 shards, 414 mutants tested:
+      37 missed, 308 caught, 68 unviable, 1 timeouts`. Output:
+      `~/.local/share/petri-tools/mutants/t25-f06/mutants.out.fresh-2026-10-19/`
+      (`missed.txt`, `timeout.txt`; transcript `fresh-run-2026-10-19.log`
+      beside it). A `MUTANTS_ITERATE=1` feedback pass after the test
+      additions (not closure evidence): `38 mutants tested in 14m: 4 missed,
+      33 caught, 1 timeouts`. No production code, test selection or tool
+      configuration changed and no test was weakened, so no second fresh
+      run; no `#[mutants::skip]` or `exclude_re` entry was added.
+
+      | Survivor | Resolution |
+      | --- | --- |
+      | `creature/plasticity_census.rs:83` `cells` -> `empty()` and the four `once(..)` forms | killed: `the_keyed_readers_carry_every_count_under_its_key` (`plasticity_census_tests.rs`) |
+      | `plasticity_census.rs:96` `rule_counts` -> `empty()` and the four `once(..)` forms | killed: the same test |
+      | `plasticity_census.rs:104` `inheritance_counts` -> `empty()` and the four `once(..)` forms | killed: the same test |
+      | `plasticity_census.rs:113` `surface_totals` -> `empty()` and the twelve `once(..)` forms | killed: the same test |
+      | `plasticity_census.rs:117:35` and `:118:34` `+` -> `-`, `+` -> `*` (drift sum, at-clamp count) | killed: the same test (totals 0.625/7 and 2.25/10) |
+      | `runtime/plasticity/learned.rs:182` `LearnedState::eq` -> `true` | killed: `learned_states_differ_once_a_visit_moves_a_learned_weight` (`runtime/plasticity/tests.rs`) |
+      | `runtime/trace/size.rs:39` `graph_heap` -> `0`, -> `1`; `:54` `+` -> `-`, `+` -> `*` | equivalent: `trace::size` compiles only under `telemetry-seams`, which the gate's v3-core build does not enable, so each mutant is absent from the tested code; a feature-on feedback run (`cargo mutants -p v3-core --features telemetry-seams -f crates/v3-core/src/runtime/trace/size.rs`) caught all four through `graph_heap_counts_every_sink_weighted_input_buffer` |
+      | `creature/genome/cgp/container.rs:1259` `take_members` `+=` -> `*=` (TIMEOUT) | deferred, pending user acceptance: see Notes for AI Agents |
 - [ ] `make rust-test-slow` on the final code.
 - [x] Gate and goal summaries at
       `docs/progress/features/t25-f06-learning-per-edge.json` and
@@ -314,3 +334,10 @@ share at the last sample (seed 11 18.2 % against 20.8 %, seed 33 1.0 % against
   (F02, F04) are spent.
 - Deferred: review finding (P3) `container.rs` `BirthSeeds` is a single-variant enum that could be a struct; kept because the spec names its `Rows` form.
 - Deferred: review finding (P3) `graphFullModel.ts` `GraphModelEdge.isPlastic` is populated but read only by a test.
+- Deferred: (pending user acceptance) mutation timeout `container.rs:1259`
+  `take_members` `index += 1` -> `index *= 1`. The mutant never advances
+  past a non-member edge, so every test that removes or relocates a group
+  with a non-member in a sink (for example
+  `remove_group_leaves_no_member_and_renumbers_higher_groups`) spins
+  forever; the suite detects it only by non-termination, and no test can
+  turn the hang into a failure while those tests share the binary.
