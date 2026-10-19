@@ -258,7 +258,18 @@ contingency does not trigger; `reward_learning_ms` fell from about 1.8 to 0.32;
 counter flags `vm_steps` +32.16 % and `decided_passes` +21.56 %, no severe.
 Goal (`make bench PROFILE=goal`, outer exit 2 from make, CLI exit 3, `severe`
 true): **`decided_passes` severe, +59.13 %** (0.004002 against 0.002515), a
-trajectory reading reported to the user (no predeclared direction); every
+trajectory reading reported to the user (no predeclared direction). It is
+one world's: Confluence 0.007742 against 0.003412 per creature-tick
+(+127 %), Orchards +5.3 %, Canyon -17 %; a decided pass is one the `Decide`
+vote ends early (`runtime/mesh.rs:423-428`: `Decide` positive and the pass
+would act), and F06 is the first feature under which an edge onto the
+`Decide` sink can learn, so a Hebbian edge there drives the sum positive
+and keeps it there, a clamp-bounded runaway the design allows; the goal
+summary carries no per-sink-kind census, so that mechanism is named from
+the code, not confirmed, and the draw-stream change alone can move a
+counter at 0.08 % of passes this far in one world. It is not a cost: wall
+clock +1.31 %, passes -1.41 %, mesh hops -2.14 %, pass-cap hits -30 %,
+actions applied -1.97 %. Every
 other counter ok, wall clock +1.31 %, `plasticity_updates` -26.11 %
 (definition changed). Sink edges become plastic in all three worlds (296, 3
 and 98 at the last sample); the sink at-clamp share is not above the compute
