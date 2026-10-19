@@ -108,6 +108,14 @@
 //! representation alone (a93d6b87... -> bd8dca14..., gestation rate 0.0
 //! 527a14e0... -> d3b71fcd...), and without them is byte-identical across
 //! the commit (633e120e..., gestation rate 0.0 f49b5c17...).
+//! Re-pinned by T25.F07 commit 1 (text only) after two agreeing runs: every
+//! member's JSON names its `scope` and every group's its `inherit_scale`,
+//! which moves the two sampled digests (bc6cee03... -> 63d2f57d...,
+//! gestation rate 0.0 bde1dbeb... -> a3b599b9...); the guard digests hold.
+//! The sampled digest without genome bytes is 9e21186e... (rate 0.0
+//! 53b0c507...) at the merge base and after the commit, and with
+//! `mutation.per_unit_rate` 0 the sampled run is byte-identical
+//! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -119,11 +127,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "bc6cee0362ccb7664ca69f1fe064f2b096cb849d6c97720a6acb7d3638b3f995"
+        "63d2f57d9a84ec1b87ec5652503effe4954cb2455999c08a36da66fd81b679b7"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "bde1dbebec30e217c193f2462c706ce7c1e909ed00e2c4847fa03e8d433ffa27"
+        "a3b599b9ab79ba4c8a6cf8987c17383700d3c3672bca5514c9e78cf553f9da8a"
     );
 }
 

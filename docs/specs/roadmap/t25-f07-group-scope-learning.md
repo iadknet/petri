@@ -125,7 +125,7 @@ and 2.5 routing changes.
 
 ## Implementation Tasks
 
-- [ ] Commit 1 (text only): `Scope`, `Membership.scope`, `Group.inherit_scale` with serde; `is_member_of` and the container's membership comparisons on `group` only (R5); `GENOME_FORMAT` 5, `PROTOCOL_VERSION` `v3alpha10`; `types/genome.ts`; the identity pins of grouped genomes re-pinned with "the hash without genome text is unchanged" as the check.
+- [x] Commit 1 (text only): `Scope`, `Membership.scope`, `Group.inherit_scale` with serde; `is_member_of` and the container's membership comparisons on `group` only (R5); `GENOME_FORMAT` 5, `PROTOCOL_VERSION` `v3alpha10`; `types/genome.ts`; the identity pins of grouped genomes re-pinned with "the hash without genome text is unchanged" as the check.
 - [ ] Container: `set_scope`, `set_inherit_scale`, `can_learn` and `validate_graph` (invariant 1); `BirthSeeds::Rows.groups` with the alignment rules and `detach_at`'s seed composition (invariant 6); the alignment proptest and `debug_assert_seed_shape` extended to group slots.
 - [ ] Refactor R1–R2 (readings file): the learner decides slot membership from each edge's occurrence; one composition used by `weigh`, the view, `applied_weight` and `applied_weights` (invariants 2–3).
 - [ ] Runtime: scale slots, the passive set, the credit accumulator in `commit` and `reward`, the snap counter, scale initialization, `capture` and `from_seeds` by scope, `scales()`, `applied_weights()` and the view fields (invariants 2–6, 10).

@@ -6,7 +6,7 @@ import { EdgeGroupList } from "./EdgeGroupList.tsx";
 const leaf = (ref_idx: number, sub_idx: number, own_weight: number, group?: number): GraphEdge => ({
 	source: { InputLeaf: { ref_idx, sub_idx } },
 	own_weight,
-	...(group === undefined ? {} : { membership: { group } }),
+	...(group === undefined ? {} : { membership: { group, scope: "Edge" as const } }),
 });
 
 /** A Move group at offset 1 on ring 1 missing its channel-3 member. */
@@ -22,7 +22,15 @@ function grouped(): GraphBackendDef {
 	return {
 		compute_nodes: [],
 		output_sinks: sinks,
-		groups: [{ shape: { Ring: { ring_ref: 1 } }, kind: "Move", offset: 1, scale: 0.5 }],
+		groups: [
+			{
+				shape: { Ring: { ring_ref: 1 } },
+				kind: "Move",
+				offset: 1,
+				scale: 0.5,
+				inherit_scale: false,
+			},
+		],
 	};
 }
 
@@ -107,6 +115,7 @@ describe("EdgeGroupList", () => {
 							kind: "Move",
 							offset: 2,
 							scale: 1,
+							inherit_scale: false,
 						},
 					],
 				}}

@@ -73,7 +73,10 @@ A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
 inputs}`, and a genome with a node-level `plasticity` key fails to
 deserialize, with no conversion path) and a graph
 backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
-offset, scale}]` (T25.F03); the `cgp` genome types deny unknown fields, so a
+offset, scale, inherit_scale}]` (T25.F03, T25.F07), each member's
+`membership` is `{group, scope}` with `scope` `"Edge"` or `"Group"` (T25.F07;
+both keys always written, so a genome from before T25.F07 fails to
+deserialize, with no conversion path); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
 with no conversion path. A genome from before T25.F05 that names
 `NearbyCreatureCore`, `NearbyCreatureVitals` or `NearbyCreatureIdentity`

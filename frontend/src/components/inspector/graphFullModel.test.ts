@@ -26,10 +26,21 @@ describe("buildFullGraphModel edge-group members", () => {
 			output_sinks: [
 				{
 					kind: { ActionVote: { Move: 0 } },
-					inputs: [inputEdge(1, 3, 0.25), { ...inputEdge(0, 0, 0), membership: { group: 0 } }],
+					inputs: [
+						inputEdge(1, 3, 0.25),
+						{ ...inputEdge(0, 0, 0), membership: { group: 0, scope: "Edge" } },
+					],
 				},
 			],
-			groups: [{ shape: { Ring: { ring_ref: 0 } }, kind: "Move", offset: 0, scale: 0.5 }],
+			groups: [
+				{
+					shape: { Ring: { ring_ref: 0 } },
+					kind: "Move",
+					offset: 0,
+					scale: 0.5,
+					inherit_scale: false,
+				},
+			],
 		});
 	}
 
@@ -69,7 +80,7 @@ describe("buildFullGraphModel edge-group members", () => {
 				output_sinks: [
 					{
 						kind: { ActionVote: { Move: 6 } },
-						inputs: [{ ...inputEdge(0, 1, 0.25), membership: { group: 0 } }],
+						inputs: [{ ...inputEdge(0, 1, 0.25), membership: { group: 0, scope: "Edge" } }],
 					},
 				],
 				groups: [
@@ -78,6 +89,7 @@ describe("buildFullGraphModel edge-group members", () => {
 						kind: "Move",
 						offset: 0,
 						scale: 0.5,
+						inherit_scale: false,
 					},
 				],
 			}),

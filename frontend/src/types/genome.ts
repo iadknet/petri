@@ -12,9 +12,16 @@ export type GraphSource =
 	| { SharedMemory: { slot: number; previous: boolean } }
 	| { ComputeNode: number };
 
-/** A sink edge's membership in an edge group (T25.F03). */
+/**
+ * How a plastic member learns (T25.F07): its own correction (`Edge`) or its
+ * group's shared scale (`Group`).
+ */
+export type Scope = "Edge" | "Group";
+
+/** A sink edge's membership in an edge group (T25.F03) and its scope (T25.F07). */
 export interface Membership {
 	group: number;
+	scope: Scope;
 }
 
 export interface GraphEdge {
@@ -133,6 +140,8 @@ export interface EdgeGroup {
 	kind: DirectedVoteKind;
 	offset: number;
 	scale: number;
+	/** Whether a parent's learned scale seeds the child's (T25.F07). */
+	inherit_scale: boolean;
 }
 
 export interface GraphBackendDef {

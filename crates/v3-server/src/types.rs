@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha9";
+pub const PROTOCOL_VERSION: &str = "v3alpha10";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -58,8 +58,8 @@ mod tests {
     /// T25.F03 renamed the genome edge `weight` to `own_weight` and replaced
     /// ring projections with edge groups, a breaking payload change.
     #[test]
-    fn protocol_version_is_v3alpha9() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha9");
+    fn protocol_version_is_v3alpha10() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha10");
     }
 
     #[test]

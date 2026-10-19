@@ -4,7 +4,7 @@ use super::*;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::creature::genome::cgp::{
-    compose, detach, GroupId, Membership, Shape, FIRST_ACTION_VOTE_SINK,
+    compose, detach, GroupId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::HebbianRule;
@@ -30,14 +30,17 @@ fn def_fields_are_exhaustively_accounted_for() {
         kind: _,
         offset: _,
         scale: _,
+        inherit_scale: _,
     } = Group {
         shape: Shape::Ring { ring_ref: 0 },
         kind: DirectedVoteKind::Move,
         offset: 0,
         scale: 0.0,
+        inherit_scale: false,
     };
-    let Membership { group: _ } = Membership {
+    let Membership { group: _, scope: _ } = Membership {
         group: GroupId::new(0),
+        scope: Scope::Edge,
     };
 }
 
@@ -61,6 +64,45 @@ fn edge_plasticity_round_trips_and_is_omitted_when_none() {
     assert_eq!(plasticity.rule, HebbianRule::Oja);
     assert!(plasticity.lamarckian);
     assert_eq!(serde_json::to_string(&edge).unwrap(), plastic_json);
+}
+
+/// A member's `scope` and a group's `inherit_scale` are always written and
+/// required: a membership or a group record without them is refused at the
+/// load boundary (T25.F07 invariant 1, `GENOME_FORMAT` 5).
+#[test]
+fn scope_and_inherit_scale_are_always_written_and_required() {
+    let member = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"group":0,"scope":"Group"}}"#;
+    let edge: GraphEdge = serde_json::from_str(member).unwrap();
+    assert_eq!(
+        edge.membership(),
+        Some(Membership {
+            group: GroupId::new(0),
+            scope: Scope::Group,
+        })
+    );
+    assert_eq!(serde_json::to_string(&edge).unwrap(), member);
+    let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"group":0}}"#;
+    assert!(serde_json::from_str::<GraphEdge>(without_scope).is_err());
+
+    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true}"#;
+    let record: Group = serde_json::from_str(group).unwrap();
+    assert!(record.inherit_scale());
+    assert_eq!(serde_json::to_string(&record).unwrap(), group);
+    let without_flag = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0}"#;
+    assert!(serde_json::from_str::<Group>(without_flag).is_err());
+}
+
+/// Group identity is the `GroupId` alone (R5): a member at scope `Group`
+/// is still a member of its group.
+#[test]
+fn is_member_of_ignores_scope() {
+    let mut edge = GraphEdge::new(leaf(0), 0.0);
+    edge.membership = Some(Membership {
+        group: GroupId::new(2),
+        scope: Scope::Group,
+    });
+    assert!(edge.is_member_of(GroupId::new(2)));
+    assert!(!edge.is_member_of(GroupId::new(1)));
 }
 
 #[test]
@@ -473,7 +515,7 @@ fn push_edge_inserts_an_independent_edge_before_the_first_member() {
     assert_eq!(inputs.len(), 3);
     assert_eq!(inputs[0].source(), leaf(0));
     assert_eq!(inputs[1].source(), leaf(5));
-    assert_eq!(inputs[2].membership(), Some(Membership { group: id }));
+    assert_eq!(inputs[2].membership(), Some(Membership { group: id, scope: Scope::Edge }));
 }
 
 #[test]
@@ -486,7 +528,7 @@ fn remove_group_leaves_no_member_and_renumbers_higher_groups() {
     assert_eq!(def.groups().len(), 2);
     assert!(def
         .edges()
-        .all(|edge| edge.membership() != Some(Membership { group: third })));
+        .all(|edge| edge.membership() != Some(Membership { group: third, scope: Scope::Edge })));
     // The third group is now `GroupId(1)`, its members with it.
     let renumbered = GroupId::new(1);
     assert_eq!(def.groups()[1].offset(), 5);
@@ -530,7 +572,7 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
     let later = sink_occurrence(sink, 1);
     assert_eq!(
         def.edge_at(later).membership(),
-        Some(Membership { group: second })
+        Some(Membership { group: second, scope: Scope::Edge })
     );
     let (moved, removed) = detach(&mut def, later, &ring_refs());
     assert!(!removed);
@@ -543,7 +585,7 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
     );
     assert_eq!(
         def.edge_at(sink_occurrence(sink, 1)).membership(),
-        Some(Membership { group: first })
+        Some(Membership { group: first, scope: Scope::Edge })
     );
     assert_eq!(def.members(second).count(), 7);
 }
@@ -624,6 +666,7 @@ fn validate_graph_rejects_each_broken_invariant() {
             if edge.membership.is_some() {
                 edge.membership = Some(Membership {
                     group: GroupId::new(4),
+                    scope: Scope::Edge,
                 });
             }
         }
@@ -644,6 +687,7 @@ fn the_group_count_limit_is_u16_max_records() {
         kind: DirectedVoteKind::Move,
         offset: 0,
         scale: 0.0,
+        inherit_scale: false,
     };
     def.groups = vec![record; usize::from(u16::MAX)];
     assert_eq!(
@@ -1022,7 +1066,7 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
         },
         own_weight: 0.25,
         plasticity: None,
-        membership: Some(Membership { group: id }),
+        membership: Some(Membership { group: id, scope: Scope::Edge }),
     });
     resort(&mut def, sink);
     assert_eq!(def.check_local_invariants(), Ok(()));

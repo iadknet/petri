@@ -183,10 +183,18 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// text is unchanged across the commit (default 13644968153452489784, rate
 /// 0.0 821082946294985330), as it is with mutation off (152334251919380938,
 /// rate 0.0 2951681092705485257).
+/// Re-pinned by T25.F07 commit 1 (text only): every member's `Debug` text
+/// names its `scope` and every group's its `inherit_scale`, which moves the
+/// rate-0.0 identity, whose run carries a group (17936859635187403177 ->
+/// 7887329904345154269); the default identity holds. The hash without
+/// genome text is unchanged at the merge base and after the commit (default
+/// 13644968153452489784, rate 0.0 821082946294985330), as is the run with
+/// mutation off, genome text included (8324246536663749152, rate 0.0
+/// 1561139812032769563).
 #[test]
 fn legacy_default_short_run_identity() {
     assert_eq!(short_run_identity(None), 12573132385420804636);
-    assert_eq!(short_run_identity(Some(0.0)), 17936859635187403177);
+    assert_eq!(short_run_identity(Some(0.0)), 7887329904345154269);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.
