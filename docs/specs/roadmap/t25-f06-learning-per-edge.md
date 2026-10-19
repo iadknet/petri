@@ -294,7 +294,7 @@ other counter ok, wall clock +1.31 %, `plasticity_updates` -26.11 %
 (definition changed). Sink edges become plastic in all three worlds (296, 3
 and 98 at the last sample); the sink at-clamp share is not above the compute
 share at the last sample (seed 11 18.2 % against 20.8 %, seed 33 1.0 % against
-16.7 %). Numbers, hashes and byte counts: readings file, "Benchmark results".
+16.7 %). Heap (dhat, `profile_ticks --ticks 500`): total bytes 1,921,029,505 to 581,287,889 and blocks 4,420,331 to 1,520,678 (commit 1 to HEAD), so the expectation "not to rise" held, but the after run ends with 0 creatures against 710, so the fall is not attributable to commit 2 (readings file, "Heap comparison (dhat)"). Numbers, hashes and byte counts: readings file, "Benchmark results".
 
 - Summaries: [gate](../../progress/features/t25-f06-learning-per-edge.json),
   [goal](../../progress/features/t25-f06-learning-per-edge-goal.json).
