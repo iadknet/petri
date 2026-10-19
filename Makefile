@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-slow rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-slow rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants rust-mutants-ci frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -116,6 +116,9 @@ rust-clippy: ## Run Clippy with warnings denied.
 rust-mutants: ## Mutation-test the feature diff (full package tests; not part of check). Fresh by default; MUTANTS_ITERATE=1 reuses results for remediation only. Env: MUTANTS_BASE, MUTANTS_OUT, MUTANTS_JOBS, MUTANTS_TIMEOUT, BENCH_WAIT_TIMEOUT.
 	@scripts/rust-mutants
 
+rust-mutants-ci: ## Run the fresh mutation gate for the committed feature branch on GitHub Actions (pushes the branch, waits, downloads the merged result). Env: MUTANTS_BASE, MUTANTS_OUT.
+	@scripts/rust-mutants-ci
+
 frontend-check: ## Lint, test, and build the frontend.
 	@$(MAKE) frontend-lint frontend-test frontend-build
 
@@ -155,6 +158,8 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/benchmark-artifacts.test.mjs scripts/historical-benchmarks.test.mjs scripts/telemetry-stats.test.mjs
 	@scripts/bench-wait-test
 	@sh scripts/rust-mutants-test
+	@sh scripts/rust-mutants-merge-test
+	@sh scripts/rust-mutants-ci-test
 	@sh scripts/dev-sh-test
 	@sh scripts/skill-check-test
 	@sh scripts/telemetry-cleanup-test

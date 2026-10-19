@@ -1,0 +1,106 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-rust-mutants-ci-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export MUTANTS_FIXTURE="$test_root"
+mkdir -p "$test_root/bin"
+# The gh stub records each call, dispatches to run 42, reports the head the
+# fixture names, and downloads a merged result.
+cat >"$test_root/bin/gh" <<'STUB'
+#!/bin/sh
+set -eu
+printf '%s\n' "$*" >>"$MUTANTS_FIXTURE/gh-calls"
+case "$1 $2" in
+  'workflow run') printf 'Created workflow_dispatch event\nhttps://github.com/o/r/actions/runs/42\n' ;;
+  'run view') cat "$MUTANTS_FIXTURE/run-head" ;;
+  'run watch') exit "${STUB_WATCH_STATUS:-0}" ;;
+  'run download')
+    while [ "$1" != --dir ]; do shift; done
+    mkdir -p "$2/mutants.out"
+    printf 'rust-mutants-merge: 4 shards, 2 mutants tested: 1 missed, 1 caught, 0 unviable, 0 timeouts\n' >"$2/summary.txt"
+    printf 'src/lib.rs:1:1: replace f with ()\n' >"$2/mutants.out/missed.txt"
+    : >"$2/mutants.out/timeout.txt"
+    ;;
+  *) exit 64 ;;
+esac
+STUB
+chmod +x "$test_root/bin/gh"
+
+git init -q --bare "$test_root/origin.git"
+git init -q -b main "$test_root/repo"
+cd "$test_root/repo"
+git remote add origin "$test_root/origin.git"
+commit() { git -c user.name=test -c user.email=test@example.invalid commit -q "$@"; }
+printf 'base\n' >subject.txt
+git add subject.txt
+commit -m base
+base=$(git rev-parse HEAD)
+git checkout -q -b worktree-feature
+printf 'feature\n' >subject.txt
+commit -am feature
+git rev-parse HEAD >"$test_root/run-head"
+
+fail() { printf 'rust-mutants-ci-test: %s\n' "$*" >&2; exit 1; }
+run_ci() {
+  status=0
+  rm -f "$test_root/gh-calls"
+  env PATH="$test_root/bin:$PATH" MUTANTS_OUT="$test_root/out" MUTANTS_BASE='' \
+    MUTANTS_WATCH_INTERVAL=1 "$@" sh "$script_dir/rust-mutants-ci" >"$test_root/log" 2>&1 || status=$?
+}
+expect_refusal() {
+  [ "$status" -ne 0 ] || fail "$1: accepted"
+  grep -F "$2" "$test_root/log" >/dev/null || fail "$1: diagnostic missing"
+}
+
+# A clean feature branch is pushed, dispatched against the local merge base,
+# and its merged result replaces the previous output.
+mkdir -p "$test_root/out"
+: >"$test_root/out/stale"
+run_ci
+[ "$status" -eq 0 ] || fail "gate failed: $(cat "$test_root/log")"
+[ "$(git --git-dir="$test_root/origin.git" rev-parse worktree-feature)" = "$(git rev-parse HEAD)" ] || fail 'branch not pushed'
+grep -Fx "workflow run offload.yml --ref worktree-feature -f task=mutants -f base=$base" "$test_root/gh-calls" >/dev/null \
+  || fail 'dispatch lacked the merge base'
+grep -F 'run watch 42 --exit-status' "$test_root/gh-calls" >/dev/null || fail 'run not watched'
+[ ! -e "$test_root/out/stale" ] || fail 'previous output kept'
+grep -F '1 missed, 1 caught' "$test_root/log" >/dev/null || fail 'summary not printed'
+grep -Fx 'src/lib.rs:1:1: replace f with ()' "$test_root/log" >/dev/null || fail 'survivor not printed'
+
+# A rebased branch replaces the pushed one.
+commit --amend -q -m 'feature, rebased'
+git rev-parse HEAD >"$test_root/run-head"
+run_ci
+[ "$status" -eq 0 ] || fail "rebased push failed: $(cat "$test_root/log")"
+
+# A failed or cancelled run is no gate result and leaves the output alone.
+: >"$test_root/out/kept"
+run_ci STUB_WATCH_STATUS=1
+expect_refusal 'failed run' 'no gate result'
+[ -e "$test_root/out/kept" ] || fail 'failed run removed the output'
+
+printf 'other\n' >"$test_root/run-head"
+run_ci
+expect_refusal 'run on another commit' 'is not on'
+git rev-parse HEAD >"$test_root/run-head"
+
+printf 'dirty\n' >>subject.txt
+run_ci
+expect_refusal 'dirty tree' 'not clean'
+[ ! -e "$test_root/gh-calls" ] || fail 'dirty tree dispatched'
+git checkout -q -- subject.txt
+
+git checkout -q main
+run_ci
+expect_refusal 'main' 'not main'
+
+git checkout -q -b empty-feature
+run_ci
+[ "$status" -eq 0 ] || fail 'empty diff failed'
+grep -F 'nothing to mutate' "$test_root/log" >/dev/null || fail 'empty diff not reported'
+[ ! -e "$test_root/gh-calls" ] || fail 'empty diff dispatched'
+
+printf 'rust-mutants-ci-test: ok\n'

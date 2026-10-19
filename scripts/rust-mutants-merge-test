@@ -1,0 +1,92 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-rust-mutants-merge-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
+fail() { printf 'rust-mutants-merge-test: %s\n' "$*" >&2; exit 1; }
+shard() {
+  dir=$test_root/shards/$1
+  mkdir -p "$dir/mutants.out"
+  printf '%s\n' "$2" >"$dir/shard.txt"
+  printf 'fresh\n' >"$dir/run-mode.txt"
+  printf 'diff\n' >"$dir/in-diff.patch"
+  printf '%s caught\n' "$1" >"$dir/mutants.out/caught.txt"
+  : >"$dir/mutants.out/missed.txt"
+  : >"$dir/mutants.out/timeout.txt"
+  : >"$dir/mutants.out/unviable.txt"
+}
+reset_fixture() {
+  rm -rf "$test_root/shards" "$test_root/out"
+  shard a 0/2
+  shard b 1/2
+}
+run_merge() {
+  status=0
+  sh "$script_dir/rust-mutants-merge" "$test_root/out" "$@" >"$test_root/log" 2>&1 || status=$?
+}
+expect_refusal() {
+  [ "$status" -ne 0 ] || fail "$1: merge accepted"
+  grep -F "$2" "$test_root/log" >/dev/null || fail "$1: diagnostic missing"
+}
+
+# A complete shard set merges into one sorted run with survivors printed.
+reset_fixture
+printf 'z missed\n' >"$test_root/shards/b/mutants.out/missed.txt"
+printf 'y slow\n' >"$test_root/shards/a/mutants.out/timeout.txt"
+printf 'x unviable\n' >"$test_root/shards/a/mutants.out/unviable.txt"
+run_merge "$test_root/shards/b" "$test_root/shards/a"
+[ "$status" -eq 0 ] || fail "complete set failed: $(cat "$test_root/log")"
+[ "$(cat "$test_root/out/mutants.out/caught.txt")" = "$(printf 'a caught\nb caught')" ] || fail 'caught not merged in order'
+grep -Fx 'rust-mutants-merge: 2 shards, 5 mutants tested: 1 missed, 2 caught, 1 unviable, 1 timeouts' \
+  "$test_root/out/summary.txt" >/dev/null || fail 'summary wrong'
+grep -Fx 'z missed' "$test_root/log" >/dev/null || fail 'missed survivor not printed'
+grep -Fx 'y slow' "$test_root/log" >/dev/null || fail 'timeout survivor not printed'
+[ "$(cat "$test_root/out/run-mode.txt")" = fresh ] || fail 'run mode not recorded'
+cmp -s "$test_root/out/in-diff.patch" "$test_root/shards/a/in-diff.patch" || fail 'diff not kept'
+
+reset_fixture
+run_merge "$test_root/shards/a" "$test_root/shards/b"
+grep -F 'no survivors' "$test_root/log" >/dev/null || fail 'clean run not reported'
+
+# A missing shard drops mutants from the gate.
+reset_fixture
+run_merge "$test_root/shards/a"
+expect_refusal 'missing shard' '1 shards given, run has 2'
+
+reset_fixture
+shard c 0/2
+run_merge "$test_root/shards/a" "$test_root/shards/c"
+expect_refusal 'duplicate shard' 'shard 0 appears twice'
+
+reset_fixture
+shard b 1/3
+run_merge "$test_root/shards/a" "$test_root/shards/b"
+expect_refusal 'mixed shard counts' 'is shard of 3, others of 2'
+
+reset_fixture
+printf 'other\n' >"$test_root/shards/b/in-diff.patch"
+run_merge "$test_root/shards/a" "$test_root/shards/b"
+expect_refusal 'different diff' 'mutated a different diff'
+
+reset_fixture
+printf 'incremental\n' >"$test_root/shards/b/run-mode.txt"
+run_merge "$test_root/shards/a" "$test_root/shards/b"
+expect_refusal 'incremental shard' 'is not a fresh run'
+
+reset_fixture
+rm "$test_root/shards/b/shard.txt"
+run_merge "$test_root/shards/a" "$test_root/shards/b"
+expect_refusal 'unsharded output' 'not a sharded run'
+
+for bad in 2/2 x/2 1/0 1 1/2/3; do
+  reset_fixture
+  printf '%s\n' "$bad" >"$test_root/shards/b/shard.txt"
+  run_merge "$test_root/shards/a" "$test_root/shards/b"
+  expect_refusal "shard record $bad" 'is not k/n'
+done
+
+printf 'rust-mutants-merge-test: ok\n'
