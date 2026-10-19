@@ -223,11 +223,7 @@ fn zero_edges_can_clear_overwrite_and_change_nonadditive_compute_outputs() {
 fn native_nonadditive_compute_inputs_are_not_qualified_zero_destinations() {
     for kind in [ComputeNodeKind::Multiply, ComputeNodeKind::Min] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.append_compute_node(ComputeNode::new(
-            kind,
-            vec![edge(memory(0, false), 1.0)],
-            None,
-        ));
+        def.append_compute_node(ComputeNode::new(kind, vec![edge(memory(0, false), 1.0)]));
         wire(
             &mut def,
             OutputSinkKind::CustomOutput(0),
@@ -270,14 +266,6 @@ fn unaffordable_active_graph_keeps_incumbent_carried_state_and_commits_no_effect
     let mut initial = crate::creature::genome::cgp::test_support::runtime_for(&def);
     initial.node_state = vec![vec![0.25, 0.75]];
     initial.node_outputs = vec![vec![0.5, 0.125]];
-    initial.plasticity_weights = vec![vec![
-        vec![0.375].into_boxed_slice(),
-        vec![0.625].into_boxed_slice(),
-    ]];
-    initial.eligibility_traces = vec![vec![
-        vec![].into_boxed_slice(),
-        vec![0.75].into_boxed_slice(),
-    ]];
     let before = visit(&def, 2.0 * BASE_COST, initial.clone());
     wire(
         &mut def,
@@ -305,8 +293,21 @@ fn unaffordable_active_graph_keeps_incumbent_carried_state_and_commits_no_effect
         assert_eq!(run.memory, ramp(0.5));
         assert_eq!(run.state.node_state, initial.node_state);
         assert_eq!(run.state.node_outputs, initial.node_outputs);
-        assert_eq!(run.state.plasticity_weights, initial.plasticity_weights);
-        assert_eq!(run.state.eligibility_traces, initial.eligibility_traces);
+        // A failed visit marks its backend visited but changes no learned
+        // value or trace (T25.F06 invariant 6).
+        let values = |state: &GraphRuntimeState| -> Vec<(f32, f32)> {
+            state
+                .learned()
+                .edges(0)
+                .map(|edge| {
+                    (
+                        edge.learned.unwrap_or(edge.genomic),
+                        edge.trace.unwrap_or(0.0),
+                    )
+                })
+                .collect()
+        };
+        assert_eq!(values(&run.state), values(&initial));
     }
 }
 
@@ -345,7 +346,7 @@ fn dormant_activation_changes_a_later_live_energy_read() {
         let mut energy = 10.0;
         let mut memory = ramp(0.5);
         let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
-        state.begin_tick(&genome.nodes, 0);
+        state.begin_tick(0);
         let result = execute_creature_mesh(
             &genome,
             &sensors(),

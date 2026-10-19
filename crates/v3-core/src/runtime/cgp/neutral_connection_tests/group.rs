@@ -54,17 +54,22 @@ fn effects_at(
     };
     let mut memory = ramp(0.0);
     let mut side = side();
-    let (result, _) = apply_cgp_graph_effects(
+    let (result, contribution) = apply_cgp_graph_effects(
+        &mut crate::runtime::cgp::execute::NoopTracer,
         def,
         &def.sink_weight_rows(refs),
         &[0.5; 3],
         refs,
         &ctx,
         &upstream,
-        &mut side,
+        None,
+        &mut Vec::new(),
+        &mut side.work_counters.shared_memory_writes_changed,
+        &mut side.action_params,
         &mut memory,
         &ramp(0.5),
     );
+    side.stage_vote_contribution(&contribution);
     Effects {
         result,
         side,

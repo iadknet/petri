@@ -214,18 +214,19 @@ impl DestinationKind {
         let previous_memory = |source: &GraphSource| {
             matches!(source, GraphSource::SharedMemory { previous: true, .. })
         };
-        let stateful = graph
-            .compute_nodes()
-            .iter()
-            .enumerate()
-            .any(|(index, node)| {
-                node.kind.class() == NodeClass::Stateful
-                    || node.plasticity.is_some()
-                    || node.inputs.iter().any(|edge| match edge.source() {
-                        GraphSource::ComputeNode(source) => usize::from(source) >= index,
-                        ref source => previous_memory(source),
-                    })
-            })
+        // Learning on either surface is state (T25.F06).
+        let stateful = graph.plastic_edges().next().is_some()
+            || graph
+                .compute_nodes()
+                .iter()
+                .enumerate()
+                .any(|(index, node)| {
+                    node.kind.class() == NodeClass::Stateful
+                        || node.inputs.iter().any(|edge| match edge.source() {
+                            GraphSource::ComputeNode(source) => usize::from(source) >= index,
+                            ref source => previous_memory(source),
+                        })
+                })
             || graph
                 .output_sinks()
                 .iter()

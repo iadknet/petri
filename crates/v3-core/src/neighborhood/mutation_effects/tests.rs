@@ -4,8 +4,8 @@ use crate::config::{FounderProfile, SimulationConfig};
 use crate::creature::founder::founder_genome;
 use crate::creature::genome::cgp::test_support::set_sink_inputs;
 use crate::creature::genome::cgp::{
-    BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge,
-    GraphSource, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
+    OutputSinkKind,
 };
 use crate::creature::genome::vote::ActionParamField;
 use crate::creature::genome::{BackendDef, NodeGenome};
@@ -18,7 +18,7 @@ fn fixture() -> (SimulationConfig, Battery) {
 }
 
 fn constant(value: f32) -> ComputeNode {
-    ComputeNode::new(ComputeNodeKind::Constant(value), Vec::new(), None)
+    ComputeNode::new(ComputeNodeKind::Constant(value), Vec::new())
 }
 
 fn from_node(index: u16, weight: f32) -> GraphEdge {
@@ -53,7 +53,6 @@ fn unwired_integrator(rate: f32) -> ComputeNode {
     ComputeNode::new(
         ComputeNodeKind::DecayIntegrator(rate),
         vec![from_node(0, 1.0)],
-        None,
     )
 }
 
@@ -229,11 +228,8 @@ fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birt
         GraphEdge::new(GraphSource::ComputeNode(0), 0.25),
     );
     let mut seeded = learned.clone();
-    graph_def(&mut seeded, 0).seed_birth(BirthSeeds::Rows(vec![vec![Some(0.5)]]));
+    graph_def(&mut seeded, 0).seed_compute_rows(vec![vec![Some(0.5)]]);
     assert_eq!(genome_identity(&seeded), genome_identity(&learned));
-    let mut learned = with(1.0);
-    graph_def(&mut learned, 0).seed_birth(BirthSeeds::Empty);
-    assert_eq!(genome_identity(&learned), genome_identity(&with(1.0)));
 }
 
 #[test]

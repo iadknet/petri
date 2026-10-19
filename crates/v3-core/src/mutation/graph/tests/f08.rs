@@ -54,7 +54,7 @@ fn run_tick_sequences(
                     let prev_shared_memory = shared_memory;
                     let mut energy = 1.0e6f32;
                     let mut side_outputs = MeshSideOutputs::new(8);
-                    graph_runtime.begin_tick(&[], 0);
+                    graph_runtime.begin_tick(0);
                     let result = execute_graph_node(
                         def,
                         input_refs,
@@ -171,7 +171,6 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                     ),
                     GraphEdge::new(GraphSource::ComputeNode(1), 0.7),
                 ],
-                None,
             ),
             ComputeNode::new(
                 ComputeNodeKind::WeightedSum,
@@ -179,12 +178,10 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                     GraphEdge::new(GraphSource::ComputeNode(0), 0.6),
                     GraphEdge::new(GraphSource::ComputeNode(2), 0.9),
                 ],
-                None,
             ),
             ComputeNode::new(
                 ComputeNodeKind::DecayIntegrator(0.4),
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-                None,
             ),
         ])
         .with_output_sinks(vec![
@@ -239,8 +236,16 @@ fn copy_internal_node_inserts_the_copy_directly_after_its_source() {
             parent.compute_nodes()[source].kind,
         );
         assert_eq!(
-            child.compute_nodes()[source + 1].plasticity,
-            parent.compute_nodes()[source].plasticity,
+            child.compute_nodes()[source + 1]
+                .inputs
+                .iter()
+                .map(GraphEdge::plasticity)
+                .collect::<Vec<_>>(),
+            parent.compute_nodes()[source]
+                .inputs
+                .iter()
+                .map(GraphEdge::plasticity)
+                .collect::<Vec<_>>(),
         );
     }
     assert!(seen.iter().all(|&s| s), "every source index is reachable");
@@ -323,7 +328,7 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
     // still applies.
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![
-            ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None);
+            ComputeNode::new(ComputeNodeKind::Add, Vec::new());
             u16::MAX as usize - 1
         ])
         .with_output_sinks(Vec::new());
@@ -428,21 +433,23 @@ fn introspection_edge_def(
         1.0,
     );
     CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![ComputeNode::new(
-            ComputeNodeKind::WeightedSum,
-            if on_compute_input {
-                vec![edge]
-            } else {
-                Vec::new()
-            },
-            plasticity.then_some(PlasticityConfig {
-                rule: crate::creature::genome::HebbianRule::Classic,
-                learning_rate: 0.1,
-                weight_clamp: 5.0,
-                lamarckian: false,
-                modulation: None,
-            }),
-        )])
+        .with_compute_nodes(vec![
+            crate::creature::genome::cgp::test_support::plastic_node(
+                ComputeNodeKind::WeightedSum,
+                if on_compute_input {
+                    vec![edge]
+                } else {
+                    Vec::new()
+                },
+                plasticity.then_some(PlasticityConfig {
+                    rule: crate::creature::genome::HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 5.0,
+                    lamarckian: false,
+                    modulation: None,
+                }),
+            ),
+        ])
         .with_output_sinks(vec![OutputSink::new(
             sink,
             if on_compute_input {
@@ -514,7 +521,7 @@ fn committed_at_energy(
     mut energy: f32,
 ) -> f32 {
     let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
-    graph_runtime.begin_tick(&[], 0);
+    graph_runtime.begin_tick(0);
     let mut shared_memory = [0.0f32; 16];
     execute_graph_node(
         def,

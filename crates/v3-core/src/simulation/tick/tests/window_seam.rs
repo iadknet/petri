@@ -64,7 +64,7 @@ fn fingerprint(sim: &Simulation) -> String {
         let g = &c.graph_runtime;
         writeln!(
             out,
-            "{id:?} e={:?} p={:?} a={} m={:?} o={:?} s={:?} n={:?} w={:?} t={:?}",
+            "{id:?} e={:?} p={:?} a={} m={:?} o={:?} s={:?} n={:?} l={:?}",
             c.energy,
             c.position,
             c.age,
@@ -72,8 +72,7 @@ fn fingerprint(sim: &Simulation) -> String {
             c.previous_outcome,
             g.node_state,
             g.node_outputs,
-            g.plasticity_weights,
-            g.eligibility_traces,
+            g.learned(),
         )
         .unwrap();
     }

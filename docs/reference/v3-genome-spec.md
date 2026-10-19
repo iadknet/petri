@@ -68,14 +68,18 @@ and fixed structural outputs (the sinks). The fixed catalog holds 98 sinks: 24 `
 `genome_size` charges one unit per edge on both graph surfaces and nothing
 for a sink itself, so unwired sinks add nothing to it (T25.F02), and one unit
 per edge-group record (T25.F03); the founder is 80 units.
-A graph edge serializes as `{source, own_weight, membership?}` and a graph
+A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
+(T25.F06: learning attributes live on the edge; a compute node is `{kind,
+inputs}`, and a genome with a node-level `plasticity` key fails to
+deserialize, with no conversion path) and a graph
 backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
 offset, scale}]` (T25.F03); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
 with no conversion path. A genome from before T25.F05 that names
 `NearbyCreatureCore`, `NearbyCreatureVitals` or `NearbyCreatureIdentity`
 fails to deserialize too; the one `NearbyCreature` reference (36 channels)
-replaces them. The lab's genome files are `genome_format` 3.
+replaces them. The lab's genome files are `genome_format` 4 (T25.F06);
+format 3 and earlier files are refused.
 A serialized genome from before T11.F27 that carries an old parameter sink
 (`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam { slot_idx, .. }`
 fails to deserialize; there is no conversion path. A pre-T11.F27 genome with
@@ -97,9 +101,11 @@ Required invariants:
 - backend payloads remain decodable.
 - Graph backend fixed output catalog is structurally intact (correct sink
   count and sink kinds match the canonical catalog).
-- Every Graph backend passes `validate_graph` (T25.F03): the edge-group
-  invariants of `v3-graph-backend-spec.md` ("Ring edge groups"), checked in
-  the mutation gate after every event and at the lab's `GenomeFile::load`.
+- Every Graph backend passes `validate_graph` (T25.F03, T25.F06): the
+  edge-group invariants of `v3-graph-backend-spec.md` ("Ring edge groups"),
+  every learning attribute in range, and no plastic `ClearSlot` edge or group
+  member (Section 13 there), checked in the mutation gate after every event
+  and at the lab's `GenomeFile::load`.
 
 Deliberately not required at validation time:
 - `entry_node_id` must resolve.
@@ -126,10 +132,11 @@ pub struct CreatureState {
 The key is mesh `NodeId` (not global flat offsets). This avoids state/index
 misalignment across topology mutations.
 
-Within each mesh node, graph runtime state (node_state, plasticity_weights,
-eligibility_traces, scratch buffers) is indexed by compute node index — only
-compute nodes have state. Fixed structural outputs (the sinks) do not
-participate in relaxation and have no runtime state.
+Within each mesh node, operator state, committed outputs and scratch
+buffers are indexed by compute node index. Learned state (T25.F06) is one
+slot per plastic edge over both surfaces in canonical order — a sink edge can
+learn — built once at birth (`v3-graph-backend-spec.md` Section 13). Fixed
+structural outputs (the sinks) carry no operator state.
 
 ---
 

@@ -54,10 +54,10 @@ pub fn structural_companions(genome: &CreatureGenome) -> StructuralCompanions {
                 }
             }
             BackendDef::Graph(graph) => {
+                if graph.plastic_edges().next().is_some() {
+                    has_plasticity = true;
+                }
                 for compute_node in graph.compute_nodes() {
-                    if compute_node.plasticity.is_some() {
-                        has_plasticity = true;
-                    }
                     if compute_node.kind.class() == NodeClass::Stateful {
                         has_stateful_compute_node = true;
                     }
@@ -252,7 +252,6 @@ mod tests {
         graph.append_compute_node(ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![],
-            None,
         ));
         let genome = graph_genome(graph);
         let companions = structural_companions(&genome);
@@ -263,9 +262,15 @@ mod tests {
     #[test]
     fn a_plastic_compute_node_is_reported() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(ComputeNode::new(
+        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
-            vec![],
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                1.0,
+            )],
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -292,7 +297,6 @@ mod tests {
                 },
                 1.0,
             )],
-            None,
         ));
         let genome = graph_genome(graph);
         assert!(structural_companions(&genome).reads_shared_memory);
@@ -301,7 +305,7 @@ mod tests {
     #[test]
     fn a_wired_write_slot_sink_writes_shared_memory_but_an_unwired_one_does_not() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![], None));
+        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![]));
         let sink = graph
             .sink_surface(OutputSinkKind::WriteSlot(0))
             .expect("the fixed catalog always has a WriteSlot(0) sink");

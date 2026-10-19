@@ -56,7 +56,7 @@ fn run_both(
     let mut energy_plain = energy;
     let mut energy_traced = energy;
     let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
-    state.begin_tick(&genome.nodes, 0);
+    state.begin_tick(0);
     let mut traced_state = state.clone();
     let output = super::execute_creature_mesh(
         genome,
@@ -83,7 +83,7 @@ fn run_both(
     assert_eq!(output.termination_reason, traced.termination_reason);
     assert_eq!(energy_plain, energy_traced);
     assert_eq!(memory, traced_memory);
-    assert_eq!(state.plasticity_weights, traced_state.plasticity_weights);
+    assert_eq!(state.learned(), traced_state.learned());
     if matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)) {
         let writes: usize = hops
             .iter()
@@ -146,7 +146,6 @@ fn graph_writes(values: &[f32], clear: bool) -> CreatureGenome {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(1.0),
                 vec![],
-                None,
             )])
             .with_output_sinks(output_sinks),
     ))

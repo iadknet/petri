@@ -156,8 +156,8 @@ Decision-state reads (T19.F05, `v3-sensor-spec.md` Section 3.6): a node reads
 and the tick's hop count, the dispatch in flight included (`HopsThisTick`),
 live at every read. A dispatch sees `V` as committed so far this pass, never
 its own staged contribution; nothing commits mid-dispatch, so a graph
-dispatch's evaluation, post-plasticity, and effects contexts read the same
-values. The worked cases V1 to V6 are in
+dispatch's evaluation and effects read one context, and learning re-reads no
+source (T25.F06: it uses the samples the visit recorded). The worked cases V1 to V6 are in
 `crates/v3-core/src/runtime/decision_input_tests.rs` and
 `crates/v3-core/src/simulation/tick/tests/previous_outcome.rs`.
 
@@ -224,7 +224,7 @@ Safety rules:
 - the cap cannot be disabled
 
 Graph internal recurrence rule:
-- Phase 0 decays initialized eligibility once per world tick and snapshots
+- Phase 0 decays every eligibility trace once per world tick and snapshots
   nothing; graph temporal state is live within the tick (T19.F02).
 - A visit is entered when the graph has a compute node or a wired effect
   surface; each entered visit evaluates once in index order, self/higher-index
@@ -300,7 +300,7 @@ selection pressure rather than strict genome repair.
 
 | Substrate | On exhaustion during the visit |
 | --- | --- |
-| Learned (pure Hebbian) weights | Applied and kept |
+| Learned weights | Unchanged: learning applies after a committed visit's effects (T25.F06); the backend's visited flag is set at entry |
 | Operator state and outputs | Not committed; the last committed values stand |
 | Eligibility traces | Unchanged (updated only after commit) |
 | Graph effects: memory writes, votes, parameters, gates | Not applied |

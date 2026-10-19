@@ -824,8 +824,106 @@ pub struct PersistenceSample {
     /// reports stored before T25.F04.
     #[serde(default)]
     pub pair_groups: Option<super::pair_groups::PairGroups>,
+    /// The plastic edges the living population carries on reachable nodes
+    /// (T25.F06), beside `sensor_census`. A true all-zero census at
+    /// extinction, absent in reports stored before T25.F06.
+    #[serde(default)]
+    pub plasticity_census: Option<PlasticityCensusBlock>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
+}
+
+/// One (pathway, surface) cell of a checkpoint's plasticity census.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlasticEdgeRow {
+    /// `hebbian` or `reward_modulated`.
+    pub learning: String,
+    /// `compute` or `sink`.
+    pub surface: String,
+    pub edges: u64,
+    /// Sum of `|learned - genomic|` over the initialized edges.
+    pub drift_sum: String,
+    /// Initialized edges at their clamp.
+    pub at_clamp: u64,
+}
+
+/// One key's plastic-edge count.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlasticKeyRow {
+    pub key: String,
+    pub edges: u64,
+}
+
+/// The plasticity census of one checkpoint (T25.F06): living creatures,
+/// carriers, and the reachable plastic edges by (pathway, surface), by rule
+/// and by inheritance, every row always present.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlasticityCensusBlock {
+    pub creatures: u64,
+    pub carriers: u64,
+    pub edges: Vec<PlasticEdgeRow>,
+    pub edges_by_rule: Vec<PlasticKeyRow>,
+    pub edges_by_inheritance: Vec<PlasticKeyRow>,
+}
+
+impl PlasticityCensusBlock {
+    /// Census the living population from post-tick state through the
+    /// learned state's view; executes no brain.
+    pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        use v3_core::creature::plasticity_census::{
+            rule_key, PlasticityCensus, INHERITANCE_KEYS, LEARNING_KEYS, RULES, SURFACE_KEYS,
+        };
+        let census = PlasticityCensus::observe(sim.creatures.values().map(|creature| {
+            (
+                &creature.genome,
+                &*creature.cached_reachable_nodes,
+                creature.graph_runtime.learned(),
+            )
+        }));
+        let edges = LEARNING_KEYS
+            .iter()
+            .enumerate()
+            .flat_map(|(learning, &learning_key)| {
+                SURFACE_KEYS
+                    .iter()
+                    .enumerate()
+                    .map(move |(surface, &surface_key)| {
+                        let cell = census.edges[learning][surface];
+                        PlasticEdgeRow {
+                            learning: learning_key.to_owned(),
+                            surface: surface_key.to_owned(),
+                            edges: cell.edges,
+                            drift_sum: six(cell.drift_sum),
+                            at_clamp: cell.at_clamp,
+                        }
+                    })
+            })
+            .collect();
+        let rows = |keys: &mut dyn Iterator<Item = (&'static str, u64)>| {
+            keys.map(|(key, edges)| PlasticKeyRow {
+                key: key.to_owned(),
+                edges,
+            })
+            .collect()
+        };
+        Self {
+            creatures: census.creatures,
+            carriers: census.carriers,
+            edges,
+            edges_by_rule: rows(
+                &mut RULES
+                    .iter()
+                    .map(|&rule| rule_key(rule))
+                    .zip(census.edges_by_rule),
+            ),
+            edges_by_inheritance: rows(
+                &mut INHERITANCE_KEYS
+                    .iter()
+                    .copied()
+                    .zip(census.edges_by_inheritance),
+            ),
+        }
+    }
 }
 
 /// The occupancy grid of one checkpoint: two parallel row-major arrays of
@@ -983,6 +1081,7 @@ pub(super) struct PopulationReadings {
     sensor_census: SensorCensus,
     occupancy_grid: OccupancyGrid,
     pair_groups: Option<super::pair_groups::PairGroups>,
+    plasticity_census: PlasticityCensusBlock,
 }
 
 impl PopulationReadings {
@@ -1002,6 +1101,7 @@ impl PopulationReadings {
             sensor_census: SensorCensus::observe(sim),
             occupancy_grid: OccupancyGrid::observe(sim),
             pair_groups: super::pair_groups::PairGroups::observe(sim),
+            plasticity_census: PlasticityCensusBlock::observe(sim),
         }
     }
 }
@@ -1101,6 +1201,7 @@ impl PersistenceAccumulator {
                 sensor_census: Some(readings.sensor_census),
                 occupancy_grid: Some(readings.occupancy_grid),
                 pair_groups: readings.pair_groups.filter(|_| alive),
+                plasticity_census: Some(readings.plasticity_census),
                 tracking: tracking(),
             });
         }

@@ -167,7 +167,6 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
                     },
                     1.0,
                 )],
-                None,
             )]);
             if live {
                 let east = move_surface(&graph, EAST);

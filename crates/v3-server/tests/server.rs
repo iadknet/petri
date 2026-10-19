@@ -2661,6 +2661,118 @@ async fn get_creature_graph_weights_carry_member_genomic_weights() {
     assert!(body.get("genome").is_some());
 }
 
+/// `graph_weights` (T25.F06): a plastic edge carries `applied` (the weight
+/// in force) and, once initialized, `learned`; a static member carries
+/// neither. A seeded Lamarckian vote edge is initialized at birth; an
+/// unseeded compute edge is not.
+#[tokio::test]
+async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge() {
+    use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::{
+        BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
+    };
+    use v3_core::creature::genome::vote::{DirectedVoteKind, VoteSink};
+    use v3_core::creature::genome::{BackendDef, HebbianRule, PlasticityConfig};
+    use v3_core::creature::state::GraphRuntimeState;
+
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let config = PlasticityConfig {
+        rule: HebbianRule::Classic,
+        learning_rate: 0.1,
+        weight_clamp: 2.0,
+        lamarckian: true,
+        modulation: None,
+    };
+    let (vote, vote_index) = {
+        let mut handle = state.sim.lock().await;
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        let node_idx = creature
+            .genome
+            .nodes
+            .iter()
+            .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .expect("a Graph node");
+        let node = &mut creature.genome.nodes[node_idx];
+        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+        node.input_refs
+            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!()
+        };
+        def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+        let vote = def
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+            .unwrap();
+        def.push_edge(
+            vote,
+            GraphEdge::new(
+                GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                0.5,
+            ),
+        );
+        let vote_index = def.surface_edges(vote).len() - 1;
+        def.edge_mut(EdgeOccurrence::new(vote, vote_index))
+            .set_plasticity(Some(config));
+        def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
+            .set_plasticity(Some(config));
+        let mut sinks: Vec<Vec<Option<f32>>> = def
+            .output_sinks()
+            .iter()
+            .map(|sink| vec![None; sink.inputs.len()])
+            .collect();
+        let EdgeSurface::SinkInput(vote_sink) = vote else {
+            unreachable!()
+        };
+        sinks[vote_sink][vote_index] = Some(1.25);
+        let seeds = BirthSeeds::Rows {
+            compute: def
+                .compute_nodes()
+                .iter()
+                .map(|node| vec![None; node.inputs.len()])
+                .collect(),
+            sinks,
+        };
+        let mut node_seeds = vec![None; creature.genome.nodes.len()];
+        node_seeds[node_idx] = Some(seeds);
+        creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
+        (vote_sink, vote_index)
+    };
+
+    let (status, body) = do_request(router(state), get_req(&format!("{uri}?exclude=genome"))).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
+    let members: Vec<_> = edges
+        .iter()
+        .filter(|edge| edge["surface"] == "sink" && edge["container"] != vote)
+        .collect();
+    assert_eq!(members.len(), 8);
+    assert!(members
+        .iter()
+        .all(|edge| edge.get("applied").is_none() && edge.get("learned").is_none()));
+    let compute = edges
+        .iter()
+        .find(|edge| edge["surface"] == "compute")
+        .expect("the plastic compute edge");
+    assert_eq!(compute["container"], 0);
+    assert!(compute.get("learned").is_none(), "uninitialized: {compute}");
+    assert_eq!(compute["applied"], compute["genomic"]);
+    let voted = edges
+        .iter()
+        .find(|edge| edge["container"] == vote && edge["edge"] == vote_index)
+        .expect("the plastic vote edge");
+    assert_eq!(voted["genomic"], 0.5);
+    assert_eq!(voted["applied"], 1.25);
+    assert_eq!(voted["learned"], 1.25);
+}
+
 /// `graph_weights` (T25.F04): one entry per actual member of a
 /// `DirectionPair` group — twelve at birth, eleven after a removal — at its
 /// genomic weight `scale × compass + own`; the genome names the shape.
@@ -2710,7 +2822,7 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
     edit(false).await;
     let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha8");
+    assert_eq!(body["protocol_version"], "v3alpha9");
     let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
     assert_eq!(edges.len(), 12, "{body}");
     let mut genomic: Vec<f64> = edges

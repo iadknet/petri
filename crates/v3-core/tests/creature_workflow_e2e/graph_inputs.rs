@@ -80,7 +80,6 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
                 },
                 1.0,
             )],
-            None,
         ));
         // CN1..=8: NeighborFoodRing per direction
         for dir_idx in 0u16..8 {
@@ -93,7 +92,6 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
                     },
                     1.0,
                 )],
-                None,
             ));
         }
         // CN9..=16: NeighborBarrierRing per direction
@@ -107,7 +105,6 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
                     },
                     1.0,
                 )],
-                None,
             ));
         }
         // CN17..=24: NeighborOccupiedRing per direction
@@ -121,7 +118,6 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
                     },
                     1.0,
                 )],
-                None,
             ));
         }
         def
@@ -248,7 +244,6 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
                     },
                     1.0,
                 )],
-                None,
             ));
             // Wire CustomOutput(i) sink to the compute node we just added
             let cn_idx = def.compute_nodes().len() - 1;

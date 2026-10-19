@@ -333,7 +333,7 @@ fn visit_sequence<M: MeshExecutionMode, B>(
     let mut prev_shared_memory = [0.0f32; 16];
     let mut graph_runtime = GraphRuntimeState::for_genome(genome, Vec::new());
     for (tick, scenario) in sequence.iter().enumerate() {
-        graph_runtime.begin_tick(&genome.nodes, tick as u64);
+        graph_runtime.begin_tick(tick as u64);
         advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
         let mut energy = scenario.energy;
         let output = execute_creature_mesh_impl(

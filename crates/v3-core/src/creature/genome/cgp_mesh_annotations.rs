@@ -31,10 +31,20 @@ pub(crate) fn derive_cgp_annotations(
 
     let live_indices = cgp_live_compute_indices(def);
 
+    // Learning (T25.F06): a plastic edge into a live compute node or a
+    // wired sink.
+    if def
+        .output_sinks()
+        .iter()
+        .any(|sink| sink.inputs.iter().any(|edge| edge.plasticity().is_some()))
+    {
+        has_stateful_behavior = true;
+    }
+
     // Stateful flags from live compute nodes
     for &idx in &live_indices {
         let node = &def.compute_nodes()[idx];
-        if node.plasticity.is_some() {
+        if node.inputs.iter().any(|edge| edge.plasticity().is_some()) {
             has_stateful_behavior = true;
         }
         match &node.kind {
@@ -146,7 +156,6 @@ mod tests {
                     },
                     1.0,
                 )],
-                None,
             )])
             .with_output_sinks(vec![
                 OutputSink::new(
@@ -172,7 +181,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::DecayIntegrator(0.5),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::CustomOutput(0),
@@ -192,7 +200,6 @@ mod tests {
                 .with_compute_nodes(vec![ComputeNode::new(
                     ComputeNodeKind::Constant(1.0),
                     Vec::new(),
-                    None,
                 )])
                 .with_output_sinks(vec![OutputSink::new(
                     kind,
@@ -209,7 +216,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::WriteSlot(0),
@@ -232,7 +238,6 @@ mod tests {
                     },
                     1.0,
                 )],
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::CustomOutput(0),

@@ -21,6 +21,8 @@ export interface GraphEdge {
 	source: GraphSource;
 	/** The genomic weight of an ungrouped edge; a member's correction. */
 	own_weight: number;
+	/** The edge's learning attributes (T25.F06); omitted for a static edge. */
+	plasticity?: PlasticityConfig;
 	/** Omitted by the server when the edge belongs to no group. */
 	membership?: Membership;
 }
@@ -62,10 +64,10 @@ export interface PlasticityConfig {
 	modulation?: RewardModulationConfig | null;
 }
 
+/** A compute node; learning attributes live on its input edges (T25.F06). */
 export interface ComputeNode {
 	kind: ComputeNodeKind;
 	inputs: GraphEdge[];
-	plasticity?: PlasticityConfig | null;
 }
 
 /** One vote sink in the catalog; the number is a `Direction::ALL` index. A

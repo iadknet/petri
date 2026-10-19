@@ -2157,7 +2157,7 @@
       "id": 44,
       "type": "timeseries",
       "title": "Plasticity updates per creature-tick, by kind",
-      "description": "Plasticity edge assignments per creature-tick, changed or not: one per input edge of each plastic compute node per graph visit (Hebbian, so multi-pass ticks count more than once) or per tick (reward-modulated, counted even when the outcome signal is 0). Mixes how many creatures carry plasticity with how active each one is.",
+      "description": "Plasticity edge assignments per creature-tick, changed or not: one per plastic edge on either surface per committed graph visit (Hebbian, so multi-pass ticks count more than once) or per initialized edge per tick (reward-modulated, counted even when the outcome signal is 0). Mixes how many creatures carry plasticity with how active each one is.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2549,7 +2549,7 @@
       "id": 48,
       "type": "timeseries",
       "title": "Plasticity carriers, share of population (sampled)",
-      "description": "Share of living creatures with at least one plastic input edge on a reachable Graph node, from the plasticity census at each snapshot. Founders carry none, so any rise is mutation-borne and kept by selection. Structure, not use: a carried edge learns only when its mesh node is visited.",
+      "description": "Share of living creatures with at least one plastic edge (compute input or sink) on a reachable Graph node, from the plasticity census at each snapshot. Founders carry none, so any rise is mutation-borne and kept by selection. Structure, not use: a carried edge learns only when its mesh node is visited.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2609,8 +2609,8 @@
     {
       "id": 49,
       "type": "timeseries",
-      "title": "Mean drift per plastic edge, by learning and inheritance (sampled)",
-      "description": "Mean |learned - genome weight| over reachable plastic edges. An edge the runtime has not initialized yet reads its genome weight, so it adds 0. Darwinian drift is learning within one lifetime; Lamarckian edges start from the parent's learned weights, so their drift also carries what ancestors learned.",
+      "title": "Mean drift per plastic edge, by surface (sampled)",
+      "description": "Mean |learned - genome weight| over reachable plastic edges, compute inputs and sink edges apart. An edge not yet initialized (its mesh node never visited, no inherited seed) adds 0. Darwinian drift is learning within one lifetime; a seeded Lamarckian edge starts from the parent's learned weight, so its drift also carries what ancestors learned.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2628,8 +2628,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (petri_plasticity_learning, petri_plasticity_inheritance) (petri_tick_plastic_edge_drift{petri_run_id=\"$run_id\"}) / sum by (petri_plasticity_learning, petri_plasticity_inheritance) (petri_tick_plastic_edges{petri_run_id=\"$run_id\"})",
-          "legendFormat": "{{petri_plasticity_learning}} {{petri_plasticity_inheritance}}",
+          "expr": "sum by (petri_surface) (petri_tick_plastic_edge_drift{petri_run_id=\"$run_id\"}) / sum by (petri_surface) (petri_tick_plastic_edges{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_surface}}",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -2668,8 +2668,8 @@
     {
       "id": 50,
       "type": "timeseries",
-      "title": "Plastic edges at their clamp, share by rule (sampled)",
-      "description": "Share of reachable plastic edges whose learned weight sits at plus or minus the node's runtime clamp (weight_clamp bounded to [0.01, 10]), per rule. A high share means learning saturates instead of tracking its inputs; T17 found Covariance with large inputs reaching its clamp in one tick.",
+      "title": "Plastic edges at their clamp, share by surface (sampled)",
+      "description": "Share of reachable plastic edges whose initialized learned weight sits at plus or minus the edge's weight_clamp (in [0.01, 10]), compute inputs and sink edges apart. A high share means learning saturates instead of tracking its inputs; T17 found Covariance with large inputs reaching its clamp in one tick.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2687,8 +2687,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (petri_plasticity_rule) (petri_tick_plastic_edges_at_clamp{petri_run_id=\"$run_id\"}) / sum by (petri_plasticity_rule) (petri_tick_plastic_edges{petri_run_id=\"$run_id\"})",
-          "legendFormat": "{{petri_plasticity_rule}}",
+          "expr": "sum by (petri_surface) (petri_tick_plastic_edges_at_clamp{petri_run_id=\"$run_id\"}) / sum by (petri_surface) (petri_tick_plastic_edges{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_surface}}",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -2730,7 +2730,7 @@
       "id": 51,
       "type": "timeseries",
       "title": "Plastic edges by rule (sampled)",
-      "description": "Reachable plastic input edges in the living population, per rule: the mix of rules selection keeps.",
+      "description": "Reachable plastic edges (compute inputs and sink edges) in the living population, per rule: the mix of rules selection keeps.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2748,7 +2748,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (petri_plasticity_rule) (petri_tick_plastic_edges{petri_run_id=\"$run_id\"})",
+          "expr": "sum by (petri_plasticity_rule) (petri_tick_plastic_edges_by_rule{petri_run_id=\"$run_id\"})",
           "legendFormat": "{{petri_plasticity_rule}}",
           "range": true,
           "instant": false,

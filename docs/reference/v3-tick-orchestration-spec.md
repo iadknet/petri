@@ -93,7 +93,7 @@ runtime backends or reproduction internals.
        For each living creature:
          [compute OutcomeSignalBank from Phase 0 snapshot + Phase 2 outcomes]
          [store it as the creature's previous outcome; newborns store zeros]
-         if it has reward-modulated plasticity nodes:
+         if it has a reward-modulated edge:
            [apply reward-modulated weight updates: dw = lr * outcome * trace]
   -> [tick ends; newborns eligible next tick]
 ```
@@ -163,8 +163,9 @@ This is the canonical first-processed-wins model.
 ### Phase 2.5: Outcome Store and Reward-Modulated Learning Pass
 
 After all actions are executed, every living creature stores its tick
-outcome, and creatures with reward-modulated plasticity nodes receive weight
-updates based on it. For each creature:
+outcome, and creatures with a reward-modulated edge on either surface
+(T25.F06) receive weight updates based on it. The pass iterates the creatures
+directly. For each creature:
 
 1. Compute `OutcomeSignalBank` from Phase 0 energy snapshot and Phase 2
    action results (energy delta, action success rate, damage received,
@@ -174,15 +175,16 @@ updates based on it. For each creature:
    `StaticInputs::previous_outcome` for the `PreviousOutcome` input
    (`v3-sensor-spec.md` Section 3.7). A creature born this tick has no
    accumulator entry and stores zeros; nothing is inherited.
-3. For each reward-modulated edge, apply:
+3. For each initialized reward-modulated edge (its backend visited, or its
+   slot seeded at birth), apply:
    `dw = learning_rate * outcome_signal[channel] * eligibility_trace[edge]`.
 4. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
 5. Floor the creature's energy at `0.0`, crediting `zero_floor_credit`; this
-   reaches exactly the creatures that have a bank and a reward-modulated node.
+   reaches exactly the creatures that have a bank and a reward-modulated edge.
 
-Phase 0 calls `graph_runtime.begin_tick(&genome.nodes, age)` to record the
-dispatch record's age and decay initialized eligibility once; it snapshots
-no internal state (T19.F02). Each successful Phase 1 graph visit adds its
+Phase 0 calls `graph_runtime.begin_tick(age)` to record the dispatch
+record's age and decay every trace once over the learned state's modulated
+slots; it snapshots no internal state (T19.F02). Each successful Phase 1 graph visit adds its
 activity to the trace, using actual evaluation inputs, so a module the pass
 dispatches twice adds twice; activity contains no learning-rate factor.
 Skipped modules retain decayed credit, and failed visits leave the trace

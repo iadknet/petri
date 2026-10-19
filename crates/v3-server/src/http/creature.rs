@@ -61,10 +61,11 @@ struct CreatureDetailResponse<'a> {
     genome: Option<&'a v3_core::creature::genome::CreatureGenome>,
     #[serde(skip_serializing_if = "Option::is_none")]
     mesh_annotations: Option<Vec<MeshNodeAnnotation>>,
-    /// The genomic weights of edge groups and their members (T25.F03), per
-    /// Graph node carrying a group, in genome order. Computed whether or not
-    /// the genome is included; excluded by the `graph_weights` token and
-    /// omitted when the creature carries no member.
+    /// The weights of edge groups, their members (T25.F03) and every plastic
+    /// edge (T25.F06), per Graph node carrying either, in genome order.
+    /// Computed on every poll, whether or not the genome is included;
+    /// excluded by the `graph_weights` token and omitted when the creature
+    /// carries neither.
     #[serde(skip_serializing_if = "Option::is_none")]
     graph_weights: Option<Vec<NodeGraphWeights>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,43 +99,66 @@ enum WeightSurface {
     Sink,
 }
 
-/// One edge's genomic weight, keyed by surface, container index (compute
-/// node or sink) and index within that container's inputs.
+/// One edge's weights, keyed by surface, container index (compute node or
+/// sink) and index within that container's inputs: its genomic weight, and
+/// for a plastic edge the weight in force (`applied`) and, once initialized,
+/// its learned weight (T25.F06).
 #[derive(Debug, PartialEq, serde::Serialize)]
 struct EdgeGenomicWeight {
     surface: WeightSurface,
     container: usize,
     edge: usize,
     genomic: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    applied: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    learned: Option<f32>,
 }
 
-/// The `graph_weights` payload: one entry per Graph node with a group, its
-/// scales and its members' genomic weights; `None` when no node carries a
-/// member.
+/// The `graph_weights` payload: one entry per Graph node with a group member
+/// or a plastic edge, its group scales and those edges' weights in canonical
+/// order; `None` when no node carries either.
 fn graph_weights(
     genome: &v3_core::creature::genome::CreatureGenome,
+    learned: &v3_core::runtime::plasticity::LearnedState,
 ) -> Option<Vec<NodeGraphWeights>> {
     let nodes: Vec<NodeGraphWeights> = genome
         .nodes
         .iter()
-        .filter_map(|node| {
+        .enumerate()
+        .filter_map(|(node_idx, node)| {
             let BackendDef::Graph(def) = &node.backend_def else {
                 return None;
             };
             let edges: Vec<EdgeGenomicWeight> = def
                 .edge_sites()
-                .filter(|&occurrence| def.edge_at(occurrence).membership().is_some())
-                .map(|occurrence| {
+                .filter_map(|occurrence| {
+                    let edge = def.edge_at(occurrence);
+                    let plastic = edge.plasticity().is_some();
+                    if !plastic && edge.membership().is_none() {
+                        return None;
+                    }
                     let (surface, container) = match occurrence.surface {
                         EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
                         EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
                     };
-                    EdgeGenomicWeight {
+                    Some(EdgeGenomicWeight {
                         surface,
                         container,
                         edge: occurrence.index,
                         genomic: def.genomic_weight(occurrence, &node.input_refs),
-                    }
+                        applied: plastic.then(|| {
+                            learned.applied_weight(node_idx, def, &node.input_refs, occurrence)
+                        }),
+                        learned: plastic
+                            .then(|| {
+                                learned
+                                    .edges(node_idx)
+                                    .find(|item| item.occurrence == occurrence)
+                                    .and_then(|item| item.learned)
+                            })
+                            .flatten(),
+                    })
                 })
                 .collect();
             (!edges.is_empty()).then(|| NodeGraphWeights {
@@ -468,7 +492,7 @@ pub async fn get_creature(
         graph_weights: if exclude.contains("graph_weights") {
             None
         } else {
-            graph_weights(&creature.genome)
+            graph_weights(&creature.genome, creature.graph_runtime.learned())
         },
         shared_memory: (!exclude.contains("shared_memory")).then(|| &creature.shared_memory[..]),
         action_log: (!exclude.contains("action_log")).then_some(action_log_entries),

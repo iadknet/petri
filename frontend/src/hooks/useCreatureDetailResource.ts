@@ -32,7 +32,9 @@ export function useCreatureDetailResource() {
 			const query: { since_tick?: number; exclude?: string } = {};
 			if (incremental && hasFullFetchRef.current && latestTickRef.current !== null) {
 				query.since_tick = latestTickRef.current;
-				query.exclude = "genome,graph_weights";
+				// `graph_weights` carries learned weights that move every tick
+				// (T25.F06), so polls exclude the genome only.
+				query.exclude = "genome";
 			}
 
 			try {

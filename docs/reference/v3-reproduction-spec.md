@@ -125,28 +125,32 @@ Constraints:
 
 ### Graph state
 
-- Newborn temporal state, eligibility traces, decayed trace bases, and dispatch
-  history start empty. Shared memory follows the separate memory rule above.
-- The final child's `plasticity.lamarckian` flag controls learned-weight
-  inheritance per compute node. False or absent plasticity leaves an empty
-  weight slice for lazy initialization from the child genome.
-- Eligible connections inherit available parent learned values by edge
-  occurrence through the entire birth mutation sequence, including mesh and
-  compute-node moves and faithful copies. Parent flags do not restrict this
-  transfer; a child flag mutation can enable inheritance of ordinary learning.
-- New or replaced connections, deleted sources, actual direct retargeting,
-  and explicit weight mutations use final child genomic weights. Index repairs
-  and faithful-copy remaps preserve correspondence. An identity split preserves
-  the consumer's learned weight; its new identity edge has no parent value.
-- If any input has an inherited value, materialize exactly one weight per final
-  input, using child genomic weights for missing values. If none has a value,
-  preserve lazy initialization. Never borrow another edge's value from a short
-  parent slice; parallel equal edges remain separate occurrences.
-- Inherited storage is independent. Birth adds no clamping and never writes
-  learned values into the child genome or changes the parent's state. The temporary
-  correspondence is the draft's `BirthSeeds`: reproduction captures them on the
-  child draft before mutation and the newborn's constructor consumes them, so a
-  built creature's genome carries none; runtime arrays do not define homology.
+- Newborn temporal state, eligibility traces (zero), visited flags and
+  dispatch history start empty. Shared memory follows the separate memory
+  rule above.
+- Before mutation the parent's learned state captures the draft's
+  `BirthSeeds` (T25.F06): nothing for a backend with no initialized plastic
+  edge, else one row per compute node and one per sink, each sized to its
+  inputs, a value per initialized plastic edge on either surface. Parent
+  flags do not restrict the capture.
+- Seeds follow their edge occurrence through the entire birth mutation
+  sequence, including mesh and compute-node moves and faithful copies, on
+  both surfaces: a pushed edge gets an empty seed at its insertion position
+  (the end of a sink's independent prefix), a removed edge loses its seed, a
+  group relocation or detach moves its members' (always empty) seeds with
+  them, and an identity split keeps the consumer's seed while the new
+  identity edge has none.
+- A weight write, a source-changing retarget and an edge reading a removed
+  compute node clear the seed; a same-source retarget, a kind change and a
+  learning-attribute change keep it.
+- The child's constructor reads the final child flags: a Lamarckian plastic
+  edge with a seed starts at the seed clamped by the child's edge clamp and
+  counts as initialized; every other plastic edge, a Darwinian one with a seed
+  included, starts at its child genomic weight, uninitialized until its
+  backend's first visit. Only seeded slots are initialized before that visit.
+- Reproduction writes no runtime field and never changes the parent's state;
+  a built creature's genome carries no seeds, and runtime arrays do not define
+  homology.
 
 ### Phenotype
 

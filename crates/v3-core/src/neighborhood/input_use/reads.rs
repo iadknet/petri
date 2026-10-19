@@ -10,7 +10,6 @@ use crate::config::RuntimeConfig;
 use crate::creature::genome::cgp::ComputeNodeKind;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
 use crate::runtime::mesh::MeshExecutionMode;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
@@ -116,7 +115,9 @@ impl GraphTracer for GraphReads<'_> {
 
     fn on_finish(&mut self, _: &[f32], _: bool) {}
 
-    fn on_effects(&mut self, _: CgpEffectsTrace) {
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+
+    fn on_effects(&mut self) {
         self.reads.insert(ReadEvent::Sinks { node: self.node });
     }
 }

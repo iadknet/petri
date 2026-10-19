@@ -238,16 +238,16 @@ impl GraphOperator {
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
             Self::CopyEdgeBundle => operators::can_copy_edge_bundle(def),
-            Self::EnableHebbian => hebbian::any_node(def, hebbian::can_enable_hebbian),
+            Self::EnableHebbian => hebbian::any_edge(def, hebbian::can_enable_hebbian),
             Self::DisableHebbian
             | Self::MutateHebbianRule
             | Self::MutateHebbianRate
-            | Self::ToggleHebbianLamarckian => hebbian::any_node(def, hebbian::is_plastic),
+            | Self::ToggleHebbianLamarckian => hebbian::any_edge(def, hebbian::is_plastic),
             Self::EnableRewardModulation => {
-                hebbian::any_node(def, hebbian::can_enable_reward_modulation)
+                hebbian::any_edge(def, hebbian::can_enable_reward_modulation)
             }
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
-                hebbian::any_node(def, hebbian::is_reward_modulated)
+                hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
             Self::AddRingGroup => group::can_add(def, input_refs),
             Self::AddDirectionPairGroup => group::can_add_pair(def, input_refs),

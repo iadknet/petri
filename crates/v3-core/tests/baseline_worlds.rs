@@ -176,10 +176,17 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 17059281914674739098). The hash without genome text is unchanged at the
 /// merge base and after the commit (default 13644968153452489784, rate 0.0
 /// 821082946294985330).
+/// Re-pinned by T25.F06 commit 2: `ComputeNode` loses its `plasticity`
+/// field, so the genome `Debug` text drops the node-level `plasticity: None`
+/// (default 2982706514543609827 -> 12573132385420804636, rate 0.0
+/// 17059281914674739098 -> 17936859635187403177). The hash without genome
+/// text is unchanged across the commit (default 13644968153452489784, rate
+/// 0.0 821082946294985330), as it is with mutation off (152334251919380938,
+/// rate 0.0 2951681092705485257).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 2982706514543609827);
-    assert_eq!(short_run_identity(Some(0.0)), 17059281914674739098);
+    assert_eq!(short_run_identity(None), 12573132385420804636);
+    assert_eq!(short_run_identity(Some(0.0)), 17936859635187403177);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

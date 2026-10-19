@@ -4,17 +4,17 @@ use std::mem::size_of;
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::cgp::BirthSeeds;
 use crate::creature::genome::mesh_annotations::{
     collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
     MeshReadClass,
 };
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmInstruction, OUTCOME_CHANNEL_COUNT,
-};
+use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction, OUTCOME_CHANNEL_COUNT};
 use crate::creature::identity::CreatureIdentityState;
-use crate::creature::newborn::take_plasticity_weights;
+use crate::creature::newborn::take_birth_seeds;
 use crate::creature::sensor_census::{creature_declared_world_inputs, creature_sensor_census};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
+use crate::runtime::plasticity::LearnedState;
 use crate::sensors::reads::WorldKeySet;
 
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
@@ -79,23 +79,14 @@ pub struct GraphRuntimeState {
     /// Last committed compute outputs (the last successful visit, this tick
     /// or earlier), held when a module is unvisited.
     pub node_outputs: Vec<Vec<f32>>,
-    /// Per-edge learned plasticity weights. Indexed as
-    /// `[mesh_node_idx][internal_node_idx][edge_idx]`.
-    /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
-    /// Uses `Box<[f32]>` since edge count per node is fixed after init.
-    pub plasticity_weights: Vec<Vec<Box<[f32]>>>,
+    /// The learned weights and traces of every plastic edge (T25.F06),
+    /// built once at construction by [`Self::for_genome`]; read through
+    /// [`Self::learned`].
+    pub(crate) learned: LearnedState,
     /// The genomic weight of every sink edge, built once at construction by
     /// [`Self::for_genome`] and read by the sink loop (T25.F03). Indexed as
     /// `[mesh_node_idx][sink_idx][edge_idx]`; a VM node's row is empty.
     pub(crate) sink_weights: Vec<Vec<Box<[f32]>>>,
-    /// Per-edge eligibility traces for reward-modulated plasticity.
-    /// Indexed as `[mesh_node_idx][internal_node_idx][edge_idx]`, parallel to
-    /// `plasticity_weights`.
-    /// Lazily initialized on first reward-modulated evaluation.
-    /// Uses `Box<[f32]>` since edge count per node is fixed after init.
-    /// Always reset (not inherited) on reproduction. Decays once per world
-    /// tick; every successful visit adds its activity (T19.F02).
-    pub eligibility_traces: Vec<Vec<Box<[f32]>>>,
     /// Scratch: prev_outputs buffer reused across graph evaluations.
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
@@ -111,23 +102,27 @@ pub struct GraphRuntimeState {
 }
 
 impl GraphRuntimeState {
-    /// Begin one world tick before any mesh visits, using the creature genome
-    /// nodes and the creature's current age: the dispatch record's age and
-    /// the once-per-world-tick eligibility decay. No internal state is
-    /// snapshotted; visits read and commit the live state (T19.F02).
-    pub fn begin_tick(&mut self, nodes: &[NodeGenome], age: u64) {
+    /// Begin one world tick before any mesh visits at the creature's current
+    /// age: the dispatch record's age and the once-per-world-tick eligibility
+    /// decay. No internal state is snapshotted; visits read and commit the
+    /// live state (T19.F02).
+    pub fn begin_tick(&mut self, age: u64) {
         self.dispatch_record.begin_tick(age);
-        crate::runtime::plasticity::traces::decay_eligibility_traces(
-            nodes,
-            &mut self.eligibility_traces,
-        );
+        self.learned.begin_tick();
     }
 
-    /// The only constructor (T25.F03): the runtime state of `genome`, with
-    /// the given compute-edge plasticity scaffold (the newborn's taken birth
-    /// seeds, or empty) and the sink weight table built from the genome.
+    /// The learned state's read-only view (T25.F06).
     #[must_use]
-    pub fn for_genome(genome: &CreatureGenome, plasticity_weights: Vec<Vec<Box<[f32]>>>) -> Self {
+    pub fn learned(&self) -> &LearnedState {
+        &self.learned
+    }
+
+    /// The only constructor (T25.F03, T25.F06): the runtime state of
+    /// `genome`, with the sink weight table and the learned state built from
+    /// the genome and `seeds` (mesh node `i`'s birth seeds at `seeds[i]`;
+    /// empty for a genome without inheritance).
+    #[must_use]
+    pub fn for_genome(genome: &CreatureGenome, seeds: Vec<Option<BirthSeeds>>) -> Self {
         let sink_weights = genome
             .nodes
             .iter()
@@ -139,9 +134,9 @@ impl GraphRuntimeState {
         Self {
             node_state: Vec::new(),
             node_outputs: Vec::new(),
-            plasticity_weights,
+            learned: LearnedState::for_genome(genome, &seeds),
             sink_weights,
-            eligibility_traces: Vec::new(),
+
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
@@ -313,9 +308,9 @@ impl CreatureState {
     }
 
     /// Create a new creature with zeroed prev_shared_memory and graph runtime
-    /// state that is empty apart from `plasticity_weights`, which the
-    /// constructor builds from the birth seeds it takes out of `genome`
-    /// (`creature::newborn`; empty for a seedless genome).
+    /// state whose learned state the constructor builds from the genome and
+    /// the birth seeds it takes out of `genome` (`creature::newborn`; none
+    /// for a seedless genome).
     /// Computes `cached_complexity` and `cached_genome_size` from the genome.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -330,8 +325,8 @@ impl CreatureState {
         identity: CreatureIdentityState,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
-        let plasticity_weights = take_plasticity_weights(&mut genome);
-        let graph_runtime = GraphRuntimeState::for_genome(&genome, plasticity_weights);
+        let seeds = take_birth_seeds(&mut genome);
+        let graph_runtime = GraphRuntimeState::for_genome(&genome, seeds);
         let cached_complexity = genome.complexity();
         let cached_genome_size = genome.genome_size();
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
@@ -384,7 +379,7 @@ impl CreatureState {
 
     /// Create a new creature with pre-computed cached fields.
     /// Used in the no-mutation reproduction fast path where the offspring
-    /// genome is identical to the parent's. Builds `plasticity_weights` from
+    /// genome is identical to the parent's. Builds the learned state from
     /// the birth seeds it takes out of `genome`, as [`Self::new`] does.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_cached_fields(
@@ -402,8 +397,8 @@ impl CreatureState {
         cached_genome_size: u32,
         cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
-        let plasticity_weights = take_plasticity_weights(&mut genome);
-        let graph_runtime = GraphRuntimeState::for_genome(&genome, plasticity_weights);
+        let seeds = take_birth_seeds(&mut genome);
+        let graph_runtime = GraphRuntimeState::for_genome(&genome, seeds);
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         let cached_live_vm_world_inputs =
@@ -542,8 +537,7 @@ mod tests {
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert!(state.graph_runtime.node_state.is_empty());
         assert!(state.graph_runtime.node_outputs.is_empty());
-        assert!(state.graph_runtime.plasticity_weights.is_empty());
-        assert!(state.graph_runtime.eligibility_traces.is_empty());
+        assert!(!state.graph_runtime.learned().has_learning());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);

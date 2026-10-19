@@ -1,8 +1,6 @@
 use super::support::*;
 use crate::contracts::{Direction, NodeId};
-use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction,
 };
@@ -27,7 +25,7 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
         }
         CognitiveClass::Stateful | CognitiveClass::Plasticity => {
             let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-            graph.append_compute_node(ComputeNode::new(
+            graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::DecayIntegrator(0.5),
                 vec![GraphEdge::new(
                     GraphSource::SharedMemory {

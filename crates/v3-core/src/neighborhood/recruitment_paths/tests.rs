@@ -1588,7 +1588,6 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
     backward.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Relu,
         vec![edge(GraphSource::ComputeNode(0))],
-        None,
     ));
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(backward)),
@@ -1619,8 +1618,9 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
         DestinationKind::GraphPureWithEffect
     );
     let mut plastic = pure;
-    plastic.set_node_plasticity(
-        0,
+    crate::creature::genome::cgp::test_support::set_surface_plasticity(
+        &mut plastic,
+        EdgeSurface::ComputeInput(0),
         Some(crate::creature::genome::PlasticityConfig {
             rule: crate::creature::genome::HebbianRule::Classic,
             learning_rate: 0.1,

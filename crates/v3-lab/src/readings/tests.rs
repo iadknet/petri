@@ -214,7 +214,6 @@ fn with_unread_family(genome: &CreatureGenome) -> CreatureGenome {
             },
             1.0,
         )],
-        None,
     ));
     genome
 }
@@ -596,22 +595,23 @@ fn a_genome_file_breaking_a_graph_invariant_is_refused() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// A genome file stored before T25.F05 (format 2, three creature families)
-/// or earlier is refused by the format guard (T25.F05).
+/// A genome file stored before T25.F06 (format 3, node-level plasticity),
+/// before T25.F05 (format 2, three creature families) or earlier is refused
+/// by the format guard (T25.F05, T25.F06).
 #[test]
 fn a_genome_file_of_an_earlier_format_is_refused() {
     let dir = std::env::temp_dir().join(format!("petri-lab-format-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("old.json");
-    assert_eq!(crate::summary::GENOME_FORMAT, 3);
-    for format in [1, 2] {
+    assert_eq!(crate::summary::GENOME_FORMAT, 4);
+    for format in [1, 2, 3] {
         let mut file =
             crate::GenomeFile::new(v3_core::creature::founder::v3alpha1_founder_genome());
         file.genome_format = format;
         std::fs::write(&path, serde_json::to_vec(&file).unwrap()).unwrap();
         let error = crate::GenomeFile::load(&path).unwrap_err();
         assert!(
-            format!("{error}").contains(&format!("genome_format {format} is not 3")),
+            format!("{error}").contains(&format!("genome_format {format} is not 4")),
             "{error}"
         );
     }
@@ -647,7 +647,7 @@ fn a_ring_read_only_through_a_group_is_causal() {
             .iter()
             .map(|compute| {
                 let inputs = compute.inputs.iter().copied().filter(&mut keep).collect();
-                ComputeNode::new(compute.kind, inputs, compute.plasticity)
+                ComputeNode::new(compute.kind, inputs)
             })
             .collect();
         let sinks = graph

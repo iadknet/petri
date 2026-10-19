@@ -218,17 +218,22 @@ fn effects(def: &CgpGraphBackendDef, refs: &[InputReference], source_memory: f32
     let mut memory = ramp(0.0);
     memory[15] = source_memory;
     let mut side = side();
-    let (result, _) = apply_cgp_graph_effects(
+    let (result, contribution) = apply_cgp_graph_effects(
+        &mut crate::runtime::cgp::execute::NoopTracer,
         def,
         &def.sink_weight_rows(refs),
         &[0.5; 3],
         refs,
         &ctx,
         &upstream,
-        &mut side,
+        None,
+        &mut Vec::new(),
+        &mut side.work_counters.shared_memory_writes_changed,
+        &mut side.action_params,
         &mut memory,
         &ramp(0.5),
     );
+    side.stage_vote_contribution(&contribution);
     Effects {
         result,
         side,
@@ -345,7 +350,7 @@ fn active_graph() -> CgpGraphBackendDef {
             trace_decay: 0.5,
         }),
     ] {
-        def.append_compute_node(ComputeNode::new(
+        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![edge(memory(0, false), 0.5)],
             Some(PlasticityConfig {
@@ -434,14 +439,6 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
     for state in &mut states {
         state.node_state = vec![vec![0.25, 0.75]];
         state.node_outputs = vec![vec![0.125, 0.5]];
-        state.plasticity_weights = vec![vec![
-            vec![0.375].into_boxed_slice(),
-            vec![0.625].into_boxed_slice(),
-        ]];
-        state.eligibility_traces = vec![vec![
-            vec![0.0].into_boxed_slice(),
-            vec![0.5].into_boxed_slice(),
-        ]];
     }
     let mut energies = [1000.0; 2];
     let mut memories = [ramp(0.5); 2];
@@ -450,7 +447,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         let mut outputs = Vec::new();
         for i in 0..2 {
             advance_shared_memory(&mut memories[i], &mut previous[i], 0.125);
-            states[i].begin_tick(&genomes[i].nodes, age);
+            states[i].begin_tick(age);
             // Direct visit checks the staged vote before mesh pass bookkeeping.
             let mut side = side();
             let node = &genomes[i].nodes[0];
@@ -508,10 +505,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         assert_eq!(previous[0], previous[1]);
         assert_eq!(states[0].node_state, states[1].node_state);
         assert_eq!(states[0].node_outputs, states[1].node_outputs);
-        assert_eq!(states[0].plasticity_weights, states[1].plasticity_weights);
-        assert_eq!(states[0].eligibility_traces, states[1].eligibility_traces);
+        assert_eq!(states[0].learned(), states[1].learned());
         assert_eq!(states[0].dispatch_record, states[1].dispatch_record);
-        assert_ne!(states[0].plasticity_weights[0][0][0], 0.375);
-        assert_ne!(states[0].eligibility_traces[0][1][0], 0.5);
     }
 }

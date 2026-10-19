@@ -22,7 +22,6 @@ use crate::mutation::graph::operators::{
     raw_field_mutation, split_existing_edge,
 };
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
@@ -150,7 +149,6 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                     },
                     0.6,
                 )],
-                None,
             ),
             ComputeNode::new(
                 ComputeNodeKind::WeightedSum,
@@ -164,12 +162,10 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                         -0.5,
                     ),
                 ],
-                None,
             ),
             ComputeNode::new(
                 ComputeNodeKind::DecayIntegrator(0.4),
                 vec![GraphEdge::new(GraphSource::ComputeNode(2), 0.3)],
-                None,
             ),
         ])
         .with_output_sinks(vec![
@@ -211,7 +207,7 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![
-            ComputeNode::new(
+            crate::creature::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::WeightedSum,
                 vec![GraphEdge::new(
                     GraphSource::InputLeaf {
@@ -231,7 +227,6 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
             ComputeNode::new(
                 ComputeNodeKind::Sigmoid,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.7)],
-                None,
             ),
         ])
         .with_output_sinks(vec![
@@ -498,7 +493,8 @@ impl GraphTracer for RecordingTracer {
     }
     fn on_pass_end(&mut self, _delta: f32) {}
     fn on_finish(&mut self, _curr_outputs: &[f32], _temporal_committed: bool) {}
-    fn on_effects(&mut self, _effects: CgpEffectsTrace) {}
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+    fn on_effects(&mut self) {}
 }
 
 impl RecordingTracer {

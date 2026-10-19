@@ -321,7 +321,6 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
                 },
                 1.0,
             )],
-            None,
         ));
         let surface = backend
             .sink_surface(OutputSinkKind::CustomOutput(0))

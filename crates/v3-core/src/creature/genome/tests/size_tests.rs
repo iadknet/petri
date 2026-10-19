@@ -91,7 +91,7 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(
                 nodes
                     .into_iter()
-                    .map(|inputs| ComputeNode::new(ComputeNodeKind::Add, inputs, None))
+                    .map(|inputs| ComputeNode::new(ComputeNodeKind::Add, inputs))
                     .collect(),
             );
             for (slot, inputs) in sinks {

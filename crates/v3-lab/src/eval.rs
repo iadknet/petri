@@ -244,15 +244,16 @@ fn blocked_fraction(blocked: u64, attempted: u64) -> f64 {
     }
 }
 
-/// `genome` with lifetime learning masked: every Graph compute node's
-/// `plasticity` set to `None` (the only lifetime-learning mechanism).
+/// `genome` with lifetime learning masked: every plastic edge on either
+/// surface made static (T25.F06; the only lifetime-learning mechanism).
 #[must_use]
 pub fn expressed(genome: &CreatureGenome) -> CreatureGenome {
     let mut masked = genome.clone();
     for node in &mut masked.nodes {
         if let BackendDef::Graph(graph) = &mut node.backend_def {
-            for compute in 0..graph.compute_nodes().len() {
-                graph.set_node_plasticity(compute, None);
+            let plastic: Vec<_> = graph.plastic_edges().map(|(site, _)| site).collect();
+            for site in plastic {
+                graph.edge_mut(site).set_plasticity(None);
             }
         }
     }
@@ -1424,17 +1425,25 @@ mod tests {
         let mut plastic = genome.clone();
         for node in &mut plastic.nodes {
             if let BackendDef::Graph(graph) = &mut node.backend_def {
-                for compute in 0..graph.compute_nodes().len() {
-                    graph.set_node_plasticity(
-                        compute,
-                        Some(v3_core::creature::genome::PlasticityConfig {
+                let compute: Vec<_> = graph
+                    .edge_sites()
+                    .filter(|site| {
+                        matches!(
+                            site.surface,
+                            v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(_)
+                        )
+                    })
+                    .collect();
+                for site in compute {
+                    graph.edge_mut(site).set_plasticity(Some(
+                        v3_core::creature::genome::PlasticityConfig {
                             rule: v3_core::creature::genome::HebbianRule::Classic,
                             learning_rate: 0.5,
                             weight_clamp: 5.0,
                             lamarckian: false,
                             modulation: None,
-                        }),
-                    );
+                        },
+                    ));
                 }
             }
         }

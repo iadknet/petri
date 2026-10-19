@@ -121,7 +121,6 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
             },
             1.0,
         )],
-        None,
     ));
     let surface = def.sink_surface(OutputSinkKind::WriteSlot(4)).unwrap();
     def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
@@ -175,7 +174,7 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                 for (tick, input) in [0.0, 1.0, 2.0, 0.0].into_iter().enumerate() {
                     let mut results = Vec::new();
                     for (i, g) in [&base, &grown].into_iter().enumerate() {
-                        states[i].begin_tick(&g.nodes, tick as u64);
+                        states[i].begin_tick(tick as u64);
                         let prev = memory[i];
                         results.push(crate::runtime::traced_mesh::execute_creature_mesh_traced(
                             g,
@@ -222,8 +221,8 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                             states[1].node_outputs.get(new_idx)
                         );
                         assert_eq!(
-                            states[0].plasticity_weights.get(old_idx),
-                            states[1].plasticity_weights.get(new_idx)
+                            states[0].learned().edges(old_idx).collect::<Vec<_>>(),
+                            states[1].learned().edges(new_idx).collect::<Vec<_>>()
                         );
                     }
                     let visited = op != TopologyOperator::AddRouteTarget || input > 0.0;

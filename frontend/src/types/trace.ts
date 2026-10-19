@@ -63,6 +63,8 @@ export interface GraphPassTrace {
 
 export interface GraphOutputSinkTrace {
 	wired: boolean;
+	/** Each edge's value times its applied weight, in sink order (T25.F06). */
+	weighted_inputs: number[];
 	weighted_sum: number;
 	applied: boolean;
 	applied_value: number;

@@ -29,7 +29,11 @@ export interface GroupScaleWeight {
 	genomic: number;
 }
 
-/** One member edge's genomic weight in `graph_weights` (T25.F03). */
+/**
+ * One member or plastic edge's weights in `graph_weights` (T25.F03,
+ * T25.F06): its genomic weight, and for a plastic edge the weight in force
+ * (`applied`) and, once initialized, its learned weight.
+ */
 export interface EdgeGenomicWeight {
 	surface: "compute" | "sink";
 	/** The compute node or sink index. */
@@ -37,6 +41,10 @@ export interface EdgeGenomicWeight {
 	/** The index within that container's inputs. */
 	edge: number;
 	genomic: number;
+	/** The weight in force; present for a plastic edge only. */
+	applied?: number;
+	/** The learned weight; present for an initialized plastic edge only. */
+	learned?: number;
 }
 
 /** One Graph node's entry in `graph_weights` (T25.F03). */
@@ -95,8 +103,9 @@ export interface CreatureDetail {
 	/** Present whenever `genome` is included in the response. */
 	mesh_annotations?: CreatureMeshAnnotation[];
 	/**
-	 * Member genomic weights per Graph node carrying an edge group; absent
-	 * when the creature has no member or via `exclude=graph_weights`.
+	 * Member and plastic-edge weights per Graph node carrying either,
+	 * refreshed on every poll; absent when the creature has neither or via
+	 * `exclude=graph_weights`.
 	 */
 	graph_weights?: NodeGraphWeights[];
 	/** Present unless excluded via `exclude=shared_memory` query parameter. */

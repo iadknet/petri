@@ -108,7 +108,7 @@ fn visit_with(
     let mut energy = energy_in;
     let mut side = MeshSideOutputs::new(4);
     let mut state = crate::creature::genome::cgp::test_support::runtime_for(def);
-    state.begin_tick(&[], 0);
+    state.begin_tick(0);
     let result = execute_graph_node(
         def,
         &input_refs(),
@@ -158,7 +158,7 @@ fn run_mesh(
         nodes,
     };
     let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
-    state.begin_tick(&genome.nodes, 0);
+    state.begin_tick(0);
     execute_creature_mesh(
         &genome,
         &sensors(),
@@ -357,7 +357,6 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
     stateful.append_compute_node(ComputeNode::new(
         ComputeNodeKind::DecayIntegrator(0.5),
         vec![leaf(1.0)],
-        None,
     ));
     wire(
         &mut stateful,
@@ -382,7 +381,7 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
         let mut memory_in = [0.0; 16];
         let mut energy = 100.0;
         for expected in [1.5, 2.25] {
-            state.begin_tick(&genome.nodes, 0);
+            state.begin_tick(0);
             let _ = execute_creature_mesh(
                 &genome,
                 &sensors(),
@@ -427,7 +426,7 @@ fn traced_zero_compute_visit_reports_its_wired_sinks() {
     let mut energy = 100.0;
     let mut side = MeshSideOutputs::new(4);
     let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
-    state.begin_tick(&[], 0);
+    state.begin_tick(0);
     let (result, trace) = execute_graph_node_traced(
         &def,
         &input_refs(),
@@ -547,7 +546,7 @@ proptest! {
     ) {
         let def = wired_def(surface, source, slot, weight);
         let mut with_dummy = def.clone();
-        with_dummy.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![], None));
+        with_dummy.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![]));
         let mut memory_in = [0.0; 16];
         memory_in[(slot % 16) as usize] = memory_value;
         let upstream = [1.0; OUTPUT_SLOT_COUNT];

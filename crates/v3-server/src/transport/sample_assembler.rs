@@ -209,6 +209,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                         .into_iter()
                         .map(|s| GraphOutputSinkTracePayload {
                             wired: s.wired,
+                            weighted_inputs: s.weighted_inputs,
                             weighted_sum: s.weighted_sum,
                             applied: s.applied,
                             applied_value: s.applied_value,
@@ -385,6 +386,7 @@ mod tests {
                         final_outputs: vec![1.0],
                         output_sinks: vec![GraphOutputSinkTrace {
                             wired: true,
+                            weighted_inputs: vec![1.0],
                             weighted_sum: 1.0,
                             applied: true,
                             applied_value: 1.0,

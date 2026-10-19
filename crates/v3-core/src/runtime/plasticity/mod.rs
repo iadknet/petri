@@ -1,19 +1,17 @@
-//! Plasticity system — weight adaptation for graph nodes at runtime.
+//! Plasticity system — per-edge weight adaptation at runtime (T25.F06).
 //!
 //! Submodules:
-//! - `hebbian`: pure Hebbian learning (unsupervised, 4 rules)
-//! - `traces`: eligibility trace management (reward-modulated nodes)
-//! - `reward`: reward-modulated learning pass (three-factor plasticity)
+//! - `rules`: the four Hebbian laws and the three-factor update
+//! - `learned`: the learned state built at birth, the visit's learner and
+//!   the read-only view
 
-pub(crate) mod hebbian;
-pub(crate) mod reward;
-pub(crate) mod traces;
+mod learned;
+pub(crate) mod rules;
+
+pub(crate) use learned::Learner;
+pub use learned::{LearnedEdge, LearnedState};
 
 use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
-
-// Re-export genome-layer types used by reward.rs and traces.rs tests.
-#[allow(unused_imports)]
-pub(crate) use crate::creature::genome::OutcomeChannel;
 
 /// Outcome signals computed per-creature per-tick for reward-modulated plasticity.
 ///

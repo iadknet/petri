@@ -67,16 +67,14 @@ const INTEGRATOR_THRESHOLD: f32 = 0.38;
 pub(super) fn integrator_pair() -> (CreatureGenome, CreatureGenome) {
     let edge = |source: u16| GraphEdge::new(GraphSource::ComputeNode(source), 1.0);
     let nodes = vec![
-        ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new(), None),
+        ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()),
         ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(INTEGRATOR_RATE),
             vec![edge(0)],
-            None,
         ),
         ComputeNode::new(
             ComputeNodeKind::Threshold(INTEGRATOR_THRESHOLD),
             vec![edge(1)],
-            None,
         ),
     ];
     (

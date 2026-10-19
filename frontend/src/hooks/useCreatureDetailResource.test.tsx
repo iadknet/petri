@@ -193,12 +193,29 @@ describe("useCreatureDetailResource", () => {
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(9);
 	});
 
-	it("keeps graph_weights from the initial load across polls that exclude it and clears it on a new selection", async () => {
+	it("replaces graph_weights on every poll, which excludes the genome only, and clears it on a new selection", async () => {
 		const graphWeights = [
 			{
 				node_id: 2,
 				scales: [{ group: 0, genomic: 0.5 }],
 				edges: [{ surface: "sink" as const, container: 65, edge: 0, genomic: 0.5 }],
+			},
+		];
+		// Learned weights move between polls (T25.F06).
+		const polledWeights = [
+			{
+				node_id: 2,
+				scales: [{ group: 0, genomic: 0.5 }],
+				edges: [
+					{
+						surface: "sink" as const,
+						container: 65,
+						edge: 1,
+						genomic: 0.5,
+						applied: 0.75,
+						learned: 0.75,
+					},
+				],
 			},
 		];
 		const {
@@ -208,6 +225,7 @@ describe("useCreatureDetailResource", () => {
 		} = {
 			...buildCreatureDetail(),
 			latest_tick: 2733,
+			graph_weights: polledWeights,
 		};
 		vi.mocked(api.getCreature)
 			.mockResolvedValueOnce({ ...buildCreatureDetail(), graph_weights: graphWeights })
@@ -233,9 +251,9 @@ describe("useCreatureDetailResource", () => {
 		expect(api.getCreature).toHaveBeenCalledTimes(2);
 		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({
 			since_tick: 2732,
-			exclude: "genome,graph_weights",
+			exclude: "genome",
 		});
-		expect(stored()).toEqual(graphWeights);
+		expect(stored()).toEqual(polledWeights);
 
 		act(() => {
 			useCreatureInspectorStore.getState().selectCreature(8);

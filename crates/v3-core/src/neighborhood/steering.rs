@@ -439,11 +439,7 @@ mod tests {
     /// founder-equivalent for the one-edge fixtures.
     fn graph_mover(scalar: u8) -> CreatureGenome {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(ComputeNode::new(
-            ComputeNodeKind::Constant(1.0),
-            Vec::new(),
-            None,
-        ));
+        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
         wire(
             &mut graph,
             VoteSink::Move(scalar),

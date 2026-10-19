@@ -114,44 +114,46 @@ the goal run reports whether sink edges become plastic at all.
 
 ## Implementation Tasks
 
-- [ ] Commit 1, text only: `GraphEdge::plasticity` (invariant 1's field,
+- [x] Commit 1, text only: `GraphEdge::plasticity` (invariant 1's field,
       getter, serde, `size_of` 36) with no writer; re-pin every genome-text
       hash (Inputs, Pins) with "the hash without genome text is unchanged"
       in each pin's comment; old → new in the readings file.
-- [ ] Tests first (Verification table), red against commit 1 where the API
+- [x] Tests first (Verification table), red against commit 1 where the API
       exists, otherwise beside their task.
-- [ ] Genome: delete the node field and its two setters; `EdgeMut::set_plasticity`;
+- [x] Genome: delete the node field and its two setters; `EdgeMut::set_plasticity`;
       `plastic_edges()`; `validate_graph` (invariants 1–2);
       `BirthSeeds::Rows { compute, sinks }` with every primitive aligned
       (invariant 8); the exhaustive destructuring test.
-- [ ] Runtime: `LearnedState` in `runtime::plasticity` (layout, slots,
+- [x] Runtime: `LearnedState` in `runtime::plasticity` (layout, slots,
       `from_seeds`, `capture`, `applied_weight`, the view, the visited flag);
       `for_genome` the only constructor; callers (`CreatureState::new*`,
       `newborn`, founder, battery, discovery, lab `eval.rs`, tests).
-- [ ] Executor: a learner parameter on `execute_graph_impl` and
+- [x] Executor: a learner parameter on `execute_graph_impl` and
       `apply_cgp_graph_effects`; samples; delete `ensure_*`,
       `effective_weight`, `collect_weighted_inputs_hebbian`, the replays and
       the `action_queue` clones; updates after effects in canonical order;
       scratch buffers in effects; sink `weighted_inputs` through the tracer.
-- [ ] Tick: `begin_tick` decay over the modulated slot list; Phase 2.5
+- [x] Tick: `begin_tick` decay over the modulated slot list; Phase 2.5
       iterates `sim.creatures.iter_mut()` directly (the per-tick id `Vec` and
       its borrow comment go: `sim.stats` is a disjoint field and the config
       read it guarded left with T25.F02) over initialized modulated slots
       keyed on the layout flag; the floor step unchanged; counters per
       invariant 12.
-- [ ] Reproduction: `capture()` replaces the storage clone and
+- [x] Reproduction: `capture()` replaces the storage clone and
       `capture_def_seeds`; `newborn` consumes `Rows { compute, sinks }`.
-- [ ] Operators: `hebbian.rs` on edges (predicates, `select_eligible` over
+- [x] Operators: `hebbian.rs` on edges (predicates, `select_eligible` over
       `edge_sites`, `applies_to`), draw tails ported.
-- [ ] Readers: companions, annotations, recruitment-paths v3,
+- [x] Readers: companions, annotations, recruitment-paths v3,
       mutation-effects v3, census through the view, lab `expressed()`.
-- [ ] Telemetry: the families, `metrics/tests.rs`, the dashboards check, the
+- [x] Telemetry: the families, `metrics/tests.rs`, the dashboards check, the
       three panels.
-- [ ] Bench: `PersistenceSample.plasticity_census`; the
-      `counter_definition_changes` entry.
-- [ ] Server and frontend: invariant 14, `PROTOCOL_VERSION`, `GENOME_FORMAT`.
-- [ ] Reference specs (readers table).
-- [ ] Re-pins listed in the readings file, one cause per commit; delete the
+- [ ] Bench: `PersistenceSample.plasticity_census` (done, kept in the v1
+      and v2 summaries); the `counter_definition_changes` entry in
+      `benchmark-series.json` (open: the build brief forbade editing the
+      stored series).
+- [x] Server and frontend: invariant 14, `PROTOCOL_VERSION`, `GENOME_FORMAT`.
+- [x] Reference specs (readers table).
+- [x] Re-pins listed in the readings file, one cause per commit; delete the
       lines of any proptest whose strategy changed from
       `proptest-regressions/` and commit new files.
 - [ ] Verification Plan: `cargo test -p v3-core --test viability` first,
@@ -160,7 +162,7 @@ the goal run reports whether sink edges become plastic at all.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core` and the frontend tests ->
+- [x] Focused tests: `cargo test -p v3-core` and the frontend tests ->
       results in the readings file; the table below names what each pins.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, every survivor resolved.

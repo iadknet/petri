@@ -36,7 +36,6 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
         def.append_compute_node(ComputeNode::new(
             ComputeNodeKind::Constant(-1.0),
             Vec::new(),
-            None,
         ));
         // Wire RouterGate(0) sink to CN0
         if let Some(sink) = def.sink_surface(OutputSinkKind::RouterGate(0)) {
@@ -139,16 +138,11 @@ fn graph_state_persists_across_ticks_e2e() {
     let state_def = {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         // CN0: Constant(1.0)
-        def.append_compute_node(ComputeNode::new(
-            ComputeNodeKind::Constant(1.0),
-            Vec::new(),
-            None,
-        ));
+        def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
         // CN1: DecayIntegrator(0.5) with input from CN0
         def.append_compute_node(ComputeNode::new(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            None,
         ));
         // Wire CustomOutput(0) sink to CN1
         if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(0)) {

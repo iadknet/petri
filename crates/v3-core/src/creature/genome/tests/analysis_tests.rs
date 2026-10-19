@@ -711,9 +711,8 @@ fn functional_complexity_excludes_dead_graph_nodes() {
                                 },
                                 1.0,
                             )],
-                            None,
                         ),
-                        ComputeNode::new(ComputeNodeKind::Sigmoid, vec![], None),
+                        ComputeNode::new(ComputeNodeKind::Sigmoid, vec![]),
                     ])
                     .with_output_sinks(vec![OutputSink::new(
                         OutputSinkKind::CustomOutput(0),

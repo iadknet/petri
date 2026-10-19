@@ -172,10 +172,9 @@ mod tests {
                             0.5,
                         ),
                     ],
-                    None,
                 ),
-                ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new(), None),
-                ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()),
+                ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new()),
             ])
             .with_output_sinks(vec![
                 OutputSink::new(

@@ -159,11 +159,10 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			meshAnnotations = detail.meshAnnotations;
 		}
 
-		// The full fetch carries the genome's weights (absent: no member);
-		// incremental polls exclude them and keep the stored value.
-		const graphWeights = detail.incremental
-			? state.staticDetail.graphWeights
-			: (detail.graphWeights ?? null);
+		// Every fetch carries the weights (absent: no member and no plastic
+		// edge), and learned weights move between polls (T25.F06), so each
+		// response replaces the stored value.
+		const graphWeights = detail.graphWeights ?? null;
 
 		let sharedMemory = state.runtimeSnapshot.sharedMemory;
 		if (detail.sharedMemory && (!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))) {

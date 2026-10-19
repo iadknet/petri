@@ -420,7 +420,7 @@ fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
     *graph = graph
         .clone()
         .with_compute_nodes(active.compute_nodes().to_vec());
-    graph.seed_birth(BirthSeeds::Rows(vec![vec![Some(0.75)], vec![Some(-0.5)]]));
+    graph.seed_compute_rows(vec![vec![Some(0.75)], vec![Some(-0.5)]]);
     let custom = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
     graph.push_edge(custom, edge(leaf(0, 0), 0.5));
     // Ring-like compute inputs and a shared-memory vote edge are not members.
@@ -444,7 +444,10 @@ fn refinement_preserves_compute_plasticity_birth_routes_and_nonvote_outputs() {
     );
     assert_eq!(old.compute_nodes(), new.compute_nodes());
     assert!(new.birth_seeds().is_some());
-    assert_eq!(old.birth_seeds(), new.birth_seeds());
+    assert_eq!(
+        old.birth_seeds().map(BirthSeeds::compute_rows),
+        new.birth_seeds().map(BirthSeeds::compute_rows)
+    );
     assert_eq!(before.nodes[0].targets, genome.nodes[0].targets);
     for (old, new) in old.output_sinks().iter().zip(new.output_sinks()) {
         if old.kind == OutputSinkKind::ActionVote(VoteSink::Eat) {

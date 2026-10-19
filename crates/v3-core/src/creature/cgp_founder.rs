@@ -49,7 +49,6 @@ pub(crate) fn build_cgp_founder_graph_with_thresholds(
             },
             1.0,
         )],
-        None,
     ));
 
     // CN1: age threshold gate.
@@ -65,7 +64,6 @@ pub(crate) fn build_cgp_founder_graph_with_thresholds(
             },
             1.0,
         )],
-        None,
     ));
 
     // CN2: can_reproduce = energy_gate * age_gate.
@@ -75,7 +73,6 @@ pub(crate) fn build_cgp_founder_graph_with_thresholds(
             GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
             GraphEdge::new(GraphSource::ComputeNode(1), 1.0),
         ],
-        None,
     ));
 
     // Wire CustomOutput(0) ← primary food on the current cell.
@@ -135,7 +132,7 @@ fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
 }
 
 fn compute(kind: ComputeNodeKind, inputs: Vec<GraphEdge>) -> ComputeNode {
-    ComputeNode::new(kind, inputs, None)
+    ComputeNode::new(kind, inputs)
 }
 
 /// Build the founder's decision graph (T19.F04 invariant 9). With

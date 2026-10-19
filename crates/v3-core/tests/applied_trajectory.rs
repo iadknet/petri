@@ -96,6 +96,16 @@
 //! b6aa8164..., gestation rate 0.0 e9374ffc... -> f251417b...); the guard
 //! digests hold, and with `mutation.per_unit_rate` 0 the sampled run is
 //! byte-identical (a93d6b87..., gestation rate 0.0 527a14e0...).
+//! Re-pinned by T25.F06 commit 2 after two agreeing runs: the plasticity
+//! operators draw one edge among edges on both surfaces, which changes every
+//! plasticity draw, and the hash reads the learned state's view in place of
+//! the deleted storage (empty for a creature without a plastic edge, where
+//! the retired birth scaffold serialized one empty row per compute node).
+//! The sampled digests move (b6aa8164... -> bc6cee03..., gestation rate 0.0
+//! f251417b... -> bde1dbeb...) and the rate-0.0 guard moves (0ec61ea2... ->
+//! a8ef1c4a...); the default guard holds. With `mutation.per_unit_rate` 0
+//! the sampled run without learned-state bytes is byte-identical across the
+//! commit (633e120e..., gestation rate 0.0 f49b5c17...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -107,11 +117,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "b6aa8164a1c22e130563cb4f085605cb67184fdbdbe9079fce782cf952c7f1d7"
+        "bc6cee0362ccb7664ca69f1fe064f2b096cb849d6c97720a6acb7d3638b3f995"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "f251417bc304254b5c3b6ce688301a34a0b053c471f83d6407a865c1b65d218d"
+        "bde1dbebec30e217c193f2462c706ce7c1e909ed00e2c4847fa03e8d433ffa27"
     );
 }
 
@@ -149,8 +159,8 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
                         creature.prev_shared_memory.map(f32::to_bits),
                         &creature.graph_runtime.node_state,
                         &creature.graph_runtime.node_outputs,
-                        &creature.graph_runtime.plasticity_weights,
-                        &creature.graph_runtime.eligibility_traces,
+                        learned_rows(creature, |edge| edge.learned),
+                        learned_rows(creature, |edge| edge.trace),
                     ))
                     .unwrap(),
                 );
@@ -188,7 +198,7 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "0ec61ea283f6747aaf3d0f5d0e284fe8307358e0388d3eaedc05f84b53f3cdc8"
+        "a8ef1c4a2db365f3223271ef6f0d49be3c7d9af9fa292691ee2b631e0fcb8df2"
     );
 }
 
@@ -223,4 +233,21 @@ fn applied_guard_digest(gestation_rate: Option<f32>) -> String {
         assert!(sim.stats.mutation_events_applied_total > 0);
     }
     hex::encode(hash.finalize())
+}
+
+/// One row per mesh node of `read` over its initialized plastic edges in
+/// canonical order, through the learned state's view (T25.F06): the learned
+/// values or the traces. Empty for a creature without a plastic edge, as the
+/// deleted storage serialized.
+fn learned_rows(
+    creature: &v3_core::creature::state::CreatureState,
+    read: impl Fn(&v3_core::runtime::plasticity::LearnedEdge) -> Option<f32>,
+) -> Vec<Vec<f32>> {
+    let learned = creature.graph_runtime.learned();
+    if !learned.has_learning() {
+        return Vec::new();
+    }
+    (0..creature.genome.nodes.len())
+        .map(|node| learned.edges(node).filter_map(|edge| read(&edge)).collect())
+        .collect()
 }

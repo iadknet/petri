@@ -304,11 +304,7 @@ pub(crate) fn add_disconnected_node(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    def.append_compute_node(ComputeNode::new(
-        random_compute_node_kind(rng),
-        Vec::new(),
-        None,
-    ));
+    def.append_compute_node(ComputeNode::new(random_compute_node_kind(rng), Vec::new()));
     Ok(())
 }
 
@@ -325,7 +321,6 @@ pub(crate) fn add_bootstrap_node(
     def.append_compute_node(ComputeNode::new(
         random_compute_node_kind(rng),
         vec![GraphEdge::new(source, rng.gen_range(-1.0f32..=1.0))],
-        None,
     ));
     Ok(())
 }
@@ -371,7 +366,7 @@ fn splittable_edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = EdgeO
 /// An identity `Add` node (weighted sum reproduces a single input exactly)
 /// without inputs: the node the split-edge form inserts or appends.
 fn identity_add_node() -> ComputeNode {
-    ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None)
+    ComputeNode::new(ComputeNodeKind::Add, Vec::new())
 }
 
 /// Remove a random compute node and remap all edges.
@@ -908,9 +903,8 @@ mod tests {
                 ComputeNode::new(
                     ComputeNodeKind::Add,
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    None,
                 ),
-                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
             ])
             .with_output_sinks(vec![
                 OutputSink::new(
@@ -1003,7 +997,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
@@ -1019,7 +1012,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::CustomOutput(0),
@@ -1040,7 +1032,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::CustomOutput(0),
@@ -1063,11 +1054,10 @@ mod tests {
     fn split_existing_edge_compute_consumer_inserts_and_remaps() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::Constant(0.25), Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Constant(0.25), Vec::new()),
                 ComputeNode::new(
                     ComputeNodeKind::Sigmoid,
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.75)],
-                    None,
                 ),
             ])
             .with_output_sinks(vec![OutputSink::new(
@@ -1112,7 +1102,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::DecayIntegrator(0.5),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                None,
             )])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
@@ -1140,7 +1129,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(0.5),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(vec![OutputSink::new(
                 OutputSinkKind::CustomOutput(0),
@@ -1221,11 +1209,7 @@ mod tests {
     #[test]
     fn copy_cgp_subgraph_too_small_is_skip() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::Add,
-                Vec::new(),
-                None,
-            )])
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
         assert!(copy_cgp_subgraph(&mut def, &mut rng).is_err());
@@ -1238,8 +1222,8 @@ mod tests {
         let dangling = || vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)];
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::Add, dangling(), None),
-                ComputeNode::new(ComputeNodeKind::Add, dangling(), None),
+                ComputeNode::new(ComputeNodeKind::Add, dangling()),
+                ComputeNode::new(ComputeNodeKind::Add, dangling()),
             ])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
@@ -1275,7 +1259,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                None,
             )])
             .with_output_sinks(Vec::new());
         let original = def.compute_nodes()[0].inputs[0].source();
@@ -1299,7 +1282,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                None,
             )])
             .with_output_sinks(Vec::new());
         let original_weight = 1.0f32;
@@ -1355,11 +1337,7 @@ mod tests {
     #[test]
     fn mutate_compute_param_no_parameterized_is_skip() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::Add,
-                Vec::new(),
-                None,
-            )])
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
         assert!(mutate_compute_param(&mut def, &mut rng).is_err());
@@ -1441,11 +1419,7 @@ mod tests {
     #[test]
     fn add_edge_reaches_the_vote_and_parameter_sinks() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.append_compute_node(ComputeNode::new(
-            ComputeNodeKind::Constant(1.0),
-            Vec::new(),
-            None,
-        ));
+        def.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
 
         let mut rng = test_rng();
         for _ in 0..200 {
@@ -1469,12 +1443,11 @@ mod tests {
         // mutates that edge's ComputeNode index.
         let def = CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new(), None),
-                ComputeNode::new(ComputeNodeKind::Negate, Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new()),
+                ComputeNode::new(ComputeNodeKind::Negate, Vec::new()),
                 ComputeNode::new(
                     ComputeNodeKind::Add,
                     vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-                    None,
                 ),
             ])
             .with_output_sinks(Vec::new());
@@ -1501,7 +1474,6 @@ mod tests {
                     },
                     1.0,
                 )],
-                None,
             )])
             .with_output_sinks(Vec::new());
         for seed in 0u64..64 {
@@ -1532,7 +1504,7 @@ mod tests {
         ];
         let def = CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
                 ComputeNode::new(
                     ComputeNodeKind::Add,
                     vec![
@@ -1552,7 +1524,6 @@ mod tests {
                             1.0,
                         ),
                     ],
-                    None,
                 ),
             ])
             .with_output_sinks(Vec::new());
@@ -1589,7 +1560,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                None,
             )])
             .with_output_sinks(Vec::new());
         let mut rng = test_rng();
@@ -1669,11 +1639,7 @@ mod tests {
     fn add_compute_node_reaches_all_three_forms_with_distinct_signatures() {
         fn fixture() -> CgpGraphBackendDef {
             CgpGraphBackendDef::new_with_fixed_outputs()
-                .with_compute_nodes(vec![ComputeNode::new(
-                    ComputeNodeKind::Negate,
-                    Vec::new(),
-                    None,
-                )])
+                .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Negate, Vec::new())])
                 .with_output_sinks(vec![OutputSink::new(
                     OutputSinkKind::ActionVote(VoteSink::Terminate),
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
@@ -2002,7 +1968,6 @@ mod tests {
             .with_compute_nodes(vec![ComputeNode::new(
                 ComputeNodeKind::Constant(0.5),
                 Vec::new(),
-                None,
             )])
             .with_output_sinks(Vec::new());
         assert_eq!(total_edge_count(&params_only), 0);
@@ -2019,9 +1984,8 @@ mod tests {
                 ComputeNode::new(
                     ComputeNodeKind::Add,
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    None,
                 ),
-                ComputeNode::new(ComputeNodeKind::Add, Vec::new(), None),
+                ComputeNode::new(ComputeNodeKind::Add, Vec::new()),
             ])
             .with_output_sinks(Vec::new());
         assert!(!has_parameterized_compute_node(&edges_only));
@@ -2120,7 +2084,7 @@ mod tests {
         ) {
             use proptest::prelude::*;
             let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes((0..compute)
-                    .map(|_| ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new(), None))
+                    .map(|_| ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new()))
                     .collect()).with_output_sinks(kinds.into_iter().map(sink).collect());
             let reference: Vec<EdgeSurface> = (0..compute)
                 .map(EdgeSurface::ComputeInput)

@@ -304,8 +304,8 @@ split exclusion (retired by T25.F02), and the mesh post-activation qualification
 required to be neutral when it fires *and* to reproduce its original when a
 later mutation runs it in the original's place. Learned-weight correspondence
 through such a copy follows T11.F09: birth-local available values move with each
-compute input occurrence through graph/mesh splices and faithful copies, including
-edge bundles. Rollback restores them with the genome. New/replaced backends or
+edge occurrence on either surface (T25.F06) through graph/mesh splices and
+faithful copies, including edge bundles. Rollback restores them with the genome. New/replaced backends or
 edges have no parent origin, even at a reused mesh ID or index. Source deletion,
 actual direct retargeting (including raw source-field changes), and explicit
 edge-weight mutation clear that edge's origin. Pure index repair and copy remaps
@@ -432,8 +432,9 @@ added/removed/retyped — only their edges are evolvable.
   the draw, so the
   operator selects only a module that has a parameterized compute node or a
   movable edge, and never skips after selecting one.
-- `CopyComputeNode` — a growth operator; inserts a faithful copy (kind,
-  inputs, plasticity) of one random compute node directly after its source
+- `CopyComputeNode` — a growth operator; inserts a faithful copy (kind and
+  inputs, each edge with its learning attributes) of one random compute node
+  directly after its source
   and nothing else. The copy reads whatever its source read and is read by
   nothing; no backlink is added, and inputs are never coin-flip cleared (a
   copy that should start disconnected is `AddComputeNode`'s disconnected
@@ -461,15 +462,26 @@ added/removed/retyped — only their edges are evolvable.
 - `CopyEdgeBundle` (copies one compute node's edge set onto another; the
   source is drawn from the nodes that have edges, and a graph with fewer than
   two compute nodes or no edge-bearing node is not an applicable target)
-- `EnableHebbian` (add `PlasticityConfig` to a non-plasticity compute node)
-- `DisableHebbian` (remove `PlasticityConfig` from a plasticity compute node)
-- `MutateHebbianRule` (change the `HebbianRule` variant)
-- `MutateHebbianRate` (perturb the `learning_rate`)
-- `ToggleHebbianLamarckian` (flip the `lamarckian` inheritance flag)
-- `EnableRewardModulation` (add `RewardModulationConfig` to a pure Hebbian node)
-- `DisableRewardModulation` (remove reward modulation from a modulated node)
-- `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
-- `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
+- The nine plasticity operators act on edges (T25.F06): each picks one edge
+  uniformly among the edges matching its predicate, in `edge_sites` order over
+  both surfaces (count-then-select, one draw), writes it through
+  `EdgeMut::set_plasticity`, and applies to a module when any edge matches. A
+  `ClearSlot` edge or a group member never matches. Weights and catalog
+  positions are unchanged; a learning attribute carries no genome unit.
+  Plasticity travels with its edge: retarget, split (the consumer keeps it,
+  the identity edge is static), `CopyComputeNode`, `CopySubgraph` and
+  `CopyEdgeBundle` copy it; `AddGraphEdge`, recruitment and group creation
+  push static edges; `RemoveGraphEdge` removes it with the edge.
+- `EnableHebbian` (a static, eligible edge: rule, rate `0.01..0.2`, clamp
+  `1.0..5.0`, Lamarckian coin)
+- `DisableHebbian` (a plastic edge: remove its `PlasticityConfig`)
+- `MutateHebbianRule` (a plastic edge: one of the other three rules)
+- `MutateHebbianRate` (a plastic edge: perturb `learning_rate`, kept in `[0, 1]`)
+- `ToggleHebbianLamarckian` (a plastic edge: flip the inheritance flag)
+- `EnableRewardModulation` (a pure Hebbian edge: a channel and decay `0.5..0.99`)
+- `DisableRewardModulation` (a modulated edge: remove its modulation)
+- `MutateRewardSource` (a modulated edge: one of the other three channels)
+- `MutateTraceDecay` (a modulated edge: perturb `trace_decay`, kept in `[0, 1]`)
 - `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled by
   `mutation.structured_heritable_refinement`, true by default since
   2026-10-12 (omitted means true).

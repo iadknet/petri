@@ -1381,17 +1381,22 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
 
 #[test]
 fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
-    use v3_core::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use v3_core::creature::genome::cgp::{
+        BirthSeeds, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+        GraphSource,
+    };
     use v3_core::creature::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
+    use v3_core::creature::state::GraphRuntimeState;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
     let config = small_config();
     let mut sim = simulation(&config);
-    // Give one founder's entry node, which is reachable, a plastic compute
-    // node whose learned weights have moved: one to its clamp, one by 0.25.
+    // Give one founder's entry node, which is reachable, a compute node with
+    // two Lamarckian plastic edges whose inherited weights have moved: one to
+    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized).
     let creature = sim.creatures.values_mut().next().unwrap();
     let entry = creature.cached_reachable_nodes[0];
     let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
@@ -1410,7 +1415,13 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Add,
         vec![edge(0, 0.5), edge(1, 0.0)],
-        Some(PlasticityConfig {
+    ));
+    for index in 0..2 {
+        def.edge_mut(EdgeOccurrence::new(
+            EdgeSurface::ComputeInput(compute),
+            index,
+        ))
+        .set_plasticity(Some(PlasticityConfig {
             rule: HebbianRule::Covariance,
             learning_rate: 0.1,
             weight_clamp: 1.0,
@@ -1419,39 +1430,78 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.5,
             }),
-        }),
-    ));
-    let learned = &mut creature.graph_runtime.plasticity_weights;
-    learned.resize_with(entry + 1, Vec::new);
-    learned[entry].resize_with(compute + 1, Default::default);
-    learned[entry][compute] = Box::new([1.0, 0.25]);
+        }));
+    }
+    let mut rows = BirthSeeds::Rows {
+        compute: def
+            .compute_nodes()
+            .iter()
+            .map(|node| vec![None; node.inputs.len()])
+            .collect(),
+        sinks: def
+            .output_sinks()
+            .iter()
+            .map(|sink| vec![None; sink.inputs.len()])
+            .collect(),
+    };
+    let BirthSeeds::Rows { compute: seeds, .. } = &mut rows;
+    seeds[compute] = vec![Some(1.0), Some(0.25)];
+    let mut node_seeds = vec![None; creature.genome.nodes.len()];
+    node_seeds[entry] = Some(rows);
+    creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
 
     let snapshot = &receiver.snapshots()[0];
-    let carried = [
-        ("petri.plasticity_rule", "covariance"),
-        ("petri.plasticity_learning", "reward_modulated"),
-        ("petri.plasticity_inheritance", "lamarckian"),
-    ];
-    let other = [
-        ("petri.plasticity_rule", "classic"),
-        ("petri.plasticity_learning", "hebbian"),
-        ("petri.plasticity_inheritance", "darwinian"),
-    ];
     let value =
         |name: &str, labels: &[(&str, &str)]| snapshot.value(name, labels).unwrap().as_f64();
+    let compute = [("petri.surface", "compute")];
+    let sink = [("petri.surface", "sink")];
     assert_eq!(value("petri.tick.plasticity_carriers", &[]), 1.0);
-    assert_eq!(value("petri.tick.plastic_edges", &carried), 2.0);
-    // |1.0 - 0.5| + |0.25 - 0.0|, exact in binary.
-    assert_eq!(value("petri.tick.plastic_edge_drift", &carried), 0.75);
-    assert_eq!(value("petri.tick.plastic_edges_at_clamp", &carried), 1.0);
-    for name in [
-        "petri.tick.plastic_edges",
-        "petri.tick.plastic_edge_drift",
-        "petri.tick.plastic_edges_at_clamp",
+    for (learning, surface, expected) in [
+        ("reward_modulated", "compute", 2.0),
+        ("reward_modulated", "sink", 0.0),
+        ("hebbian", "compute", 0.0),
+        ("hebbian", "sink", 0.0),
     ] {
-        assert_eq!(value(name, &other), 0.0, "{name}");
+        let labels = [
+            ("petri.plasticity_learning", learning),
+            ("petri.surface", surface),
+        ];
+        assert_eq!(
+            value("petri.tick.plastic_edges", &labels),
+            expected,
+            "{labels:?}"
+        );
     }
+    let rule = |key| [("petri.plasticity_rule", key)];
+    assert_eq!(
+        value("petri.tick.plastic_edges_by_rule", &rule("covariance")),
+        2.0
+    );
+    assert_eq!(
+        value("petri.tick.plastic_edges_by_rule", &rule("classic")),
+        0.0
+    );
+    let inheritance = |key| [("petri.plasticity_inheritance", key)];
+    assert_eq!(
+        value(
+            "petri.tick.plastic_edges_by_inheritance",
+            &inheritance("lamarckian")
+        ),
+        2.0
+    );
+    assert_eq!(
+        value(
+            "petri.tick.plastic_edges_by_inheritance",
+            &inheritance("darwinian")
+        ),
+        0.0
+    );
+    // |1.0 - 0.5| + |0.25 - 0.0|, exact in binary.
+    assert_eq!(value("petri.tick.plastic_edge_drift", &compute), 0.75);
+    assert_eq!(value("petri.tick.plastic_edges_at_clamp", &compute), 1.0);
+    assert_eq!(value("petri.tick.plastic_edge_drift", &sink), 0.0);
+    assert_eq!(value("petri.tick.plastic_edges_at_clamp", &sink), 0.0);
 }

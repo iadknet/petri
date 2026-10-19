@@ -44,16 +44,23 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
                     },
                     1.0,
                 )],
-                Some(PlasticityConfig {
-                    rule: HebbianRule::Classic,
-                    learning_rate: 0.1,
-                    weight_clamp: 1.0,
-                    lamarckian: false,
-                    modulation: None,
-                }),
             )])
             .with_output_sinks(vec![]),
     ));
+    let mut stateful_plastic = stateful_plastic;
+    if let BackendDef::Graph(def) = &mut stateful_plastic.nodes[0].backend_def {
+        def.edge_mut(v3_core::creature::genome::cgp::EdgeOccurrence::new(
+            v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+            0,
+        ))
+        .set_plasticity(Some(PlasticityConfig {
+            rule: HebbianRule::Classic,
+            learning_rate: 0.1,
+            weight_clamp: 1.0,
+            lamarckian: false,
+            modulation: None,
+        }));
+    }
     let mut inert = make(BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![],
@@ -460,7 +467,6 @@ fn temporal_report_keeps_substrate_counts_separate() {
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(0.0),
                         vec![],
-                        None,
                     )])
                     .with_output_sinks(vec![v3_core::creature::genome::cgp::OutputSink::new(
                         v3_core::creature::genome::cgp::OutputSinkKind::ActionVote(

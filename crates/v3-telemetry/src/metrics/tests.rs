@@ -692,29 +692,37 @@ fn tick_families(families: &mut Vec<Family>) {
             )],
         ));
     }
-    for field in [
-        "plastic_edges",
-        "plastic_edge_drift",
-        "plastic_edges_at_clamp",
-    ] {
-        families.push((
-            format!("petri.tick.{field}"),
-            Gauge,
-            vec![
-                (
-                    "petri.plasticity_rule",
-                    strings(["classic", "oja", "anti_hebb", "covariance"], str::to_owned),
-                ),
-                (
-                    "petri.plasticity_learning",
-                    strings(["hebbian", "reward_modulated"], str::to_owned),
-                ),
-                (
-                    "petri.plasticity_inheritance",
-                    strings(["darwinian", "lamarckian"], str::to_owned),
-                ),
-            ],
-        ));
+    // T25.F06: at most two attributes per plasticity family.
+    let surface = || ("petri.surface", strings(["compute", "sink"], str::to_owned));
+    families.push((
+        "petri.tick.plastic_edges".to_owned(),
+        Gauge,
+        vec![
+            (
+                "petri.plasticity_learning",
+                strings(["hebbian", "reward_modulated"], str::to_owned),
+            ),
+            surface(),
+        ],
+    ));
+    families.push((
+        "petri.tick.plastic_edges_by_rule".to_owned(),
+        Gauge,
+        vec![(
+            "petri.plasticity_rule",
+            strings(["classic", "oja", "anti_hebb", "covariance"], str::to_owned),
+        )],
+    ));
+    families.push((
+        "petri.tick.plastic_edges_by_inheritance".to_owned(),
+        Gauge,
+        vec![(
+            "petri.plasticity_inheritance",
+            strings(["darwinian", "lamarckian"], str::to_owned),
+        )],
+    ));
+    for field in ["plastic_edge_drift", "plastic_edges_at_clamp"] {
+        families.push((format!("petri.tick.{field}"), Gauge, vec![surface()]));
     }
 }
 

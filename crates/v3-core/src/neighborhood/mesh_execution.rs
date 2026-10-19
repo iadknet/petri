@@ -517,7 +517,6 @@ mod tests {
                 },
                 7.0,
             )],
-            None,
         ));
         let surface = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
         graph.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
@@ -1091,7 +1090,7 @@ mod tests {
         assert_eq!(reading(&g).knockout_count, 0);
         assert_eq!(reading(&g).backends.vm.contributing, 2);
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::WeightedSum, vec![], None));
+        graph.append_compute_node(ComputeNode::new(ComputeNodeKind::WeightedSum, vec![]));
         graph = graph.with_output_sinks(vec![OutputSink::new(
             OutputSinkKind::WriteSlot(0),
             vec![GraphEdge::new(
