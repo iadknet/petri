@@ -77,7 +77,8 @@
       "docs/progress/features/t25-f02-uniform-genome-size.json",
       "docs/progress/features/t25-f03-ring-groups-replace-ring-projections.json",
       "docs/progress/features/t25-f04-direction-pair-groups.json",
-      "docs/progress/features/t25-f05-nearby-creature-family.json"
+      "docs/progress/features/t25-f05-nearby-creature-family.json",
+      "docs/progress/features/t25-f06-learning-per-edge.json"
     ]
   },
   "goal": {
@@ -202,7 +203,8 @@
       "docs/progress/features/t25-f02-uniform-genome-size-goal.json",
       "docs/progress/features/t25-f03-ring-groups-replace-ring-projections-goal.json",
       "docs/progress/features/t25-f04-direction-pair-groups-goal.json",
-      "docs/progress/features/t25-f05-nearby-creature-family-goal.json"
+      "docs/progress/features/t25-f05-nearby-creature-family-goal.json",
+      "docs/progress/features/t25-f06-learning-per-edge-goal.json"
     ]
   },
   "goal_worlds_long": {
