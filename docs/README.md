@@ -8,6 +8,7 @@
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
 - [Edge groups and per-edge learning design, 2026-10-13](strategy/edge-groups-and-learning-design-2026-10-13.md) (companion to the T25 track: edges and edge groups as domain objects, learning per edge and group, the two mutation layers, boundaries and feature contracts)
+- [Learned-weight decay research, 2026-10-19](strategy/weight-decay-research-2026-10-19.md) (passive forgetting for plastic edges: decay toward the birth value, a heritable per-edge retention, the literature and a probe on the production law)
 - [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
 - [Mesh evolvability research, 2026-09-06](strategy/mesh-evolvability-research-2026-09-06.md) (companion to the T11 track; mesh-layer follow-up to the audit)
 - [Depth research, 2026-09-07](strategy/mesh-depth-research-2026-09-07.md) (companion to the T11 track; why a 281,405-tick run stalled, and the evidence for T11.F16 and T11.F17)
