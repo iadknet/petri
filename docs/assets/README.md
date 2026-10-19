@@ -17,7 +17,7 @@ headless Chromium (Playwright) at 1 CSS px per pixel; crops are noted per file.
 - The run was paused several times (near ticks 3,870, 12,906 and 13,289) to
   select creatures; the dashboards show those pauses as flat stretches.
 
-## `petri-creatures.gif` (hero animation)
+## `readme/hero.gif` (hero animation)
 
 - 960 × 540 px, 72 frames, 90 ms per frame, loops; 1:1 crop of the map at
   about 9.5 px per cell, in the region the snapshot API showed held the most
