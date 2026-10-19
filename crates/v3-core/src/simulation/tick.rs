@@ -1286,7 +1286,6 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
         // Floor energy at 0.0 — same invariant as Phase 2 action costs. Learning
         // is free (T25.F02), so the floor is its own step: it reaches exactly
         // the creatures with an outcome bank and a reward-modulated edge.
-
         let before = creature.energy;
         creature.energy = creature.energy.max(0.0);
         sim.stats.energy_flows.zero_floor_credit += applied_debit(creature.energy, before);

@@ -854,6 +854,16 @@ pub struct PlasticKeyRow {
     pub edges: u64,
 }
 
+impl PlasticKeyRow {
+    fn rows(keys: impl Iterator<Item = (&'static str, u64)>) -> Vec<Self> {
+        keys.map(|(key, edges)| Self {
+            key: key.to_owned(),
+            edges,
+        })
+        .collect()
+    }
+}
+
 /// The plasticity census of one checkpoint (T25.F06): living creatures,
 /// carriers, and the reachable plastic edges by (pathway, surface), by rule
 /// and by inheritance, every row always present.
@@ -870,58 +880,28 @@ impl PlasticityCensusBlock {
     /// Census the living population from post-tick state through the
     /// learned state's view; executes no brain.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        use v3_core::creature::plasticity_census::{
-            rule_key, PlasticityCensus, INHERITANCE_KEYS, LEARNING_KEYS, RULES, SURFACE_KEYS,
-        };
+        use v3_core::creature::plasticity_census::PlasticityCensus;
         let census = PlasticityCensus::observe(sim.creatures.values().map(|creature| {
             (
-                &creature.genome,
                 &*creature.cached_reachable_nodes,
                 creature.graph_runtime.learned(),
             )
         }));
-        let edges = LEARNING_KEYS
-            .iter()
-            .enumerate()
-            .flat_map(|(learning, &learning_key)| {
-                SURFACE_KEYS
-                    .iter()
-                    .enumerate()
-                    .map(move |(surface, &surface_key)| {
-                        let cell = census.edges[learning][surface];
-                        PlasticEdgeRow {
-                            learning: learning_key.to_owned(),
-                            surface: surface_key.to_owned(),
-                            edges: cell.edges,
-                            drift_sum: six(cell.drift_sum),
-                            at_clamp: cell.at_clamp,
-                        }
-                    })
-            })
-            .collect();
-        let rows = |keys: &mut dyn Iterator<Item = (&'static str, u64)>| {
-            keys.map(|(key, edges)| PlasticKeyRow {
-                key: key.to_owned(),
-                edges,
-            })
-            .collect()
-        };
         Self {
             creatures: census.creatures,
             carriers: census.carriers,
-            edges,
-            edges_by_rule: rows(
-                &mut RULES
-                    .iter()
-                    .map(|&rule| rule_key(rule))
-                    .zip(census.edges_by_rule),
-            ),
-            edges_by_inheritance: rows(
-                &mut INHERITANCE_KEYS
-                    .iter()
-                    .copied()
-                    .zip(census.edges_by_inheritance),
-            ),
+            edges: census
+                .cells()
+                .map(|(learning, surface, cell)| PlasticEdgeRow {
+                    learning: learning.to_owned(),
+                    surface: surface.to_owned(),
+                    edges: cell.edges,
+                    drift_sum: six(cell.drift_sum),
+                    at_clamp: cell.at_clamp,
+                })
+                .collect(),
+            edges_by_rule: PlasticKeyRow::rows(census.rule_counts()),
+            edges_by_inheritance: PlasticKeyRow::rows(census.inheritance_counts()),
         }
     }
 }

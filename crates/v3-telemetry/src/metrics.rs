@@ -24,9 +24,7 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::plasticity_census::{
-    rule_key, PlasticityCensus, INHERITANCE_KEYS, LEARNING_KEYS, RULES, SURFACE_KEYS,
-};
+use v3_core::creature::plasticity_census::PlasticityCensus;
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::energy_accounting::DeathCause;
@@ -173,13 +171,11 @@ impl Census {
                 .values()
                 .map(|c| (&c.genome, &*c.cached_reachable_nodes)),
         );
-        let plasticity = PlasticityCensus::observe(sim.creatures.values().map(|c| {
-            (
-                &c.genome,
-                &*c.cached_reachable_nodes,
-                c.graph_runtime.learned(),
-            )
-        }));
+        let plasticity = PlasticityCensus::observe(
+            sim.creatures
+                .values()
+                .map(|c| (&*c.cached_reachable_nodes, c.graph_runtime.learned())),
+        );
         Self {
             plasticity,
             sensors,
@@ -1048,28 +1044,11 @@ fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
         sampled,
         plasticity.carriers,
     );
-    let cells = || {
-        LEARNING_KEYS
-            .iter()
-            .enumerate()
-            .flat_map(move |(learning, &learning_key)| {
-                SURFACE_KEYS
-                    .iter()
-                    .enumerate()
-                    .map(move |(surface, &surface_key)| {
-                        (
-                            learning_key,
-                            surface_key,
-                            plasticity.edges[learning][surface],
-                        )
-                    })
-            })
-    };
     f.push(
         "petri.tick.plastic_edges".to_owned(),
         sampled,
         "",
-        cells().map(|(learning, surface, cell)| {
+        plasticity.cells().map(|(learning, surface, cell)| {
             (
                 vec![
                     ("petri.plasticity_learning", learning.to_owned()),
@@ -1083,58 +1062,39 @@ fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
         "petri.tick.plastic_edges_by_rule".to_owned(),
         sampled,
         "",
-        RULES
-            .iter()
-            .zip(plasticity.edges_by_rule)
-            .map(|(&rule, edges)| {
-                (
-                    vec![("petri.plasticity_rule", rule_key(rule).to_owned())],
-                    edges.into(),
-                )
-            }),
+        plasticity.rule_counts().map(|(rule, edges)| {
+            (
+                vec![("petri.plasticity_rule", rule.to_owned())],
+                edges.into(),
+            )
+        }),
     );
     f.push(
         "petri.tick.plastic_edges_by_inheritance".to_owned(),
         sampled,
         "",
-        INHERITANCE_KEYS
-            .iter()
-            .zip(plasticity.edges_by_inheritance)
-            .map(|(&inheritance, edges)| {
-                (
-                    vec![("petri.plasticity_inheritance", inheritance.to_owned())],
-                    edges.into(),
-                )
-            }),
+        plasticity.inheritance_counts().map(|(inheritance, edges)| {
+            (
+                vec![("petri.plasticity_inheritance", inheritance.to_owned())],
+                edges.into(),
+            )
+        }),
     );
-    let by_surface = |surface: usize| {
-        let (hebbian, reward) = (plasticity.edges[0][surface], plasticity.edges[1][surface]);
-        (
-            hebbian.drift_sum + reward.drift_sum,
-            hebbian.at_clamp + reward.at_clamp,
-        )
-    };
     f.push(
         "petri.tick.plastic_edge_drift".to_owned(),
         sampled,
         "",
-        SURFACE_KEYS.iter().enumerate().map(|(surface, &key)| {
-            (
-                vec![("petri.surface", key.to_owned())],
-                by_surface(surface).0.into(),
-            )
-        }),
+        plasticity
+            .surface_totals()
+            .map(|(key, drift, _)| (vec![("petri.surface", key.to_owned())], drift.into())),
     );
     f.push(
         "petri.tick.plastic_edges_at_clamp".to_owned(),
         sampled,
         "",
-        SURFACE_KEYS.iter().enumerate().map(|(surface, &key)| {
-            (
-                vec![("petri.surface", key.to_owned())],
-                by_surface(surface).1.into(),
-            )
-        }),
+        plasticity
+            .surface_totals()
+            .map(|(key, _, at_clamp)| (vec![("petri.surface", key.to_owned())], at_clamp.into())),
     );
 }
 
