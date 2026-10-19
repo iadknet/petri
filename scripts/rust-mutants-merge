@@ -1,0 +1,80 @@
+#!/bin/sh
+# Merges the shard outputs of one sharded scripts/rust-mutants run into one
+# output directory shaped like an unsharded run, then prints the survivors.
+#
+# Usage: rust-mutants-merge <out-dir> <shard-dir>...
+#
+# Each shard directory is one MUTANTS_OUT of scripts/rust-mutants run with
+# MUTANTS_SHARD=k/n. The merge refuses unless every shard 0..n-1 is present
+# exactly once, every shard ran fresh, and every shard mutated the same diff:
+# a missing or mismatched shard would silently drop mutants from the gate.
+# Like scripts/rust-mutants, survivors never fail this script.
+set -eu
+
+fail() { printf 'rust-mutants-merge: %s\n' "$*" >&2; exit 1; }
+
+[ "$#" -ge 2 ] || fail 'usage: rust-mutants-merge <out-dir> <shard-dir>...'
+out=$1
+shift
+
+total=''
+seen=' '
+first=''
+for dir do
+  [ -f "$dir/shard.txt" ] || fail "$dir has no shard.txt; not a sharded run"
+  [ "$(cat "$dir/run-mode.txt" 2>/dev/null)" = fresh ] || fail "$dir is not a fresh run"
+  shard=$(cat "$dir/shard.txt")
+  index=${shard%/*}
+  count=${shard#*/}
+  case "$index:$count" in
+    *[!0-9:]* | :* | *: | *:*:* | *:0) fail "$dir/shard.txt is not k/n: $shard" ;;
+  esac
+  [ "$index" -lt "$count" ] || fail "$dir/shard.txt is not k/n: $shard"
+  [ -z "$total" ] || [ "$count" = "$total" ] || fail "$dir is shard of $count, others of $total"
+  total=$count
+  case "$seen" in *" $index "*) fail "shard $index appears twice" ;; esac
+  seen="$seen$index "
+  if [ -z "$first" ]; then
+    first=$dir
+  else
+    cmp -s "$first/in-diff.patch" "$dir/in-diff.patch" || fail "$dir mutated a different diff than $first"
+  fi
+done
+[ "$#" -eq "$total" ] || fail "$# shards given, run has $total"
+index=0
+while [ "$index" -lt "$total" ]; do
+  case "$seen" in *" $index "*) ;; *) fail "shard $index/$total missing" ;; esac
+  index=$((index + 1))
+done
+
+mkdir -p "$out/mutants.out"
+cp "$first/in-diff.patch" "$out/in-diff.patch"
+printf 'fresh\n' >"$out/run-mode.txt"
+for outcome in caught missed timeout unviable; do
+  for dir do
+    file=$dir/mutants.out/$outcome.txt
+    [ ! -f "$file" ] || cat "$file"
+  done | LC_ALL=C sort >"$out/mutants.out/$outcome.txt"
+done
+
+lines() { wc -l <"$out/mutants.out/$1.txt" | tr -d ' '; }
+caught=$(lines caught)
+missed=$(lines missed)
+timeout=$(lines timeout)
+unviable=$(lines unviable)
+printf 'rust-mutants-merge: %s shards, %s mutants tested: %s missed, %s caught, %s unviable, %s timeouts\n' \
+  "$total" $((caught + missed + timeout + unviable)) "$missed" "$caught" "$unviable" "$timeout" |
+  tee "$out/summary.txt"
+printf 'rust-mutants-merge: output in %s\n' "$out/mutants.out"
+
+found=0
+survivors() {
+  file=$out/mutants.out/$1
+  [ -s "$file" ] || return 0
+  printf '\nrust-mutants-merge: %s (%s):\n' "$2" "$file"
+  cat "$file"
+  found=1
+}
+survivors missed.txt 'survivors: missed by every test'
+survivors timeout.txt 'survivors: timed out'
+[ "$found" -eq 1 ] || printf 'rust-mutants-merge: no survivors\n'

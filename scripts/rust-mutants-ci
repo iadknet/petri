@@ -1,0 +1,58 @@
+#!/bin/sh
+# Runs the fresh mutation gate for the committed feature branch on GitHub
+# Actions (.github/workflows/offload.yml): pushes the branch, dispatches the
+# sharded mutants task against the local merge base with main, waits for it,
+# and downloads the merged result. The output directory has the same shape as
+# a fresh scripts/rust-mutants run, so triage reads it the same way.
+#
+# CI mutates committed code only, so the working tree must be clean.
+# Iterative remediation (MUTANTS_ITERATE=1) stays local: make rust-mutants.
+#
+# Environment:
+#   MUTANTS_BASE  ref to diff against (default: merge base of HEAD and main)
+#   MUTANTS_OUT   output directory (default: the one scripts/rust-mutants uses,
+#                 so a later MUTANTS_ITERATE=1 pass reuses the CI results)
+#   MUTANTS_WATCH_INTERVAL  seconds between run status polls (default 60)
+set -eu
+
+fail() { printf 'rust-mutants-ci: %s\n' "$*" >&2; exit 1; }
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+[ -z "$(git status --porcelain)" ] || fail 'working tree is not clean; commit the feature code first'
+branch=$(git symbolic-ref --quiet --short HEAD) || fail 'HEAD is detached; check out the feature branch'
+[ "$branch" != main ] || fail 'run the gate from the feature branch, not main'
+base=$(git rev-parse "${MUTANTS_BASE:-$(git merge-base HEAD main)}^{commit}")
+[ -n "$(git diff "$base" HEAD)" ] || { printf 'rust-mutants-ci: no changes against %s; nothing to mutate\n' "$base"; exit 0; }
+head=$(git rev-parse HEAD)
+tool_root=${PETRI_TOOL_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}
+out=${MUTANTS_OUT:-$tool_root/mutants/$(basename "$root")}
+
+# The branch is the feature's own; a rebase since the last push replaces it.
+git push --quiet --force-with-lease origin "HEAD:refs/heads/$branch"
+dispatch=$(gh workflow run offload.yml --ref "$branch" -f task=mutants -f base="$base" 2>&1) \
+  || fail "dispatch failed: $dispatch"
+url=$(printf '%s\n' "$dispatch" | grep -Eo 'https://[^ ]+/actions/runs/[0-9]+' | tail -n 1)
+[ -n "$url" ] || fail "dispatch printed no run URL: $dispatch"
+run=${url##*/}
+[ "$(gh run view "$run" --json headSha -q .headSha)" = "$head" ] || fail "run $run is not on $head"
+printf 'rust-mutants-ci: fresh run of %s against %s: %s\n' "$head" "$base" "$url"
+
+status=0
+gh run watch "$run" --exit-status --interval "${MUTANTS_WATCH_INTERVAL:-60}" >/dev/null || status=$?
+[ "$status" -eq 0 ] || fail "run $run did not succeed (gh run view $run --log-failed); no gate result"
+
+rm -rf "$out"
+mkdir -p "$out"
+gh run download "$run" --name mutants --dir "$out"
+cat "$out/summary.txt"
+printf 'rust-mutants-ci: output in %s\n' "$out/mutants.out"
+found=0
+for outcome in missed:'missed by every test' timeout:'timed out'; do
+  file=$out/mutants.out/${outcome%%:*}.txt
+  [ -s "$file" ] || continue
+  printf '\nrust-mutants-ci: survivors: %s (%s):\n' "${outcome#*:}" "$file"
+  cat "$file"
+  found=1
+done
+[ "$found" -eq 1 ] || printf 'rust-mutants-ci: no survivors\n'

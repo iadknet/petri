@@ -1,0 +1,120 @@
+name: Offload
+
+# Runs a feature branch's benchmark profile or diff-scoped mutation gate on
+# GitHub-hosted runners so the closure gates do not hold local CPU.
+# The mutation gate is driven by scripts/rust-mutants-ci (make rust-mutants-ci);
+# a bench run is dispatched by hand:
+#   gh workflow run offload.yml --ref <branch> -f task=bench -f profile=<profile>
+# Results come back as run artifacts (gh run download).
+#
+# Runners are macos-15 arm64, the platform the pinned trajectory hashes were
+# recorded on: Linux x86_64 floating point changes them and fails the
+# unmutated baseline.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: bench or mutants
+        type: choice
+        options: [bench, mutants]
+        default: mutants
+      base:
+        description: mutants diff base commit (git merge-base HEAD main on the feature checkout)
+        type: string
+        default: ""
+      profile:
+        description: make bench PROFILE
+        type: choice
+        options: [gate, goal, goal-long]
+        default: goal
+      feature:
+        description: make bench FEATURE label
+        type: string
+        default: offload
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offload-${{ github.ref }}-${{ inputs.task }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    if: ${{ inputs.task == 'bench' }}
+    runs-on: macos-15
+    timeout-minutes: 360
+    env:
+      PROFILE: ${{ inputs.profile }}
+      FEATURE: ${{ inputs.feature }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with: { toolchain: 1.93.0 }
+      - run: sysctl -n machdep.cpu.brand_string hw.ncpu hw.memsize && df -h .
+      - run: make bench PROFILE="$PROFILE" FEATURE="$FEATURE" SUMMARY_OUT="$RUNNER_TEMP/bench/$FEATURE-$PROFILE.json" OUT="$RUNNER_TEMP/bench-raw"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() }}
+        with:
+          name: bench-${{ env.PROFILE }}
+          path: ${{ runner.temp }}/bench/
+          retention-days: 14
+
+  mutants:
+    if: ${{ inputs.task == 'mutants' }}
+    runs-on: macos-15
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with: { toolchain: 1.93.0 }
+      - run: cargo install --locked cargo-mutants --version 27.1.0
+      - name: Mutation shard
+        env:
+          BASE: ${{ inputs.base }}
+          MUTANTS_SHARD: ${{ matrix.shard }}/4
+          MUTANTS_JOBS: "1"
+        # The base is an input because origin/main can lag the local main the
+        # feature branched from, and a stale base mutates unrelated commits.
+        run: |
+          [ -n "$BASE" ] || { echo 'base input is required' >&2; exit 1; }
+          git merge-base --is-ancestor "$BASE" HEAD || { echo "base $BASE is not an ancestor of HEAD" >&2; exit 1; }
+          MUTANTS_BASE=$BASE MUTANTS_OUT="$RUNNER_TEMP/mutants" scripts/rust-mutants
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ always() }}
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/mutants/in-diff.patch
+            ${{ runner.temp }}/mutants/run-mode.txt
+            ${{ runner.temp }}/mutants/shard.txt
+            ${{ runner.temp }}/mutants/mutants.out/*.txt
+            ${{ runner.temp }}/mutants/mutants.out/outcomes.json
+          retention-days: 14
+
+  # Runs only when every shard finished: a cancelled or failed shard leaves
+  # the gate without a result rather than with a partial one.
+  mutants-merge:
+    needs: mutants
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: mutants-shard-*
+          path: ${{ runner.temp }}/shards
+      - run: scripts/rust-mutants-merge "$RUNNER_TEMP/mutants" "$RUNNER_TEMP"/shards/mutants-shard-*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutants
+          path: ${{ runner.temp }}/mutants/
+          retention-days: 14

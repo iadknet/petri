@@ -55,7 +55,7 @@ run_mutants() {
   (unset MUTANTS_ITERATE
     cd "$test_root/repo" && env PATH="$test_root/bin:$PATH" \
     MUTANTS_BASE="$base" MUTANTS_OUT="$test_root/output with spaces" \
-    MUTANTS_JOBS=2 MUTANTS_TIMEOUT='' BENCH_WAIT_TIMEOUT=0 STUB_CARGO_STATUS=0 \
+    MUTANTS_JOBS=2 MUTANTS_TIMEOUT='' MUTANTS_SHARD='' BENCH_WAIT_TIMEOUT=0 STUB_CARGO_STATUS=0 \
     "$@" sh "$script_dir/rust-mutants") >"$test_root/log" 2>&1 || status=$?
 }
 
@@ -78,6 +78,18 @@ grep -Fx -- '40' "$test_root/args" >/dev/null || fail 'timeout lost'
 grep -F 'not closure evidence' "$test_root/log" >/dev/null || fail 'cache caveat missing'
 grep -F 'fresh run required' "$test_root/log" >/dev/null || fail 'empty incremental pass looked final'
 [ "$(cat "$test_root/output with spaces/run-mode.txt")" = incremental ] || fail 'incremental mode not recorded'
+
+# A shard passes through to cargo-mutants; an unsharded run passes none.
+reset_fixture
+run_mutants MUTANTS_SHARD=3/8
+[ "$status" -eq 0 ] || fail 'sharded run failed'
+grep -Fx -- '--shard' "$test_root/args" >/dev/null || fail 'shard flag missing'
+grep -Fx -- '3/8' "$test_root/args" >/dev/null || fail 'shard value lost'
+[ "$(cat "$test_root/output with spaces/shard.txt")" = 3/8 ] || fail 'shard not recorded'
+reset_fixture
+run_mutants
+grep -Fx -- '--shard' "$test_root/args" >/dev/null && fail 'unsharded run passed a shard'
+[ ! -e "$test_root/output with spaces/shard.txt" ] || fail 'stale shard record kept'
 
 # A normal invocation after an incremental one must still be fresh.
 reset_fixture

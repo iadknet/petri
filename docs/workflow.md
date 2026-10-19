@@ -45,8 +45,9 @@ fires for `PETRI_COMPILE_CHECK_COOLDOWN` seconds (15); a failure never does. It
 is feedback, not a gate: a breaking edit that ends a burst inside the cooldown
 is caught by `make check`.
 `make rust-mutants` runs cargo-mutants (installed through aqua's local
-registry) on the feature diff; it is deliberately outside `make check` and the
-stop gate, because its output is a survivor list to triage, not a score.
+registry) on the feature diff, and `make rust-mutants-ci` runs the same fresh
+run sharded on GitHub Actions; both are deliberately outside `make check` and
+the stop gate, because their output is a survivor list to triage, not a score.
 The benchmark and mutation specialists run sequentially and never alongside
 each other or competing builds, tests, servers, or measurements.
 
@@ -350,12 +351,21 @@ only scope is this gate, its test-only triage, and the spec's Verification
 record. Give it the worktree and spec paths, feature ID, final-review result,
 and only the spec's Verification and Notes for AI Agents sections.
 
-The gate is a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
-The target diffs the worktree (committed, uncommitted, and untracked) against
-its merge base with `main`,
-runs `cargo mutants --in-diff` with the caps in `.cargo/mutants.toml`, writes
-its output under `~/.local/share/petri-tools/mutants/<worktree>/`, and prints
-every survivor: mutants missed by every test and mutants that timed out. The
+The gate is a fresh `make rust-mutants-ci` on the committed feature branch. It
+requires a clean tree, pushes the branch to `origin`, and dispatches the
+Offload workflow (`.github/workflows/offload.yml`) against the local merge
+base with `main`, passed explicitly because `origin/main` may lag it. Four
+macOS shards run `scripts/rust-mutants`, `scripts/rust-mutants-merge` refuses a
+result unless every shard finished fresh on the same diff, and the target
+downloads the merged output to `~/.local/share/petri-tools/mutants/<worktree>/`,
+where a later `MUTANTS_ITERATE=1` pass reuses it. A run that fails or is
+cancelled produces no result and is not a fresh run; dispatch it again. When
+Actions is unavailable, the gate is a local fresh `make rust-mutants`
+(`MUTANTS_ITERATE=0`, the default), recorded as such in the spec.
+Either target diffs against the merge base with `main` (the local one also
+includes uncommitted and untracked files), runs `cargo mutants --in-diff` with
+the caps in `.cargo/mutants.toml`, and reports every survivor: mutants missed
+by every test and mutants that timed out. The
 diff limits where mutations are generated; each viable mutant invokes the
 affected package's unfiltered test suite, including integration tests and
 doctests. Test filtering and reducing property-test case counts are not part of
@@ -800,7 +810,8 @@ the full suite was just run on the same code), and commit. Then:
    rebase and its re-verification. Stop and report only when the conflicts
    cannot be resolved on the feature's own terms or the re-verification fails.
 3. `git worktree remove .claude/worktrees/<tnn-fnn>` and
-   `git branch -d worktree-<tnn-fnn>`.
+   `git branch -d worktree-<tnn-fnn>`; if the mutation gate pushed it, also
+   `git push origin --delete worktree-<tnn-fnn>`.
 4. Show `git status`, `git worktree list`, and the worktree's `make check`
    result with its tested commit in your own message, so the goal evaluator can
    see them. Do not rerun `make check` on `main`.
@@ -809,7 +820,9 @@ Executing a user-pasted goal authorizes local branch, worktree, and commit
 creation, rebasing the feature branch onto `main`, the fast-forward of `main`,
 and removal of the completed feature's worktree and branch. Merely reading or
 editing this workflow grants no such authorization. It does **not** authorize
-pushing, opening or updating a pull request, or any other remote mutation.
+pushing, opening or updating a pull request, or any other remote mutation,
+except that `make rust-mutants-ci` pushes the feature branch for the mutation
+gate and closure deletes that remote branch.
 
 ### Cost record
 

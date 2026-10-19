@@ -17,6 +17,8 @@
 #   MUTANTS_JOBS     parallel cargo-mutants jobs (default 2)
 #   MUTANTS_TIMEOUT  fixed per-mutant test timeout in seconds (default: the
 #                    automatic timeout capped by .cargo/mutants.toml)
+#   MUTANTS_SHARD    k/n runs only shard k of n (CI matrix); every shard must
+#                    see the same diff and the same n
 #   MUTANTS_ITERATE  1 reuses caught/unviable results while adding tests;
 #                    0 (default) runs fresh, as required for feature closure
 #   MUTANTS_OUT      output directory (default: under PETRI_TOOL_ROOT)
@@ -56,6 +58,7 @@ fi
 
 set -- --in-diff "$out/in-diff.patch" --output "$out" --jobs "${MUTANTS_JOBS:-2}"
 [ -z "${MUTANTS_TIMEOUT:-}" ] || set -- "$@" --timeout "$MUTANTS_TIMEOUT"
+[ -z "${MUTANTS_SHARD:-}" ] || set -- "$@" --shard "$MUTANTS_SHARD"
 [ "$iterate" -eq 0 ] || set -- "$@" --iterate
 # Never start a second mutation run on this host: two runs thrash the CPU and
 # memory budget cargo-mutants already saturates, and the slower one times out
@@ -65,6 +68,12 @@ set -- --in-diff "$out/in-diff.patch" --output "$out" --jobs "${MUTANTS_JOBS:-2}
 BENCH_WAIT_BLOCKERS=mutants "$script_dir/bench-wait" true
 mkdir -p "$out"
 cp "$diff_file" "$out/in-diff.patch"
+# scripts/rust-mutants-merge reads shard.txt to prove every shard is present.
+if [ -n "${MUTANTS_SHARD:-}" ]; then
+  printf '%s\n' "$MUTANTS_SHARD" >"$out/shard.txt"
+else
+  rm -f "$out/shard.txt"
+fi
 if [ "$iterate" -eq 1 ]; then
   printf 'incremental\n' >"$out/run-mode.txt"
   printf 'rust-mutants: incremental remediation; prior caught/unviable results may be reused; not closure evidence\n'

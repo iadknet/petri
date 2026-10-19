@@ -32,9 +32,12 @@ review the feature, decide scope, consult the advisor, or spawn subagents.
 - Read `AGENTS.md`, the "Mutation gate" section of `docs/workflow.md`, and only
   the named Verification and Notes for AI Agents sections of the feature spec.
 - Work only in the assigned feature worktree. Preserve user changes and do not
-  push, merge, create a pull request, or edit `main`.
-- Run the fresh `MUTANTS_ITERATE=0 make rust-mutants` gate after review and
-  post-review remediation. Follow the workflow's one-fresh-run rule, permitted
+  push (except through `make rust-mutants-ci`), merge, create a pull request,
+  or edit `main`.
+- Run the fresh `make rust-mutants-ci` gate on the committed feature branch
+  after review and post-review remediation (run it in the background; it waits
+  for the CI run), or the local `MUTANTS_ITERATE=0 make rust-mutants` when
+  Actions is unavailable. Follow the workflow's one-fresh-run rule, permitted
   iterative feedback, second-run condition, and absolute third-run limit.
 - Resolve survivors only by adding or strengthening tests, classifying an
   equivalent mutant with a one-sentence observable-behavior reason, or recording
