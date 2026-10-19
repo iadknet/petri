@@ -103,10 +103,9 @@ file records no current answer.
 reordered rows in a track roadmap or `docs/roadmap.md`, or a change to a
 feature's dependencies or to the master's priority order, run one fresh read-only
 Codex Sol `high` job through the Codex channel applying `$plan-design-review` to
-the changed rows and any design note they cite: decomposition of the rows into
-features, their order and dependencies, domain boundaries, the step-back
-challenge, and the premises they inherit. Record its findings and dispositions
-in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
+the changed rows and any design note they cite, with all six of the skill's
+checks and its coverage section. Record the coverage table, findings and
+dispositions in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
 `step-back:` and premise findings go to the user before the rows are committed.
 
 **Concurrent sessions.** Before launching, inspect `git worktree list` for
@@ -218,10 +217,18 @@ one resumes.
 Codex Sol `high` job through the Codex channel, whose brief names the spec
 path, the original requirement, the roadmap contract, the feature's track row,
 dependency rows, and matching Notes entries. Round 1 is the design round: it
-applies `$plan-design-review` only, to the decomposition of the components and
-of the implementation tasks, the domain boundaries, the step-back challenge, and
-the premises the spec inherits from earlier features and existing code, and it
-checks that the declared preparatory refactors leave no unmarked workaround.
+applies `$plan-design-review` only and runs all six of its checks, namely code
+decomposition, task decomposition, domain boundaries and separation of concerns,
+outdated or never-correct premises, a larger design flaw (step back), and
+workarounds that should be refactors. The brief supplies the spec owner's
+`$refactor-audit` table for check 6 to test, not to trust, and requires the
+skill's full report: the coverage section, with one line per check naming what
+was examined, any `step-back:` lines, the assumptions and workaround tables, and
+the `Could not verify:` list; the brief overrides only the severity labels
+(`blocking:` and `advisory:`) and adds the verdict line. A round-1 output that
+lacks a check's coverage line is incomplete: the spec owner replaces it with a
+fresh round-1 job, which does not count as a round, rather than dispositioning
+it.
 Round 2 is the readiness round: it applies `$spec-review`, confirms the round-1
 dispositions, and asks Codex to break confidence that the spec is ready to
 implement. Its attack surface is contradiction with the roadmap row or
@@ -246,7 +253,9 @@ blocking finding remains that Codex upholds. A blocking finding Codex
 still upholds after round 3, or a new one first raised in round 3, is an
 unresolved requirement: the spec owner reports it, and it follows the blocker
 rule when only the user can settle it. Advisory findings are adopted or dropped
-at the spec owner's judgment. The findings and dispositions of every round go
+at the spec owner's judgment. Round 1's coverage section is copied into
+`docs/progress/readings/<id>.md` as a six-row table (check, verdict, what was
+examined, finding references or why it is clear). The findings and dispositions of every round go
 in one table in `docs/progress/readings/<id>.md`, never in the spec; the spec
 carries only the
 resulting requirements. Quote the spec owner's agent name or ID in your own
@@ -426,15 +435,18 @@ roadmap.
 
 Every brief gives the worktree path, the feature ID and the spec path, and
 asks for one finding per line starting `P1:`, `P2:`, or `P3:` with file, line,
-issue, and smallest fix, followed by what it could not verify. The design brief
-also allows ungraded `step-back:` lines, listed first. The design and
+issue, and smallest fix, followed by what it could not verify. The design and
+code-health briefs also require their skill's coverage section, one line per
+check with what was examined, listed first; the design brief also allows
+ungraded `step-back:` lines after it. A report missing a coverage line is
+incomplete and that lens is rerun. The design and
 code-health briefs tell Codex to start from the diff's code hunks and not to
 read the touched `docs/` files, the workflow documents, the roadmap row or the
 telemetry template: those are the correctness lens's inputs,
 and reading them in every job multiplies the cost. No reviewer edits, runs
 builds or tests, or consults the spec owner. Do not reuse a spec challenge
-thread for a review. Quote each output file path and the findings in your own
-message.
+thread for a review. Quote each output file path, the findings and the
+design and code-health coverage lines in your own message.
 
 Only a P1 finding blocks progress. The design lens raises P1 only for a
 breach of a boundary `AGENTS.md` or the checklist's Petri boundaries list
