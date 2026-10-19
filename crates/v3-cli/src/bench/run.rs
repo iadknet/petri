@@ -17,6 +17,7 @@ use super::profiles::{
     build_config, goal_case, goal_recipes_for, is_goal_world_set, profile_block, GoalCase,
     GoalRecipe, NeighborhoodSizes, ProfileParams, SCHEMA_VERSION,
 };
+use super::progress::{Progress, INTERVAL};
 use super::ring_rules::{undefined_ring_rules, RingRules};
 use super::schema::{
     ratio, timed_recruitment_paths, undefined_neighborhood_read, Deterministic, DriftDepth,
@@ -143,6 +144,17 @@ pub(super) struct NeighborhoodObservation<'a> {
     )>,
 }
 
+fn final_complexities(sim: &v3_core::simulation::Simulation) -> Vec<u32> {
+    sim.creatures
+        .values()
+        .map(|c| functional_complexity(&c.genome))
+        .collect()
+}
+
+fn tick_line(seed: u64, tick: u64, horizon: u64, population: u64) -> String {
+    format!("seed {seed} tick {tick}/{horizon} population {population}")
+}
+
 /// `recipe` names the goal case's recipe on the world set; the seed's
 /// telemetry run records it (T21.F06).
 pub(super) fn run_one_seed(
@@ -165,10 +177,12 @@ pub(super) fn run_one_seed(
     let mut persistence = PersistenceAccumulator::new(horizon, sim.creatures.len() as u64);
 
     let mut ticks_executed: u64 = 0;
+    let mut progress = Progress::new(INTERVAL);
     for _ in 0..horizon {
         run_tick(&mut sim, &mut None);
         ticks_executed += 1;
         let population = sim.creatures.len() as u64;
+        progress.log_if_due(|| tick_line(seed, ticks_executed, horizon, population));
         persistence.observe(
             sim.tick,
             population,
@@ -207,11 +221,7 @@ pub(super) fn run_one_seed(
     };
     #[cfg(feature = "telemetry")]
     crate::telemetry::end_seed(telemetry_run, sim.tick, &per_seed);
-    let complexities: Vec<u32> = sim
-        .creatures
-        .values()
-        .map(|c| functional_complexity(&c.genome))
-        .collect();
+    let complexities = final_complexities(&sim);
     let goal_observation = observe_goal_indicators.then(|| {
         let observation_started = Instant::now();
         let actions = observe_final_actions(&sim);
@@ -476,6 +486,12 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     // computed outside the per-seed loop and timed separately from every
     // per-seed wall-clock field.
     let run_neighborhood = !world_set && (params.name == "gate" || observe_goal_indicators);
+    let progress = Progress::new(INTERVAL);
+    let cases = params.seeds.len();
+    progress.log(&format!(
+        "profile {}: {cases} run(s) of {} ticks",
+        params.name, params.ticks
+    ));
     let neighborhood_battery =
         run_neighborhood.then(|| Battery::generate(config.world.food.types.len()));
     let neighborhood_founder_start = Instant::now();
@@ -490,6 +506,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         // `recipes` is empty off the world set and exactly one entry per seed
         // on it, so this pairs each seed with its own world and never falls
         // back to the shared config for a world-set case.
+        progress.log(&format!("run {}/{cases} seed {seed}: preparing", index + 1));
         let case = recipes.get(index).map(|recipe| {
             prepare_goal_case(
                 params,
@@ -516,6 +533,10 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                     .and_then(|case| case.drift_cohort.as_ref())
                     .map(|drift| (drift, params.mutation_effects)),
             });
+        progress.log(&format!(
+            "run {}/{cases} seed {seed}: simulating",
+            index + 1
+        ));
         let run = run_one_seed(
             case_config,
             seed,
@@ -524,6 +545,12 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             neighborhood,
             case.as_ref().map(|case| case.case.recipe_path.as_str()),
         );
+        progress.log(&format!(
+            "run {}/{cases} seed {seed}: done, {} ticks, final population {}",
+            index + 1,
+            run.per_seed.ticks,
+            run.per_seed.final_population
+        ));
         pooled_complexities.extend(run.complexities.iter().copied());
         wall_clock.push(SeedWallClock {
             seed,
@@ -628,8 +655,12 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         },
     );
 
+    if observe_goal_indicators {
+        progress.log("recruitment paths");
+    }
     let (recruitment_paths, recruitment_paths_wall_clock_ms) =
         timed_recruitment_paths(observe_goal_indicators, params.recruitment);
+    progress.log("profile done");
     goal_indicators.recruitment_paths = recruitment_paths;
 
     let deterministic = Deterministic {
