@@ -1,6 +1,6 @@
 # T25.F06 — Learning Per Edge
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-18
 **Feature**: T25.F06
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -170,7 +170,7 @@ the goal run reports whether sink edges become plastic at all.
 - [x] Re-pins listed in the readings file, one cause per commit; delete the
       lines of any proptest whose strategy changed from
       `proptest-regressions/` and commit new files.
-- [ ] Verification Plan: `cargo test -p v3-core --test viability` first,
+- [x] Verification Plan: `cargo test -p v3-core --test viability` first,
       `make check` once, the mutation gate, the slow tier, gate + goal, the
       epochs re-pinned.
 
@@ -200,13 +200,15 @@ the goal run reports whether sink edges become plastic at all.
       | `plasticity_census.rs:117:35` and `:118:34` `+` -> `-`, `+` -> `*` (drift sum, at-clamp count) | killed: the same test (totals 0.625/7 and 2.25/10) |
       | `runtime/plasticity/learned.rs:182` `LearnedState::eq` -> `true` | killed: `learned_states_differ_once_a_visit_moves_a_learned_weight` (`runtime/plasticity/tests.rs`) |
       | `runtime/trace/size.rs:39` `graph_heap` -> `0`, -> `1`; `:54` `+` -> `-`, `+` -> `*` | equivalent: `trace::size` compiles only under `telemetry-seams`, which the gate's v3-core build does not enable, so each mutant is absent from the tested code; a feature-on feedback run (`cargo mutants -p v3-core --features telemetry-seams -f crates/v3-core/src/runtime/trace/size.rs`) caught all four through `graph_heap_counts_every_sink_weighted_input_buffer` |
-      | `creature/genome/cgp/container.rs:1259` `take_members` `+=` -> `*=` (TIMEOUT) | deferred, pending user acceptance: see Notes for AI Agents |
-- [ ] `make rust-test-slow` on the final code.
+      | `creature/genome/cgp/container.rs:1259` `take_members` `+=` -> `*=` (TIMEOUT) | deferred, accepted by the user 2026-10-19: see Notes for AI Agents |
+- [x] `make rust-test-slow` on the final code: exit 0 at 347339c7, beside
+      `make check` exit 0.
 - [x] Gate and goal summaries at
       `docs/progress/features/t25-f06-learning-per-edge.json` and
       `-goal.json`, raw hash and byte count in the readings file, series
       entries added to `closed`, no full report staged. Goal ran `severe`
-      (`decided_passes`); the epoch re-pin stays with the closing commit.
+      (`decided_passes`); the user accepted it (2026-10-19) and the closing
+      commit re-pins the gate and goal-worlds epochs to these summaries.
 
 | Test | What it pins |
 | --- | --- |
@@ -300,18 +302,22 @@ share at the last sample (seed 11 18.2 % against 20.8 %, seed 33 1.0 % against
   [goal](../../progress/features/t25-f06-learning-per-edge-goal.json).
 - Full readings: [`docs/progress/readings/t25-f06.md`](../../progress/readings/t25-f06.md).
 
+User decision (2026-10-19): the goal `decided_passes` severe (+59.13 %) is
+accepted as a trajectory reading ("Accept and re-pin"); the gate and
+goal-worlds epochs are re-pinned to the T25.F06 summaries.
+
 ## Success Criteria
 
-- [ ] Learning mode, reward source, trace decay and the Lamarckian flag are
+- [x] Learning mode, reward source, trace decay and the Lamarckian flag are
       per-edge heritable attributes on both surfaces; a plastic vote edge
       learns and its vote follows (focused test); no cost knob and no lazy
       initializer remains.
-- [ ] A graph without a plastic edge allocates no learned state; the gate
+- [x] A graph without a plastic edge allocates no learned state; the gate
       wall-clock is within the flag threshold or the user has decided the
       width.
-- [ ] Every reader derives "carries learning" from `plastic_edges()` and
+- [x] Every reader derives "carries learning" from `plastic_edges()` and
       learned values from the view; no `pub` learned storage remains.
-- [ ] Both commits re-pinned with one cause each; the founder-only viability
+- [x] Both commits re-pinned with one cause each; the founder-only viability
       digests unmoved; the declared checks run.
 
 ## Notes for AI Agents
@@ -334,7 +340,7 @@ share at the last sample (seed 11 18.2 % against 20.8 %, seed 33 1.0 % against
   (F02, F04) are spent.
 - Deferred: review finding (P3) `container.rs` `BirthSeeds` is a single-variant enum that could be a struct; kept because the spec names its `Rows` form.
 - Deferred: review finding (P3) `graphFullModel.ts` `GraphModelEdge.isPlastic` is populated but read only by a test.
-- Deferred: (pending user acceptance) mutation timeout `container.rs:1259`
+- Deferred: (accepted by the user 2026-10-19) mutation timeout `container.rs:1259`
   `take_members` `index += 1` -> `index *= 1`. The mutant never advances
   past a non-member edge, so every test that removes or relocates a group
   with a non-member in a sink (for example
