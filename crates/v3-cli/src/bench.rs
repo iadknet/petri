@@ -13,6 +13,7 @@ pub mod input_use;
 pub mod mutation_effects;
 pub mod pair_groups;
 mod profiles;
+mod progress;
 pub mod ring_rules;
 mod run;
 mod schema;
