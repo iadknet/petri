@@ -1,4 +1,4 @@
-import type { EdgeGroup, InputReference, OutputSinkKind } from "../../types/genome.ts";
+import type { EdgeGroup, InputReference, OutputSinkKind, Scope } from "../../types/genome.ts";
 import { directionPairs, isRingSensor, parseWorldInputRef } from "./inputRefUtils.ts";
 
 /** `Direction::ALL` screen deltas: x grows east, y grows south. */
@@ -77,4 +77,9 @@ export function composeTerms(own: number, scale: number, pattern: number): strin
 		scale,
 		pattern,
 	).toFixed(3)}`;
+}
+
+/** A member's scope as the inspector badges print it (T25.F07). */
+export function scopeLabel(scope: Scope): string {
+	return `${scope.toLowerCase()} scope`;
 }

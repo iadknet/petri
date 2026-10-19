@@ -176,6 +176,7 @@ export function buildFullGraphModel(
 		(surface: "compute" | "sink", container: number, sink?: OutputSinkKind) =>
 		(edge: GraphEdge, index: number): EdgeFacts => {
 			const entry = weightEntry(surface, container, index);
+			const applied = entry === undefined ? {} : { applied: entry.applied };
 			const group = edge.membership ? graphDef.groups?.[edge.membership.group] : undefined;
 			const member =
 				edge.membership && group
@@ -190,14 +191,14 @@ export function buildFullGraphModel(
 								sinkDirection(sink),
 							),
 							scope: edge.membership.scope,
-							...(entry === undefined ? {} : { applied: entry.applied }),
+							...applied,
 						}
 					: undefined;
 			const plastic = edge.plasticity
 				? {
 						config: edge.plasticity,
 						genomic: entry?.genomic ?? edge.own_weight,
-						...(entry === undefined ? {} : { applied: entry.applied }),
+						...applied,
 						...(entry?.learned === undefined ? {} : { learned: entry.learned }),
 					}
 				: undefined;

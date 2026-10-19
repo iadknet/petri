@@ -173,16 +173,17 @@ are `a_non_member_draws_no_coin`,
 `group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale` and
 `validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge`.
 
-Verification run (build, 2026-10-19; `make check`, benchmarks, mutation and
-the slow tier not run):
+Verification run (build and self-review, 2026-10-19; `make check`,
+benchmarks, mutation and the slow tier not run):
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p v3-core --test viability` (first, both commits) | 30 passed; founder-only digests unchanged |
-| `cargo test --workspace --no-fail-fast` | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry), awaiting the gate and goal re-pin |
+| `cargo test -p v3-core --test viability` (first, each commit) | 30 passed; founder-only digests unchanged |
+| `cargo test --workspace --no-fail-fast` (build commits) | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry), awaiting the gate and goal re-pin |
+| `cargo test -p v3-core` (after the self-review cleanup) | every suite passes (lib 2,187 passed, 10 ignored) |
 | `PROPTEST_CASES=2000 cargo test -p v3-core --lib seed_rows_follow` | pass |
-| `cargo clippy --workspace --all-targets`; `cargo fmt --all -- --check` | clean |
-| frontend `tsc -b --noEmit`; `vitest run`; `biome check src/` | clean; 103 files, 666 tests pass |
+| `cargo clippy --workspace --all-targets`; `cargo fmt --all --check`; `cargo check --workspace --all-targets` | clean |
+| frontend `tsc --noEmit -p .`; `vitest run`; `biome check src` | clean; 103 files, 666 tests pass; biome no errors (4 `noArrayIndexKey` warnings in untouched `config-panel/startup` files) |
 
 Identity checks: commit 1 leaves every hash without genome text and every
 rate-0 fixture unchanged (`recruitment_tests`, `baseline_worlds`,
