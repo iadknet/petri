@@ -82,13 +82,19 @@ changes while preserving existing work accounting:
   surface (T25.F06): per committed visit for a pure-Hebbian edge, per
   initialized modulated edge per tick for a reward-modulated one (a seeded
   modulated slot counts from birth); `hebbian_updates_total` and
-  `reward_modulated_updates_total` partition it.
+  `reward_modulated_updates_total` partition it. Since T25.F07 a group-scope
+  learner counts one per contribution to its group's scale.
 - `plasticity_changes_total` counts assignments whose final clamped `f32`
-  weight is unequal (`!=`) to the immediately prior weight. Its partitions are
-  `hebbian_changes_total` and `reward_modulated_changes_total`; each changed
-  count is at most that pathway's assignment count. Proposed deltas that clamp
-  or round away do not count as changes. Formulas, costs, and write timing are
-  unchanged.
+  stored quantity is unequal (`!=`) to the immediately prior one: an
+  ungrouped or edge-scope learner's own quantity, and for a group-scope
+  learner its group's scale, so a moved scale counts every contributor
+  (T25.F07). Its partitions are `hebbian_changes_total` and
+  `reward_modulated_changes_total`; each changed count is at most that
+  pathway's assignment count. Proposed deltas that clamp or round away do
+  not count as changes. Formulas, costs, and write timing are unchanged.
+- `plasticity_scale_snaps_total` (T25.F07) counts learned-scale writes, at a
+  visit or in Phase 2.5, whose stored value lay outside the scale's bound;
+  only an unseeded genomic scale's first write can.
 - `shared_memory_writes_changed_total` counts each executed VM store/clear and
   applied wired Graph write/clear when the sanitized written value satisfies
   `(old_value - new_value).abs() > f32::EPSILON`. Production and traced VM

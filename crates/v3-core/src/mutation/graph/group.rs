@@ -5,12 +5,43 @@
 use rand::Rng;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GroupId, Shape};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GroupId, Scope, Shape};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, NodeGenome};
 use crate::mutation::types::MutationSkipReason;
 
+use super::hebbian::{draw_hebbian_config, draw_modulation};
 use super::operators::perturb_weight;
+
+/// Learned creation (T25.F07 invariant 7), drawn after a new group's shape
+/// draws: one learning mode `gen_range(0..3u8)` (0 static, 1 Hebbian, 2
+/// reward-modulated); a learning mode draws one config by
+/// `EnableHebbian`'s law, then `EnableRewardModulation`'s for mode 2,
+/// written to every member; then one scope coin (true `Group`) written to
+/// every member; then one `inherit_scale` coin.
+fn draw_learning(def: &mut CgpGraphBackendDef, id: GroupId, rng: &mut impl Rng) {
+    let mode = rng.gen_range(0..3u8);
+    let config = (mode > 0).then(|| {
+        let mut config = draw_hebbian_config(rng);
+        if mode == 2 {
+            config.modulation = Some(draw_modulation(rng));
+        }
+        config
+    });
+    let scope = if rng.gen_bool(0.5) {
+        Scope::Group
+    } else {
+        Scope::Edge
+    };
+    let inherit_scale = rng.gen_bool(0.5);
+    let members: Vec<_> = def.members(id).collect();
+    for member in members {
+        let mut edge = def.edge_mut(member);
+        edge.set_plasticity(config);
+        edge.set_scope(scope);
+    }
+    def.group_mut(id).set_inherit_scale(inherit_scale);
+}
 
 /// The node's ring indices a group can name, ascending: neighbor rings at an
 /// index representable as `u16`.
@@ -53,8 +84,8 @@ pub(super) fn can_add_pair(def: &CgpGraphBackendDef, input_refs: &[InputReferenc
 /// `AddDirectionPairGroup` (T25.F04): three draws in order — one pair
 /// uniformly over the flat list `(ref_idx ascending, pair ascending)`, the
 /// kind over `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent
-/// `DirectionPair` group: twelve members at own weight 0 and scale 0.
-/// Duplicates are allowed.
+/// `DirectionPair` group: twelve members at own weight 0 and scale 0, with
+/// learned creation's draws ([`draw_learning`]). Duplicates are allowed.
 pub(crate) fn add_pair(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
@@ -68,7 +99,8 @@ pub(crate) fn add_pair(
     let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
     let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
     let layout = input_refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
-    def.add_pair_group(ref_idx, pair, layout, kind, offset);
+    let id = def.add_pair_group(ref_idx, pair, layout, kind, offset);
+    draw_learning(def, id, rng);
     Ok(())
 }
 
@@ -89,7 +121,8 @@ fn graph_node(
 /// `AddRingGroup`: three draws in order — the ring uniformly over the ring
 /// indices ascending, the kind over `DirectedVoteKind::ALL`, the offset in
 /// `0..8` — then a silent `Ring` group: eight members at own weight 0 and
-/// scale 0. Duplicates are allowed.
+/// scale 0, with learned creation's draws ([`draw_learning`]). Duplicates
+/// are allowed.
 pub(crate) fn add(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let rings: Vec<u16> = ring_indices(input_refs).collect();
@@ -99,7 +132,8 @@ pub(crate) fn add(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), Mutat
     let ring_ref = rings[rng.gen_range(0..rings.len())];
     let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
     let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
-    def.add_group(Shape::Ring { ring_ref }, kind, offset);
+    let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
+    draw_learning(def, id, rng);
     Ok(())
 }
 

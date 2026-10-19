@@ -3,7 +3,9 @@
 //! Nine operators that evolve per-edge learning attributes on either
 //! surface. Each picks one edge uniformly among the edges matching its
 //! predicate, in `edge_sites` order over both surfaces (count-then-select,
-//! one draw), and applies its value law:
+//! one draw); a picked member then draws the scope coin, which lands the
+//! change on it alone or on every member of its group the predicate admits
+//! (T25.F07); the value is drawn once and each target applies its law:
 //! - EnableHebbian: add learning attributes to a static, eligible edge
 //! - DisableHebbian: remove them from a plastic edge
 //! - MutateHebbianRule: change the learning rule variant
@@ -13,8 +15,10 @@
 //! - DisableRewardModulation: remove reward modulation from a modulated edge
 //! - MutateRewardSource: change the outcome channel a modulated edge listens to
 //! - MutateTraceDecay: perturb the trace decay rate on a modulated edge
+//!
+//! `SetScope` flips a member's scope through the same coin.
 
-use rand::Rng;
+use rand::{Rng, RngCore};
 
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence};
 use crate::creature::genome::{
@@ -138,8 +142,8 @@ const ALL_CHANNELS: [OutcomeChannel; 4] = [
 // The per-edge predicates the plasticity operators draw their target from.
 // `GraphMutator::apply` filters Graph-backend nodes by [`any_edge`] over the
 // same predicate, so an operator is never selected onto a module with no
-// edge it can touch. A `ClearSlot` edge or a group member never matches
-// (`CgpGraphBackendDef::can_learn`).
+// edge it can touch. A `ClearSlot` edge never matches
+// (`CgpGraphBackendDef::can_learn`); a member does (T25.F07).
 
 /// The edge's learning attributes.
 fn plasticity_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> Option<PlasticityConfig> {
@@ -169,6 +173,11 @@ pub(super) fn can_enable_reward_modulation(
 /// plastic edge that carries modulation.
 pub(super) fn is_reward_modulated(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
     plasticity_of(def, occurrence).is_some_and(|p| p.modulation.is_some())
+}
+
+/// `SetScope`: a group member.
+pub(super) fn is_member(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
+    def.edge_at(occurrence).membership().is_some()
 }
 
 /// An edge predicate of this module.
@@ -203,39 +212,105 @@ fn select_eligible(
         .ok_or(MutationSkipReason::NoApplicableTarget)
 }
 
-/// Rewrite the learning attributes of a random edge matching `predicate`
-/// with `law`, which receives the current config.
-fn mutate_selected<R: Rng>(
+/// The scope coin (T25.F07 invariant 7): the edges a change picked at
+/// `picked` lands on. A non-member draws no coin and is the only target; a
+/// member draws `gen_bool(0.5)`: false, itself; true, every member of its
+/// group that `admits` accepts, in canonical order.
+pub(super) fn scope_targets(
+    def: &CgpGraphBackendDef,
+    picked: EdgeOccurrence,
+    admits: EdgePredicate,
+    rng: &mut impl Rng,
+) -> Vec<EdgeOccurrence> {
+    match def.edge_at(picked).membership() {
+        Some(membership) if rng.gen_bool(0.5) => def
+            .members(membership.group)
+            .filter(|&member| admits(def, member))
+            .collect(),
+        _ => vec![picked],
+    }
+}
+
+/// A plasticity law split into its draws and its per-config apply (R3):
+/// the value is drawn once, after the scope coin, from the picked edge's
+/// config, and every target applies it to its own config.
+struct Law<V> {
+    draw: fn(Option<PlasticityConfig>, &mut dyn RngCore) -> V,
+    apply: fn(Option<PlasticityConfig>, &V) -> Option<PlasticityConfig>,
+}
+
+/// Pick one edge matching `predicate`, draw the scope coin, draw the law's
+/// value once and apply it to every target's config.
+fn mutate_scoped<V, R: Rng>(
     def: &mut CgpGraphBackendDef,
     predicate: EdgePredicate,
     rng: &mut R,
-    law: impl FnOnce(&mut PlasticityConfig, &mut R),
+    law: Law<V>,
 ) -> Result<(), MutationSkipReason> {
-    let occurrence = select_eligible(def, predicate, rng)?;
-    let mut config =
-        plasticity_of(def, occurrence).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    law(&mut config, rng);
-    def.edge_mut(occurrence).set_plasticity(Some(config));
+    let picked = select_eligible(def, predicate, rng)?;
+    let targets = scope_targets(def, picked, predicate, rng);
+    let value = (law.draw)(plasticity_of(def, picked), rng);
+    for target in targets {
+        let config = (law.apply)(plasticity_of(def, target), &value);
+        def.edge_mut(target).set_plasticity(config);
+    }
     Ok(())
 }
 
-/// Add learning attributes to a random static, eligible edge.
+/// `EnableHebbian`'s value law: a fresh pure-Hebbian config, in draw order
+/// rule, rate, clamp, inheritance.
+pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> PlasticityConfig {
+    let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
+    PlasticityConfig {
+        rule,
+        learning_rate: rng.gen_range(0.01f32..0.2),
+        weight_clamp: rng.gen_range(1.0f32..5.0),
+        lamarckian: rng.gen_bool(0.5),
+        modulation: None,
+    }
+}
+
+/// `EnableRewardModulation`'s value law: a fresh modulation, in draw order
+/// channel, decay.
+pub(super) fn draw_modulation(rng: &mut dyn RngCore) -> RewardModulationConfig {
+    let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
+    RewardModulationConfig {
+        reward_source: channel,
+        trace_decay: rng.gen_range(0.5f32..0.99),
+    }
+}
+
+/// One perturbation draw `u ∈ [−1, 1]`, applied per value by its branch:
+/// `× (1 + 0.3u)` above 0.01, else `+ 0.05u`, then clamped to `[0, 1]`
+/// (I1).
+fn perturb(value: f32, u: f32) -> f32 {
+    let stepped = if value > 0.01 {
+        value * (1.0 + 0.3 * u)
+    } else {
+        value + 0.05 * u
+    };
+    stepped.clamp(0.0, 1.0)
+}
+
+fn draw_u(_: Option<PlasticityConfig>, rng: &mut dyn RngCore) -> f32 {
+    rng.gen_range(-1.0f32..=1.0)
+}
+
+/// Add learning attributes to a random static, eligible edge (one config,
+/// written to every admitted static member).
 pub(crate) fn enable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let occurrence = select_eligible(def, can_enable_hebbian, rng)?;
-
-    let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
-    def.edge_mut(occurrence)
-        .set_plasticity(Some(PlasticityConfig {
-            rule,
-            learning_rate: rng.gen_range(0.01f32..0.2),
-            weight_clamp: rng.gen_range(1.0f32..5.0),
-            lamarckian: rng.gen_bool(0.5),
-            modulation: None,
-        }));
-    Ok(())
+    mutate_scoped(
+        def,
+        can_enable_hebbian,
+        rng,
+        Law {
+            draw: |_, rng| draw_hebbian_config(rng),
+            apply: |_, &config| Some(config),
+        },
+    )
 }
 
 /// Remove the learning attributes of a random plastic edge.
@@ -243,113 +318,209 @@ pub(crate) fn disable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let occurrence = select_eligible(def, is_plastic, rng)?;
-    def.edge_mut(occurrence).set_plasticity(None);
-    Ok(())
+    mutate_scoped(
+        def,
+        is_plastic,
+        rng,
+        Law {
+            draw: |_, _| (),
+            apply: |_, ()| None,
+        },
+    )
 }
 
-/// Change the HebbianRule variant on a random plastic edge.
+/// Change the HebbianRule variant on a random plastic edge: one of the
+/// others of the picked edge's rule, written to every target.
 pub(crate) fn mutate_hebbian_rule_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_plastic, rng, |cfg, rng| {
-        let others: Vec<HebbianRule> = ALL_RULES
-            .iter()
-            .copied()
-            .filter(|r| *r != cfg.rule)
-            .collect();
-        cfg.rule = others[rng.gen_range(0..others.len())];
-    })
+    mutate_scoped(
+        def,
+        is_plastic,
+        rng,
+        Law {
+            draw: |picked, rng| {
+                let current = picked.map(|picked| picked.rule);
+                let others: Vec<HebbianRule> = ALL_RULES
+                    .iter()
+                    .copied()
+                    .filter(|r| Some(*r) != current)
+                    .collect();
+                others[rng.gen_range(0..others.len())]
+            },
+            apply: |config, &rule| config.map(|config| PlasticityConfig { rule, ..config }),
+        },
+    )
 }
 
-/// Perturb the learning_rate on a random plastic edge.
-///
-/// Uses ~30% multiplicative perturbation when rate is above a threshold,
-/// otherwise a small additive perturbation; clamped to [0.0, 1.0] (I1).
+/// Perturb the learning_rate on a random plastic edge: one `u`, each target
+/// stepping its own rate by its branch.
 pub(crate) fn mutate_hebbian_rate_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_plastic, rng, |cfg, rng| {
-        if cfg.learning_rate.abs() > 0.01 {
-            cfg.learning_rate *= 1.0 + rng.gen_range(-0.3f32..=0.3);
-        } else {
-            cfg.learning_rate += rng.gen_range(-0.05f32..=0.05);
-        }
-        cfg.learning_rate = cfg.learning_rate.clamp(0.0, 1.0);
-    })
+    mutate_scoped(
+        def,
+        is_plastic,
+        rng,
+        Law {
+            draw: draw_u,
+            apply: |config, &u| {
+                config.map(|config| PlasticityConfig {
+                    learning_rate: perturb(config.learning_rate, u),
+                    ..config
+                })
+            },
+        },
+    )
 }
 
-/// Flip the `lamarckian` flag on a random plastic edge.
+/// Flip the `lamarckian` flag on a random plastic edge: every target takes
+/// the picked edge's flipped value.
 pub(crate) fn toggle_hebbian_lamarckian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_plastic, rng, |cfg, _| {
-        cfg.lamarckian = !cfg.lamarckian;
-    })
+    mutate_scoped(
+        def,
+        is_plastic,
+        rng,
+        Law {
+            draw: |picked, _| !picked.is_some_and(|picked| picked.lamarckian),
+            apply: |config, &lamarckian| {
+                config.map(|config| PlasticityConfig {
+                    lamarckian,
+                    ..config
+                })
+            },
+        },
+    )
 }
 
-/// Add reward modulation to a random plastic edge that has `modulation=None`.
+/// Add reward modulation to a random plastic edge that has `modulation=None`:
+/// one modulation, set on every target, which keeps its rule, rate, clamp
+/// and flag.
 pub(crate) fn enable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, can_enable_reward_modulation, rng, |cfg, rng| {
-        let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
-        cfg.modulation = Some(RewardModulationConfig {
-            reward_source: channel,
-            trace_decay: rng.gen_range(0.5f32..0.99),
-        });
-    })
+    mutate_scoped(
+        def,
+        can_enable_reward_modulation,
+        rng,
+        Law {
+            draw: |_, rng| draw_modulation(rng),
+            apply: |config, &modulation| {
+                config.map(|config| PlasticityConfig {
+                    modulation: Some(modulation),
+                    ..config
+                })
+            },
+        },
+    )
 }
 
-/// Remove reward modulation from a random reward-modulated edge.
+/// Remove reward modulation from a random reward-modulated edge, keeping
+/// each target's config.
 pub(crate) fn disable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_reward_modulated, rng, |cfg, _| {
-        cfg.modulation = None;
-    })
+    mutate_scoped(
+        def,
+        is_reward_modulated,
+        rng,
+        Law {
+            draw: |_, _| (),
+            apply: |config, ()| {
+                config.map(|config| PlasticityConfig {
+                    modulation: None,
+                    ..config
+                })
+            },
+        },
+    )
 }
 
-/// Switch the `reward_source` channel on a random reward-modulated edge.
+/// Switch the `reward_source` channel on a random reward-modulated edge:
+/// one of the others of the picked edge's channel, written to every target.
 pub(crate) fn mutate_reward_source_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_reward_modulated, rng, |cfg, rng| {
-        if let Some(modulation) = &mut cfg.modulation {
-            let others: Vec<OutcomeChannel> = ALL_CHANNELS
-                .iter()
-                .copied()
-                .filter(|c| *c != modulation.reward_source)
-                .collect();
-            modulation.reward_source = others[rng.gen_range(0..others.len())];
-        }
-    })
+    mutate_scoped(
+        def,
+        is_reward_modulated,
+        rng,
+        Law {
+            draw: |picked, rng| {
+                let current = picked
+                    .and_then(|picked| picked.modulation)
+                    .map(|m| m.reward_source);
+                let others: Vec<OutcomeChannel> = ALL_CHANNELS
+                    .iter()
+                    .copied()
+                    .filter(|c| Some(*c) != current)
+                    .collect();
+                others[rng.gen_range(0..others.len())]
+            },
+            apply: |config, &reward_source| {
+                config.map(|config| PlasticityConfig {
+                    modulation: config.modulation.map(|modulation| RewardModulationConfig {
+                        reward_source,
+                        ..modulation
+                    }),
+                    ..config
+                })
+            },
+        },
+    )
 }
 
-/// Perturb the `trace_decay` on a random reward-modulated edge.
-///
-/// Uses ~30% multiplicative perturbation when decay is above a threshold,
-/// otherwise a small additive perturbation. Clamped to [0.0, 1.0] (I1).
+/// Perturb the `trace_decay` on a random reward-modulated edge: one `u`,
+/// each target stepping its own decay by its branch.
 pub(crate) fn mutate_trace_decay_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    mutate_selected(def, is_reward_modulated, rng, |cfg, rng| {
-        if let Some(modulation) = &mut cfg.modulation {
-            if modulation.trace_decay.abs() > 0.01 {
-                modulation.trace_decay *= 1.0 + rng.gen_range(-0.3f32..=0.3);
-            } else {
-                modulation.trace_decay += rng.gen_range(-0.05f32..=0.05);
-            }
-            modulation.trace_decay = modulation.trace_decay.clamp(0.0, 1.0);
-        }
-    })
+    mutate_scoped(
+        def,
+        is_reward_modulated,
+        rng,
+        Law {
+            draw: draw_u,
+            apply: |config, &u| {
+                config.map(|config| PlasticityConfig {
+                    modulation: config.modulation.map(|modulation| RewardModulationConfig {
+                        trace_decay: perturb(modulation.trace_decay, u),
+                        ..modulation
+                    }),
+                    ..config
+                })
+            },
+        },
+    )
+}
+
+/// `SetScope` (T25.F07): one member uniformly in canonical order, the scope
+/// coin, then the other of the picked member's scope written to it alone or
+/// to every member of its group; no value draw.
+pub(crate) fn set_scope_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let picked = select_eligible(def, is_member, rng)?;
+    let scope = def
+        .edge_at(picked)
+        .membership()
+        .ok_or(MutationSkipReason::NoApplicableTarget)?
+        .scope
+        .other();
+    for target in scope_targets(def, picked, is_member, rng) {
+        def.edge_mut(target).set_scope(scope);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -712,5 +883,317 @@ mod tests {
             }
             assert_eq!(surfaces, [true, true], "{name} reaches both surfaces");
         }
+    }
+
+    // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
+
+    use crate::creature::genome::cgp::{GroupId, Scope, Shape};
+    use crate::creature::genome::vote::DirectedVoteKind;
+
+    /// A full catalog with one ring group of eight members on `Move`, member
+    /// `k` carrying `configs[k]` (static past the list's end).
+    fn group_def(
+        configs: &[Option<PlasticityConfig>],
+    ) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = def.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
+        let members: Vec<EdgeOccurrence> = def.members(id).collect();
+        for (&member, &config) in members.iter().zip(configs) {
+            def.edge_mut(member).set_plasticity(config);
+        }
+        (def, members)
+    }
+
+    /// The selection draws of an operator over `predicate` on `def`: the
+    /// picked edge and, for a member, the coin. `rng` continues at the value
+    /// draws.
+    fn replay_pick(
+        def: &CgpGraphBackendDef,
+        predicate: EdgePredicate,
+        rng: &mut SmallRng,
+    ) -> (EdgeOccurrence, Option<bool>) {
+        let matching: Vec<EdgeOccurrence> = def
+            .edge_sites()
+            .filter(|&occurrence| predicate(def, occurrence))
+            .collect();
+        let picked = matching[rng.gen_range(0..matching.len())];
+        let coin = def.edge_at(picked).membership().map(|_| rng.gen_bool(0.5));
+        (picked, coin)
+    }
+
+    /// The edges whose learning attributes or scope `op` changed.
+    fn edited(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Vec<EdgeOccurrence> {
+        before
+            .edge_sites()
+            .filter(|&occurrence| before.edge_at(occurrence) != after.edge_at(occurrence))
+            .collect()
+    }
+
+    fn with(
+        config: PlasticityConfig,
+        edit: impl FnOnce(&mut PlasticityConfig),
+    ) -> PlasticityConfig {
+        let mut config = config;
+        edit(&mut config);
+        config
+    }
+
+    /// A non-member draws no coin: the operator's draws are the pick and the
+    /// value alone.
+    #[test]
+    fn a_non_member_draws_no_coin() {
+        for seed in 0..16 {
+            let mut def = mixed_def();
+            let mut expected = rng(seed);
+            let (_, coin) = replay_pick(&def, can_enable_hebbian, &mut expected);
+            assert_eq!(coin, None);
+            let config = draw_hebbian_config(&mut expected);
+            let mut actual = rng(seed);
+            enable_hebbian_in_def(&mut def, &mut actual).unwrap();
+            assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
+            assert!(def.edges().any(|edge| edge.plasticity() == Some(config)));
+        }
+    }
+
+    /// `EnableHebbian` on a group with a modulated member: the coin lands
+    /// one config on the picked member or on every static member; the
+    /// member the predicate rejects is untouched and consumes no draw.
+    #[test]
+    fn enable_hebbian_lands_one_config_on_the_admitted_members() {
+        let (original, members) = group_def(&[None, None, None, Some(modulated())]);
+        let mut tails = [false; 2];
+        for seed in 0..64 {
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, can_enable_hebbian, &mut expected);
+            let coin = coin.expect("a member draws the coin");
+            let config = draw_hebbian_config(&mut expected);
+            let mut def = original.clone();
+            let mut actual = rng(seed);
+            enable_hebbian_in_def(&mut def, &mut actual).unwrap();
+            assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
+            let want: Vec<EdgeOccurrence> = if coin {
+                members
+                    .iter()
+                    .copied()
+                    .filter(|&m| m != members[3])
+                    .collect()
+            } else {
+                vec![picked]
+            };
+            assert_eq!(edited(&original, &def), want, "seed {seed}");
+            assert!(want
+                .iter()
+                .all(|&m| def.edge_at(m).plasticity() == Some(config)));
+            assert_eq!(def.edge_at(members[3]), original.edge_at(members[3]));
+            tails[usize::from(coin)] = true;
+        }
+        assert_eq!(tails, [true, true]);
+    }
+
+    /// `EnableRewardModulation` on a heterogeneous group sets one modulation
+    /// on every admitted member, each keeping its rule, rate, clamp and flag;
+    /// `DisableRewardModulation` clears the modulation alone.
+    #[test]
+    fn group_wide_modulation_changes_keep_each_members_config() {
+        let base = hebbian();
+        let configs = [
+            Some(base),
+            Some(with(base, |c| {
+                c.rule = HebbianRule::Oja;
+                c.learning_rate = 0.3;
+            })),
+            Some(with(base, |c| {
+                c.weight_clamp = 1.5;
+                c.lamarckian = true;
+            })),
+        ];
+        let (original, members) = group_def(&configs);
+        let mut all = false;
+        for seed in 0..32 {
+            let mut expected = rng(seed);
+            let (_, coin) = replay_pick(&original, can_enable_reward_modulation, &mut expected);
+            let modulation = draw_modulation(&mut expected);
+            let mut def = original.clone();
+            enable_reward_modulation_in_def(&mut def, &mut rng(seed)).unwrap();
+            if coin != Some(true) {
+                continue;
+            }
+            all = true;
+            for (k, config) in configs.iter().enumerate() {
+                let want = with(config.unwrap(), |c| c.modulation = Some(modulation));
+                assert_eq!(def.edge_at(members[k]).plasticity(), Some(want));
+            }
+            disable_reward_modulation_in_def(&mut def, &mut rng(seed)).unwrap();
+            let cleared = members[..configs.len()]
+                .iter()
+                .filter(|&&m| def.edge_at(m).plasticity().unwrap().modulation.is_none())
+                .count();
+            assert!(cleared == 1 || cleared == configs.len(), "{cleared}");
+            for k in 0..configs.len() {
+                let config = def.edge_at(members[k]).plasticity().unwrap();
+                if config.modulation.is_none() {
+                    assert_eq!(Some(config), configs[k], "the config kept");
+                }
+            }
+        }
+        assert!(all, "a group-wide tail");
+    }
+
+    /// `ToggleHebbianLamarckian` writes the picked member's flipped flag to
+    /// every target; the rate and decay steps draw one `u` and apply it on
+    /// each member's own branch, on both sides of 0.01.
+    #[test]
+    fn group_wide_toggle_and_perturbations_follow_the_picked_value_and_each_branch() {
+        let low = with(modulated(), |c| {
+            c.learning_rate = 0.005;
+            c.lamarckian = true;
+            c.modulation = Some(RewardModulationConfig {
+                reward_source: OutcomeChannel::DamageDelta,
+                trace_decay: 0.004,
+            });
+        });
+        let high = with(modulated(), |c| c.learning_rate = 0.5);
+        let configs = [Some(low), Some(high)];
+        let (original, members) = group_def(&configs);
+        let mut seen = [false; 3];
+        for seed in 0..64 {
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, is_plastic, &mut expected);
+            let mut def = original.clone();
+            toggle_hebbian_lamarckian_in_def(&mut def, &mut rng(seed)).unwrap();
+            let flag = !original.edge_at(picked).plasticity().unwrap().lamarckian;
+            if coin == Some(true) {
+                seen[0] = true;
+                assert!(members[..2].iter().all(|&m| def
+                    .edge_at(m)
+                    .plasticity()
+                    .unwrap()
+                    .lamarckian
+                    == flag));
+            }
+
+            let mut expected = rng(seed);
+            let (_, coin) = replay_pick(&original, is_plastic, &mut expected);
+            let u: f32 = expected.gen_range(-1.0f32..=1.0);
+            let mut def = original.clone();
+            let mut actual = rng(seed);
+            mutate_hebbian_rate_in_def(&mut def, &mut actual).unwrap();
+            assert_eq!(
+                actual.gen::<u64>(),
+                expected.gen::<u64>(),
+                "one u, seed {seed}"
+            );
+            if coin == Some(true) {
+                seen[1] = true;
+                let rate = |m: usize| def.edge_at(members[m]).plasticity().unwrap().learning_rate;
+                assert_eq!(rate(0), (0.005 + 0.05 * u).clamp(0.0, 1.0));
+                assert_eq!(rate(1), (0.5 * (1.0 + 0.3 * u)).clamp(0.0, 1.0));
+            }
+
+            let mut expected = rng(seed);
+            let (_, coin) = replay_pick(&original, is_reward_modulated, &mut expected);
+            let u: f32 = expected.gen_range(-1.0f32..=1.0);
+            let mut def = original.clone();
+            mutate_trace_decay_in_def(&mut def, &mut rng(seed)).unwrap();
+            if coin == Some(true) {
+                seen[2] = true;
+                let decay = |m: usize| {
+                    def.edge_at(members[m])
+                        .plasticity()
+                        .unwrap()
+                        .modulation
+                        .unwrap()
+                        .trace_decay
+                };
+                assert_eq!(decay(0), (0.004 + 0.05 * u).clamp(0.0, 1.0));
+                assert_eq!(decay(1), (0.9 * (1.0 + 0.3 * u)).clamp(0.0, 1.0));
+            }
+        }
+        assert_eq!(seen, [true; 3]);
+    }
+
+    /// `MutateHebbianRule` and `MutateRewardSource` draw among the others of
+    /// the picked member's value and write it to every target.
+    #[test]
+    fn group_wide_rule_and_source_redraws_write_the_drawn_value() {
+        let configs = [
+            Some(modulated()),
+            Some(with(modulated(), |c| {
+                c.rule = HebbianRule::Covariance;
+                c.modulation = Some(RewardModulationConfig {
+                    reward_source: OutcomeChannel::ActionSuccess,
+                    trace_decay: 0.7,
+                });
+            })),
+        ];
+        let (original, members) = group_def(&configs);
+        let mut seen = false;
+        for seed in 0..64 {
+            let mut def = original.clone();
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, is_plastic, &mut expected);
+            mutate_hebbian_rule_in_def(&mut def, &mut rng(seed)).unwrap();
+            let picked_rule = original.edge_at(picked).plasticity().unwrap().rule;
+            let rule = def.edge_at(picked).plasticity().unwrap().rule;
+            assert_ne!(rule, picked_rule);
+            if coin == Some(true) {
+                seen = true;
+                assert!(members[..2]
+                    .iter()
+                    .all(|&m| def.edge_at(m).plasticity().unwrap().rule == rule));
+            }
+            let mut def = original.clone();
+            mutate_reward_source_in_def(&mut def, &mut rng(seed)).unwrap();
+            let source = |def: &CgpGraphBackendDef, m| {
+                def.edge_at(m)
+                    .plasticity()
+                    .unwrap()
+                    .modulation
+                    .unwrap()
+                    .reward_source
+            };
+            assert_ne!(source(&def, picked), source(&original, picked));
+            if coin == Some(true) {
+                assert_eq!(source(&def, members[0]), source(&def, members[1]));
+            }
+        }
+        assert!(seen);
+    }
+
+    /// `SetScope`: one member, the coin, then the other of the picked
+    /// member's scope on it alone or on every member; no value draw.
+    #[test]
+    fn set_scope_flips_one_member_or_every_member() {
+        let (mut original, members) = group_def(&[Some(hebbian())]);
+        original.edge_mut(members[2]).set_scope(Scope::Group);
+        let mut tails = [false; 2];
+        for seed in 0..64 {
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, is_member, &mut expected);
+            let coin = coin.expect("a member draws the coin");
+            let mut def = original.clone();
+            let mut actual = rng(seed);
+            set_scope_in_def(&mut def, &mut actual).unwrap();
+            assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "no value draw");
+            let other = original.edge_at(picked).membership().unwrap().scope.other();
+            let scope = |m: EdgeOccurrence| def.edge_at(m).membership().unwrap().scope;
+            if coin {
+                assert!(members.iter().all(|&m| scope(m) == other));
+            } else {
+                assert_eq!(scope(picked), other);
+                assert!(members
+                    .iter()
+                    .filter(|&&m| m != picked)
+                    .all(|&m| def.edge_at(m) == original.edge_at(m)));
+            }
+            assert_eq!(def.members(GroupId::new(0)).count(), 8);
+            tails[usize::from(coin)] = true;
+        }
+        assert_eq!(tails, [true, true]);
+        let mut ungrouped = mixed_def();
+        assert_eq!(
+            set_scope_in_def(&mut ungrouped, &mut rng(0)),
+            Err(MutationSkipReason::NoApplicableTarget)
+        );
     }
 }

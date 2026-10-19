@@ -41,7 +41,7 @@ pub use contexts::Group;
 use contexts::{recorded_contexts, Extension};
 use records::{run_panel_executions, PanelExecution, TracedBattery};
 
-pub const VERSION: &str = "mutation-effects-v3";
+pub const VERSION: &str = "mutation-effects-v4";
 pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v2";
 /// Proposal seed: `PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER * cohort +
 /// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`, where

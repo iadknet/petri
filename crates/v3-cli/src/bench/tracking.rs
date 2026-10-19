@@ -526,6 +526,10 @@ pub struct CognitionTracking {
     pub hebbian_changes_total: u64,
     pub reward_modulated_updates_total: u64,
     pub reward_modulated_changes_total: u64,
+    /// Learned-scale writes that snapped a value outside the bound
+    /// (T25.F07); absent in a report from before it.
+    #[serde(default)]
+    pub plasticity_scale_snaps_total: u64,
     pub shared_memory_writes_changed_total: u64,
 }
 
@@ -635,6 +639,7 @@ impl WorldTracking {
                 hebbian_changes_total: stats.hebbian_changes_total,
                 reward_modulated_updates_total: stats.reward_modulated_updates_total,
                 reward_modulated_changes_total: stats.reward_modulated_changes_total,
+                plasticity_scale_snaps_total: stats.plasticity_scale_snaps_total,
                 shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
             }),
             mortality: Some(MortalityTracking {
@@ -864,9 +869,22 @@ impl PlasticKeyRow {
     }
 }
 
-/// The plasticity census of one checkpoint (T25.F06): living creatures,
-/// carriers, and the reachable plastic edges by (pathway, surface), by rule
-/// and by inheritance, every row always present.
+/// One inheritance cell of a checkpoint's learned scales (T25.F07).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LearnedScaleRow {
+    /// `darwinian` or `lamarckian`: the group's `inherit_scale`.
+    pub inheritance: String,
+    pub scales: u64,
+    /// Sum of `|learned - genomic|` over the initialized scale slots.
+    pub drift_sum: String,
+    /// Initialized scale slots at their bound.
+    pub at_bound: u64,
+}
+
+/// The plasticity census of one checkpoint (T25.F06, T25.F07): living
+/// creatures, carriers, the reachable plastic edges by (pathway, surface),
+/// by rule, by inheritance and by scope, and the learned scales by
+/// inheritance, every row always present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlasticityCensusBlock {
     pub creatures: u64,
@@ -874,6 +892,8 @@ pub struct PlasticityCensusBlock {
     pub edges: Vec<PlasticEdgeRow>,
     pub edges_by_rule: Vec<PlasticKeyRow>,
     pub edges_by_inheritance: Vec<PlasticKeyRow>,
+    pub edges_by_scope: Vec<PlasticKeyRow>,
+    pub scales: Vec<LearnedScaleRow>,
 }
 
 impl PlasticityCensusBlock {
@@ -902,6 +922,16 @@ impl PlasticityCensusBlock {
                 .collect(),
             edges_by_rule: PlasticKeyRow::rows(census.rule_counts()),
             edges_by_inheritance: PlasticKeyRow::rows(census.inheritance_counts()),
+            edges_by_scope: PlasticKeyRow::rows(census.scope_counts()),
+            scales: census
+                .scale_cells()
+                .map(|(inheritance, cell)| LearnedScaleRow {
+                    inheritance: inheritance.to_owned(),
+                    scales: cell.scales,
+                    drift_sum: six(cell.drift_sum),
+                    at_bound: cell.at_bound,
+                })
+                .collect(),
         }
     }
 }

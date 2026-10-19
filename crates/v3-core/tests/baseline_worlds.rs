@@ -191,10 +191,16 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 13644968153452489784, rate 0.0 821082946294985330), as is the run with
 /// mutation off, genome text included (8324246536663749152, rate 0.0
 /// 1561139812032769563).
+/// Re-pinned by T25.F07 commit 2: learned group creation, the scope coin and
+/// `SetScope` remap every Graph draw and groups now learn (default
+/// 12573132385420804636 -> 7345675788631625454, rate 0.0
+/// 7887329904345154269 -> 11318987159188275955); with mutation off the run
+/// is unchanged, genome text included (8324246536663749152, rate 0.0
+/// 1561139812032769563).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 12573132385420804636);
-    assert_eq!(short_run_identity(Some(0.0)), 7887329904345154269);
+    assert_eq!(short_run_identity(None), 7345675788631625454);
+    assert_eq!(short_run_identity(Some(0.0)), 11318987159188275955);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

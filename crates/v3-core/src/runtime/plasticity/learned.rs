@@ -1,45 +1,149 @@
-//! Learned state (T25.F06): per-edge learned weights and eligibility traces,
-//! built once at birth from the genome and the parent's seeds.
+//! Learned state (T25.F06, T25.F07): per-edge learned weights, per-group
+//! learned scales and eligibility traces, built once at birth from the
+//! genome and the parent's seeds.
 //!
-//! [`LearnedState::for_genome`] lays out, per mesh node, the plastic-edge
-//! slots over both surfaces in canonical order (`edge_sites`), a learned own
-//! weight per slot, a trace per reward-modulated slot and a visited flag. A
-//! graph without a plastic edge allocates nothing and runs the static loops.
-//! A slot is initialized once its backend has been visited or when it was
-//! seeded at birth; only initialized slots are updated by reward, captured
-//! for a child and exposed by the view.
+//! [`LearnedState::for_genome`] lays out, per mesh node, the learners (the
+//! plastic edges over both surfaces in canonical order, `edge_sites`), the
+//! scale slots (one per group with a group-scope learner, in `GroupId`
+//! order) and the passive members (static members of a group with a scale
+//! slot), a learned own quantity per ungrouped or edge-scope learner, a
+//! learned scale per scale slot, a trace per reward-modulated learner and a
+//! visited flag. A graph without a plastic edge allocates nothing and runs
+//! the static loops. A learner or a scale slot is initialized once its
+//! backend has been visited or when it was seeded at birth; only
+//! initialized ones are updated by reward, captured for a child and exposed
+//! by the view.
 
 use super::rules::{activity, hebbian_delta, three_factor};
 use super::{OutcomeSignalBank, PlasticityKind};
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
+use crate::creature::genome::cgp::{
+    compose, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GroupId, Scope,
+};
 use crate::creature::genome::{BackendDef, CreatureGenome, PlasticityConfig};
 
-/// One plastic edge of a backend's layout.
+/// Where a member's group term reads its scale.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ScaleSource {
+    /// The group has no scale slot: its genomic scale.
+    Genomic(f32),
+    /// The group's scale slot.
+    Slot(usize),
+}
+
+/// A member's group term: its pattern and its scale's source.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct GroupTerm {
+    pattern: f32,
+    scale: ScaleSource,
+}
+
+/// One learner (plastic edge) of a backend's layout.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Slot {
     occurrence: EdgeOccurrence,
     config: PlasticityConfig,
-    /// The genomic weight at birth (the edge's own weight: a plastic edge is
-    /// never a member).
+    /// The genomic own weight: an ungrouped edge's weight, a member's
+    /// correction.
     genomic: f32,
+    /// The member's scope, `None` for an ungrouped edge.
+    scope: Option<Scope>,
+    /// The member's group term, `None` for an ungrouped edge.
+    term: Option<GroupTerm>,
+}
+
+impl Slot {
+    /// The scale slot a group learner credits, `None` for an ungrouped or
+    /// edge-scope learner.
+    fn credited_scale(&self) -> Option<(usize, f32)> {
+        match (self.scope, self.term) {
+            (
+                Some(Scope::Group),
+                Some(GroupTerm {
+                    pattern,
+                    scale: ScaleSource::Slot(scale),
+                }),
+            ) => Some((scale, pattern)),
+            _ => None,
+        }
+    }
+}
+
+/// One group's learned scale.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct ScaleSlot {
+    group: GroupId,
+    /// The genomic scale.
+    genomic: f32,
+    /// The smallest `weight_clamp` among the group's group learners.
+    bound: f32,
+    inherit_scale: bool,
+}
+
+/// One static member of a group with a scale slot: weighed through the
+/// learned scale, with no samples and no stored value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Passive {
+    own: f32,
+    term: GroupTerm,
+}
+
+/// A dynamic edge: a learner or a passive member, by index.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Dynamic {
+    Learner(usize),
+    Passive(usize),
+}
+
+/// What one learning event did: learner assignments, assignments whose
+/// stored quantity changed and scale writes that snapped a value lying
+/// outside the bound (T25.F07 invariants 4, 9).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct LearningCounts {
+    pub updates: u32,
+    pub changes: u32,
+    pub scale_snaps: u32,
+}
+
+impl std::ops::AddAssign for LearningCounts {
+    fn add_assign(&mut self, other: Self) {
+        self.updates += other.updates;
+        self.changes += other.changes;
+        self.scale_snaps += other.scale_snaps;
+    }
 }
 
 /// One mesh node's learning layout and state. Empty for a VM node and for a
 /// graph without a plastic edge.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct BackendLearning {
-    /// Plastic edges in canonical order.
+    /// Learners in canonical order.
     slots: Box<[Slot]>,
-    /// The learned own weight per slot: the clamped seed of a seeded
-    /// Lamarckian slot, else the genomic weight until learning moves it.
+    /// Per learner, the learned own quantity of an ungrouped or edge-scope
+    /// learner: the clamped seed of a seeded Lamarckian learner, else the
+    /// genomic own weight until learning moves it. A group learner stores
+    /// none: its entry holds its genomic own weight, is never written, and
+    /// the view and `capture` expose `None` for it.
     learned: Box<[f32]>,
-    /// Whether each slot inherited its learned weight at birth.
+    /// Whether each learner inherited its own quantity at birth.
     seeded: Box<[bool]>,
-    /// Slot index of every reward-modulated slot, ascending.
+    /// Learner index of every reward-modulated learner, ascending.
     modulated: Box<[usize]>,
     /// One eligibility trace per entry of `modulated`.
     traces: Box<[f32]>,
+    /// The scale slots, in `GroupId` order.
+    scales: Box<[ScaleSlot]>,
+    /// The learned scale per scale slot.
+    scale: Box<[f32]>,
+    /// Whether each scale slot inherited its scale at birth.
+    scale_seeded: Box<[bool]>,
+    /// Static members of groups with a scale slot, in canonical order.
+    passive: Box<[Passive]>,
+    /// Every dynamic edge in canonical order.
+    order: Box<[(EdgeOccurrence, Dynamic)]>,
+    /// Per scale slot, the event's summed contribution and its number of
+    /// contributors: zero between events.
+    credit: Box<[(f32, u32)]>,
     /// Set at the first visit's entry, before the pass-cost check, for life.
     visited: bool,
 }
@@ -50,19 +154,96 @@ impl BackendLearning {
         input_refs: &[InputReference],
         seeds: Option<&BirthSeeds>,
     ) -> Self {
-        let slots: Box<[Slot]> = def
-            .plastic_edges()
-            .map(|(occurrence, config)| Slot {
-                occurrence,
-                config,
-                genomic: def.genomic_weight(occurrence, input_refs),
+        let groups = def.groups();
+        // The scale slots: one per group with a group learner, bounded by
+        // the smallest clamp among them.
+        let mut bounds: Vec<Option<f32>> = vec![None; groups.len()];
+        for (occurrence, config) in def.plastic_edges() {
+            if let Some(membership) = def.edge_at(occurrence).membership() {
+                if membership.scope == Scope::Group {
+                    let bound = &mut bounds[membership.group.index()];
+                    *bound =
+                        Some(bound.map_or(config.weight_clamp, |b| b.min(config.weight_clamp)));
+                }
+            }
+        }
+        let mut slot_of: Vec<Option<usize>> = vec![None; groups.len()];
+        let mut scales = Vec::new();
+        for (index, bound) in bounds.iter().enumerate() {
+            if let Some(bound) = *bound {
+                slot_of[index] = Some(scales.len());
+                let group = GroupId::new(u16::try_from(index).expect("groups below u16::MAX"));
+                scales.push(ScaleSlot {
+                    group,
+                    genomic: groups[index].scale(),
+                    bound,
+                    inherit_scale: groups[index].inherit_scale(),
+                });
+            }
+        }
+        let inherited_scales: Vec<Option<f32>> = scales
+            .iter()
+            .map(|slot| {
+                seeds
+                    .filter(|_| slot.inherit_scale)
+                    .and_then(|seeds| seeds.group_value(slot.group))
+                    .map(|seed| seed.clamp(-slot.bound, slot.bound))
             })
             .collect();
+        let scale = scales
+            .iter()
+            .zip(&inherited_scales)
+            .map(|(slot, seed)| seed.unwrap_or(slot.genomic))
+            .collect();
+        let scale_seeded = inherited_scales.iter().map(Option::is_some).collect();
+
+        let mut slots = Vec::new();
+        let mut passive = Vec::new();
+        let mut order = Vec::new();
+        for occurrence in def.edge_sites() {
+            let edge = def.edge_at(occurrence);
+            let term = edge.membership().map(|membership| GroupTerm {
+                pattern: def.pattern(occurrence, input_refs),
+                scale: slot_of[membership.group.index()].map_or(
+                    ScaleSource::Genomic(groups[membership.group.index()].scale()),
+                    ScaleSource::Slot,
+                ),
+            });
+            match (edge.plasticity(), term) {
+                (Some(config), _) => {
+                    order.push((occurrence, Dynamic::Learner(slots.len())));
+                    slots.push(Slot {
+                        occurrence,
+                        config,
+                        genomic: edge.own_weight(),
+                        scope: edge.membership().map(|membership| membership.scope),
+                        term,
+                    });
+                }
+                (
+                    None,
+                    Some(
+                        term @ GroupTerm {
+                            scale: ScaleSource::Slot(_),
+                            ..
+                        },
+                    ),
+                ) => {
+                    order.push((occurrence, Dynamic::Passive(passive.len())));
+                    passive.push(Passive {
+                        own: edge.own_weight(),
+                        term,
+                    });
+                }
+                _ => {}
+            }
+        }
+        // A group learner ignores any seed on its row.
         let inherited: Vec<Option<f32>> = slots
             .iter()
             .map(|slot| {
                 seeds
-                    .filter(|_| slot.config.lamarckian)
+                    .filter(|_| slot.config.lamarckian && slot.scope != Some(Scope::Group))
                     .and_then(|seeds| seeds.value(slot.occurrence))
                     .map(|seed| seed.clamp(-slot.config.weight_clamp, slot.config.weight_clamp))
             })
@@ -80,18 +261,93 @@ impl BackendLearning {
             .map(|(index, _)| index)
             .collect();
         let traces = vec![0.0; modulated.len()].into_boxed_slice();
+        let credit = vec![(0.0, 0); scales.len()].into_boxed_slice();
         Self {
-            slots,
+            slots: slots.into_boxed_slice(),
             learned,
             seeded,
             modulated,
             traces,
+            scales: scales.into_boxed_slice(),
+            scale,
+            scale_seeded,
+            passive: passive.into_boxed_slice(),
+            order: order.into_boxed_slice(),
+            credit,
             visited: false,
         }
     }
 
     fn initialized(&self, slot: usize) -> bool {
         self.visited || self.seeded[slot]
+    }
+
+    fn scale_initialized(&self, scale: usize) -> bool {
+        self.visited || self.scale_seeded[scale]
+    }
+
+    /// The scale a group term reads.
+    fn term_scale(&self, term: GroupTerm) -> f32 {
+        match term.scale {
+            ScaleSource::Genomic(scale) => scale,
+            ScaleSource::Slot(slot) => self.scale[slot],
+        }
+    }
+
+    /// The applied weight of learner `slot`: `own + scale × pattern`, its
+    /// own quantity alone when ungrouped (invariant 3).
+    fn learner_applied(&self, slot: usize) -> f32 {
+        let own = self.learned[slot];
+        match self.slots[slot].term {
+            None => own,
+            Some(term) => compose(own, self.term_scale(term), term.pattern),
+        }
+    }
+
+    /// The applied weight of a dynamic edge, the one composition the
+    /// executor, the view and both resolvers use.
+    fn applied(&self, dynamic: Dynamic) -> f32 {
+        match dynamic {
+            Dynamic::Learner(slot) => self.learner_applied(slot),
+            Dynamic::Passive(index) => {
+                let passive = self.passive[index];
+                compose(
+                    passive.own,
+                    self.term_scale(passive.term),
+                    passive.term.pattern,
+                )
+            }
+        }
+    }
+
+    /// Add one group learner's contribution to its scale's accumulator.
+    fn credit(&mut self, scale: usize, contribution: f32) {
+        let (sum, contributors) = &mut self.credit[scale];
+        *sum += contribution;
+        *contributors += 1;
+    }
+
+    /// Write every scale with a contribution once, `clamp(scale + Σ,
+    /// ±bound)`, in slot order, and clear the accumulators: changes count
+    /// every contributor of a moved scale, snaps a write whose stored value
+    /// lay outside the bound.
+    fn write_scales(&mut self, counts: &mut LearningCounts) {
+        for (index, credit) in self.credit.iter_mut().enumerate() {
+            let (sum, contributors) = std::mem::take(credit);
+            if contributors == 0 {
+                continue;
+            }
+            let bound = self.scales[index].bound;
+            let old = self.scale[index];
+            let new = (old + sum).clamp(-bound, bound);
+            counts.scale_snaps += u32::from(old.abs() > bound);
+            // Exact stored-value inequality excludes sums rounded or
+            // clamped away.
+            if new != old {
+                counts.changes += contributors;
+            }
+            self.scale[index] = new;
+        }
     }
 
     /// Decay every trace once per world tick by its edge's retention.
@@ -103,38 +359,54 @@ impl BackendLearning {
         }
     }
 
-    /// The three-factor update on every initialized modulated slot: edge
-    /// assignments and assignments that change a stored weight.
-    fn reward(&mut self, signals: &OutcomeSignalBank) -> (u32, u32) {
-        let (mut updates, mut changes) = (0, 0);
-        for (&trace, &slot) in self.traces.iter().zip(self.modulated.iter()) {
-            if !self.initialized(slot) {
-                continue;
-            }
+    /// The three-factor update: each initialized modulated ungrouped or
+    /// edge learner updates its own quantity, each modulated group learner
+    /// whose scale slot is initialized credits its scale, then each credited
+    /// scale is written once.
+    fn reward(&mut self, signals: &OutcomeSignalBank) -> LearningCounts {
+        let mut counts = LearningCounts::default();
+        for position in 0..self.modulated.len() {
+            let (trace, slot) = (self.traces[position], self.modulated[position]);
             let config = self.slots[slot].config;
             let Some(modulation) = config.modulation else {
                 continue;
             };
-            let old = self.learned[slot];
-            self.learned[slot] = three_factor(
-                old,
-                config.learning_rate,
-                signals.signals[modulation.reward_source as usize],
-                trace,
-                config.weight_clamp,
-            );
-            // Compare the final stored f32, including clamping and rounding.
-            changes += u32::from(self.learned[slot] != old);
-            updates += 1;
+            let signal = signals.signals[modulation.reward_source as usize];
+            if let Some((scale, pattern)) = self.slots[slot].credited_scale() {
+                if !self.scale_initialized(scale) {
+                    continue;
+                }
+                self.credit(scale, pattern * config.learning_rate * signal * trace);
+            } else {
+                if !self.initialized(slot) {
+                    continue;
+                }
+                let old = self.learned[slot];
+                self.learned[slot] = three_factor(
+                    old,
+                    config.learning_rate,
+                    signal,
+                    trace,
+                    config.weight_clamp,
+                );
+                // Compare the final stored f32, including clamping and rounding.
+                counts.changes += u32::from(self.learned[slot] != old);
+            }
+            counts.updates += 1;
         }
-        (updates, changes)
+        self.write_scales(&mut counts);
+        counts
     }
 
-    /// The seeds this backend hands a child: `None` when no plastic edge is
-    /// initialized, else one row per compute node and per sink of `def`,
-    /// a value per initialized plastic edge.
+    /// The seeds this backend hands a child: `None` when no learner and no
+    /// scale slot is initialized, else one row per compute node and per sink
+    /// of `def` with the own quantity of each initialized ungrouped or edge
+    /// learner, and one group slot per group record with the learned scale
+    /// of each initialized scale slot.
     fn capture(&self, def: &CgpGraphBackendDef) -> Option<BirthSeeds> {
-        if !(0..self.slots.len()).any(|slot| self.initialized(slot)) {
+        let any_slot = (0..self.slots.len()).any(|slot| self.initialized(slot));
+        let any_scale = (0..self.scales.len()).any(|scale| self.scale_initialized(scale));
+        if !any_slot && !any_scale {
             return None;
         }
         let mut compute: Vec<Vec<Option<f32>>> = def
@@ -148,7 +420,7 @@ impl BackendLearning {
             .map(|sink| vec![None; sink.inputs.len()])
             .collect();
         for (index, slot) in self.slots.iter().enumerate() {
-            if !self.initialized(index) {
+            if !self.initialized(index) || slot.scope == Some(Scope::Group) {
                 continue;
             }
             let row = match slot.occurrence.surface {
@@ -157,11 +429,21 @@ impl BackendLearning {
             };
             row[slot.occurrence.index] = Some(self.learned[index]);
         }
-        Some(BirthSeeds::Rows { compute, sinks })
+        let mut groups = vec![None; def.groups().len()];
+        for (index, slot) in self.scales.iter().enumerate() {
+            if self.scale_initialized(index) {
+                groups[slot.group.index()] = Some(self.scale[index]);
+            }
+        }
+        Some(BirthSeeds::Rows {
+            compute,
+            sinks,
+            groups,
+        })
     }
 }
 
-/// Per-slot samples of the visit in flight: runtime scratch.
+/// Per-learner samples of the visit in flight: runtime scratch.
 #[derive(Debug, Clone, Default)]
 struct Samples {
     pre: Vec<f32>,
@@ -187,16 +469,35 @@ impl PartialEq for LearnedState {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LearnedEdge {
     pub occurrence: EdgeOccurrence,
-    /// The genomic weight at birth.
+    /// The genomic own weight: an ungrouped edge's weight, a member's
+    /// correction (not its composed weight).
     pub genomic: f32,
-    /// The learned own weight, `Some` only for an initialized slot.
+    /// The learned own quantity, `Some` only for an initialized ungrouped
+    /// or edge-scope learner; always `None` for a group learner.
     pub learned: Option<f32>,
+    /// The weight in force: `own + scale × pattern`.
+    pub applied: f32,
     /// The eligibility trace, `Some` only for an initialized
-    /// reward-modulated slot.
+    /// reward-modulated learner.
     pub trace: Option<f32>,
     /// The edge's weight clamp.
     pub bound: f32,
     pub kind: PlasticityKind,
+    /// The member's scope, `None` for an ungrouped edge.
+    pub scope: Option<Scope>,
+}
+
+/// One group's learned scale as the readers see it, in `GroupId` order.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LearnedScale {
+    pub group: GroupId,
+    /// The genomic scale.
+    pub genomic: f32,
+    /// The learned scale, `Some` only for an initialized scale slot.
+    pub learned: Option<f32>,
+    /// The smallest clamp among the group's group learners.
+    pub bound: f32,
+    pub inherit_scale: bool,
 }
 
 impl LearnedState {
@@ -250,13 +551,13 @@ impl LearnedState {
         }
     }
 
-    /// Phase 2.5's three-factor update over every backend: edge assignments
-    /// and assignments that change a stored weight.
-    pub(crate) fn apply_reward(&mut self, signals: &OutcomeSignalBank) -> (u32, u32) {
-        self.backends
-            .iter_mut()
-            .map(|backend| backend.reward(signals))
-            .fold((0, 0), |(u, c), (bu, bc)| (u + bu, c + bc))
+    /// Phase 2.5's three-factor update over every backend.
+    pub(crate) fn apply_reward(&mut self, signals: &OutcomeSignalBank) -> LearningCounts {
+        let mut counts = LearningCounts::default();
+        for backend in &mut self.backends {
+            counts += backend.reward(signals);
+        }
+        counts
     }
 
     /// Mesh node `node_idx`'s seeds for a child before mutation (`def` is
@@ -278,8 +579,11 @@ impl LearnedState {
         Some(Learner {
             backend,
             samples: &mut self.samples,
+            next: 0,
             cursor: 0,
             row_start: 0,
+            row: EdgeSurface::ComputeInput(0),
+            index: 0,
         })
     }
 
@@ -298,18 +602,55 @@ impl LearnedState {
                 LearnedEdge {
                     occurrence: slot.occurrence,
                     genomic: slot.genomic,
-                    learned: initialized.then_some(backend.learned[index]),
+                    learned: (initialized && slot.scope != Some(Scope::Group))
+                        .then_some(backend.learned[index]),
+                    applied: backend.learner_applied(index),
                     trace: trace.filter(|_| initialized),
                     bound: slot.config.weight_clamp,
                     kind: PlasticityKind::of(&slot.config),
+                    scope: slot.scope,
                 }
             })
         })
     }
 
+    /// The read-only view of mesh node `node_idx`'s scale slots, in
+    /// `GroupId` order.
+    pub fn scales(&self, node_idx: usize) -> impl Iterator<Item = LearnedScale> + '_ {
+        self.backends.get(node_idx).into_iter().flat_map(|backend| {
+            backend
+                .scales
+                .iter()
+                .enumerate()
+                .map(move |(index, slot)| LearnedScale {
+                    group: slot.group,
+                    genomic: slot.genomic,
+                    learned: backend
+                        .scale_initialized(index)
+                        .then_some(backend.scale[index]),
+                    bound: slot.bound,
+                    inherit_scale: slot.inherit_scale,
+                })
+        })
+    }
+
+    /// `(occurrence, applied)` over every dynamic edge of mesh node
+    /// `node_idx` (every learner and passive member), in canonical order.
+    pub fn applied_weights(
+        &self,
+        node_idx: usize,
+    ) -> impl Iterator<Item = (EdgeOccurrence, f32)> + '_ {
+        self.backends.get(node_idx).into_iter().flat_map(|backend| {
+            backend
+                .order
+                .iter()
+                .map(move |&(occurrence, dynamic)| (occurrence, backend.applied(dynamic)))
+        })
+    }
+
     /// The weight in force on the edge at `occurrence` of mesh node
-    /// `node_idx` (graph `def`): the learned own weight of a plastic edge,
-    /// else the genomic weight. The only resolver.
+    /// `node_idx` (graph `def`): the applied weight of a dynamic edge, else
+    /// the genomic weight. The only single-edge resolver.
     #[must_use]
     pub fn applied_weight(
         &self,
@@ -322,10 +663,10 @@ impl LearnedState {
             .get(node_idx)
             .and_then(|backend| {
                 backend
-                    .slots
+                    .order
                     .iter()
-                    .position(|slot| slot.occurrence == occurrence)
-                    .map(|slot| backend.learned[slot])
+                    .find(|(at, _)| *at == occurrence)
+                    .map(|&(_, dynamic)| backend.applied(dynamic))
             })
             .unwrap_or_else(|| def.genomic_weight(occurrence, input_refs))
     }
@@ -333,9 +674,9 @@ impl LearnedState {
 
 #[cfg(test)]
 impl LearnedState {
-    /// A fixture: mark mesh node `node_idx`'s backend visited, set its slot
-    /// `slot` (canonical order) to `learned` and, on a reward-modulated
-    /// slot, its trace to `trace`.
+    /// A fixture: mark mesh node `node_idx`'s backend visited, set its
+    /// learner `slot` (canonical order) to `learned` and, on a
+    /// reward-modulated learner, its trace to `trace`.
     pub(crate) fn set_slot(&mut self, node_idx: usize, slot: usize, learned: f32, trace: f32) {
         let backend = &mut self.backends[node_idx];
         backend.visited = true;
@@ -346,17 +687,25 @@ impl LearnedState {
     }
 }
 
-/// One visit's access to its backend's learned weights and samples. The
+/// One visit's access to its backend's learned state and samples. The
 /// executor weighs every edge in canonical order through it, compute
-/// surface first, then the sinks; [`Self::commit`] learns from the samples
-/// once the visit's effects have run.
+/// surface first, then the sinks, each container opened by
+/// [`Self::begin_row`]; the learner, not the executor, decides from each
+/// edge's occurrence whether it is a learner, a passive member or static
+/// (R1). [`Self::commit`] learns from the samples once the visit's effects
+/// have run.
 pub(crate) struct Learner<'a> {
     backend: &'a mut BackendLearning,
     samples: &'a mut Samples,
-    /// The next plastic slot in canonical order.
+    /// The next dynamic edge in canonical order.
+    next: usize,
+    /// The next learner in canonical order.
     cursor: usize,
-    /// The first slot of the container in flight.
+    /// The first learner of the container in flight.
     row_start: usize,
+    /// The container in flight and the index of its next edge.
+    row: EdgeSurface,
+    index: usize,
 }
 
 impl Learner<'_> {
@@ -369,65 +718,85 @@ impl Learner<'_> {
         self.samples.pre.resize(n, 0.0);
         self.samples.post.clear();
         self.samples.post.resize(n, 0.0);
+        self.next = 0;
         self.cursor = 0;
         self.row_start = 0;
     }
 
-    /// Start the next container (a compute node or a sink).
+    /// Start container `surface` (a compute node or a sink).
     #[inline]
-    pub(crate) fn begin_row(&mut self) {
+    pub(crate) fn begin_row(&mut self, surface: EdgeSurface) {
+        self.row = surface;
+        self.index = 0;
         self.row_start = self.cursor;
     }
 
-    /// The weight of the next edge, which read `value`: the learned weight
-    /// of a plastic edge, whose pre sample is recorded, else `genomic`.
+    /// The weight of the container's next edge, which read `value`: the
+    /// applied weight of a dynamic edge (a learner's pre sample recorded),
+    /// else `genomic`.
     #[inline]
-    pub(crate) fn weigh(&mut self, plastic: bool, value: f32, genomic: f32) -> f32 {
-        if !plastic {
-            return genomic;
+    pub(crate) fn weigh(&mut self, value: f32, genomic: f32) -> f32 {
+        let occurrence = EdgeOccurrence::new(self.row, self.index);
+        self.index += 1;
+        match self.backend.order.get(self.next) {
+            Some(&(at, dynamic)) if at == occurrence => {
+                self.next += 1;
+                if let Dynamic::Learner(slot) = dynamic {
+                    self.samples.pre[slot] = value;
+                    self.cursor += 1;
+                }
+                self.backend.applied(dynamic)
+            }
+            _ => genomic,
         }
-        let slot = self.cursor;
-        self.cursor += 1;
-        self.samples.pre[slot] = value;
-        self.backend.learned[slot]
     }
 
     /// End the container in flight: `post` is the post sample of each of
-    /// its plastic edges.
+    /// its learners.
     #[inline]
     pub(crate) fn end_row(&mut self, post: f32) {
         self.samples.post[self.row_start..self.cursor].fill(post);
     }
 
-    /// Learn from the committed visit's samples: each pure-Hebbian slot
-    /// applies its rule's change bounded by its clamp, in canonical order,
-    /// and each reward-modulated slot adds its activity to its trace.
-    /// Returns pure-Hebbian edge assignments and the assignments that
-    /// change a stored weight.
-    pub(crate) fn commit(self) -> (u32, u32) {
+    /// Learn from the committed visit's samples (invariant 4), in canonical
+    /// order with visit-start values: each pure-Hebbian ungrouped or edge
+    /// learner applies its rule's change to its own quantity bounded by its
+    /// clamp, each pure-Hebbian group learner credits `pattern × Δ` to its
+    /// scale, each reward-modulated learner adds its activity to its trace;
+    /// then each credited scale is written once.
+    pub(crate) fn commit(self) -> LearningCounts {
         debug_assert_eq!(
-            self.cursor,
-            self.backend.slots.len(),
-            "the visit weighed every plastic edge of the layout"
+            self.next,
+            self.backend.order.len(),
+            "the visit weighed every dynamic edge of the layout"
         );
         let backend = self.backend;
-        let (mut updates, mut changes) = (0, 0);
+        let mut counts = LearningCounts::default();
         let mut modulated = 0;
-        for (slot, config) in backend.slots.iter().map(|slot| slot.config).enumerate() {
+        for slot in 0..backend.slots.len() {
+            let config = backend.slots[slot].config;
             let (pre, post) = (self.samples.pre[slot], self.samples.post[slot]);
-            let w = backend.learned[slot];
+            // Own quantities change only at their own slot and scales after
+            // the loop, so this is the visit-start applied weight.
+            let w = backend.learner_applied(slot);
             if config.modulation.is_some() {
                 backend.traces[modulated] += activity(config.rule, pre, post, w);
                 modulated += 1;
                 continue;
             }
             let dw = hebbian_delta(config.rule, config.learning_rate, pre, post, w);
-            backend.learned[slot] = (w + dw).clamp(-config.weight_clamp, config.weight_clamp);
-            // Exact stored-value inequality excludes deltas rounded or
-            // clamped away.
-            changes += u32::from(backend.learned[slot] != w);
-            updates += 1;
+            if let Some((scale, pattern)) = backend.slots[slot].credited_scale() {
+                backend.credit(scale, pattern * dw);
+            } else {
+                let old = backend.learned[slot];
+                backend.learned[slot] = (old + dw).clamp(-config.weight_clamp, config.weight_clamp);
+                // Exact stored-value inequality excludes deltas rounded or
+                // clamped away.
+                counts.changes += u32::from(backend.learned[slot] != old);
+            }
+            counts.updates += 1;
         }
-        (updates, changes)
+        backend.write_scales(&mut counts);
+        counts
     }
 }

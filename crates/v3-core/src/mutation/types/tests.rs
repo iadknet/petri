@@ -256,7 +256,8 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphAlterGroupScale
             | MutationOperator::GraphShiftGroupOffset
             | MutationOperator::GraphRetargetGroupKind
-            | MutationOperator::GraphRemoveGroup => {
+            | MutationOperator::GraphRemoveGroup
+            | MutationOperator::GraphSetScope => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -376,6 +377,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
             GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
             GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
+            GraphOperator::SetScope => MutationOperator::GraphSetScope,
         };
         assert_eq!(
             mo.complexity_effect(),

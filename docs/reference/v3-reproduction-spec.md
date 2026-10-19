@@ -129,25 +129,38 @@ Constraints:
   dispatch history start empty. Shared memory follows the separate memory
   rule above.
 - Before mutation the parent's learned state captures the draft's
-  `BirthSeeds` (T25.F06): nothing for a backend with no initialized plastic
-  edge, else one row per compute node and one per sink, each sized to its
-  inputs, a value per initialized plastic edge on either surface. Parent
-  flags do not restrict the capture.
+  `BirthSeeds` (T25.F06, T25.F07): nothing for a backend with no initialized
+  learner and no initialized scale slot, else one row per compute node and
+  one per sink, each sized to its inputs, the own quantity of each
+  initialized ungrouped or edge-scope learner on either surface (`None` for a
+  group-scope learner and every static edge), and one group slot per group
+  record with the learned scale of each initialized scale slot. Parent flags
+  do not restrict the capture.
 - Seeds follow their edge occurrence through the entire birth mutation
   sequence, including mesh and compute-node moves and faithful copies, on
   both surfaces: a pushed edge gets an empty seed at its insertion position
   (the end of a sink's independent prefix), a removed edge loses its seed, a
-  group relocation or detach moves its members' (always empty) seeds with
-  them, and an identity split keeps the consumer's seed while the new
-  identity edge has none.
+  group relocation moves its members' seeds with them, and an identity split
+  keeps the consumer's seed while the new identity edge has none. Group
+  slots follow their records: a new group gets an empty slot, dropping a
+  record (`RemoveGroup`, a last member's removal or detach) removes its
+  slot, and a relocation, a scope write or an `inherit_scale` write keeps it.
+- A detached member's seed is composed (T25.F07): when the edge or its group
+  has a seed, `compose(edge seed or own weight, group seed or scale,
+  pattern)`, reading no flag and clamping nothing; with neither, none.
 - A weight write, a source-changing retarget and an edge reading a removed
-  compute node clear the seed; a same-source retarget, a kind change and a
-  learning-attribute change keep it.
-- The child's constructor reads the final child flags: a Lamarckian plastic
-  edge with a seed starts at the seed clamped by the child's edge clamp and
-  counts as initialized; every other plastic edge, a Darwinian one with a seed
-  included, starts at its child genomic weight, uninitialized until its
-  backend's first visit. Only seeded slots are initialized before that visit.
+  compute node clear the edge's seed and a scale write clears the group's;
+  a same-source retarget, a kind change, a learning-attribute change and a
+  scope change keep it.
+- The child's constructor reads the final child flags: a Lamarckian
+  ungrouped or edge-scope learner with a seed starts at the seed clamped by
+  the child's edge clamp and counts as initialized; every other learner, a
+  Darwinian one with a seed and a group-scope learner included, starts at
+  its child genomic own weight, uninitialized until its backend's first
+  visit. A scale slot starts at `clamp(seed, ±bound)`, initialized, when the
+  child group has `inherit_scale` and a seed, else at the genomic scale. A
+  seed the child does not read is dropped. Only seeded slots are
+  initialized before that visit.
 - Reproduction writes no runtime field and never changes the parent's state;
   a built creature's genome carries no seeds, and runtime arrays do not define
   homology.

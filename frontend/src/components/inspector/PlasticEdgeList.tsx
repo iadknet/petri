@@ -4,6 +4,7 @@ import type {
 	GraphEdge,
 	InputReference,
 	PlasticityConfig,
+	Scope,
 } from "../../types/genome.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { edgeWeightLookup } from "./graphFullModel.ts";
@@ -25,24 +26,39 @@ export interface PlasticEdgeRow {
 	/** What the edge reads. */
 	source: string;
 	config: PlasticityConfig;
+	/** A member's scope (T25.F07); absent for an ungrouped edge. */
+	scope: Scope | undefined;
 	genomic: number;
 	/** The weight in force, when the payload carries it. */
 	applied: number | undefined;
-	/** The learned weight, once the edge is initialized. */
+	/** The learned own quantity, once initialized; never for a group-scope member. */
 	learned: number | undefined;
 }
 
-/** The per-edge plasticity badge: rule, pathway, trace decay and inheritance (T25.F06). */
-export function plasticityBadge(config: PlasticityConfig): string {
+/**
+ * The per-edge plasticity badge: rule, pathway, trace decay and inheritance
+ * (T25.F06), and a member's scope (T25.F07).
+ */
+export function plasticityBadge(config: PlasticityConfig, scope?: Scope): string {
 	const pathway = config.modulation
 		? `reward ${config.modulation.reward_source} · decay ${config.modulation.trace_decay.toFixed(2)}`
 		: "hebbian";
-	return `${config.rule} · ${pathway} · ${config.lamarckian ? "lamarckian" : "darwinian"}`;
+	const badge = `${config.rule} · ${pathway} · ${config.lamarckian ? "lamarckian" : "darwinian"}`;
+	return scope === undefined ? badge : `${badge} · ${scope.toLowerCase()} scope`;
 }
 
 /** The badge spelled out, one sentence per attribute, for its tooltip. */
-export function plasticityDetail(config: PlasticityConfig): string[] {
+export function plasticityDetail(config: PlasticityConfig, scope?: Scope): string[] {
+	const scoped =
+		scope === undefined
+			? []
+			: [
+					scope === "Group"
+						? "Group scope: learns for its group, moving the group's shared scale."
+						: "Edge scope: learns its own correction on top of the group term.",
+				];
 	return [
+		...scoped,
 		`${config.rule} rule, learning rate ${config.learning_rate.toFixed(3)}, weight clamp ±${config.weight_clamp.toFixed(2)}.`,
 		config.modulation
 			? `Reward-modulated by ${config.modulation.reward_source}; its eligibility trace keeps ${config.modulation.trace_decay.toFixed(2)} of itself each tick.`
@@ -54,10 +70,10 @@ export function plasticityDetail(config: PlasticityConfig): string[] {
 }
 
 /** The badge with its spelled-out attributes in a tooltip. */
-export function PlasticityBadge({ config }: { config: PlasticityConfig }) {
+export function PlasticityBadge({ config, scope }: { config: PlasticityConfig; scope?: Scope }) {
 	return (
 		<Tip
-			content={plasticityDetail(config).map((line) => (
+			content={plasticityDetail(config, scope).map((line) => (
 				<span key={line} className="block">
 					{line}
 				</span>
@@ -65,7 +81,7 @@ export function PlasticityBadge({ config }: { config: PlasticityConfig }) {
 			plain
 			className="rounded bg-violet-500/15 px-1 text-violet-200"
 		>
-			<span data-testid="plasticity-badge">{plasticityBadge(config)}</span>
+			<span data-testid="plasticity-badge">{plasticityBadge(config, scope)}</span>
 		</Tip>
 	);
 }
@@ -94,6 +110,7 @@ export function collectPlasticEdges(
 				target,
 				source: describeGraphSource(edge.source, inputRefs).label,
 				config: edge.plasticity,
+				scope: edge.membership?.scope,
 				genomic: entry?.genomic ?? edge.own_weight,
 				applied: entry?.applied,
 				learned: entry?.learned,
@@ -141,7 +158,7 @@ export function PlasticEdgeList({ graphDef, inputRefs, graphWeights }: PlasticEd
 						<span>
 							{row.source} → {row.target}
 						</span>
-						<PlasticityBadge config={row.config} />
+						<PlasticityBadge config={row.config} scope={row.scope} />
 						<span className="text-slate-400">{rowWeights(row)}</span>
 					</li>
 				))}

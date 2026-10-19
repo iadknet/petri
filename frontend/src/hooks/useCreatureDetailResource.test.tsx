@@ -198,7 +198,7 @@ describe("useCreatureDetailResource", () => {
 			{
 				node_id: 2,
 				scales: [{ group: 0, genomic: 0.5 }],
-				edges: [{ surface: "sink" as const, container: 65, edge: 0, genomic: 0.5 }],
+				edges: [{ surface: "sink" as const, container: 65, edge: 0, genomic: 0.5, applied: 0.5 }],
 			},
 		];
 		// Learned weights move between polls (T25.F06).

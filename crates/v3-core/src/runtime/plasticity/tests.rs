@@ -190,7 +190,8 @@ fn weight(state: &GraphRuntimeState) -> f32 {
 fn reward_counts(state: &mut GraphRuntimeState, signal: f32) -> (u32, u32) {
     let mut signals = super::OutcomeSignalBank::default();
     signals.signals[OutcomeChannel::EnergyDelta as usize] = signal;
-    state.learned.apply_reward(&signals)
+    let counts = state.learned.apply_reward(&signals);
+    (counts.updates, counts.changes)
 }
 
 /// The reward pass's edge assignments for one signal.
@@ -772,6 +773,7 @@ fn a_mixed_seed_backend_initializes_only_its_seeded_slot() {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect(),
+        groups: Vec::new(),
     };
     let BirthSeeds::Rows { sinks, .. } = &mut seeds;
     sinks[vote_index][1] = Some(-0.75);

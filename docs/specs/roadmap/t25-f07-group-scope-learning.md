@@ -126,13 +126,13 @@ and 2.5 routing changes.
 ## Implementation Tasks
 
 - [x] Commit 1 (text only): `Scope`, `Membership.scope`, `Group.inherit_scale` with serde; `is_member_of` and the container's membership comparisons on `group` only (R5); `GENOME_FORMAT` 5, `PROTOCOL_VERSION` `v3alpha10`; `types/genome.ts`; the identity pins of grouped genomes re-pinned with "the hash without genome text is unchanged" as the check.
-- [ ] Container: `set_scope`, `set_inherit_scale`, `can_learn` and `validate_graph` (invariant 1); `BirthSeeds::Rows.groups` with the alignment rules and `detach_at`'s seed composition (invariant 6); the alignment proptest and `debug_assert_seed_shape` extended to group slots.
-- [ ] Refactor R1–R2 (readings file): the learner decides slot membership from each edge's occurrence; one composition used by `weigh`, the view, `applied_weight` and `applied_weights` (invariants 2–3).
-- [ ] Runtime: scale slots, the passive set, the credit accumulator in `commit` and `reward`, the snap counter, scale initialization, `capture` and `from_seeds` by scope, `scales()`, `applied_weights()` and the view fields (invariants 2–6, 10).
-- [ ] Refactor R3: each plasticity law split into one draw and a per-config apply; the two perturbations take one `u`; then the scope coin helper, members admitted, `SetScope`, learned creation, the catalog pins (`ALL` 30, default arm 60, `all()` 63) and the weight-sum test (invariant 7).
-- [ ] Counters (invariant 9) with the `counter_definition_changes` entry; census (R6), the four telemetry families, `always_names`, expected families, the three panels, the bench summary rows and totals (invariant 10).
-- [ ] Refactor R4 and the payload (invariant 12); `v3alpha10` §2 history; `creature-detail.ts`, `EdgeGroupList.tsx`, the badge, `graphFullModel.ts`, fixtures.
-- [ ] `mutation-effects-v4`, `applied_trajectory` hash, lab format 5; reference specs per the readers table.
+- [x] Container: `set_scope`, `set_inherit_scale`, `can_learn` and `validate_graph` (invariant 1); `BirthSeeds::Rows.groups` with the alignment rules and `detach_at`'s seed composition (invariant 6); the alignment proptest and `debug_assert_seed_shape` extended to group slots.
+- [x] Refactor R1–R2 (readings file): the learner decides slot membership from each edge's occurrence; one composition used by `weigh`, the view, `applied_weight` and `applied_weights` (invariants 2–3).
+- [x] Runtime: scale slots, the passive set, the credit accumulator in `commit` and `reward`, the snap counter, scale initialization, `capture` and `from_seeds` by scope, `scales()`, `applied_weights()` and the view fields (invariants 2–6, 10).
+- [x] Refactor R3: each plasticity law split into one draw and a per-config apply; the two perturbations take one `u`; then the scope coin helper, members admitted, `SetScope`, learned creation, the catalog pins (`ALL` 30, default arm 60, `all()` 63) and the weight-sum test (invariant 7).
+- [x] Counters (invariant 9) with the `counter_definition_changes` entry; census (R6), the four telemetry families, `always_names`, expected families, the three panels, the bench summary rows and totals (invariant 10).
+- [x] Refactor R4 and the payload (invariant 12); `v3alpha10` §2 history; `creature-detail.ts`, `EdgeGroupList.tsx`, the badge, `graphFullModel.ts`, fixtures.
+- [x] `mutation-effects-v4`, `applied_trajectory` hash, lab format 5; reference specs per the readers table.
 - [ ] Re-pin every mutation-on pin under commit 2 (invariant 11), one cause per commit; viability first.
 
 ## Verification
@@ -160,6 +160,34 @@ Tests written first (names bind the implementer; design is the implementer's):
 | counters | invariant 9 on a group of two contributors whose scale moves |
 | census | a group learner adds no edge drift; an unchanged correction under a nonzero genomic scale drifts 0; scale drift once per group |
 | `validate_graph` | a plastic member passes; a plastic `ClearSlot` edge is still rejected |
+
+The scope-coin tails, `SetScope`, learned creation, counters and census rows
+are `a_non_member_draws_no_coin`,
+`enable_hebbian_lands_one_config_on_the_admitted_members`,
+`group_wide_modulation_changes_keep_each_members_config`,
+`group_wide_toggle_and_perturbations_follow_the_picked_value_and_each_branch`,
+`group_wide_rule_and_source_redraws_write_the_drawn_value`,
+`set_scope_flips_one_member_or_every_member`,
+`add_*_draws_*_then_learning_and_is_born_silent`,
+`counters_count_every_contributor_of_a_moved_scale`,
+`group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale` and
+`validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge`.
+
+Build pass (2026-10-19; `make check`, benchmarks, mutation and the slow tier
+not run):
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p v3-core --test viability` (first, both commits) | 30 passed; founder-only digests unchanged |
+| `cargo test --workspace --no-fail-fast` | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry), awaiting the gate and goal re-pin |
+| `PROPTEST_CASES=2000 cargo test -p v3-core --lib seed_rows_follow` | pass |
+| `cargo clippy --workspace --all-targets`; `cargo fmt --all -- --check` | clean |
+| frontend `tsc -b --noEmit`; `vitest run`; `biome check src/` | clean; 103 files, 666 tests pass |
+
+Identity checks: commit 1 leaves every hash without genome text and every
+rate-0 fixture unchanged (`recruitment_tests`, `baseline_worlds`,
+`applied_trajectory` comments); commit 2 leaves the mutation-off short-run
+identity and the rate-0 sampled trajectory byte-identical.
 
 - [ ] Focused tests: `cargo test -p v3-core --test viability` first, then `make check` -> result recorded here.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.

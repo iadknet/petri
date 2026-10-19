@@ -53,7 +53,9 @@ Version contract:
 - Canonical value: `"v3alpha10"`.
 - Breaking payload changes require protocol-version bump. `v3alpha10`
   (T25.F07) gave every genome membership a `scope` (`"Edge"` or `"Group"`)
-  and every genome group an `inherit_scale`, both always written. `v3alpha9`
+  and every genome group an `inherit_scale`, both always written, put
+  `applied` on every `graph_weights` edge (a member's through the learned
+  scale) and gave each scale a `learned?`. `v3alpha9`
   (T25.F06) moved `plasticity` from a genome compute node to each graph edge
   (`{source, own_weight, plasticity?, membership?}`), made `graph_weights`
   list every plastic edge beside the members with `applied?` and `learned?`,
@@ -776,7 +778,7 @@ Field definitions:
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
 | `genome` | object | Full genome (omitted when `exclude` contains `genome`). A Graph backend's edges carry `own_weight` and, for an edge-group member, `membership: {group, scope}` (`scope` `"Edge"` or `"Group"`, T25.F07); its `groups` list (`{shape: {Ring: {ring_ref}} \| {DirectionPair: {ref_idx, pair}}, kind, offset, scale, inherit_scale}`) is omitted when empty (T25.F03, T25.F04, T25.F07). |
 | `mesh_annotations` | array | Per-node read and write classes, reachability and liveness; present whenever `genome` is. |
-| `graph_weights` | array | Per Graph node carrying an edge group or a plastic edge, in genome order: `{node_id, scales: [{group, genomic}], edges: [{surface: "compute" \| "sink", container, edge, genomic, applied?, learned?}]}`, in canonical edge order one `edges` entry per group member actually present (eight for a new `Ring` group, twelve for a new `DirectionPair` group) at its genomic weight `scale × pattern + own_weight`, the pattern 1 for a `Ring` member and the member's compass component for a `DirectionPair` member (T25.F03, T25.F04), and one per plastic edge on either surface with `applied` (the weight in force) and `learned` (present only once the edge is initialized); a member carries neither (T25.F06). Computed on every request whether or not `genome` is included; omitted when the creature has neither or `exclude` contains `graph_weights`. |
+| `graph_weights` | array | Per Graph node carrying an edge group or a plastic edge, in genome order: `{node_id, scales: [{group, genomic, learned?}], edges: [{surface: "compute" \| "sink", container, edge, genomic, applied, learned?}]}`, in canonical edge order one `edges` entry per group member actually present (eight for a new `Ring` group, twelve for a new `DirectionPair` group) with its genomic weight `scale × pattern + own_weight`, the pattern 1 for a `Ring` member and the member's compass component for a `DirectionPair` member (T25.F03, T25.F04), and one per plastic edge on either surface (T25.F06). Every listed edge carries `applied`, the weight in force `own + scale × pattern` through the learned own quantity and the learned scale where they exist; `learned` is present only for an initialized own quantity (an ungrouped edge's weight or an edge-scope member's correction, never a group-scope member's), and a scale's `learned` only for an initialized scale slot of a group with a group-scope learner (T25.F07). Built by one merge-walk over the canonical edge order. Computed on every request whether or not `genome` is included; omitted when the creature has neither or `exclude` contains `graph_weights`. |
 | `shared_memory` | `f32[]` | 16-slot creature shared memory (omitted when `exclude` contains `shared_memory`). |
 | `action_log` | array | Action log entries (omitted when `exclude` contains `action_log`). |
 

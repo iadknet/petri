@@ -116,6 +116,14 @@
 //! 53b0c507...) at the merge base and after the commit, and with
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical
 //! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
+//! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned group
+//! creation, the scope coin and `SetScope` change every Graph draw, groups
+//! learn, and the learned row carries the initialized learned scales after
+//! the edge items, which moves all four digests (sampled 63d2f57d... ->
+//! 38f68975..., gestation rate 0.0 a3b599b9... -> 0d037fb0...; guard
+//! 45759536... -> 31bd6e95..., rate 0.0 a8ef1c4a... -> ec2e084d...). With
+//! `mutation.per_unit_rate` 0 the sampled run is byte-identical
+//! (bd8dca14..., gestation rate 0.0 d3b71fcd...): no founder-based change.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -127,11 +135,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "63d2f57d9a84ec1b87ec5652503effe4954cb2455999c08a36da66fd81b679b7"
+        "38f68975757d019f953a7caa988aaa4f88ab1dbacc6c2fa29e6a849f8cae8c8c"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "a3b599b9ab79ba4c8a6cf8987c17383700d3c3672bca5514c9e78cf553f9da8a"
+        "0d037fb0c9b745f82d9a57d90a8571a99b722ce7fe193a47ee4ff5a2989c5edc"
     );
 }
 
@@ -169,8 +177,8 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
                         creature.prev_shared_memory.map(f32::to_bits),
                         &creature.graph_runtime.node_state,
                         &creature.graph_runtime.node_outputs,
-                        learned_rows(creature, |edge| edge.learned),
-                        learned_rows(creature, |edge| edge.trace),
+                        learned_rows(creature, |edge| edge.learned, true),
+                        learned_rows(creature, |edge| edge.trace, false),
                     ))
                     .unwrap(),
                 );
@@ -204,11 +212,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "457595366f477a697819566ea05000618c0dcf30ec250e6691bac04d375eed43"
+        "31bd6e9506a3e7c13ff08f55bee19c60cd736b3f074bc8e1fb9c6913d8cbc3b5"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "a8ef1c4a2db365f3223271ef6f0d49be3c7d9af9fa292691ee2b631e0fcb8df2"
+        "ec2e084da1d59938f016f8e3293c28c1883554050306ea2457cdd9e43b70b859"
     );
 }
 
@@ -247,17 +255,29 @@ fn applied_guard_digest(gestation_rate: Option<f32>) -> String {
 
 /// One row per mesh node of `read` over its initialized plastic edges in
 /// canonical order, through the learned state's view (T25.F06): the learned
-/// values or the traces. Empty for a creature without a plastic edge, as the
-/// deleted storage serialized.
+/// values or the traces. The learned row carries the initialized learned
+/// scales after the edge items, in `GroupId` order (T25.F07). Empty for a
+/// creature without a plastic edge, as the deleted storage serialized.
 fn learned_rows(
     creature: &v3_core::creature::state::CreatureState,
     read: impl Fn(&v3_core::runtime::plasticity::LearnedEdge) -> Option<f32>,
+    with_scales: bool,
 ) -> Vec<Vec<f32>> {
     let learned = creature.graph_runtime.learned();
     if !learned.has_learning() {
         return Vec::new();
     }
     (0..creature.genome.nodes.len())
-        .map(|node| learned.edges(node).filter_map(|edge| read(&edge)).collect())
+        .map(|node| {
+            let scales = learned
+                .scales(node)
+                .filter(|_| with_scales)
+                .filter_map(|scale| scale.learned);
+            learned
+                .edges(node)
+                .filter_map(|edge| read(&edge))
+                .chain(scales)
+                .collect()
+        })
         .collect()
 }

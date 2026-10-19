@@ -1443,6 +1443,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect(),
+        groups: vec![None; def.groups().len()],
     };
     let BirthSeeds::Rows { compute: seeds, .. } = &mut rows;
     seeds[compute] = vec![Some(1.0), Some(0.25)];

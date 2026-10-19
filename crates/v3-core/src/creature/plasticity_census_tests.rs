@@ -241,6 +241,19 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
         ],
         edges_by_rule: [11, 12, 13, 14],
         edges_by_inheritance: [21, 22],
+        edges_by_scope: [31, 32, 33],
+        scales: [
+            LearnedScales {
+                scales: 41,
+                drift_sum: 0.5,
+                at_bound: 1,
+            },
+            LearnedScales {
+                scales: 42,
+                drift_sum: 1.5,
+                at_bound: 2,
+            },
+        ],
     };
 
     let cells: Vec<_> = census.cells().collect();
@@ -257,9 +270,95 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
     let expected: Vec<_> = RULES.iter().map(|&rule| rule_key(rule)).zip(11..).collect();
     assert_eq!(rules, expected);
     assert_eq!(rules.len(), 4);
+    assert_eq!(
+        census.scope_counts().collect::<Vec<_>>(),
+        vec![("ungrouped", 31), ("edge", 32), ("group", 33)]
+    );
+    let scales: Vec<_> = census.scale_cells().collect();
+    assert_eq!(
+        scales,
+        vec![
+            ("darwinian", census.scales[0]),
+            ("lamarckian", census.scales[1])
+        ]
+    );
     let inheritance: Vec<_> = census.inheritance_counts().collect();
     assert_eq!(inheritance, vec![("darwinian", 21), ("lamarckian", 22)]);
     // Every term is exact in binary.
     let totals: Vec<_> = census.surface_totals().collect();
     assert_eq!(totals, vec![("compute", 0.625, 7), ("sink", 2.25, 10)]);
+}
+
+/// T25.F07 invariant 10: a group learner adds no edge drift, an unchanged
+/// correction under a nonzero genomic scale drifts 0, and a learned scale
+/// counts once per group by its `inherit_scale`, with its drift and bound.
+#[test]
+fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
+    use crate::contracts::WorldInputKey;
+    use crate::creature::genome::cgp::{BirthSeeds, EdgeSurface, Scope, Shape};
+    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::creature::genome::HebbianRule;
+
+    let lamarckian = PlasticityConfig {
+        rule: HebbianRule::Classic,
+        learning_rate: 0.1,
+        weight_clamp: 1.5,
+        lamarckian: true,
+        modulation: None,
+    };
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    def.group_mut(id).set_scale(0.5);
+    def.group_mut(id).set_inherit_scale(true);
+    let members: Vec<EdgeOccurrence> = def.members(id).collect();
+    def.edge_mut(members[0]).set_weight(0.25);
+    for (k, scope) in [Scope::Edge, Scope::Group, Scope::Group]
+        .into_iter()
+        .enumerate()
+    {
+        let mut edge = def.edge_mut(members[k]);
+        edge.set_plasticity(Some(lamarckian));
+        edge.set_scope(scope);
+    }
+    let mut sinks: Vec<Vec<Option<f32>>> = def
+        .output_sinks()
+        .iter()
+        .map(|sink| vec![None; sink.inputs.len()])
+        .collect();
+    let EdgeSurface::SinkInput(sink) = members[0].surface else {
+        unreachable!()
+    };
+    // The edge learner's seed is its genomic correction; the scale is
+    // seeded past its bound.
+    sinks[sink][members[0].index] = Some(0.25);
+    let seeds = BirthSeeds::Rows {
+        compute: Vec::new(),
+        sinks,
+        groups: vec![Some(4.0)],
+    };
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![crate::contracts::InputReference::World(
+                WorldInputKey::NeighborBarrierRing,
+            )],
+            backend_def: BackendDef::Graph(def),
+            targets: vec![],
+        }],
+    };
+    let state = GraphRuntimeState::for_genome(&genome, vec![Some(seeds)]);
+    let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
+
+    assert_eq!(census.edges_by_scope, [0, 1, 2]);
+    let sink_cell = census.edges[0][1];
+    assert_eq!(sink_cell.edges, 3);
+    assert_eq!(sink_cell.drift_sum, 0.0, "the unchanged correction");
+    assert_eq!(sink_cell.at_clamp, 0);
+    let [darwinian, lamarckian_scales] = census.scales;
+    assert_eq!(darwinian, LearnedScales::default());
+    assert_eq!(lamarckian_scales.scales, 1, "once per group");
+    // Seeded at 4, clamped to the bound 1.5 at construction.
+    assert_eq!(lamarckian_scales.drift_sum, 1.0);
+    assert_eq!(lamarckian_scales.at_bound, 1);
 }

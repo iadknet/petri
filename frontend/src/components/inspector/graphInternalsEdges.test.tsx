@@ -51,11 +51,12 @@ describe("graph edge tooltips", () => {
 			target: "Move[NE]",
 			weight: 0.75,
 			own: 0.25,
-			member: { group: 2, scale: 0.5, pattern: 1 },
+			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge" },
 		});
 		expect(tip).toHaveTextContent("group #2 member");
 		expect(tip).toHaveTextContent("scale × pattern + correction");
 		expect(tip).toHaveTextContent("0.500 × 1.00 + 0.250 = 0.750");
+		expect(tip).toHaveTextContent("applied unavailable · scope Edge");
 	});
 
 	it("shows a plastic edge's weights, rule, reward source, trace decay and inheritance", () => {

@@ -12,7 +12,7 @@ pub(crate) mod rules;
 
 pub use kind::{PlasticityKind, RULES};
 pub(crate) use learned::Learner;
-pub use learned::{LearnedEdge, LearnedState};
+pub use learned::{LearnedEdge, LearnedScale, LearnedState};
 
 use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 
@@ -26,5 +26,7 @@ pub(crate) struct OutcomeSignalBank {
     pub signals: [f32; OUTCOME_CHANNEL_COUNT],
 }
 
+#[cfg(test)]
+mod group_tests;
 #[cfg(test)]
 mod tests;

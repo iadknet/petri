@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { EdgeGroup, GraphBackendDef, InputReference } from "../../types/genome.ts";
+import type { EdgeGroup, GraphBackendDef, InputReference, Scope } from "../../types/genome.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { directionName } from "./directions.ts";
 import { composeTerms, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
@@ -23,7 +23,7 @@ const PAIR_BIRTH_SET = new Set(PAIR_BIRTH_KEYS);
 interface EdgeGroupListProps {
 	graphDef: GraphBackendDef;
 	inputRefs: InputReference[];
-	/** The server's genomic member weights for this node. */
+	/** The server's member weights and learned scales for this node. */
 	graphWeights: NodeGraphWeights | null;
 }
 
@@ -35,8 +35,12 @@ export interface GroupMember {
 	sink: number;
 	edge: number;
 	ownWeight: number;
+	/** How the member learns when plastic (T25.F07). */
+	scope: Scope;
 	/** The server's genomic weight, when the payload carries it. */
 	genomic: number | undefined;
+	/** The server's weight in force, when the payload carries it (T25.F07). */
+	applied: number | undefined;
 }
 
 /** The reference a group reads, or its dangling index. */
@@ -50,23 +54,27 @@ export function collectGroupMembers(
 	graphDef: GraphBackendDef,
 	graphWeights: NodeGraphWeights | null,
 ): GroupMember[][] {
-	const genomic = new Map(
+	const weights = new Map(
 		(graphWeights?.edges ?? [])
 			.filter((entry) => entry.surface === "sink")
-			.map((entry) => [`${entry.container}:${entry.edge}`, entry.genomic]),
+			.map((entry) => [`${entry.container}:${entry.edge}`, entry]),
 	);
 	const members: GroupMember[][] = (graphDef.groups ?? []).map(() => []);
 	graphDef.output_sinks.forEach((sink, sinkIndex) => {
 		sink.inputs.forEach((edge, edgeIndex) => {
-			const group = edge.membership?.group;
-			if (group === undefined || !members[group] || !("InputLeaf" in edge.source)) return;
-			members[group].push({
+			const membership = edge.membership;
+			const list = membership ? members[membership.group] : undefined;
+			if (!membership || !list || !("InputLeaf" in edge.source)) return;
+			const entry = weights.get(`${sinkIndex}:${edgeIndex}`);
+			list.push({
 				channel: edge.source.InputLeaf.sub_idx,
 				direction: sinkDirection(sink.kind),
 				sink: sinkIndex,
 				edge: edgeIndex,
 				ownWeight: edge.own_weight,
-				genomic: genomic.get(`${sinkIndex}:${edgeIndex}`),
+				scope: membership.scope,
+				genomic: entry?.genomic,
+				applied: entry?.applied,
 			});
 		});
 	});
@@ -97,18 +105,45 @@ function MemberWeights({
 		>
 			own={member.ownWeight.toFixed(3)}
 			{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
+			{member.applied !== undefined ? ` applied=${member.applied.toFixed(3)}` : ""}
+			<span data-testid="edge-group-member-scope"> {member.scope.toLowerCase()} scope</span>
 		</Tip>
 	);
 }
 
 /** Group facts shared by both shapes, each explained in a tooltip. */
-function GroupFacts({ group, offsetTip }: { group: EdgeGroup; offsetTip: string }) {
+function GroupFacts({
+	group,
+	learnedScale,
+	offsetTip,
+}: {
+	group: EdgeGroup;
+	/** The learned scale, for an initialized scale slot (T25.F07). */
+	learnedScale: number | undefined;
+	offsetTip: string;
+}) {
 	return (
 		<>
 			<span className="text-slate-400">{group.kind}</span>
 			<Tip content={offsetTip}>offset {group.offset}</Tip>
 			<Tip content="The group's shared weight: each member's weight is scale × its pattern + its own correction.">
 				scale={group.scale.toFixed(3)}
+			</Tip>
+			{learnedScale !== undefined ? (
+				<Tip content="The learned scale the group's group-scope members moved; every member weighs through it.">
+					<span data-testid="edge-group-learned-scale">learned={learnedScale.toFixed(3)}</span>
+				</Tip>
+			) : null}
+			<Tip
+				content={
+					group.inherit_scale
+						? "inherit_scale: a parent's learned scale seeds the child's."
+						: "No inherit_scale: a child starts from the genomic scale."
+				}
+			>
+				<span data-testid="edge-group-inherit-scale">
+					{group.inherit_scale ? "inherits scale" : "genomic scale at birth"}
+				</span>
 			</Tip>
 		</>
 	);
@@ -158,12 +193,14 @@ function RingRow({
 	index,
 	members,
 	inputRefs,
+	learnedScale,
 }: {
 	group: EdgeGroup;
 	ringRef: number;
 	index: number;
 	members: GroupMember[];
 	inputRefs: InputReference[];
+	learnedScale: number | undefined;
 }) {
 	const present = new Set(members.map((member) => member.channel));
 	const byChannel = [...members].sort((a, b) => a.channel - b.channel);
@@ -178,6 +215,7 @@ function RingRow({
 				<>
 					<GroupFacts
 						group={group}
+						learnedScale={learnedScale}
 						offsetTip={`Each ring cell votes ${group.kind} toward the direction ${steps(group.offset)} clockwise from that cell (0 = same, 4 = opposite).`}
 					/>
 					<Tip
@@ -210,6 +248,7 @@ function PairRow({
 	index,
 	members,
 	inputRefs,
+	learnedScale,
 }: {
 	group: EdgeGroup;
 	refIdx: number;
@@ -217,6 +256,7 @@ function PairRow({
 	index: number;
 	members: GroupMember[];
 	inputRefs: InputReference[];
+	learnedScale: number | undefined;
 }) {
 	const ref = inputRefs[refIdx];
 	const fields = directionPairs(ref)[pair];
@@ -245,6 +285,7 @@ function PairRow({
 				<>
 					<GroupFacts
 						group={group}
+						learnedScale={learnedScale}
 						offsetTip={`Votes ${group.kind} toward the sensed offset, rotated ${steps(group.offset)} clockwise (0 = toward, 4 = away).`}
 					/>
 					<Tip
@@ -282,6 +323,9 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 	const groups = graphDef.groups ?? [];
 	if (groups.length === 0) return null;
 	const members = collectGroupMembers(graphDef, graphWeights);
+	const learned = new Map(
+		(graphWeights?.scales ?? []).map((scale) => [scale.group, scale.learned]),
+	);
 	return (
 		<section aria-label="Edge groups" className="mt-2">
 			<h4 className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -298,6 +342,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
+							learnedScale={learned.get(index)}
 						/>
 					) : (
 						<PairRow
@@ -309,6 +354,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
+							learnedScale={learned.get(index)}
 						/>
 					),
 				)}

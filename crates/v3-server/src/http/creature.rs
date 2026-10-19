@@ -84,11 +84,14 @@ struct NodeGraphWeights {
     edges: Vec<EdgeGenomicWeight>,
 }
 
-/// One group's shared scale, by `GroupId` index.
+/// One group's shared scale, by `GroupId` index: its genomic value and,
+/// for an initialized scale slot, its learned value (T25.F07).
 #[derive(Debug, PartialEq, serde::Serialize)]
 struct GroupScaleWeight {
     group: usize,
     genomic: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    learned: Option<f32>,
 }
 
 /// Which edge-bearing surface an edge sits on.
@@ -100,24 +103,25 @@ enum WeightSurface {
 }
 
 /// One edge's weights, keyed by surface, container index (compute node or
-/// sink) and index within that container's inputs: its genomic weight, and
-/// for a plastic edge the weight in force (`applied`) and, once initialized,
-/// its learned weight (T25.F06).
+/// sink) and index within that container's inputs: its genomic weight, the
+/// weight in force (`applied`) and, for an initialized own quantity, its
+/// learned value (T25.F06, T25.F07).
 #[derive(Debug, PartialEq, serde::Serialize)]
 struct EdgeGenomicWeight {
     surface: WeightSurface,
     container: usize,
     edge: usize,
     genomic: f32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    applied: Option<f32>,
+    applied: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     learned: Option<f32>,
 }
 
 /// The `graph_weights` payload: one entry per Graph node with a group member
 /// or a plastic edge, its group scales and those edges' weights in canonical
-/// order; `None` when no node carries either.
+/// order; `None` when no node carries either. Built by one merge-walk over
+/// `edge_sites()`, the learned state's `applied_weights` and its edge and
+/// scale views, all in canonical order (R4).
 fn graph_weights(
     genome: &v3_core::creature::genome::CreatureGenome,
     learned: &v3_core::runtime::plasticity::LearnedState,
@@ -130,14 +134,22 @@ fn graph_weights(
             let BackendDef::Graph(def) = &node.backend_def else {
                 return None;
             };
+            let mut applied = learned.applied_weights(node_idx).peekable();
+            let mut views = learned.edges(node_idx).peekable();
             let edges: Vec<EdgeGenomicWeight> = def
                 .edge_sites()
                 .filter_map(|occurrence| {
                     let edge = def.edge_at(occurrence);
-                    let plastic = edge.plasticity().is_some();
-                    if !plastic && edge.membership().is_none() {
+                    if edge.plasticity().is_none() && edge.membership().is_none() {
                         return None;
                     }
+                    let genomic = def.genomic_weight(occurrence, &node.input_refs);
+                    let applied = applied
+                        .next_if(|&(at, _)| at == occurrence)
+                        .map_or(genomic, |(_, weight)| weight);
+                    let learned = views
+                        .next_if(|view| view.occurrence == occurrence)
+                        .and_then(|view| view.learned);
                     let (surface, container) = match occurrence.surface {
                         EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
                         EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
@@ -146,21 +158,13 @@ fn graph_weights(
                         surface,
                         container,
                         edge: occurrence.index,
-                        genomic: def.genomic_weight(occurrence, &node.input_refs),
-                        applied: plastic.then(|| {
-                            learned.applied_weight(node_idx, def, &node.input_refs, occurrence)
-                        }),
-                        learned: plastic
-                            .then(|| {
-                                learned
-                                    .edges(node_idx)
-                                    .find(|item| item.occurrence == occurrence)
-                                    .and_then(|item| item.learned)
-                            })
-                            .flatten(),
+                        genomic,
+                        applied,
+                        learned,
                     })
                 })
                 .collect();
+            let mut scales = learned.scales(node_idx).peekable();
             (!edges.is_empty()).then(|| NodeGraphWeights {
                 node_id: node.node_id,
                 scales: def
@@ -170,6 +174,9 @@ fn graph_weights(
                     .map(|(group, record)| GroupScaleWeight {
                         group,
                         genomic: record.scale(),
+                        learned: scales
+                            .next_if(|scale| scale.group.index() == group)
+                            .and_then(|scale| scale.learned),
                     })
                     .collect(),
                 edges,

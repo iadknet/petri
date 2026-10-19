@@ -14,7 +14,10 @@ use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use v3_core::sensors::static_inputs::StaticInputs;
 use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;
 
-const SEARCH_SEEDS: u64 = 512;
+/// 1,024 since T25.F07 commit 2: learned group creation, the scope coin and
+/// `SetScope` remap every Graph draw, and no lineage of the first 512 seeds
+/// reaches a positive bid beside a real action within 12 generations.
+const SEARCH_SEEDS: u64 = 1024;
 const SEARCH_GENERATIONS: usize = 12;
 
 #[derive(Debug, Clone)]

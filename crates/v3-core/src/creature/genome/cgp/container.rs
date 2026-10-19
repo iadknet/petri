@@ -10,8 +10,8 @@
 use std::fmt;
 use std::ops::Deref;
 
-use super::edge::{Membership, Scope};
 use super::edge::{GraphEdge, GraphSource};
+use super::edge::{Membership, Scope};
 use super::group::{compose, pair_birth_members, Group, GroupId, Shape};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
@@ -155,19 +155,21 @@ impl EdgeOccurrence {
 // ── Birth seeds ─────────────────────────────────────────────────────────────
 
 /// The birth payload a reproduction draft carries (T25.F01, design note D1,
-/// T25.F06): the parent's learned value per initialized plastic edge on
-/// either surface, captured before mutation (`LearnedState::capture`) and
-/// consumed by the newborn's constructor. A parent backend with nothing
+/// T25.F06, T25.F07): the parent's learned own quantity per initialized
+/// ungrouped or edge-scope learner on either surface and its learned scale
+/// per initialized scale slot, captured before mutation
+/// (`LearnedState::capture`) and consumed by the newborn's constructor. A parent backend with nothing
 /// initialized carries no payload at all. Outside genome identity,
 /// serialization and equality.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BirthSeeds {
     /// One row per compute node and one per sink, each sized to that
-    /// container's `inputs` (I11); `None` where the edge has no inherited
-    /// value.
+    /// container's `inputs`, and one group slot per group record (I11);
+    /// `None` where the edge or the group has no inherited value.
     Rows {
         compute: Vec<Vec<Option<f32>>>,
         sinks: Vec<Vec<Option<f32>>>,
+        groups: Vec<Option<f32>>,
     },
 }
 
@@ -175,7 +177,7 @@ impl BirthSeeds {
     /// The row of `surface`, empty when the payload has none.
     #[must_use]
     pub fn row(&self, surface: EdgeSurface) -> &[Option<f32>] {
-        let Self::Rows { compute, sinks } = self;
+        let Self::Rows { compute, sinks, .. } = self;
         let rows = match surface {
             EdgeSurface::ComputeInput(i) => compute.get(i),
             EdgeSurface::SinkInput(i) => sinks.get(i),
@@ -190,6 +192,19 @@ impl BirthSeeds {
             .get(occurrence.index)
             .copied()
             .flatten()
+    }
+
+    /// The inherited scale of `group`, if any.
+    #[must_use]
+    pub fn group_value(&self, group: GroupId) -> Option<f32> {
+        self.group_slots().get(group.index()).copied().flatten()
+    }
+
+    /// One slot per group record.
+    #[must_use]
+    pub fn group_slots(&self) -> &[Option<f32>] {
+        let Self::Rows { groups, .. } = self;
+        groups
     }
 
     /// One row per compute node.
@@ -207,11 +222,16 @@ impl BirthSeeds {
     }
 
     fn row_mut(&mut self, surface: EdgeSurface) -> &mut Vec<Option<f32>> {
-        let Self::Rows { compute, sinks } = self;
+        let Self::Rows { compute, sinks, .. } = self;
         match surface {
             EdgeSurface::ComputeInput(i) => &mut compute[i],
             EdgeSurface::SinkInput(i) => &mut sinks[i],
         }
+    }
+
+    fn groups_mut(&mut self) -> &mut Vec<Option<f32>> {
+        let Self::Rows { groups, .. } = self;
+        groups
     }
 }
 
@@ -300,9 +320,24 @@ impl EdgeMut<'_> {
         );
         debug_assert!(
             plasticity.is_none() || self.def.can_learn(self.occurrence),
-            "set_plasticity: neither a ClearSlot edge nor a member learns"
+            "set_plasticity: a ClearSlot edge does not learn"
         );
         self.def.edge_slot(self.occurrence).plasticity = plasticity;
+    }
+
+    /// Set a member's learning scope (T25.F07), the only writer; no seed
+    /// change.
+    ///
+    /// # Panics
+    ///
+    /// If the edge is not a member.
+    pub fn set_scope(&mut self, scope: Scope) {
+        self.def
+            .edge_slot(self.occurrence)
+            .membership
+            .as_mut()
+            .expect("set_scope: the edge is a member")
+            .scope = scope;
     }
 }
 
@@ -319,9 +354,18 @@ impl GroupMut<'_> {
         self.def.groups[self.group.index()]
     }
 
-    /// Set the group's shared scale.
+    /// Set the group's shared scale; its seed is cleared.
     pub fn set_scale(&mut self, scale: f32) {
+        if let Some(seeds) = &mut self.def.birth_seeds {
+            seeds.groups_mut()[self.group.index()] = None;
+        }
         self.def.groups[self.group.index()].scale = scale;
+    }
+
+    /// Set whether a parent's learned scale seeds the child's (T25.F07),
+    /// the only writer; no seed change.
+    pub fn set_inherit_scale(&mut self, inherit_scale: bool) {
+        self.def.groups[self.group.index()].inherit_scale = inherit_scale;
     }
 }
 
@@ -350,7 +394,8 @@ pub enum GraphInvariantViolation {
     SinkOrder,
     /// I1 (T25.F06): a learning attribute is non-finite or out of range.
     PlasticityOutOfRange,
-    /// T25.F06 invariant 2: a `ClearSlot` edge or a group member is plastic.
+    /// T25.F06 invariant 2, T25.F07 invariant 1: a `ClearSlot` edge is
+    /// plastic.
     IneligiblePlasticEdge,
 }
 
@@ -543,8 +588,8 @@ impl CgpGraphBackendDef {
     }
 
     /// Whether the edge at `occurrence` may carry learning attributes
-    /// (T25.F06 invariant 2): every edge except one of a `ClearSlot` sink,
-    /// whose sum is ignored, and a group member, until T25.F07 gives it a
+    /// (T25.F06 invariant 2, T25.F07 invariant 1): every edge except one of
+    /// a `ClearSlot` sink, whose sum is ignored. A member learns at its
     /// scope.
     #[must_use]
     pub fn can_learn(&self, occurrence: EdgeOccurrence) -> bool {
@@ -552,7 +597,6 @@ impl CgpGraphBackendDef {
             EdgeSurface::ComputeInput(_) => true,
             EdgeSurface::SinkInput(i) => {
                 !matches!(self.output_sinks[i].kind, OutputSinkKind::ClearSlot(_))
-                    && self.edge_at(occurrence).membership.is_none()
             }
         }
     }
@@ -598,6 +642,16 @@ impl CgpGraphBackendDef {
                 self.pattern_at(edge, sink, input_refs),
             ),
         }
+    }
+
+    /// The pattern of the edge at `occurrence`: its group's at the member's
+    /// field and sink direction, 0 for an ungrouped edge (T25.F07).
+    #[must_use]
+    pub fn pattern(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32 {
+        if self.edge_at(occurrence).membership.is_none() {
+            return 0.0;
+        }
+        self.member_pattern(occurrence, input_refs)
     }
 
     /// The pattern of the member at `occurrence` (its group's at the
@@ -709,7 +763,7 @@ impl CgpGraphBackendDef {
             self.compute_nodes.len()
         );
         self.compute_nodes.0.remove(idx);
-        if let Some(BirthSeeds::Rows { compute, sinks }) = &mut self.birth_seeds {
+        if let Some(BirthSeeds::Rows { compute, sinks, .. }) = &mut self.birth_seeds {
             compute.remove(idx);
             let read_removed = GraphSource::ComputeNode(idx as u16);
             let containers = self
@@ -1101,6 +1155,9 @@ impl CgpGraphBackendDef {
             scale: 0.0,
             inherit_scale: false,
         });
+        if let Some(seeds) = &mut self.birth_seeds {
+            seeds.groups_mut().push(None);
+        }
         id
     }
 
@@ -1180,7 +1237,23 @@ impl CgpGraphBackendDef {
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
         let Membership { group, .. } = edge.membership.expect("detach_at: the edge is a member");
-        edge.own_weight = compose(edge.own_weight, self.groups[group.index()].scale, pattern);
+        let scale = self.groups[group.index()].scale;
+        // The composed seed (T25.F07 invariant 6): what the detached edge
+        // weighed at the parent, from the edge's and the group's seeds, each
+        // falling back to its genomic value; no flag read and no clamp
+        // (`from_seeds` clamps at construction).
+        let group_seed = self
+            .birth_seeds
+            .as_ref()
+            .and_then(|seeds| seeds.group_value(group));
+        let seed = (seed.is_some() || group_seed.is_some()).then(|| {
+            compose(
+                seed.unwrap_or(edge.own_weight),
+                group_seed.unwrap_or(scale),
+                pattern,
+            )
+        });
+        edge.own_weight = compose(edge.own_weight, scale, pattern);
         edge.membership = None;
         let at = self.first_member(sink);
         self.output_sinks.0[sink].inputs.0.insert(at, edge);
@@ -1270,6 +1343,9 @@ impl CgpGraphBackendDef {
     /// Remove `group`'s record and decrement every higher `GroupId`.
     fn drop_group_record(&mut self, group: GroupId) {
         self.groups.remove(group.index());
+        if let Some(seeds) = &mut self.birth_seeds {
+            seeds.groups_mut().remove(group.index());
+        }
         for sink in &mut self.output_sinks.0 {
             for edge in &mut sink.inputs.0 {
                 if let Some(Membership { group: id, .. }) = &mut edge.membership {
@@ -1413,9 +1489,20 @@ impl CgpGraphBackendDef {
     }
 
     /// I11: when rows are present there is one per compute node and one per
-    /// sink, each sized to that container's inputs.
+    /// sink, each sized to that container's inputs, and one group slot per
+    /// group record.
     fn debug_assert_seed_shape(&self) {
-        if let Some(BirthSeeds::Rows { compute, sinks }) = &self.birth_seeds {
+        if let Some(BirthSeeds::Rows {
+            compute,
+            sinks,
+            groups,
+        }) = &self.birth_seeds
+        {
+            debug_assert_eq!(
+                groups.len(),
+                self.groups.len(),
+                "one seed slot per group record"
+            );
             debug_assert_eq!(
                 compute.len(),
                 self.compute_nodes.len(),
@@ -1471,7 +1558,12 @@ impl CgpGraphBackendDef {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect();
-        self.seed_birth(BirthSeeds::Rows { compute, sinks });
+        let groups = vec![None; self.groups.len()];
+        self.seed_birth(BirthSeeds::Rows {
+            compute,
+            sinks,
+            groups,
+        });
     }
 
     /// Fill the group table to its `u16::MAX`-record limit with memberless

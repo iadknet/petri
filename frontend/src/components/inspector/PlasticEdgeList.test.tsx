@@ -70,6 +70,13 @@ describe("PlasticEdgeList", () => {
 		);
 	});
 
+	it("names a member's scope in the badge and its tooltip", () => {
+		expect(plasticityBadge(hebbian, "Group")).toBe("Oja · hebbian · darwinian · group scope");
+		expect(plasticityBadge(hebbian, "Edge")).toBe("Oja · hebbian · darwinian · edge scope");
+		expect(plasticityDetail(hebbian, "Group")[0]).toMatch(/shared scale/);
+		expect(plasticityDetail(hebbian)).toHaveLength(3);
+	});
+
 	it("spells out every learning attribute for the badge's tooltip", () => {
 		expect(plasticityDetail(hebbian)).toEqual([
 			"Oja rule, learning rate 0.100, weight clamp ±2.00.",

@@ -43,7 +43,7 @@ describe("EdgeGroupList", () => {
 				graphWeights={{
 					node_id: 0,
 					scales: [{ group: 0, genomic: 0.5 }],
-					edges: [{ surface: "sink", container: 1, edge: 0, genomic: 0.75 }],
+					edges: [{ surface: "sink", container: 1, edge: 0, genomic: 0.75, applied: 0.75 }],
 				}}
 			/>,
 		);
@@ -59,6 +59,41 @@ describe("EdgeGroupList", () => {
 		expect(screen.getByTestId("tooltip")).toHaveTextContent(
 			"scale × pattern + correction0.500 × 1.00 + 0.250 = 0.750",
 		);
+	});
+
+	it("shows the learned scale, inherit_scale, and each member's scope and applied weight", () => {
+		const def = grouped();
+		const group = def.groups?.[0];
+		if (group) group.inherit_scale = true;
+		const member = def.output_sinks[1]?.inputs[0];
+		if (member?.membership) member.membership.scope = "Group";
+		render(
+			<EdgeGroupList
+				graphDef={def}
+				inputRefs={[{ World: "FoodHere" }, { World: "NeighborBarrierRing" }]}
+				graphWeights={{
+					node_id: 0,
+					scales: [{ group: 0, genomic: 0.5, learned: 1.25 }],
+					edges: [{ surface: "sink", container: 1, edge: 0, genomic: 0.75, applied: 1.5 }],
+				}}
+			/>,
+		);
+		expect(screen.getByTestId("edge-group")).toHaveTextContent("scale=0.500");
+		expect(screen.getByTestId("edge-group-learned-scale")).toHaveTextContent("learned=1.250");
+		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent("inherits scale");
+		const members = screen.getAllByTestId("edge-group-member");
+		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 group scope");
+		expect(members[1]).toHaveTextContent("edge scope");
+		expect(members[1]).not.toHaveTextContent("applied=");
+	});
+
+	it("shows neither a learned scale nor applied weights without the payload", () => {
+		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} graphWeights={null} />);
+		expect(screen.queryByTestId("edge-group-learned-scale")).toBeNull();
+		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent(
+			"genomic scale at birth",
+		);
+		expect(screen.getAllByTestId("edge-group-member")[0]).not.toHaveTextContent("applied=");
 	});
 
 	it("explains the offset and the members glyphs in tooltips, outside the toggle", () => {

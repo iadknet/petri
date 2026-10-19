@@ -6,6 +6,7 @@ import type {
 	InputReference,
 	OutputSinkKind,
 	PlasticityConfig,
+	Scope,
 } from "../../types/genome.ts";
 import { compose, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
@@ -34,10 +35,11 @@ export interface GraphModelEdge {
 	sourceId: string;
 	targetId: string;
 	/**
-	 * The weight drawn: a member's genomic weight (the server's
-	 * `graph_weights` value), a plastic edge's applied weight (T25.F06), else
-	 * its own weight. `null` for a plastic edge whose applied weight the
-	 * payload does not carry: runtime state the UI does not invent.
+	 * The weight drawn: a listed edge's applied weight (the server's
+	 * `graph_weights` value, T25.F06, T25.F07); without the payload a
+	 * member's genomic composition (its applied weight marked unavailable),
+	 * `null` for an ungrouped plastic edge (runtime state the UI does not
+	 * invent), else the own weight.
 	 */
 	weight: number | null;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
@@ -58,6 +60,10 @@ export interface MemberComposition {
 	group: number;
 	scale: number;
 	pattern: number;
+	/** How the member learns when plastic (T25.F07). */
+	scope: Scope;
+	/** The weight in force, when the payload carries it; else unavailable. */
+	applied?: number;
 }
 
 export interface PlasticFacts {
@@ -183,24 +189,29 @@ export function buildFullGraphModel(
 								"InputLeaf" in edge.source ? edge.source.InputLeaf.sub_idx : NO_FIELD,
 								sinkDirection(sink),
 							),
+							scope: edge.membership.scope,
+							...(entry === undefined ? {} : { applied: entry.applied }),
 						}
 					: undefined;
 			const plastic = edge.plasticity
 				? {
 						config: edge.plasticity,
 						genomic: entry?.genomic ?? edge.own_weight,
-						...(entry?.applied === undefined ? {} : { applied: entry.applied }),
+						...(entry === undefined ? {} : { applied: entry.applied }),
 						...(entry?.learned === undefined ? {} : { learned: entry.learned }),
 					}
 				: undefined;
-			// A member is drawn at its genomic weight: the server's, else
-			// composed as v3-core's `compose` (`cgp/group.rs`), never its own
-			// weight alone; a plastic edge at the weight in force (T25.F06).
-			const weight = member
-				? (entry?.genomic ?? compose(edge.own_weight, member.scale, member.pattern))
-				: plastic
-					? (plastic.applied ?? null)
-					: edge.own_weight;
+			// A listed edge is drawn at the weight in force (T25.F06, T25.F07);
+			// without the payload a member at its genomic composition, as
+			// v3-core's `compose` (`cgp/group.rs`), never its own weight alone.
+			const weight =
+				entry !== undefined
+					? entry.applied
+					: member
+						? compose(edge.own_weight, member.scale, member.pattern)
+						: plastic
+							? null
+							: edge.own_weight;
 			return {
 				weight,
 				own: edge.own_weight,
