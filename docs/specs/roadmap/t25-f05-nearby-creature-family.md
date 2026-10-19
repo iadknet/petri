@@ -1,6 +1,6 @@
 # T25.F05 — The NearbyCreature Family
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-18
 **Feature**: T25.F05
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -156,7 +156,7 @@ Commit 2, the recruitment universe:
 
 Closure:
 
-- [ ] Benchmark profiles, mutation gate and slow tier as declared; readings:
+- [x] Benchmark profiles, mutation gate and slow tier as declared; readings:
       the merged family's wired prevalence and pair-group count against
       F04's stored goal summary (Performance section), and
       `refinement_applications_by_key` by field for F08.
@@ -173,7 +173,7 @@ Closure:
       `cargo check` clean; `cargo test -p v3-server`, `cargo test -p
       v3-lab` and frontend `npm test` pass on `842bf12f` -> results in
       [`docs/progress/readings/t25-f05.md`](../../progress/readings/t25-f05.md).
-- [ ] `make check` -> exit 0 on the final code.
+- [x] `make check` -> exit 0 on `42c1fa27`.
 - [x] `make rust-test-slow` -> exit 0 on `7aadb463`, re-pinned rows
       recorded in the readings file.
 - [x] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants` on
@@ -181,12 +181,12 @@ Closure:
       unviable, 3 timeouts`, output
       `~/.local/share/petri-tools/mutants/t25-f05/mutants.out/`; every
       survivor resolved in the table below, tests only, so no second run.
-- [ ] Benchmark profiles: summaries at
+- [x] Benchmark profiles: summaries at
       `docs/progress/features/t25-f05-nearby-creature-family.json` (gate)
       and `t25-f05-nearby-creature-family-goal.json`, local raw hash/byte
       count and verification time checked (done at `e1134dc0`, both
       `severe=false`, see Performance and Goal Impact), series entry points
-      to the summary (left to closure), no new full report staged.
+      to the summary, no new full report staged.
 
 | Survivor | Resolution |
 | --- | --- |
@@ -299,22 +299,23 @@ line), `severe=false` on both, against F04's stored summaries.
 
 ## Success Criteria
 
-- [ ] `WorldInputKey::NearbyCreature` is the only creature family in
+- [x] `WorldInputKey::NearbyCreature` is the only creature family in
       `contracts::inputs`; the three variants and their index modules are
       gone from every crate, the frontend and the reference specs.
-- [ ] The layout pin holds: every slot's nine values equal the F04 core,
+- [x] The layout pin holds: every slot's nine values equal the F04 core,
       vitals and identity values at the `nearby_idx` constants.
-- [ ] The sampler's indices 10–12 draw the family with one draw each;
+- [x] The sampler's indices 10–12 draw the family with one draw each;
       recruitment lists it three times, draws one slot after the destination
       on every `WholeFamily` destination, and never adds more than 30 edges.
-- [ ] `Slots` refinement keys on nine fields and the goal readings carry
-      `NearbyCreature:0..8` for F08.
-- [ ] Gate and goal run with no unaccepted `severe` flag; the merged family's
+- [x] `Slots` refinement keys on nine fields (invariant 8); the goal
+      readings record the merged family's `refinement_applications_by_key`
+      per world for F08, zero (absent keys) included.
+- [x] Gate and goal run with no unaccepted `severe` flag; the merged family's
       wired prevalence and pair-group count are recorded per world against
       F04's stored goal summary, zero-baseline worlds reported separately,
       and on at least one positive-baseline world each reading holds half
       its baseline (the predeclared floor).
-- [ ] Mutation gate and slow tier run on the final code; `make check` exits 0.
+- [x] Mutation gate and slow tier run on the final code; `make check` exits 0.
 
 ## Notes for AI Agents
 
@@ -328,5 +329,7 @@ line), `severe=false` on both, against F04's stored summaries.
 - Deferred: the merged family's long-run reading (whether a whole-neighbor
   recruitment is retained past 2,000 ticks) to the next goal-long carrier;
   T25's carriers (F02, F04) are spent, so a later track's carrier takes it.
-- Deferred: the `Slots` refinement key's keep-or-delete decision to F08,
-  from the `refinement_applications_by_key` readings this feature records.
+- Deferred: the `Slots` keep-or-delete decision to F08, from this feature's
+  by-key readings: zero on all three worlds at 2,000 ticks (ruling
+  2026-10-18: a reading, not a defect; mechanism in the readings file),
+  beside F04's 40,000-tick counts.

@@ -37,7 +37,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: One developmental program wires a whole map (Eph/ephrin gradients, central-complex columns): a ring projection is a group of eight real synapses with one shared scale, and any one synapse can later be changed or lost on its own.
 - [x] **T25.F04 — Direction-Pair Groups** — Depends on: T25.F03
   - Goal: The sensory map sits in register with the motor map (superior colliculus): a creature's sensed offset to food, a barrier, a crowd or another creature can reach all eight direction votes of one kind as one silent gene, and that thing's plain facts reach the kind's drive.
-- [ ] **T25.F05 — The NearbyCreature Family** — Depends on: T25.F04
+- [x] **T25.F05 — The NearbyCreature Family** — Depends on: T25.F04
   - Goal: One sense of another creature, as an animal reads a neighbor's place, condition and kinship in one glance: the three creature families become one, so a slot's position, vitals and identity arrive from one declaration.
 - [ ] **T25.F06 — Learning Per Edge** — Depends on: T25.F05
   - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts, and a synapse onto a vote can learn like one onto a neuron.
