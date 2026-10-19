@@ -39,7 +39,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: The sensory map sits in register with the motor map (superior colliculus): a creature's sensed offset to food, a barrier, a crowd or another creature can reach all eight direction votes of one kind as one silent gene, and that thing's plain facts reach the kind's drive.
 - [x] **T25.F05 — The NearbyCreature Family** — Depends on: T25.F04
   - Goal: One sense of another creature, as an animal reads a neighbor's place, condition and kinship in one glance: the three creature families become one, so a slot's position, vitals and identity arrive from one declaration.
-- [ ] **T25.F06 — Learning Per Edge** — Depends on: T25.F05
+- [x] **T25.F06 — Learning Per Edge** — Depends on: T25.F05
   - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts, and a synapse onto a vote can learn like one onto a neuron.
 - [ ] **T25.F07 — Group-Scope Learning** — Depends on: T25.F06
   - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
