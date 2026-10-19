@@ -173,8 +173,8 @@ are `a_non_member_draws_no_coin`,
 `group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale` and
 `validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge`.
 
-Build pass (2026-10-19; `make check`, benchmarks, mutation and the slow tier
-not run):
+Verification run (build, 2026-10-19; `make check`, benchmarks, mutation and
+the slow tier not run):
 
 | Command | Result |
 | --- | --- |
