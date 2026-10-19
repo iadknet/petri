@@ -52,7 +52,9 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   feature's question, each with a one-sentence reason. Your self-review is not
   independent validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
-  defines it: a `plan-design-review` design round, then `spec-review`
+  defines it: a `plan-design-review` design round (all six checks, its
+  coverage section required, your `refactor-audit` table supplied for check 6
+  to test), then `spec-review`
   readiness rounds, up to three rounds in all, each a fresh read-only Codex Sol `high`
   `codex exec` job started in the background, with the
   brief written outside the worktree. Answer every blocking finding with a

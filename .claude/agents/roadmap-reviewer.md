@@ -195,5 +195,7 @@ original roadmap row, not only against each other.
 
 ## Report
 
-List findings ordered by severity, each with file and line, the issue, why it
-matters, and the smallest fix. Then state what you could not verify. Then stop.
+Lenses 2 and 3 start with their skill's coverage section: one line per check,
+clean ones included, naming what was examined. Then list findings ordered by
+severity, each with file and line, the issue, why it matters, and the smallest
+fix. Then state what you could not verify. Then stop.

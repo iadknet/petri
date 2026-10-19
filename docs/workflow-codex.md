@@ -54,7 +54,9 @@ revision. Its self-review is not independent validation. The shared Plan
 step's Codex challenge loop is Claude-only: a Codex run's spec owner is already
 Astra, so a Codex challenge would not be an independent model family, and this
 adapter keeps its single readiness review. The shared "User-owned findings"
-rule still applies to the spec owner's own plan-design-review findings. It handles the
+rule still applies to the spec owner's own plan-design-review findings, and
+its six-row coverage table goes in the readings file as the shared Plan step
+requires. It handles the
 shared Plan status updates and runs `make roadmap-check`; the orchestrator
 verifies the result and commits the plan before implementation starts.
 
