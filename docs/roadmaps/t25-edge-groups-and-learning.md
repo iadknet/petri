@@ -67,12 +67,21 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   extra goal-long arm at rate 0.005 as the rate's counterfactual (D25).
 - Decided (user, 2026-10-19): F09 adds passive forgetting after F08, from
   the [learned-weight decay research note](../strategy/weight-decay-research-2026-10-19.md)
-  (Section 5 is the contract sketch): `w ← b + ρ·(w − b)` once per world
-  tick on every plastic edge, `b` the slot's birth value (the clamped
-  Lamarckian seed, else the genomic weight clamped at construction), `ρ`
-  heritable in `[0, 1]` and mutated in log space, founder-neutral at
-  `ρ = 1`; the group scale F07 makes learnable decays toward its birth scale
-  by the same law. Decay toward the genomic weight, toward zero and an
+  (Section 5 is the contract sketch, amended after its plan-design review in
+  [the review readings](../progress/readings/t25-design-review.md)): once per
+  world tick each stored learned quantity relaxes toward its own birth value,
+  `x ← b + ρ·(x − b)`: an edge's learned own weight (a member's own
+  correction, never the composed weight) by a heritable per-edge `ρ`, a
+  group's learned scale by a retention stored on the group (a deliberate
+  revision, user 2026-10-19, of the 2026-10-13 ruling that groups own no
+  learning configuration beyond `inherit_scale`); a scope-`Group`
+  member has no own decay. `ρ` lies in `[0, 1]`, `ρ = 1` is an exact no-op,
+  enable and disable operators move it on and off 1 and a step mutates
+  `1 − ρ` in log space. Learned state is clamped at construction so the
+  birth value is the start value (user decision, option A), a predeclared
+  re-pin for out-of-clamp slots. Verification: viability first, gate + goal;
+  the goal run reads the `ρ` distribution descriptively and does not settle
+  long-horizon selection. Decay toward the genomic weight, toward zero and an
   energy cost on the deviation are rejected there.
 - Open: F08 decides the `GroupKey::Slots` refinement disposition from the
   refinement-by-key readings F04 and F05 record.
@@ -89,5 +98,5 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   F04 gate + goal + goal-long, carrying F03's deferred 40,000-tick ring
   readings; F05 gate + goal; F06 gate + goal,
   viability first; F07 gate + goal, viability first; F08 gate + goal;
-  F09 gate + goal; mutation gate and slow tests run on all nine. F03 and F06 land a
+  F09 gate + goal, viability first; mutation gate and slow tests run on all nine. F03 and F06 land a
   text-only commit (genome identity) before their behavior commit.

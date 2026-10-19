@@ -670,3 +670,62 @@ advisory 2: expressed() setting inherit_scale false has no effect (no scope-Grou
 advisory 3: GraphOperator::layer() would be a third attribute on petri.run.mutation_operator_funnel (petri.operator + petri.stage, metrics.rs:743-753). Change: derive the layer grouping in the bench reading, not exported.
 advisory 4: companions.rs:55-80 reads no projection; drop it from F03 (F06 the only owner).
 ```
+
+## T25.F09 plan-design review (2026-10-19)
+
+One fresh read-only `codex exec` job (`gpt-6.1-sol`, effort `high`) applied
+`$plan-design-review` with all six checks to commit `7e8c3b78` (the T25.F09
+row, its track criterion and decision note, the priority entry) and the
+[learned-weight decay research note](../../strategy/weight-decay-research-2026-10-19.md)
+it cites. The review ran after the rows were committed, against
+`docs/workflow.md` ("Plan a track or master change"), which asks for it
+before; the rows were not pushed, and the two premise findings went to the
+user before any amendment.
+
+Verdict: `not ready`. 2 blocking (both premise), 4 advisory. No `step-back:`
+finding: C5 found no larger deficiency (F01 and F06 already consolidated
+editing, construction and resolution), and C2 upheld one F09 after F08.
+
+Coverage: C1 code decomposition (finding), C2 task decomposition (finding),
+C3 domain boundaries (finding), C4 premises (finding), C5 larger design flaw
+(clear), C6 workarounds versus refactors (finding). Files read in full: the
+T25 track, the research note and its three appendices, the T25 design note,
+`runtime/plasticity/{rules,learned,kind}.rs`; read in part: `PlasticityConfig`
+in `creature/genome/mod.rs`, `mutation/graph/{hebbian,operators,mod}.rs`,
+`creature/genome/cgp/{container,group}.rs`, the T25.F06 readings, this file,
+`AGENTS.md`, `CONTRIBUTING.md`, `docs/workflow.md`, `docs/roadmaps/README.md`,
+`docs/lab.md`. Not verifiable by the reviewer: the probe's numbers (its source
+is now kept as `probe.rs` beside the note), the original papers, and F07/F08
+behavior (contracts only).
+
+| # | Severity | Finding (short) | Disposition |
+| --- | --- | --- | --- |
+| 1 | blocking, premise | The anchor "genomic weight" equals a plastic slot's stored quantity only while plastic edges cannot be members; after F07 a member's genomic weight is `scale × pattern + own` (`container.rs:567`), so an own-correction slot would decay toward the composed weight | Upheld. Note §5 and the track decision: each stored learned quantity decays toward its own birth value (own weight or member correction; group scale); a scope-`Group` member has no own decay; one decay per stored quantity |
+| 2 | blocking, premise | "Clamped genomic anchor" is not the actual birth value: unseeded slots start raw (`learned.rs:73`) and snap on first update; clamping the start too changes behavior at `ρ = 1` | User decision (option A): learned state is clamped at construction for own weights and scales, so the birth value is the start value; a predeclared re-pin for out-of-clamp slots. Option B (separate anchor, raw start) rejected: two birth values per slot |
+| 3 | advisory | Group retention needs an owner and a mutation route; F07's scope coin broadcasts member attributes and does not reach a group field | Adopted: a retention stored on `Group`, set by the creation forms and mutated by group-layer operators. Round 2 #1 corrects the consistency claim first written here; see that row |
+| 4 | advisory, premise | `1 − ρ` in log space is undefined at `ρ = 1`; `b + 1·(w − b)` is not a bitwise identity; founder neutrality under mutation is a stronger claim than holds | Adopted: `ρ = 1` skips the update; enable and disable operators move on and off 1, a step operator mutates `1 − ρ` in log space while `ρ < 1`; neutrality stated as mutation-off founder-only, with draw-stream and birth-clamp re-pins predeclared |
+| 5 | advisory | gate + goal cannot establish lifetime selection on `ρ`; the 2,000-tick goal reads a distribution that also reflects mutation supply | Adopted: viability first, gate + goal for cost, early ecology and descriptive distributions; long-horizon selection stays open, with no third goal-long carrier added |
+| 6 | advisory, premise | The synthesis overstates its appendices: FADE and ordinary L2 decay toward zero; model baselines are often learned slow components; `ρ = 1` disables decay, it does not stop plasticity as Yaman's rules do | Adopted: Summary, §2.1 and §2.4 narrowed; birth anchoring stated as Petri's extrapolation |
+
+### Round 2 (confirm, 2026-10-19)
+
+A fresh `codex exec` job (`gpt-6.1-sol`, `high`) over `7e8c3b78` plus the
+round-1 amendments. Verdict: `not ready`. 1 blocking (premise), 2 advisory;
+no `step-back:`; C5 and C6 clear. Round-1 findings 1, 2, 4, 5 and 6 resolved,
+3 partially.
+
+| # | Severity | Finding (short) | Disposition |
+| --- | --- | --- | --- |
+| 1 | blocking, premise | A stored group retention contradicts round 1 #4 (2026-10-13: the group record owns no learning configuration beyond `inherit_scale`); the analogy to the group bound fails because that bound is derived from member clamps (design note §3 clamp rule) | User decision (option B): keep the stored group retention and record F09 as a deliberate revision of the 2026-10-13 ruling, which predates decay. Every T25 knob splits into a group part and an individual part (weight = `scale × pattern + own`), so each stored value carries its own fade rate. Option A (the smallest member `ρ`, after the bound's rule) rejected as breaking that split. Note §5 and the track decision amended |
+| 2 | advisory, premise | §6 said selection on the seed is the only check on Lamarckian drift; weight and scale mutations clear seeds and a non-Lamarckian child ignores them | Adopted: §6 states the within-lifetime property and the between-generation seed resets |
+| 3 | advisory, premise | The probe applied decay after the reward pass; §5 decays in `begin_tick`, before learning; with the clamp the two do not commute | Probe re-run in §5's order (decay first, skipped before the first visit) and the table updated; at learning rate 0.005 the numbers moved in the second decimal at most; `probe.rs` updated |
+
+
+### Round 3 (confirm, 2026-10-19)
+
+A fresh `codex exec` job (`gpt-6.1-sol`, `high`) over `7e8c3b78` plus the
+round-1 and round-2 amendments, with the user's options A and B fixed.
+Verdict: `ready`. No findings, no `step-back:`; all six checks clear. All
+nine round-1 and round-2 findings confirmed resolved. Not verifiable by the
+reviewer: the probe's numbers (source only), the original papers, and F07/F08
+behavior (contracts only).

@@ -16,9 +16,13 @@ the production update law (Section 3, not committed).
 
 ## Summary
 
-Every model in all three literatures that returns a learned weight "to zero"
-does so for a deviation from a baseline: the effective weight relaxes toward
-the synapse's own pre-learning value, never toward zero. That is the design
+In the additive fast-weight, tag-and-capture and consolidation models read
+here, the quantity that decays "to zero" is a deviation from a baseline, so
+the effective weight relaxes toward a prior value, not toward zero (FADE, a
+2026 continual-learning preprint, is the exception read: it decays output
+weights toward zero). The baseline in those models is a slow or reference
+component, sometimes itself learned; anchoring it at the synapse's birth
+value is this note's extrapolation for Petri. The additive form is the design
 fast weights have used since Hinton and Plaut (1987), the one the
 tag-and-capture and consolidation models use (Clopath et al. 2008; Ziegler et
 al. 2015; Leimer et al. 2019), and the one the in vivo data show: LTP "eventually
@@ -47,16 +51,19 @@ argument for a heritable one.
 The strongest case against: Petri already clamps every learned weight, and
 Backpropamine found a hard clip gave "equal or superior performance" to decay
 (Miconi et al. 2019, p. 3); Yaman et al. (2021) found evolution prefers rules
-that stop changing once the task is learned. Both come from lifetimes that
+that stop changing once the task is learned (stopping plasticity, which a
+retention of 1 does not provide: it disables decay only). Both come from lifetimes that
 reset each episode. Petri's creatures live thousands of ticks without a reset,
 the regime Miconi (2023, Appendix G.4) calls "the missing loop", and the clamp
 bounds the walk without returning anything to the evolved prior.
 
-**Recommendation** (Section 5): add a heritable per-edge retention
-`w ← b + ρ·(w − b)` applied once per world tick to every plastic edge, where
-`b` is the slot's birth value (the clamped Lamarckian seed when seeded, else
-the clamped genomic weight) and `ρ ∈ [0, 1]`, with the founder at exactly
-`ρ = 1` so the feature is founder-neutral. Named analog: early LTP decays back
+**Recommendation** (Section 5, amended after the 2026-10-19 design review):
+add a heritable retention `ρ ∈ [0, 1]` that once per world tick relaxes each
+stored learned quantity toward its own birth value, `x ← b + ρ·(x − b)`: an
+edge's learned own weight (a member's own correction after F07) by the edge's
+retention, and a group's learned scale by a retention stored on the group.
+Learned state starts inside the clamp, so the birth value is the start value.
+`ρ = 1` is an exact no-op and the founder carries no plastic edge. Named analog: early LTP decays back
 to baseline; intrinsic forgetting returns the synapse to its birth state. Place
 it after T25.F08, so the group scale F07 makes learnable decays by the same
 rule. The user placed it as
@@ -112,9 +119,11 @@ Full per-source sections, equations and quotes are in the appendices:
 | Kumar et al. 2023 (L2 Init) | L2 penalty toward the initial parameters | the initial weights |
 | Loewenstein et al. 2011 | log spine size as two Ornstein–Uhlenbeck processes (τ 2.9 d and 212 d) | a population mean, not the spine's own size |
 
-Every row but the last is decay toward the synapse's own prior value; the last
-is the one counter-example and concerns spontaneous spine volatility, not the
-loss of a learned change. Decay of the whole weight toward zero corresponds in
+Every row but the last decays toward a prior or reference value of that
+synapse (in several models a slow component that itself learns, not a fixed
+birth value); the last concerns spontaneous spine volatility, not the loss of
+a learned change. Decay toward zero does appear outside these models: FADE
+and ordinary L2 weight decay pull weights toward zero (ML appendix). Decay of the whole weight toward zero corresponds in
 biology to synapse elimination (Richards & Frankland 2017's mapping of "weight
 elimination" to Rac-mediated spine shrinkage), which removes innate wiring
 rather than forgetting a learned change. Kumar et al. tested the target
@@ -164,8 +173,9 @@ third of the original one."
   decay (Miconi et al. 2019, p. 3). But its plastic state reset every episode;
   the clamp bounds Petri's walk without returning to the prior.
 - Yaman et al. (2021) found evolution prefers rules that stop changing weights
-  once the task is learned, because continued change causes forgetting. Decay
-  at `ρ = 1` is that option, and the recommended draw keeps it reachable.
+  once the task is learned, because continued change causes forgetting. That
+  is stopping plasticity, which `ρ = 1` does not provide: it disables passive
+  decay only, so the two answer different questions.
 - In continual deep learning the evidence is mixed: L2 Init forgets more than
   EWC in Kumar et al.'s own appendix (backward transfer −63.4% vs −39.0%);
   Elsayed et al. (2024) found pulling toward any point overwrites useful
@@ -182,9 +192,10 @@ third of the original one."
 
 A scratch `#[ignore]` test in `runtime/plasticity/tests.rs` (reverted, not
 committed) ran one reward-modulated Classic edge (genomic weight 0.5, clamp 2,
-`trace_decay` 0.9) for 20,000 ticks, 20 seeds per arm: each tick a visit with a
-uniform input, a reward pass, then `w ← b + ρ·(w − b)` through the fixture
-`set_slot`. Arm A gives a zero-mean ±1 reward independent of the input (pure
+`trace_decay` 0.9) for 20,000 ticks, 20 seeds per arm: each tick
+`w ← b + ρ·(w − b)` through the fixture `set_slot` at the start of the tick
+(Section 5's order, decay before learning), then a visit with a uniform input
+and a reward pass. Arm A gives a zero-mean ±1 reward independent of the input (pure
 coincidence); arm B makes the reward follow the input 30% of the time (a real
 contingency). Arm A reports the mean `|w − b|`, arm B the mean signed `w − b`.
 
@@ -193,12 +204,13 @@ Learning rate 0.005:
 | ρ | A at 100 | A at 1,000 | A at 20,000 | B at 20,000 (kept vs ρ = 1) |
 | --- | ---: | ---: | ---: | ---: |
 | 1 (today) | 0.19 | 0.61 | 1.38 | +0.55 |
-| 0.999 | 0.19 | 0.39 | 0.58 | +0.49 (90%) |
+| 0.999 | 0.19 | 0.39 | 0.58 | +0.50 (90%) |
 | 0.99 | 0.11 | 0.09 | 0.14 | +0.10 (18%) |
-| 0.9 | 0.03 | 0.05 | 0.03 | +0.01 |
+| 0.9 | 0.03 | 0.05 | 0.04 | +0.01 |
 
 At learning rate 0.05 the walk reaches the clamp scale within 100 ticks in
-every arm but `ρ = 0.9` (mean 0.38 to 0.51), and arm B's signed shift is
+every arm but `ρ = 0.9` (mean 0.42 to 0.57), arms with `ρ` of 0.999 and 0.99
+still end at the clamp in up to 3 of 20 seeds, and arm B's signed shift is
 indistinguishable from noise: large steps defeat any retention slow enough to
 keep learning.
 
@@ -207,17 +219,20 @@ reaches the clamp scale within a lifetime, which is HTP's information loss in
 Petri's own law. The stationary spread under decay scales as
 `step / √(2(1 − ρ))`, so a useful retention depends on the learning rate and on
 how long a real contingency lasts, which is Brea's rate-matching argument in
-numbers. Both rates are already heritable per edge; the retention belongs
+numbers. A first run applied decay after the reward pass instead; at
+learning rate 0.005 its numbers differ from these in the second decimal at
+most. Both rates are already heritable per edge; the retention belongs
 beside them. The probe measures one edge with a synthetic reward and says
-nothing about selection; the feature's goal run is that reading.
+nothing about selection. Its source is kept as
+[probe.rs](weight-decay-research-2026-10-19/probe.rs) for re-running.
 
 ## 4. Options
 
 | Option | Natural analog | Evidence | Verdict |
 | --- | --- | --- | --- |
 | A. Status quo: clamp only | stable LTP lasting months (Abraham) | Backpropamine clip ≥ decay; Yaman | Rejected as the only mechanism: the walk is unbounded below the clamp and nothing returns to the prior (Section 3). Kept reachable as `ρ = 1`. |
-| B. Per-edge decay toward the slot's birth value | early LTP returns to baseline; intrinsic forgetting returns the brain "to its basal state" (Davis & Zhong 2017); the *C. elegans* AVA synapse reverts to its naive state (Richards & Frankland 2017) | Section 2.1 rows 1–8; Brea; Bullinaria; probe | **Recommended.** |
-| C. Per-edge decay toward the genomic weight | as B | as B | Rejected: for a Lamarckian edge it erases the inheritance at rate `ρ`, making two mechanisms for one concept (the Lamarckian flag and `ρ`). B and C are identical on Darwinian edges. |
+| B. Decay of each stored learned quantity toward its birth value | early LTP returns to baseline; intrinsic forgetting returns the brain "to its basal state" (Davis & Zhong 2017); the *C. elegans* AVA synapse reverts to its naive state (Richards & Frankland 2017) | Section 2.1 rows 1–8; Brea; Bullinaria; probe | **Recommended.** |
+| C. Per-edge decay toward the genomic weight | as B | as B | Rejected: for a Lamarckian edge it erases the inheritance at rate `ρ`, making two mechanisms for one concept (the Lamarckian flag and `ρ`); for a group member the genomic weight is the composed `scale × pattern + own`, not the stored own correction. |
 | D. Decay of the whole weight toward zero | synapse elimination | none for forgetting a learned change; Bullinaria's evolved λ went to zero | Rejected: erases innate wiring, which the biology does not do. |
 | E. Neuron-wide multiplicative scaling | Turrigiano synaptic scaling; sleep downscaling (Tononi & Cirelli 2014) | strong, but it "normalize[s] firing without changing the relative strength of synaptic inputs" (Turrigiano 2008) | Out of scope: activity homeostasis, a separate feature; it preserves what was learned. |
 | F. Energy cost on learned deviation | "stronger synapses consume more energy" (Tononi & Cirelli 2014) | not tested | Rejected: the plasticity cost is 0 and its machinery was deleted by user decision (T25 D9, 2026-10-13). |
@@ -225,52 +240,95 @@ nothing about selection; the feature's goal run is that reading.
 
 ## 5. Recommended design
 
-- **Attribute**: a heritable retention `ρ` in `PlasticityConfig`, range
-  `[0, 1]`, `1.0` meaning no decay. The spec names it. It applies to every
-  plastic edge, Hebbian and reward-modulated alike.
+Amended after the 2026-10-19 design review
+([readings](../progress/readings/t25-design-review.md#t25f09-plan-design-review-2026-10-19)).
+
+- **What decays**: each stored learned quantity, toward its own birth value.
+  - An edge's learned own weight. For a group member after F07 that is its
+    own correction, never the composed `scale × pattern + own`.
+  - A group's learned scale, toward its birth scale.
+  - A scope-`Group` member stores no learned own weight of its own, so it
+    gets no per-member decay; its learning fades through the scale. One decay
+    per stored quantity, never two.
+- **Edge attribute**: a heritable retention `ρ` in `PlasticityConfig`, range
+  `[0, 1]`, `1.0` meaning no decay; the spec names it. It applies to every
+  plastic edge, Hebbian and reward-modulated alike, and the F07 scope coin
+  applies to it like every other learning attribute.
+- **Group attribute (user decision, 2026-10-19, option B)**: a retention
+  stored on the `Group` record for its shared scale, distinct from
+  `inherit_scale` (one is lifetime relaxation, the other birth inheritance).
+  Group creation sets it with the group's other learning draws (uniform or
+  randomized form), and group-layer operators mutate it. This follows the
+  group/individual split every T25 knob already has: a member's weight is
+  `scale × pattern + own`, the scale is the group's stored value and the own
+  correction the member's, so each stored value carries its own fade rate,
+  and a member's weight fades in both parts at their own speeds. It
+  deliberately revises the 2026-10-13 ruling (design review round 1 #4) that
+  the group record owns no learning configuration beyond `inherit_scale`; that
+  ruling predates decay. Rejected alternative: deriving the scale's rate from
+  its members (the smallest member `ρ`, after the group bound's
+  smallest-clamp rule), which breaks that split.
 - **Law**: once per world tick, beside the trace decay in `begin_tick`,
-  `w ← b + ρ·(w − b)`. The learning update acts on top, as in Leimer's rule.
-- **Anchor `b`**: the slot's birth value, computed once at construction: the
-  clamped seed for a seeded Lamarckian slot, else the genomic weight clamped to
-  `±weight_clamp`. Clamping the genomic anchor at construction removes the
-  decay-versus-clamp fight noted in Section 1.
-- **Founder-neutral**: the founder carries no plastic edge, and every
-  plasticity-enabling draw starts at `ρ = 1` or draws `ρ` with most mass at or
-  near 1. A retention operator mutates `1 − ρ` in log space (FADE's
-  parameterization; Abraham's decay families span four orders of magnitude).
-  The F07 scope coin applies to it like every other learning attribute.
-- **Group scale**: after F07 the learned scale of a group decays toward its
-  birth scale by one group retention under the same law, under the group's
-  own `inherit_scale` rule. This is why the feature follows F08: it edits the
-  same catalog and plasticity layout, and the T25 chain is linear by design
-  (D10).
-- **Numerics**: with `w` stored absolute, the decay stalls once
-  `|w − b|·(1 − ρ)` falls under half an ulp of `w`, a residual of at most
-  `ulp(w) / (2(1 − ρ))` (about `6e−5` at `|w| ≈ 1`, `ρ = 0.999`). The spec
+  `x ← b + ρ·(x − b)`, the learning update acting on top as in Leimer's rule.
+  `ρ = 1` skips the update entirely, so it is an exact no-op rather than a
+  floating-point identity.
+- **Birth value equals start value (user decision, 2026-10-19)**: learned
+  state is clamped at construction. A slot starts from its clamped Lamarckian
+  seed when seeded, else from its genomic own weight clamped to
+  `±weight_clamp`; a learned scale starts from its clamped seed or genomic
+  scale under the group bound. That start value is `b`. Today an out-of-clamp
+  unseeded slot starts raw and snaps on its first update, so this changes
+  behavior even at `ρ = 1` for such slots: a predeclared re-pin, not a
+  neutrality breach.
+- **Endpoints and mutation**: `ρ = 1` and `ρ < 1` are two states, as
+  modulation is today: an enable operator moves an edge (or group) off 1 by
+  drawing `1 − ρ` log-uniformly over a declared range, a disable operator sets
+  it to exactly 1, and a step operator perturbs `1 − ρ` in log space while
+  `ρ < 1` (FADE's parameterization; Abraham's decay families span four orders
+  of magnitude). Plasticity-enabling draws and group creation start at
+  `ρ = 1`.
+- **Neutrality, stated narrowly**: with mutation off, a founder-only run is
+  unchanged (the founder has no plastic edge). With mutation on, the new
+  operators remap the Graph draw stream and the birth clamp moves
+  out-of-clamp slots, so trajectory pins move; the spec predeclares them.
+- **Placement**: after F08, because it edits the same catalog, creation forms
+  and plasticity layout, and the T25 chain is linear by design (D10).
+- **Numerics**: with `x` stored absolute, the decay stalls once
+  `|x − b|·(1 − ρ)` falls under half an ulp of `x`, a residual of at most
+  `ulp(x) / (2(1 − ρ))` (about `6e−5` at `|x| ≈ 1`, `ρ = 0.999`). The spec
   decides whether that residual is acceptable or the slot stores the deviation.
   An eager per-tick multiply keeps determinism; a lazy `ρ^Δt` form would need
   integer exponentiation to stay bit-identical across platforms.
 - **Tests first**: decay converges to `b` and never crosses it; `ρ = 1` is
-  byte-identical to today; a Lamarckian slot decays toward its seed, not the
-  genomic weight; a genomic weight above the clamp yields a clamped anchor;
-  Oja plus decay stays bounded under both pulls (two attractors, one toward a
-  normalized weight and one toward `b`).
-- **Readings**: the distribution of `ρ` among plastic edges at goal close;
-  at-clamp share and drift beside the F06 census; plastic-carrier share.
+  byte-identical to the clamped-birth baseline; a Lamarckian slot decays
+  toward its seed; a member's own-correction slot decays toward its birth
+  correction, not the composed weight; a scope-`Group` member contributes no
+  own decay while the scale decays; an out-of-clamp genomic weight starts
+  clamped; Oja plus decay stays bounded under both pulls (two attractors, one
+  toward a normalized weight and one toward `b`).
+- **Verification**: viability first (tick-loop change), then gate + goal, as
+  the other T25 rows. The 2,000-tick goal reads cost, early ecology and the
+  descriptive distribution of `ρ` among plastic edges and groups beside the
+  F06 census (at-clamp share, drift, carrier share). It cannot establish
+  whether selection favors decay over a lifetime: a retention distribution
+  also reflects mutation supply. That long-horizon question stays open; T25's
+  goal-long carriers are F02 and F04, and a third is not added implicitly.
   Expected from the Baldwin effect: in stable worlds selection may favor
-  `ρ` near 1 or encode the learned value genetically (Floreano & Urzelai 2000;
-  Soltoggio et al. 2018); that is a reading, not a failure.
+  `ρ = 1` or encode the learned value genetically (Floreano & Urzelai 2000;
+  Soltoggio et al. 2018).
 
 ## 6. Remaining uncertainty
 
 - Whether selection moves `ρ` off 1 at all when plastic edges are 6% of
   creatures and reward-modulated edges number four. The feature can be
-  correct and inert; its goal run decides, and a later consolidation feature
-  (option G) is pointless until reward-modulated edges exist.
+  correct and inert, the goal run cannot settle it (Section 5,
+  Verification), and a later consolidation feature (option G) is pointless
+  until reward-modulated edges exist.
 - Per-edge against per-node grain (Section 2.2).
-- Lamarckian drift: decay toward the seed has no path back to the genomic
-  weight, so learned values can accumulate across generations; selection on
-  the seed is the only check. Sasaki & Tokoro (1999, abstract only) found
+- Lamarckian drift: within a lifetime, decay toward the seed has no path back
+  to the genomic weight. Across generations the seed is not permanent: a weight
+  or scale mutation clears the seed it touches, and a child whose edge is not
+  Lamarckian ignores it, so mutation and selection both bound the drift. Sasaki & Tokoro (1999, abstract only) found
   Darwinian inheritance best in dynamic worlds; Luo et al. (2024, full text)
   found Lamarckian better under between-generation change.
 - Gated decay (Zenke et al.'s burst-gated return; Turrigiano's "useful if it
