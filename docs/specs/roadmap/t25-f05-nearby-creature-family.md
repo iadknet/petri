@@ -176,15 +176,23 @@ Closure:
 - [ ] `make check` -> exit 0 on the final code.
 - [x] `make rust-test-slow` -> exit 0 on `7aadb463`, re-pinned rows
       recorded in the readings file.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its
-      summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred (the full list stays here).
+- [x] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants` on
+      `7aadb463` -> `116 mutants tested in 51m: 5 missed, 77 caught, 31
+      unviable, 3 timeouts`, output
+      `~/.local/share/petri-tools/mutants/t25-f05/mutants.out/`; every
+      survivor resolved in the table below, tests only, so no second run.
 - [ ] Benchmark profiles: summaries at
       `docs/progress/features/t25-f05-nearby-creature-family.json` (gate)
       and `t25-f05-nearby-creature-family-goal.json`, local raw hash/byte
       count and verification time checked (done at `e1134dc0`, both
       `severe=false`, see Performance and Goal Impact), series entry points
       to the summary (left to closure), no new full report staged.
+
+| Survivor | Resolution |
+| --- | --- |
+| `sensors/reducers.rs:371:42`, `:376:42`, `:381:48`, `:388:65` (`>` to `>=`, `fill_nearby_banks`) | Killed: `nearby_slot_reads_zero_for_a_non_positive_normalizer` |
+| `neighborhood/mutation_effects/contexts.rs:79:9` (delete arm 4, `set_group`) | Killed: `authored_contexts_set_only_their_channel_group_in_production_ranges` now requires each perception group to change only in its own contexts |
+| `contracts/inputs.rs:144:15`, `:146:11`, `:162:11` (`+=` to `*=`, build timeout) | Equivalent: the index stays 0, so const evaluation of `NEARBY_FACTS`/`NEARBY_PAIRS` never ends and no build exists to behave differently |
 
 ## Performance and Goal Impact
 

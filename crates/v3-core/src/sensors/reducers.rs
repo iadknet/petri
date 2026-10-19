@@ -1127,4 +1127,52 @@ mod tests {
             "age+energy eligible creature should be reproduce_ready"
         );
     }
+
+    #[test]
+    fn nearby_slot_reads_zero_for_a_non_positive_normalizer() {
+        let origin = crate::contracts::Position::new(10, 10);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        let neighbor_id = creatures.insert_with_key(|id| {
+            make_creature(
+                id,
+                crate::contracts::Position::new(11, 11),
+                40.0,
+                CreatureIdentityState::default(),
+                [0; 6],
+            )
+        });
+        let candidates = [NearbyCandidate {
+            creature_id: neighbor_id,
+            dx: 1,
+            dy: 1,
+            euclidean_dist: 2.0f32.sqrt(),
+            chebyshev_dist: 1,
+        }];
+        let config = PerceptionConfig {
+            max_energy: 0.0,
+            ..PerceptionConfig::default()
+        };
+
+        let nearby = fill_nearby_banks(
+            &candidates,
+            &creatures[observer_id],
+            &creatures,
+            &config,
+            0.0,
+            0.0,
+        );
+
+        assert_eq!(nearby[nearby_idx::PRESENT], 1.0);
+        for field in [
+            nearby_idx::REL_X,
+            nearby_idx::REL_Y,
+            nearby_idx::DIST,
+            nearby_idx::ENERGY_RATIO,
+        ] {
+            assert_eq!(nearby[field], 0.0, "field {field}");
+        }
+    }
 }
