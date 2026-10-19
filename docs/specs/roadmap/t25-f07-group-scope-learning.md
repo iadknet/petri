@@ -81,7 +81,7 @@ Readers, with their post-change expectations:
 | `companions.has_plasticity`, `cgp_mesh_annotations`, recruitment-paths `stateful`, lab `expressed()` | the same `plastic_edges()` definition; members now count; lab refuses format 4 |
 | `plasticity_census` | invariant 10 |
 | v3-telemetry | the families in Telemetry; `metrics/tests.rs` expected families; `scripts/telemetry-dashboards-check` `always_names`; `petri-run.json` adds three panels beside `:2612-2760`: plastic edges by scope, mean learned-scale drift by inheritance, learned scales at their bound by inheritance |
-| bench summary | the `plasticity_census` block adds the by-scope and scale rows; `plasticity_scale_snaps` joins the `SimStats` totals the gate and goal compare; the closure readings are taken from them |
+| bench summary | the `plasticity_census` block adds the by-scope and scale rows; `plasticity_scale_snaps_total` joins `CognitionTracking` in the bench cases (per seed at the gate, per world at the goal), the reading's source, not a thresholded comparison counter (it has no reference epoch); the closure readings are taken from them |
 | mutation-effects state records | the scale items appended after the edge items; `VERSION` `mutation-effects-v4` |
 | `tests/applied_trajectory.rs` | hashes the scale items after the edge items (no founder-based change: no plastic edge) |
 | server | invariant 12; `v3alpha10` with a §2 history line |
@@ -190,6 +190,7 @@ rate-0 fixture unchanged (`recruitment_tests`, `baseline_worlds`,
 identity and the rate-0 sampled trajectory byte-identical.
 
 - [ ] Focused tests: `cargo test -p v3-core --test viability` first, then `make check` -> result recorded here.
+- [ ] `gate_profile_has_no_severe_regression_against_series_references` (`crates/v3-cli/tests/bench.rs`) is red from commit 2 until the closing commit re-pins the gate epoch: `plasticity_updates` per creature-tick rises past the severe threshold against the F06 epoch by invariant 9's definition change (every member of a learning group counts one update per contribution per visit; learned creation makes two of three new groups learn on every member); the readings file records the per-seed `plasticity_updates`, the gate census's plastic edges by scope and the updates-per-plastic-edge-per-visit ratio against F06's, which must be of the same order (a defect otherwise); the test is not edited and the series is re-pinned only in the closing commit.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Slow tests: `make rust-test-slow` -> result and any re-pinned recruitment-paths readings.
 - [ ] Gate and goal: summaries at `docs/progress/features/t25-f07-group-scope-learning.json` and `-goal.json`, local raw hash and byte count, series entries, no new full report staged.
@@ -243,7 +244,7 @@ the scale-slot count, the design note's §8 reading).
 - [ ] Track criterion 7: scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
 - [ ] A plastic member learns at scope `Edge` or `Group` on both shapes; a static member contributes nothing; a scale seeds a child only with `inherit_scale`.
 - [ ] `SetScope` and learned creation are in the catalog with the pinned positions and weights; the nine operators land on one member or on every admitted member by one coin.
-- [ ] The census, telemetry families, panels, bench summary, payload and inspector show scope and learned scales; `plasticity_scale_snaps` reaches the `SimStats` totals, its telemetry family and the closure readings.
+- [ ] The census, telemetry families, panels, bench summary, payload and inspector show scope and learned scales; `plasticity_scale_snaps` reaches the bench cases' `CognitionTracking`, its telemetry family and the closure readings.
 - [ ] Verification Plan checks run and recorded; the mutation gate has no unresolved survivor; epochs re-pinned.
 
 ## Notes for AI Agents
