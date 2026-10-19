@@ -6,7 +6,7 @@ steal from each other and die on a seeded world, and every child inherits a
 mutated copy of its parent's genome: its brain, its learning rules and its
 color.
 
-![A mature Petri world: blue, yellow, orange and pink lineages moving across grassland, fruit groves and barrier rock](docs/assets/petri-creatures.gif)
+![A mature Petri world: blue, yellow, orange and pink lineages moving across grassland, fruit groves and barrier rock](docs/assets/readme/hero.gif)
 
 <sub>Confluence world, run seed 33, around tick 13,000: about 4,400 creatures
 whose mean generation is about 190. A creature's color is set by six heritable
