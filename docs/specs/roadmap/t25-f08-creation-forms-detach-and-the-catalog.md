@@ -197,7 +197,9 @@ reported with a recorded disposition at closure, not a closure blocker
       equivalent, or deferred.
 - [ ] `make rust-test-slow` -> pass with the re-pinned recruitment-paths
       readings.
-- [ ] Gate and goal: summaries at `docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json`
+- [x] Gate and goal (measured 2026-10-20 at `fea7746d`; both `severe=true` as
+      predeclared draw-stream trajectory readings, series entries still to
+      re-pin in the closing commit): summaries at `docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json`
       and `-goal.json`, local raw hash/byte count and verification time
       checked, series entries re-pinned in the closing commit, no full report
       staged; the readings below recorded in the readings file.
@@ -259,7 +261,23 @@ learner scope); harmful share per carrier,
 against F07's per world, hypothesis not up, reported either way; the `Slots`
 firing rate is recorded as "deleted on nine empty post-F05 readings".
 
-**Measured verdict.** Not yet run.
+**Measured verdict (2026-10-20, HEAD fea7746d, each profile run once).**
+Gate: v3-cli exit 3 (source: `measurement_evidence.cli_exit`, successful
+artifact pair with a severe), outer `make` exit 2; `severe=true`, one severe,
+`decided_passes` 0.000997 vs 0.000140 (+612%), the draw-stream trajectory
+reading ruled by the spec owner; `wall_clock_ms_per_creature_tick` 0.0025481
+vs epoch 0.0038113 (-33.1%), inside the 25% band, no flag. Goal: exit 3 /
+make 2, `severe=true`: `vm_steps` 2.0196 vs 0.5709 (+253.7%),
+`plasticity_updates` 3.2016 vs 1.7537 (+82.6%), `decided_passes` 0.002550 vs
+0.001407 (+81.2%), all trajectory readings re-pinned at closure; flags on
+`mesh_hops`, `graph_relax_iters`, `actions_applied`, `passes`. Group share of
+attribute changes: Orchards 0.257, Canyon 0.116, Confluence 0.371. Detached
+edges 400 / 12 / 932 (F07: 112 / 33 / 195), groups removed 244 / 5 / 608
+(F07: 250 / 69 / 365). Harmful share 0.360 / 0.477 / 0.438 (F07: 0.360 /
+0.434 / 0.399), up in two worlds. New operators applied: randomized ring
+1,687 / 411 / 1,453, randomized pair 156 / 17 / 211, detach 262 / 6 / 633.
+Raw gate 118,732 B, sha256 `b19ce575...b9f8`; raw goal 699,473,823 B, sha256
+`76586a4a...f8baf8`; summaries 23,772 B and 482,625 B.
 
 - Summaries: [gate](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog.json),
   [goal](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json).
