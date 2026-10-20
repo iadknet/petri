@@ -347,6 +347,22 @@ fn a_retention_of_one_leaves_every_stored_value_bit_identical() {
     );
 }
 
+/// `ρ = 1` is never applied: a learner whose `b + 1·(x − b)` would round
+/// away from `x` keeps its stored bits.
+#[test]
+fn a_retention_of_one_is_not_applied_where_the_law_would_round() {
+    let def = ungrouped(1.0, config(HebbianRule::Classic, 0.0, 2.0, 1.0));
+    let mut learned = state(&def, None);
+    let value = 1.0e-8f32;
+    assert_ne!(relax(value, 1.0, 1.0).to_bits(), value.to_bits());
+    learned.set_slot(0, 0, value, 0.0);
+    learned.begin_tick();
+    assert_eq!(
+        edge(&learned, 0).learned.map(f32::to_bits),
+        Some(value.to_bits())
+    );
+}
+
 /// An uninitialized learner or scale slot holds its birth value and is
 /// not decayed, even at `ρ = 0`.
 #[test]
