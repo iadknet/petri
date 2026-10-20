@@ -592,8 +592,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // 37, 45, 50, 63 and 64 are the first six). T25.F08 commit 2 (the
     // randomized creation operators and `DetachGraphEdge` remap every Graph
     // draw): seed 9 goes extinct; seed 14 is the lowest of 0..=200 that
-    // survives (14, 37, 40, 50, 51 and 53 are the first six).
-    params.seeds = vec![14];
+    // survives (14, 37, 40, 50, 51 and 53 are the first six). T25.F09 commit
+    // 3 (the six retention operators remap every Graph draw): seed 14 goes
+    // extinct; seed 2 is the lowest of 0..=200 that survives (2, 15, 18, 37,
+    // 53 and 79 are the first six).
+    params.seeds = vec![2];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 23b20845a6a9ee13e5e58682773be1671fc4339155fe0aa96d34b3d9711b5019 # shrinks to seed = 5849452112570820215, mesh_layer_probability = 0.6327577840976883, groups = [[(0, 0, 0.0, 0, 0)], []]
+cc 9aaebea595089f39daa7c16905f4cfccc4d07e9d84c2cba002981ec734e5c6fc # shrinks to seed = 683074293188132175, mesh_layer_probability = 0.3540500610970657, groups = [[(0, 0, 0.0, 5166, 1), (0, 0, 0.0, 5382, 0)], []]

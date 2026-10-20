@@ -144,21 +144,25 @@ Constraints:
   keeps the consumer's seed while the new identity edge has none. Group
   slots follow their records: a new group gets an empty slot, dropping a
   record (`RemoveGroup`, a last member's removal or detach) removes its
-  slot, and a relocation, a scope write or an `inherit_scale` write keeps it.
+  slot, and a relocation, a scope write, an `inherit_scale` write or a
+  `retention` write (T25.F09) keeps it.
 - A detached member's seed is composed (T25.F07): when the edge or its group
   has a seed, `compose(edge seed or own weight, group seed or scale,
   pattern)`, reading no flag and clamping nothing; with neither, none.
 - A weight write, a source-changing retarget and an edge reading a removed
   compute node clear the edge's seed and a scale write clears the group's;
-  a same-source retarget, a kind change, a learning-attribute change and a
-  scope change keep it.
+  a same-source retarget, a kind change, a learning-attribute change (an
+  edge `retention` write included, T25.F09) and a scope change keep it.
 - The child's constructor reads the final child flags: a Lamarckian
   ungrouped or edge-scope learner with a seed starts at the seed clamped by
-  the child's edge clamp and counts as initialized; every other learner, a
-  Darwinian one with a seed and a group-scope learner included, starts at
-  its child genomic own weight, uninitialized until its backend's first
-  visit. A scale slot starts at `clamp(seed, ±bound)`, initialized, when the
-  child group has `inherit_scale` and a seed, else at the genomic scale. A
+  the child's edge clamp and counts as initialized; every other ungrouped or
+  edge-scope learner, a Darwinian one with a seed included, starts at its
+  child genomic own weight clamped by its edge clamp, uninitialized until
+  its backend's first visit; a group-scope learner holds its raw genomic own
+  weight. A scale slot starts at `clamp(seed, ±bound)`, initialized, when
+  the child group has `inherit_scale` and a seed, else at `clamp(genomic,
+  ±bound)`. That start is each quantity's birth value, toward which it
+  decays (T25.F09, graph backend spec Section 13). A
   seed the child does not read is dropped. Only seeded slots are
   initialized before that visit.
 - Reproduction writes no runtime field and never changes the parent's state;

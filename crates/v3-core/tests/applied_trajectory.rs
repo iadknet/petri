@@ -142,6 +142,11 @@
 //! 23a0754d...); the guard digests hold. The sampled digest without genome
 //! bytes is 146fe823... (rate 0.0 4eb8afe8...) at the merge base and after
 //! the commit.
+//! Re-pinned by T25.F09 commit 3 after two agreeing runs: the six retention
+//! operators join the Graph catalog (enabled weight 67 -> 79) and remap
+//! every Graph draw, which moves all four digests (sampled 5beb9f71... ->
+//! fd1d7d5a..., gestation rate 0.0 23a0754d... -> b60acab7...; guard
+//! 3d299de5... -> cca5541d..., rate 0.0 7d7ae0e2... -> 55e51cf0...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -153,11 +158,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "5beb9f71185c6af51e870163da3bfaabbb637148feb872b4ed8e6a7dc81741f3"
+        "fd1d7d5a7800c773540a9856a39b1dcfe479a105c76f2fac89352e9b19d33064"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "23a0754d1c3884d90bcbfffc160e8f2b3a4f83850826d2531452964b327e757b"
+        "b60acab7d1480d6c4e6177bc5a3b0484c7e21ee515827e9e162aba3d81f9f5cc"
     );
 }
 
@@ -230,11 +235,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "3d299de59b4e733fac2bf20daa0d93ad5e3837371ac912372ab56b5563628177"
+        "cca5541dd4f9eb6bc2e8ae52d1880d7d4075b1f6d1abdda8295dd42db85c7e01"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "7d7ae0e2a2d0b87dd8f9275dbdc81edd027ce76a53dabc335abc26e9fdfa0343"
+        "55e51cf090472f2762bb0ad763e522cf352af85df90112013acc2d87778d8360"
     );
 }
 

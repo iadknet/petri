@@ -504,9 +504,28 @@ added/removed/retyped — only their edges are evolvable.
   member uniformly in canonical order, the scope coin, then the other of the
   picked member's scope written to it alone or to every member of its group;
   no value draw. Scope carries no genome unit.
-  Each committed change of the nine plasticity operators and `SetScope`
-  counts once at the scope it landed on, `Group` for a member with a true
-  coin, else `Edge` (`attribute_changes_by_scope`, T25.F08).
+  Each committed change of the nine plasticity operators, `SetScope` and
+  the three edge retention operators counts once at the scope it landed on,
+  `Group` for a member with a true coin, else `Edge`
+  (`attribute_changes_by_scope`, T25.F08, T25.F09).
+- **Retention** (T25.F09): an edge's `retention` and a group's (its learned
+  scale's) set how far a learned quantity relaxes toward its birth value
+  each tick (graph backend spec Section 13); `EnableHebbian` and both
+  creation forms write 1 with no draw. Six operators after
+  `DetachGraphEdge`, keys `Graph.<name>`, all Neutral, `Δgenome_size` 0,
+  none admitted by restricted size pressure:
+
+  | Operator | Weight | Applies to | Draws, in order |
+  | --- | ---: | --- | --- |
+  | `EnableRetention` | 1 | a Graph node with a plastic edge at retention 1 | one such edge uniformly in canonical order; the scope coin for a member (a group-wide change reaches every admitted member); one `u = gen_range(-4.0..=0.0)`; retention `1 − 10ᵘ` on every target |
+  | `DisableRetention` | 1 | a Graph node with a plastic edge below retention 1 | the edge and coin; no value draw; retention 1 |
+  | `MutateRetention` | 4 | as `DisableRetention` | the edge and coin; one `u = gen_range(-1.0..=1.0)`; each target's deficit `d = 1 − retention` becomes `(d · (1 + 0.3u)).clamp(10⁻⁴, 1)` |
+  | `EnableGroupRetention` | 1 | a Graph node with a group record at retention 1 | one such record uniformly in `GroupId` order (a record without a scale slot admitted, its retention inert); `EnableRetention`'s draw |
+  | `DisableGroupRetention` | 1 | a Graph node with a group record below retention 1 | the record; retention 1 |
+  | `MutateGroupRetention` | 4 | as `DisableGroupRetention` | the record; `MutateRetention`'s `u` and step |
+
+  A scope-`Group` member's retention is inert but editable, as its
+  `lamarckian` flag; the group three report no scope.
 - `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled by
   `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`;
   `"WholeFamily"` is the default since 2026-10-12.
@@ -586,12 +605,13 @@ added/removed/retyped — only their edges are evolvable.
   `RecruitNeutralInput`, with `AddDirectionPairGroup` (T25.F04) directly
   after `AddRingGroup`, `SetScope` (T25.F07) after `RemoveGroup`, and
   `AddRandomizedRingGroup`, `AddRandomizedDirectionPairGroup` and
-  `DetachGraphEdge` (T25.F08) after `SetScope`. The Graph catalog holds 32
+  `DetachGraphEdge` (T25.F08) after `SetScope`, and the six retention
+  operators (T25.F09) after `DetachGraphEdge`. The Graph catalog holds 38
   operators; the default-arm total weight (every operator but
-  `RecruitNeutralInput`) is 66, and the enabled total at the default config
-  67. A group is a record
+  `RecruitNeutralInput`) is 78, and the enabled total at the default config
+  79. A group is a record
   `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind, offset,
-  scale, inherit_scale}` plus its member sink edges, each with a `scope`
+  scale, inherit_scale, retention}` plus its member sink edges, each with a `scope`
   (graph backend spec, "Ring edge groups" and "Direction-pair edge groups");
   the unit operators pick one group uniformly over both shapes, edit the
   record and move members with it, scope included.

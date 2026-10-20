@@ -236,7 +236,7 @@ fn group_edits_count_detaches_and_removals_by_operator() {
 
 /// The ten operators whose committed change reports its scope (T25.F08
 /// invariant 8).
-const ATTRIBUTE_OPERATORS: [GraphOperator; 10] = [
+const ATTRIBUTE_OPERATORS: [GraphOperator; 13] = [
     GraphOperator::EnableHebbian,
     GraphOperator::DisableHebbian,
     GraphOperator::MutateHebbianRule,
@@ -247,6 +247,9 @@ const ATTRIBUTE_OPERATORS: [GraphOperator; 10] = [
     GraphOperator::MutateRewardSource,
     GraphOperator::MutateTraceDecay,
     GraphOperator::SetScope,
+    GraphOperator::EnableRetention,
+    GraphOperator::DisableRetention,
+    GraphOperator::MutateRetention,
 ];
 
 /// Every node index of `genome`, the selection universe of the event tests.
@@ -325,7 +328,8 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
     );
 }
 
-/// The ten attribute operators report the scope their committed change
+/// The thirteen attribute operators (T25.F09 adds the three edge retention
+/// operators, `retention.rs`) report the scope their committed change
 /// landed on (T25.F08 invariant 8): `Group` when a member was picked and
 /// the coin was true (the change reaches every admitted member), else
 /// `Edge` (one edge changed: a member with a false coin, or a non-member).
@@ -497,7 +501,13 @@ fn expected_delta(
         }
         MutationOperator::GraphAlterGroupScale
         | MutationOperator::GraphShiftGroupOffset
-        | MutationOperator::GraphRetargetGroupKind => Some(vec![0]),
+        | MutationOperator::GraphRetargetGroupKind
+        | MutationOperator::GraphEnableRetention
+        | MutationOperator::GraphDisableRetention
+        | MutationOperator::GraphMutateRetention
+        | MutationOperator::GraphEnableGroupRetention
+        | MutationOperator::GraphDisableGroupRetention
+        | MutationOperator::GraphMutateGroupRetention => Some(vec![0]),
         _ => None,
     }
 }

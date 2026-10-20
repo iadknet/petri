@@ -163,8 +163,9 @@ fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut Smal
 
 #[test]
 fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 32);
-    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 65);
+    // T25.F09 appends the six retention operators (`retention.rs`).
+    assert_eq!(GraphOperator::ALL.len(), 38);
+    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 71);
     assert_eq!(&GraphOperator::ALL[22..28], &GROUP_OPERATORS);
     // T25.F08: the randomized twins and `DetachGraphEdge` follow `SetScope`.
     assert_eq!(
@@ -202,7 +203,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .filter(|op| op.enabled(&MutationConfig::default()))
         .map(|op| u16::from(op.weight()))
         .sum();
-    assert_eq!(enabled, 67, "the engine's enabled Graph weight at defaults");
+    assert_eq!(enabled, 79, "the engine's enabled Graph weight at defaults");
     // T25.F07: `SetScope` follows `RemoveGroup`, weight 2, neutral.
     assert_eq!(GraphOperator::ALL[28], GraphOperator::SetScope);
     assert_eq!(GraphOperator::SetScope.weight(), 2);
@@ -225,7 +226,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .filter(|&&op| op != GraphOperator::RecruitNeutralInput)
         .map(|op| u16::from(op.weight()))
         .sum();
-    assert_eq!(default_arm, 66);
+    assert_eq!(default_arm, 78);
     let keys = GROUP_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
         keys,

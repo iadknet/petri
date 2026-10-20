@@ -83,7 +83,10 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // (1771622774480443924 -> 2113204031778778398); the hash without the
     // genome JSON is 8882269626750794464 at the merge base and after the
     // commit.
-    assert_eq!(hash, 2113204031778778398, "pin of the recruitment-Off path");
+    // Re-pinned by T25.F09 commit 3: the six retention operators join the
+    // Graph catalog (enabled weight 66 -> 78 on this path) and remap every
+    // Graph draw (2113204031778778398 -> 5304583554271412245).
+    assert_eq!(hash, 5304583554271412245, "pin of the recruitment-Off path");
 }
 
 #[test]
