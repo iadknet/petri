@@ -130,6 +130,12 @@
 //! (sampled f55ad21d... was 38f68975..., gestation rate 0.0 872113ec... was
 //! 0d037fb0...; guard dc32a1fa... was 31bd6e95..., rate 0.0 d61cf3eb... was
 //! ec2e084d...).
+//! Re-pinned by T25.F08 commit 2 after two agreeing runs: the randomized
+//! creation operators and `DetachGraphEdge` join the Graph catalog (enabled
+//! weight 61 -> 67) and remap every Graph draw, which moves all four digests
+//! (sampled f55ad21d... -> 9458abf6..., gestation rate 0.0 872113ec... ->
+//! a187a3fe...; guard dc32a1fa... -> 3d299de5..., rate 0.0 d61cf3eb... ->
+//! 7d7ae0e2...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -141,11 +147,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "f55ad21de23f441bbef991c91552491c00c42b47b84ada2734cdde63a101f53e"
+        "9458abf62ffa83bc7ca60c83800a534505bc9502713c8e29839facf5055b09a5"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "872113ec48868cc2f87725eb6ecdc708ee0dcaf39ee08dd52f74d029f6ff4a47"
+        "a187a3fefe41f1cae24a4949bdcf2a1db38f0159bbfd557d9eec41c68fe3b994"
     );
 }
 
@@ -218,11 +224,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "dc32a1fad13ac284b607f52ec8cb44bf1689729628d05ef902ceb42845e27bf1"
+        "3d299de59b4e733fac2bf20daa0d93ad5e3837371ac912372ab56b5563628177"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "d61cf3eb6b0281c6e71ca54ffe2f994b158dfc9a816c2f4b8149b31ed4989898"
+        "7d7ae0e2a2d0b87dd8f9275dbdc81edd027ce76a53dabc335abc26e9fdfa0343"
     );
 }
 

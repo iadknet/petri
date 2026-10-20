@@ -7,8 +7,8 @@ use rand::Rng;
 
 use crate::config::{MutationConfig, NeutralInputRecruitment};
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::CgpGraphBackendDef;
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, Scope};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
     BirthEdgeClass, MutationOperator, MutationSkipReason, TargetReachability,
@@ -19,6 +19,9 @@ use crate::mutation::types::{
 pub(crate) struct GraphEventReport {
     /// The class of the vote-sink edge an `AddGraphEdge` pushed (T11.F30).
     pub class: Option<BirthEdgeClass>,
+    /// The scope the change of one of the ten attribute operators (the nine
+    /// plasticity operators and `SetScope`) landed on (T25.F08).
+    pub attribute_scope: Option<Scope>,
 }
 
 /// Graph mutation operator variants.
@@ -53,10 +56,13 @@ pub enum GraphOperator {
     RetargetGroupKind,
     RemoveGroup,
     SetScope,
+    AddRandomizedRingGroup,
+    AddRandomizedDirectionPairGroup,
+    DetachGraphEdge,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 32] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -86,6 +92,9 @@ impl GraphOperator {
         Self::RetargetGroupKind,
         Self::RemoveGroup,
         Self::SetScope,
+        Self::AddRandomizedRingGroup,
+        Self::AddRandomizedDirectionPairGroup,
+        Self::DetachGraphEdge,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -127,12 +136,17 @@ impl GraphOperator {
             Self::RemoveGroup => 2,
             // T25.F07: after `RemoveGroup`, at the tier of a moderate edit.
             Self::SetScope => 2,
+            // T25.F08: after `SetScope`, each at its uniform twin's tier and
+            // detach at a moderate edit's.
+            Self::AddRandomizedRingGroup => 2,
+            Self::AddRandomizedDirectionPairGroup => 2,
+            Self::DetachGraphEdge => 2,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 29,
+            Self::ALL.len() == 32,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -180,6 +194,11 @@ impl GraphOperator {
             Self::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
             Self::RemoveGroup => MutationOperator::GraphRemoveGroup,
             Self::SetScope => MutationOperator::GraphSetScope,
+            Self::AddRandomizedRingGroup => MutationOperator::GraphAddRandomizedRingGroup,
+            Self::AddRandomizedDirectionPairGroup => {
+                MutationOperator::GraphAddRandomizedDirectionPairGroup
+            }
+            Self::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
         }
     }
 
@@ -250,13 +269,15 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
-            Self::AddRingGroup => group::can_add(def, input_refs),
-            Self::AddDirectionPairGroup => group::can_add_pair(def, input_refs),
+            Self::AddRingGroup | Self::AddRandomizedRingGroup => group::can_add(def, input_refs),
+            Self::AddDirectionPairGroup | Self::AddRandomizedDirectionPairGroup => {
+                group::can_add_pair(def, input_refs)
+            }
             Self::AlterGroupScale
             | Self::ShiftGroupOffset
             | Self::RetargetGroupKind
             | Self::RemoveGroup => group::has_group(def),
-            Self::SetScope => hebbian::any_edge(def, hebbian::is_member),
+            Self::SetScope | Self::DetachGraphEdge => hebbian::any_edge(def, hebbian::is_member),
         }
     }
 }
@@ -332,19 +353,14 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        let report = match op {
-            GraphOperator::AddGraphEdge => GraphEventReport {
-                class: operators::add_graph_edge(genome, node_idx, rng)?,
-            },
-            _ => {
-                Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
-                GraphEventReport::default()
-            }
-        };
+        let report = Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
         Ok((reachability, report))
     }
 
-    /// Dispatch `op` onto one already-selected node.
+    /// Dispatch `op` onto one already-selected node, with what the event
+    /// reports: the class of the vote-sink edge an `AddGraphEdge` pushed
+    /// (T11.F30) and the scope an attribute operator's change landed on
+    /// (T25.F08 invariant 8).
     pub(crate) fn apply_to_node(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -352,93 +368,134 @@ impl GraphMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
         food_type_count: usize,
-    ) -> Result<(), MutationSkipReason> {
+    ) -> Result<GraphEventReport, MutationSkipReason> {
+        let unreported =
+            |result: Result<(), MutationSkipReason>| result.map(|()| GraphEventReport::default());
+        let scoped = |result: Result<Scope, MutationSkipReason>| {
+            result.map(|scope| GraphEventReport {
+                class: None,
+                attribute_scope: Some(scope),
+            })
+        };
         match op {
-            GraphOperator::RecruitNeutralInput => {
-                let node = genome
-                    .nodes
-                    .get_mut(node_idx)
-                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                recruitment::recruit(node, config.neutral_input_recruitment, food_type_count, rng)
-            }
+            GraphOperator::RecruitNeutralInput => unreported(recruitment::recruit(
+                node_mut(genome, node_idx)?,
+                config.neutral_input_recruitment,
+                food_type_count,
+                rng,
+            )),
             GraphOperator::AlterGraphEdgeWeight => {
-                operators::alter_edge_weight(genome, node_idx, rng)
+                unreported(operators::alter_edge_weight(genome, node_idx, rng))
             }
-            GraphOperator::SwapGraphOperator => operators::swap_operator(genome, node_idx, rng),
+            GraphOperator::SwapGraphOperator => {
+                unreported(operators::swap_operator(genome, node_idx, rng))
+            }
             GraphOperator::MutateGraphOperatorParam => {
-                operators::mutate_operator_param(genome, node_idx, rng)
+                unreported(operators::mutate_operator_param(genome, node_idx, rng))
             }
             GraphOperator::AddInternalGraphNode => {
-                operators::add_internal_node(genome, node_idx, rng)
+                unreported(operators::add_internal_node(genome, node_idx, rng))
             }
             GraphOperator::RemoveInternalGraphNode => {
-                operators::remove_internal_node(genome, node_idx, rng)
+                unreported(operators::remove_internal_node(genome, node_idx, rng))
             }
-            GraphOperator::AddGraphEdge => {
-                operators::add_graph_edge(genome, node_idx, rng).map(|_| ())
-            }
+            GraphOperator::AddGraphEdge => Ok(GraphEventReport {
+                class: operators::add_graph_edge(genome, node_idx, rng)?,
+                attribute_scope: None,
+            }),
             GraphOperator::RetargetGraphEdge => {
-                operators::retarget_graph_edge(genome, node_idx, rng)
+                unreported(operators::retarget_graph_edge(genome, node_idx, rng))
             }
-            GraphOperator::RemoveGraphEdge => operators::remove_graph_edge(genome, node_idx, rng),
-            GraphOperator::GraphRawFieldMutation => {
-                operators::apply_graph_raw_field_mutation(genome, node_idx, rng)
+            GraphOperator::RemoveGraphEdge => {
+                unreported(operators::remove_graph_edge(genome, node_idx, rng))
             }
+            GraphOperator::GraphRawFieldMutation => unreported(
+                operators::apply_graph_raw_field_mutation(genome, node_idx, rng),
+            ),
             GraphOperator::CopyInternalNode => {
-                operators::apply_copy_internal_node(genome, node_idx, rng)
+                unreported(operators::apply_copy_internal_node(genome, node_idx, rng))
             }
-            GraphOperator::CopySubgraph => operators::apply_copy_subgraph(genome, node_idx, rng),
+            GraphOperator::CopySubgraph => {
+                unreported(operators::apply_copy_subgraph(genome, node_idx, rng))
+            }
             GraphOperator::CopyEdgeBundle => {
-                operators::apply_copy_edge_bundle(genome, node_idx, rng)
+                unreported(operators::apply_copy_edge_bundle(genome, node_idx, rng))
             }
-            GraphOperator::EnableHebbian => hebbian::enable_hebbian(genome, node_idx, rng),
-            GraphOperator::DisableHebbian => hebbian::disable_hebbian(genome, node_idx, rng),
-            GraphOperator::MutateHebbianRule => hebbian::mutate_hebbian_rule(genome, node_idx, rng),
-            GraphOperator::MutateHebbianRate => hebbian::mutate_hebbian_rate(genome, node_idx, rng),
+            GraphOperator::EnableHebbian => scoped(hebbian::enable_hebbian(genome, node_idx, rng)),
+            GraphOperator::DisableHebbian => {
+                scoped(hebbian::disable_hebbian(genome, node_idx, rng))
+            }
+            GraphOperator::MutateHebbianRule => {
+                scoped(hebbian::mutate_hebbian_rule(genome, node_idx, rng))
+            }
+            GraphOperator::MutateHebbianRate => {
+                scoped(hebbian::mutate_hebbian_rate(genome, node_idx, rng))
+            }
             GraphOperator::ToggleHebbianLamarckian => {
-                hebbian::toggle_hebbian_lamarckian(genome, node_idx, rng)
+                scoped(hebbian::toggle_hebbian_lamarckian(genome, node_idx, rng))
             }
             GraphOperator::EnableRewardModulation => {
-                hebbian::enable_reward_modulation(genome, node_idx, rng)
+                scoped(hebbian::enable_reward_modulation(genome, node_idx, rng))
             }
             GraphOperator::DisableRewardModulation => {
-                hebbian::disable_reward_modulation(genome, node_idx, rng)
+                scoped(hebbian::disable_reward_modulation(genome, node_idx, rng))
             }
             GraphOperator::MutateRewardSource => {
-                hebbian::mutate_reward_source(genome, node_idx, rng)
+                scoped(hebbian::mutate_reward_source(genome, node_idx, rng))
             }
-            GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
-            GraphOperator::AddRingGroup => {
-                let node = genome
-                    .nodes
-                    .get_mut(node_idx)
-                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                group::add(node, rng)
+            GraphOperator::MutateTraceDecay => {
+                scoped(hebbian::mutate_trace_decay(genome, node_idx, rng))
             }
+            GraphOperator::AddRingGroup => unreported(group::add(node_mut(genome, node_idx)?, rng)),
             GraphOperator::AddDirectionPairGroup => {
-                let node = genome
-                    .nodes
-                    .get_mut(node_idx)
-                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                group::add_pair(node, rng)
+                unreported(group::add_pair(node_mut(genome, node_idx)?, rng))
             }
-            GraphOperator::AlterGroupScale => {
-                group::alter_scale(operators::graph_def_mut(genome, node_idx)?, rng)
-            }
-            GraphOperator::ShiftGroupOffset => {
-                group::shift_offset(operators::graph_def_mut(genome, node_idx)?, rng)
-            }
-            GraphOperator::RetargetGroupKind => {
-                group::retarget_kind(operators::graph_def_mut(genome, node_idx)?, rng)
-            }
-            GraphOperator::RemoveGroup => {
-                group::remove(operators::graph_def_mut(genome, node_idx)?, rng)
-            }
-            GraphOperator::SetScope => {
-                hebbian::set_scope_in_def(operators::graph_def_mut(genome, node_idx)?, rng)
+            GraphOperator::AlterGroupScale => unreported(group::alter_scale(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::ShiftGroupOffset => unreported(group::shift_offset(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::RetargetGroupKind => unreported(group::retarget_kind(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::RemoveGroup => unreported(group::remove(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::SetScope => scoped(hebbian::set_scope_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::AddRandomizedRingGroup => unreported(group::add_in_form(
+                node_mut(genome, node_idx)?,
+                group::CreationForm::Randomized,
+                rng,
+            )),
+            GraphOperator::AddRandomizedDirectionPairGroup => unreported(group::add_pair_in_form(
+                node_mut(genome, node_idx)?,
+                group::CreationForm::Randomized,
+                rng,
+            )),
+            GraphOperator::DetachGraphEdge => {
+                unreported(group::detach_member(node_mut(genome, node_idx)?, rng))
             }
         }
     }
+}
+
+/// The node at `node_idx`, or `NoApplicableTarget` past the end.
+fn node_mut(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+) -> Result<&mut NodeGenome, MutationSkipReason> {
+    genome
+        .nodes
+        .get_mut(node_idx)
+        .ok_or(MutationSkipReason::NoApplicableTarget)
 }
 
 #[cfg(test)]

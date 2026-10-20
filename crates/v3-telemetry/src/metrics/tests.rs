@@ -163,6 +163,7 @@ fn populated() -> SimStats {
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
     }
+    s.mutation_attribute_changes_total_by_scope = [3, 1];
     for class in BirthEdgeClass::ALL {
         s.mutation_value_totals_by_birth_edge_class
             .insert(class, MutationValueTotals::default());
@@ -502,6 +503,11 @@ fn mutation_families(families: &mut Vec<Family>) {
                 ),
             ),
         ],
+    ));
+    families.push((
+        "petri.run.mutation_attribute_changes_by_scope".to_owned(),
+        MonotonicSum,
+        vec![("petri.scope", strings(["Edge", "Group"], str::to_owned))],
     ));
     for (field, kind) in [
         ("carriers_observed", MonotonicSum),
@@ -900,6 +906,15 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
         ),
         PointValue::Int(1)
     );
+    for (scope, count) in [("Edge", 3), ("Group", 1)] {
+        assert_eq!(
+            value(
+                "petri.run.mutation_attribute_changes_by_scope",
+                &[("petri.scope", scope)]
+            ),
+            PointValue::Int(count)
+        );
+    }
     assert_eq!(
         value("petri.tick.food_total_density", &[("petri.food_type", "1")]),
         PointValue::Double(0.25)

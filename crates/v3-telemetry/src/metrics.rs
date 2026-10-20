@@ -23,6 +23,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::drives::DriveCensus;
+use v3_core::creature::genome::cgp::Scope;
 use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
@@ -788,6 +789,20 @@ fn mutations(f: &mut Families, s: &SimStats) {
                 .map(|(input, count)| (input.as_key().to_owned(), *count))
                 .collect()
         },
+    );
+
+    // T25.F08: committed attribute changes by the scope they landed on, both
+    // series always exported.
+    f.push(
+        run_name("mutation_attribute_changes_total_by_scope"),
+        Kind::Sum,
+        "",
+        Scope::ALL.map(|scope| {
+            (
+                vec![("petri.scope", scope.as_key().to_owned())],
+                s.mutation_attribute_changes_total_by_scope[scope.index()].into(),
+            )
+        }),
     );
 
     value_families(

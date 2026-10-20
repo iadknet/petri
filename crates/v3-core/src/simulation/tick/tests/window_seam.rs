@@ -188,10 +188,13 @@ fn traced_and_untraced_runs_are_identical_for_graph_founders() {
     // Kind drives (T11.F30), 2026-10-12: seed 7 to 12. At seed 7 a traced
     // target dies of a move at tick 31, inside its window, and a dead
     // creature's action log, the oracle, is removed with it; seeds 8 to 11
-    // also lose a target inside its window.
+    // also lose a target inside its window. T25.F08 commit 2 (the
+    // randomized creation operators and `DetachGraphEdge` remap every Graph
+    // draw): seed 12 to 14. At seed 12 a traced target dies of a move at tick
+    // 40, inside its window; seed 13 also fails the check.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = seed_simulation(equivalence_config(), 12);
-        let plain = seed_simulation(equivalence_config(), 12);
+        let traced = seed_simulation(equivalence_config(), 14);
+        let plain = seed_simulation(equivalence_config(), 14);
         assert_equivalent(traced, plain, budget);
     }
 }
@@ -209,10 +212,12 @@ fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // 97 restore seed 16. `AddDirectionPairGroup` (T25.F04 commit 1): seed 21
     // to 24. At seed 21 a traced target dies of a move at tick 46, inside its
     // window; seeds 22 and 23 also fail the check. Removing the catalog entry
-    // restores seed 21.
+    // restores seed 21. T25.F08 commit 2 (the randomized creation operators
+    // and `DetachGraphEdge` remap every Graph draw): seed 24 to 25. At seed
+    // 24 a traced target dies of a move at tick 49, inside its window.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 24));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 24));
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 25));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 25));
         assert_equivalent(traced, plain, budget);
     }
 }

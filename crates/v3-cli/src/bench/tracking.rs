@@ -688,6 +688,12 @@ impl WorldTracking {
                 groups_removed_total: stats.groups_removed_total,
                 pair_group_inherited_nonzero_births_total: stats
                     .pair_group_inherited_nonzero_births_total,
+                attribute_changes_by_scope: stats.mutation_attribute_changes_total_by_scope.into(),
+                operator_funnel_by_operator: stats
+                    .mutation_operator_funnel_total_by_operator
+                    .iter()
+                    .map(|(operator, funnel)| (operator.as_key().to_string(), funnel.into()))
+                    .collect(),
             }),
             mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
             mutation_value_totals_by_operator: Some(

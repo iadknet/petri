@@ -10,7 +10,7 @@ use super::*;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
-    test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Shape,
+    test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
@@ -116,7 +116,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let all: Vec<usize> = (0..valid.nodes.len()).collect();
     for seed in 0..8 {
         let mut committed = valid.clone();
-        let (result, edits) = apply_graph_event(
+        let (result, edits, _) = apply_graph_event(
             &mut committed,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -128,7 +128,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         assert_eq!(edits.groups_removed, 1);
 
         let mut rolled_back = broken.clone();
-        let (result, edits) = apply_graph_event(
+        let (result, edits, scope) = apply_graph_event(
             &mut rolled_back,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -138,6 +138,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         );
         assert_eq!(result, Err(MutationSkipReason::GraphInvariantViolation));
         assert_eq!(edits, GroupEdits::default());
+        assert_eq!(scope, None);
         assert_eq!(rolled_back, broken);
     }
 }
@@ -177,6 +178,215 @@ fn group_edits_count_detaches_and_removals_by_operator() {
         edits(GraphOperator::AddRingGroup, (0, 0), (8, 1)),
         GroupEdits::default()
     );
+    assert_eq!(
+        edits(GraphOperator::DetachGraphEdge, (8, 1), (7, 1)),
+        GroupEdits {
+            detached: 1,
+            groups_removed: 0
+        }
+    );
+}
+
+/// The ten operators whose committed change reports its scope (T25.F08
+/// invariant 8).
+const ATTRIBUTE_OPERATORS: [GraphOperator; 10] = [
+    GraphOperator::EnableHebbian,
+    GraphOperator::DisableHebbian,
+    GraphOperator::MutateHebbianRule,
+    GraphOperator::MutateHebbianRate,
+    GraphOperator::ToggleHebbianLamarckian,
+    GraphOperator::EnableRewardModulation,
+    GraphOperator::DisableRewardModulation,
+    GraphOperator::MutateRewardSource,
+    GraphOperator::MutateTraceDecay,
+    GraphOperator::SetScope,
+];
+
+/// Every node index of `genome`, the selection universe of the event tests.
+fn every_node(genome: &CreatureGenome) -> Vec<usize> {
+    (0..genome.nodes.len()).collect()
+}
+
+/// A committed `DetachGraphEdge` counts one detach and no removal while
+/// members remain, moves no genome unit and keeps the record (T25.F08).
+#[test]
+fn a_committed_detach_counts_one_graph_edge_detached() {
+    let (genome, idx, _) = grouped_founder();
+    let all = every_node(&genome);
+    for seed in 0..16 {
+        let mut detached = genome.clone();
+        let (result, edits, scope) = apply_graph_event(
+            &mut detached,
+            GraphOperator::DetachGraphEdge,
+            &mut TargetSelector::reachable_only(&all, 0.0),
+            &mut SmallRng::seed_from_u64(seed),
+            &MutationConfig::default(),
+            2,
+        );
+        assert!(result.is_ok(), "seed {seed}");
+        assert_eq!(
+            edits,
+            GroupEdits {
+                detached: 1,
+                groups_removed: 0
+            }
+        );
+        assert_eq!(scope, None, "a detach reports no attribute scope");
+        assert_eq!(detached.genome_size(), genome.genome_size());
+        let def = graph_mut(&mut detached.nodes[idx]);
+        assert_eq!(def.groups().len(), 1);
+        assert_eq!(def.members(GroupId::new(0)).count(), 7);
+    }
+}
+
+/// A last member's `DetachGraphEdge` removes the group: one detach, one
+/// removal, and the record's genome unit goes (T25.F08 invariant 3).
+#[test]
+fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
+    let (mut genome, idx, _) = grouped_founder();
+    let refs = genome.nodes[idx].input_refs.clone();
+    let def = graph_mut(&mut genome.nodes[idx]);
+    while def.members(GroupId::new(0)).count() > 1 {
+        let member = def.members(GroupId::new(0)).next().unwrap();
+        crate::creature::genome::cgp::detach(def, member, &refs);
+    }
+    let all = every_node(&genome);
+    let mut detached = genome.clone();
+    let (result, edits, _) = apply_graph_event(
+        &mut detached,
+        GraphOperator::DetachGraphEdge,
+        &mut TargetSelector::reachable_only(&all, 0.0),
+        &mut SmallRng::seed_from_u64(0),
+        &MutationConfig::default(),
+        2,
+    );
+    assert!(result.is_ok());
+    assert_eq!(
+        edits,
+        GroupEdits {
+            detached: 1,
+            groups_removed: 1
+        }
+    );
+    assert!(graph_mut(&mut detached.nodes[idx]).groups().is_empty());
+    assert_eq!(detached.genome_size() + 1, genome.genome_size());
+    let mut summary = MutationSummary::zero();
+    summary.record_group_edits(edits);
+    assert_eq!(
+        (summary.graph_edges_detached, summary.groups_removed),
+        (1, 1)
+    );
+}
+
+/// The ten attribute operators report the scope their committed change
+/// landed on (T25.F08 invariant 8): `Group` when a member was picked and
+/// the coin was true (the change reaches every admitted member), else
+/// `Edge` (one edge changed: a member with a false coin, or a non-member).
+/// Creation and detach report none.
+#[test]
+fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
+    let (genome, idx, _) = grouped_founder();
+    let all = every_node(&genome);
+    let plasticity = |genome: &CreatureGenome| -> Vec<_> {
+        genome
+            .nodes
+            .iter()
+            .filter_map(|node| match &node.backend_def {
+                BackendDef::Graph(def) => Some(def),
+                BackendDef::Vm(_) => None,
+            })
+            .flat_map(|def| {
+                def.edge_sites()
+                    .map(|at| {
+                        let edge = def.edge_at(at);
+                        (edge.plasticity(), edge.membership())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    };
+    // EnableHebbian: (member, true coin), (member, false coin), non-member.
+    let mut seen = [false; 3];
+    for seed in 0..256 {
+        let mut changed = genome.clone();
+        let (result, _, scope) = apply_graph_event(
+            &mut changed,
+            GraphOperator::EnableHebbian,
+            &mut TargetSelector::reachable_only(&all, 0.0),
+            &mut SmallRng::seed_from_u64(seed),
+            &MutationConfig::default(),
+            2,
+        );
+        assert!(result.is_ok(), "seed {seed}");
+        let (before, after) = (plasticity(&genome), plasticity(&changed));
+        let diffs: Vec<_> = before
+            .iter()
+            .zip(&after)
+            .filter(|(old, new)| old.0 != new.0)
+            .map(|(_, new)| new.1)
+            .collect();
+        match scope {
+            Some(Scope::Group) => {
+                assert_eq!(diffs.len(), 8, "every member, seed {seed}");
+                seen[0] = true;
+            }
+            Some(Scope::Edge) => {
+                assert_eq!(diffs.len(), 1, "seed {seed}");
+                seen[if diffs[0].is_some() { 1 } else { 2 }] = true;
+            }
+            None => panic!("an attribute change reports its scope, seed {seed}"),
+        }
+    }
+    assert_eq!(seen, [true; 3], "every case drawn");
+
+    // SetScope: `Group` flips every member, `Edge` one.
+    let mut scopes = [false; 2];
+    for seed in 0..64 {
+        let mut changed = genome.clone();
+        let (result, _, scope) = apply_graph_event(
+            &mut changed,
+            GraphOperator::SetScope,
+            &mut TargetSelector::reachable_only(&all, 0.0),
+            &mut SmallRng::seed_from_u64(seed),
+            &MutationConfig::default(),
+            2,
+        );
+        assert!(result.is_ok());
+        let def = graph_mut(&mut changed.nodes[idx]);
+        let group_scope = def
+            .members(GroupId::new(0))
+            .filter(|&at| def.edge_at(at).membership().unwrap().scope == Scope::Group)
+            .count();
+        let scope = scope.expect("SetScope reports its scope");
+        assert_eq!(group_scope, if scope == Scope::Group { 8 } else { 1 });
+        scopes[scope.index()] = true;
+    }
+    assert_eq!(scopes, [true; 2]);
+
+    for op in [
+        GraphOperator::AddRingGroup,
+        GraphOperator::AddRandomizedRingGroup,
+        GraphOperator::DetachGraphEdge,
+        GraphOperator::AlterGraphEdgeWeight,
+    ] {
+        let mut changed = genome.clone();
+        let (result, _, scope) = apply_graph_event(
+            &mut changed,
+            op,
+            &mut TargetSelector::reachable_only(&all, 0.0),
+            &mut SmallRng::seed_from_u64(1),
+            &MutationConfig::default(),
+            2,
+        );
+        assert!(result.is_ok(), "{op:?}");
+        assert_eq!(scope, None, "{op:?} reports no attribute scope");
+    }
+
+    let mut summary = MutationSummary::zero();
+    summary.record_attribute_scope(Scope::Group);
+    summary.record_attribute_scope(Scope::Edge);
+    summary.record_attribute_scope(Scope::Group);
+    assert_eq!(summary.attribute_changes_by_scope, [1, 2]);
 }
 
 /// The tallies count every member edge and every group record: one ring
@@ -220,8 +430,18 @@ fn expected_delta(
         .map(|i| before.members(GroupId::new(i as u16)).count() as i64)
         .collect();
     match op {
-        MutationOperator::GraphAddRingGroup => Some(vec![9]),
-        MutationOperator::GraphAddDirectionPairGroup => Some(vec![13]),
+        MutationOperator::GraphAddRingGroup | MutationOperator::GraphAddRandomizedRingGroup => {
+            Some(vec![9])
+        }
+        MutationOperator::GraphAddDirectionPairGroup
+        | MutationOperator::GraphAddRandomizedDirectionPairGroup => Some(vec![13]),
+        MutationOperator::GraphDetachGraphEdge => {
+            Some(vec![if after.groups().len() < before.groups().len() {
+                -1
+            } else {
+                0
+            }])
+        }
         MutationOperator::GraphRemoveGroup => {
             Some(member_counts.iter().map(|n| -(n + 1)).collect())
         }
@@ -343,6 +563,12 @@ proptest! {
                 &mut rng,
                 2,
             );
+            // Every committed attribute change reports one scope (T25.F08).
+            let attribute_events: u32 = ATTRIBUTE_OPERATORS
+                .iter()
+                .filter_map(|op| summary.applied_by_operator.get(&op.operator()))
+                .sum();
+            prop_assert_eq!(summary.attribute_changes_by_scope.iter().sum::<u32>(), attribute_events);
             prop_assert!(!summary.skip_reasons.contains_key(&MutationSkipReason::GraphInvariantViolation));
             for node in &genome.nodes {
                 prop_assert_eq!(validate_graph(node), Ok(()));
@@ -370,8 +596,16 @@ proptest! {
                 BackendDef::Graph(d) => d.groups().len(),
                 BackendDef::Vm(_) => 0,
             }).sum::<usize>());
-            if matches!(op, MutationOperator::GraphRemoveGroup | MutationOperator::GraphRemoveGraphEdge) {
+            if matches!(
+                op,
+                MutationOperator::GraphRemoveGroup
+                    | MutationOperator::GraphRemoveGraphEdge
+                    | MutationOperator::GraphDetachGraphEdge
+            ) {
                 prop_assert_eq!(summary.groups_removed as usize, removed);
+            }
+            if op == MutationOperator::GraphDetachGraphEdge {
+                prop_assert_eq!(summary.graph_edges_detached, 1);
             }
         }
     }

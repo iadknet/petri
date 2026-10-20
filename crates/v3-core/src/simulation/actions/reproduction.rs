@@ -498,6 +498,14 @@ fn spawn_child(
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
     sim.stats.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
     sim.stats.groups_removed_total += u64::from(summary.groups_removed);
+    for (total, count) in sim
+        .stats
+        .mutation_attribute_changes_total_by_scope
+        .iter_mut()
+        .zip(summary.attribute_changes_by_scope)
+    {
+        *total += u64::from(count);
+    }
     sim.stats.pair_group_inherited_nonzero_births_total +=
         u64::from(inherits_nonzero_pair_group(&child_genome, &summary));
     let mut child_birth_mutation_operators: Vec<_> =
@@ -1402,5 +1410,74 @@ mod tests {
             ReproductionActionResult::Conceived
         );
         assert_eq!(sim.stats.pair_group_inherited_nonzero_births_total, 1);
+    }
+
+    /// A birth's committed attribute changes reach the run's totals by the
+    /// scope they landed on (T25.F08 invariant 8): over a pair-grouped
+    /// parent's births, the two totals sum to the applied events of the ten
+    /// attribute operators, and both scopes are reached.
+    #[test]
+    fn a_births_attribute_changes_reach_the_run_totals_by_scope() {
+        use crate::config::SimulationConfig;
+        use crate::mutation::types::MutationOperator as Op;
+        use crate::simulation::seed_simulation;
+        use rand::SeedableRng;
+
+        const ATTRIBUTE: [Op; 10] = [
+            Op::GraphEnableHebbian,
+            Op::GraphDisableHebbian,
+            Op::GraphMutateHebbianRule,
+            Op::GraphMutateHebbianRate,
+            Op::GraphToggleHebbianLamarckian,
+            Op::GraphEnableRewardModulation,
+            Op::GraphDisableRewardModulation,
+            Op::GraphMutateRewardSource,
+            Op::GraphMutateTraceDecay,
+            Op::GraphSetScope,
+        ];
+        let mut reached = [false; 2];
+        for seed in 0..64 {
+            let mut cfg = SimulationConfig::default();
+            cfg.population.initial_creatures = 1;
+            cfg.mutation.per_unit_rate = 1.0;
+            cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
+            let mut sim = seed_simulation(cfg, 83);
+            let parent_id = sim.creatures.keys().next().unwrap();
+            let parent = &mut sim.creatures[parent_id];
+            parent.genome = pair_grouped_founder(-0.25);
+            parent.age = sim.config.energy.lifecycle.min_reproduce_age;
+            parent.energy = 10000.0;
+            let direction = Direction::ALL
+                .into_iter()
+                .find(|&direction| {
+                    sim.world
+                        .resolve_neighbor(sim.creatures[parent_id].position, direction)
+                        .is_some_and(|p| sim.world.is_valid_target_cell(p))
+                })
+                .unwrap();
+            assert_eq!(
+                apply_reproduce(
+                    parent_id,
+                    &mut sim,
+                    direction,
+                    10.0,
+                    &mut rand::rngs::SmallRng::seed_from_u64(seed)
+                ),
+                ReproductionActionResult::Conceived
+            );
+            let applied: u64 = ATTRIBUTE
+                .iter()
+                .filter_map(|op| sim.stats.mutation_events_applied_total_by_operator.get(op))
+                .sum();
+            let totals = sim.stats.mutation_attribute_changes_total_by_scope;
+            assert_eq!(totals.iter().sum::<u64>(), applied, "seed {seed}");
+            for (seen, total) in reached.iter_mut().zip(totals) {
+                *seen |= total > 0;
+            }
+            if reached == [true; 2] {
+                break;
+            }
+        }
+        assert_eq!(reached, [true; 2], "both scopes reached");
     }
 }

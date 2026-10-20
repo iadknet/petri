@@ -143,7 +143,7 @@ blocker (Success Criteria require the readings).
       config digests with the undo step, and assert the refinement-disabled
       fixtures unchanged; the `WORKAROUND(T25.F08)` comment on
       `GraphOperator::random` (readings R1).
-- [ ] Commit 2, the three operators, the export and the scope channel
+- [x] Commit 2, the three operators, the export and the scope channel
       (invariants 1–4, 6, 8): tests first,
       `a_committed_attribute_change_reports_the_scope_it_landed_on` (a
       member pick with a true coin, a false coin, a non-member pick,
@@ -199,7 +199,16 @@ viability digests hold at every commit):
 | 1 | recruitment-paths known-deleting lineage (`--lib`) | arm 12 batch 1 lineage 3 -> batch 22 lineage 0 (generation 7, at 263, depth 47) | same; the first `Deleted` lineage of the recorded search (batches 0-40, lineages 0-15) |
 | 1 | v3-cli real-run-path seeds (`bench/tests.rs`, three tests) | 129, 129, 164 -> 73 | same; 73 is the lowest of 0..=400 surviving the horizon (73, 147, 158, 197, 201), over three cells |
 | 1 | v3-cli cadence seed (`bench/run/tests.rs`) | 3 -> 9 | same; seed 3 goes extinct at tick 93 |
-| 1 | open until closure | `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references`: `vm_steps` severe (0.073814 against F07's 0.034618) | the series references re-pin with the gate and goal epochs in the closing commit |
+| 2 | `engine/recruitment_tests.rs` recruitment-Off digest | `6729442929459510286` -> `1771622774480443924` | enabled Graph weight 60 -> 66 under recruitment Off remaps every Graph draw |
+| 2 | `applied_trajectory.rs` sampled / sampled rate 0 / guard / guard rate 0 | `f55ad21d…` / `872113ec…` / `dc32a1fa…` / `d61cf3eb…` -> `9458abf6…` / `a187a3fe…` / `3d299de5…` / `7d7ae0e2…` | enabled Graph weight 61 -> 67 remaps every Graph draw |
+| 2 | `baseline_worlds.rs` short-run identity, default / rate 0 | `5737684664837370108` / `11540034954633671093` -> `5477079874225389176` / `2120864728947376946` | same |
+| 2 | recruitment-paths known-deleting lineage (`--lib`) | batch 22 lineage 0 -> batch 1 lineage 3 (generation 6, at 262, depth 112) | same; the first `Deleted` lineage of the recorded search |
+| 2 | `simulation/actions` stats test seed | 101 -> 100 | same; 101 meets a domain-level skip, 100 is the first seed from 100 without one |
+| 2 | `priority_bid_reachability.rs` search bound | 1,024 -> 2,048 seeds | same; seed 2,026 is the first lineage reaching a positive bid beside a real action |
+| 2 | window-seam equivalence seeds (`--features telemetry-seams`) | graph 12 -> 14, VM 24 -> 25 | same; at 12 and 24 a traced target dies inside its window |
+| 2 | v3-cli real-run-path seeds | post-tick and census 73 -> 129, occupancy 73 -> 473 | same; 129 is the only survivor of 0..=400 and ends on one occupancy cell, 473 the first survivor above 400 |
+| 2 | v3-cli cadence seed | 9 -> 14 | same; 14 is the lowest of 0..=200 that survives |
+| 1, 2 | open until closure | `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references`: severe against F07's series reference, first reported `vm_steps` 0.073814 vs 0.034618 at commit 1 and `decided_passes` 0.000997 vs 0.000140 at commit 2 (reduced-fixture gate) | the series references re-pin with the gate and goal epochs in the closing commit |
 | 1 | held, asserted | `engine/recruitment_tests.rs` recruitment-Off digest; `tests/mutational_neighborhood.rs` disabled rows | drew from the same enabled set before and after |
 
 ## Performance and Goal Impact

@@ -1,6 +1,7 @@
 use super::*;
 use crate::bench::indicators::lineage_diversity;
 use crate::bench::profiles::build_config;
+use crate::bench::schema::{AttributeChangesByScope, OperatorFunnel};
 use crate::bench::tests::small_profile;
 use crate::UNDEFINED;
 use proptest::prelude::*;
@@ -730,6 +731,17 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.graph_edges_detached_total = 8;
     stats.groups_removed_total = 2;
     stats.pair_group_inherited_nonzero_births_total = 5;
+    stats.mutation_attribute_changes_total_by_scope = [7, 4];
+    stats.mutation_operator_funnel_total_by_operator.insert(
+        MutationOperator::GraphDetachGraphEdge,
+        v3_core::mutation::types::MutationOperatorFunnel {
+            attempted: 6,
+            applicable: 5,
+            structurally_valid: 4,
+            applied: 3,
+            skipped: 2,
+        },
+    );
     stats.mutation_outcome_summary = MutationValueTotals {
         carriers_observed_total: 5,
         survival_ticks_sum: 120,
@@ -787,6 +799,17 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             graph_edges_detached_total: 8,
             groups_removed_total: 2,
             pair_group_inherited_nonzero_births_total: 5,
+            attribute_changes_by_scope: AttributeChangesByScope { edge: 7, group: 4 },
+            operator_funnel_by_operator: BTreeMap::from([(
+                "Graph.DetachGraphEdge".to_string(),
+                OperatorFunnel {
+                    attempted: 6,
+                    applicable: 5,
+                    structurally_valid: 4,
+                    applied: 3,
+                    skipped: 2,
+                },
+            )]),
         })
     );
     // T25.F08: the deleted refinement channel leaves no key in the block.
@@ -1394,6 +1417,15 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 graph_edges_detached_total: 4,
                 groups_removed_total: 1,
                 pair_group_inherited_nonzero_births_total: 3,
+                attribute_changes_by_scope: AttributeChangesByScope { edge: 2, group: 1 },
+                operator_funnel_by_operator: BTreeMap::from([(
+                    "Graph.AddRandomizedRingGroup".to_string(),
+                    OperatorFunnel {
+                        attempted: 2,
+                        applied: 1,
+                        ..OperatorFunnel::default()
+                    },
+                )]),
             }),
             mutation_outcome_summary: Some(MutationOutcomeTotals {
                 carriers_observed_total: 4,

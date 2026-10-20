@@ -202,10 +202,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// and remaps every Graph draw (default 7345675788631625454 ->
 /// 5737684664837370108, rate 0.0 11318987159188275955 ->
 /// 11540034954633671093).
+/// Re-pinned by T25.F08 commit 2 after two agreeing runs: the randomized
+/// creation operators and `DetachGraphEdge` join the Graph catalog and remap
+/// every Graph draw (default 5737684664837370108 -> 5477079874225389176,
+/// rate 0.0 11540034954633671093 -> 2120864728947376946).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 5737684664837370108);
-    assert_eq!(short_run_identity(Some(0.0)), 11540034954633671093);
+    assert_eq!(short_run_identity(None), 5477079874225389176);
+    assert_eq!(short_run_identity(Some(0.0)), 2120864728947376946);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

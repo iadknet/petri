@@ -1179,8 +1179,11 @@ mod tests {
         // remaps every Graph draw, and at seed 100 one VM-domain attempt finds
         // no applicable operator (a domain-level skip, counted by domain and
         // by no operator); 101 is the first seed from 100 without one, and
-        // removing the catalog entry restores 100.
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(101);
+        // removing the catalog entry restores 100. Re-seeded by T25.F08
+        // commit 2 (101 -> 100): the randomized creation operators and
+        // `DetachGraphEdge` remap every Graph draw, and seed 101 meets a
+        // domain-level skip; 100 is the first seed from 100 without one.
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
 

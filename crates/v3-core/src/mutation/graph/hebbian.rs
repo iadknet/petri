@@ -20,7 +20,7 @@
 
 use rand::{Rng, RngCore};
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
@@ -47,7 +47,7 @@ pub(super) fn enable_hebbian(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     enable_hebbian_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -56,7 +56,7 @@ pub(super) fn disable_hebbian(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     disable_hebbian_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -65,7 +65,7 @@ pub(super) fn mutate_hebbian_rule(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_hebbian_rule_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -74,7 +74,7 @@ pub(super) fn mutate_hebbian_rate(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_hebbian_rate_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -83,7 +83,7 @@ pub(super) fn toggle_hebbian_lamarckian(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     toggle_hebbian_lamarckian_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -92,7 +92,7 @@ pub(super) fn enable_reward_modulation(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     enable_reward_modulation_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -101,7 +101,7 @@ pub(super) fn disable_reward_modulation(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     disable_reward_modulation_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -110,7 +110,7 @@ pub(super) fn mutate_reward_source(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_reward_source_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -119,7 +119,7 @@ pub(super) fn mutate_trace_decay(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_trace_decay_in_def(graph_def_mut(genome, node_idx)?, rng)
 }
 
@@ -193,7 +193,7 @@ pub(super) fn any_edge(def: &CgpGraphBackendDef, predicate: EdgePredicate) -> bo
 /// Pick a random edge matching `predicate`, in `edge_sites` order over both
 /// surfaces, or `NoApplicableTarget` if none match. Two-pass
 /// count-then-select with one draw avoids allocating the eligible list.
-fn select_eligible(
+pub(super) fn select_eligible(
     def: &CgpGraphBackendDef,
     predicate: EdgePredicate,
     rng: &mut impl Rng,
@@ -212,22 +212,25 @@ fn select_eligible(
         .ok_or(MutationSkipReason::NoApplicableTarget)
 }
 
-/// The scope coin (T25.F07 invariant 7): the edges a change picked at
-/// `picked` lands on. A non-member draws no coin and is the only target; a
-/// member draws `gen_bool(0.5)`: false, itself; true, every member of its
-/// group that `admits` accepts, in canonical order.
+/// The scope coin (T25.F07 invariant 7): the scope a change picked at
+/// `picked` lands on and its targets (T25.F08 invariant 8). A non-member
+/// draws no coin and is the only target, at `Edge`; a member draws
+/// `gen_bool(0.5)`: false, itself at `Edge`; true, every member of its group
+/// that `admits` accepts, in canonical order, at `Group`.
 pub(super) fn scope_targets(
     def: &CgpGraphBackendDef,
     picked: EdgeOccurrence,
     admits: EdgePredicate,
     rng: &mut impl Rng,
-) -> Vec<EdgeOccurrence> {
+) -> (Scope, Vec<EdgeOccurrence>) {
     match def.edge_at(picked).membership() {
-        Some(membership) if rng.gen_bool(0.5) => def
-            .members(membership.group)
-            .filter(|&member| admits(def, member))
-            .collect(),
-        _ => vec![picked],
+        Some(membership) if rng.gen_bool(0.5) => (
+            Scope::Group,
+            def.members(membership.group)
+                .filter(|&member| admits(def, member))
+                .collect(),
+        ),
+        _ => (Scope::Edge, vec![picked]),
     }
 }
 
@@ -240,21 +243,22 @@ struct Law<V> {
 }
 
 /// Pick one edge matching `predicate`, draw the scope coin, draw the law's
-/// value once and apply it to every target's config.
+/// value once and apply it to every target's config; returns the scope the
+/// change landed on.
 fn mutate_scoped<V, R: Rng>(
     def: &mut CgpGraphBackendDef,
     predicate: EdgePredicate,
     rng: &mut R,
     law: Law<V>,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     let picked = select_eligible(def, predicate, rng)?;
-    let targets = scope_targets(def, picked, predicate, rng);
+    let (scope, targets) = scope_targets(def, picked, predicate, rng);
     let value = (law.draw)(plasticity_of(def, picked), rng);
     for target in targets {
         let config = (law.apply)(plasticity_of(def, target), &value);
         def.edge_mut(target).set_plasticity(config);
     }
-    Ok(())
+    Ok(scope)
 }
 
 /// `EnableHebbian`'s value law: a fresh pure-Hebbian config, in draw order
@@ -312,7 +316,7 @@ fn draw_u(_: Option<PlasticityConfig>, rng: &mut dyn RngCore) -> f32 {
 pub(crate) fn enable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         can_enable_hebbian,
@@ -328,7 +332,7 @@ pub(crate) fn enable_hebbian_in_def(
 pub(crate) fn disable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_plastic,
@@ -345,7 +349,7 @@ pub(crate) fn disable_hebbian_in_def(
 pub(crate) fn mutate_hebbian_rule_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_plastic,
@@ -362,7 +366,7 @@ pub(crate) fn mutate_hebbian_rule_in_def(
 pub(crate) fn mutate_hebbian_rate_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_plastic,
@@ -384,7 +388,7 @@ pub(crate) fn mutate_hebbian_rate_in_def(
 pub(crate) fn toggle_hebbian_lamarckian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_plastic,
@@ -407,7 +411,7 @@ pub(crate) fn toggle_hebbian_lamarckian_in_def(
 pub(crate) fn enable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         can_enable_reward_modulation,
@@ -429,7 +433,7 @@ pub(crate) fn enable_reward_modulation_in_def(
 pub(crate) fn disable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_reward_modulated,
@@ -451,7 +455,7 @@ pub(crate) fn disable_reward_modulation_in_def(
 pub(crate) fn mutate_reward_source_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_reward_modulated,
@@ -481,7 +485,7 @@ pub(crate) fn mutate_reward_source_in_def(
 pub(crate) fn mutate_trace_decay_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     mutate_scoped(
         def,
         is_reward_modulated,
@@ -503,11 +507,12 @@ pub(crate) fn mutate_trace_decay_in_def(
 
 /// `SetScope` (T25.F07): one member uniformly in canonical order, the scope
 /// coin, then the other of the picked member's scope written to it alone or
-/// to every member of its group; no value draw.
+/// to every member of its group; no value draw. Returns the scope the
+/// change landed on (the coin's), not the scope it wrote.
 pub(crate) fn set_scope_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<Scope, MutationSkipReason> {
     let picked = select_eligible(def, is_member, rng)?;
     let scope = def
         .edge_at(picked)
@@ -515,10 +520,11 @@ pub(crate) fn set_scope_in_def(
         .ok_or(MutationSkipReason::NoApplicableTarget)?
         .scope
         .other();
-    for target in scope_targets(def, picked, is_member, rng) {
+    let (landed, targets) = scope_targets(def, picked, is_member, rng);
+    for target in targets {
         def.edge_mut(target).set_scope(scope);
     }
-    Ok(())
+    Ok(landed)
 }
 
 #[cfg(test)]
@@ -794,7 +800,7 @@ mod tests {
         );
     }
 
-    type Operator = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<(), MutationSkipReason>;
+    type Operator = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<Scope, MutationSkipReason>;
 
     /// A graph with static, pure-Hebbian and reward-modulated edges on both
     /// surfaces, and a static `ClearSlot` edge that never matches.

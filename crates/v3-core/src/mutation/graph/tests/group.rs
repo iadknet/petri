@@ -9,7 +9,8 @@ use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::test_support::edit_sinks;
 use crate::creature::genome::cgp::{
-    validate_graph, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
+    compose, detach, validate_graph, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
+    GroupId, OutputSinkKind, Scope, Shape,
 };
 use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::{
@@ -94,6 +95,20 @@ fn id(index: usize) -> GroupId {
     GroupId::new(u16::try_from(index).unwrap())
 }
 
+const RULES: [HebbianRule; 4] = [
+    HebbianRule::Classic,
+    HebbianRule::Oja,
+    HebbianRule::AntiHebb,
+    HebbianRule::Covariance,
+];
+
+const CHANNELS: [OutcomeChannel; 4] = [
+    OutcomeChannel::EnergyDelta,
+    OutcomeChannel::ActionSuccess,
+    OutcomeChannel::DamageDelta,
+    OutcomeChannel::OffspringSuccess,
+];
+
 /// Learned creation's draws, replayed from `rng` in their pinned order
 /// (T25.F07 invariant 7): one mode in `0..3`; for a learning mode the rule,
 /// rate, clamp and inheritance of `EnableHebbian`, then for mode 2 the
@@ -101,18 +116,6 @@ fn id(index: usize) -> GroupId {
 /// `inherit_scale` coin. Applied to group `group` of `want`; returns the
 /// mode.
 fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) -> u8 {
-    const RULES: [HebbianRule; 4] = [
-        HebbianRule::Classic,
-        HebbianRule::Oja,
-        HebbianRule::AntiHebb,
-        HebbianRule::Covariance,
-    ];
-    const CHANNELS: [OutcomeChannel; 4] = [
-        OutcomeChannel::EnergyDelta,
-        OutcomeChannel::ActionSuccess,
-        OutcomeChannel::DamageDelta,
-        OutcomeChannel::OffspringSuccess,
-    ];
     let mode = rng.gen_range(0..3u8);
     let config = (mode > 0).then(|| {
         let rule = RULES[rng.gen_range(0..4)];
@@ -151,9 +154,46 @@ fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut Smal
 
 #[test]
 fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 29);
-    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 62);
+    assert_eq!(GraphOperator::ALL.len(), 32);
+    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 65);
     assert_eq!(&GraphOperator::ALL[22..28], &GROUP_OPERATORS);
+    // T25.F08: the randomized twins and `DetachGraphEdge` follow `SetScope`.
+    assert_eq!(
+        &GraphOperator::ALL[29..32],
+        &[
+            GraphOperator::AddRandomizedRingGroup,
+            GraphOperator::AddRandomizedDirectionPairGroup,
+            GraphOperator::DetachGraphEdge,
+        ]
+    );
+    for (op, key, effect) in [
+        (
+            GraphOperator::AddRandomizedRingGroup,
+            "Graph.AddRandomizedRingGroup",
+            ComplexityEffect::Increasing,
+        ),
+        (
+            GraphOperator::AddRandomizedDirectionPairGroup,
+            "Graph.AddRandomizedDirectionPairGroup",
+            ComplexityEffect::Increasing,
+        ),
+        (
+            GraphOperator::DetachGraphEdge,
+            "Graph.DetachGraphEdge",
+            ComplexityEffect::Neutral,
+        ),
+    ] {
+        assert_eq!(op.weight(), 2, "{op:?}");
+        assert_eq!(op.operator().as_key(), key);
+        assert_eq!(op.complexity_effect(), effect, "{op:?}");
+        assert!(op.enabled(&MutationConfig::default()), "{op:?}");
+    }
+    let enabled: u16 = GraphOperator::ALL
+        .iter()
+        .filter(|op| op.enabled(&MutationConfig::default()))
+        .map(|op| u16::from(op.weight()))
+        .sum();
+    assert_eq!(enabled, 67, "the engine's enabled Graph weight at defaults");
     // T25.F07: `SetScope` follows `RemoveGroup`, weight 2, neutral.
     assert_eq!(GraphOperator::ALL[28], GraphOperator::SetScope);
     assert_eq!(GraphOperator::SetScope.weight(), 2);
@@ -176,7 +216,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .filter(|&&op| op != GraphOperator::RecruitNeutralInput)
         .map(|op| u16::from(op.weight()))
         .sum();
-    assert_eq!(default_arm, 60);
+    assert_eq!(default_arm, 66);
     let keys = GROUP_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
         keys,
@@ -650,5 +690,343 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     assert_eq!(
         group::add_pair(&mut past, &mut SmallRng::seed_from_u64(0)),
         Err(MutationSkipReason::NoApplicableTarget)
+    );
+}
+
+/// One member's randomized draws (T25.F08 invariant 2), replayed: a mode in
+/// `0..3`, its config by `EnableHebbian`'s law (and `EnableRewardModulation`'s
+/// for mode 2), then the member's scope coin.
+fn replay_member(rng: &mut SmallRng) -> (Option<PlasticityConfig>, Scope) {
+    let mode = rng.gen_range(0..3u8);
+    let config = (mode > 0).then(|| {
+        let rule = RULES[rng.gen_range(0..4)];
+        let learning_rate = rng.gen_range(0.01f32..0.2);
+        let weight_clamp = rng.gen_range(1.0f32..5.0);
+        let lamarckian = rng.gen_bool(0.5);
+        let modulation = (mode == 2).then(|| {
+            let reward_source = CHANNELS[rng.gen_range(0..4)];
+            RewardModulationConfig {
+                reward_source,
+                trace_decay: rng.gen_range(0.5f32..0.99),
+            }
+        });
+        PlasticityConfig {
+            rule,
+            learning_rate,
+            weight_clamp,
+            lamarckian,
+            modulation,
+        }
+    });
+    let scope = if rng.gen_bool(0.5) {
+        Scope::Group
+    } else {
+        Scope::Edge
+    };
+    (config, scope)
+}
+
+/// The randomized form's learning draws on group `group` of `want`: per
+/// member in canonical order its mode, fields and scope, then one
+/// `inherit_scale` coin.
+fn replay_randomized(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) {
+    for member in want.members(group).collect::<Vec<_>>() {
+        let (config, scope) = replay_member(rng);
+        let mut edge = want.edge_mut(member);
+        edge.set_plasticity(config);
+        edge.set_scope(scope);
+    }
+    let inherit_scale = rng.gen_bool(0.5);
+    want.group_mut(group).set_inherit_scale(inherit_scale);
+}
+
+/// The refs the creation tests read: rings at 1, 2 and 3 and the
+/// pair-declaring references at 4 and 5.
+fn creation_refs() -> Vec<InputReference> {
+    vec![
+        InputReference::ActionVotes,
+        food(1),
+        barrier(),
+        food(0),
+        nearby(),
+        area_barrier(),
+    ]
+}
+
+/// One creation event `op` through the dispatch on an empty graph; returns
+/// the node and the event's RNG after it.
+fn create(op: GraphOperator, seed: u64) -> (NodeGenome, SmallRng) {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![graph_node(
+            creation_refs(),
+            CgpGraphBackendDef::new_with_fixed_outputs(),
+        )],
+    };
+    let mut rng = SmallRng::seed_from_u64(seed);
+    GraphMutator::apply_to_node(&mut genome, op, 0, &mut rng, &MutationConfig::default(), 2)
+        .unwrap();
+    (genome.nodes.remove(0), rng)
+}
+
+/// Either shape's draws, replayed: a `Ring` draws the ring, kind and
+/// offset; a `DirectionPair` the pair over the flat list, kind and offset.
+/// Returns the silent group the container builds from them.
+fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, GroupId) {
+    let refs = creation_refs();
+    let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
+    let group = if pair {
+        // NearbyCreature: 4 pairs; AreaBarrierSummary 2.
+        let flat: Vec<(u16, u8)> = (0..4)
+            .map(|p| (4, p))
+            .chain((0..2).map(|p| (5, p)))
+            .collect();
+        let (ref_idx, pair) = flat[rng.gen_range(0..flat.len())];
+        let kind = DirectedVoteKind::ALL[rng.gen_range(0..3)];
+        let offset = rng.gen_range(0..8u8);
+        let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
+        want.add_pair_group(ref_idx, pair, layout, kind, offset)
+    } else {
+        let rings = [1u16, 2, 3];
+        let ring_ref = rings[rng.gen_range(0..rings.len())];
+        let kind = DirectedVoteKind::ALL[rng.gen_range(0..3)];
+        let offset = rng.gen_range(0..8u8);
+        want.add_group(Shape::Ring { ring_ref }, kind, offset)
+    };
+    (want, group)
+}
+
+proptest::proptest! {
+    /// T25.F08 invariant 2: a randomized creation makes its uniform twin's
+    /// shape draws, then per member its mode, fields and scope, then one
+    /// `inherit_scale`, and no further draw; the group is born silent.
+    #[test]
+    fn randomized_creation_draws_shape_then_per_member_mode_fields_scope_then_inherit_scale(
+        seed in proptest::prelude::any::<u64>(),
+        pair in proptest::prelude::any::<bool>(),
+    ) {
+        let op = if pair {
+            GraphOperator::AddRandomizedDirectionPairGroup
+        } else {
+            GraphOperator::AddRandomizedRingGroup
+        };
+        let (node, mut rng) = create(op, seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        let (mut want, group) = replay_shape(pair, &mut expected);
+        replay_randomized(&mut want, group, &mut expected);
+        proptest::prop_assert_eq!(graph(&node), &want);
+        proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
+        proptest::prop_assert!(validate_graph(&node).is_ok());
+        let def = graph(&node);
+        proptest::prop_assert_eq!(def.groups()[0].scale(), 0.0, "born silent");
+        proptest::prop_assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
+    }
+
+    /// The uniform operators' draws are unchanged through the dispatch:
+    /// the shape draws, then learned creation's one mode, one scope and one
+    /// `inherit_scale`, every member alike.
+    #[test]
+    fn uniform_creation_draws_are_unchanged(
+        seed in proptest::prelude::any::<u64>(),
+        pair in proptest::prelude::any::<bool>(),
+    ) {
+        let op = if pair {
+            GraphOperator::AddDirectionPairGroup
+        } else {
+            GraphOperator::AddRingGroup
+        };
+        let (node, mut rng) = create(op, seed);
+        let mut expected = SmallRng::seed_from_u64(seed);
+        let (mut want, group) = replay_shape(pair, &mut expected);
+        replay_learning(&mut want, group, &mut expected);
+        proptest::prop_assert_eq!(graph(&node), &want);
+        proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
+    }
+}
+
+/// Randomized members draw their own attributes: some seed gives one group
+/// members both static and plastic, and members of both scopes.
+#[test]
+fn randomized_members_differ_within_one_group() {
+    let mut mixed = [false; 2];
+    for seed in 0..32 {
+        for op in [
+            GraphOperator::AddRandomizedRingGroup,
+            GraphOperator::AddRandomizedDirectionPairGroup,
+        ] {
+            let (node, _) = create(op, seed);
+            let def = graph(&node);
+            let edges: Vec<_> = def.members(id(0)).map(|at| def.edge_at(at)).collect();
+            mixed[0] |= edges.iter().any(|e| e.plasticity().is_some())
+                && edges.iter().any(|e| e.plasticity().is_none());
+            let scope =
+                |e: &&crate::creature::genome::cgp::GraphEdge| e.membership().unwrap().scope;
+            mixed[1] |= edges.iter().any(|e| scope(e) == Scope::Group)
+                && edges.iter().any(|e| scope(e) == Scope::Edge);
+        }
+    }
+    assert_eq!(mixed, [true; 2]);
+}
+
+/// A one-ring-group node at scale 0.5 whose first member (canonical order)
+/// is a Lamarckian learner at own weight 0.25 with an edge seed of 9.0; the
+/// other seven are static and unseeded, and the group carries no seed.
+fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let group = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 3);
+    def.group_mut(group).set_scale(0.5);
+    let first = def.members(group).next().unwrap();
+    let config = PlasticityConfig {
+        rule: HebbianRule::Oja,
+        learning_rate: 0.1,
+        weight_clamp: 2.0,
+        lamarckian: true,
+        modulation: None,
+    };
+    def.edge_mut(first).set_plasticity(Some(config));
+    def.edge_mut(first).set_weight(0.25);
+    let compute = def
+        .compute_nodes()
+        .iter()
+        .map(|node| vec![None; node.inputs.len()])
+        .collect();
+    let mut sinks: Vec<Vec<Option<f32>>> = def
+        .output_sinks()
+        .iter()
+        .map(|sink| vec![None; sink.inputs.len()])
+        .collect();
+    let EdgeSurface::SinkInput(sink) = first.surface else {
+        panic!("a member is a sink edge")
+    };
+    sinks[sink][first.index] = Some(9.0);
+    def.seed_birth(BirthSeeds::Rows {
+        compute,
+        sinks,
+        groups: vec![None],
+    });
+    (graph_node(refs(), def), first)
+}
+
+proptest::proptest! {
+    /// T25.F08 invariant 3: `DetachGraphEdge` draws one member uniformly in
+    /// canonical order and nothing else, then detaches it as the F03
+    /// primitive does: own weight `compose(own, scale, pattern)` bitwise, no
+    /// membership, plasticity kept; the Lamarckian member's seed composes
+    /// with the group's scale, a static unseeded member carries none.
+    #[test]
+    fn detach_draws_one_member_and_keeps_its_composed_weight_plasticity_and_seed(
+        seed in proptest::prelude::any::<u64>(),
+    ) {
+        let (original, learner) = detach_fixture();
+        let mut node = original.clone();
+        let mut rng = SmallRng::seed_from_u64(seed);
+        group::detach_member(&mut node, &mut rng).unwrap();
+        let mut expected = SmallRng::seed_from_u64(seed);
+        let def = graph(&original);
+        let members: Vec<_> = def.members(id(0)).collect();
+        let picked = members[expected.gen_range(0..members.len())];
+        proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "one draw");
+
+        let mut want = def.clone();
+        let (at, removed) = detach(&mut want, picked, &original.input_refs);
+        proptest::prop_assert!(!removed);
+        proptest::prop_assert_eq!(graph(&node), &want);
+        let pattern = def.pattern(picked, &original.input_refs);
+        let before = def.edge_at(picked);
+        let after = graph(&node).edge_at(at);
+        proptest::prop_assert_eq!(
+            after.own_weight().to_bits(),
+            compose(before.own_weight(), 0.5, pattern).to_bits()
+        );
+        proptest::prop_assert_eq!(after.membership(), None);
+        proptest::prop_assert_eq!(after.plasticity(), before.plasticity());
+        let seed_value = graph(&node).birth_seeds().unwrap().value(at);
+        if picked == learner {
+            proptest::prop_assert_eq!(seed_value, Some(compose(9.0, 0.5, pattern)));
+        } else {
+            proptest::prop_assert_eq!(seed_value, None);
+        }
+        proptest::prop_assert_eq!(graph(&node).members(id(0)).count(), 7);
+        proptest::prop_assert!(validate_graph(&node).is_ok());
+    }
+}
+
+/// `DetachGraphEdge` applies exactly where a member exists: not on a graph
+/// without a group, on one with a group, and not once the groups are gone;
+/// it skips without a draw where none is.
+#[test]
+fn applicability_follows_members_for_detach() {
+    let genome = |def| CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![graph_node(refs(), def)],
+    };
+    let op = GraphOperator::DetachGraphEdge;
+    let plain = genome(CgpGraphBackendDef::new_with_fixed_outputs());
+    assert!(GraphMutator::applicable_indices(&plain, op).is_empty());
+    let grouped = genome(three());
+    assert_eq!(GraphMutator::applicable_indices(&grouped, op), vec![0]);
+    let mut emptied = three();
+    while !emptied.groups().is_empty() {
+        emptied.remove_group(id(0));
+    }
+    assert!(GraphMutator::applicable_indices(&genome(emptied), op).is_empty());
+
+    let mut node = graph_node(refs(), CgpGraphBackendDef::new_with_fixed_outputs());
+    let before = node.clone();
+    let mut rng = SmallRng::seed_from_u64(5);
+    let mut replay = rng.clone();
+    assert_eq!(
+        group::detach_member(&mut node, &mut rng),
+        Err(MutationSkipReason::NoApplicableTarget)
+    );
+    assert_eq!(node, before);
+    assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "no draw");
+}
+
+/// T25.F08 invariant 4: `AddGraphEdge` on a node whose sinks hold groups
+/// pushes an ordinary edge, never a member: every group keeps its record
+/// and its member set.
+#[test]
+fn add_graph_edge_never_joins_a_group() {
+    let mut onto_a_group_sink = false;
+    for seed in 0..256 {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![graph_node(refs(), three())],
+        };
+        let before = graph(&genome.nodes[0]).clone();
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let config = MutationConfig::default();
+        let op = GraphOperator::AddGraphEdge;
+        if GraphMutator::apply_to_node(&mut genome, op, 0, &mut rng, &config, 2).is_err() {
+            continue;
+        }
+        let after = graph(&genome.nodes[0]);
+        assert_eq!(after.groups(), before.groups(), "seed {seed}");
+        for index in 0..before.groups().len() {
+            let members = |def: &CgpGraphBackendDef| -> Vec<_> {
+                def.members(id(index)).map(|at| *def.edge_at(at)).collect()
+            };
+            assert_eq!(members(after), members(&before), "seed {seed}");
+        }
+        let ordinary = |def: &CgpGraphBackendDef| {
+            def.edges()
+                .filter(|edge| edge.membership().is_none())
+                .count()
+        };
+        assert_eq!(ordinary(after), ordinary(&before) + 1, "seed {seed}");
+        onto_a_group_sink |=
+            after
+                .output_sinks()
+                .iter()
+                .zip(before.output_sinks())
+                .any(|(new, old)| {
+                    new.inputs.len() > old.inputs.len()
+                        && old.inputs.iter().any(|edge| edge.membership().is_some())
+                });
+    }
+    assert!(
+        onto_a_group_sink,
+        "some push lands on a sink holding a group"
     );
 }

@@ -4,7 +4,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
-use crate::creature::genome::cgp::validate_graph;
+use crate::creature::genome::cgp::{validate_graph, Scope};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -44,6 +44,9 @@ struct SelectedEvent {
     /// The detaches and group removals the event made, counted when it
     /// commits (T25.F03); zero outside the Graph domain.
     group_edits: GroupEdits,
+    /// The scope an attribute operator's change landed on, when it commits
+    /// (T25.F08).
+    attribute_scope: Option<Scope>,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
     /// it stood before the event (T13.F01).
@@ -223,6 +226,7 @@ impl MutationEngine {
                         tracked_before,
                         result,
                         group_edits: GroupEdits::default(),
+                        attribute_scope: None,
                         executed_hits: targets.executed_hits(),
                         first_pick: targets.first_pick(),
                     });
@@ -267,6 +271,7 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits: GroupEdits::default(),
+                                attribute_scope: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -297,7 +302,7 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let (result, group_edits) = apply_graph_event(
+                            let (result, group_edits, attribute_scope) = apply_graph_event(
                                 genome,
                                 op,
                                 &mut targets,
@@ -318,6 +323,7 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits,
+                                attribute_scope,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -366,6 +372,7 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits: GroupEdits::default(),
+                                attribute_scope: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -379,6 +386,7 @@ impl MutationEngine {
                 tracked_before,
                 result,
                 group_edits,
+                attribute_scope,
                 executed_hits,
                 first_pick,
             }) = selected
@@ -414,6 +422,9 @@ impl MutationEngine {
                 Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
                     summary.record_group_edits(group_edits);
+                    if let Some(scope) = attribute_scope {
+                        summary.record_attribute_scope(scope);
+                    }
                     if let Some(class) = edge_class {
                         summary.record_vote_edge_class(class);
                     }
@@ -609,15 +620,19 @@ fn group_tallies(genome: &CreatureGenome) -> (u32, u32) {
 }
 
 /// What a committed Graph event `op` did to groups, from the tallies before
-/// and after it. Only retarget, a raw-field step and a split detach (each at
-/// most one member, and nothing else they do loses one); `RemoveGroup` and
-/// `RemoveGraphEdge` remove groups, as does a last member's detach.
+/// and after it. Only retarget, a raw-field step, a split and
+/// `DetachGraphEdge` detach (each at most one member, and nothing else they
+/// do loses one); `RemoveGroup` and `RemoveGraphEdge` remove groups, as does
+/// a last member's detach.
+// WORKAROUND(T25.F08): operators report their group edits; the container's
+// detach_at already returns whether the record went.
 fn group_edits(op: GraphOperator, before: (u32, u32), after: (u32, u32)) -> GroupEdits {
     let detaches = matches!(
         op,
         GraphOperator::RetargetGraphEdge
             | GraphOperator::GraphRawFieldMutation
             | GraphOperator::AddInternalGraphNode
+            | GraphOperator::DetachGraphEdge
     );
     let removes = detaches
         || matches!(
@@ -705,7 +720,7 @@ fn apply_vm_event(
 
 /// Apply one graph mutation event with the gate, and the detaches and group
 /// removals it made, counted only when it commits: a rolled-back event
-/// reports none (T25.F03).
+/// reports none (T25.F03), nor an attribute scope (T25.F08).
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
@@ -713,7 +728,7 @@ fn apply_graph_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
-) -> (ClassifiedResult, GroupEdits) {
+) -> (ClassifiedResult, GroupEdits, Option<Scope>) {
     let before = group_tallies(genome);
     let result = apply_gated(genome, |genome| {
         GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
@@ -723,9 +738,14 @@ fn apply_graph_event(
     } else {
         GroupEdits::default()
     };
+    let attribute_scope = result
+        .as_ref()
+        .ok()
+        .and_then(|(_, report)| report.attribute_scope);
     (
         result.map(|(reachability, report)| (reachability, report.class)),
         edits,
+        attribute_scope,
     )
 }
 

@@ -17,7 +17,10 @@ use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;
 /// 1,024 since T25.F07 commit 2: learned group creation, the scope coin and
 /// `SetScope` remap every Graph draw, and no lineage of the first 512 seeds
 /// reaches a positive bid beside a real action within 12 generations.
-const SEARCH_SEEDS: u64 = 1024;
+/// 2,048 since T25.F08 commit 2: the randomized creation operators and
+/// `DetachGraphEdge` remap every Graph draw, and seed 2,026 is the first
+/// whose lineage reaches one.
+const SEARCH_SEEDS: u64 = 2048;
 const SEARCH_GENERATIONS: usize = 12;
 
 #[derive(Debug, Clone)]
