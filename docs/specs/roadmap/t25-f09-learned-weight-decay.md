@@ -191,6 +191,11 @@ six operators applied (edge enable/disable/step Orchards 154/2/17, Canyon
 B, sha256 `34d19e3a...f42a6f`; raw goal 706,524,112 B, sha256
 `b6190669...270f0b`; summaries 26,118 B and 534,802 B.
 
+**User acceptance (2026-10-20).** The user accepted the gate `pass_cap_hits`
+severe and the gate `vm_steps` flag as the birth-clamp and draw-stream
+trajectory reading ("Accept and re-pin"); the gate and goal-worlds epochs are
+re-pinned to this feature's summaries in `docs/progress/benchmark-series.json`.
+
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f09-learned-weight-decay.json),
   [goal](../../progress/features/t25-f09-learned-weight-decay-goal.json).
 - Full readings: [`docs/progress/readings/t25-f09.md`](../../progress/readings/t25-f09.md).
