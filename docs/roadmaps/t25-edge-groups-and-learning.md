@@ -42,7 +42,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: One sense of another creature, as an animal reads a neighbor's place, condition and kinship in one glance: the three creature families become one, so a slot's position, vitals and identity arrive from one declaration.
 - [x] **T25.F06 — Learning Per Edge** — Depends on: T25.F05
   - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts, and a synapse onto a vote can learn like one onto a neuron.
-- [ ] **T25.F07 — Group-Scope Learning** — Depends on: T25.F06
+- [x] **T25.F07 — Group-Scope Learning** — Depends on: T25.F06
   - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
 - [ ] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.

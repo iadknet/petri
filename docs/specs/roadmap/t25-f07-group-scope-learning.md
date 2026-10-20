@@ -1,6 +1,6 @@
 # T25.F07 — Group-Scope Learning
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-19
 **Feature**: T25.F07
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -180,7 +180,7 @@ mutation gate below):
 | Command | Result |
 | --- | --- |
 | `cargo test -p v3-core --test viability` (first, each commit) | 30 passed; founder-only digests unchanged |
-| `cargo test --workspace --no-fail-fast` (build commits) | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry), awaiting the gate and goal re-pin |
+| `cargo test --workspace --no-fail-fast` (build commits) | all pass except `gate_profile_has_no_severe_regression_against_series_references`: `plasticity_updates` 0.104622 per creature-tick against the F06 epoch's 0.012305 (+750%), the predeclared counter-definition change (series entry); green after the epoch re-pin at cb5d8416 |
 | `cargo test -p v3-core` (at head) | every suite passes (lib 2,187 passed, 10 ignored); every replay, draw-order, trajectory and catalog pin unchanged by the `GraphOperator::operator()` table and the flattened group dispatch |
 | `cargo test -p v3-cli --lib`; `cargo test -p v3-cli --bins --test cli` (at head) | 159 passed, 2 ignored; 18 and 13 passed: the v3-cli trajectory and deterministic fixtures unchanged |
 | `PROPTEST_CASES=2000 cargo test -p v3-core --lib seed_rows_follow` | pass |
@@ -193,8 +193,8 @@ rate-0 fixture unchanged (`recruitment_tests`, `baseline_worlds`,
 `applied_trajectory` comments); commit 2 leaves the mutation-off short-run
 identity and the rate-0 sampled trajectory byte-identical.
 
-- [ ] Focused tests: `cargo test -p v3-core --test viability` first, then `make check` -> result recorded here.
-- [ ] `gate_profile_has_no_severe_regression_against_series_references` (`crates/v3-cli/tests/bench.rs`) is red from commit 2 until the closing commit re-pins the gate epoch: `plasticity_updates` per creature-tick rises past the severe threshold against the F06 epoch by invariant 9's definition change (every member of a learning group counts one update per contribution per visit; learned creation makes two of three new groups learn on every member); the readings file records the per-seed `plasticity_updates`, the gate census's plastic edges by scope and the updates-per-plastic-edge-per-visit ratio against F06's, which must be of the same order (a defect otherwise); the test is not edited and the series is re-pinned only in the closing commit.
+- [x] Focused tests: `cargo test -p v3-core --test viability` first (30 passed), then `make check` exit 0 at tested commit 18e8ad0b.
+- [x] `gate_profile_has_no_severe_regression_against_series_references` (`crates/v3-cli/tests/bench.rs`) is red from commit 2 until the closing commit re-pins the gate epoch: `plasticity_updates` per creature-tick rises past the severe threshold against the F06 epoch by invariant 9's definition change (every member of a learning group counts one update per contribution per visit; learned creation makes two of three new groups learn on every member); the readings file records the per-seed `plasticity_updates`, the gate census's plastic edges by scope and the updates-per-plastic-edge-per-visit ratio against F06's, which must be of the same order (a defect otherwise); the test is not edited and the series is re-pinned only in the closing commit. Passes at 18e8ad0b.
 - [x] Mutation gate: fresh `make rust-mutants-ci` on cb5d8416, Actions run 39342875401 (run 39336879451 failed its baseline before the re-pin; no result): `4 shards, 317 mutants tested: 8 missed, 275 caught, 33 unviable, 1 timeouts`; output `~/.local/share/petri-tools/mutants/t25-f07-fresh-39342875401/mutants.out/` (`missed.txt`, `timeout.txt`). Every survivor killed by tests in dd80a7c3, confirmed by `MUTANTS_ITERATE=1 make rust-mutants` (9 tested, 9 caught; not closure evidence); production, selection and config unchanged, so no second fresh run.
 
 | Survivor | Resolution |
@@ -206,7 +206,7 @@ identity and the rate-0 sampled trajectory byte-identical.
 | timeout `hebbian.rs:374:21` delete `learning_rate` in `mutate_hebbian_rate_in_def` | killed: with the mutant applied the suite ends in seconds, failing `mutate_rate_stays_in_bounds_and_moves_the_rate` and three others; the 120 s CI timeout (18–20 s baseline) was shard-host slowness |
 
 - [x] Slow tests: `make rust-test-slow` passes; the re-pinned recruitment-paths readings are in the run table.
-- [ ] Gate and goal: summaries at `docs/progress/features/t25-f07-group-scope-learning.json` and `-goal.json`, local raw hash and byte count, series entries, no new full report staged.
+- [x] Gate and goal: summaries at `docs/progress/features/t25-f07-group-scope-learning.json` and `-goal.json`, local raw hash and byte count, series entries, no new full report staged.
 
 ## Performance and Goal Impact
 
@@ -279,11 +279,11 @@ Thresholds, baselines and epochs untouched; the closing commit re-pins.
 
 ## Success Criteria
 
-- [ ] Track criterion 7: scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
-- [ ] A plastic member learns at scope `Edge` or `Group` on both shapes; a static member contributes nothing; a scale seeds a child only with `inherit_scale`.
-- [ ] `SetScope` and learned creation are in the catalog with the pinned positions and weights; the nine operators land on one member or on every admitted member by one coin.
-- [ ] The census, telemetry families, panels, bench summary, payload and inspector show scope and learned scales; `plasticity_scale_snaps` reaches the bench cases' `CognitionTracking`, its telemetry family and the closure readings.
-- [ ] Verification Plan checks run and recorded; the mutation gate has no unresolved survivor; epochs re-pinned.
+- [x] Track criterion 7: scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
+- [x] A plastic member learns at scope `Edge` or `Group` on both shapes; a static member contributes nothing; a scale seeds a child only with `inherit_scale`.
+- [x] `SetScope` and learned creation are in the catalog with the pinned positions and weights; the nine operators land on one member or on every admitted member by one coin.
+- [x] The census, telemetry families, panels, bench summary, payload and inspector show scope and learned scales; `plasticity_scale_snaps` reaches the bench cases' `CognitionTracking`, its telemetry family and the closure readings.
+- [x] Verification Plan checks run and recorded; the mutation gate has no unresolved survivor; epochs re-pinned.
 
 ## Notes for AI Agents
 
@@ -292,3 +292,4 @@ Thresholds, baselines and epochs untouched; the closing commit re-pins.
 - Deferred: the 40,000-tick reading of learned scales (retention, drift) goes to the next goal-long carrier; T25's carriers are F02 and F04 (user, 2026-10-15).
 - Decision: the user accepted the goal `pass_cap_hits` severe (+61.0%, Confluence +129.8%) as a trajectory reading, and the gate and goal-worlds epochs are re-pinned to the F07 summaries (user, 2026-10-19).
 - Decision: the user accepted the compute delta unmeasured: the gate and goal wall clock (+51.5%, +92.9%) ran on a different, loaded host and carry no comparison; no rerun or interleaved pair is taken (user, 2026-10-19).
+- Cost: /usage not collected; 4 implementer passes, advisor 2 each; 2 spec-owner resumes; 3 Codex rounds, ready; review: correctness 2 P1, design 1 P2, health 1 P2 2 P3.
