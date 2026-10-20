@@ -193,7 +193,16 @@ identity and the rate-0 sampled trajectory byte-identical.
 
 - [ ] Focused tests: `cargo test -p v3-core --test viability` first, then `make check` -> result recorded here.
 - [ ] `gate_profile_has_no_severe_regression_against_series_references` (`crates/v3-cli/tests/bench.rs`) is red from commit 2 until the closing commit re-pins the gate epoch: `plasticity_updates` per creature-tick rises past the severe threshold against the F06 epoch by invariant 9's definition change (every member of a learning group counts one update per contribution per visit; learned creation makes two of three new groups learn on every member); the readings file records the per-seed `plasticity_updates`, the gate census's plastic edges by scope and the updates-per-plastic-edge-per-visit ratio against F06's, which must be of the same order (a defect otherwise); the test is not edited and the series is re-pinned only in the closing commit.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
+- [x] Mutation gate: fresh `make rust-mutants-ci` on cb5d8416, Actions run 39342875401 (run 39336879451 failed its baseline before the re-pin; no result): `4 shards, 317 mutants tested: 8 missed, 275 caught, 33 unviable, 1 timeouts`; output `~/.local/share/petri-tools/mutants/t25-f07-fresh-39342875401/mutants.out/` (`missed.txt`, `timeout.txt`). Every survivor killed by tests in dd80a7c3, confirmed by `MUTANTS_ITERATE=1 make rust-mutants` (9 tested, 9 caught; not closure evidence); production, selection and config unchanged, so no second fresh run.
+
+| Survivor | Resolution |
+| --- | --- |
+| `hebbian.rs:287:28` `>` → `>=` in `perturb` | killed: `perturb_steps_a_value_of_exactly_one_hundredth_additively` |
+| `learned.rs:379:44` `*` → `/` in `BackendLearning::reward` | killed: `reward_credit_to_a_scale_is_pattern_times_rate_times_signal_times_trace` (the existing test saturated the bound) |
+| `tick.rs:1290:48` `+=` → `*=`, `-=` in `run_reward_learning` | killed: `run_tick_accumulates_a_reward_scale_snap_in_phase_2_5` |
+| `tick.rs:732:37` `+=` → `*=`, `-=` in `TickComputeStats::record`; `tick.rs:778:44` same in `commit` | killed: `run_tick_accumulates_a_visit_scale_snap_through_the_work_counters` |
+| timeout `hebbian.rs:374:21` delete `learning_rate` in `mutate_hebbian_rate_in_def` | killed: with the mutant applied the suite ends in seconds, failing `mutate_rate_stays_in_bounds_and_moves_the_rate` and three others; the 120 s CI timeout (18–20 s baseline) was shard-host slowness |
+
 - [ ] Slow tests: `make rust-test-slow` -> result and any re-pinned recruitment-paths readings.
 - [ ] Gate and goal: summaries at `docs/progress/features/t25-f07-group-scope-learning.json` and `-goal.json`, local raw hash and byte count, series entries, no new full report staged.
 
