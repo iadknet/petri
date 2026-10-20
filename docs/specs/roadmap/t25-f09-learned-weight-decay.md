@@ -132,7 +132,7 @@ cannot show the feature wrong and is not a closure blocker.
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed; founder-only digests unchanged.
 - [x] Static checks (2026-10-20): `cargo check --workspace --all-targets`, `cargo fmt --all --check` and `make rust-clippy` clean.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (fallback `MUTANTS_ITERATE=0 make rust-mutants`), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate and goal: summaries at `docs/progress/features/t25-f09-learned-weight-decay.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged.
+- [x] Gate and goal (2026-10-20): summaries at `docs/progress/features/t25-f09-learned-weight-decay.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged.
 - [ ] Slow tier: `make rust-test-slow` -> result, re-pinned readings named.
 
 ## Performance and Goal Impact
@@ -175,7 +175,21 @@ zero-denominator mean is unavailable, the counts are still reported, and
 the inequality is skipped). The long-horizon question, whether
 selection favors decay, stays open (Non-Goals).
 
-**Measured verdict.** Not yet run.
+**Measured verdict (2026-10-20, HEAD dd862536, each profile run once).**
+Viability 30 passed. Gate: v3-cli exit 3 (`measurement_evidence.cli_exit`,
+successful artifact pair with a severe), outer `make` exit 2; `severe=true`,
+one severe: `pass_cap_hits` 0.004623 vs 0.000990 (+367%), the predeclared
+trajectory reading, to be re-pinned at closure; one flag, `vm_steps` 0.031219
+vs 0.025323 (+23.3%); `wall_clock_ms_per_creature_tick` 0.0026384 vs epoch
+0.0025481 (+3.5%), inside the 25% band. Goal: exit 0 / make 0, `severe=false`,
+no flag. Decaying (`rho < 1`) entries at tick 2000, edges Orchards 85 of
+12,829, Canyon 0 of 370, Confluence 214 of 5,831; scales 14 of 1,156, 1 of 36,
+1 of 637. Edge drift inequality: Orchards fails (0.0788 vs 0.0728), Canyon
+unavailable, Confluence holds; scales hold in all three. Every attempt of the
+six operators applied (edge enable/disable/step Orchards 154/2/17, Canyon
+4/0/1, Confluence 79/5/16; group 116/6/18, 8/0/0, 109/2/28). Raw gate 129,630
+B, sha256 `34d19e3a...f42a6f`; raw goal 706,524,112 B, sha256
+`b6190669...270f0b`; summaries 26,118 B and 534,802 B.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f09-learned-weight-decay.json),
   [goal](../../progress/features/t25-f09-learned-weight-decay-goal.json).
