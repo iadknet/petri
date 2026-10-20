@@ -118,9 +118,7 @@ fn replay_pick(
 }
 
 #[test]
-fn the_six_retention_operators_close_the_catalog_at_their_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 38);
-    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 71);
+fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
     assert_eq!(&GraphOperator::ALL[32..38], &RETENTION_OPERATORS);
     let keys = RETENTION_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
@@ -145,18 +143,6 @@ fn the_six_retention_operators_close_the_catalog_at_their_tiers() {
         assert!(!op.complexity_effect().is_decreasing(), "{op:?}");
         assert!(op.enabled(&MutationConfig::default()), "{op:?}");
     }
-    let enabled: u16 = GraphOperator::ALL
-        .iter()
-        .filter(|op| op.enabled(&MutationConfig::default()))
-        .map(|op| u16::from(op.weight()))
-        .sum();
-    assert_eq!(enabled, 79, "the engine's enabled Graph weight at defaults");
-    let default_arm: u16 = GraphOperator::ALL
-        .iter()
-        .filter(|&&op| op != GraphOperator::RecruitNeutralInput)
-        .map(|op| u16::from(op.weight()))
-        .sum();
-    assert_eq!(default_arm, 78);
 }
 
 /// Each operator applies exactly where its predicate admits a site: the

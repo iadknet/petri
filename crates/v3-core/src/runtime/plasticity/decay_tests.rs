@@ -226,6 +226,49 @@ fn an_ungrouped_learner_relaxes_toward_its_birth_value() {
     assert_eq!(edge(&learned, 0).learned, Some(0.75));
 }
 
+/// A Lamarckian learner seeded away from its genomic weight decays toward
+/// its clamped seed, not its genomic weight.
+#[test]
+fn a_seeded_learner_relaxes_toward_its_clamped_seed_not_its_genomic_weight() {
+    let def = ungrouped(0.5, config(HebbianRule::Classic, 0.0, 2.0, 0.5));
+    let seeds = compute_seed(&def, -7.0);
+    let mut learned = state(&def, Some(seeds));
+    let view = edge(&learned, 0);
+    assert_eq!((view.genomic, view.birth), (0.5, -2.0));
+    learned.set_slot(0, 0, 1.5, 0.0);
+    learned.begin_tick();
+    let relaxed = edge(&learned, 0).learned;
+    assert_eq!(relaxed, Some(relax(1.5, -2.0, 0.5)));
+    assert_eq!(relaxed, Some(-0.25));
+    assert_ne!(relaxed, Some(relax(1.5, 0.5, 0.5)));
+}
+
+/// An inherited scale seeded away from its genomic scale decays toward its
+/// bound-clamped seed, not its genomic scale.
+#[test]
+fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
+    let (mut def, id, members) = ring(0.5, 0.5);
+    def.group_mut(id).set_inherit_scale(true);
+    learn(
+        &mut def,
+        members[0],
+        config(HebbianRule::Classic, 0.0, 2.0, 1.0),
+        Scope::Group,
+    );
+    let mut seeds = compute_seed(&def, 0.0);
+    let BirthSeeds::Rows { groups, .. } = &mut seeds;
+    groups[0] = Some(-5.0);
+    let mut learned = state(&def, Some(seeds));
+    let view = scale(&learned);
+    assert_eq!((view.genomic, view.birth), (0.5, -2.0));
+    learned.set_scale(0, 0, 1.0);
+    learned.begin_tick();
+    let relaxed = scale(&learned).learned;
+    assert_eq!(relaxed, Some(relax(1.0, -2.0, 0.5)));
+    assert_eq!(relaxed, Some(-0.5));
+    assert_ne!(relaxed, Some(relax(1.0, 0.5, 0.5)));
+}
+
 /// An edge-scope member decays toward its birth own correction, not its
 /// composed weight.
 #[test]

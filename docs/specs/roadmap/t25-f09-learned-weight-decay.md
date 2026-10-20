@@ -127,7 +127,8 @@ cannot show the feature wrong and is not a closure blocker.
 
 ## Verification
 
-- [x] Tests (2026-10-20): `cargo test -p v3-core --no-fail-fast` 2,304 passed, 0 failed (slow tier ignored); `cargo test -p v3-cli --lib bench` 132 passed; `cargo test -p v3-telemetry` 78 passed. `cargo test --workspace --no-fail-fast` passes every target except `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references` (`pass_cap_hits` 0.004623 against the F08 epoch's 0.000990, severe), the predeclared catalog reading that the closing epoch re-pin resolves.
+- [x] Tests (2026-10-20): `cargo test -p v3-core --no-fail-fast` 2,306 passed, 0 failed (slow tier ignored), the decay-law tests including a seeded edge and a seeded scale whose clamped seed differs from the genomic value; `cargo test -p v3-cli --lib bench` 132 passed; `cargo test -p v3-telemetry` 78 passed. `cargo test --workspace --no-fail-fast` passes every target except `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references` (`pass_cap_hits` 0.004623 against the F08 epoch's 0.000990, severe), the predeclared catalog reading that the closing epoch re-pin resolves.
+- [x] Frontend (2026-10-20): `npx vitest run src/components/inspector` 309 passed, the tooltip naming a scope-`Group` member's edge retention inert; `npx biome check` on `PlasticEdgeList.tsx` and its test clean.
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed; founder-only digests unchanged.
 - [x] Static checks (2026-10-20): `cargo check --workspace --all-targets`, `cargo fmt --all --check` and `make rust-clippy` clean.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (fallback `MUTANTS_ITERATE=0 make rust-mutants`), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.

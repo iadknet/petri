@@ -149,6 +149,16 @@ describe("PlasticEdgeList", () => {
 		expect(detail.join(" ")).toMatch(/keeps 0\.9990 of its learned change/);
 	});
 
+	it("names a group learner's own retention inert: its group's retention governs", () => {
+		const forgetful = { ...hebbian, retention: 0 };
+		const group = { scope: "Group", inheritScale: false } as const;
+		const detail = plasticityDetail(forgetful, group).join(" ");
+		expect(detail).not.toMatch(/Decays/);
+		expect(detail).toMatch(/Edge retention is inert at group scope/);
+		const edge = { scope: "Edge", inheritScale: false } as const;
+		expect(plasticityDetail(forgetful, edge).join(" ")).toMatch(/Decays toward its birth weight/);
+	});
+
 	it("infers a group learner's initialization from its group's learned scale", () => {
 		const scales = [{ group: 0, genomic: 0.5, learned: 0.8 }];
 		const learned = { ...groupWeights, scales };

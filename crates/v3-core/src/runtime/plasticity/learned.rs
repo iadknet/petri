@@ -390,14 +390,14 @@ impl BackendLearning {
     /// is skipped, and a group learner has no own decay.
     fn relax(&mut self) {
         for &slot in self.decaying.iter() {
-            if self.visited || self.seeded[slot] {
+            if self.initialized(slot) {
                 let birth = self.slots[slot].birth;
                 let retention = self.slots[slot].config.retention;
                 self.learned[slot] = relax(self.learned[slot], birth, retention);
             }
         }
         for &index in self.decaying_scales.iter() {
-            if self.visited || self.scale_seeded[index] {
+            if self.scale_initialized(index) {
                 let ScaleSlot {
                     birth, retention, ..
                 } = self.scales[index];
