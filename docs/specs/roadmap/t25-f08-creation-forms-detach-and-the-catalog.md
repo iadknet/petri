@@ -199,7 +199,7 @@ reported with a recorded disposition at closure, not a closure blocker
       `cgp/edge.rs:50:9` `Scope::as_key -> ""` and `-> "xyzzy"`: both killed
       by `a_scope_key_matches_its_genome_json_spelling_and_index` (test only,
       no second run).
-- [ ] `make rust-test-slow` -> pass with the re-pinned recruitment-paths
+- [x] `make rust-test-slow` -> pass with the re-pinned recruitment-paths
       readings.
 - [x] Gate and goal (measured 2026-10-20 at `fea7746d`; both `severe=true` as
       predeclared draw-stream trajectory readings): summaries at `docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json`
@@ -227,6 +227,8 @@ viability digests hold at every commit):
 | 2 | window-seam equivalence seeds (`--features telemetry-seams`) | graph 12 -> 14, VM 24 -> 25 | same; at 12 and 24 a traced target dies inside its window |
 | 2 | v3-cli real-run-path seeds | post-tick and census 73 -> 129, occupancy 73 -> 473 | same; 129 is the only survivor of 0..=400 and ends on one occupancy cell, 473 the first survivor above 400 |
 | 2 | v3-cli cadence seed | 9 -> 14 | same; 14 is the lowest of 0..=200 that survives |
+| 1, 2 | recruitment-paths prepared lineages (slow tier) `[proposal, retained, viable, useful]` | Graph Drift `[14, 10, 9, 5]` -> `[17, 13, 11, 8]` -> `[13, 10, 8, 6]`; Graph Selection `[14; 4]` -> `[17; 4]` -> `[13; 4]`; VM Drift `[20, 15, 15, 8]` -> `[22, 16, 16, 7]` -> `[23, 16, 16, 9]`; VM Selection `[20; 4]` -> `[22; 4]` -> `[23; 4]` (commit 1, then commit 2); discards `[0, 0]` | enabled Graph weight 65 -> 61 -> 67 remaps every Graph draw at each commit; nothing deleted or task-dead; the commit-1 values are one attribution run on a `76b01a00` export, the final values two agreeing runs at `8f2fbb34` |
+| 1, 2 | recruitment-paths cost-selection lineages (slow tier) | Graph `[16; 4]` censored 16 (held at commit 1) -> `[17; 4]` censored 15; VM `[20; 4]` censored 12 -> `[21; 4]` censored 11 -> `[20; 4]` censored 12 | same; every retained discovery stays useful; `make rust-test-slow` at the re-pin: recruitment-paths 3 passed, lab 6 passed |
 | 1, 2 | open until closure | `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references`: severe against F07's series reference, first reported `vm_steps` 0.073814 vs 0.034618 at commit 1 and `decided_passes` 0.000997 vs 0.000140 at commit 2 (reduced-fixture gate) | the series references re-pin with the gate and goal epochs in the closing commit |
 | 1 | held, asserted | `engine/recruitment_tests.rs` recruitment-Off digest; `tests/mutational_neighborhood.rs` disabled rows | drew from the same enabled set before and after |
 
