@@ -255,6 +255,14 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
                 at_bound: 2,
             },
         ],
+        edges_by_retention: std::array::from_fn(|bin| RetentionCell {
+            count: 50 + bin as u64,
+            ..RetentionCell::default()
+        }),
+        scales_by_retention: std::array::from_fn(|bin| RetentionCell {
+            count: 60 + bin as u64,
+            ..RetentionCell::default()
+        }),
     };
 
     let cells: Vec<_> = census.cells().collect();
@@ -285,6 +293,20 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
     );
     let inheritance: Vec<_> = census.inheritance_counts().collect();
     assert_eq!(inheritance, vec![("darwinian", 21), ("lamarckian", 22)]);
+    let retention = |cells: Vec<(&'static str, RetentionCell)>| -> Vec<(&str, u64)> {
+        cells
+            .into_iter()
+            .map(|(key, cell)| (key, cell.count))
+            .collect()
+    };
+    assert_eq!(
+        retention(census.edge_retention_cells().collect()),
+        RETENTION_KEYS.into_iter().zip(50..).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        retention(census.scale_retention_cells().collect()),
+        RETENTION_KEYS.into_iter().zip(60..).collect::<Vec<_>>()
+    );
     // Every term is exact in binary.
     let totals: Vec<_> = census.surface_totals().collect();
     assert_eq!(totals, vec![("compute", 0.625, 7), ("sink", 2.25, 10)]);
@@ -360,7 +382,105 @@ fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     let [darwinian, lamarckian_scales] = census.scales;
     assert_eq!(darwinian, LearnedScales::default());
     assert_eq!(lamarckian_scales.scales, 1, "once per group");
-    // Seeded at 4, clamped to the bound 1.5 at construction.
-    assert_eq!(lamarckian_scales.drift_sum, 1.0);
+    // Seeded at 4, clamped to the bound 1.5 at construction: its birth
+    // value, so no lifetime drift (T25.F09).
+    assert_eq!(lamarckian_scales.drift_sum, 0.0);
     assert_eq!(lamarckian_scales.at_bound, 1);
+}
+
+/// The retention bins (T25.F09 invariant 7) are exhaustive over `[0, 1]`:
+/// exactly 1 is `none`, the largest f32 below 1 is in `1e-3`, 0 in `1`, and
+/// each decade boundary's two f32 neighbors fall on either side by their
+/// exact deficit.
+#[test]
+fn retention_bins_cover_every_admitted_retention() {
+    assert_eq!(RETENTION_KEYS, ["none", "1e-3", "1e-2", "1e-1", "1"]);
+    assert_eq!(retention_index(1.0), 0);
+    assert_eq!(retention_index(f32::from_bits(1.0f32.to_bits() - 1)), 1);
+    assert_eq!(retention_index(0.0), 4);
+    for (decade, below, at_or_above) in [(1e-3f64, 1, 2), (1e-2, 2, 3), (1e-1, 3, 4)] {
+        // The f32 nearest `1 − 10⁻ᵏ` and its neighbors bracket the boundary.
+        let near = (1.0 - decade) as f32;
+        let candidates = [
+            f32::from_bits(near.to_bits() - 1),
+            near,
+            f32::from_bits(near.to_bits() + 1),
+        ];
+        let mut sides = [false, false];
+        for retention in candidates {
+            let deficit = 1.0 - f64::from(retention);
+            let expected = if deficit < decade { below } else { at_or_above };
+            sides[usize::from(deficit >= decade)] = true;
+            assert_eq!(retention_index(retention), expected, "{retention}");
+        }
+        assert_eq!(sides, [true, true], "both sides of {decade} are tested");
+    }
+}
+
+/// An edge and a scale slot land in their retention bin: `count` every
+/// entry, `initialized`, drift from birth and at-bound over initialized
+/// ones only.
+#[test]
+fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
+    use crate::contracts::{InputReference, WorldInputKey};
+    use crate::creature::genome::cgp::{Scope, Shape};
+    use crate::creature::genome::vote::DirectedVoteKind;
+
+    for (retention, bin) in [
+        (1.0, 0),
+        (f32::from_bits(1.0f32.to_bits() - 1), 1),
+        (0.995, 2),
+        (0.95, 3),
+        (0.0, 4),
+    ] {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+        def.group_mut(id).set_scale(0.5);
+        def.group_mut(id).set_retention(retention);
+        let members: Vec<EdgeOccurrence> = def.members(id).collect();
+        let config = PlasticityConfig {
+            retention,
+            ..plastic(HebbianRule::Classic, false, false)
+        };
+        for (k, scope) in [Scope::Edge, Scope::Group].into_iter().enumerate() {
+            let mut edge = def.edge_mut(members[k]);
+            edge.set_plasticity(Some(config));
+            edge.set_scope(scope);
+        }
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+                backend_def: BackendDef::Graph(def),
+                targets: vec![],
+            }],
+        };
+        let unvisited = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let census = PlasticityCensus::observe([(&[0usize][..], unvisited.learned())]);
+        let mut expected = [RetentionCell::default(); 5];
+        expected[bin] = RetentionCell {
+            count: 2,
+            ..RetentionCell::default()
+        };
+        assert_eq!(census.edges_by_retention, expected, "{retention}");
+        expected[bin].count = 1;
+        assert_eq!(census.scales_by_retention, expected, "{retention}");
+
+        let mut visited = GraphRuntimeState::for_genome(&genome, Vec::new());
+        visited.learned.set_slot(0, 0, -2.0, 0.0);
+        visited.learned.set_scale(0, 0, 1.25);
+        let census = PlasticityCensus::observe([(&[0usize][..], visited.learned())]);
+        let edges = census.edges_by_retention[bin];
+        // The group learner counts but has no learned own quantity.
+        assert_eq!((edges.count, edges.initialized, edges.at_bound), (2, 1, 1));
+        assert_eq!(edges.drift_sum, 2.0, "|-2 - 0| from the birth correction");
+        let scales = census.scales_by_retention[bin];
+        assert_eq!(
+            (scales.count, scales.initialized, scales.at_bound),
+            (1, 1, 0)
+        );
+        assert_eq!(scales.drift_sum, 0.75);
+        assert_eq!(census.scales[0].drift_sum, 0.75);
+    }
 }

@@ -92,9 +92,6 @@ changes while preserving existing work accounting:
   `reward_modulated_changes_total`; each changed count is at most that
   pathway's assignment count. Proposed deltas that clamp or round away do
   not count as changes. Formulas, costs, and write timing are unchanged.
-- `plasticity_scale_snaps_total` (T25.F07) counts learned-scale writes, at a
-  visit or in Phase 2.5, whose stored value lay outside the scale's bound;
-  only an unseeded genomic scale's first write can.
 - `shared_memory_writes_changed_total` counts each executed VM store/clear and
   applied wired Graph write/clear when the sanitized written value satisfies
   `(old_value - new_value).abs() > f32::EPSILON`. Production and traced VM

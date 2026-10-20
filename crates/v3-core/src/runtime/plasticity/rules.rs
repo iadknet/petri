@@ -36,3 +36,10 @@ pub(crate) fn activity(rule: HebbianRule, pre: f32, post: f32, w: f32) -> f32 {
 pub(crate) fn three_factor(w: f32, eta: f32, signal: f32, trace: f32, clamp: f32) -> f32 {
     (w + eta * signal * trace).clamp(-clamp, clamp)
 }
+
+/// The learned-weight decay (T25.F09): `value` relaxed once toward its
+/// birth value, `birth + retention · (value − birth)`.
+#[inline]
+pub(crate) fn relax(value: f32, birth: f32, retention: f32) -> f32 {
+    birth + retention * (value - birth)
+}

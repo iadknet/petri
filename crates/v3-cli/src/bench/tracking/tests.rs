@@ -20,7 +20,6 @@ fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
     sim.stats.hebbian_changes_total = 2;
     sim.stats.reward_modulated_updates_total = 11;
     sim.stats.reward_modulated_changes_total = 5;
-    sim.stats.plasticity_scale_snaps_total = 3;
     sim.stats.shared_memory_writes_changed_total = 23;
     let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let value = serde_json::to_value(&terminal).unwrap();
@@ -30,7 +29,7 @@ fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
             "plasticity_updates_total": 19, "plasticity_changes_total": 7,
             "hebbian_updates_total": 8, "hebbian_changes_total": 2,
             "reward_modulated_updates_total": 11, "reward_modulated_changes_total": 5,
-            "plasticity_scale_snaps_total": 3, "shared_memory_writes_changed_total": 23,
+            "shared_memory_writes_changed_total": 23,
         })
     );
     let round_trip: WorldTracking = serde_json::from_value(value).unwrap();
@@ -134,7 +133,41 @@ fn plasticity_for(population: u64) -> PlasticityCensusBlock {
                 at_bound: 0,
             })
             .collect(),
+        edges_by_retention: retention_rows(),
+        scales_by_retention: retention_rows(),
     }
+}
+
+/// The five retention rows at zero (T25.F09).
+fn retention_rows() -> Vec<RetentionRow> {
+    ["none", "1e-3", "1e-2", "1e-1", "1"]
+        .iter()
+        .map(|key| RetentionRow {
+            key: (*key).to_owned(),
+            count: 0,
+            initialized: 0,
+            drift_sum: six(0.0),
+            at_bound: 0,
+        })
+        .collect()
+}
+
+/// A census block stored before T25.F09 carries no retention rows and still
+/// reads, with both empty; a current block writes all five of each.
+#[test]
+fn a_census_block_without_retention_rows_still_reads() {
+    let block = plasticity_for(3);
+    let mut value = serde_json::to_value(&block).unwrap();
+    assert_eq!(value["edges_by_retention"].as_array().unwrap().len(), 5);
+    assert_eq!(
+        value["scales_by_retention"][2],
+        serde_json::json!({"key": "1e-2", "count": 0, "initialized": 0, "drift_sum": "0.000000", "at_bound": 0})
+    );
+    let object = value.as_object_mut().unwrap();
+    object.remove("edges_by_retention");
+    object.remove("scales_by_retention");
+    let stored: PlasticityCensusBlock = serde_json::from_value(value).unwrap();
+    assert!(stored.edges_by_retention.is_empty() && stored.scales_by_retention.is_empty());
 }
 
 /// The reading `PopulationReadings::observe` produces for an empty

@@ -156,6 +156,13 @@
       "before": "one per plastic edge per committed visit (Hebbian) or per initialized modulated edge per tick; a group member never learned",
       "after": "a group member learns: an edge-scope member as an edge, a group-scope member one update per contribution to its group's scale (Phase 2.5 contributions gated on the scale slot), and a moved scale counts a change for every contributor; plasticity_scale_snaps counts scale writes whose stored value lay outside the bound",
       "comparison": "group creation now draws a learning mode (two of three modes learn) for every member, so plastic edges and assignments per creature-tick rise where groups exist; rates are not like-for-like across F07"
+    },
+    {
+      "feature": "T25.F09",
+      "counter": "plasticity_scale_snaps (removed); plastic edge and learned scale drift_sum",
+      "before": "plasticity_scale_snaps_total counted learned-scale writes whose stored value lay outside the bound (only an unseeded genomic scale's first write); drift_sum was |learned - genomic|",
+      "after": "every learned quantity starts at its clamped birth value, so no write can snap and the counter is deleted; drift_sum is |learned - birth| (lifetime learning; a Lamarckian edge's ancestral component and an out-of-clamp start no longer count)",
+      "comparison": "drift_sum is not like-for-like across F09 where Lamarckian edges or inherited scales carry seeds; plasticity_scale_snaps_total has no successor"
     }
   ],
   "goal_worlds": {

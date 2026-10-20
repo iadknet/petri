@@ -661,7 +661,6 @@ struct TickComputeStats {
     graph_relax_iters: u64,
     plasticity_updates: u64,
     plasticity_changes: u64,
-    plasticity_scale_snaps: u64,
     shared_memory_writes_changed: u64,
     energy_exhausted_dispatches: u64,
     pass_cap_hits: u64,
@@ -687,7 +686,6 @@ impl Default for TickComputeStats {
             graph_relax_iters: 0,
             plasticity_updates: 0,
             plasticity_changes: 0,
-            plasticity_scale_snaps: 0,
             shared_memory_writes_changed: 0,
             energy_exhausted_dispatches: 0,
             pass_cap_hits: 0,
@@ -729,7 +727,6 @@ impl TickComputeStats {
         self.graph_relax_iters += u64::from(work.graph_relax_iters);
         self.plasticity_updates += u64::from(work.plasticity_updates);
         self.plasticity_changes += u64::from(work.plasticity_changes);
-        self.plasticity_scale_snaps += u64::from(work.plasticity_scale_snaps);
         self.shared_memory_writes_changed += u64::from(work.shared_memory_writes_changed);
         self.pass_cap_hits += u64::from(work.pass_cap_hits);
         self.passes += u64::from(work.passes);
@@ -775,7 +772,6 @@ impl TickComputeStats {
         stats.hebbian_updates_total += self.plasticity_updates;
         stats.plasticity_changes_total += self.plasticity_changes;
         stats.hebbian_changes_total += self.plasticity_changes;
-        stats.plasticity_scale_snaps_total += self.plasticity_scale_snaps;
         stats.shared_memory_writes_changed_total += self.shared_memory_writes_changed;
         stats.creature_ticks_total += u64::from(self.creature_count);
         stats.mesh_dispatches_energy_exhausted_total += self.energy_exhausted_dispatches;
@@ -1287,7 +1283,6 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
         sim.stats.reward_modulated_updates_total += u64::from(counts.updates);
         sim.stats.plasticity_changes_total += u64::from(counts.changes);
         sim.stats.reward_modulated_changes_total += u64::from(counts.changes);
-        sim.stats.plasticity_scale_snaps_total += u64::from(counts.scale_snaps);
         // Floor energy at 0.0 — same invariant as Phase 2 action costs. Learning
         // is free (T25.F02), so the floor is its own step: it reaches exactly
         // the creatures with an outcome bank and a reward-modulated edge.

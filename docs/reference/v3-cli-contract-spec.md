@@ -167,9 +167,9 @@ block, serialized directly under each world-set case alongside the other
 flattened tracking fields. It copies cumulative `SimStats` counters:
 `plasticity_updates_total`, `plasticity_changes_total`,
 `hebbian_updates_total`, `hebbian_changes_total`,
-`reward_modulated_updates_total`, `reward_modulated_changes_total`,
-`plasticity_scale_snaps_total` (T25.F07; absent, read as 0, before it) and
-`shared_memory_writes_changed_total`. The existing work-counter definition of
+`reward_modulated_updates_total`, `reward_modulated_changes_total` and
+`shared_memory_writes_changed_total` (T25.F09 deleted
+`plasticity_scale_snaps_total`, structurally zero after the birth clamp). The existing work-counter definition of
 `plasticity_updates` is unchanged. Event semantics are defined in
 `v3-evolution-observability-spec.md`; assignments, changed weights, and changed
 memory writes do not establish useful learning or memory capability.
@@ -186,6 +186,14 @@ adds `edges_by_scope` rows `{key, edges}` (`ungrouped`, `edge`, `group`) and
 `lamarckian`, by the group's `inherit_scale`), drift and at-bound over
 initialized scale slots, once per group; edge drift and at-clamp read
 initialized own quantities only, so a group-scope learner adds neither.
+Since T25.F09 every drift is `|learned - birth|` (lifetime learning; a
+Lamarckian edge's ancestral component no longer counts), and the block adds
+`edges_by_retention` (every reachable plastic edge by its retention) and
+`scales_by_retention` (every scale slot by its group's) rows `{key, count,
+initialized, drift_sum, at_bound}` for the keys `none` (retention exactly
+1), `1e-3`, `1e-2`, `1e-1` and `1` (the bin's upper bound on `1 −
+retention`); drift and at-bound read initialized entries, and both lists
+are empty in a block stored before T25.F09.
 
 Beside `goal_indicators.memory_sensitivity`, optional `structural_companions`
 carries `per_seed` rows with `seed`, `final_creature_count`,

@@ -384,9 +384,6 @@ pub struct SimStats {
     pub reward_modulated_updates_total: u64,
     /// Reward-modulated assignments that change the stored weight.
     pub reward_modulated_changes_total: u64,
-    /// Learned-scale writes, at a visit or in Phase 2.5, whose stored value
-    /// lay outside the scale's bound (T25.F07).
-    pub plasticity_scale_snaps_total: u64,
     /// Executed changed VM store/clear and applied changed Graph write/clear events.
     /// Excludes lifecycle memory decay, initialization, and observation on copies.
     pub shared_memory_writes_changed_total: u64,

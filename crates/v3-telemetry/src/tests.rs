@@ -1396,7 +1396,8 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     let mut sim = simulation(&config);
     // Give one founder's entry node, which is reachable, a compute node with
     // two Lamarckian plastic edges whose inherited weights have moved: one to
-    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized).
+    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized). The
+    // second decays (T25.F09).
     let creature = sim.creatures.values_mut().next().unwrap();
     let entry = creature.cached_reachable_nodes[0];
     let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
@@ -1430,7 +1431,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.5,
             }),
-            retention: 1.0,
+            retention: [1.0, 0.5][index],
         }));
     }
     let mut rows = BirthSeeds::Rows {
@@ -1501,8 +1502,27 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
         ),
         0.0
     );
-    // |1.0 - 0.5| + |0.25 - 0.0|, exact in binary.
-    assert_eq!(value("petri.tick.plastic_edge_drift", &compute), 0.75);
+    // An inherited weight is its birth value: no lifetime drift (T25.F09).
+    assert_eq!(value("petri.tick.plastic_edge_drift", &compute), 0.0);
+    let retention = |key| [("petri.plasticity_retention", key)];
+    for (key, edges) in [
+        ("none", 1.0),
+        ("1e-3", 0.0),
+        ("1e-2", 0.0),
+        ("1e-1", 0.0),
+        ("1", 1.0),
+    ] {
+        assert_eq!(
+            value("petri.tick.plastic_edges_by_retention", &retention(key)),
+            edges,
+            "{key}"
+        );
+        assert_eq!(
+            value("petri.tick.learned_scales_by_retention", &retention(key)),
+            0.0,
+            "{key}"
+        );
+    }
     assert_eq!(value("petri.tick.plastic_edges_at_clamp", &compute), 1.0);
     assert_eq!(value("petri.tick.plastic_edge_drift", &sink), 0.0);
     assert_eq!(value("petri.tick.plastic_edges_at_clamp", &sink), 0.0);
