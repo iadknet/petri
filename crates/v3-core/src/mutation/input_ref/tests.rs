@@ -850,6 +850,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
                 weight_clamp: 5.0,
                 lamarckian: false,
                 modulation: None,
+                retention: 1.0,
             }),
         );
         let rows = def

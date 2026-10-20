@@ -472,6 +472,7 @@ fn reward_modulated_node_genome_impl(
             reward_source,
             trace_decay: 0.5,
         }),
+        retention: 1.0,
     }));
     if wire_action {
         let surface = def

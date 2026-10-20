@@ -16,12 +16,14 @@ const hebbian: PlasticityConfig = {
 	learning_rate: 0.1,
 	weight_clamp: 2,
 	lamarckian: false,
+	retention: 1,
 };
 const rewarded: PlasticityConfig = {
 	rule: "Classic",
 	learning_rate: 0.1,
 	weight_clamp: 2,
 	lamarckian: true,
+	retention: 1,
 	modulation: { reward_source: "EnergyDelta", trace_decay: 0.5 },
 };
 
@@ -88,6 +90,7 @@ function groupLearner(lamarckian: boolean, inheritScale: boolean): GraphBackendD
 				offset: 1,
 				scale: 0.5,
 				inherit_scale: inheritScale,
+				retention: 1,
 			},
 		],
 	};
@@ -136,6 +139,14 @@ describe("PlasticEdgeList", () => {
 		expect(plasticityBadge(lamarckian, { scope: "Edge", inheritScale: false })).toBe(
 			"Oja · hebbian · lamarckian · edge scope",
 		);
+	});
+
+	it("states an edge's retention only when it decays (T25.F09)", () => {
+		expect(plasticityDetail(hebbian).join(" ")).not.toMatch(/Decays/);
+		const decaying = { ...hebbian, retention: 0.999 };
+		const detail = plasticityDetail(decaying);
+		expect(detail).toHaveLength(4);
+		expect(detail.join(" ")).toMatch(/keeps 0\.9990 of its learned change/);
 	});
 
 	it("infers a group learner's initialization from its group's learned scale", () => {

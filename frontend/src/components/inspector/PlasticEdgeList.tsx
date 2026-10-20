@@ -91,6 +91,11 @@ export function plasticityDetail(config: PlasticityConfig, member?: MemberLearni
 		config.modulation
 			? `Reward-modulated by ${config.modulation.reward_source}; its eligibility trace keeps ${config.modulation.trace_decay.toFixed(2)} of itself each tick.`
 			: "Hebbian: learns from co-activity alone.",
+		...(config.retention < 1
+			? [
+					`Decays toward its birth weight: keeps ${config.retention.toFixed(4)} of its learned change each tick.`,
+				]
+			: []),
 		inheritanceDetail(config, member),
 	];
 }

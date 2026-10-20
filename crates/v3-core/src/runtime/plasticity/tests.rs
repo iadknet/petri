@@ -69,6 +69,7 @@ fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
             reward_source: OutcomeChannel::EnergyDelta,
             trace_decay: lambda,
         }),
+        retention: 1.0,
     }
 }
 
@@ -642,14 +643,15 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
     };
     let modulated = |decay: &str| {
         format!(
-            r#"{{"rule":"Classic","learning_rate":1.0,"weight_clamp":2.0,"lamarckian":false,"modulation":{{"reward_source":"EnergyDelta","trace_decay":{decay}}}}}"#
+            r#"{{"rule":"Classic","learning_rate":1.0,"weight_clamp":2.0,"lamarckian":false,"modulation":{{"reward_source":"EnergyDelta","trace_decay":{decay}}},"retention":1.0}}"#
         )
     };
-    let hebbian = |eta: &str, clamp: &str| {
+    let retained = |eta: &str, clamp: &str, retention: &str| {
         format!(
-            r#"{{"rule":"Classic","learning_rate":{eta},"weight_clamp":{clamp},"lamarckian":false}}"#
+            r#"{{"rule":"Classic","learning_rate":{eta},"weight_clamp":{clamp},"lamarckian":false,"retention":{retention}}}"#
         )
     };
+    let hebbian = |eta: &str, clamp: &str| retained(eta, clamp, "1.0");
     for plasticity in [
         modulated("-1.0"),
         modulated("2.0"),
@@ -657,6 +659,8 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
         hebbian("1.5", "2.0"),
         hebbian("0.5", "50.0"),
         hebbian("0.5", "0.0"),
+        retained("0.5", "2.0", "-0.1"),
+        retained("0.5", "2.0", "1.1"),
     ] {
         assert_eq!(
             validate_graph(&node(&plasticity)),
@@ -669,6 +673,7 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
         modulated("1.0"),
         hebbian("0.0", "0.01"),
         hebbian("1.0", "10.0"),
+        retained("0.5", "2.0", "0.0"),
     ] {
         assert_eq!(validate_graph(&node(&plasticity)), Ok(()), "{plasticity}");
     }
@@ -853,6 +858,7 @@ fn hebbian_sink(eta: f32) -> PlasticityConfig {
         weight_clamp: 10.0,
         lamarckian: false,
         modulation: None,
+        retention: 1.0,
     }
 }
 

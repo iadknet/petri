@@ -649,6 +649,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
                     reward_source: OutcomeChannel::EnergyDelta,
                     trace_decay: 0.5,
                 }),
+                retention: 1.0,
             }),
         ));
         let genome = CreatureGenome {

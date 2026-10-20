@@ -73,10 +73,12 @@ A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
 inputs}`, and a genome with a node-level `plasticity` key fails to
 deserialize, with no conversion path) and a graph
 backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
-offset, scale, inherit_scale}]` (T25.F03, T25.F07), each member's
+offset, scale, inherit_scale, retention}]` (T25.F03, T25.F07, T25.F09), each member's
 `membership` is `{group, scope}` with `scope` `"Edge"` or `"Group"` (T25.F07;
 both keys always written, so a genome from before T25.F07 fails to
-deserialize, with no conversion path); the `cgp` genome types deny unknown fields, so a
+deserialize, with no conversion path); every `plasticity` config and every
+group carries `retention` in `[0, 1]`, always written (T25.F09, genome file
+format 6); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
 with no conversion path. A genome from before T25.F05 that names
 `NearbyCreatureCore`, `NearbyCreatureVitals` or `NearbyCreatureIdentity`
@@ -141,7 +143,8 @@ slot per plastic edge over both surfaces in canonical order — a sink edge can
 learn — and, since T25.F07, one scale slot per edge group with a
 group-scope learner, in `GroupId` order, built once at birth
 (`v3-graph-backend-spec.md` Section 13). A member's `scope` and a group's
-`inherit_scale` are genome fields; the learned scale is runtime state. Fixed
+`inherit_scale` and `retention` and an edge's `retention` are genome fields;
+the learned scale is runtime state. Fixed
 structural outputs (the sinks) carry no operator state.
 
 ---

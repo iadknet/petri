@@ -28,6 +28,7 @@ fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> Plast
             reward_source: OutcomeChannel::EnergyDelta,
             trace_decay: 0.5,
         }),
+        retention: 1.0,
     }
 }
 
@@ -153,7 +154,7 @@ fn an_uninitialized_edge_has_no_drift_and_is_never_at_its_clamp() {
 /// normalized by the reader.
 #[test]
 fn an_out_of_range_clamp_is_rejected_at_the_load_boundary() {
-    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false}}]}],"output_sinks":[]}"#;
+    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false,"retention":1.0}}]}],"output_sinks":[]}"#;
     let def: CgpGraphBackendDef = serde_json::from_str(json).unwrap();
     let node = genome_of(def).nodes.remove(0);
     assert_eq!(
@@ -305,6 +306,7 @@ fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
         weight_clamp: 1.5,
         lamarckian: true,
         modulation: None,
+        retention: 1.0,
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);

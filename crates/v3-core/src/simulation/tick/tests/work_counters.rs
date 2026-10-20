@@ -113,6 +113,7 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
                                     reward_source: OutcomeChannel::EnergyDelta,
                                     trace_decay: 0.9,
                                 }),
+                                retention: 1.0,
                             }),
                         ),
                     ])
@@ -224,6 +225,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
                     reward_source: OutcomeChannel::ActionSuccess,
                     trace_decay: 0.0,
                 }),
+                retention: 1.0,
             }),
         )
     };
@@ -374,6 +376,7 @@ fn run_tick_accumulates_a_visit_scale_snap_through_the_work_counters() {
         weight_clamp: 2.0,
         lamarckian: false,
         modulation: None,
+        retention: 1.0,
     };
     let (mut sim, _id) = make_sim_with_custom_genome(1000.0, snapping_ring_group_genome(config));
 
@@ -403,6 +406,7 @@ fn run_tick_accumulates_a_reward_scale_snap_in_phase_2_5() {
             reward_source: OutcomeChannel::EnergyDelta,
             trace_decay: 0.9,
         }),
+        retention: 1.0,
     };
     let (mut sim, _id) = make_sim_with_custom_genome(1000.0, snapping_ring_group_genome(config));
 

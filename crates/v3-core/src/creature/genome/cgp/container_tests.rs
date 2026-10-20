@@ -31,13 +31,8 @@ fn def_fields_are_exhaustively_accounted_for() {
         offset: _,
         scale: _,
         inherit_scale: _,
-    } = Group {
-        shape: Shape::Ring { ring_ref: 0 },
-        kind: DirectedVoteKind::Move,
-        offset: 0,
-        scale: 0.0,
-        inherit_scale: false,
-    };
+        retention: _,
+    } = Group::new(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     let Membership { group: _, scope: _ } = Membership {
         group: GroupId::new(0),
         scope: Scope::Edge,
@@ -45,8 +40,70 @@ fn def_fields_are_exhaustively_accounted_for() {
 }
 
 #[test]
-fn a_graph_edge_is_thirty_six_bytes() {
-    assert_eq!(std::mem::size_of::<GraphEdge>(), 36);
+fn a_graph_edge_is_forty_bytes() {
+    assert_eq!(std::mem::size_of::<GraphEdge>(), 40);
+}
+
+/// `Group::new` builds the silent record: scale 0, no `inherit_scale`,
+/// retention 1 (T25.F09 invariant 1).
+#[test]
+fn a_new_group_record_is_silent_with_retention_one() {
+    let record = Group::new(Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2);
+    assert_eq!(
+        (record.scale(), record.inherit_scale(), record.retention()),
+        (0.0, false, 1.0)
+    );
+    assert_eq!(
+        (record.shape(), record.kind(), record.offset()),
+        (Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2)
+    );
+}
+
+/// An edge's and a group's `retention` are always written and required
+/// (T25.F09 invariant 1, `GENOME_FORMAT` 6).
+#[test]
+fn retention_is_always_written_and_required() {
+    let plastic = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"retention":0.75}}"#;
+    let edge: GraphEdge = serde_json::from_str(plastic).unwrap();
+    assert_eq!(edge.plasticity().unwrap().retention, 0.75);
+    assert_eq!(serde_json::to_string(&edge).unwrap(), plastic);
+    let without = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true}}"#;
+    assert!(serde_json::from_str::<GraphEdge>(without).is_err());
+
+    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
+    let record: Group = serde_json::from_str(group).unwrap();
+    assert_eq!(record.retention(), 0.5);
+    assert_eq!(serde_json::to_string(&record).unwrap(), group);
+    let without = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false}"#;
+    assert!(serde_json::from_str::<Group>(without).is_err());
+}
+
+/// I1 (T25.F09): an edge retention outside `[0, 1]` or non-finite is out of
+/// range; both ends are in range.
+#[test]
+fn plasticity_in_range_bounds_the_retention() {
+    let config = PlasticityConfig {
+        rule: HebbianRule::Classic,
+        learning_rate: 0.1,
+        weight_clamp: 2.0,
+        lamarckian: false,
+        modulation: None,
+        retention: 1.0,
+    };
+    for retention in [0.0, 0.5, 1.0] {
+        assert!(PlasticityConfig {
+            retention,
+            ..config
+        }
+        .in_range());
+    }
+    for retention in [-0.0001, 1.0001, f32::NAN, f32::INFINITY] {
+        assert!(!PlasticityConfig {
+            retention,
+            ..config
+        }
+        .in_range());
+    }
 }
 
 /// The edge's plasticity key round-trips and is omitted when `None`
@@ -58,7 +115,7 @@ fn edge_plasticity_round_trips_and_is_omitted_when_none() {
     assert!(edge.plasticity().is_none());
     assert_eq!(serde_json::to_string(&edge).unwrap(), static_json);
 
-    let plastic_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"modulation":{"reward_source":"DamageDelta","trace_decay":0.75}}}"#;
+    let plastic_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"modulation":{"reward_source":"DamageDelta","trace_decay":0.75},"retention":1.0}}"#;
     let edge: GraphEdge = serde_json::from_str(plastic_json).unwrap();
     let plasticity = edge.plasticity().expect("the key is read");
     assert_eq!(plasticity.rule, HebbianRule::Oja);
@@ -84,11 +141,12 @@ fn scope_and_inherit_scale_are_always_written_and_required() {
     let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"group":0}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without_scope).is_err());
 
-    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true}"#;
+    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
     let record: Group = serde_json::from_str(group).unwrap();
     assert!(record.inherit_scale());
     assert_eq!(serde_json::to_string(&record).unwrap(), group);
-    let without_flag = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0}"#;
+    let without_flag =
+        r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"retention":1.0}"#;
     assert!(serde_json::from_str::<Group>(without_flag).is_err());
 }
 
@@ -166,6 +224,7 @@ fn plastic() -> Option<PlasticityConfig> {
         weight_clamp: 5.0,
         lamarckian: true,
         modulation: None,
+        retention: 1.0,
     })
 }
 
@@ -662,6 +721,19 @@ fn validate_graph_rejects_each_broken_invariant() {
         offset.check_local_invariants(),
         Err(GraphInvariantViolation::OffsetOutOfRange)
     );
+    // T25.F09 invariant 1: a group retention outside [0, 1] or non-finite;
+    // 0 is in range.
+    for retention in [-0.5, 1.5, f32::NAN] {
+        let mut out = def.clone();
+        out.groups[0].retention = retention;
+        assert_eq!(
+            out.check_local_invariants(),
+            Err(GraphInvariantViolation::GroupRetentionOutOfRange)
+        );
+    }
+    let mut zero = def.clone();
+    zero.groups[0].retention = 0.0;
+    assert_eq!(zero.check_local_invariants(), Ok(()));
     // I4: a member on the wrong sink.
     let mut shifted = def.clone();
     shifted.groups[0].offset = 2;
@@ -712,13 +784,7 @@ fn validate_graph_rejects_each_broken_invariant() {
 #[test]
 fn the_group_count_limit_is_u16_max_records() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let record = Group {
-        shape: ring(),
-        kind: DirectedVoteKind::Move,
-        offset: 0,
-        scale: 0.0,
-        inherit_scale: false,
-    };
+    let record = Group::new(ring(), DirectedVoteKind::Move, 0);
     def.groups = vec![record; usize::from(u16::MAX)];
     assert_eq!(
         def.check_local_invariants(),
@@ -1415,7 +1481,7 @@ fn validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge(
 /// `plasticity` is refused, and the edge-level key reads.
 #[test]
 fn a_node_level_plasticity_key_is_refused() {
-    let config = r#"{"rule":"Classic","learning_rate":0.1,"weight_clamp":5.0,"lamarckian":true}"#;
+    let config = r#"{"rule":"Classic","learning_rate":0.1,"weight_clamp":5.0,"lamarckian":true,"retention":1.0}"#;
     let node_level = format!(
         r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5}}],"plasticity":{config}}}"#
     );
@@ -1823,8 +1889,8 @@ fn a_mixed_scope_group_survives_a_relocation_and_its_inverse() {
     assert_eq!(def.birth_seeds().unwrap(), &seeds_before);
 }
 
-/// `set_scope` and `set_inherit_scale` keep every seed; `set_scale` clears
-/// the group's.
+/// `set_scope`, `set_inherit_scale` and `set_retention` (T25.F09) keep
+/// every seed; `set_scale` clears the group's.
 #[test]
 fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_group_seed() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
@@ -1832,6 +1898,8 @@ fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_group_seed
     seed_with(&mut def, &[(member, 2.0)], &[(id, 3.0)]);
     def.edge_mut(member).set_scope(Scope::Group);
     def.group_mut(id).set_inherit_scale(true);
+    def.group_mut(id).set_retention(0.25);
+    assert_eq!(def.groups()[id.index()].retention(), 0.25);
     let seeds = def.birth_seeds().unwrap();
     assert_eq!(
         (seeds.value(member), seeds.group_value(id)),

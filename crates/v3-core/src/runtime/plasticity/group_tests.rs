@@ -41,6 +41,7 @@ fn hebbian(rule: HebbianRule, eta: f32, clamp: f32) -> PlasticityConfig {
         weight_clamp: clamp,
         lamarckian: false,
         modulation: None,
+        retention: 1.0,
     }
 }
 

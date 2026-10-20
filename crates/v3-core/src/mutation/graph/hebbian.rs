@@ -174,6 +174,7 @@ pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> PlasticityConfig {
         weight_clamp: rng.gen_range(1.0f32..5.0),
         lamarckian: rng.gen_bool(0.5),
         modulation: None,
+        retention: 1.0,
     }
 }
 
@@ -460,6 +461,7 @@ mod tests {
             weight_clamp: 5.0,
             lamarckian: false,
             modulation: None,
+            retention: 1.0,
         }
     }
 

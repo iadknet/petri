@@ -40,6 +40,7 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
                     weight_clamp: 1.0,
                     lamarckian: false,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ));
             genome.nodes[0].backend_def = BackendDef::Graph(graph);

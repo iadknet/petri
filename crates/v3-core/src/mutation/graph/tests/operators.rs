@@ -223,6 +223,7 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                     weight_clamp: 5.0,
                     lamarckian: false,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
             ComputeNode::new(

@@ -73,6 +73,7 @@ describe("graph edge tooltips", () => {
 						learning_rate: 0.1,
 						weight_clamp: 2,
 						lamarckian: true,
+						retention: 1,
 						modulation: { reward_source: "EnergyDelta", trace_decay: 0.5 },
 					},
 					genomic: 1.5,
@@ -95,7 +96,13 @@ describe("graph edge tooltips", () => {
 			weight: null,
 			own: 1.5,
 			plastic: {
-				config: { rule: "Oja", learning_rate: 0.1, weight_clamp: 2, lamarckian: false },
+				config: {
+					rule: "Oja",
+					learning_rate: 0.1,
+					weight_clamp: 2,
+					lamarckian: false,
+					retention: 1,
+				},
 				genomic: 1.5,
 				initialized: false,
 			},
@@ -114,7 +121,13 @@ describe("graph edge tooltips", () => {
 						{
 							source: { InputLeaf: { ref_idx: 1, sub_idx: 0 } },
 							own_weight: 0.25,
-							plasticity: { rule: "Oja", learning_rate: 0.1, weight_clamp: 2, lamarckian: true },
+							plasticity: {
+								rule: "Oja",
+								learning_rate: 0.1,
+								weight_clamp: 2,
+								lamarckian: true,
+								retention: 1,
+							},
 							membership: { group: 0, scope: "Group" },
 						},
 					],
@@ -127,6 +140,7 @@ describe("graph edge tooltips", () => {
 					offset: 1,
 					scale: 0.5,
 					inherit_scale: false,
+					retention: 1,
 				},
 			],
 		};

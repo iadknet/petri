@@ -108,6 +108,7 @@ fn plasticity(rng: &mut SmallRng) -> Option<PlasticityConfig> {
             reward_source: OutcomeChannel::EnergyDelta,
             trace_decay: 0.9,
         }),
+        retention: 1.0,
     })
 }
 
