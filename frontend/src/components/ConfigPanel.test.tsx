@@ -682,7 +682,6 @@ describe("ConfigPanel", () => {
 				"config-field-energy-lifecycle-age-reference-ticks",
 				"config-field-runtime-hop-ramp-allowance",
 				"config-field-runtime-hop-ramp-cost",
-				"config-field-mutation-structured-heritable-refinement",
 				"config-field-mutation-neutral-input-recruitment",
 			]) {
 				expect(screen.getByTestId(testId)).toBeInTheDocument();

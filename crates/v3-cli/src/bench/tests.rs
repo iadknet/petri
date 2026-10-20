@@ -133,8 +133,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // entry restores seed 59. Moved from 14 to 129 by T25.F07 commit 2:
     // learned group creation, the scope coin and `SetScope` remap every Graph
     // draw and seed 14 goes extinct at tick 132; 129 is the lowest of 0..=400
-    // that survives the horizon (129, 164 and 175 do).
-    const SEED: u64 = 129;
+    // that survives the horizon (129, 164 and 175 do). Moved from 129 to 73
+    // by T25.F08 commit 1: deleting `RefineHeritableStructure` remaps every
+    // Graph draw and seed 129 goes extinct; 73 is the lowest of 0..=400 that
+    // survives the horizon (73, 147, 158, 197 and 201 do).
+    const SEED: u64 = 73;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -210,8 +213,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // seed 19 goes extinct at tick 159 and seed 59 survives; T25.F04 commit
     // 1: seed 59 goes extinct and seed 14 survives (see the
     // post-tick-state test). T25.F07 commit 2: seed 14 goes extinct at tick
-    // 132 and seed 129 survives (see the post-tick-state test).
-    const SEED: u64 = 129;
+    // 132 and seed 129 survives (see the post-tick-state test). T25.F08
+    // commit 1: seed 129 goes extinct and seed 73 survives (see the
+    // post-tick-state test).
+    const SEED: u64 = 73;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -348,8 +353,11 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // seed 14 is the lowest of 0..=400 that survives it. T25.F07 commit 2
     // moved it from 14 to 164: seed 14 goes extinct at tick 132; of the
     // seeds of 0..=400 that survive the horizon (129, 164, 175), 129 ends on
-    // one cell and 164 is the lowest over more than one.
-    const SEED: u64 = 164;
+    // one cell and 164 is the lowest over more than one. T25.F08 commit 1
+    // moved it from 164 to 73: of the seeds of 0..=400 that survive the
+    // horizon (73, 147, 158, 197, 201), 73 is the lowest and ends over three
+    // cells.
+    const SEED: u64 = 73;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

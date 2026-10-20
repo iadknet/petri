@@ -2,7 +2,6 @@ pub(crate) mod group;
 pub mod hebbian;
 pub(crate) mod operators;
 pub(crate) mod recruitment;
-pub(crate) mod refinement;
 
 use rand::Rng;
 
@@ -12,7 +11,7 @@ use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
-    BirthEdgeClass, MutationOperator, MutationSkipReason, RefinementKey, TargetReachability,
+    BirthEdgeClass, MutationOperator, MutationSkipReason, TargetReachability,
 };
 
 /// What an applied Graph event reports beside its reachability.
@@ -20,8 +19,6 @@ use crate::mutation::types::{
 pub(crate) struct GraphEventReport {
     /// The class of the vote-sink edge an `AddGraphEdge` pushed (T11.F30).
     pub class: Option<BirthEdgeClass>,
-    /// The set a `RefineHeritableStructure` stepped (T25.F04).
-    pub refined: Option<RefinementKey>,
 }
 
 /// Graph mutation operator variants.
@@ -49,7 +46,6 @@ pub enum GraphOperator {
     MutateRewardSource,
     MutateTraceDecay,
     RecruitNeutralInput,
-    RefineHeritableStructure,
     AddRingGroup,
     AddDirectionPairGroup,
     AlterGroupScale,
@@ -60,7 +56,7 @@ pub enum GraphOperator {
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 29] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -83,7 +79,6 @@ impl GraphOperator {
         Self::MutateRewardSource,
         Self::MutateTraceDecay,
         Self::RecruitNeutralInput,
-        Self::RefineHeritableStructure,
         Self::AddRingGroup,
         Self::AddDirectionPairGroup,
         Self::AlterGroupScale,
@@ -120,7 +115,6 @@ impl GraphOperator {
             Self::MutateRewardSource => 2,
             Self::MutateTraceDecay => 4,
             Self::RecruitNeutralInput => 1,
-            Self::RefineHeritableStructure => 4,
             // Edge groups (T25.F03, at the catalog positions and weights of
             // the T11.F31 ring projection operators): each the tier of the
             // edge operator it parallels.
@@ -138,16 +132,13 @@ impl GraphOperator {
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 30,
+            Self::ALL.len() == 29,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {
-            if !matches!(
-                Self::ALL[i],
-                Self::RecruitNeutralInput | Self::RefineHeritableStructure
-            ) {
+            if !matches!(Self::ALL[i], Self::RecruitNeutralInput) {
                 sum += Self::ALL[i].weight() as u16;
             }
             i += 1;
@@ -182,7 +173,6 @@ impl GraphOperator {
             Self::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             Self::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             Self::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            Self::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
             Self::AddRingGroup => MutationOperator::GraphAddRingGroup,
             Self::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
             Self::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
@@ -206,19 +196,19 @@ impl GraphOperator {
             Self::RecruitNeutralInput => {
                 config.neutral_input_recruitment != NeutralInputRecruitment::Off
             }
-            Self::RefineHeritableStructure => config.structured_heritable_refinement,
             _ => true,
         }
     }
 
     /// Pick a default-arm graph operator weighted by impact tier.
+    // WORKAROUND(T25.F08): a test-only sampler beside the engine's
+    // `select_weighted_index` over the enabled catalog; the four domains'
+    // `random` and `TOTAL_WEIGHT` go in one area change and the catalog pins
+    // assert `ALL.len()` and the engine's enabled weight sum.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {
-            if matches!(
-                op,
-                Self::RecruitNeutralInput | Self::RefineHeritableStructure
-            ) {
+            if op == Self::RecruitNeutralInput {
                 continue;
             }
             let w = op.weight() as u16;
@@ -245,7 +235,6 @@ impl GraphOperator {
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
             Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
-            Self::RefineHeritableStructure => refinement::has_inferred_set(def, input_refs),
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -323,9 +312,7 @@ impl GraphMutator {
     }
 
     /// [`Self::apply_with_food_type_count`] with what the event reports
-    /// beside its reachability: the class of the vote-sink edge an
-    /// `AddGraphEdge` pushed (T11.F30) and the set a
-    /// `RefineHeritableStructure` stepped (T25.F04); the same draws.
+    /// beside its reachability ([`GraphEventReport`]); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -348,18 +335,7 @@ impl GraphMutator {
         let report = match op {
             GraphOperator::AddGraphEdge => GraphEventReport {
                 class: operators::add_graph_edge(genome, node_idx, rng)?,
-                refined: None,
             },
-            GraphOperator::RefineHeritableStructure => {
-                let node = genome
-                    .nodes
-                    .get_mut(node_idx)
-                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                GraphEventReport {
-                    class: None,
-                    refined: Some(refinement::refine(node, rng)?),
-                }
-            }
             _ => {
                 Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
                 GraphEventReport::default()
@@ -378,13 +354,6 @@ impl GraphMutator {
         food_type_count: usize,
     ) -> Result<(), MutationSkipReason> {
         match op {
-            GraphOperator::RefineHeritableStructure => {
-                let node = genome
-                    .nodes
-                    .get_mut(node_idx)
-                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
-                refinement::refine(node, rng).map(|_| ())
-            }
             GraphOperator::RecruitNeutralInput => {
                 let node = genome
                     .nodes

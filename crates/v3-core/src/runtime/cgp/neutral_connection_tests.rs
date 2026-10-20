@@ -29,8 +29,8 @@ use proptest::prelude::*;
 mod boundaries;
 mod group;
 mod lifecycle;
+mod offspring;
 mod recruitment;
-mod refinement;
 
 const BASE_COST: f32 = 0.25;
 

@@ -115,7 +115,6 @@ const MOCK_CONFIG: SimulationConfig = {
 		perception: { vision_radius: 5 },
 	},
 	mutation: {
-		structured_heritable_refinement: true,
 		neutral_input_recruitment: "WholeFamily",
 		per_unit_rate: 0.0060625,
 		mesh_layer_probability: 0.2,

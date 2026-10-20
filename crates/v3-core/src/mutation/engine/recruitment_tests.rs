@@ -4,11 +4,10 @@ use rand::{rngs::SmallRng, SeedableRng};
 
 #[test]
 fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
-    // Both T20 input mechanisms are on by default since 2026-10-12; this pin
-    // keeps reading the path with them off, which must add no draw.
+    // Whole-family recruitment is on by default since 2026-10-12; this pin
+    // keeps reading the path with it off, which must add no draw.
     let config = MutationConfig {
         neutral_input_recruitment: crate::config::NeutralInputRecruitment::Off,
-        structured_heritable_refinement: false,
         ..MutationConfig::default()
     };
     let mut hash = 0xcbf29ce484222325u64;

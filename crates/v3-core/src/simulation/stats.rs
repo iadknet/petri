@@ -342,9 +342,6 @@ pub struct SimStats {
     pub graph_edges_detached_total: u64,
     /// Edge groups committed mutation events removed (T25.F03).
     pub groups_removed_total: u64,
-    /// Committed `RefineHeritableStructure` applications keyed by the
-    /// stepped set's `(family, field)` (T25.F04).
-    pub refinement_applications_total_by_key: HashMap<crate::mutation::types::RefinementKey, u64>,
     /// Births whose committed genome holds a `DirectionPair` group with
     /// `|scale| > 1e-3` that no event of the birth could have created: the
     /// inheritance witness (T25.F04).

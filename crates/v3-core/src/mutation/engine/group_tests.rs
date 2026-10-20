@@ -116,7 +116,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let all: Vec<usize> = (0..valid.nodes.len()).collect();
     for seed in 0..8 {
         let mut committed = valid.clone();
-        let (result, edits, _) = apply_graph_event(
+        let (result, edits) = apply_graph_event(
             &mut committed,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -128,7 +128,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         assert_eq!(edits.groups_removed, 1);
 
         let mut rolled_back = broken.clone();
-        let (result, edits, refined) = apply_graph_event(
+        let (result, edits) = apply_graph_event(
             &mut rolled_back,
             GraphOperator::RemoveGroup,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -138,57 +138,8 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         );
         assert_eq!(result, Err(MutationSkipReason::GraphInvariantViolation));
         assert_eq!(edits, GroupEdits::default());
-        assert_eq!(refined, None);
         assert_eq!(rolled_back, broken);
     }
-}
-
-/// A committed `RefineHeritableStructure` reports the stepped set's key and
-/// the summary counts it once per application (T25.F04).
-#[test]
-fn a_committed_refinement_reports_its_key() {
-    use crate::creature::genome::cgp::{GraphEdge, GraphSource};
-    let mut genome = v3alpha1_founder_genome();
-    let idx = graph_index(&genome);
-    let node = &mut genome.nodes[idx];
-    let core = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs
-        .push(InputReference::World(WorldInputKey::NearbyCreature));
-    let def = graph_mut(node);
-    let sink = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap();
-    for slot in 0..2u16 {
-        let source = GraphSource::InputLeaf {
-            ref_idx: core,
-            sub_idx: 9 * slot + 3,
-        };
-        def.push_edge(sink, GraphEdge::new(source, 0.25));
-    }
-    let config = MutationConfig {
-        structured_heritable_refinement: true,
-        ..MutationConfig::default()
-    };
-    let all: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (result, _, refined) = apply_graph_event(
-        &mut genome,
-        GraphOperator::RefineHeritableStructure,
-        &mut TargetSelector::reachable_only(&all, 0.0),
-        &mut SmallRng::seed_from_u64(3),
-        &config,
-        2,
-    );
-    assert!(result.is_ok());
-    let key = crate::mutation::types::RefinementKey {
-        family: WorldInputKey::NearbyCreature,
-        field: 3,
-    };
-    assert_eq!(refined, Some(key));
-    assert_eq!(key.as_key(), "NearbyCreature:3");
-    let mut summary = MutationSummary::zero();
-    summary.record_refinement(key);
-    summary.record_refinement(key);
-    assert_eq!(summary.refinement_applications_by_key.get(&key), Some(&2));
 }
 
 #[test]

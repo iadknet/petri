@@ -1083,10 +1083,6 @@ pub struct MutationSupply {
     /// with `|scale| > 1e-3` (T25.F04); absent in reports stored before
     /// T25.F04.
     pub pair_group_inherited_nonzero_births_total: u64,
-    /// Committed `RefineHeritableStructure` applications keyed
-    /// `"<family>:<field>"` (T25.F04); absent in reports stored before
-    /// T25.F04.
-    pub refinement_applications_by_key: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
