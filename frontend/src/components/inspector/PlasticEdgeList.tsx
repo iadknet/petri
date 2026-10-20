@@ -75,6 +75,13 @@ function inheritanceDetail(config: PlasticityConfig, member?: MemberLearning): s
 		: "Darwinian: offspring start from the genomic weight.";
 }
 
+/** The decay sentence of a retention below 1: inert for a group learner, which has no own decay. */
+function retentionDetail(retention: number, member?: MemberLearning): string {
+	return member?.scope === "Group"
+		? "Edge retention is inert at group scope: the group's retention governs its shared scale."
+		: `Decays toward its birth weight: keeps ${retention.toFixed(4)} of its learned change each tick.`;
+}
+
 /** The badge spelled out, one sentence per attribute, for its tooltip. */
 export function plasticityDetail(config: PlasticityConfig, member?: MemberLearning): string[] {
 	const scoped =
@@ -91,11 +98,7 @@ export function plasticityDetail(config: PlasticityConfig, member?: MemberLearni
 		config.modulation
 			? `Reward-modulated by ${config.modulation.reward_source}; its eligibility trace keeps ${config.modulation.trace_decay.toFixed(2)} of itself each tick.`
 			: "Hebbian: learns from co-activity alone.",
-		...(config.retention < 1
-			? [
-					`Decays toward its birth weight: keeps ${config.retention.toFixed(4)} of its learned change each tick.`,
-				]
-			: []),
+		...(config.retention < 1 ? [retentionDetail(config.retention, member)] : []),
 		inheritanceDetail(config, member),
 	];
 }
