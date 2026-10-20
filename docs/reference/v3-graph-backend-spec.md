@@ -333,7 +333,6 @@ weight is its `own_weight`.
 - A group record is one `genome_size()` unit and each member one edge unit,
   so a full `Ring` group is nine units (T25.F02's projection charge). Its
   ring is consumed through its members; `Prune` never deletes it.
-  Structured refinement never steps a member.
 - The VM has no group (T11.F18 parity exemption): a VM node reaches one by
   `SwapNodeBackend` to Graph.
 

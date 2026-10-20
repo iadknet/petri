@@ -405,8 +405,11 @@ added/removed/retyped — only their edges are evolvable.
   split) detaches it first: its own weight becomes its genomic weight
   `scale + own_weight`, bitwise, and it moves to the end of its sink's
   independent edges, where the edit continues. A same-source retarget draw
-  changes nothing. `AddGraphEdge` inserts before a sink's first member and
-  never joins a group. Each committed detach and group removal is counted
+  changes nothing. `DetachGraphEdge` (below) detaches one member and
+  nothing else. `AddGraphEdge` and `InputRef.Add` insert before a sink's
+  first member and never join a group: the pushed edge carries no
+  membership and every group keeps its record and member set (T25.F08).
+  Each committed detach and group removal is counted
   (`graph_edges_detached_total`, `groups_removed_total`).
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
@@ -501,54 +504,9 @@ added/removed/retyped — only their edges are evolvable.
   member uniformly in canonical order, the scope coin, then the other of the
   picked member's scope written to it alone or to every member of its group;
   no value draw. Scope carries no genome unit.
-- `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled by
-  `mutation.structured_heritable_refinement`, true by default since
-  2026-10-12 (omitted means true).
-  Select an eligible Graph node with the existing target selector, then one
-  inferred set uniformly. The sets contain only existing direct, ungrouped
-  `InputLeaf` edges to valid `ActionVote` sinks (refinement never steps an
-  edge-group member, T25.F03):
-
-  - Slots: one nearby-creature bank and field, across four ranked slots, within
-    one sink occurrence. Core has width 4, Vitals 2 and Identity 3 per slot.
-    Every field and all 30 valid vote identities have support. Rank is not a
-    direction; no cyclic rotation or cross-field/bank correspondence is inferred.
-
-  The ring key (one ring, kind and offset across direction sinks) is gone
-  since T25.F03: a ring map is an explicit `Ring` edge group, refined through
-  `AlterGroupScale`. No set includes a member of either group shape. Every
-  committed application is counted by the stepped set's `(family, field)`
-  (`SimStats.refinement_applications_total_by_key`, T25.F04).
-
-  Sets need at least two distinct homologous positions, with at most four
-  members. A duplicate semantic position excludes its whole
-  set. Duplicate input
-  declarations alone do not exclude a unique semantic edge. Nonfinite weights
-  exclude their group. Dangling references, invalid channels/directions,
-  compute-node inputs, non-vote sinks and unsupported input meanings are
-  excluded; other valid groups in that node remain available.
-
-  Draw one `d` uniformly from `[-0.1, 0.1]` and add `d / sqrt(m)` to every
-  selected weight. Preflight all resulting f32 values and the actual coefficient
-  vector norm (at most `0.1 + 1e-6`) before any write. A failed proposal records
-  `NumericProposalRejected` and ends that event without retry; rounded-to-zero
-  changes may still be an applied event. The selected node and distinct
-  `Graph.RefineHeritableStructure` identity use existing event/funnel records;
-  selected versus changed coefficients, requested/actual norms and native costs
-  are reported in the [bounded F05 reading](../progress/readings/t20-f05.md).
-
-  Coefficients retain their local differences up to f32 rounding. Independent
-  scalar mutation, edge removal and declaration pruning remain available, and
-  deleted members are never recreated. No declarations, edges, nodes, routes,
-  backend kinds, compute/plasticity/birth state or genomic units are added or
-  rewritten. Native copies, offspring and serde retain independent coefficients.
-  Enabled refinement is a neutral-complexity exception to restricted pressure's
-  decreasing-only admission; it retains the existing pressure-adjusted target
-  bias. Other operator admission, weights and event supply stay unchanged.
-  Off removes the candidate before sampling without additional RNG draws.
-  The two supported engineering layouts do not establish inherited discovery
-  or general biological usefulness; T20.F09 owns that qualification.
-
+  Each committed change of the nine plasticity operators and `SetScope`
+  counts once at the scope it landed on, `Group` for a member with a true
+  coin, else `Edge` (`attribute_changes_by_scope`, T25.F08).
 - `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled by
   `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`;
   `"WholeFamily"` is the default since 2026-10-12.
@@ -625,9 +583,13 @@ added/removed/retyped — only their edges are evolvable.
 
 - Edge-group operators (T25.F03), at the catalog positions and weights of the
   T11.F31 ring projection operators they replace, after
-  `RefineHeritableStructure`, with `AddDirectionPairGroup` (T25.F04)
-  directly after `AddRingGroup`, and `SetScope` (T25.F07) after
-  `RemoveGroup`; the default-arm total weight is 60. A group is a record
+  `RecruitNeutralInput`, with `AddDirectionPairGroup` (T25.F04) directly
+  after `AddRingGroup`, `SetScope` (T25.F07) after `RemoveGroup`, and
+  `AddRandomizedRingGroup`, `AddRandomizedDirectionPairGroup` and
+  `DetachGraphEdge` (T25.F08) after `SetScope`. The Graph catalog holds 32
+  operators; the default-arm total weight (every operator but
+  `RecruitNeutralInput`) is 66, and the enabled total at the default config
+  67. A group is a record
   `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind, offset,
   scale, inherit_scale}` plus its member sink edges, each with a `scope`
   (graph backend spec, "Ring edge groups" and "Direction-pair edge groups");
@@ -642,6 +604,25 @@ added/removed/retyped — only their edges are evolvable.
   member; then one `inherit_scale` coin (`gen_bool(0.5)`). The pattern and
   the scale are never randomized: a new group is silent.
 
+  **Randomized creation** (T25.F08): `AddRandomizedRingGroup` and
+  `AddRandomizedDirectionPairGroup` apply where their uniform twins do, make
+  the twin's shape draws in the same order and create the silent group
+  through the same constructor; then, per member in canonical order, its
+  own mode `gen_range(0..3u8)`, that mode's config by the same laws and its
+  own scope coin; then one `inherit_scale` coin for the group. A mutation in
+  the uniform form changes every member it builds; the randomized form
+  gives each member its own learning attributes.
+
+  **Detach** (T25.F08): `DetachGraphEdge` applies to a Graph node with a
+  member. It draws one member uniformly in canonical order (one draw, no
+  coin, no value draw) and detaches it as a retarget does: its own weight
+  becomes `compose(own, scale, pattern)` bitwise, its membership and scope
+  clear, its plasticity stays, it moves to the end of its sink's
+  independent prefix, and its seed composes (T25.F07 invariant 6). A last
+  member's detach removes the record and renumbers higher `GroupId`s. A
+  committed detach counts one `graph_edges_detached`, and one
+  `groups_removed` when the record went.
+
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
   | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +9 | Increasing |
@@ -650,8 +631,11 @@ added/removed/retyped — only their edges are evolvable.
   | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
   | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink | Neutral |
   | `RemoveGroup` | 2 | same | the group; removes the record and every member, renumbering higher `GroupId`s; `Δgenome_size` −(n + 1) for n members | Decreasing |
+  | `AddRandomizedRingGroup` | 2 | as `AddRingGroup` | `AddRingGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +9 | Increasing |
+  | `AddRandomizedDirectionPairGroup` | 2 | as `AddDirectionPairGroup` | `AddDirectionPairGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +13 | Increasing |
+  | `DetachGraphEdge` | 2 | a Graph node with a member | one member uniformly in canonical order; detaches it; `Δgenome_size` 0, or −1 when the record goes | Neutral |
 
-  Restricted size pressure admits only `RemoveGroup` of the six. A shift or
+  Restricted size pressure admits only `RemoveGroup` of these nine. A shift or
   retarget re-inserts each member at its new sink in the I10 position, so it
   and its inverse return an equal genome. A born-connected `InputRef.Add`
   ring landing on a direction sink stays one ordinary edge (T20.F16
@@ -831,8 +815,7 @@ Selection randomization rules (internal to `MutationEngine`):
 Complexity pressure gate:
 - When `genome_size_pressure_enabled` is true and the genome's total structural
   size (`genome_size()`) exceeds `genome_size_cap`, the engine restricts mutation
-  domains to decreasing-only operators, except enabled T20.F05 structured
-  refinement, which adds no genomic units.
+  domains to decreasing-only operators.
 - The pressure gate uses `genome_size()` (total structural size including
   unreachable/dead code), not `complexity()` (functional reachability-aware).
   This prevents runaway structural bloat even when junk DNA does not affect

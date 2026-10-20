@@ -165,7 +165,7 @@ blocker (Success Criteria require the readings).
       R6); `DetachGraphEdge` in `group_edits` with its `WORKAROUND(T25.F08)`
       comment (readings R4); `operator_funnel_by_operator` with its
       projection test; re-pin every mutation-on pin.
-- [ ] Commit 3, reference text only: `v3-mutation-spec.md` (the three rows,
+- [x] Commit 3, reference text only: `v3-mutation-spec.md` (the three rows,
       the randomized-creation and detach paragraphs, the no-join sentence,
       the refinement entry removed, counts 32 / 66) and
       `v3-runtime-config-spec.md` (the refinement row removed).
@@ -173,10 +173,16 @@ blocker (Success Criteria require the readings).
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core mutation::graph` and
+- [x] Focused tests: `cargo test -p v3-core mutation::graph` and
       `cargo test -p v3-core mutation::engine` -> the named tests pass;
       `cargo test -p v3-cli bench` -> the projection and digest tests pass;
       `cargo test -p v3-core --test viability` -> founder digests unchanged.
+      At `40ec50fe` (commit 2): viability 30/30 first; `cargo test -p v3-core
+      -p v3-cli -p v3-telemetry -p v3-server` pass but the open gate-series
+      row below; `--features telemetry-seams` window seam 20/20; `cargo fmt
+      --all --check`, `cargo clippy --workspace --all-targets` clean;
+      frontend vitest (config panel, control bar) 106/106, `tsc --noEmit`
+      and biome clean.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (local
       `MUTANTS_ITERATE=0 make rust-mutants` when Actions is unavailable), its
       summary line, output path, and every survivor resolved as killed,
