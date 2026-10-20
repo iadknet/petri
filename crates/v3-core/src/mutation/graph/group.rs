@@ -108,14 +108,6 @@ pub(super) fn can_add_pair(def: &CgpGraphBackendDef, input_refs: &[InputReferenc
     def.can_host_group() && pair_sites(input_refs).next().is_some()
 }
 
-/// `AddDirectionPairGroup`: [`add_pair_in_form`] in the uniform form.
-pub(crate) fn add_pair(
-    node: &mut NodeGenome,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    add_pair_in_form(node, CreationForm::Uniform, rng)
-}
-
 /// `AddDirectionPairGroup` (T25.F04) and `AddRandomizedDirectionPairGroup`
 /// (T25.F08): three draws in order — one pair uniformly over the flat list
 /// `(ref_idx ascending, pair ascending)`, the kind over
@@ -154,11 +146,6 @@ fn graph_node(
         BackendDef::Graph(def) => Ok((def, &node.input_refs)),
         BackendDef::Vm(_) => Err(MutationSkipReason::NoApplicableTarget),
     }
-}
-
-/// `AddRingGroup`: [`add_in_form`] in the uniform form.
-pub(crate) fn add(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
-    add_in_form(node, CreationForm::Uniform, rng)
 }
 
 /// `AddRingGroup` and `AddRandomizedRingGroup` (T25.F08): three draws in

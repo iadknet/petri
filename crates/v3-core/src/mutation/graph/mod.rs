@@ -446,10 +446,6 @@ impl GraphMutator {
             GraphOperator::MutateTraceDecay => {
                 scoped(hebbian::mutate_trace_decay(genome, node_idx, rng))
             }
-            GraphOperator::AddRingGroup => unreported(group::add(node_mut(genome, node_idx)?, rng)),
-            GraphOperator::AddDirectionPairGroup => {
-                unreported(group::add_pair(node_mut(genome, node_idx)?, rng))
-            }
             GraphOperator::AlterGroupScale => unreported(group::alter_scale(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
@@ -470,9 +466,19 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
+            GraphOperator::AddRingGroup => unreported(group::add_in_form(
+                node_mut(genome, node_idx)?,
+                group::CreationForm::Uniform,
+                rng,
+            )),
             GraphOperator::AddRandomizedRingGroup => unreported(group::add_in_form(
                 node_mut(genome, node_idx)?,
                 group::CreationForm::Randomized,
+                rng,
+            )),
+            GraphOperator::AddDirectionPairGroup => unreported(group::add_pair_in_form(
+                node_mut(genome, node_idx)?,
+                group::CreationForm::Uniform,
                 rng,
             )),
             GraphOperator::AddRandomizedDirectionPairGroup => unreported(group::add_pair_in_form(

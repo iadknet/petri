@@ -22,13 +22,7 @@ fn fixture() -> CreatureGenome {
     }
 }
 
-fn native_run(
-    genome: &CreatureGenome,
-) -> (
-    crate::creature::genome::vote::VoteVector,
-    crate::runtime::types::WorkCounters,
-    f64,
-) {
+fn native_run(genome: &CreatureGenome) {
     let node = &genome.nodes[0];
     let mut energy = 10.0;
     let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
@@ -72,11 +66,6 @@ fn native_run(
         "native input resolution and applied vote contribution"
     );
     assert_eq!(side.work_counters.plasticity_updates, 0);
-    (
-        side.votes,
-        side.work_counters,
-        side.energy_observation.graph_compute,
-    )
 }
 
 #[test]
