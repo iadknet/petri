@@ -1,7 +1,7 @@
-//! The edge-group operators (T25.F03, T25.F04, T25.F08): four create a
-//! silent group (`Ring`, `DirectionPair`, each in the uniform and the
-//! randomized form), four change an existing group through its record, and
-//! one detaches a member.
+//! The edge-group operators (T25.F03, T25.F04, T25.F08, T25.F09): four
+//! create a silent group (`Ring`, `DirectionPair`, each in the uniform and
+//! the randomized form), four change an existing group through its record,
+//! three move its learned scale's retention, and one detaches a member.
 
 use rand::Rng;
 
@@ -11,7 +11,10 @@ use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::MutationSkipReason;
 
-use super::hebbian::{draw_hebbian_config, draw_modulation, is_member, select_eligible};
+use super::hebbian::{
+    decays, draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
+    step_retention,
+};
 use super::operators::perturb_weight;
 
 /// How a creation operator draws its new group's learning attributes
@@ -239,6 +242,88 @@ pub(crate) fn retarget_kind(
         .nth(pick)
         .expect("two other kinds");
     def.relocate_group(id, kind, group.offset());
+    Ok(())
+}
+
+/// A group-record predicate of the retention operators.
+pub(super) type GroupPredicate = fn(&cgp::Group) -> bool;
+
+/// `EnableGroupRetention`: a record whose retention is exactly 1.
+pub(super) fn retains(group: &cgp::Group) -> bool {
+    !decays(group.retention())
+}
+
+/// `DisableGroupRetention`, `MutateGroupRetention`: a record whose
+/// retention is below 1.
+pub(super) fn is_decaying_group(group: &cgp::Group) -> bool {
+    decays(group.retention())
+}
+
+/// Whether any group record matches `predicate`.
+pub(super) fn any_group(def: &CgpGraphBackendDef, predicate: GroupPredicate) -> bool {
+    def.groups().iter().any(predicate)
+}
+
+/// One group uniformly among the records `predicate` admits, in `GroupId`
+/// order: count-then-select, one draw. A record without a scale slot is
+/// admitted; its retention is inert.
+fn pick_where(
+    def: &CgpGraphBackendDef,
+    predicate: GroupPredicate,
+    rng: &mut impl Rng,
+) -> Result<GroupId, MutationSkipReason> {
+    let matching = || {
+        def.groups()
+            .iter()
+            .enumerate()
+            .filter(|(_, group)| predicate(group))
+    };
+    let count = matching().count();
+    if count == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let pick = rng.gen_range(0..count);
+    let (index, _) = matching()
+        .nth(pick)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    Ok(GroupId::new(
+        u16::try_from(index).expect("groups below u16::MAX"),
+    ))
+}
+
+/// `EnableGroupRetention` (T25.F09): one retaining group, then
+/// `EnableRetention`'s draw on its record.
+pub(crate) fn enable_retention(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let id = pick_where(def, retains, rng)?;
+    let retention = draw_retention(rng);
+    def.group_mut(id).set_retention(retention);
+    Ok(())
+}
+
+/// `DisableGroupRetention` (T25.F09): one decaying group's retention
+/// returns to 1; no value draw.
+pub(crate) fn disable_retention(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let id = pick_where(def, is_decaying_group, rng)?;
+    def.group_mut(id).set_retention(1.0);
+    Ok(())
+}
+
+/// `MutateGroupRetention` (T25.F09): one decaying group, one `u ∈ [−1, 1]`,
+/// `MutateRetention`'s step on its deficit.
+pub(crate) fn mutate_retention(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let id = pick_where(def, is_decaying_group, rng)?;
+    let u = rng.gen_range(-1.0f32..=1.0);
+    let retention = step_retention(def.groups()[id.index()].retention(), u);
+    def.group_mut(id).set_retention(retention);
     Ok(())
 }
 

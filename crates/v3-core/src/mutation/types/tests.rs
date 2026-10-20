@@ -259,7 +259,13 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphSetScope
             | MutationOperator::GraphAddRandomizedRingGroup
             | MutationOperator::GraphAddRandomizedDirectionPairGroup
-            | MutationOperator::GraphDetachGraphEdge => {
+            | MutationOperator::GraphDetachGraphEdge
+            | MutationOperator::GraphEnableRetention
+            | MutationOperator::GraphDisableRetention
+            | MutationOperator::GraphMutateRetention
+            | MutationOperator::GraphEnableGroupRetention
+            | MutationOperator::GraphDisableGroupRetention
+            | MutationOperator::GraphMutateGroupRetention => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -382,6 +388,12 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
                 MutationOperator::GraphAddRandomizedDirectionPairGroup
             }
             GraphOperator::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
+            GraphOperator::EnableRetention => MutationOperator::GraphEnableRetention,
+            GraphOperator::DisableRetention => MutationOperator::GraphDisableRetention,
+            GraphOperator::MutateRetention => MutationOperator::GraphMutateRetention,
+            GraphOperator::EnableGroupRetention => MutationOperator::GraphEnableGroupRetention,
+            GraphOperator::DisableGroupRetention => MutationOperator::GraphDisableGroupRetention,
+            GraphOperator::MutateGroupRetention => MutationOperator::GraphMutateGroupRetention,
         };
         // `complexity_effect` delegates to `operator()`, so pinning the
         // mapping pins the classification.
@@ -462,10 +474,16 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::SetScope
             | GraphOperator::AddRandomizedRingGroup
             | GraphOperator::AddRandomizedDirectionPairGroup
-            | GraphOperator::DetachGraphEdge => {}
+            | GraphOperator::DetachGraphEdge
+            | GraphOperator::EnableRetention
+            | GraphOperator::DisableRetention
+            | GraphOperator::MutateRetention
+            | GraphOperator::EnableGroupRetention
+            | GraphOperator::DisableGroupRetention
+            | GraphOperator::MutateGroupRetention => {}
         }
     }
-    assert_eq!(variants.len(), 32);
+    assert_eq!(variants.len(), 38);
 
     let image: HashSet<MutationOperator> = GraphOperator::ALL
         .into_iter()

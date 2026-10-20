@@ -139,8 +139,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // survives the horizon (73, 147, 158, 197 and 201 do). Moved from 73 to
     // 129 by T25.F08 commit 2: the randomized creation operators and
     // `DetachGraphEdge` remap every Graph draw and seed 73 goes extinct; 129
-    // is the only seed of 0..=400 that survives the horizon.
-    const SEED: u64 = 129;
+    // is the only seed of 0..=400 that survives the horizon. Moved from 129
+    // to 14 by T25.F09 commit 3: the six retention operators remap every
+    // Graph draw and seed 129 goes extinct; 14 is the lowest of 0..=400 that
+    // survives the horizon (14, 202, 268 and 358 do).
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -219,8 +222,9 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // 132 and seed 129 survives (see the post-tick-state test). T25.F08
     // commit 1: seed 129 goes extinct and seed 73 survives (see the
     // post-tick-state test). T25.F08 commit 2: seed 73 goes extinct and seed
-    // 129 survives (see the post-tick-state test).
-    const SEED: u64 = 129;
+    // 129 survives (see the post-tick-state test). T25.F09 commit 3: seed
+    // 129 goes extinct and seed 14 survives (see the post-tick-state test).
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -363,7 +367,11 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // cells. T25.F08 commit 2 moved it from 73 to 473: seed 73 goes extinct;
     // 129, the only seed of 0..=400 that survives the horizon, ends on one
     // occupancy cell, and 473, the first survivor above 400, ends over three.
-    const SEED: u64 = 473;
+    // T25.F09 commit 3 moved it from 473 to 14: the six retention operators
+    // remap every Graph draw and seed 473 goes extinct; of the seeds of
+    // 0..=600 that survive the horizon (14, 202, 268, 358, 423, 430, 510, 531,
+    // 558), 14 is the lowest and ends over five cells.
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

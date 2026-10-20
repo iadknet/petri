@@ -19,8 +19,9 @@ use crate::mutation::types::{
 pub(crate) struct GraphEventReport {
     /// The class of the vote-sink edge an `AddGraphEdge` pushed (T11.F30).
     pub class: Option<BirthEdgeClass>,
-    /// The scope the change of one of the ten attribute operators (the nine
-    /// plasticity operators and `SetScope`) landed on (T25.F08).
+    /// The scope the change of one of the thirteen attribute operators (the
+    /// nine plasticity operators, `SetScope` and the three edge retention
+    /// operators) landed on (T25.F08, T25.F09).
     pub attribute_scope: Option<Scope>,
 }
 
@@ -59,10 +60,16 @@ pub enum GraphOperator {
     AddRandomizedRingGroup,
     AddRandomizedDirectionPairGroup,
     DetachGraphEdge,
+    EnableRetention,
+    DisableRetention,
+    MutateRetention,
+    EnableGroupRetention,
+    DisableGroupRetention,
+    MutateGroupRetention,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 38] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -95,6 +102,12 @@ impl GraphOperator {
         Self::AddRandomizedRingGroup,
         Self::AddRandomizedDirectionPairGroup,
         Self::DetachGraphEdge,
+        Self::EnableRetention,
+        Self::DisableRetention,
+        Self::MutateRetention,
+        Self::EnableGroupRetention,
+        Self::DisableGroupRetention,
+        Self::MutateGroupRetention,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -141,12 +154,19 @@ impl GraphOperator {
             Self::AddRandomizedRingGroup => 2,
             Self::AddRandomizedDirectionPairGroup => 2,
             Self::DetachGraphEdge => 2,
+            // T25.F09: after `DetachGraphEdge`, the enable and disable twins
+            // at a structural tier and the steps at a refinement's, as
+            // their trace-decay analogs.
+            Self::EnableRetention | Self::DisableRetention => 1,
+            Self::MutateRetention => 4,
+            Self::EnableGroupRetention | Self::DisableGroupRetention => 1,
+            Self::MutateGroupRetention => 4,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 32,
+            Self::ALL.len() == 38,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -199,6 +219,12 @@ impl GraphOperator {
                 MutationOperator::GraphAddRandomizedDirectionPairGroup
             }
             Self::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
+            Self::EnableRetention => MutationOperator::GraphEnableRetention,
+            Self::DisableRetention => MutationOperator::GraphDisableRetention,
+            Self::MutateRetention => MutationOperator::GraphMutateRetention,
+            Self::EnableGroupRetention => MutationOperator::GraphEnableGroupRetention,
+            Self::DisableGroupRetention => MutationOperator::GraphDisableGroupRetention,
+            Self::MutateGroupRetention => MutationOperator::GraphMutateGroupRetention,
         }
     }
 
@@ -278,6 +304,14 @@ impl GraphOperator {
             | Self::RetargetGroupKind
             | Self::RemoveGroup => group::has_group(def),
             Self::SetScope | Self::DetachGraphEdge => hebbian::any_edge(def, hebbian::is_member),
+            Self::EnableRetention => hebbian::any_edge(def, hebbian::can_enable_retention),
+            Self::DisableRetention | Self::MutateRetention => {
+                hebbian::any_edge(def, hebbian::is_decaying)
+            }
+            Self::EnableGroupRetention => group::any_group(def, group::retains),
+            Self::DisableGroupRetention | Self::MutateGroupRetention => {
+                group::any_group(def, group::is_decaying_group)
+            }
         }
     }
 }
@@ -506,6 +540,30 @@ impl GraphMutator {
             GraphOperator::DetachGraphEdge => {
                 unreported(group::detach_member(node_mut(genome, node_idx)?, rng))
             }
+            GraphOperator::EnableRetention => scoped(hebbian::enable_retention_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::DisableRetention => scoped(hebbian::disable_retention_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::MutateRetention => scoped(hebbian::mutate_retention_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::EnableGroupRetention => unreported(group::enable_retention(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::DisableGroupRetention => unreported(group::disable_retention(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::MutateGroupRetention => unreported(group::mutate_retention(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
         }
     }
 }

@@ -212,10 +212,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 8568333528152149267). The hash without genome text is unchanged at the merge base
 /// and after the commit (default 1525356918335449842, rate 0.0
 /// 8486363218089703579).
+/// Re-pinned by T25.F09 commit 3 after two agreeing runs: the six retention
+/// operators join the Graph catalog (enabled weight 67 -> 79) and remap
+/// every Graph draw (default 7591672062617439646 -> 2537487317403075458,
+/// rate 0.0 8568333528152149267 -> 2081929543008060806).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 7591672062617439646);
-    assert_eq!(short_run_identity(Some(0.0)), 8568333528152149267);
+    assert_eq!(short_run_identity(None), 2537487317403075458);
+    assert_eq!(short_run_identity(Some(0.0)), 2081929543008060806);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

@@ -16,6 +16,15 @@
 //! - MutateRewardSource: change the outcome channel a modulated edge listens to
 //! - MutateTraceDecay: perturb the trace decay rate on a modulated edge
 //!
+//!
+//! Three retention operators (T25.F09) move an edge's learned-weight
+//! retention `ρ` on and off 1 and step its deficit `1 − ρ`, through the same
+//! pick and coin:
+//! - EnableRetention: a plastic edge with `ρ = 1` decays, `1 − ρ` drawn
+//!   log-uniform over `[10⁻⁴, 1]`
+//! - DisableRetention: a decaying edge's `ρ` returns to 1
+//! - MutateRetention: a decaying edge's deficit steps multiplicatively
+//!
 //! `SetScope` flips a member's scope through the same coin.
 
 use rand::{Rng, RngCore};
@@ -76,6 +85,22 @@ pub(super) fn can_enable_reward_modulation(
 /// plastic edge that carries modulation.
 pub(super) fn is_reward_modulated(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
     plasticity_of(def, occurrence).is_some_and(|p| p.modulation.is_some())
+}
+
+/// `EnableRetention`: a plastic edge whose retention is exactly 1.
+pub(super) fn can_enable_retention(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
+    plasticity_of(def, occurrence).is_some_and(|p| !decays(p.retention))
+}
+
+/// `DisableRetention`, `MutateRetention`: a plastic edge whose retention is
+/// below 1.
+pub(super) fn is_decaying(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
+    plasticity_of(def, occurrence).is_some_and(|p| decays(p.retention))
+}
+
+/// Whether a retention decays: below 1, compared exactly (T25.F09).
+pub(super) fn decays(retention: f32) -> bool {
+    retention < 1.0
 }
 
 /// `SetScope`: a group member.
@@ -213,6 +238,25 @@ fn draw_other<T: Copy + PartialEq>(all: &[T], current: Option<T>, rng: &mut dyn 
 
 fn draw_u(_: Option<PlasticityConfig>, rng: &mut dyn RngCore) -> f32 {
     rng.gen_range(-1.0f32..=1.0)
+}
+
+/// The smallest deficit `1 − ρ` the enable draw and the step reach
+/// (T25.F09 invariant 6).
+pub(super) const RETENTION_DEFICIT_MIN: f32 = 1e-4;
+
+/// `EnableRetention`'s value law: one `u = gen_range(−4..=0)`, `ρ = 1 −
+/// 10ᵘ`, so the deficit is log-uniform over `[10⁻⁴, 1]`.
+pub(super) fn draw_retention(rng: &mut dyn RngCore) -> f32 {
+    let u = rng.gen_range(-4.0f32..=0.0);
+    1.0 - 10f32.powf(u)
+}
+
+/// `MutateRetention`'s per-target law: the deficit `d = 1 − ρ` steps by
+/// one `u ∈ [−1, 1]`, `d ← (d · (1 + 0.3u)).clamp(10⁻⁴, 1)` (`perturb`'s
+/// multiplicative branch, a log-space step), and `ρ = 1 − d`.
+pub(super) fn step_retention(retention: f32, u: f32) -> f32 {
+    let deficit = 1.0 - retention;
+    1.0 - (deficit * (1.0 + 0.3 * u)).clamp(RETENTION_DEFICIT_MIN, 1.0)
 }
 
 /// Add learning attributes to a random static, eligible edge (one config,
@@ -402,6 +446,72 @@ pub(crate) fn mutate_trace_decay_in_def(
                         trace_decay: perturb(modulation.trace_decay, u),
                         ..modulation
                     }),
+                    ..config
+                })
+            },
+        },
+    )
+}
+
+/// `EnableRetention` (T25.F09): one retention, drawn once after the scope
+/// coin, written to every admitted target.
+pub(crate) fn enable_retention_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<Scope, MutationSkipReason> {
+    mutate_scoped(
+        def,
+        can_enable_retention,
+        rng,
+        Law {
+            draw: |_, rng| draw_retention(rng),
+            apply: |config, &retention| {
+                config.map(|config| PlasticityConfig {
+                    retention,
+                    ..config
+                })
+            },
+        },
+    )
+}
+
+/// `DisableRetention` (T25.F09): every target's retention returns to 1; no
+/// value draw.
+pub(crate) fn disable_retention_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<Scope, MutationSkipReason> {
+    mutate_scoped(
+        def,
+        is_decaying,
+        rng,
+        Law {
+            draw: |_, _| (),
+            apply: |config, ()| {
+                config.map(|config| PlasticityConfig {
+                    retention: 1.0,
+                    ..config
+                })
+            },
+        },
+    )
+}
+
+/// `MutateRetention` (T25.F09): one `u`, each target stepping its own
+/// deficit.
+pub(crate) fn mutate_retention_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<Scope, MutationSkipReason> {
+    mutate_scoped(
+        def,
+        is_decaying,
+        rng,
+        Law {
+            draw: draw_u,
+            apply: |config, &u| {
+                config.map(|config| PlasticityConfig {
+                    retention: step_retention(config.retention, u),
                     ..config
                 })
             },

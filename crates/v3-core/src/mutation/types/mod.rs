@@ -251,6 +251,12 @@ pub enum MutationOperator {
     GraphAddRandomizedRingGroup,
     GraphAddRandomizedDirectionPairGroup,
     GraphDetachGraphEdge,
+    GraphEnableRetention,
+    GraphDisableRetention,
+    GraphMutateRetention,
+    GraphEnableGroupRetention,
+    GraphDisableGroupRetention,
+    GraphMutateGroupRetention,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -323,6 +329,12 @@ impl MutationOperator {
             Self::GraphAddRandomizedRingGroup => "Graph.AddRandomizedRingGroup",
             Self::GraphAddRandomizedDirectionPairGroup => "Graph.AddRandomizedDirectionPairGroup",
             Self::GraphDetachGraphEdge => "Graph.DetachGraphEdge",
+            Self::GraphEnableRetention => "Graph.EnableRetention",
+            Self::GraphDisableRetention => "Graph.DisableRetention",
+            Self::GraphMutateRetention => "Graph.MutateRetention",
+            Self::GraphEnableGroupRetention => "Graph.EnableGroupRetention",
+            Self::GraphDisableGroupRetention => "Graph.DisableGroupRetention",
+            Self::GraphMutateGroupRetention => "Graph.MutateGroupRetention",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -393,7 +405,13 @@ impl MutationOperator {
             | Self::GraphSetScope
             | Self::GraphAddRandomizedRingGroup
             | Self::GraphAddRandomizedDirectionPairGroup
-            | Self::GraphDetachGraphEdge => MutationDomain::Graph,
+            | Self::GraphDetachGraphEdge
+            | Self::GraphEnableRetention
+            | Self::GraphDisableRetention
+            | Self::GraphMutateRetention
+            | Self::GraphEnableGroupRetention
+            | Self::GraphDisableGroupRetention
+            | Self::GraphMutateGroupRetention => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -473,7 +491,13 @@ impl MutationOperator {
             | Self::GraphShiftGroupOffset
             | Self::GraphRetargetGroupKind
             | Self::GraphSetScope
-            | Self::GraphDetachGraphEdge => ComplexityEffect::Neutral,
+            | Self::GraphDetachGraphEdge
+            | Self::GraphEnableRetention
+            | Self::GraphDisableRetention
+            | Self::GraphMutateRetention
+            | Self::GraphEnableGroupRetention
+            | Self::GraphDisableGroupRetention
+            | Self::GraphMutateGroupRetention => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -482,7 +506,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 65] {
+    pub const fn all() -> [Self; 71] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -545,6 +569,12 @@ impl MutationOperator {
             Self::GraphAddRandomizedRingGroup,
             Self::GraphAddRandomizedDirectionPairGroup,
             Self::GraphDetachGraphEdge,
+            Self::GraphEnableRetention,
+            Self::GraphDisableRetention,
+            Self::GraphMutateRetention,
+            Self::GraphEnableGroupRetention,
+            Self::GraphDisableGroupRetention,
+            Self::GraphMutateGroupRetention,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,
