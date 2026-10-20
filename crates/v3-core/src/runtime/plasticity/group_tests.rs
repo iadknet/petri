@@ -398,6 +398,30 @@ fn reward_credit_to_a_scale_is_one_bounded_write_per_tick() {
     assert_eq!((counts.updates, counts.changes), (2, 2));
 }
 
+/// Inside the bound, a modulated group learner's reward credit to its
+/// scale is exactly `pattern × η × signal × trace`.
+#[test]
+fn reward_credit_to_a_scale_is_pattern_times_rate_times_signal_times_trace() {
+    // Arrange
+    let (mut def, id) = pair_def(0.5);
+    let negative = member_with_sign(&def, id, -1.0);
+    learn(&mut def, negative, modulated(0.25, 10.0), Scope::Group);
+    let pattern = def.pattern(negative, &refs());
+    let mut learned = state(&def, None);
+    drive(&mut learned, &def, |_| 1.0, 2.0);
+    let trace = view_edge(&learned, negative).trace.unwrap();
+    assert_eq!(scale(&learned).learned, Some(0.5), "no visit write");
+
+    // Act
+    let counts = learned.apply_reward(&signals(3.0));
+
+    // Assert
+    let expected = 0.5 + pattern * 0.25 * 3.0 * trace;
+    assert!(expected.abs() < 10.0, "the credit stays inside the bound");
+    assert_eq!(scale(&learned).learned, Some(expected));
+    assert_eq!((counts.updates, counts.changes), (1, 1));
+}
+
 /// An unseeded genomic scale outside its bound snaps to the bound at its
 /// first event, a zero-`Σ` event included, and counts one snap; a later
 /// write counts none.
