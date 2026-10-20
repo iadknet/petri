@@ -100,7 +100,6 @@ fn a_dispatched_add_graph_edge_reports_its_vote_sink_class() {
         };
         let expected = grown_vote_sink(before, after).and_then(BirthEdgeClass::of_sink);
         assert_eq!(report.class, expected, "seed {seed}");
-        assert_eq!(report.refined, None, "seed {seed}");
         classified += usize::from(expected.is_some());
     }
     assert!(

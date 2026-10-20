@@ -118,7 +118,6 @@ fn every_operator_in_the_four_domains_produces_a_row() {
 
     let disabled = founder_evaluation_with(1, |config| {
         config.mutation.neutral_input_recruitment = v3_core::config::NeutralInputRecruitment::Off;
-        config.mutation.structured_heritable_refinement = false;
     });
     assert_eq!(
         disabled.operator_rows.len(),
@@ -127,10 +126,7 @@ fn every_operator_in_the_four_domains_produces_a_row() {
     for row in &disabled.operator_rows {
         assert_eq!(
             row.tally.trials,
-            if matches!(
-                row.operator.as_str(),
-                "RecruitNeutralInput" | "RefineHeritableStructure"
-            ) {
+            if row.operator == "RecruitNeutralInput" {
                 0
             } else {
                 REDUCED_OPERATOR_TRIALS

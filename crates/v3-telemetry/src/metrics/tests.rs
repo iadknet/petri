@@ -163,11 +163,6 @@ fn populated() -> SimStats {
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
     }
-    let family = WorldInputKey::NearbyCreature;
-    for field in 0..9 {
-        s.refinement_applications_total_by_key
-            .insert(v3_core::mutation::types::RefinementKey { family, field }, 1);
-    }
     for class in BirthEdgeClass::ALL {
         s.mutation_value_totals_by_birth_edge_class
             .insert(class, MutationValueTotals::default());
@@ -506,17 +501,6 @@ fn mutation_families(families: &mut Vec<Family>) {
                     str::to_owned,
                 ),
             ),
-        ],
-    ));
-    families.push((
-        "petri.run.refinement_applications_by_key".to_owned(),
-        MonotonicSum,
-        vec![
-            (
-                "petri.world_input",
-                strings(["NearbyCreature"], str::to_owned),
-            ),
-            ("petri.field", strings(0..9, |field: u16| field.to_string())),
         ],
     ));
     for (field, kind) in [
@@ -912,17 +896,6 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
             &[
                 ("petri.operator", "Topology.AddNode"),
                 ("petri.world_input", "NeighborBarrierRing")
-            ]
-        ),
-        PointValue::Int(1)
-    );
-    // Each key's count reaches its series (one per key in `populated`).
-    assert_eq!(
-        value(
-            "petri.run.refinement_applications_by_key",
-            &[
-                ("petri.world_input", "NearbyCreature"),
-                ("petri.field", "0")
             ]
         ),
         PointValue::Int(1)

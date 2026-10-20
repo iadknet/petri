@@ -124,6 +124,12 @@
 //! 45759536... -> 31bd6e95..., rate 0.0 a8ef1c4a... -> ec2e084d...). With
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical
 //! (bd8dca14..., gestation rate 0.0 d3b71fcd...): no founder-based change.
+//! Re-pinned by T25.F08 commit 1 after two agreeing runs: deleting
+//! `RefineHeritableStructure` drops weight 4 from the enabled Graph catalog
+//! (65 -> 61) and changes every Graph draw, which moves all four digests
+//! (sampled f55ad21d... was 38f68975..., gestation rate 0.0 872113ec... was
+//! 0d037fb0...; guard dc32a1fa... was 31bd6e95..., rate 0.0 d61cf3eb... was
+//! ec2e084d...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -135,11 +141,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "38f68975757d019f953a7caa988aaa4f88ab1dbacc6c2fa29e6a849f8cae8c8c"
+        "f55ad21de23f441bbef991c91552491c00c42b47b84ada2734cdde63a101f53e"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "0d037fb0c9b745f82d9a57d90a8571a99b722ce7fe193a47ee4ff5a2989c5edc"
+        "872113ec48868cc2f87725eb6ecdc708ee0dcaf39ee08dd52f74d029f6ff4a47"
     );
 }
 
@@ -212,11 +218,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "31bd6e9506a3e7c13ff08f55bee19c60cd736b3f074bc8e1fb9c6913d8cbc3b5"
+        "dc32a1fad13ac284b607f52ec8cb44bf1689729628d05ef902ceb42845e27bf1"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "ec2e084da1d59938f016f8e3293c28c1883554050306ea2457cdd9e43b70b859"
+        "d61cf3eb6b0281c6e71ca54ffe2f994b158dfc9a816c2f4b8149b31ed4989898"
     );
 }
 

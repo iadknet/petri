@@ -766,6 +766,41 @@ fn engine_pressure_at_cap_selects_only_decreasing() {
     }
 }
 
+/// Under restricted size pressure the Graph arm admits decreasing operators
+/// only (T25.F08): every Graph operator an event tried, the one it kept and
+/// every one it discarded for want of a site, is decreasing.
+#[test]
+fn restricted_pressure_admits_decreasing_graph_operators_only() {
+    let mut config = SimulationConfig::default().mutation;
+    config.per_unit_rate = 1.0;
+    config.genome_size_pressure_enabled = true;
+    config.genome_size_cap = 1;
+
+    let mut graph_events = 0;
+    for seed in 0u64..512 {
+        let mut genome = v3alpha1_founder_genome();
+        let summary = apply_events(&mut genome, &config, &[0, 1, 2], &mut rng(seed), 4);
+        for event in summary
+            .events
+            .iter()
+            .filter(|event| event.domain == MutationDomain::Graph)
+        {
+            graph_events += 1;
+            let tried = event
+                .operator
+                .into_iter()
+                .chain(event.discarded.iter().map(|&(operator, _)| operator));
+            for operator in tried {
+                assert!(
+                    operator.complexity_effect().is_decreasing(),
+                    "restricted Graph arm admitted {operator:?} (seed {seed})"
+                );
+            }
+        }
+    }
+    assert!(graph_events > 0, "the Graph arm was drawn");
+}
+
 #[test]
 fn engine_restricted_vm_mutations_can_apply() {
     // Restricted VM events should be able to select and apply a Decreasing operator.

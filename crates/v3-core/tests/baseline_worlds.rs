@@ -197,10 +197,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 7887329904345154269 -> 11318987159188275955); with mutation off the run
 /// is unchanged, genome text included (8324246536663749152, rate 0.0
 /// 1561139812032769563).
+/// Re-pinned by T25.F08 commit 1 after two agreeing runs: deleting
+/// `RefineHeritableStructure` drops weight 4 from the enabled Graph catalog
+/// and remaps every Graph draw (default 7345675788631625454 ->
+/// 5737684664837370108, rate 0.0 11318987159188275955 ->
+/// 11540034954633671093).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 7345675788631625454);
-    assert_eq!(short_run_identity(Some(0.0)), 11318987159188275955);
+    assert_eq!(short_run_identity(None), 5737684664837370108);
+    assert_eq!(short_run_identity(Some(0.0)), 11540034954633671093);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

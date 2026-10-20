@@ -16,7 +16,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef,
 };
-use crate::mutation::graph::{group, refinement, GraphMutator, GraphOperator};
+use crate::mutation::graph::{group, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
 
@@ -151,11 +151,11 @@ fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut Smal
 
 #[test]
 fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 30);
-    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 63);
-    assert_eq!(&GraphOperator::ALL[23..29], &GROUP_OPERATORS);
+    assert_eq!(GraphOperator::ALL.len(), 29);
+    assert_eq!(crate::mutation::types::MutationOperator::all().len(), 62);
+    assert_eq!(&GraphOperator::ALL[22..28], &GROUP_OPERATORS);
     // T25.F07: `SetScope` follows `RemoveGroup`, weight 2, neutral.
-    assert_eq!(GraphOperator::ALL[29], GraphOperator::SetScope);
+    assert_eq!(GraphOperator::ALL[28], GraphOperator::SetScope);
     assert_eq!(GraphOperator::SetScope.weight(), 2);
     assert_eq!(
         GraphOperator::SetScope.complexity_effect(),
@@ -173,12 +173,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
     assert_eq!(weights, [2, 2, 4, 2, 2, 2]);
     let default_arm: u16 = GraphOperator::ALL
         .iter()
-        .filter(|op| {
-            !matches!(
-                op,
-                GraphOperator::RecruitNeutralInput | GraphOperator::RefineHeritableStructure
-            )
-        })
+        .filter(|&&op| op != GraphOperator::RecruitNeutralInput)
         .map(|op| u16::from(op.weight()))
         .sum();
     assert_eq!(default_arm, 60);
@@ -210,7 +205,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
     let pair = GraphOperator::ALL
         .iter()
         .position(|&op| op == GraphOperator::AddDirectionPairGroup);
-    assert_eq!(pair, Some(24), "directly after AddRingGroup");
+    assert_eq!(pair, Some(23), "directly after AddRingGroup");
     for op in GROUP_OPERATORS {
         assert_eq!(
             op.complexity_effect(),
@@ -356,10 +351,10 @@ fn unit_operators_draw_the_group_first_and_change_its_record() {
     );
 }
 
-/// `InputRef.Add` on a Graph node and structured refinement draw and write
-/// exactly what they would without groups, apart from the members.
+/// `InputRef.Add` on a Graph node draws and writes exactly what it would
+/// without groups, apart from the members.
 #[test]
-fn add_and_refinement_are_unchanged_by_groups() {
+fn add_is_unchanged_by_groups() {
     for seed in 0..64 {
         let mut plain = v3alpha1_founder_genome();
         let idx = plain
@@ -379,7 +374,6 @@ fn add_and_refinement_are_unchanged_by_groups() {
         let mut rngs = [SmallRng::seed_from_u64(seed), SmallRng::seed_from_u64(seed)];
         for (genome, rng) in [&mut plain, &mut grouped].into_iter().zip(&mut rngs) {
             InputRefMutator::apply_to_node(genome, InputRefOperator::Add, idx, rng, 2).unwrap();
-            let _ = refinement::refine(&mut genome.nodes[idx], rng);
         }
         let [a, b] = &mut rngs;
         assert_eq!(a.gen::<u64>(), b.gen::<u64>(), "seed {seed}");

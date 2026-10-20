@@ -250,7 +250,6 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphMutateRewardSource
             | MutationOperator::GraphMutateTraceDecay
             | MutationOperator::GraphRecruitNeutralInput
-            | MutationOperator::GraphRefineHeritableStructure
             | MutationOperator::GraphAddRingGroup
             | MutationOperator::GraphAddDirectionPairGroup
             | MutationOperator::GraphAlterGroupScale
@@ -368,9 +367,6 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            GraphOperator::RefineHeritableStructure => {
-                MutationOperator::GraphRefineHeritableStructure
-            }
             GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
             GraphOperator::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
             GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,

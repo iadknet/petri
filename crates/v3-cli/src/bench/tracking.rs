@@ -688,11 +688,6 @@ impl WorldTracking {
                 groups_removed_total: stats.groups_removed_total,
                 pair_group_inherited_nonzero_births_total: stats
                     .pair_group_inherited_nonzero_births_total,
-                refinement_applications_by_key: stats
-                    .refinement_applications_total_by_key
-                    .iter()
-                    .map(|(key, count)| (key.as_key(), *count))
-                    .collect(),
             }),
             mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
             mutation_value_totals_by_operator: Some(

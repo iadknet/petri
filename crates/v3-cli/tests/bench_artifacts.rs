@@ -192,13 +192,12 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
-/// Undoes T25.F02 on the resolved goal recipes, asserting the commit-2
-/// digests between its two steps, and returns the input-mechanism values:
-/// restoring the learning-cost knobs commit 3 deleted, then the rate 0.005
-/// commit 2 replaced.
-fn undo_t25_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
-    let rate_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+/// Undoes T25.F02 on the goal recipes' T25.F02 commit-3 values, asserting
+/// the commit-2 digests between its two steps, and returns the
+/// input-mechanism values: restoring the learning-cost knobs commit 3
+/// deleted, then the rate 0.005 commit 2 replaced.
+fn undo_t25_f02(values: [Value; 3]) -> [Value; 3] {
+    let rate_values = values.map(|mut value| {
         let runtime = value["runtime"].as_object_mut().unwrap();
         for key in ["plasticity_update_cost", "reward_learning_cost"] {
             assert_eq!(runtime.insert(key.into(), json!(0.0)), None, "{key}");
@@ -254,7 +253,9 @@ fn undo_t25_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
 /// input-mechanism digests. T25.F02 commit 3 re-pinned all three after two
 /// agreeing runs: the resolved `runtime` drops `plasticity_update_cost` and
 /// `reward_learning_cost`; restoring both at 0.0 recovers the commit-2
-/// digests.
+/// digests. T25.F08 commit 1 re-pinned all three after two agreeing runs:
+/// the resolved `MutationConfig` drops `structured_heritable_refinement`;
+/// re-inserting it at `true` recovers the T25.F02 commit-3 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -270,13 +271,34 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:62fcf74bafeb6ab75f0e1c882eeafce73720c892441d65872706cc6d14159f24",
+            "sha256:3d595bef955f186a5ef59278bae6e741a233cc4bd7c4b989bfa77558a52d54b8",
+            "sha256:e4d5bef9de074f0d1d1376c2f312c85c64c489fe6b484451948727a7bcbc5454",
+        ]
+    );
+
+    // Undoing T25.F08's deletion recovers the T25.F02 commit-3 digests.
+    let t25_f02_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        assert_eq!(
+            value["mutation"]
+                .as_object_mut()
+                .unwrap()
+                .insert("structured_heritable_refinement".into(), json!(true)),
+            None
+        );
+        value
+    });
+    assert_eq!(
+        t25_f02_values.each_ref().map(value_digest),
+        [
             "sha256:5ab6069b67f292606b2588fb6f7590c23a3ecc9705c02e5762a8048f4c6e8504",
             "sha256:87ad318819d883fffe44baba9c262d832399976ead911d5d1d49ec624e9bc6de",
             "sha256:b33044d50bf95be990c0d2fcd09af8c6685db5534e8b4b4dff71d3b284b3c559",
         ]
     );
 
-    let input_values = undo_t25_f02(configs);
+    let input_values = undo_t25_f02(t25_f02_values);
     assert_eq!(
         input_values.each_ref().map(value_digest),
         [

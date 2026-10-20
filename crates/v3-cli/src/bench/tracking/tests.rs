@@ -730,13 +730,6 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.graph_edges_detached_total = 8;
     stats.groups_removed_total = 2;
     stats.pair_group_inherited_nonzero_births_total = 5;
-    stats.refinement_applications_total_by_key.insert(
-        v3_core::mutation::types::RefinementKey {
-            family: v3_core::contracts::WorldInputKey::NearbyCreature,
-            field: 3,
-        },
-        4,
-    );
     stats.mutation_outcome_summary = MutationValueTotals {
         carriers_observed_total: 5,
         survival_ticks_sum: 120,
@@ -794,9 +787,11 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             graph_edges_detached_total: 8,
             groups_removed_total: 2,
             pair_group_inherited_nonzero_births_total: 5,
-            refinement_applications_by_key: BTreeMap::from([("NearbyCreature:3".to_string(), 4)]),
         })
     );
+    // T25.F08: the deleted refinement channel leaves no key in the block.
+    let supply = serde_json::to_value(&tracking.mutation_supply).unwrap();
+    assert!(supply.get("refinement_applications_by_key").is_none());
     assert_eq!(
         tracking.mutation_outcome_summary,
         Some(MutationOutcomeTotals {
@@ -1399,10 +1394,6 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 graph_edges_detached_total: 4,
                 groups_removed_total: 1,
                 pair_group_inherited_nonzero_births_total: 3,
-                refinement_applications_by_key: BTreeMap::from([(
-                    "NearbyCreature:4".to_string(),
-                    2,
-                )]),
             }),
             mutation_outcome_summary: Some(MutationOutcomeTotals {
                 carriers_observed_total: 4,

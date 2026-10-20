@@ -147,13 +147,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 
 export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	{
-		path: "mutation.structured_heritable_refinement",
-		label: "Structured Refinement",
-		testId: "config-field-mutation-structured-heritable-refinement",
-		defaultValue: true,
-		tooltip: "Bounded semantic input-to-vote refinement at birth",
-	},
-	{
 		path: "mutation.genome_size_pressure_enabled",
 		label: "Genome Size Pressure",
 		testId: "config-field-mutation-genome-size-pressure-enabled",

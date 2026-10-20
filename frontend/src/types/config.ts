@@ -222,7 +222,6 @@ export interface ReachableBiasConfig {
 export type NeutralInputRecruitment = "Off" | "SingleChannel" | "WholeFamily";
 
 export interface MutationConfig {
-	structured_heritable_refinement: boolean;
 	neutral_input_recruitment: NeutralInputRecruitment;
 	per_unit_rate: number;
 	mesh_layer_probability: number;

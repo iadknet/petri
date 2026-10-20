@@ -1386,14 +1386,12 @@ mod tests {
         assert_eq!(extinct[1]["pair_groups"], Value::Null);
     }
 
-    /// T25.F04: the refinement-by-key map rides inside `mutation_supply`,
-    /// which the case projection keeps whole.
+    /// T25.F04: `mutation_supply` rides whole through the case projection.
     #[test]
-    fn a_committed_refinement_count_survives_summary_projection() {
+    fn mutation_supply_survives_summary_projection() {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
-            "pair_group_inherited_nonzero_births_total": 2,
-            "refinement_applications_by_key": {"NearbyCreature:3": 1}
+            "pair_group_inherited_nonzero_births_total": 2
         }});
         let kept = keep_case(&case);
         assert_eq!(kept["mutation_supply"], case["mutation_supply"]);

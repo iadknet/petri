@@ -54,8 +54,7 @@
       "input_ref": 0.0,
       "topology": 0.0,
       "vm": 0.0
-    },
-    "structured_heritable_refinement": false
+    }
   },
   "population": {
     "founder_profile": "v3_alpha1",

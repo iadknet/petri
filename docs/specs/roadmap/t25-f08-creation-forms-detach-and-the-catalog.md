@@ -134,7 +134,7 @@ blocker (Success Criteria require the readings).
 
 ## Implementation Tasks
 
-- [ ] Commit 1, `Slots` deletion (invariant 5, the deletion table): tests
+- [x] Commit 1, `Slots` deletion (invariant 5, the deletion table): tests
       first, `restricted_pressure_admits_decreasing_graph_operators_only`
       and the bench projection without the key; delete the mechanism, the
       config field and every site; collapse `GraphEventReport`; drop the
@@ -187,6 +187,20 @@ blocker (Success Criteria require the readings).
       and `-goal.json`, local raw hash/byte count and verification time
       checked, series entries re-pinned in the closing commit, no full report
       staged; the readings below recorded in the readings file.
+
+Pins moved by the build (each read on two agreeing runs; the founder-only
+viability digests hold at every commit):
+
+| Commit | Pin | Was -> now | Cause |
+| --- | --- | --- | --- |
+| 1 | `bench_artifacts.rs` recipe config digests | `5ab6069b…`, `87ad3188…`, `b33044d5…` -> `62fcf74b…`, `3d595bef…`, `e4d5bef9…` | the resolved `MutationConfig` drops `structured_heritable_refinement`; re-inserting it at `true` recovers the old three (asserted in the chain) |
+| 1 | `applied_trajectory.rs` sampled / sampled rate 0 / guard / guard rate 0 | `38f68975…` / `0d037fb0…` / `31bd6e95…` / `ec2e084d…` -> `f55ad21d…` / `872113ec…` / `dc32a1fa…` / `d61cf3eb…` | enabled Graph weight 65 -> 61 remaps every Graph draw |
+| 1 | `baseline_worlds.rs` short-run identity, default / rate 0 | `7345675788631625454` / `11318987159188275955` -> `5737684664837370108` / `11540034954633671093` | same |
+| 1 | recruitment-paths known-deleting lineage (`--lib`) | arm 12 batch 1 lineage 3 -> batch 22 lineage 0 (generation 7, at 263, depth 47) | same; the first `Deleted` lineage of the recorded search (batches 0-40, lineages 0-15) |
+| 1 | v3-cli real-run-path seeds (`bench/tests.rs`, three tests) | 129, 129, 164 -> 73 | same; 73 is the lowest of 0..=400 surviving the horizon (73, 147, 158, 197, 201), over three cells |
+| 1 | v3-cli cadence seed (`bench/run/tests.rs`) | 3 -> 9 | same; seed 3 goes extinct at tick 93 |
+| 1 | open until closure | `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references`: `vm_steps` severe (0.073814 against F07's 0.034618) | the series references re-pin with the gate and goal epochs in the closing commit |
+| 1 | held, asserted | `engine/recruitment_tests.rs` recruitment-Off digest; `tests/mutational_neighborhood.rs` disabled rows | drew from the same enabled set before and after |
 
 ## Performance and Goal Impact
 

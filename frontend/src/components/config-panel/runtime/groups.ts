@@ -233,10 +233,7 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 			},
 			{
 				title: "Experimental arms",
-				fields: pick(
-					"mutation.structured_heritable_refinement",
-					"mutation.neutral_input_recruitment",
-				),
+				fields: pick("mutation.neutral_input_recruitment"),
 			},
 			{
 				title: "Colour drift",

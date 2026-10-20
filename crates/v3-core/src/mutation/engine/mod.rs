@@ -14,8 +14,7 @@ use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelec
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
     BirthEdgeClass, GroupEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
-    MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, RefinementKey,
-    TargetReachability,
+    MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
@@ -45,9 +44,6 @@ struct SelectedEvent {
     /// The detaches and group removals the event made, counted when it
     /// commits (T25.F03); zero outside the Graph domain.
     group_edits: GroupEdits,
-    /// The set a `RefineHeritableStructure` stepped, when it commits
-    /// (T25.F04).
-    refined: Option<RefinementKey>,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
     /// it stood before the event (T13.F01).
@@ -227,7 +223,6 @@ impl MutationEngine {
                         tracked_before,
                         result,
                         group_edits: GroupEdits::default(),
-                        refined: None,
                         executed_hits: targets.executed_hits(),
                         first_pick: targets.first_pick(),
                     });
@@ -272,7 +267,6 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits: GroupEdits::default(),
-                                refined: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -284,11 +278,7 @@ impl MutationEngine {
                             .iter()
                             .copied()
                             .filter(|op| op.enabled(config))
-                            .filter(|op| {
-                                !restricted
-                                    || op.complexity_effect().is_decreasing()
-                                    || *op == GraphOperator::RefineHeritableStructure
-                            })
+                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
                             .collect();
                         let selected = loop {
                             if available.is_empty() {
@@ -307,7 +297,7 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let (result, group_edits, refined) = apply_graph_event(
+                            let (result, group_edits) = apply_graph_event(
                                 genome,
                                 op,
                                 &mut targets,
@@ -328,7 +318,6 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits,
-                                refined,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -377,7 +366,6 @@ impl MutationEngine {
                                 tracked_before,
                                 result,
                                 group_edits: GroupEdits::default(),
-                                refined: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
                             });
@@ -391,7 +379,6 @@ impl MutationEngine {
                 tracked_before,
                 result,
                 group_edits,
-                refined,
                 executed_hits,
                 first_pick,
             }) = selected
@@ -427,9 +414,6 @@ impl MutationEngine {
                 Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
                     summary.record_group_edits(group_edits);
-                    if let Some(key) = refined {
-                        summary.record_refinement(key);
-                    }
                     if let Some(class) = edge_class {
                         summary.record_vote_edge_class(class);
                     }
@@ -721,7 +705,7 @@ fn apply_vm_event(
 
 /// Apply one graph mutation event with the gate, and the detaches and group
 /// removals it made, counted only when it commits: a rolled-back event
-/// reports none (T25.F03), nor a refined set (T25.F04).
+/// reports none (T25.F03).
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
@@ -729,7 +713,7 @@ fn apply_graph_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
-) -> (ClassifiedResult, GroupEdits, Option<RefinementKey>) {
+) -> (ClassifiedResult, GroupEdits) {
     let before = group_tallies(genome);
     let result = apply_gated(genome, |genome| {
         GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
@@ -739,11 +723,9 @@ fn apply_graph_event(
     } else {
         GroupEdits::default()
     };
-    let refined = result.as_ref().ok().and_then(|(_, report)| report.refined);
     (
         result.map(|(reachability, report)| (reachability, report.class)),
         edits,
-        refined,
     )
 }
 
@@ -821,9 +803,6 @@ mod recruitment_tests;
 
 #[cfg(test)]
 mod membership_tests;
-
-#[cfg(test)]
-mod refinement_tests;
 
 #[cfg(test)]
 mod group_tests;
