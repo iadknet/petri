@@ -105,6 +105,22 @@ fn is_member_of_ignores_scope() {
     assert!(!edge.is_member_of(GroupId::new(1)));
 }
 
+/// A scope's transport key is the genome JSON spelling of that scope, and
+/// `index` is its position in `ALL`, so a telemetry series and a saved
+/// genome name the same scope.
+#[test]
+fn a_scope_key_matches_its_genome_json_spelling_and_index() {
+    assert_eq!(Scope::Edge.as_key(), "Edge");
+    assert_eq!(Scope::Group.as_key(), "Group");
+    for (position, scope) in Scope::ALL.into_iter().enumerate() {
+        assert_eq!(scope.index(), position);
+        assert_eq!(
+            serde_json::to_string(&scope).unwrap(),
+            format!("\"{}\"", scope.as_key())
+        );
+    }
+}
+
 #[test]
 fn genome_json_uses_own_weight_and_rejects_unknown_keys() {
     let edge: GraphEdge =
