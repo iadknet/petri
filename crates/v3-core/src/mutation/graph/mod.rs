@@ -421,31 +421,48 @@ impl GraphMutator {
             GraphOperator::CopyEdgeBundle => {
                 unreported(operators::apply_copy_edge_bundle(genome, node_idx, rng))
             }
-            GraphOperator::EnableHebbian => scoped(hebbian::enable_hebbian(genome, node_idx, rng)),
-            GraphOperator::DisableHebbian => {
-                scoped(hebbian::disable_hebbian(genome, node_idx, rng))
-            }
-            GraphOperator::MutateHebbianRule => {
-                scoped(hebbian::mutate_hebbian_rule(genome, node_idx, rng))
-            }
-            GraphOperator::MutateHebbianRate => {
-                scoped(hebbian::mutate_hebbian_rate(genome, node_idx, rng))
-            }
+            GraphOperator::EnableHebbian => scoped(hebbian::enable_hebbian_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::DisableHebbian => scoped(hebbian::disable_hebbian_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::MutateHebbianRule => scoped(hebbian::mutate_hebbian_rule_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::MutateHebbianRate => scoped(hebbian::mutate_hebbian_rate_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
             GraphOperator::ToggleHebbianLamarckian => {
-                scoped(hebbian::toggle_hebbian_lamarckian(genome, node_idx, rng))
+                scoped(hebbian::toggle_hebbian_lamarckian_in_def(
+                    operators::graph_def_mut(genome, node_idx)?,
+                    rng,
+                ))
             }
             GraphOperator::EnableRewardModulation => {
-                scoped(hebbian::enable_reward_modulation(genome, node_idx, rng))
+                scoped(hebbian::enable_reward_modulation_in_def(
+                    operators::graph_def_mut(genome, node_idx)?,
+                    rng,
+                ))
             }
             GraphOperator::DisableRewardModulation => {
-                scoped(hebbian::disable_reward_modulation(genome, node_idx, rng))
+                scoped(hebbian::disable_reward_modulation_in_def(
+                    operators::graph_def_mut(genome, node_idx)?,
+                    rng,
+                ))
             }
-            GraphOperator::MutateRewardSource => {
-                scoped(hebbian::mutate_reward_source(genome, node_idx, rng))
-            }
-            GraphOperator::MutateTraceDecay => {
-                scoped(hebbian::mutate_trace_decay(genome, node_idx, rng))
-            }
+            GraphOperator::MutateRewardSource => scoped(hebbian::mutate_reward_source_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
+            GraphOperator::MutateTraceDecay => scoped(hebbian::mutate_trace_decay_in_def(
+                operators::graph_def_mut(genome, node_idx)?,
+                rng,
+            )),
             GraphOperator::AlterGroupScale => unreported(group::alter_scale(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,

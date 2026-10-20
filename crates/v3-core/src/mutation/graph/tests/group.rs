@@ -109,13 +109,13 @@ const CHANNELS: [OutcomeChannel; 4] = [
     OutcomeChannel::OffspringSuccess,
 ];
 
-/// Learned creation's draws, replayed from `rng` in their pinned order
-/// (T25.F07 invariant 7): one mode in `0..3`; for a learning mode the rule,
-/// rate, clamp and inheritance of `EnableHebbian`, then for mode 2 the
-/// channel and decay of `EnableRewardModulation`; one scope coin; one
-/// `inherit_scale` coin. Applied to group `group` of `want`; returns the
-/// mode.
-fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) -> u8 {
+/// One learning draw sequence, replayed from `rng` in its pinned order
+/// (T25.F07 invariant 7, T25.F08 invariant 2): a mode in `0..3`; for a
+/// learning mode the rule, rate, clamp and inheritance of `EnableHebbian`,
+/// then for mode 2 the channel and decay of `EnableRewardModulation`; then
+/// one scope coin. Learned creation draws it once per group, the
+/// randomized form once per member. Returns the mode, config and scope.
+fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
     let mode = rng.gen_range(0..3u8);
     let config = (mode > 0).then(|| {
         let rule = RULES[rng.gen_range(0..4)];
@@ -142,6 +142,14 @@ fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut Smal
     } else {
         Scope::Edge
     };
+    (mode, config, scope)
+}
+
+/// Learned creation's draws on group `group` of `want`: one
+/// [`replay_member`] sequence shared by every member, then one
+/// `inherit_scale` coin. Returns the mode.
+fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) -> u8 {
+    let (mode, config, scope) = replay_member(rng);
     let inherit_scale = rng.gen_bool(0.5);
     for member in want.members(group).collect::<Vec<_>>() {
         let mut edge = want.edge_mut(member);
@@ -714,45 +722,12 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     );
 }
 
-/// One member's randomized draws (T25.F08 invariant 2), replayed: a mode in
-/// `0..3`, its config by `EnableHebbian`'s law (and `EnableRewardModulation`'s
-/// for mode 2), then the member's scope coin.
-fn replay_member(rng: &mut SmallRng) -> (Option<PlasticityConfig>, Scope) {
-    let mode = rng.gen_range(0..3u8);
-    let config = (mode > 0).then(|| {
-        let rule = RULES[rng.gen_range(0..4)];
-        let learning_rate = rng.gen_range(0.01f32..0.2);
-        let weight_clamp = rng.gen_range(1.0f32..5.0);
-        let lamarckian = rng.gen_bool(0.5);
-        let modulation = (mode == 2).then(|| {
-            let reward_source = CHANNELS[rng.gen_range(0..4)];
-            RewardModulationConfig {
-                reward_source,
-                trace_decay: rng.gen_range(0.5f32..0.99),
-            }
-        });
-        PlasticityConfig {
-            rule,
-            learning_rate,
-            weight_clamp,
-            lamarckian,
-            modulation,
-        }
-    });
-    let scope = if rng.gen_bool(0.5) {
-        Scope::Group
-    } else {
-        Scope::Edge
-    };
-    (config, scope)
-}
-
-/// The randomized form's learning draws on group `group` of `want`: per
-/// member in canonical order its mode, fields and scope, then one
+/// The randomized form's learning draws on group `group` of `want`: one
+/// [`replay_member`] sequence per member in canonical order, then one
 /// `inherit_scale` coin.
 fn replay_randomized(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) {
     for member in want.members(group).collect::<Vec<_>>() {
-        let (config, scope) = replay_member(rng);
+        let (_, config, scope) = replay_member(rng);
         let mut edge = want.edge_mut(member);
         edge.set_plasticity(config);
         edge.set_scope(scope);

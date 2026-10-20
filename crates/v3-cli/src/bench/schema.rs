@@ -1107,9 +1107,29 @@ impl From<[u64; 2]> for AttributeChangesByScope {
     }
 }
 
-/// One operator's event funnel (T25.F08): the engine's five stages,
-/// serialized as they are.
-pub use v3_core::mutation::types::MutationOperatorFunnel as OperatorFunnel;
+/// One operator's event funnel (T25.F08): the five stages of
+/// `MutationOperatorFunnel`, owned by the bench report.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OperatorFunnel {
+    pub attempted: u64,
+    pub applicable: u64,
+    pub structurally_valid: u64,
+    pub applied: u64,
+    pub skipped: u64,
+}
+
+impl From<&v3_core::mutation::types::MutationOperatorFunnel> for OperatorFunnel {
+    fn from(funnel: &v3_core::mutation::types::MutationOperatorFunnel) -> Self {
+        Self {
+            attempted: funnel.attempted,
+            applicable: funnel.applicable,
+            structurally_valid: funnel.structurally_valid,
+            applied: funnel.applied,
+            skipped: funnel.skipped,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructureSizeDistribution {

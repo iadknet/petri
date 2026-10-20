@@ -412,8 +412,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
 /// The Graph catalog is one consistent set (T25.F08 invariant 1): `ALL`
 /// covers every variant once, `operator()` is injective onto exactly the
 /// Graph-domain members of `MutationOperator::all()`, every key is unique
-/// and `Graph.`-prefixed, the two enums agree on complexity, and `all()` is
-/// the four domains' catalogs. The hand-written map above stays the
+/// and `Graph.`-prefixed, and `all()` is the four domains' catalogs. The hand-written map above stays the
 /// identity oracle.
 #[test]
 fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
@@ -489,9 +488,6 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
         .collect();
     assert_eq!(keys.len(), GraphOperator::ALL.len(), "keys are unique");
     assert!(keys.iter().all(|key| key.starts_with("Graph.")));
-    for &op in &GraphOperator::ALL {
-        assert_eq!(op.complexity_effect(), op.operator().complexity_effect());
-    }
 
     assert_eq!(
         MutationOperator::all().len(),
