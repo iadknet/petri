@@ -60,12 +60,15 @@ synapse-type-specific plasticity each (F07's source, Larsen & Sjöström 2015).
 
 Vocabulary: a **creation form** is `Uniform` (one mode, one scope, one
 `inherit_scale` for the group, F07) or `Randomized` (a mode and a scope per
-member, one `inherit_scale`); the **edge layer** is every operator whose key
-names an edge, node or plasticity attribute (`AlterGraphEdgeWeight` …
-`MutateTraceDecay`, `RecruitNeutralInput`, `DetachGraphEdge`) and the
-**group layer** every operator whose key names a group or a scope
-(`AddRingGroup` … `SetScope`, the two randomized operators); the grouping is
-derived from keys in the readings file, never exported.
+member, one `inherit_scale`); the **group layer** is exactly these nine
+keys: `Graph.AddRingGroup`, `Graph.AddDirectionPairGroup`,
+`Graph.AddRandomizedRingGroup`, `Graph.AddRandomizedDirectionPairGroup`,
+`Graph.AlterGroupScale`, `Graph.ShiftGroupOffset`,
+`Graph.RetargetGroupKind`, `Graph.RemoveGroup` and `Graph.SetScope`
+(`SetScope` edits a group attribute although its key lacks "Group"); the
+**edge layer** is the other 23 Graph operators, `DetachGraphEdge` and
+`RecruitNeutralInput` included; the grouping is applied to the exported keys
+in the readings file, never exported.
 
 | # | Invariant |
 | --- | --- |
