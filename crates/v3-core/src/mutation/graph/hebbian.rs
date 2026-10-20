@@ -22,106 +22,9 @@ use rand::{Rng, RngCore};
 
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, HebbianRule, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig,
+    HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
 };
 use crate::mutation::types::MutationSkipReason;
-
-#[inline]
-fn graph_def_mut(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-) -> Result<&mut CgpGraphBackendDef, MutationSkipReason> {
-    let node = genome
-        .nodes
-        .get_mut(node_idx)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    match &mut node.backend_def {
-        BackendDef::Graph(def) => Ok(def),
-        _ => Err(MutationSkipReason::NoApplicableTarget),
-    }
-}
-
-/// Add learning attributes to a random static, eligible edge.
-pub(super) fn enable_hebbian(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    enable_hebbian_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Remove the learning attributes of a random plastic edge.
-pub(super) fn disable_hebbian(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    disable_hebbian_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Change the HebbianRule variant on a random plastic edge.
-pub(super) fn mutate_hebbian_rule(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_hebbian_rule_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Perturb the learning_rate on a random plastic edge.
-pub(super) fn mutate_hebbian_rate(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_hebbian_rate_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Flip the `lamarckian` flag on a random plastic edge.
-pub(super) fn toggle_hebbian_lamarckian(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    toggle_hebbian_lamarckian_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Add reward modulation to a random plastic edge that has `modulation=None`.
-pub(super) fn enable_reward_modulation(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    enable_reward_modulation_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Remove reward modulation from a random reward-modulated edge.
-pub(super) fn disable_reward_modulation(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    disable_reward_modulation_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Switch the `reward_source` channel on a random reward-modulated edge.
-pub(super) fn mutate_reward_source(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_reward_source_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
-
-/// Perturb the `trace_decay` on a random reward-modulated edge.
-pub(super) fn mutate_trace_decay(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_trace_decay_in_def(graph_def_mut(genome, node_idx)?, rng)
-}
 
 const ALL_RULES: [HebbianRule; 4] = [
     HebbianRule::Classic,
@@ -536,6 +439,7 @@ mod tests {
         OutputSinkKind,
     };
     use crate::creature::genome::vote::VoteSink;
+    use crate::creature::genome::BackendDef;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 

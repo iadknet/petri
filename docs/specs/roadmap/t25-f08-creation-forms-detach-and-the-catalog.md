@@ -177,8 +177,8 @@ reported with a recorded disposition at closure, not a closure blocker
 ## Verification
 
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 30/30,
-      founder digests unchanged at every build commit and after the
-      simplify pass.
+      founder digests unchanged at every build commit, after the simplify
+      pass and after the review remediation.
 - [x] Crate tests: `cargo test --no-fail-fast -p v3-core -p v3-cli` -> every
       target passes (the named tests of Implementation Tasks included) but
       `v3-cli --test bench`
@@ -189,7 +189,8 @@ reported with a recorded disposition at closure, not a closure blocker
 - [x] Lints: `cargo fmt --all --check`, `cargo check --workspace
       --all-targets`, `cargo clippy --workspace --all-targets` -> clean.
 - [x] Frontend (config panel, control bar): vitest 106/106, `tsc --noEmit`
-      and biome clean at `40ec50fe`; the simplify pass touches no frontend.
+      and biome clean at `40ec50fe`; the simplify pass and the review
+      remediation touch no frontend.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (local
       `MUTANTS_ITERATE=0 make rust-mutants` when Actions is unavailable), its
       summary line, output path, and every survivor resolved as killed,

@@ -143,6 +143,53 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     }
 }
 
+/// An attribute operator that reports its scope when it commits (here
+/// `EnableHebbian` and `SetScope`) reports none when the gate rolls it back:
+/// the group's ring reference is no longer a ring, which no attribute
+/// operator reads, so the operator applies and only the gate rejects it.
+#[test]
+fn a_rolled_back_attribute_change_reports_no_scope() {
+    let (valid, idx, ring) = grouped_founder();
+    let mut broken = valid.clone();
+    broken.nodes[idx].input_refs[usize::from(ring)] = InputReference::ActionVotes;
+    assert!(validate_graph(&broken.nodes[idx]).is_err());
+    let config = MutationConfig::default();
+    let all = every_node(&valid);
+    for op in [GraphOperator::EnableHebbian, GraphOperator::SetScope] {
+        for seed in 0..16 {
+            let mut committed = valid.clone();
+            let (result, _, scope) = apply_graph_event(
+                &mut committed,
+                op,
+                &mut TargetSelector::reachable_only(&all, 0.0),
+                &mut SmallRng::seed_from_u64(seed),
+                &config,
+                2,
+            );
+            assert!(result.is_ok(), "{op:?} seed {seed}");
+            assert!(scope.is_some(), "{op:?} seed {seed} reports its scope");
+
+            let mut rolled_back = broken.clone();
+            let (result, edits, scope) = apply_graph_event(
+                &mut rolled_back,
+                op,
+                &mut TargetSelector::reachable_only(&all, 0.0),
+                &mut SmallRng::seed_from_u64(seed),
+                &config,
+                2,
+            );
+            assert_eq!(
+                result,
+                Err(MutationSkipReason::GraphInvariantViolation),
+                "{op:?} seed {seed}"
+            );
+            assert_eq!(edits, GroupEdits::default());
+            assert_eq!(scope, None, "{op:?} seed {seed} reports no scope");
+            assert_eq!(rolled_back, broken);
+        }
+    }
+}
+
 #[test]
 fn group_edits_count_detaches_and_removals_by_operator() {
     let edits = |op, before, after| group_edits(op, before, after);

@@ -692,7 +692,7 @@ impl WorldTracking {
                 operator_funnel_by_operator: stats
                     .mutation_operator_funnel_total_by_operator
                     .iter()
-                    .map(|(operator, funnel)| (operator.as_key().to_string(), *funnel))
+                    .map(|(operator, funnel)| (operator.as_key().to_string(), funnel.into()))
                     .collect(),
             }),
             mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
