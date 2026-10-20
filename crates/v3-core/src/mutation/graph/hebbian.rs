@@ -687,6 +687,18 @@ mod tests {
         );
     }
 
+    /// The multiplicative branch is strictly above 0.01: a value of exactly
+    /// 0.01 takes the additive step, a value just above it the
+    /// multiplicative one.
+    #[test]
+    fn perturb_steps_a_value_of_exactly_one_hundredth_additively() {
+        let above = f32::from_bits(0.01f32.to_bits() + 1);
+
+        assert_eq!(perturb(0.01, 1.0), 0.01 + 0.05);
+        assert_eq!(perturb(0.01, -1.0), 0.0);
+        assert_eq!(perturb(above, 1.0), above * 1.3);
+    }
+
     #[test]
     fn mutate_rate_skips_when_no_edge_is_plastic() {
         let mut def = def_with_nodes(vec![node_without_hebbian()]);
