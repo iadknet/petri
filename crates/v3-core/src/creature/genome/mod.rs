@@ -212,6 +212,15 @@ impl PlasticityConfig {
     }
 }
 
+/// Whether a learned-weight retention (a [`PlasticityConfig`]'s or a
+/// group's) decays: below 1, compared exactly so that 1 is an exact no-op
+/// (T25.F09 invariant 3).
+#[inline]
+#[must_use]
+pub(crate) fn retention_decays(retention: f32) -> bool {
+    retention < 1.0
+}
+
 // ── Top-level genome types ────────────────────────────────────────────────────
 
 /// Backend definition: either VM or Graph (CGP three-layer model).

@@ -31,7 +31,7 @@ use rand::{Rng, RngCore};
 
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
 use crate::creature::genome::{
-    HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
+    retention_decays, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
 };
 use crate::mutation::types::MutationSkipReason;
 
@@ -89,18 +89,13 @@ pub(super) fn is_reward_modulated(def: &CgpGraphBackendDef, occurrence: EdgeOccu
 
 /// `EnableRetention`: a plastic edge whose retention is exactly 1.
 pub(super) fn can_enable_retention(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| !decays(p.retention))
+    plasticity_of(def, occurrence).is_some_and(|p| !retention_decays(p.retention))
 }
 
 /// `DisableRetention`, `MutateRetention`: a plastic edge whose retention is
 /// below 1.
 pub(super) fn is_decaying(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| decays(p.retention))
-}
-
-/// Whether a retention decays: below 1, compared exactly (T25.F09).
-pub(super) fn decays(retention: f32) -> bool {
-    retention < 1.0
+    plasticity_of(def, occurrence).is_some_and(|p| retention_decays(p.retention))
 }
 
 /// `SetScope`: a group member.
