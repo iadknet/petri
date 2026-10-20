@@ -1321,21 +1321,28 @@ mod tests {
     /// `[17, 13, 11, 8]` -> `[13, 10, 8, 6]`, Selection `[14; 4]` ->
     /// `[17; 4]` -> `[13; 4]`; VM Drift `[20, 15, 15, 8]` ->
     /// `[22, 16, 16, 7]` -> `[23, 16, 16, 9]`, Selection `[20; 4]` ->
-    /// `[22; 4]` -> `[23; 4]`); the discard counts stay zero.
+    /// `[22; 4]` -> `[23; 4]`); the discard counts stay zero. Re-pinned by
+    /// T25.F09 (learned-weight decay): the six retention operators (enabled
+    /// Graph weight 67 -> 79) remap every Graph draw (Graph Drift
+    /// `[13, 10, 8, 6]` -> `[15, 10, 9, 2]`, Selection `[13; 4]` ->
+    /// `[15; 4]`; VM Drift `[23, 16, 16, 9]` -> `[22, 16, 16, 9]`, Selection
+    /// `[23; 4]` -> `[22; 4]`); the discard counts stay zero. The runtime
+    /// commit (birth clamp and decay at retention 1) still passes the
+    /// T25.F08 values, so the move is the catalog commit's.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [13, 10, 8, 6], [0, 0]),
+            ("graph_prepared", Policy::Drift, [15, 10, 9, 2], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [13, 13, 13, 13],
+                [15, 15, 15, 15],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [23, 16, 16, 9], [0, 0]),
-            ("vm_prepared", Policy::Selection, [23, 23, 23, 23], [0, 0]),
+            ("vm_prepared", Policy::Drift, [22, 16, 16, 9], [0, 0]),
+            ("vm_prepared", Policy::Selection, [22, 22, 22, 22], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1480,13 +1487,17 @@ mod tests {
     /// each remap every Graph draw): the deletion alone reads 16/16 graph
     /// (censored 16) and 21/21 VM (censored 11); with the operators 17/17
     /// graph (censored 16 -> 15) and 20/20 VM (censored 12, the T25.F07
-    /// value again) retained discoveries remain useful.
+    /// value again) retained discoveries remain useful. Re-pinned by T25.F09
+    /// (the six retention operators, enabled Graph weight 67 -> 79, remap
+    /// every Graph draw; the runtime commit alone keeps the T25.F08 values):
+    /// 18/18 graph (censored 15 -> 14) and 20/20 VM (censored 12, unchanged)
+    /// retained discoveries remain useful.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [17, 17, 17, 17], 15),
+            ("graph_prepared", [18, 18, 18, 18], 14),
             ("vm_prepared", [20, 20, 20, 20], 12),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
