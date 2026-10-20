@@ -183,10 +183,8 @@ reported with a recorded disposition at closure, not a closure blocker
       founder digests unchanged at every build commit, after the simplify
       pass and after the review remediation.
 - [x] Crate tests: `cargo test --no-fail-fast -p v3-core -p v3-cli` -> every
-      target passes (the named tests of Implementation Tasks included) but
-      `v3-cli --test bench`
-      `gate_profile_has_no_severe_regression_against_series_references`,
-      the open-until-closure row of the pins table; `-p v3-telemetry
+      target passes (the named tests of Implementation Tasks included;
+      `v3-cli --test bench` 20/20 after the `68440ee7` re-pin); `-p v3-telemetry
       -p v3-server` pass at `40ec50fe`; `--features telemetry-seams` window
       seam 20/20 at `40ec50fe`.
 - [x] Lints: `cargo fmt --all --check`, `cargo check --workspace
@@ -194,17 +192,19 @@ reported with a recorded disposition at closure, not a closure blocker
 - [x] Frontend (config panel, control bar): vitest 106/106, `tsc --noEmit`
       and biome clean at `40ec50fe`; the simplify pass and the review
       remediation touch no frontend.
-- [ ] Mutation gate: fresh `make rust-mutants-ci` (local
-      `MUTANTS_ITERATE=0 make rust-mutants` when Actions is unavailable), its
-      summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred.
+- [x] Mutation gate: fresh `make rust-mutants-ci` at `68440ee7` (run
+      39421862079): `4 shards, 66 mutants tested: 2 missed, 46 caught,
+      18 unviable, 0 timeouts`, output
+      `~/.local/share/petri-tools/mutants/t25-f08/mutants.out`. Survivors
+      `cgp/edge.rs:50:9` `Scope::as_key -> ""` and `-> "xyzzy"`: both killed
+      by `a_scope_key_matches_its_genome_json_spelling_and_index` (test only,
+      no second run).
 - [ ] `make rust-test-slow` -> pass with the re-pinned recruitment-paths
       readings.
 - [x] Gate and goal (measured 2026-10-20 at `fea7746d`; both `severe=true` as
-      predeclared draw-stream trajectory readings, series entries still to
-      re-pin in the closing commit): summaries at `docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json`
+      predeclared draw-stream trajectory readings): summaries at `docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json`
       and `-goal.json`, local raw hash/byte count and verification time
-      checked, series entries re-pinned in the closing commit, no full report
+      checked, series entries re-pinned at `68440ee7`, no full report
       staged; the readings below recorded in the readings file.
 
 Pins moved by the build (each read on two agreeing runs; the founder-only
