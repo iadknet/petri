@@ -121,10 +121,13 @@ attributes, that one member can leave its group with the weight it weighed,
 and that the catalog is one consistent, bijection-pinned set with the inert
 `Slots` refinement gone at no cost to the tick loop; a gate wall-clock flag,
 a goal world where neither randomized creation nor detach is ever applied,
-or a harmful-per-carrier share that rises would show it wrong. The gate
-`severe` is a defect; the other two are predeclared hypotheses whose
-failure is reported with a recorded disposition at closure, not a closure
-blocker (Success Criteria require the readings).
+or a harmful-per-carrier share that rises would show it wrong. A gate
+wall-clock `severe` is a defect; a gate counter `severe` is a trajectory
+reading under the changed draw stream (Performance: no predeclared
+direction), reported to the user and re-pinned in the closing commit, never
+tuned away; the other two are predeclared hypotheses whose failure is
+reported with a recorded disposition at closure, not a closure blocker
+(Success Criteria require the readings).
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -262,8 +265,12 @@ firing rate is recorded as "deleted on nine empty post-F05 readings".
 - [ ] Invariants 1–8 hold and their named tests pass; the uniform
       operators' creation tests pass unedited.
 - [ ] `RefineHeritableStructure`, `structured_heritable_refinement` and
-      `refinement_applications` appear nowhere outside `docs/archive`,
-      `docs/strategy`, `docs/progress` and closed specs.
+      `refinement_applications` appear in no production code, config,
+      recipe, script, frontend source or reference spec; test code may name
+      them only in the config-digest undo chain invariant 7 requires, in an
+      assertion that the old field or key is absent, and in pin-history
+      comments; documents under `docs/archive`, `docs/strategy`,
+      `docs/progress` and closed specs are historical.
 - [ ] The goal run reports the three new operators' funnels, the funnel by
       layer, detaches and removals, the share of attribute changes at group
       scope, the census by scope and the harmful share per world in the
