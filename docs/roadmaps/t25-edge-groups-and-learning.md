@@ -1,7 +1,7 @@
 # T25 — Edge Groups and Per-Edge Learning
 
 **Status**: In Progress
-**Last updated**: 2026-10-19
+**Last updated**: 2026-10-20
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -46,7 +46,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
 - [x] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.
-- [ ] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
+- [x] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
   - Goal: Early LTP decays back to baseline: a learned synapse and a learned group scale relax toward the value they were born with at a heritable rate, so learning that is no longer reinforced fades instead of wandering.
 
 ## Notes for AI Agents
