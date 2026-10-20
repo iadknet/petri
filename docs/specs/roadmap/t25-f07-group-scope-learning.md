@@ -133,7 +133,7 @@ and 2.5 routing changes.
 - [x] Counters (invariant 9) with the `counter_definition_changes` entry; census (R6), the four telemetry families, `always_names`, expected families, the three panels, the bench summary rows and totals (invariant 10).
 - [x] Refactor R4 and the payload (invariant 12); `v3alpha10` §2 history; `creature-detail.ts`, `EdgeGroupList.tsx`, the badge, `graphFullModel.ts`, fixtures.
 - [x] `mutation-effects-v4`, `applied_trajectory` hash, lab format 5; reference specs per the readers table.
-- [ ] Re-pin every mutation-on pin under commit 2 (invariant 11), one cause per commit; viability first.
+- [x] Re-pin every mutation-on pin under commit 2 (invariant 11), one cause per commit; viability first.
 
 ## Verification
 
@@ -173,8 +173,9 @@ are `a_non_member_draws_no_coin`,
 `group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale` and
 `validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge`.
 
-Verification run (build, self-review and review remediation, 2026-10-19;
-`make check`, benchmarks, mutation and the slow tier not run):
+Verification run (build, self-review, review remediation and the slow-tier
+re-pin, 2026-10-19; `make check` and benchmarks not in this table, the
+mutation gate below):
 
 | Command | Result |
 | --- | --- |
@@ -184,6 +185,7 @@ Verification run (build, self-review and review remediation, 2026-10-19;
 | `cargo test -p v3-cli --lib`; `cargo test -p v3-cli --bins --test cli` (at head) | 159 passed, 2 ignored; 18 and 13 passed: the v3-cli trajectory and deterministic fixtures unchanged |
 | `PROPTEST_CASES=2000 cargo test -p v3-core --lib seed_rows_follow` | pass |
 | `cargo clippy --workspace --all-targets`; `cargo fmt --all --check`; `cargo check --workspace --all-targets` | clean |
+| `make rust-test-slow` (at the slow-tier re-pin) | recruitment-paths 3 passed, lab 6 passed. Re-pinned in `recruitment_paths/experiment.rs` `[proposal, retained, viable retained, retained useful]`: prepared Graph Drift `[14, 11, 10, 6]` -> `[14, 10, 9, 5]`, VM Drift `[22, 16, 16, 7]` -> `[20, 15, 15, 8]`, VM Selection `[22; 4]` -> `[20; 4]` (Graph Selection `[14; 4]` and discards `[0, 0]` unchanged); cost selection Graph `[15; 4]` censored 17 -> `[16; 4]` censored 16, VM `[21; 4]` censored 11 -> `[20; 4]` censored 12, all useful. Commit 1 (210cc30c) passes both tests with the T25.F04 values and commit 2 (6e5ad678) fails them with these, so the move is invariant 11's catalog and draw change |
 | frontend `npx tsc -b --noEmit`; `npx vitest run`; `npx biome check src` | clean; 103 files, 670 tests pass (a group learner's initialization from its scale slot and its `inherit_scale` inheritance pinned in `PlasticEdgeList.test.tsx` and `graphInternalsEdges.test.tsx`); biome no errors (4 `noArrayIndexKey` warnings in untouched `config-panel/startup` files) |
 
 Identity checks: commit 1 leaves every hash without genome text and every
@@ -203,7 +205,7 @@ identity and the rate-0 sampled trajectory byte-identical.
 | `tick.rs:732:37` `+=` → `*=`, `-=` in `TickComputeStats::record`; `tick.rs:778:44` same in `commit` | killed: `run_tick_accumulates_a_visit_scale_snap_through_the_work_counters` |
 | timeout `hebbian.rs:374:21` delete `learning_rate` in `mutate_hebbian_rate_in_def` | killed: with the mutant applied the suite ends in seconds, failing `mutate_rate_stays_in_bounds_and_moves_the_rate` and three others; the 120 s CI timeout (18–20 s baseline) was shard-host slowness |
 
-- [ ] Slow tests: `make rust-test-slow` -> result and any re-pinned recruitment-paths readings.
+- [x] Slow tests: `make rust-test-slow` passes; the re-pinned recruitment-paths readings are in the run table.
 - [ ] Gate and goal: summaries at `docs/progress/features/t25-f07-group-scope-learning.json` and `-goal.json`, local raw hash and byte count, series entries, no new full report staged.
 
 ## Performance and Goal Impact
