@@ -44,7 +44,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: Synapse-type-specific plasticity with three-factor traces: each synapse carries whether it is fixed, Hebbian or reward-modulated, which reward it listens to and how long its trace lasts, and a synapse onto a vote can learn like one onto a neuron.
 - [x] **T25.F07 — Group-Scope Learning** — Depends on: T25.F06
   - Goal: A synapse built by a group program can learn for the whole group or for itself, and a change to such an attribute lands on one synapse or on every synapse its group built.
-- [ ] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
+- [x] **T25.F08 — Creation Forms, Detach and the Catalog** — Depends on: T25.F07
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.
 - [ ] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
   - Goal: Early LTP decays back to baseline: a learned synapse and a learned group scale relax toward the value they were born with at a heritable rate, so learning that is no longer reinforced fades instead of wandering.
@@ -83,8 +83,10 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   the goal run reads the `ρ` distribution descriptively and does not settle
   long-horizon selection. Decay toward the genomic weight, toward zero and an
   energy cost on the deviation are rejected there.
-- Open: F08 decides the `GroupKey::Slots` refinement disposition from the
-  refinement-by-key readings F04 and F05 record.
+- Decided (F08, 2026-10-19): `Slots` deleted on nine empty post-F05
+  refinement-by-key readings (F05, F06, F07 goal); `RefineHeritableStructure`,
+  `mutation.structured_heritable_refinement` and the inferred-set code are
+  gone; a `Slots` group shape would be a new row.
 - The chain is linear by design (D10): a later feature edits the same
   operator catalog and draws as the one before it, so a rebase during a
   goal-long run would invalidate the reading.
