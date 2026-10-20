@@ -258,7 +258,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         let counts = learner.commit();
         side_outputs.work_counters.plasticity_updates += counts.updates;
         side_outputs.work_counters.plasticity_changes += counts.changes;
-        side_outputs.work_counters.plasticity_scale_snaps += counts.scale_snaps;
     }
     // The visit reached its effects, so it commits (T19.F03): an exhausted
     // visit returns before them and stages nothing.

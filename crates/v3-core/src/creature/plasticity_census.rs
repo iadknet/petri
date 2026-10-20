@@ -5,15 +5,15 @@
 //! with learning attributes (T25.F06), keyed by learning pathway (pure
 //! Hebbian or reward-modulated) and surface (compute or sink), and counted
 //! separately by rule and by inheritance (Lamarckian or Darwinian). The
-//! census reads the learned state's view: edge drift is `|learned -
-//! genomic|` over initialized own quantities (an ungrouped edge's weight, an
-//! edge-scope member's correction; lifetime learning on a Darwinian edge,
-//! on a Lamarckian edge also what ancestors learned), and an initialized
-//! own quantity sits at its clamp when it reaches the edge's clamp, which
-//! every write saturates to exactly. A group learner has no own quantity
-//! and adds neither (T25.F07). Every learner counts by scope; each scale
-//! slot counts once per group, by its `inherit_scale`, with its drift
-//! `|learned - genomic|` and whether it sits at its bound.
+//! census reads the learned state's view: edge drift is `|learned - birth|`
+//! over initialized own quantities (an ungrouped edge's weight, an
+//! edge-scope member's correction; lifetime learning, T25.F09), and an
+//! initialized own quantity sits at its clamp when it reaches the edge's
+//! clamp, which every write saturates to exactly. A group learner has no
+//! own quantity and adds neither (T25.F07). Every learner counts by scope;
+//! each scale slot counts once per group, by its `inherit_scale`, with its
+//! drift `|learned - birth|` and whether it sits at its bound. Edges and
+//! scale slots also count by retention bin ([`RETENTION_KEYS`], T25.F09).
 //!
 //! Pure structure and state: it reads genomes, cached reachability and
 //! learned state and executes no brain.
@@ -49,6 +49,31 @@ pub const INHERITANCE_KEYS: [&str; 2] = ["darwinian", "lamarckian"];
 /// 2 group).
 pub const SCOPE_KEYS: [&str; 3] = ["ungrouped", "edge", "group"];
 
+/// The `petri.plasticity_retention` keys, by retention bin (T25.F09): `none`
+/// for a retention of exactly 1, else the bin's upper bound on the deficit
+/// `d = 1 − ρ`: `(0, 10⁻³)`, `[10⁻³, 10⁻²)`, `[10⁻², 10⁻¹)`, `[10⁻¹, 1]`.
+pub const RETENTION_KEYS: [&str; 5] = ["none", "1e-3", "1e-2", "1e-1", "1"];
+
+/// The retention bin of a retention `retention ∈ [0, 1]`
+/// ([`RETENTION_KEYS`]). The deficit is exact in `f64`.
+#[must_use]
+pub fn retention_index(retention: f32) -> usize {
+    // Exact: only a retention of 1 is the no-op bin.
+    if retention == 1.0 {
+        return 0;
+    }
+    let deficit = 1.0 - f64::from(retention);
+    if deficit < 1e-3 {
+        1
+    } else if deficit < 1e-2 {
+        2
+    } else if deficit < 1e-1 {
+        3
+    } else {
+        4
+    }
+}
+
 /// The scope index of a learner of scope `scope` ([`SCOPE_KEYS`]).
 #[must_use]
 pub const fn scope_index(scope: Option<Scope>) -> usize {
@@ -59,11 +84,46 @@ pub const fn scope_index(scope: Option<Scope>) -> usize {
     }
 }
 
+/// One retention bin's edges or scale slots over a population (T25.F09).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct RetentionCell {
+    /// Every entry of the bin.
+    pub count: u64,
+    /// Entries with a learned own quantity or an initialized scale.
+    pub initialized: u64,
+    /// Sum of `|learned - birth|` over the initialized entries.
+    pub drift_sum: f64,
+    /// Initialized entries at their clamp or bound.
+    pub at_bound: u64,
+}
+
+impl RetentionCell {
+    /// Count one entry, with its learned value when initialized.
+    fn add(&mut self, learned: Option<f32>, birth: f32, bound: f32) {
+        self.count += 1;
+        let Some(value) = learned else {
+            return;
+        };
+        self.initialized += 1;
+        add_drift(&mut self.drift_sum, value, birth);
+        self.at_bound += u64::from(value.abs() >= bound);
+    }
+}
+
+/// Add `|value - birth|` to `sum`; a non-finite drift would poison the
+/// population sum.
+fn add_drift(sum: &mut f64, value: f32, birth: f32) {
+    let drift = f64::from((value - birth).abs());
+    if drift.is_finite() {
+        *sum += drift;
+    }
+}
+
 /// One inheritance cell's learned scales over a population.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct LearnedScales {
     pub scales: u64,
-    /// Sum of `|learned - genomic|` over the initialized scale slots.
+    /// Sum of `|learned - birth|` over the initialized scale slots.
     pub drift_sum: f64,
     /// Initialized scale slots whose learned scale sits at their bound.
     pub at_bound: u64,
@@ -73,7 +133,7 @@ pub struct LearnedScales {
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PlasticEdges {
     pub edges: u64,
-    /// Sum of `|learned - genomic|` over the initialized edges.
+    /// Sum of `|learned - birth|` over the initialized edges.
     pub drift_sum: f64,
     /// Initialized edges whose learned weight sits at the edge's clamp.
     pub at_clamp: u64,
@@ -95,6 +155,12 @@ pub struct PlasticityCensus {
     pub edges_by_scope: [u64; 3],
     /// Scale slots per inheritance, in [`INHERITANCE_KEYS`] order.
     pub scales: [LearnedScales; 2],
+    /// Reachable plastic edges per retention bin, in [`RETENTION_KEYS`]
+    /// order (T25.F09).
+    pub edges_by_retention: [RetentionCell; 5],
+    /// Scale slots per their group's retention bin, in [`RETENTION_KEYS`]
+    /// order (T25.F09).
+    pub scales_by_retention: [RetentionCell; 5],
 }
 
 impl PlasticityCensus {
@@ -150,6 +216,18 @@ impl PlasticityCensus {
         INHERITANCE_KEYS.iter().copied().zip(self.scales)
     }
 
+    /// Edge retention cells keyed by bin, in [`RETENTION_KEYS`] order.
+    pub fn edge_retention_cells(&self) -> impl Iterator<Item = (&'static str, RetentionCell)> + '_ {
+        RETENTION_KEYS.iter().copied().zip(self.edges_by_retention)
+    }
+
+    /// Scale retention cells keyed by bin, in [`RETENTION_KEYS`] order.
+    pub fn scale_retention_cells(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, RetentionCell)> + '_ {
+        RETENTION_KEYS.iter().copied().zip(self.scales_by_retention)
+    }
+
     /// Drift sum and at-clamp count per surface over both pathways, keyed
     /// in [`SURFACE_KEYS`] order.
     pub fn surface_totals(&self) -> impl Iterator<Item = (&'static str, f64, u64)> + '_ {
@@ -177,28 +255,31 @@ impl PlasticityCensus {
                 self.edges_by_rule[kind.rule_index()] += 1;
                 self.edges_by_inheritance[usize::from(kind.lamarckian)] += 1;
                 self.edges_by_scope[scope_index(edge.scope)] += 1;
+                self.edges_by_retention[retention_index(edge.retention)].add(
+                    edge.learned,
+                    edge.birth,
+                    edge.bound,
+                );
                 let cell = &mut self.edges[usize::from(kind.reward_modulated)][surface];
                 cell.edges += 1;
                 let Some(weight) = edge.learned else {
                     continue;
                 };
-                let drift = f64::from((weight - edge.genomic).abs());
-                // A non-finite weight would poison the population sum.
-                if drift.is_finite() {
-                    cell.drift_sum += drift;
-                }
+                add_drift(&mut cell.drift_sum, weight, edge.birth);
                 cell.at_clamp += u64::from(weight.abs() >= edge.bound);
             }
             for scale in learned.scales(node_idx) {
+                self.scales_by_retention[retention_index(scale.retention)].add(
+                    scale.learned,
+                    scale.birth,
+                    scale.bound,
+                );
                 let cell = &mut self.scales[usize::from(scale.inherit_scale)];
                 cell.scales += 1;
                 let Some(value) = scale.learned else {
                     continue;
                 };
-                let drift = f64::from((value - scale.genomic).abs());
-                if drift.is_finite() {
-                    cell.drift_sum += drift;
-                }
+                add_drift(&mut cell.drift_sum, value, scale.birth);
                 cell.at_bound += u64::from(value.abs() >= scale.bound);
             }
         }

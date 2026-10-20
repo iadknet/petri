@@ -13,8 +13,13 @@
 //! backend has been visited or when it was seeded at birth; only
 //! initialized ones are updated by reward, captured for a child and exposed
 //! by the view.
+//!
+//! Every learned own quantity and learned scale starts at its birth value:
+//! the clamped seed when seeded, else its genomic value clamped to its
+//! bound (T25.F09 invariant 2). Once per world tick each initialized one
+//! whose retention is below 1 relaxes toward it (invariant 3).
 
-use super::rules::{activity, hebbian_delta, three_factor};
+use super::rules::{activity, hebbian_delta, relax, three_factor};
 use super::{OutcomeSignalBank, PlasticityKind};
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
@@ -46,6 +51,9 @@ struct Slot {
     /// The genomic own weight: an ungrouped edge's weight, a member's
     /// correction.
     genomic: f32,
+    /// The stored own quantity at construction: the clamped seed or the
+    /// clamped genomic own weight; a group learner's raw genomic entry.
+    birth: f32,
     /// The member's scope, `None` for an ungrouped edge.
     scope: Option<Scope>,
     /// The member's group term, `None` for an ungrouped edge.
@@ -75,9 +83,14 @@ struct ScaleSlot {
     group: GroupId,
     /// The genomic scale.
     genomic: f32,
+    /// The stored scale at construction: the clamped seed or the clamped
+    /// genomic scale.
+    birth: f32,
     /// The smallest `weight_clamp` among the group's group learners.
     bound: f32,
     inherit_scale: bool,
+    /// The group's retention, read from the record at construction.
+    retention: f32,
 }
 
 /// One static member of a group with a scale slot: weighed through the
@@ -95,21 +108,18 @@ enum Dynamic {
     Passive(usize),
 }
 
-/// What one learning event did: learner assignments, assignments whose
-/// stored quantity changed and scale writes that snapped a value lying
-/// outside the bound (T25.F07 invariants 4, 9).
+/// What one learning event did: learner assignments and assignments whose
+/// stored quantity changed (T25.F07 invariant 9).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct LearningCounts {
     pub updates: u32,
     pub changes: u32,
-    pub scale_snaps: u32,
 }
 
 impl std::ops::AddAssign for LearningCounts {
     fn add_assign(&mut self, other: Self) {
         self.updates += other.updates;
         self.changes += other.changes;
-        self.scale_snaps += other.scale_snaps;
     }
 }
 
@@ -120,11 +130,13 @@ pub(crate) struct BackendLearning {
     /// Learners in canonical order.
     slots: Box<[Slot]>,
     /// Per learner, the learned own quantity of an ungrouped or edge-scope
-    /// learner: the clamped seed of a seeded Lamarckian learner, else the
-    /// genomic own weight until learning moves it. A group learner stores
-    /// none: its entry holds its genomic own weight, is never written, and
-    /// the view and `capture` expose `None` for it.
+    /// learner, starting at its birth value. A group learner stores none:
+    /// its entry holds its raw genomic own weight, is never written, and the
+    /// view and `capture` expose `None` for it.
     learned: Box<[f32]>,
+    /// Learner index of every ungrouped or edge-scope learner whose
+    /// retention is below 1, ascending.
+    decaying: Box<[usize]>,
     /// Whether each learner inherited its own quantity at birth.
     seeded: Box<[bool]>,
     /// Learner index of every reward-modulated learner, ascending.
@@ -137,6 +149,8 @@ pub(crate) struct BackendLearning {
     scale: Box<[f32]>,
     /// Whether each scale slot inherited its scale at birth.
     scale_seeded: Box<[bool]>,
+    /// Every scale slot whose group's retention is below 1, ascending.
+    decaying_scales: Box<[usize]>,
     /// Static members of groups with a scale slot, in canonical order.
     passive: Box<[Passive]>,
     /// Every dynamic edge in canonical order.
@@ -169,35 +183,36 @@ impl BackendLearning {
         }
         let mut slot_of: Vec<Option<usize>> = vec![None; groups.len()];
         let mut scales = Vec::new();
+        let mut scale_seeded = Vec::new();
         for (index, bound) in bounds.iter().enumerate() {
             if let Some(bound) = *bound {
                 slot_of[index] = Some(scales.len());
                 let group = GroupId::new(u16::try_from(index).expect("groups below u16::MAX"));
+                let genomic = groups[index].scale();
+                let inherit_scale = groups[index].inherit_scale();
+                // The birth value (invariant 2): the clamped seed, else the
+                // clamped genomic scale.
+                let seed = seeds
+                    .filter(|_| inherit_scale)
+                    .and_then(|seeds| seeds.group_value(group));
                 scales.push(ScaleSlot {
                     group,
-                    genomic: groups[index].scale(),
+                    genomic,
+                    birth: seed.unwrap_or(genomic).clamp(-bound, bound),
                     bound,
-                    inherit_scale: groups[index].inherit_scale(),
+                    inherit_scale,
+                    retention: groups[index].retention(),
                 });
+                scale_seeded.push(seed.is_some());
             }
         }
-        let inherited_scales: Vec<Option<f32>> = scales
-            .iter()
-            .map(|slot| {
-                seeds
-                    .filter(|_| slot.inherit_scale)
-                    .and_then(|seeds| seeds.group_value(slot.group))
-                    .map(|seed| seed.clamp(-slot.bound, slot.bound))
-            })
+        let scale = scales.iter().map(|slot| slot.birth).collect();
+        let decaying_scales = (0..scales.len())
+            .filter(|&index| decays(scales[index].retention))
             .collect();
-        let scale = scales
-            .iter()
-            .zip(&inherited_scales)
-            .map(|(slot, seed)| seed.unwrap_or(slot.genomic))
-            .collect();
-        let scale_seeded = inherited_scales.iter().map(Option::is_some).collect();
 
         let mut slots = Vec::new();
+        let mut seeded = Vec::new();
         let mut passive = Vec::new();
         let mut order = Vec::new();
         for occurrence in def.edge_sites() {
@@ -212,11 +227,28 @@ impl BackendLearning {
             match (edge.plasticity(), term) {
                 (Some(config), _) => {
                     order.push((occurrence, Dynamic::Learner(slots.len())));
+                    let scope = edge.membership().map(|membership| membership.scope);
+                    let genomic = edge.own_weight();
+                    // The birth value (invariant 2): a group learner's raw
+                    // entry, else the clamped seed of a seeded Lamarckian
+                    // learner (a group learner ignores any seed on its
+                    // row), else the clamped genomic own weight.
+                    let seed = seeds
+                        .filter(|_| config.lamarckian && scope != Some(Scope::Group))
+                        .and_then(|seeds| seeds.value(occurrence));
+                    let birth = if scope == Some(Scope::Group) {
+                        genomic
+                    } else {
+                        seed.unwrap_or(genomic)
+                            .clamp(-config.weight_clamp, config.weight_clamp)
+                    };
+                    seeded.push(seed.is_some());
                     slots.push(Slot {
                         occurrence,
                         config,
-                        genomic: edge.own_weight(),
-                        scope: edge.membership().map(|membership| membership.scope),
+                        genomic,
+                        birth,
+                        scope,
                         term,
                     });
                 }
@@ -238,22 +270,13 @@ impl BackendLearning {
                 _ => {}
             }
         }
-        // A group learner ignores any seed on its row.
-        let inherited: Vec<Option<f32>> = slots
+        let learned = slots.iter().map(|slot| slot.birth).collect();
+        let decaying = slots
             .iter()
-            .map(|slot| {
-                seeds
-                    .filter(|_| slot.config.lamarckian && slot.scope != Some(Scope::Group))
-                    .and_then(|seeds| seeds.value(slot.occurrence))
-                    .map(|seed| seed.clamp(-slot.config.weight_clamp, slot.config.weight_clamp))
-            })
+            .enumerate()
+            .filter(|(_, slot)| slot.scope != Some(Scope::Group) && decays(slot.config.retention))
+            .map(|(index, _)| index)
             .collect();
-        let learned = slots
-            .iter()
-            .zip(&inherited)
-            .map(|(slot, seed)| seed.unwrap_or(slot.genomic))
-            .collect();
-        let seeded = inherited.iter().map(Option::is_some).collect();
         let modulated: Box<[usize]> = slots
             .iter()
             .enumerate()
@@ -265,12 +288,14 @@ impl BackendLearning {
         Self {
             slots: slots.into_boxed_slice(),
             learned,
-            seeded,
+            decaying,
+            seeded: seeded.into_boxed_slice(),
             modulated,
             traces,
             scales: scales.into_boxed_slice(),
             scale,
-            scale_seeded,
+            scale_seeded: scale_seeded.into_boxed_slice(),
+            decaying_scales,
             passive: passive.into_boxed_slice(),
             order: order.into_boxed_slice(),
             credit,
@@ -329,8 +354,7 @@ impl BackendLearning {
 
     /// Write every scale with a contribution once, `clamp(scale + Σ,
     /// ±bound)`, in slot order, and clear the accumulators: changes count
-    /// every contributor of a moved scale, snaps a write whose stored value
-    /// lay outside the bound.
+    /// every contributor of a moved scale.
     fn write_scales(&mut self, counts: &mut LearningCounts) {
         for (index, credit) in self.credit.iter_mut().enumerate() {
             let (sum, contributors) = std::mem::take(credit);
@@ -340,7 +364,6 @@ impl BackendLearning {
             let bound = self.scales[index].bound;
             let old = self.scale[index];
             let new = (old + sum).clamp(-bound, bound);
-            counts.scale_snaps += u32::from(old.abs() > bound);
             // Exact stored-value inequality excludes sums rounded or
             // clamped away.
             if new != old {
@@ -355,6 +378,28 @@ impl BackendLearning {
         for (trace, &slot) in self.traces.iter_mut().zip(self.modulated.iter()) {
             if let Some(modulation) = self.slots[slot].config.modulation {
                 *trace *= modulation.trace_decay;
+            }
+        }
+    }
+
+    /// Relax every initialized decaying own quantity and scale once per
+    /// world tick toward its birth value (T25.F09 invariant 3). A retention
+    /// of 1 is never listed, an uninitialized one holds its birth value and
+    /// is skipped, and a group learner has no own decay.
+    fn relax(&mut self) {
+        for &slot in self.decaying.iter() {
+            if self.visited || self.seeded[slot] {
+                let birth = self.slots[slot].birth;
+                let retention = self.slots[slot].config.retention;
+                self.learned[slot] = relax(self.learned[slot], birth, retention);
+            }
+        }
+        for &index in self.decaying_scales.iter() {
+            if self.visited || self.scale_seeded[index] {
+                let ScaleSlot {
+                    birth, retention, ..
+                } = self.scales[index];
+                self.scale[index] = relax(self.scale[index], birth, retention);
             }
         }
     }
@@ -472,6 +517,11 @@ pub struct LearnedEdge {
     /// The genomic own weight: an ungrouped edge's weight, a member's
     /// correction (not its composed weight).
     pub genomic: f32,
+    /// The own quantity's birth value (T25.F09); a group learner's raw
+    /// entry, which no reading uses.
+    pub birth: f32,
+    /// The edge's stored retention.
+    pub retention: f32,
     /// The learned own quantity, `Some` only for an initialized ungrouped
     /// or edge-scope learner; always `None` for a group learner.
     pub learned: Option<f32>,
@@ -493,6 +543,10 @@ pub struct LearnedScale {
     pub group: GroupId,
     /// The genomic scale.
     pub genomic: f32,
+    /// The scale's birth value (T25.F09).
+    pub birth: f32,
+    /// The group's retention.
+    pub retention: f32,
     /// The learned scale, `Some` only for an initialized scale slot.
     pub learned: Option<f32>,
     /// The smallest clamp among the group's group learners.
@@ -544,10 +598,12 @@ impl LearnedState {
             .any(|backend| !backend.modulated.is_empty())
     }
 
-    /// Decay every trace once per world tick (T19.F02).
+    /// Decay every trace, then relax every decaying learned quantity, once
+    /// per world tick before any visit (T19.F02, T25.F09).
     pub(crate) fn begin_tick(&mut self) {
         for backend in &mut self.backends {
             backend.decay();
+            backend.relax();
         }
     }
 
@@ -602,6 +658,8 @@ impl LearnedState {
                 LearnedEdge {
                     occurrence: slot.occurrence,
                     genomic: slot.genomic,
+                    birth: slot.birth,
+                    retention: slot.config.retention,
                     learned: (initialized && slot.scope != Some(Scope::Group))
                         .then_some(backend.learned[index]),
                     applied: backend.learner_applied(index),
@@ -625,6 +683,8 @@ impl LearnedState {
                 .map(move |(index, slot)| LearnedScale {
                     group: slot.group,
                     genomic: slot.genomic,
+                    birth: slot.birth,
+                    retention: slot.retention,
                     learned: backend
                         .scale_initialized(index)
                         .then_some(backend.scale[index]),
@@ -685,6 +745,20 @@ impl LearnedState {
             backend.traces[position] = trace;
         }
     }
+
+    /// A fixture: mark mesh node `node_idx`'s backend visited and set its
+    /// scale slot `slot` (`GroupId` order) to `scale`.
+    pub(crate) fn set_scale(&mut self, node_idx: usize, slot: usize, scale: f32) {
+        let backend = &mut self.backends[node_idx];
+        backend.visited = true;
+        backend.scale[slot] = scale;
+    }
+}
+
+/// Whether a retention decays: below 1, compared exactly so that 1 is an
+/// exact no-op (T25.F09 invariant 3).
+fn decays(retention: f32) -> bool {
+    retention < 1.0
 }
 
 /// One visit's access to its backend's learned state and samples. The

@@ -316,7 +316,6 @@ fn run_families(families: &mut Vec<Family>) {
         "hebbian_changes",
         "reward_modulated_updates",
         "reward_modulated_changes",
-        "plasticity_scale_snaps",
         "shared_memory_writes_changed",
         "creature_ticks",
         "mesh_dispatches_energy_exhausted",
@@ -724,6 +723,17 @@ fn tick_families(families: &mut Vec<Family>) {
             strings(["ungrouped", "edge", "group"], str::to_owned),
         )],
     ));
+    // T25.F09: edges and learned scales by retention bin.
+    for field in ["plastic_edges_by_retention", "learned_scales_by_retention"] {
+        families.push((
+            format!("petri.tick.{field}"),
+            Gauge,
+            vec![(
+                "petri.plasticity_retention",
+                strings(["none", "1e-3", "1e-2", "1e-1", "1"], str::to_owned),
+            )],
+        ));
+    }
     for field in [
         "learned_scales",
         "learned_scale_drift",

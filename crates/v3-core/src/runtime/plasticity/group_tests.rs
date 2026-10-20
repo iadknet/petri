@@ -423,11 +423,11 @@ fn reward_credit_to_a_scale_is_pattern_times_rate_times_signal_times_trace() {
     assert_eq!((counts.updates, counts.changes), (1, 1));
 }
 
-/// An unseeded genomic scale outside its bound snaps to the bound at its
-/// first event, a zero-`Σ` event included, and counts one snap; a later
-/// write counts none.
+/// An unseeded genomic scale outside its bound starts at the bound, its
+/// birth value (T25.F09 invariant 2), so a zero-`Σ` write leaves it
+/// unchanged and counts no change.
 #[test]
-fn a_first_scale_write_snaps_a_genomic_scale_outside_the_bound() {
+fn a_genomic_scale_outside_the_bound_starts_at_the_bound() {
     let (mut def, id) = ring_def(7.0);
     let all = members(&def, id);
     learn(
@@ -437,14 +437,10 @@ fn a_first_scale_write_snaps_a_genomic_scale_outside_the_bound() {
         Scope::Group,
     );
     let mut learned = state(&def, None);
-    assert_eq!(scale(&learned).genomic, 7.0);
+    assert_eq!((scale(&learned).genomic, scale(&learned).birth), (7.0, 2.0));
     let first = drive(&mut learned, &def, |_| 1.0, 1.0);
     assert_eq!(scale(&learned).learned, Some(2.0));
-    assert_eq!(first.scale_snaps, 1);
-    assert_eq!(first.changes, 1);
-    let second = drive(&mut learned, &def, |_| 1.0, 1.0);
-    assert_eq!(second.scale_snaps, 0);
-    assert_eq!(second.changes, 0);
+    assert_eq!((first.updates, first.changes), (1, 0));
 }
 
 /// `inherit_scale` without a group learner seeds nothing (no scale slot);
@@ -579,7 +575,7 @@ fn counters_count_every_contributor_of_a_moved_scale() {
     learn(&mut def, all[1], classic, Scope::Group);
     let mut learned = state(&def, None);
     let first = drive(&mut learned, &def, |_| 1.0, 0.5);
-    assert_eq!((first.updates, first.changes, first.scale_snaps), (2, 2, 0));
+    assert_eq!((first.updates, first.changes), (2, 2));
     let mut saturated = state(&def, None);
     drive(&mut saturated, &def, |_| 10.0, 10.0);
     assert_eq!(scale(&saturated).learned, Some(1.0));

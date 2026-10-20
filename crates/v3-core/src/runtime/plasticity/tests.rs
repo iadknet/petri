@@ -521,7 +521,9 @@ proptest! {
     }
 
     /// The three-factor update bounds the stored weight by the edge's clamp;
-    /// the parameters are in range (I1), so no law re-clamps them.
+    /// the parameters are in range (I1), so no law re-clamps them. The
+    /// update starts from the birth value, the genomic weight clamped
+    /// (T25.F09 invariant 2).
     #[test]
     fn normalized_reward_update_obeys_exact_clamp(
         weight_0 in -10.0f32..10.0, pulse in -20.0f32..20.0, signal in -20.0f32..20.0,
@@ -534,7 +536,8 @@ proptest! {
         visit(&def, &mut state, pulse, &mut 100.0, &RuntimeConfig::default());
         reward(&mut state, signal);
         let actual = weight(&state);
-        prop_assert_eq!(actual, (weight_0 + eta * signal * pulse).clamp(-clamp, clamp));
+        let birth = weight_0.clamp(-clamp, clamp);
+        prop_assert_eq!(actual, (birth + eta * signal * pulse).clamp(-clamp, clamp));
         prop_assert!(actual >= -clamp && actual <= clamp);
     }
 }

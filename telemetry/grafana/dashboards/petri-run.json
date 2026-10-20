@@ -3027,7 +3027,7 @@
       "id": 59,
       "type": "timeseries",
       "title": "Learned scales at their bound, share by inheritance (sampled)",
-      "description": "Share of learned scales whose initialized value sits at plus or minus the group's bound (the smallest weight_clamp among its group-scope learners). A genomic scale outside the bound snaps to it at its first write (petri.run.plasticity_scale_snaps).",
+      "description": "Share of learned scales whose initialized value sits at plus or minus the group's bound (the smallest weight_clamp among its group-scope learners). A genomic scale outside the bound starts at it (T25.F09).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

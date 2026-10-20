@@ -549,7 +549,6 @@ fn counters(f: &mut Families, s: &SimStats) {
         hebbian_changes_total,
         reward_modulated_updates_total,
         reward_modulated_changes_total,
-        plasticity_scale_snaps_total,
         shared_memory_writes_changed_total,
         creature_ticks_total,
         mesh_dispatches_energy_exhausted_total,
@@ -1030,10 +1029,11 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
     plasticity_values(f, &census.plasticity);
 }
 
-/// The plasticity census families (T25.F06, T25.F07): at most two
+/// The plasticity census families (T25.F06, T25.F07, T25.F09): at most two
 /// attributes per family; the edges by pathway and surface, by rule, by
-/// inheritance and by scope, drift and at-clamp by surface, and the learned
-/// scales, their drift and those at their bound by inheritance.
+/// inheritance, by scope and by retention, drift and at-clamp by surface,
+/// the learned scales, their drift and those at their bound by inheritance,
+/// and the learned scales by retention.
 fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
     let sampled = Kind::Gauge { sampled: true };
     f.scalar(
@@ -1085,6 +1085,28 @@ fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
             (
                 vec![("petri.plasticity_scope", scope.to_owned())],
                 edges.into(),
+            )
+        }),
+    );
+    f.push(
+        "petri.tick.plastic_edges_by_retention".to_owned(),
+        sampled,
+        "",
+        plasticity.edge_retention_cells().map(|(retention, cell)| {
+            (
+                vec![("petri.plasticity_retention", retention.to_owned())],
+                cell.count.into(),
+            )
+        }),
+    );
+    f.push(
+        "petri.tick.learned_scales_by_retention".to_owned(),
+        sampled,
+        "",
+        plasticity.scale_retention_cells().map(|(retention, cell)| {
+            (
+                vec![("petri.plasticity_retention", retention.to_owned())],
+                cell.count.into(),
             )
         }),
     );

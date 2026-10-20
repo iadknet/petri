@@ -587,10 +587,11 @@ order) and the view agree; the applied weight is never clamped. The
 executor hands the learner each edge's occurrence and value and the learner
 decides whether the edge is a learner, a passive member or static. Readers
 use the read-only views: per plastic edge `(occurrence, genomic, learned,
-applied, trace, bound, kind, scope)`, where `genomic` is the genomic own
-weight (a member's correction), `learned` the initialized own quantity
-(always `None` for a group learner) and `trace` present only for an
-initialized learner; and per scale slot `(group, genomic, learned, bound,
+applied, trace, bound, kind, scope, birth, retention)`, where `genomic` is
+the genomic own weight (a member's correction), `birth` the own quantity's
+birth value, `learned` the initialized own quantity (always `None` for a
+group learner) and `trace` present only for an initialized learner; and per
+scale slot `(group, genomic, birth, retention, learned, bound,
 inherit_scale)`, `learned` present only for an initialized scale slot.
 
 - A learner slot is initialized when its backend has been visited (the flag
@@ -598,13 +599,16 @@ inherit_scale)`, `learned` present only for an initialized scale slot.
   birth; a scale slot when its backend has been visited or its scale was
   seeded. Reward, `capture()` and the views read initialized slots only, each
   slot on its own.
-- A Lamarckian ungrouped or edge learner with a birth seed starts at the
-  seed clamped by the child's edge clamp, initialized; every other learner
-  (a Darwinian one with a seed, and a group learner, which ignores any seed
-  on its row) starts at its genomic own weight and stays uninitialized until
-  its backend's first visit. A scale slot starts at `clamp(seed, ±bound)`,
-  seeded, when the child group has `inherit_scale` and a seed, else at the
-  genomic scale. Traces start at zero. See
+- Every learned quantity starts at its **birth value** (T25.F09). A
+  Lamarckian ungrouped or edge learner with a birth seed starts at the seed
+  clamped by the child's edge clamp, initialized; every other ungrouped or
+  edge learner (a Darwinian one with a seed included) starts at its genomic
+  own weight clamped by its edge clamp and stays uninitialized until its
+  backend's first visit. A group learner ignores any seed on its row and
+  holds its raw genomic own weight, which is not a learned quantity, is
+  never written and composes unclamped. A scale slot starts at
+  `clamp(seed, ±bound)`, seeded, when the child group has `inherit_scale`
+  and a seed, else at `clamp(genomic, ±bound)`. Traces start at zero. See
   [reproduction inheritance](v3-reproduction-spec.md#graph-state).
 - Birth seeds are temporary, excluded from serialization and genome
   equality, and consumed by the constructor.
@@ -635,9 +639,8 @@ scale <- clamp(scale + Σ pattern × dw, -bound, bound)        (once per scale p
 
 A static member contributes nothing; a member with a negative pattern
 contributes with the opposite sign of its `dw`, so the net change is the sum
-over contributors. A write whose stored value lay outside the bound (only an
-unseeded genomic scale's first write can) counts one `plasticity_scale_snaps`.
-`plasticity_updates` counts one per contributing learner per event and
+over contributors; the birth clamp keeps every stored scale inside its
+bound, so no write snaps. `plasticity_updates` counts one per contributing learner per event and
 `plasticity_changes` one per contributor whose stored quantity changed (for a
 group learner its scale, so a moved scale counts every contributor).
 
@@ -649,8 +652,18 @@ failed visit changes no learned value or trace.
 
 ```text
 trace <- trace_decay * trace                        (once per world tick, begin_tick)
+x     <- b + retention * (x - b)                    (once per world tick, begin_tick, after the traces)
 trace <- trace + activity(pre, post, w)             (per committed visit)
 ```
+
+The second line is the learned-weight decay (T25.F09): every initialized
+own quantity of an ungrouped or edge learner relaxes toward its birth value
+`b` by its edge's `retention`, and every initialized learned scale by its
+group's; a retention of exactly 1 is skipped (an exact no-op), an
+uninitialized quantity holds `b`, and a group learner has no own decay. The
+stored value stays absolute, so a decayed value stops within `ulp(x) /
+(2(1 − retention))` of `b`. Learning in the same tick acts on the decayed
+value.
 
 Activity excludes the learning rate: Classic `pre*post`, Oja
 `post*(pre-w*post)`, AntiHebb `-pre*post`, Covariance `(pre-0.5)*(post-0.5)`,

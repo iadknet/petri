@@ -526,10 +526,6 @@ pub struct CognitionTracking {
     pub hebbian_changes_total: u64,
     pub reward_modulated_updates_total: u64,
     pub reward_modulated_changes_total: u64,
-    /// Learned-scale writes that snapped a value outside the bound
-    /// (T25.F07); absent in a report from before it.
-    #[serde(default)]
-    pub plasticity_scale_snaps_total: u64,
     pub shared_memory_writes_changed_total: u64,
 }
 
@@ -639,7 +635,6 @@ impl WorldTracking {
                 hebbian_changes_total: stats.hebbian_changes_total,
                 reward_modulated_updates_total: stats.reward_modulated_updates_total,
                 reward_modulated_changes_total: stats.reward_modulated_changes_total,
-                plasticity_scale_snaps_total: stats.plasticity_scale_snaps_total,
                 shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
             }),
             mortality: Some(MortalityTracking {
@@ -847,10 +842,46 @@ pub struct PlasticEdgeRow {
     /// `compute` or `sink`.
     pub surface: String,
     pub edges: u64,
-    /// Sum of `|learned - genomic|` over the initialized edges.
+    /// Sum of `|learned - birth|` over the initialized edges (T25.F09).
     pub drift_sum: String,
     /// Initialized edges at their clamp.
     pub at_clamp: u64,
+}
+
+/// One retention bin of a checkpoint's plastic edges or learned scales
+/// (T25.F09).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RetentionRow {
+    /// `none`, `1e-3`, `1e-2`, `1e-1` or `1`.
+    pub key: String,
+    pub count: u64,
+    /// Entries with a learned own quantity or an initialized scale.
+    pub initialized: u64,
+    /// Sum of `|learned - birth|` over the initialized entries.
+    pub drift_sum: String,
+    /// Initialized entries at their clamp or bound.
+    pub at_bound: u64,
+}
+
+impl RetentionRow {
+    fn rows(
+        cells: impl Iterator<
+            Item = (
+                &'static str,
+                v3_core::creature::plasticity_census::RetentionCell,
+            ),
+        >,
+    ) -> Vec<Self> {
+        cells
+            .map(|(key, cell)| Self {
+                key: key.to_owned(),
+                count: cell.count,
+                initialized: cell.initialized,
+                drift_sum: six(cell.drift_sum),
+                at_bound: cell.at_bound,
+            })
+            .collect()
+    }
 }
 
 /// One key's plastic-edge count.
@@ -876,16 +907,17 @@ pub struct LearnedScaleRow {
     /// `darwinian` or `lamarckian`: the group's `inherit_scale`.
     pub inheritance: String,
     pub scales: u64,
-    /// Sum of `|learned - genomic|` over the initialized scale slots.
+    /// Sum of `|learned - birth|` over the initialized scale slots
+    /// (T25.F09).
     pub drift_sum: String,
     /// Initialized scale slots at their bound.
     pub at_bound: u64,
 }
 
-/// The plasticity census of one checkpoint (T25.F06, T25.F07): living
-/// creatures, carriers, the reachable plastic edges by (pathway, surface),
-/// by rule, by inheritance and by scope, and the learned scales by
-/// inheritance, every row always present.
+/// The plasticity census of one checkpoint (T25.F06, T25.F07, T25.F09):
+/// living creatures, carriers, the reachable plastic edges by (pathway,
+/// surface), by rule, by inheritance, by scope and by retention, and the
+/// learned scales by inheritance and by retention, every row always present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlasticityCensusBlock {
     pub creatures: u64,
@@ -899,6 +931,12 @@ pub struct PlasticityCensusBlock {
     /// Since T25.F07; empty in a report stored before it.
     #[serde(default)]
     pub scales: Vec<LearnedScaleRow>,
+    /// Since T25.F09; empty in a report stored before it.
+    #[serde(default)]
+    pub edges_by_retention: Vec<RetentionRow>,
+    /// Since T25.F09; empty in a report stored before it.
+    #[serde(default)]
+    pub scales_by_retention: Vec<RetentionRow>,
 }
 
 impl PlasticityCensusBlock {
@@ -937,6 +975,8 @@ impl PlasticityCensusBlock {
                     at_bound: cell.at_bound,
                 })
                 .collect(),
+            edges_by_retention: RetentionRow::rows(census.edge_retention_cells()),
+            scales_by_retention: RetentionRow::rows(census.scale_retention_cells()),
         }
     }
 }

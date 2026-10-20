@@ -187,9 +187,6 @@ pub struct WorkCounters {
     pub plasticity_updates: u32,
     /// Hebbian assignments whose final stored weight differs from its prior value.
     pub plasticity_changes: u32,
-    /// Scale writes whose stored value lay outside the scale's bound
-    /// (T25.F07 invariant 4).
-    pub plasticity_scale_snaps: u32,
     /// Executed shared-memory store/clear events exceeding the trace epsilon.
     /// Includes VM writes executed before a later exhaustion discards its copy.
     pub shared_memory_writes_changed: u32,
