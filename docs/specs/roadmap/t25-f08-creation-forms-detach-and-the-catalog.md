@@ -1,6 +1,6 @@
 # T25.F08 — Creation Forms, Detach and the Catalog
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-19
 **Feature**: T25.F08
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -175,7 +175,7 @@ reported with a recorded disposition at closure, not a closure blocker
       the randomized-creation and detach paragraphs, the no-join sentence,
       the refinement entry removed, counts 32 / 66) and
       `v3-runtime-config-spec.md` (the refinement row removed).
-- [ ] `make rust-test-slow` and re-pin its readings; then one `make check`.
+- [x] `make rust-test-slow` and re-pin its readings; then one `make check`.
 
 ## Verification
 
@@ -284,11 +284,9 @@ edges 400 / 12 / 932 (F07: 112 / 33 / 195), groups removed 244 / 5 / 608
 Raw gate 118,732 B, sha256 `b19ce575...b9f8`; raw goal 699,473,823 B, sha256
 `76586a4a...f8baf8`; summaries 23,772 B and 482,625 B.
 
-**User acceptance (2026-10-20).** The user accepted the gate `decided_passes`
-severe and the goal `vm_steps`, `plasticity_updates` and `decided_passes`
-severes as the draw-stream trajectory reading, together with the `Slots`
-deletion ("Accept and re-pin"); the gate and goal-worlds epochs are re-pinned
-to this feature's summaries in `docs/progress/benchmark-series.json`.
+| User acceptance | Date | Scope | Effect |
+| --- | --- | --- | --- |
+| "Accept and re-pin" | 2026-10-20 | gate `decided_passes` severe; goal `vm_steps`, `plasticity_updates`, `decided_passes` severes as the draw-stream trajectory reading; the `Slots` deletion | gate and goal-worlds epochs re-pinned to this feature's summaries in `docs/progress/benchmark-series.json` (68440ee7) |
 
 - Summaries: [gate](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog.json),
   [goal](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json).
@@ -296,20 +294,20 @@ to this feature's summaries in `docs/progress/benchmark-series.json`.
 
 ## Success Criteria
 
-- [ ] Invariants 1–8 hold and their named tests pass; the uniform
+- [x] Invariants 1–8 hold and their named tests pass; the uniform
       operators' creation tests pass unedited.
-- [ ] `RefineHeritableStructure`, `structured_heritable_refinement` and
+- [x] `RefineHeritableStructure`, `structured_heritable_refinement` and
       `refinement_applications` appear in no production code, config,
       recipe, script, frontend source or reference spec; test code may name
       them only in the config-digest undo chain invariant 7 requires, in an
       assertion that the old field or key is absent, and in pin-history
       comments; documents under `docs/archive`, `docs/strategy`,
       `docs/progress` and closed specs are historical.
-- [ ] The goal run reports the three new operators' funnels, the funnel by
+- [x] The goal run reports the three new operators' funnels, the funnel by
       layer, detaches and removals, the share of attribute changes at group
       scope, the census by scope and the harmful share per world in the
       readings file.
-- [ ] Gate and goal summaries stored, epochs re-pinned, the mutation gate
+- [x] Gate and goal summaries stored, epochs re-pinned, the mutation gate
       and the slow tier recorded.
 
 ## Notes for AI Agents
@@ -334,3 +332,6 @@ to this feature's summaries in `docs/progress/benchmark-series.json`.
 - Deferred: a long-run reading of detached members' retention and of
   randomized groups' survival goes to the next goal-long carrier; T25's
   carriers (F02, F04) are spent.
+- Cost: `/usage` not collected; implementer passes 4 (advisor 2/2/2/2);
+  spec-owner resumes after Plan 2; Codex challenge rounds 4, final `ready`;
+  review lens 1 P2×1, lens 2 P1×1, lens 3 P2×2 P3×1.
