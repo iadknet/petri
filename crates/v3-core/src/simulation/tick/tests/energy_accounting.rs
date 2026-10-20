@@ -396,6 +396,7 @@ fn learning_genome(reward: bool) -> crate::creature::genome::CreatureGenome {
                                     reward_source: OutcomeChannel::EnergyDelta,
                                     trace_decay: 0.5,
                                 }),
+                                retention: 1.0,
                             }),
                         ),
                     ])
@@ -480,6 +481,7 @@ fn sink_learning_genome() -> crate::creature::genome::CreatureGenome {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.5,
             }),
+            retention: 1.0,
         }));
     genome.nodes[0].backend_def = BackendDef::Graph(def);
     genome

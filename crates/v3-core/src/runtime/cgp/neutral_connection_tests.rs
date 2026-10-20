@@ -359,6 +359,7 @@ fn active_graph() -> CgpGraphBackendDef {
                 weight_clamp: 2.0,
                 lamarckian: false,
                 modulation,
+                retention: 1.0,
             }),
         ));
     }

@@ -39,6 +39,7 @@ describe("buildFullGraphModel edge-group members", () => {
 					offset: 0,
 					scale: 0.5,
 					inherit_scale: false,
+					retention: 1,
 				},
 			],
 		});
@@ -101,6 +102,7 @@ describe("buildFullGraphModel edge-group members", () => {
 						offset: 0,
 						scale: 0.5,
 						inherit_scale: false,
+						retention: 1,
 					},
 				],
 			}),

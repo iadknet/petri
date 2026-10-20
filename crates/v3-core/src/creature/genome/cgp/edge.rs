@@ -91,10 +91,10 @@ pub struct GraphEdge {
     pub(super) membership: Option<Membership>,
 }
 
-// A 6-byte source, a 4-byte weight, a 20-byte plasticity and a 4-byte
-// membership (a 2-byte group and a 1-byte scope), 36 bytes at 4-byte
-// alignment (T25.F03, T25.F06, T25.F07).
-const _: () = assert!(std::mem::size_of::<GraphEdge>() == 36);
+// A 6-byte source, a 4-byte weight, a 24-byte plasticity and a 4-byte
+// membership (a 2-byte group and a 1-byte scope), 40 bytes at 4-byte
+// alignment (T25.F03, T25.F06, T25.F07, T25.F09).
+const _: () = assert!(std::mem::size_of::<GraphEdge>() == 40);
 
 impl GraphEdge {
     /// A static, ungrouped edge.

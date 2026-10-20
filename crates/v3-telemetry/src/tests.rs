@@ -1430,6 +1430,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.5,
             }),
+            retention: 1.0,
         }));
     }
     let mut rows = BirthSeeds::Rows {

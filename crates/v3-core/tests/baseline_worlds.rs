@@ -206,10 +206,16 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// creation operators and `DetachGraphEdge` join the Graph catalog and remap
 /// every Graph draw (default 5737684664837370108 -> 5477079874225389176,
 /// rate 0.0 11540034954633671093 -> 2120864728947376946).
+/// Re-pinned by T25.F09 commit 1 (text only): every plastic edge's and
+/// every group's `Debug` text names its `retention` (default
+/// 5477079874225389176 -> 7591672062617439646, rate 0.0 2120864728947376946 ->
+/// 8568333528152149267). The hash without genome text is unchanged at the merge base
+/// and after the commit (default 1525356918335449842, rate 0.0
+/// 8486363218089703579).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 5477079874225389176);
-    assert_eq!(short_run_identity(Some(0.0)), 2120864728947376946);
+    assert_eq!(short_run_identity(None), 7591672062617439646);
+    assert_eq!(short_run_identity(Some(0.0)), 8568333528152149267);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

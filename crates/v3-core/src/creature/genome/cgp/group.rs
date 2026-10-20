@@ -1,6 +1,7 @@
 //! Edge groups (T25.F03): one developmental program that wires a whole map.
 //!
-//! A [`Group`] is a record `{shape, kind, offset, scale, inherit_scale}`; its members are
+//! A [`Group`] is a record `{shape, kind, offset, scale, inherit_scale,
+//! retention}`; its members are
 //! real sink edges whose [`super::Membership`] names it. A member's genomic
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
@@ -84,9 +85,25 @@ pub struct Group {
     /// Whether a parent's learned scale seeds the child's (T25.F07); born
     /// false.
     pub(super) inherit_scale: bool,
+    /// The learned scale's retention per world tick, in `[0, 1]` (T25.F09);
+    /// born 1, an exact no-op.
+    pub(super) retention: f32,
 }
 
 impl Group {
+    /// The silent record: scale 0, `inherit_scale` false, retention 1.
+    #[must_use]
+    pub(super) const fn new(shape: Shape, kind: DirectedVoteKind, offset: u8) -> Self {
+        Self {
+            shape,
+            kind,
+            offset,
+            scale: 0.0,
+            inherit_scale: false,
+            retention: 1.0,
+        }
+    }
+
     /// The group's pattern at the member reading field `sub_idx` on a sink
     /// of direction `direction`: 1 for a `Ring` group whose `ring_ref`
     /// resolves to a ring of `input_refs` (the coordinate ignored); for a
@@ -155,6 +172,13 @@ impl Group {
     #[must_use]
     pub const fn inherit_scale(&self) -> bool {
         self.inherit_scale
+    }
+
+    /// The learned scale's retention per world tick (T25.F09).
+    #[inline]
+    #[must_use]
+    pub const fn retention(&self) -> f32 {
+        self.retention
     }
 }
 

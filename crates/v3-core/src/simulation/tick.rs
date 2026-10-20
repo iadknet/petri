@@ -1707,6 +1707,7 @@ mod final_action_observation_tests {
                         reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
                         trace_decay: 0.5,
                     }),
+                    retention: 1.0,
                 }),
             );
             creature.genome = genome;

@@ -783,6 +783,7 @@ mod tests {
                     reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
                     trace_decay: 0.9,
                 }),
+                retention: 1.0,
             }),
         ));
         let mut vm = vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]);

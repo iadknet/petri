@@ -447,6 +447,7 @@ fn introspection_edge_def(
                     weight_clamp: 5.0,
                     lamarckian: false,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
         ])

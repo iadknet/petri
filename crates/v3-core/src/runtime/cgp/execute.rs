@@ -427,6 +427,7 @@ mod work_counter_tests {
                                     weight_clamp: 1.0,
                                     lamarckian: false,
                                     modulation: None,
+                                    retention: 1.0,
                                 }),
                             ),
                         ])
@@ -564,6 +565,7 @@ mod clock_tests {
                 weight_clamp: 2.0,
                 lamarckian: false,
                 modulation: None,
+                retention: 1.0,
             }),
         );
         let config = RuntimeConfig {
@@ -601,6 +603,7 @@ mod clock_tests {
                 weight_clamp: 2.0,
                 lamarckian: false,
                 modulation: None,
+                retention: 1.0,
             }),
         );
         let config = RuntimeConfig {

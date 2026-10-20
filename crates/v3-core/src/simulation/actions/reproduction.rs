@@ -867,6 +867,7 @@ mod tests {
                     weight_clamp: 5.0,
                     lamarckian: true,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
         ]);
@@ -890,6 +891,7 @@ mod tests {
                     weight_clamp: 5.0,
                     lamarckian: false,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
         ]);
@@ -912,6 +914,7 @@ mod tests {
                     weight_clamp: 5.0,
                     lamarckian: true,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
         ]);
@@ -1021,6 +1024,7 @@ mod tests {
                 weight_clamp: 5.0,
                 lamarckian: true,
                 modulation: None,
+                retention: 1.0,
             }),
         );
         let mut original = genome_with_cgp_compute_nodes(vec![compute]);
@@ -1122,6 +1126,7 @@ mod tests {
                     weight_clamp: 5.0,
                     lamarckian: true,
                     modulation: None,
+                    retention: 1.0,
                 }),
             ),
         ]);

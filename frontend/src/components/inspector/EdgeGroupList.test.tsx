@@ -29,6 +29,7 @@ function grouped(): GraphBackendDef {
 				offset: 1,
 				scale: 0.5,
 				inherit_scale: false,
+				retention: 1,
 			},
 		],
 	};
@@ -81,10 +82,19 @@ describe("EdgeGroupList", () => {
 		expect(screen.getByTestId("edge-group")).toHaveTextContent("scale=0.500");
 		expect(screen.getByTestId("edge-group-learned-scale")).toHaveTextContent("learned=1.250");
 		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent("inherits scale");
+		expect(screen.queryByTestId("edge-group-retention")).toBeNull();
 		const members = screen.getAllByTestId("edge-group-member");
 		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 group scope");
 		expect(members[1]).toHaveTextContent("edge scope");
 		expect(members[1]).not.toHaveTextContent("applied=");
+	});
+
+	it("shows a group's retention when it decays (T25.F09)", () => {
+		const def = grouped();
+		const group = def.groups?.[0];
+		if (group) group.retention = 0.99;
+		render(<EdgeGroupList graphDef={def} inputRefs={[]} graphWeights={null} />);
+		expect(screen.getByTestId("edge-group-retention")).toHaveTextContent("retention=0.9900");
 	});
 
 	it("shows neither a learned scale nor applied weights without the payload", () => {
@@ -151,6 +161,7 @@ describe("EdgeGroupList", () => {
 							offset: 2,
 							scale: 1,
 							inherit_scale: false,
+							retention: 1,
 						},
 					],
 				}}

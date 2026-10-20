@@ -65,6 +65,7 @@ pub struct Group {
     offset: u8,                      // always < 8
     scale: f32,                      // one shared weight, born 0
     inherit_scale: bool,             // a parent's learned scale seeds the child (T25.F07), born false
+    retention: f32,                  // the learned scale's retention per tick, [0, 1] (T25.F09), born 1
 }
 
 pub struct Membership {
@@ -528,6 +529,7 @@ pub struct PlasticityConfig {
     pub weight_clamp: f32,        // [0.01, 10]
     pub lamarckian: bool,
     pub modulation: Option<RewardModulationConfig>,
+    pub retention: f32,           // [0, 1], learned-weight retention per tick (T25.F09)
 }
 
 pub struct RewardModulationConfig {
@@ -541,7 +543,8 @@ sink (its sum is ignored); `validate_graph` rejects that case and any value
 outside the ranges above (I1), which the mutation draws and perturbations
 keep by construction. The laws read the stored values; no runtime clamp
 normalizes them. A learning attribute, a member's `scope` and a group's
-`inherit_scale` carry no genome unit. `CgpGraphBackendDef::plastic_edges()`
+`inherit_scale` and `retention` carry no genome unit; `validate_graph`
+rejects a group retention outside `[0, 1]` (`GroupRetentionOutOfRange`). `CgpGraphBackendDef::plastic_edges()`
 enumerates the plastic edges in canonical (`edge_sites`) order and is the
 one definition of "carries learning".
 

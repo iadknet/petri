@@ -136,6 +136,12 @@
 //! (sampled f55ad21d... -> 9458abf6..., gestation rate 0.0 872113ec... ->
 //! a187a3fe...; guard dc32a1fa... -> 3d299de5..., rate 0.0 d61cf3eb... ->
 //! 7d7ae0e2...).
+//! Re-pinned by T25.F09 commit 1 (text only): every plastic edge's and
+//! every group's JSON names its `retention`, which moves the two sampled
+//! digests (9458abf6... -> 5beb9f71..., gestation rate 0.0 a187a3fe... ->
+//! 23a0754d...); the guard digests hold. The sampled digest without genome
+//! bytes is 146fe823... (rate 0.0 4eb8afe8...) at the merge base and after
+//! the commit.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -147,11 +153,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "9458abf62ffa83bc7ca60c83800a534505bc9502713c8e29839facf5055b09a5"
+        "5beb9f71185c6af51e870163da3bfaabbb637148feb872b4ed8e6a7dc81741f3"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "a187a3fefe41f1cae24a4949bdcf2a1db38f0159bbfd557d9eec41c68fe3b994"
+        "23a0754d1c3884d90bcbfffc160e8f2b3a4f83850826d2531452964b327e757b"
     );
 }
 

@@ -135,6 +135,7 @@ fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
             weight_clamp,
             lamarckian,
             modulation,
+            retention: 1.0,
         }
     });
     let scope = if rng.gen_bool(0.5) {
@@ -878,6 +879,7 @@ fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
         weight_clamp: 2.0,
         lamarckian: true,
         modulation: None,
+        retention: 1.0,
     };
     def.edge_mut(first).set_plasticity(Some(config));
     def.edge_mut(first).set_weight(0.25);

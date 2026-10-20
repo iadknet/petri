@@ -59,6 +59,7 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
             weight_clamp: 1.0,
             lamarckian: false,
             modulation: None,
+            retention: 1.0,
         }));
     }
     let mut inert = make(BackendDef::Vm(VmBackendDef {

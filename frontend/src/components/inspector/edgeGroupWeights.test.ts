@@ -35,6 +35,7 @@ describe("memberPattern", () => {
 		offset: 2,
 		scale: 0,
 		inherit_scale: false,
+		retention: 1,
 	};
 
 	it("is 1 for a ring group whose ring resolves, 0 when it does not", () => {
@@ -56,6 +57,7 @@ describe("memberPattern", () => {
 			offset: 1,
 			scale: 0,
 			inherit_scale: false,
+			retention: 1,
 		};
 		// Sink E (2) at offset 1 is relative NE (1).
 		expect(memberPattern(group, refs, pair.x, 2)).toBeCloseTo(D);

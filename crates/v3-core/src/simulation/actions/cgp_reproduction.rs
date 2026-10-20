@@ -63,6 +63,7 @@ mod tests {
             weight_clamp: 10.0,
             lamarckian,
             modulation: None,
+            retention: 1.0,
         }
     }
 

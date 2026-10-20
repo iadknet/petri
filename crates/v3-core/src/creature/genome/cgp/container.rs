@@ -367,6 +367,16 @@ impl GroupMut<'_> {
     pub fn set_inherit_scale(&mut self, inherit_scale: bool) {
         self.def.groups[self.group.index()].inherit_scale = inherit_scale;
     }
+
+    /// Set the learned scale's retention (T25.F09), the only writer; in
+    /// `[0, 1]`; no seed change.
+    pub fn set_retention(&mut self, retention: f32) {
+        debug_assert!(
+            (0.0..=1.0).contains(&retention),
+            "set_retention: a retention is in [0, 1]"
+        );
+        self.def.groups[self.group.index()].retention = retention;
+    }
 }
 
 /// The graph invariant a genome breaks (T25.F03, design note §3, I2–I10).
@@ -397,6 +407,9 @@ pub enum GraphInvariantViolation {
     /// T25.F06 invariant 2, T25.F07 invariant 1: a `ClearSlot` edge is
     /// plastic.
     IneligiblePlasticEdge,
+    /// T25.F09 invariant 1: a group's retention is non-finite or outside
+    /// `[0, 1]`.
+    GroupRetentionOutOfRange,
 }
 
 /// The direction a `Ring` member of `group` on `channel` votes toward:
@@ -1148,13 +1161,7 @@ impl CgpGraphBackendDef {
         );
         assert!(offset < VOTE_DIRECTION_COUNT, "add_group: offset below 8");
         let id = GroupId(u16::try_from(self.groups.len()).expect("groups below u16::MAX"));
-        self.groups.push(Group {
-            shape,
-            kind,
-            offset,
-            scale: 0.0,
-            inherit_scale: false,
-        });
+        self.groups.push(Group::new(shape, kind, offset));
         if let Some(seeds) = &mut self.birth_seeds {
             seeds.groups_mut().push(None);
         }
@@ -1391,6 +1398,13 @@ impl CgpGraphBackendDef {
         {
             return Err(V::OffsetOutOfRange);
         }
+        if self
+            .groups
+            .iter()
+            .any(|group| !(0.0..=1.0).contains(&group.retention))
+        {
+            return Err(V::GroupRetentionOutOfRange);
+        }
         for (occurrence, config) in self.plastic_edges() {
             if !config.in_range() {
                 return Err(V::PlasticityOutOfRange);
@@ -1570,13 +1584,7 @@ impl CgpGraphBackendDef {
     /// records, so [`Self::can_host_group`] is false on an otherwise full
     /// sink catalog (a preflight fixture; such a def fails `EmptyGroup`).
     pub(crate) fn exhaust_group_capacity(&mut self) {
-        let record = Group {
-            shape: Shape::Ring { ring_ref: 0 },
-            kind: Kind::Move,
-            offset: 0,
-            scale: 0.0,
-            inherit_scale: false,
-        };
+        let record = Group::new(Shape::Ring { ring_ref: 0 }, Kind::Move, 0);
         self.groups = vec![record; usize::from(u16::MAX)];
     }
 }

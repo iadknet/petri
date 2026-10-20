@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha10 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha11 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha10 protocol-version posture;
+- v3alpha11 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,10 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha10"`.
-- Breaking payload changes require protocol-version bump. `v3alpha10`
+- Canonical value: `"v3alpha11"`.
+- Breaking payload changes require protocol-version bump. `v3alpha11`
+  (T25.F09) gave every genome `plasticity` config and every genome group a
+  `retention`, always written. `v3alpha10`
   (T25.F07) gave every genome membership a `scope` (`"Edge"` or `"Group"`)
   and every genome group an `inherit_scale`, both always written, put
   `applied` on every `graph_weights` edge (a member's through the learned
@@ -115,7 +117,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha10 shape):
+Request (conceptual v3alpha11 shape):
 
 ```json
 {
@@ -250,7 +252,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -271,7 +273,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "running",
   "tick": 123
 }
@@ -286,7 +288,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "paused",
   "tick": 123
 }
@@ -315,7 +317,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -328,7 +330,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -382,7 +384,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -431,7 +433,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "paused",
   "config": {
     "population": {
@@ -574,7 +576,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -605,7 +607,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -618,7 +620,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -629,7 +631,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -727,7 +729,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -765,7 +767,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha10"`. |
+| `protocol_version` | string | Always `"v3alpha11"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -776,7 +778,7 @@ Field definitions:
 | `complexity` | u32 | Genome complexity (node count). |
 | `phenotype` | object | Visual phenotype state. |
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
-| `genome` | object | Full genome (omitted when `exclude` contains `genome`). A Graph backend's edges carry `own_weight` and, for an edge-group member, `membership: {group, scope}` (`scope` `"Edge"` or `"Group"`, T25.F07); its `groups` list (`{shape: {Ring: {ring_ref}} \| {DirectionPair: {ref_idx, pair}}, kind, offset, scale, inherit_scale}`) is omitted when empty (T25.F03, T25.F04, T25.F07). |
+| `genome` | object | Full genome (omitted when `exclude` contains `genome`). A Graph backend's edges carry `own_weight` and, for an edge-group member, `membership: {group, scope}` (`scope` `"Edge"` or `"Group"`, T25.F07); its `groups` list (`{shape: {Ring: {ring_ref}} \| {DirectionPair: {ref_idx, pair}}, kind, offset, scale, inherit_scale, retention}`) is omitted when empty (T25.F03, T25.F04, T25.F07); every `plasticity` config and every group carries `retention` (T25.F09). |
 | `mesh_annotations` | array | Per-node read and write classes, reachability and liveness; present whenever `genome` is. |
 | `graph_weights` | array | Per Graph node carrying an edge group or a plastic edge, in genome order: `{node_id, scales: [{group, genomic, learned?}], edges: [{surface: "compute" \| "sink", container, edge, genomic, applied, learned?}]}`, in canonical edge order one `edges` entry per group member actually present (eight for a new `Ring` group, twelve for a new `DirectionPair` group) with its genomic weight `scale × pattern + own_weight`, the pattern 1 for a `Ring` member and the member's compass component for a `DirectionPair` member (T25.F03, T25.F04), and one per plastic edge on either surface (T25.F06). Every listed edge carries `applied`, the weight in force `own + scale × pattern` through the learned own quantity and the learned scale where they exist; `learned` is present only for an initialized own quantity (an ungrouped edge's weight or an edge-scope member's correction, never a group-scope member's), and a scale's `learned` only for an initialized scale slot of a group with a group-scope learner (T25.F07). Built by one merge-walk over the canonical edge order. Computed on every request whether or not `genome` is included; omitted when the creature has neither or `exclude` contains `graph_weights`. |
 | `shared_memory` | `f32[]` | 16-slot creature shared memory (omitted when `exclude` contains `shared_memory`). |
@@ -821,7 +823,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -929,7 +931,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha10
+  performance, but must document the throttle policy. The default v3alpha11
   behavior is per-tick emission.
 
 Ordering rules:
@@ -946,7 +948,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha10",
+  "protocol_version": "v3alpha11",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -972,7 +974,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha10)
+## 7. Out-of-Scope API Surfaces (v3alpha11)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -994,7 +996,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha10 server transport/API semantics.
+This file remains canonical for v3alpha11 server transport/API semantics.
 
 ---
 

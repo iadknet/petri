@@ -564,6 +564,7 @@ mod tests {
                 weight_clamp: 1.0,
                 lamarckian: false,
                 modulation: None,
+                retention: 1.0,
             }),
         ));
         push_sink(

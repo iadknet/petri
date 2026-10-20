@@ -69,6 +69,8 @@ export interface PlasticityConfig {
 	weight_clamp: number;
 	lamarckian: boolean;
 	modulation?: RewardModulationConfig | null;
+	/** Learned-weight retention per tick toward the birth value; 1 keeps it (T25.F09). */
+	retention: number;
 }
 
 /** A compute node; learning attributes live on its input edges (T25.F06). */
@@ -142,6 +144,8 @@ export interface EdgeGroup {
 	scale: number;
 	/** Whether a parent's learned scale seeds the child's (T25.F07). */
 	inherit_scale: boolean;
+	/** Learned-scale retention per tick toward the birth value; 1 keeps it (T25.F09). */
+	retention: number;
 }
 
 export interface GraphBackendDef {

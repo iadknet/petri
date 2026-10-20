@@ -189,17 +189,23 @@ pub struct PlasticityConfig {
     /// Reward modulation config. `None` = pure Hebbian (default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modulation: Option<RewardModulationConfig>,
+    /// Learned-weight retention per world tick, in [0.0, 1.0] (T25.F09): the
+    /// learned own quantity relaxes `b + ρ·(x − b)` toward its birth value;
+    /// 1 is an exact no-op.
+    pub retention: f32,
 }
 
 impl PlasticityConfig {
-    /// I1 for plasticity (T25.F06): every value finite, the learning rate and
-    /// trace decay in `[0, 1]` and the weight clamp in `[0.01, 10]`. The
+    /// I1 for plasticity (T25.F06, T25.F09): every value finite, the learning
+    /// rate, trace decay and retention in `[0, 1]` and the weight clamp in
+    /// `[0.01, 10]`. The
     /// enable draws and perturbation laws keep it by construction; the load
     /// boundary checks it ([`cgp::validate_graph`]).
     #[must_use]
     pub fn in_range(&self) -> bool {
         (0.0..=1.0).contains(&self.learning_rate)
             && (0.01..=10.0).contains(&self.weight_clamp)
+            && (0.0..=1.0).contains(&self.retention)
             && self
                 .modulation
                 .is_none_or(|modulation| (0.0..=1.0).contains(&modulation.trace_decay))
@@ -954,6 +960,7 @@ mod tests {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.9,
             }),
+            retention: 1.0,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         let cfg2: PlasticityConfig = serde_json::from_str(&json).unwrap();
@@ -968,6 +975,7 @@ mod tests {
             weight_clamp: 5.0,
             lamarckian: false,
             modulation: None,
+            retention: 1.0,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         // modulation: None should be skipped in serialization

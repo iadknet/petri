@@ -146,6 +146,11 @@ function GroupFacts({
 					{group.inherit_scale ? "inherits scale" : "genomic scale at birth"}
 				</span>
 			</Tip>
+			{group.retention < 1 ? (
+				<Tip content="The learned scale decays toward its birth value, keeping this share of its learned change each tick.">
+					<span data-testid="edge-group-retention">retention={group.retention.toFixed(4)}</span>
+				</Tip>
+			) : null}
 		</>
 	);
 }

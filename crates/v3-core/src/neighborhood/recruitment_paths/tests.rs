@@ -1627,6 +1627,7 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
             weight_clamp: 1.0,
             lamarckian: false,
             modulation: None,
+            retention: 1.0,
         }),
     );
     assert_eq!(
