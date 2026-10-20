@@ -176,16 +176,20 @@ reported with a recorded disposition at closure, not a closure blocker
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-core mutation::graph` and
-      `cargo test -p v3-core mutation::engine` -> the named tests pass;
-      `cargo test -p v3-cli bench` -> the projection and digest tests pass;
-      `cargo test -p v3-core --test viability` -> founder digests unchanged.
-      At `40ec50fe` (commit 2): viability 30/30 first; `cargo test -p v3-core
-      -p v3-cli -p v3-telemetry -p v3-server` pass but the open gate-series
-      row below; `--features telemetry-seams` window seam 20/20; `cargo fmt
-      --all --check`, `cargo clippy --workspace --all-targets` clean;
-      frontend vitest (config panel, control bar) 106/106, `tsc --noEmit`
-      and biome clean.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 30/30,
+      founder digests unchanged at every build commit and after the
+      simplify pass.
+- [x] Crate tests: `cargo test --no-fail-fast -p v3-core -p v3-cli` -> every
+      target passes (the named tests of Implementation Tasks included) but
+      `v3-cli --test bench`
+      `gate_profile_has_no_severe_regression_against_series_references`,
+      the open-until-closure row of the pins table; `-p v3-telemetry
+      -p v3-server` pass at `40ec50fe`; `--features telemetry-seams` window
+      seam 20/20 at `40ec50fe`.
+- [x] Lints: `cargo fmt --all --check`, `cargo check --workspace
+      --all-targets`, `cargo clippy --workspace --all-targets` -> clean.
+- [x] Frontend (config panel, control bar): vitest 106/106, `tsc --noEmit`
+      and biome clean at `40ec50fe`; the simplify pass touches no frontend.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (local
       `MUTANTS_ITERATE=0 make rust-mutants` when Actions is unavailable), its
       summary line, output path, and every survivor resolved as killed,

@@ -312,7 +312,7 @@ fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add(&mut node, &mut rng).unwrap();
+        group::add_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
         let rings = [1u16, 2, 3];
         let ring_ref = rings[expected.gen_range(0..rings.len())];
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
@@ -485,8 +485,16 @@ fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
     let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
 
     // Act
-    let added = group::add(&mut last, &mut SmallRng::seed_from_u64(0));
-    let skipped = group::add(&mut past, &mut SmallRng::seed_from_u64(0));
+    let added = group::add_in_form(
+        &mut last,
+        group::CreationForm::Uniform,
+        &mut SmallRng::seed_from_u64(0),
+    );
+    let skipped = group::add_in_form(
+        &mut past,
+        group::CreationForm::Uniform,
+        &mut SmallRng::seed_from_u64(0),
+    );
 
     // Assert
     assert_eq!(added, Ok(()));
@@ -512,7 +520,7 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     let mut rng = SmallRng::seed_from_u64(9);
     let mut untouched = SmallRng::seed_from_u64(9);
     assert_eq!(
-        group::add(&mut node, &mut rng),
+        group::add_in_form(&mut node, group::CreationForm::Uniform, &mut rng),
         Err(MutationSkipReason::NoApplicableTarget)
     );
     assert_eq!(node, before);
@@ -547,7 +555,7 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add_pair(&mut node, &mut rng).unwrap();
+        group::add_pair_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
         let (ref_idx, pair) = flat[expected.gen_range(0..flat.len())];
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
         let offset = expected.gen_range(0..8u8);
@@ -583,7 +591,7 @@ fn add_pair_skips_without_a_draw_without_a_site() {
         let mut rng = SmallRng::seed_from_u64(9);
         let mut untouched = SmallRng::seed_from_u64(9);
         assert_eq!(
-            group::add_pair(&mut node, &mut rng),
+            group::add_pair_in_form(&mut node, group::CreationForm::Uniform, &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
         assert_eq!(node, before);
@@ -610,7 +618,12 @@ fn the_mutator_dispatches_add_direction_pair_group() {
             1,
         )
         .unwrap();
-        group::add_pair(&mut direct, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        group::add_pair_in_form(
+            &mut direct,
+            group::CreationForm::Uniform,
+            &mut SmallRng::seed_from_u64(seed),
+        )
+        .unwrap();
         assert_eq!(graph(&genome.nodes[0]), graph(&direct), "seed {seed}");
         assert_eq!(graph(&direct).groups().len(), 4);
     }
@@ -683,12 +696,20 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     refs.insert(0, InputReference::ActionVotes);
     let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
     assert_eq!(
-        group::add_pair(&mut last, &mut SmallRng::seed_from_u64(0)),
+        group::add_pair_in_form(
+            &mut last,
+            group::CreationForm::Uniform,
+            &mut SmallRng::seed_from_u64(0)
+        ),
         Ok(())
     );
     assert_eq!(graph(&last).groups()[0].shape().ref_idx(), u16::MAX);
     assert_eq!(
-        group::add_pair(&mut past, &mut SmallRng::seed_from_u64(0)),
+        group::add_pair_in_form(
+            &mut past,
+            group::CreationForm::Uniform,
+            &mut SmallRng::seed_from_u64(0)
+        ),
         Err(MutationSkipReason::NoApplicableTarget)
     );
 }
