@@ -1,6 +1,6 @@
 # T25.F09 — Learned-Weight Decay
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-20
 **Feature**: T25.F09
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -123,7 +123,7 @@ cannot show the feature wrong and is not a closure blocker.
 - [x] Commit 1 (text only): `PlasticityConfig.retention`, `Group.retention`, `Group::new`, `GroupMut::set_retention`, `in_range`, `validate_graph` (`GroupRetentionOutOfRange`), serde round trips; `GENOME_FORMAT` 6, `PROTOCOL_VERSION` `v3alpha11`; `types/genome.ts` and fixtures; `GraphEdge` 40 bytes; identity pins of plastic or grouped genomes re-pinned with "the hash without genome text is unchanged" as the check.
 - [x] Commit 2 (runtime), tests first: the birth clamp (invariant 2; an out-of-clamp genomic own weight and scale start clamped; a Lamarckian slot starts at its clamped seed; a scope-`Group` learner's out-of-clamp correction composes raw before and after scale learning); the law (invariant 3: a slot decays toward its birth own correction, not the composed weight; a scope-`Group` member has no own decay while its scale decays; `ρ = 1` leaves every stored f32 bit-identical; an uninitialized slot is untouched); the bounds proptest (invariant 4); Oja plus decay bounded; the view fields; the census bins and birth drift with their bench rows and telemetry gauges; the `plasticity_scale_snaps` deletion (invariant 8) with its `counter_definition_changes` entry; any moved mutation-on pin re-pinned with the birth clamp as its one cause.
 - [x] Commit 3 (catalog), tests first: the six operators (invariant 6: applicability, draw order, the enable range, the step clamp, the disable identity, scope broadcast and report for the edge three, the group pick), catalog pins 38 / 78 / 79 / 71, the identity map and bijection test, every mutation-on pin re-pinned with the draw-stream change as its cause; the reference specs (readers table).
-- [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
+- [x] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
@@ -131,9 +131,10 @@ cannot show the feature wrong and is not a closure blocker.
 - [x] Frontend (2026-10-20): `npx vitest run src/components/inspector` 309 passed, the tooltip naming a scope-`Group` member's edge retention inert; `npx biome check` on `PlasticEdgeList.tsx` and its test clean.
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed; founder-only digests unchanged.
 - [x] Static checks (2026-10-20): `cargo check --workspace --all-targets`, `cargo fmt --all --check` and `make rust-clippy` clean.
-- [x] Mutation gate (2026-10-20): fresh `make rust-mutants-ci` (CI run 39460022426, 7f7fafbf against 2fcd006d) -> `4 shards, 159 mutants tested: 4 missed, 138 caught, 17 unviable, 0 timeouts`; output `~/.local/share/petri-tools/mutants/t25-f09/mutants.out` (since overwritten by the incremental pass). Survivors: `learned.rs:278:50` `&&`->`||` in `BackendLearning::from_seeds` killed by `a_retention_of_one_is_not_applied_where_the_law_would_round` in `decay_tests.rs` (`MUTANTS_ITERATE=1` pass: caught); `plasticity_census.rs:66:16`, `:68:23`, `:70:23` `<`->`<=` in `retention_index` equivalent: an f32 retention near those bins lies in `[0.5, 1)`, so its exact `f64` deficit is a multiple of 2⁻²⁴ and never equals the non-dyadic thresholds 10⁻³, 10⁻², 10⁻¹.
+- [x] Mutation gate (2026-10-20): fresh `make rust-mutants-ci` (CI run 39460022426, 7f7fafbf against 2fcd006d) -> `4 shards, 159 mutants tested: 4 missed, 138 caught, 17 unviable, 0 timeouts`; output `~/.local/share/petri-tools/mutants/t25-f09/mutants.out.old` (the fresh run, moved aside by the incremental pass; its `missed.txt` lists the four survivors below and `timeout.txt` is empty). Survivors: `learned.rs:278:50` `&&`->`||` in `BackendLearning::from_seeds` killed by `a_retention_of_one_is_not_applied_where_the_law_would_round` in `decay_tests.rs` (`MUTANTS_ITERATE=1` pass: caught); `plasticity_census.rs:66:16`, `:68:23`, `:70:23` `<`->`<=` in `retention_index` equivalent: an f32 retention near those bins lies in `[0.5, 1)`, so its exact `f64` deficit is a multiple of 2⁻²⁴ and never equals the non-dyadic thresholds 10⁻³, 10⁻², 10⁻¹.
 - [x] Gate and goal (2026-10-20): summaries at `docs/progress/features/t25-f09-learned-weight-decay.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged.
 - [x] Slow tier (2026-10-20): `make rust-test-slow` -> recruitment-paths 3 passed, lab 6 passed, after re-pinning the recruitment-paths readings the catalog commit moves (enabled Graph weight 67 -> 79; the runtime commit alone keeps the T25.F08 values): prepared Graph Drift `[13, 10, 8, 6]` -> `[15, 10, 9, 2]`, Graph Selection `[13; 4]` -> `[15; 4]`, VM Drift `[23, 16, 16, 9]` -> `[22, 16, 16, 9]`, VM Selection `[23; 4]` -> `[22; 4]`, discards zero; cost selection graph `[17; 4]` censored 15 -> `[18; 4]` censored 14, VM `[20; 4]` censored 12 unchanged, every retained discovery useful.
+- [x] Close (2026-10-20): `make check` exited 0 at the tested commit 2226c3c9; the closure commit is documentation only and checked with `make check-docs`.
 
 ## Performance and Goal Impact
 
@@ -202,11 +203,11 @@ re-pinned to this feature's summaries in `docs/progress/benchmark-series.json`.
 
 ## Success Criteria
 
-- [ ] An ungrouped or edge-scope learner's own quantity and a group's learned scale relax toward their birth values at their own `ρ`; a scope-`Group` member has no own decay; `ρ = 1` is bit-identical to no decay (invariants 2–5, pinned by tests).
-- [ ] The six operators exist with their laws, weights and catalog positions, pinned by the catalog counts, the identity map and the bijection test (invariant 6).
-- [ ] The census reports the retention bins and birth drift for edges and scales in the bench summary and telemetry; `plasticity_scale_snaps` is gone from every site (invariants 7, 8).
-- [ ] The Verification Plan ran as declared; the goal readings are recorded in the readings file with the retention distribution per world, including zero.
-- [ ] Every re-pin names its cause (invariant 9); the founder-only viability digests are unchanged.
+- [x] An ungrouped or edge-scope learner's own quantity and a group's learned scale relax toward their birth values at their own `ρ`; a scope-`Group` member has no own decay; `ρ = 1` is bit-identical to no decay (invariants 2–5, pinned by tests).
+- [x] The six operators exist with their laws, weights and catalog positions, pinned by the catalog counts, the identity map and the bijection test (invariant 6).
+- [x] The census reports the retention bins and birth drift for edges and scales in the bench summary and telemetry; `plasticity_scale_snaps` is gone from every site (invariants 7, 8).
+- [x] The Verification Plan ran as declared; the goal readings are recorded in the readings file with the retention distribution per world, including zero.
+- [x] Every re-pin names its cause (invariant 9); the founder-only viability digests are unchanged.
 
 ## Notes for AI Agents
 
@@ -216,3 +217,4 @@ re-pinned to this feature's summaries in `docs/progress/benchmark-series.json`.
 - Decision: the enable draw is log-uniform over `d ∈ [10⁻⁴, 1]` and the step is the `perturb` law's multiplicative branch on `d`, clamped to that range; `f32::powf` is already in the tick loop (`eval.rs` sigmoid, grazing), so the enable draw adds no new platform dependence.
 - Decision: the census drift is lifetime drift `|learned − birth|`; the ancestral component of a Lamarckian edge is not a census reading.
 - Deferred: a long-run reading of whether selection moves `ρ` off 1 and of the drift under decay over a lifetime goes to the next goal-long carrier; T25's carriers (F02, F04) are spent.
+- Cost: `/usage` totals not collected (user command, not run); implementer passes 4 (build, self-review, post-review remediation, slow-tier re-pin) with advisor consults 2/1/2/2; spec-owner resumes after Plan 0; Codex challenge rounds 2, final verdict ready; review findings: correctness 1 P1 + 1 P2, design 0, code health 2 P3, all fixed in dd862536.
