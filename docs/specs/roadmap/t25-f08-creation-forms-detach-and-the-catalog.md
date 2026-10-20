@@ -282,6 +282,12 @@ edges 400 / 12 / 932 (F07: 112 / 33 / 195), groups removed 244 / 5 / 608
 Raw gate 118,732 B, sha256 `b19ce575...b9f8`; raw goal 699,473,823 B, sha256
 `76586a4a...f8baf8`; summaries 23,772 B and 482,625 B.
 
+**User acceptance (2026-10-20).** The user accepted the gate `decided_passes`
+severe and the goal `vm_steps`, `plasticity_updates` and `decided_passes`
+severes as the draw-stream trajectory reading, together with the `Slots`
+deletion ("Accept and re-pin"); the gate and goal-worlds epochs are re-pinned
+to this feature's summaries in `docs/progress/benchmark-series.json`.
+
 - Summaries: [gate](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog.json),
   [goal](../../progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json).
 - Full readings: [`docs/progress/readings/t25-f08.md`](../../progress/readings/t25-f08.md).

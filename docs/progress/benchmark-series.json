@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t25-f07-group-scope-learning.json",
+    "epoch_baseline": "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -79,7 +79,8 @@
       "docs/progress/features/t25-f04-direction-pair-groups.json",
       "docs/progress/features/t25-f05-nearby-creature-family.json",
       "docs/progress/features/t25-f06-learning-per-edge.json",
-      "docs/progress/features/t25-f07-group-scope-learning.json"
+      "docs/progress/features/t25-f07-group-scope-learning.json",
+      "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json"
     ]
   },
   "goal": {
@@ -159,7 +160,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t25-f07-group-scope-learning-goal.json",
+    "epoch_baseline": "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -213,7 +214,8 @@
       "docs/progress/features/t25-f04-direction-pair-groups-goal.json",
       "docs/progress/features/t25-f05-nearby-creature-family-goal.json",
       "docs/progress/features/t25-f06-learning-per-edge-goal.json",
-      "docs/progress/features/t25-f07-group-scope-learning-goal.json"
+      "docs/progress/features/t25-f07-group-scope-learning-goal.json",
+      "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json"
     ]
   },
   "goal_worlds_long": {
