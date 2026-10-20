@@ -8,11 +8,11 @@ use rand::Rng;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, Scope, Shape};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
-use crate::creature::genome::{BackendDef, NodeGenome, PlasticityConfig};
+use crate::creature::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::MutationSkipReason;
 
 use super::hebbian::{
-    decays, draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
+    draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
     step_retention,
 };
 use super::operators::perturb_weight;
@@ -191,14 +191,7 @@ pub(crate) fn detach_member(
 
 /// The first draw of every unit operator: one group, uniformly.
 fn pick(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Result<GroupId, MutationSkipReason> {
-    let count = def.groups().len();
-    if count == 0 {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let index = rng.gen_range(0..count);
-    Ok(GroupId::new(
-        u16::try_from(index).expect("groups below u16::MAX"),
-    ))
+    pick_where(def, |_| true, rng)
 }
 
 /// `AlterGroupScale`: `AlterGraphEdgeWeight`'s law on the group's scale.
@@ -250,13 +243,13 @@ pub(super) type GroupPredicate = fn(&cgp::Group) -> bool;
 
 /// `EnableGroupRetention`: a record whose retention is exactly 1.
 pub(super) fn retains(group: &cgp::Group) -> bool {
-    !decays(group.retention())
+    !retention_decays(group.retention())
 }
 
 /// `DisableGroupRetention`, `MutateGroupRetention`: a record whose
 /// retention is below 1.
 pub(super) fn is_decaying_group(group: &cgp::Group) -> bool {
-    decays(group.retention())
+    retention_decays(group.retention())
 }
 
 /// Whether any group record matches `predicate`.

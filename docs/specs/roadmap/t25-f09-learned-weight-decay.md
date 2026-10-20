@@ -127,8 +127,9 @@ cannot show the feature wrong and is not a closure blocker.
 
 ## Verification
 
-- [x] Focused tests (build, 2026-10-20): `cargo test -p v3-core --lib plasticity` 78 passed; `cargo test -p v3-core --lib mutation::graph` passed; `cargo test -p v3-cli --lib bench` 132 passed; `cargo test -p v3-telemetry` 78 passed. `cargo test --workspace --no-fail-fast` at commit 3: every target passes except `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references` (`pass_cap_hits` 0.004623 against the F08 epoch's 0.000990, severe), the predeclared catalog reading that the closing epoch re-pin resolves.
-- [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed before and after each of the three commits; founder-only digests unchanged.
+- [x] Tests (2026-10-20): `cargo test -p v3-core --no-fail-fast` 2,304 passed, 0 failed (slow tier ignored); `cargo test -p v3-cli --lib bench` 132 passed; `cargo test -p v3-telemetry` 78 passed. `cargo test --workspace --no-fail-fast` passes every target except `v3-cli --test bench` `gate_profile_has_no_severe_regression_against_series_references` (`pass_cap_hits` 0.004623 against the F08 epoch's 0.000990, severe), the predeclared catalog reading that the closing epoch re-pin resolves.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed; founder-only digests unchanged.
+- [x] Static checks (2026-10-20): `cargo check --workspace --all-targets`, `cargo fmt --all --check` and `make rust-clippy` clean.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (fallback `MUTANTS_ITERATE=0 make rust-mutants`), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Gate and goal: summaries at `docs/progress/features/t25-f09-learned-weight-decay.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged.
 - [ ] Slow tier: `make rust-test-slow` -> result, re-pinned readings named.

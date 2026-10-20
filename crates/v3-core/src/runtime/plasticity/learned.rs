@@ -25,7 +25,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
     compose, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GroupId, Scope,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, PlasticityConfig};
+use crate::creature::genome::{retention_decays, BackendDef, CreatureGenome, PlasticityConfig};
 
 /// Where a member's group term reads its scale.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -208,7 +208,7 @@ impl BackendLearning {
         }
         let scale = scales.iter().map(|slot| slot.birth).collect();
         let decaying_scales = (0..scales.len())
-            .filter(|&index| decays(scales[index].retention))
+            .filter(|&index| retention_decays(scales[index].retention))
             .collect();
 
         let mut slots = Vec::new();
@@ -274,7 +274,9 @@ impl BackendLearning {
         let decaying = slots
             .iter()
             .enumerate()
-            .filter(|(_, slot)| slot.scope != Some(Scope::Group) && decays(slot.config.retention))
+            .filter(|(_, slot)| {
+                slot.scope != Some(Scope::Group) && retention_decays(slot.config.retention)
+            })
             .map(|(index, _)| index)
             .collect();
         let modulated: Box<[usize]> = slots
@@ -753,12 +755,6 @@ impl LearnedState {
         backend.visited = true;
         backend.scale[slot] = scale;
     }
-}
-
-/// Whether a retention decays: below 1, compared exactly so that 1 is an
-/// exact no-op (T25.F09 invariant 3).
-fn decays(retention: f32) -> bool {
-    retention < 1.0
 }
 
 /// One visit's access to its backend's learned state and samples. The
