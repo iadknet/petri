@@ -73,7 +73,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // (weight 58 -> 60), the plasticity operators admit members and draw the
     // scope coin, and group creation draws its learning
     // (11853091526805612651 -> 6729442929459510286).
-    assert_eq!(hash, 6729442929459510286, "pin of the recruitment-Off path");
+    // Held by T25.F08 commit 1: this path never enabled refinement, so its
+    // enabled set did not change. Re-pinned by T25.F08 commit 2: the two
+    // randomized creation operators and `DetachGraphEdge` join the Graph
+    // catalog (enabled weight 60 -> 66) and remap every Graph draw
+    // (6729442929459510286 -> 1771622774480443924).
+    assert_eq!(hash, 1771622774480443924, "pin of the recruitment-Off path");
 }
 
 #[test]

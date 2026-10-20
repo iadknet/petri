@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::creature::genome::cgp::Scope;
 use crate::creature::genome::vote::VoteSink;
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
@@ -247,6 +248,9 @@ pub enum MutationOperator {
     GraphRetargetGroupKind,
     GraphRemoveGroup,
     GraphSetScope,
+    GraphAddRandomizedRingGroup,
+    GraphAddRandomizedDirectionPairGroup,
+    GraphDetachGraphEdge,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -316,6 +320,9 @@ impl MutationOperator {
             Self::GraphRetargetGroupKind => "Graph.RetargetGroupKind",
             Self::GraphRemoveGroup => "Graph.RemoveGroup",
             Self::GraphSetScope => "Graph.SetScope",
+            Self::GraphAddRandomizedRingGroup => "Graph.AddRandomizedRingGroup",
+            Self::GraphAddRandomizedDirectionPairGroup => "Graph.AddRandomizedDirectionPairGroup",
+            Self::GraphDetachGraphEdge => "Graph.DetachGraphEdge",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -383,7 +390,10 @@ impl MutationOperator {
             | Self::GraphShiftGroupOffset
             | Self::GraphRetargetGroupKind
             | Self::GraphRemoveGroup
-            | Self::GraphSetScope => MutationDomain::Graph,
+            | Self::GraphSetScope
+            | Self::GraphAddRandomizedRingGroup
+            | Self::GraphAddRandomizedDirectionPairGroup
+            | Self::GraphDetachGraphEdge => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -439,7 +449,9 @@ impl MutationOperator {
             | Self::GraphEnableRewardModulation
             | Self::GraphRecruitNeutralInput
             | Self::GraphAddRingGroup
-            | Self::GraphAddDirectionPairGroup => ComplexityEffect::Increasing,
+            | Self::GraphAddDirectionPairGroup
+            | Self::GraphAddRandomizedRingGroup
+            | Self::GraphAddRandomizedDirectionPairGroup => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
@@ -460,7 +472,8 @@ impl MutationOperator {
             | Self::GraphAlterGroupScale
             | Self::GraphShiftGroupOffset
             | Self::GraphRetargetGroupKind
-            | Self::GraphSetScope => ComplexityEffect::Neutral,
+            | Self::GraphSetScope
+            | Self::GraphDetachGraphEdge => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -469,7 +482,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 62] {
+    pub const fn all() -> [Self; 65] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -529,6 +542,9 @@ impl MutationOperator {
             Self::GraphRetargetGroupKind,
             Self::GraphRemoveGroup,
             Self::GraphSetScope,
+            Self::GraphAddRandomizedRingGroup,
+            Self::GraphAddRandomizedDirectionPairGroup,
+            Self::GraphDetachGraphEdge,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,
@@ -645,6 +661,10 @@ pub struct MutationSummary {
     /// Edge groups committed events removed (T25.F03): `RemoveGroup`, and a
     /// last member's removal or detach.
     pub groups_removed: u32,
+    /// Committed attribute changes (the nine plasticity operators and
+    /// `SetScope`) by the scope they landed on, indexed by
+    /// [`Scope::index`] (T25.F08).
+    pub attribute_changes_by_scope: [u32; 2],
 }
 
 impl MutationSummary {
@@ -674,6 +694,7 @@ impl MutationSummary {
             vote_edge_classes: Vec::new(),
             graph_edges_detached: 0,
             groups_removed: 0,
+            attribute_changes_by_scope: [0; 2],
         }
     }
 
@@ -681,6 +702,11 @@ impl MutationSummary {
     pub fn record_group_edits(&mut self, edits: GroupEdits) {
         self.graph_edges_detached += edits.detached;
         self.groups_removed += edits.groups_removed;
+    }
+
+    /// Record one committed attribute change at the scope it landed on.
+    pub fn record_attribute_scope(&mut self, scope: Scope) {
+        self.attribute_changes_by_scope[scope.index()] += 1;
     }
 
     /// Record the class of a vote-sink edge an applied event pushed.

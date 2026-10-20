@@ -1083,6 +1083,52 @@ pub struct MutationSupply {
     /// with `|scale| > 1e-3` (T25.F04); absent in reports stored before
     /// T25.F04.
     pub pair_group_inherited_nonzero_births_total: u64,
+    /// Committed attribute changes by the scope they landed on (T25.F08);
+    /// absent in reports stored before T25.F08.
+    pub attribute_changes_by_scope: AttributeChangesByScope,
+    /// The event funnel of every operator an event tried, keyed
+    /// `MutationOperator::as_key()` (T25.F08); absent in reports stored
+    /// before T25.F08.
+    pub operator_funnel_by_operator: BTreeMap<String, OperatorFunnel>,
+}
+
+/// Committed attribute changes (the nine plasticity operators and
+/// `SetScope`) by the scope they landed on (T25.F08 invariant 8).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AttributeChangesByScope {
+    pub edge: u64,
+    pub group: u64,
+}
+
+impl From<[u64; 2]> for AttributeChangesByScope {
+    fn from([edge, group]: [u64; 2]) -> Self {
+        Self { edge, group }
+    }
+}
+
+/// One operator's event funnel (T25.F08): the five stages of
+/// `MutationOperatorFunnel`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OperatorFunnel {
+    pub attempted: u64,
+    pub applicable: u64,
+    pub structurally_valid: u64,
+    pub applied: u64,
+    pub skipped: u64,
+}
+
+impl From<&v3_core::mutation::types::MutationOperatorFunnel> for OperatorFunnel {
+    fn from(funnel: &v3_core::mutation::types::MutationOperatorFunnel) -> Self {
+        Self {
+            attempted: funnel.attempted,
+            applicable: funnel.applicable,
+            structurally_valid: funnel.structurally_valid,
+            applied: funnel.applied,
+            skipped: funnel.skipped,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

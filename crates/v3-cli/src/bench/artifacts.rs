@@ -1386,12 +1386,18 @@ mod tests {
         assert_eq!(extinct[1]["pair_groups"], Value::Null);
     }
 
-    /// T25.F04: `mutation_supply` rides whole through the case projection.
+    /// T25.F04: `mutation_supply` rides whole through the case projection,
+    /// with T25.F08's scope totals and per-operator funnel.
     #[test]
     fn mutation_supply_survives_summary_projection() {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
-            "pair_group_inherited_nonzero_births_total": 2
+            "pair_group_inherited_nonzero_births_total": 2,
+            "attribute_changes_by_scope": {"edge": 5, "group": 1},
+            "operator_funnel_by_operator": {"Graph.DetachGraphEdge": {
+                "attempted": 2, "applicable": 2, "structurally_valid": 2,
+                "applied": 1, "skipped": 1
+            }}
         }});
         let kept = keep_case(&case);
         assert_eq!(kept["mutation_supply"], case["mutation_supply"]);

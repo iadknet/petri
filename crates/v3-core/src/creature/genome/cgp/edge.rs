@@ -30,6 +30,29 @@ pub enum Scope {
 }
 
 impl Scope {
+    /// Both scopes, in index order.
+    pub const ALL: [Self; 2] = [Self::Edge, Self::Group];
+
+    /// This scope's position in [`Self::ALL`].
+    #[inline]
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Edge => 0,
+            Self::Group => 1,
+        }
+    }
+
+    /// Stable string key used by transport boundaries.
+    #[inline]
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Edge => "Edge",
+            Self::Group => "Group",
+        }
+    }
+
     /// The other scope.
     #[inline]
     #[must_use]

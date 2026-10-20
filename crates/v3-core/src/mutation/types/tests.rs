@@ -256,7 +256,10 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphShiftGroupOffset
             | MutationOperator::GraphRetargetGroupKind
             | MutationOperator::GraphRemoveGroup
-            | MutationOperator::GraphSetScope => {
+            | MutationOperator::GraphSetScope
+            | MutationOperator::GraphAddRandomizedRingGroup
+            | MutationOperator::GraphAddRandomizedDirectionPairGroup
+            | MutationOperator::GraphDetachGraphEdge => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -374,6 +377,11 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
             GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
             GraphOperator::SetScope => MutationOperator::GraphSetScope,
+            GraphOperator::AddRandomizedRingGroup => MutationOperator::GraphAddRandomizedRingGroup,
+            GraphOperator::AddRandomizedDirectionPairGroup => {
+                MutationOperator::GraphAddRandomizedDirectionPairGroup
+            }
+            GraphOperator::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
         };
         // `complexity_effect` delegates to `operator()`, so pinning the
         // mapping pins the classification.
@@ -399,6 +407,104 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             ir
         );
     }
+}
+
+/// The Graph catalog is one consistent set (T25.F08 invariant 1): `ALL`
+/// covers every variant once, `operator()` is injective onto exactly the
+/// Graph-domain members of `MutationOperator::all()`, every key is unique
+/// and `Graph.`-prefixed, the two enums agree on complexity, and `all()` is
+/// the four domains' catalogs. The hand-written map above stays the
+/// identity oracle.
+#[test]
+fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
+    use crate::mutation::graph::GraphOperator;
+    use crate::mutation::input_ref::InputRefOperator;
+    use crate::mutation::topology::TopologyOperator;
+    use crate::mutation::vm::VmOperator;
+    use std::collections::HashSet;
+
+    let variants: HashSet<GraphOperator> = GraphOperator::ALL.into_iter().collect();
+    assert_eq!(
+        variants.len(),
+        GraphOperator::ALL.len(),
+        "ALL lists each once"
+    );
+    // A variant missing from `ALL` fails to compile here.
+    for &op in &GraphOperator::ALL {
+        match op {
+            GraphOperator::AlterGraphEdgeWeight
+            | GraphOperator::SwapGraphOperator
+            | GraphOperator::MutateGraphOperatorParam
+            | GraphOperator::AddInternalGraphNode
+            | GraphOperator::RemoveInternalGraphNode
+            | GraphOperator::AddGraphEdge
+            | GraphOperator::RetargetGraphEdge
+            | GraphOperator::RemoveGraphEdge
+            | GraphOperator::GraphRawFieldMutation
+            | GraphOperator::CopyInternalNode
+            | GraphOperator::CopySubgraph
+            | GraphOperator::CopyEdgeBundle
+            | GraphOperator::EnableHebbian
+            | GraphOperator::DisableHebbian
+            | GraphOperator::MutateHebbianRule
+            | GraphOperator::MutateHebbianRate
+            | GraphOperator::ToggleHebbianLamarckian
+            | GraphOperator::EnableRewardModulation
+            | GraphOperator::DisableRewardModulation
+            | GraphOperator::MutateRewardSource
+            | GraphOperator::MutateTraceDecay
+            | GraphOperator::RecruitNeutralInput
+            | GraphOperator::AddRingGroup
+            | GraphOperator::AddDirectionPairGroup
+            | GraphOperator::AlterGroupScale
+            | GraphOperator::ShiftGroupOffset
+            | GraphOperator::RetargetGroupKind
+            | GraphOperator::RemoveGroup
+            | GraphOperator::SetScope
+            | GraphOperator::AddRandomizedRingGroup
+            | GraphOperator::AddRandomizedDirectionPairGroup
+            | GraphOperator::DetachGraphEdge => {}
+        }
+    }
+    assert_eq!(variants.len(), 32);
+
+    let image: HashSet<MutationOperator> = GraphOperator::ALL
+        .into_iter()
+        .map(GraphOperator::operator)
+        .collect();
+    assert_eq!(
+        image.len(),
+        GraphOperator::ALL.len(),
+        "operator() is injective"
+    );
+    let graph_domain: HashSet<MutationOperator> = MutationOperator::all()
+        .into_iter()
+        .filter(|op| op.domain() == MutationDomain::Graph)
+        .collect();
+    assert_eq!(image, graph_domain, "the image is the Graph domain");
+
+    let keys: HashSet<&str> = GraphOperator::ALL
+        .into_iter()
+        .map(|op| op.operator().as_key())
+        .collect();
+    assert_eq!(keys.len(), GraphOperator::ALL.len(), "keys are unique");
+    assert!(keys.iter().all(|key| key.starts_with("Graph.")));
+    for &op in &GraphOperator::ALL {
+        assert_eq!(op.complexity_effect(), op.operator().complexity_effect());
+    }
+
+    assert_eq!(
+        MutationOperator::all().len(),
+        TopologyOperator::ALL.len()
+            + VmOperator::ALL.len()
+            + GraphOperator::ALL.len()
+            + InputRefOperator::ALL.len()
+    );
+    let all_keys: HashSet<&str> = MutationOperator::all()
+        .into_iter()
+        .map(MutationOperator::as_key)
+        .collect();
+    assert_eq!(all_keys.len(), MutationOperator::all().len());
 }
 
 #[test]

@@ -342,6 +342,10 @@ pub struct SimStats {
     pub graph_edges_detached_total: u64,
     /// Edge groups committed mutation events removed (T25.F03).
     pub groups_removed_total: u64,
+    /// Committed attribute changes (the nine plasticity operators and
+    /// `SetScope`) by the scope they landed on, indexed by `Scope::index`
+    /// (T25.F08).
+    pub mutation_attribute_changes_total_by_scope: [u64; 2],
     /// Births whose committed genome holds a `DirectionPair` group with
     /// `|scale| > 1e-3` that no event of the birth could have created: the
     /// inheritance witness (T25.F04).
