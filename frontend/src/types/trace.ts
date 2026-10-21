@@ -1,5 +1,5 @@
 import type { InputReference, VmInstruction, VoteSink } from "./genome.ts";
-import { VOTE_SINK_COUNT } from "./vote-sinks.ts";
+import { VOTE_KINDS, VOTE_SINK_COUNT } from "./vote-sinks.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -161,12 +161,15 @@ export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
 export const ZERO_VOTES: readonly number[] = Object.freeze(
 	Array.from({ length: VOTE_SINK_COUNT }, () => 0),
 );
+/** A per-kind vector (commit counts, bars) with every kind at zero, in
+ * `VOTE_KINDS` order. */
+export const ZERO_KIND_COUNTS: readonly number[] = Object.freeze(VOTE_KINDS.map(() => 0));
 
 /** Decision-state inputs of a dispatch before any vote, commit, or hop. */
 export const ZERO_DECISION_INPUTS: DecisionInputs = Object.freeze({
 	action_votes: ZERO_VOTES,
 	previous_pass_votes: ZERO_VOTES,
-	commit_counts: Object.freeze([0, 0, 0, 0]),
+	commit_counts: ZERO_KIND_COUNTS,
 	hops_this_tick: 0,
 });
 

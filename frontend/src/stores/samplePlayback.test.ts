@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ExecutionSample } from "../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../types/trace.ts";
 import { useSamplePlaybackStore } from "./samplePlayback.ts";
 
 function makeSample(): ExecutionSample {
@@ -101,7 +101,7 @@ function makeSample(): ExecutionSample {
 				termination_reason: "NoDecision",
 				debug_perception: null,
 				priority_bid: 0,
-				commit_counts: [0, 0, 0, 0],
+				commit_counts: ZERO_KIND_COUNTS,
 			},
 			{
 				tick_number: 2,
@@ -154,7 +154,7 @@ function makeSample(): ExecutionSample {
 				termination_reason: "NoDecision",
 				debug_perception: null,
 				priority_bid: 0,
-				commit_counts: [0, 0, 0, 0],
+				commit_counts: ZERO_KIND_COUNTS,
 			},
 		],
 	};

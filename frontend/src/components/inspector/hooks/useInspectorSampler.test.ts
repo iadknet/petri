@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSamplePlaybackStore } from "../../../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../../../stores/sampleSession.ts";
 import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../../types/trace.ts";
 import { useInspectorSampler } from "./useInspectorSampler.ts";
 
 const mockClearSampling = vi.fn();
@@ -104,7 +104,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 		termination_reason: "NoDecision" as const,
 		debug_perception: null,
 		priority_bid: 0,
-		commit_counts: [0, 0, 0, 0],
+		commit_counts: ZERO_KIND_COUNTS,
 	}));
 
 	return { creature_id: creatureId, ticks };

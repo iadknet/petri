@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { VoteKind } from "../../types/genome.ts";
 import type { MeshHopTrace } from "../../types/trace.ts";
-import { ZERO_VOTES } from "../../types/trace.ts";
+import { VOTE_KINDS, ZERO_VOTES } from "../../types/trace.ts";
 import { SelectedHopBlock } from "./SelectedHopBlock.tsx";
 
 function votes(entries: Record<number, number>): number[] {
@@ -9,6 +10,8 @@ function votes(entries: Record<number, number>): number[] {
 	for (const [index, value] of Object.entries(entries)) vector[Number(index)] = value;
 	return vector;
 }
+
+const COMMIT_COUNTS: Partial<Record<VoteKind, number>> = { Eat: 1, Reproduce: 2 };
 
 const selected: MeshHopTrace = {
 	hop_index: 4,
@@ -24,7 +27,7 @@ const selected: MeshHopTrace = {
 	decision_inputs: {
 		action_votes: votes({ 4: 0.5 }),
 		previous_pass_votes: votes({ 0: 1, 37: 0.125 }),
-		commit_counts: [1, 0, 2, 0, 0],
+		commit_counts: VOTE_KINDS.map((kind) => COMMIT_COUNTS[kind] ?? 0),
 		hops_this_tick: 5,
 	},
 	backend_trace: {
@@ -49,8 +52,10 @@ describe("SelectedHopBlock", () => {
 		expect(screen.getByTestId("hop-ActionVotes")).toHaveTextContent("Move[SE] 0.500");
 		expect(screen.getByTestId("hop-PreviousPassVotes")).toHaveTextContent("Eat 1.000");
 		expect(screen.getByTestId("hop-PreviousPassVotes")).toHaveTextContent("Terminate 0.125");
-		for (const text of ["Eat 1", "Move 0", "Reproduce 2", "StealEnergy 0", "GiveEnergy 0"]) {
-			expect(screen.getByTestId("hop-CommitCounts")).toHaveTextContent(text);
+		for (const kind of VOTE_KINDS) {
+			expect(screen.getByTestId("hop-CommitCounts")).toHaveTextContent(
+				`${kind} ${COMMIT_COUNTS[kind] ?? 0}`,
+			);
 		}
 		expect(screen.getByTestId("hop-HopsThisTick")).toHaveTextContent("5");
 		for (const text of [
