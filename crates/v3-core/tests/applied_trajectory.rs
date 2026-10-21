@@ -173,6 +173,13 @@
 //! e73790b0..., gestation rate 0.0 95ef1cbb... -> 7ce96421...); the guard
 //! digests hold, and mapping the genome text back to the old shape restores
 //! both old sampled digests.
+//! Re-pinned by T27.F03 commit 2 after two agreeing runs: retiring
+//! `StealEnergyAmount` narrows the `WriteActionParam` field draw to `0..3`
+//! and the Graph sink surface to 97, and a steal moves the fixed bite, which
+//! moves the sampled digests (e73790b0... -> aaf02e29..., gestation rate 0.0
+//! 7ce96421... -> c902c7b9...) and the default guard (c7e77b62... ->
+//! 9ad87b36...); the rate-0.0 guard holds (7488a15f...), and the
+//! founder-only viability digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -184,11 +191,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "e73790b01711f0f1cc8ad3ff5acc816d6fdcc5f3fcbfc5d99ade84c306a30971"
+        "aaf02e29e0d7e3bd1958777c3ecc474e0e225a68bd53daa1c4d274c8e4e259c6"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "7ce96421b0ed9d4bae1e28b97519548b174baec5a32c819ad17c40c3db52b96d"
+        "c902c7b930dbe7e0873c65735a1adc9209ab8d8732185d07613467f4846808a8"
     );
 }
 
@@ -261,7 +268,7 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "c7e77b620d6a887b9183cfb301818ea7c99aa06462f8f6f6716960ed674c9150"
+        "9ad87b3603ae2d60b0d70cfa7f7baf1ca7b913f760eee4530b01de22fc597e98"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),

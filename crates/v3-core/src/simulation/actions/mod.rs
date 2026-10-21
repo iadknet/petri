@@ -3,7 +3,11 @@ mod predation;
 mod reproduction;
 
 use crate::creature::action_log::ActionType;
-pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
+#[cfg(test)]
+pub(crate) use predation::steal_with_bite;
+pub use predation::{
+    apply_steal_energy, PredationActionResult, PredationEventRecord, TransferOutcome,
+};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
@@ -1628,7 +1632,7 @@ mod tests {
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
         let energy_before_low = sim_low.creatures[attacker_low].energy;
-        let _ = apply_steal_energy(attacker_low, &mut sim_low, Direction::N, 10.0);
+        let _ = steal_with_bite(attacker_low, &mut sim_low, Direction::N, 10.0);
         let cost_low = energy_before_low - sim_low.creatures[attacker_low].energy;
 
         // Set up high-complexity attacker with victim
@@ -1647,7 +1651,7 @@ mod tests {
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
         let energy_before_high = sim_high.creatures[attacker_high].energy;
-        let _ = apply_steal_energy(attacker_high, &mut sim_high, Direction::N, 10.0);
+        let _ = steal_with_bite(attacker_high, &mut sim_high, Direction::N, 10.0);
         let cost_high = energy_before_high - sim_high.creatures[attacker_high].energy;
 
         // Both steal 10.0 from victim and get 10.0 back, but the cost (steal_cost_rate * amount)
@@ -1822,7 +1826,7 @@ mod tests {
         });
         sim_young.world.place_creature(victim_pos, victim_young);
         let energy_before_young = sim_young.creatures[attacker_young].energy;
-        let _ = apply_steal_energy(attacker_young, &mut sim_young, Direction::N, 10.0);
+        let _ = steal_with_bite(attacker_young, &mut sim_young, Direction::N, 10.0);
         let cost_young = energy_before_young - sim_young.creatures[attacker_young].energy;
 
         // Old attacker
@@ -1841,7 +1845,7 @@ mod tests {
         });
         sim_old.world.place_creature(victim_pos, victim_old);
         let energy_before_old = sim_old.creatures[attacker_old].energy;
-        let _ = apply_steal_energy(attacker_old, &mut sim_old, Direction::N, 10.0);
+        let _ = steal_with_bite(attacker_old, &mut sim_old, Direction::N, 10.0);
         let cost_old = energy_before_old - sim_old.creatures[attacker_old].energy;
 
         // Both steal from victim, but old attacker's cost portion is higher.

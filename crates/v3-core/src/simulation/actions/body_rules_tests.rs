@@ -7,7 +7,7 @@ use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
-use super::{apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat};
+use super::{apply_move, apply_reproduce, apply_typed_eat, steal_with_bite};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, Position};
@@ -211,7 +211,7 @@ fn steal(victim_energy: f32) -> (Simulation, CreatureId, PredationActionResult, 
         .config
         .energy
         .action_effort(0.0, attacker.cached_complexity, attacker.age);
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0).result;
+    let result = steal_with_bite(ids[0], &mut sim, Direction::N, 20.0).result;
     (sim, ids[0], result, 195.0 - effort)
 }
 
@@ -262,7 +262,7 @@ fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
 fn predation_under_the_cap_books_no_clamp_loss() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0), (Position::new(5, 4), 50.0)]);
     sim.config.predation.steal_cost_rate = 0.0;
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0).result;
+    let result = steal_with_bite(ids[0], &mut sim, Direction::N, 20.0).result;
     assert_eq!(result, PredationActionResult::Transferred);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
 }

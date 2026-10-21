@@ -91,12 +91,9 @@ export type VoteSink =
 /** An action kind carrying votes and a bar. */
 export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
 
-/** One action-parameter field the commit decoder reads (T11.F27, T02.F08). */
-export type ActionParamField =
-	| "EatFoodType"
-	| "EatLeaveShare"
-	| "ReproduceTransferFraction"
-	| "StealEnergyAmount";
+/** One action-parameter field the commit decoder reads (T11.F27, T02.F08,
+ * T27.F03). */
+export type ActionParamField = "EatFoodType" | "EatLeaveShare" | "ReproduceTransferFraction";
 
 export type OutputSinkKind =
 	| { CustomOutput: number }

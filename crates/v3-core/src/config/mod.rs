@@ -8,9 +8,9 @@ pub use crate::contracts::OrdinaryFoodTypeId;
 #[cfg(test)]
 pub(crate) use simulation::MAX_GRAZING_RECOVERY_TICKS;
 pub use simulation::{
-    AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FertilityAlgorithm,
-    FertilityBlend, FertilityConfig, FertilityLayer, FertilityLayerTarget, FoodConfig,
-    FoodResourceConfig, FoodTypeConfig, FounderProfile, GrazingConfig, MutationConfig,
+    AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, ExchangeConfig,
+    FertilityAlgorithm, FertilityBlend, FertilityConfig, FertilityLayer, FertilityLayerTarget,
+    FoodConfig, FoodResourceConfig, FoodTypeConfig, FounderProfile, GrazingConfig, MutationConfig,
     NeutralInputRecruitment, OccupancyDepletionConfig, PhenotypeConfig, PopulationConfig,
     PredationConfig, ReachableBiasConfig, RuntimeConfig, SimulationConfig, TerrainLayer,
     VmRuntimeConfig, WorldConfig, WorldEdgeMode,

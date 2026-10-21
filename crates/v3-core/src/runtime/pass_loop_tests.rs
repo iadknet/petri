@@ -154,8 +154,7 @@ fn w4_one_edge_into_an_unused_kind_adds_exactly_one_action() {
         tick.actions(),
         &[
             WorldAction::StealEnergy {
-                direction: Direction::E,
-                amount: 0.0,
+                direction: Direction::E
             },
             mv(E),
         ]
@@ -626,7 +625,6 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
         ActionParamField::ReproduceTransferFraction,
         &[(fraction, 1.0)],
     );
-    graph.param(ActionParamField::StealEnergyAmount, &[(fraction, 8.0)]);
     graph.param(ActionParamField::EatLeaveShare, &[(fraction, 2.0)]);
     let steal = vm_node(
         1,
@@ -666,12 +664,12 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     );
     let g = genome(vec![graph.build(0, vec![], &[1]), steal]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-    assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25, 2.0));
+    assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25));
 }
 
 /// The commits of a tick that votes `Eat`, `Reproduce(W)` and
 /// `StealEnergy(N)` once each with the given parameter surface.
-fn three_param_commits(food: u16, leave: f32, fraction: f32, amount: f32) -> [WorldAction; 3] {
+fn three_param_commits(food: u16, leave: f32, fraction: f32) -> [WorldAction; 3] {
     [
         WorldAction::Eat {
             type_idx: OrdinaryFoodTypeId::new(food),
@@ -683,17 +681,15 @@ fn three_param_commits(food: u16, leave: f32, fraction: f32, amount: f32) -> [Wo
         },
         WorldAction::StealEnergy {
             direction: Direction::N,
-            amount,
         },
     ]
 }
 
 /// The surface values and the vote each end-to-end fixture writes.
-const FIELD_VALUES: [(ActionParamField, f32); 4] = [
+const FIELD_VALUES: [(ActionParamField, f32); 3] = [
     (ActionParamField::EatFoodType, 3.0),
     (ActionParamField::EatLeaveShare, 0.5),
     (ActionParamField::ReproduceTransferFraction, 0.25),
-    (ActionParamField::StealEnergyAmount, 2.0),
 ];
 const FIELD_VOTES: [VoteSink; 3] = [
     VoteSink::Eat,
@@ -763,7 +759,7 @@ fn every_param_field_reaches_its_commit_from_either_backend() {
     for writer in [graph_param_writer, vm_param_writer] {
         let g = genome(vec![writer(0, &FIELD_VALUES, &FIELD_VOTES, &[])]);
         let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-        assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25, 2.0));
+        assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25));
     }
 }
 
@@ -796,7 +792,7 @@ fn a_field_unwritten_in_the_mesh_run_decodes_as_zero() {
     for writer in [graph_param_writer, vm_param_writer] {
         let g = genome(vec![writer(0, &FIELD_VALUES[..1], &FIELD_VOTES, &[])]);
         let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-        assert_eq!(tick.actions(), &three_param_commits(3, 0.0, 0.0, 0.0));
+        assert_eq!(tick.actions(), &three_param_commits(3, 0.0, 0.0));
     }
 }
 
