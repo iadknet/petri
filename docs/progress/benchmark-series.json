@@ -81,7 +81,8 @@
       "docs/progress/features/t25-f06-learning-per-edge.json",
       "docs/progress/features/t25-f07-group-scope-learning.json",
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json",
-      "docs/progress/features/t25-f09-learned-weight-decay.json"
+      "docs/progress/features/t25-f09-learned-weight-decay.json",
+      "docs/progress/features/t25-f10.json"
     ]
   },
   "goal": {
@@ -238,7 +239,8 @@
       "docs/progress/features/t25-f06-learning-per-edge-goal.json",
       "docs/progress/features/t25-f07-group-scope-learning-goal.json",
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json",
-      "docs/progress/features/t25-f09-learned-weight-decay-goal.json"
+      "docs/progress/features/t25-f09-learned-weight-decay-goal.json",
+      "docs/progress/features/t25-f10-goal.json"
     ]
   },
   "goal_worlds_long": {
