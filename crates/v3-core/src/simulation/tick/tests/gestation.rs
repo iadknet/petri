@@ -79,6 +79,11 @@ fn gestation_conception_ends_the_queue_and_holds_the_founder_one_tick() {
     let pending = sim.creatures[id].pending_birth.expect("conceived");
     assert_eq!(pending.deliver_tick, 1);
     assert_eq!(pending.litter_energy, LITTER);
+    // T26.F02 invariant 7, in gestation: the debit is the pending stock.
+    assert_eq!(
+        sim.stats.energy_flows.parental_transfer_debit,
+        f64::from(LITTER)
+    );
     assert_eq!(pending.direction, Direction::N);
     assert_eq!(sim.creatures[id].energy, PARENT_ENERGY - 1.0 - LITTER);
     assert_eq!(sim.creature_count(), 1);
@@ -107,6 +112,13 @@ fn gestation_conception_ends_the_queue_and_holds_the_founder_one_tick() {
     assert_eq!(sim.stats.gestation_creature_ticks_total, 1);
     assert_eq!(
         f64::from(LITTER),
+        sim.stats.energy_flows.offspring_energy_credit
+    );
+    // Delivered within the child's capacity: no overflow, the debit is the
+    // credit exactly.
+    assert_eq!(sim.stats.energy_flows.offspring_capacity_overflow, 0.0);
+    assert_eq!(
+        sim.stats.energy_flows.parental_transfer_debit,
         sim.stats.energy_flows.offspring_energy_credit
     );
     assert_eq!(sim.stats.last_tick_noop, 0);
@@ -165,6 +177,11 @@ fn gestation_with_no_valid_cell_loses_the_litter_and_still_holds_the_parent() {
     assert!(sim.creatures[id].pending_birth.is_none());
     assert_eq!(sim.stats.gestations_lost_no_cell_total, 1);
     assert_eq!(sim.stats.energy_flows.gestation_lost, f64::from(LITTER));
+    // T26.F02 invariant 7, lost: the debit is the lost litter exactly.
+    assert_eq!(
+        sim.stats.energy_flows.parental_transfer_debit,
+        sim.stats.energy_flows.gestation_lost
+    );
     assert_eq!(sim.stats.gestations_delivered_total, 0);
     assert_eq!(sim.stats.gestation_creature_ticks_total, 1);
     assert_eq!(
