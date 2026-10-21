@@ -1,6 +1,6 @@
 # T27 — Social Signals and Exchange
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-10-20
 **Master**: [Program Roadmap](../roadmap.md)
 
