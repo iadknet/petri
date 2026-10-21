@@ -165,21 +165,20 @@ The user chose B3, which keeps heritable colour a pure inherited label.
 
 - A creature holds `signal: [f32; 8]`, written by eight `WriteSignal(c)`
   graph sinks and a VM store opcode, last-write like memory.
-- The value is held until rewritten, with configurable decay.
+- The value is held until rewritten, with no decay.
 - Others read last tick's value as eight more fields per NearbyCreature
   slot.
 - The newborn's signal starts at zero, never inherited.
 - Signal values travel in `MeshOutput` and are applied after the mesh, as
   `heading` is; there is no new `&mut` argument (audit #11).
 
-**Cost.** Per tick, proportional to Σ|signal|: the metabolic cost of
-producing scent or song. It is not an honesty mechanism; Lachmann 2001
-allows honest equilibria at negligible production cost (review round 5
-finding 7). The spec checks that a lower amplitude with a higher receiver
-gain does not make the cost vanish, sets the signal range and resolution,
-and requires a causal receiver witness before calling channel variance
-communication. It sets the rate so the cost alone does not drive signals to
-zero.
+**No cost (user decision, 2026-10-21).** A creature writes sinks and others
+read them; nothing else. An earlier draft added a per-tick Σ|signal| cost
+from prior art (Wagner 2000, PA §2), which was never a user decision; it is
+removed with its amplitude/gain check, rate tuning, ledger bucket and
+configurable decay. Signal writes keep the existing graph/VM compute
+charging and affordability that memory writes pay; the NoOp effort floor
+applies only to world actions.
 
 **Recorded consequences.**
 
@@ -346,9 +345,9 @@ do not remove its pin changes.
 | Row | Depends on | Collides with | Verification |
 | --- | --- | --- | --- |
 | T26.F01 body record + hooks | — | — | gate; any moved pin is a defect |
-| T26.F02 energy reserves | T26.F01 | T28.F01 (move hook, ordered), T27.F02 (Phase 0 upkeep) | viability first; gate + goal + **goal-long** (runaway is long-horizon) |
+| T26.F02 energy reserves | T26.F01 | T28.F01 (move hook, ordered) | viability first; gate + goal + **goal-long** (runaway is long-horizon) |
 | T27.F01 colour vision | — | T27.F02 (nearby width, ordered) | gate + goal |
-| T27.F02 signals | T27.F01, T25.F10, T27.F03 | T26.F02 (Phase 0); T27.F03 ordered before it | gate + goal + **goal-long**; three-world pressure |
+| T27.F02 signals | T27.F01, T25.F10, T27.F03 | T27.F03 ordered before it | gate + goal + **goal-long**; three-world pressure |
 | T27.F03 giving + steal bite | T26.F01 | T28.F01 (vote catalog, ordered) | viability first; gate + goal; three-world pressure |
 | T28.F01 carrying + food caching | T26.F02, T27.F03 | — | viability first; gate + goal; three-world pressure |
 | T28.F02 digging + building | T28.F01 | — | viability first; gate + goal + **goal-long**; three-world pressure |
@@ -359,7 +358,6 @@ Rows in one wave are concurrent branches, not separated surfaces (review
 finding 1). They share some files, so the one merged second reconciles them
 at integration. Shared files:
 
-- T26.F02 and T27.F02 both add a Phase 0 debit.
 - T27.F03 then T27.F02 edit the graph and vote catalogs in order, not
   concurrently: F02 depends on F03.
 

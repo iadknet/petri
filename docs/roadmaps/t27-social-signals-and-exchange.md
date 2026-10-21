@@ -17,7 +17,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 ## Track Success Criteria
 
 - [x] Each NearbyCreature slot carries the seen creature's red, green and blue, and the creature senses its own; the lineage oracle `LINEAGE_MATCH` and the genotype comparison `PHENOTYPE_SIMILARITY` are retired, and `KIN_AFFINITY` stays as the one self-referent matching sense.
-- [ ] A creature holds eight signal values it writes like memory, pays per tick for their magnitude through a named ledger bucket, and its neighbours read them per slot one tick later; no channel carries an assigned meaning.
+- [ ] A creature holds eight signal values it writes like memory, held until rewritten, and its neighbours read them per slot one tick later; no channel carries an assigned meaning.
 - [ ] Giving and stealing each move one fixed bite per action through named ledger flows; a zero transfer is a failure, and the steal amount parameter is gone.
 - [ ] Signals and giving run in all three goal worlds, and their goal readings report occurrences and use, including zero.
 
@@ -26,7 +26,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 - [x] **T27.F01 — Colour Vision** — Depends on: None
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
 - [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
-  - Goal: Song and scent: a creature broadcasts eight held signals that cost energy to sustain, and its neighbours perceive them, so meaning can arise from who sends what.
+  - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
 - [ ] **T27.F03 — Giving Energy** — Depends on: T26.F01
   - Goal: Trophallaxis and parental feeding: a creature can pass a mouthful of energy to a neighbour, and stealing takes a mouthful the same way, so care and exploitation are both possible.
 
@@ -59,20 +59,17 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   replacement ceiling. Rejected: a colour-distance ring and a retina.
 - F02: `signal: [f32; 8]` written by fixed graph sinks and a VM opcode
   reachable from the instruction sampler. Writes are sparse: a channel no
-  sink or opcode writes this tick keeps its held value, with configurable
-  decay. Signals start at zero at birth and are applied after the mesh
-  through `MeshOutput`; neighbours read last tick's value. Graph and VM paths
-  keep affordability and traced/plain parity. The cost per tick is
-  proportional to Σ|signal| in its own ledger bucket with death attribution.
-  It is the metabolic cost of producing scent or song, not an honesty
-  mechanism: Lachmann 2001 allows honest equilibria at negligible production
-  cost. The spec checks that a lower amplitude with higher receiver gain does
-  not make the cost vanish, sets the signal range and resolution, and picks
-  the rate so the cost alone does not zero the signals. The reading
-  requires a causal receiver witness (a receiver's decision changing with a
-  sender's signal) before calling any channel variance communication. F02 owns the inspector,
-  trace and frontend type surfaces for signals, measures tick time, and
-  reports per-channel wiring and value variance. User decision
+  sink or opcode writes this tick keeps its held value, with no decay.
+  Signals start at zero at birth and are applied after the mesh through
+  `MeshOutput`; neighbours read last tick's value. Signal writes keep the
+  existing graph/VM compute charging, affordability and commit rules, as
+  memory writes do, with traced/plain parity; the opcode gets an ordinary
+  opcode-cost entry. User decision (2026-10-21): signals carry no energy
+  charge of their own and no other mechanism (no sustain cost, decay or
+  special range; the same value range as other sink outputs); a creature
+  writes sinks and others read them. F02 owns the
+  inspector, trace and frontend type surfaces for signals, measures tick
+  time, and reports per-channel wiring and value variance. User decision
   (2026-10-20): the eight signal fields are ordinary slot facts, so a slot
   recruitment wires them into the drive with the slot's other facts (16
   facts after F01 retires two fields, so a directed recruitment builds 12
@@ -96,7 +93,10 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   run on F02 includes giving. It reads colour, giving and slot-fact
   discovery together. A 2,000-tick goal reading is an early integration
   reading for every T27 row; zero use there is inconclusive.
-- F02 and F03 are creature-authored pressures under the
+- F02's signal writes and next-tick NearbyCreature reads operate in all
+  three goal worlds, with a focused write-to-read fixture; the reading
+  reports per-channel wiring and value variance, including zero, with no
+  pressure tuning. F03 is a creature-authored pressure under the
   [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline).
 - Verification: F01 gate + goal; F02 viability first, gate + goal +
   goal-long (the track's one goal-long carrier); F03 viability first, gate +
