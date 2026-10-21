@@ -1328,7 +1328,12 @@ mod tests {
     /// `[15; 4]`; VM Drift `[23, 16, 16, 9]` -> `[22, 16, 16, 9]`, Selection
     /// `[23; 4]` -> `[22; 4]`); the discard counts stay zero. The runtime
     /// commit (birth clamp and decay at retention 1) still passes the
-    /// T25.F08 values, so the move is the catalog commit's.
+    /// T25.F08 values, so the move is the catalog commit's. Re-pinned by
+    /// T27.F01 (colour vision): the input catalog (30 buckets with eight slot
+    /// facts, family width 36 -> 40, 20 slot-recruitment edges) remaps the
+    /// mutation-on draws (Graph Selection `[15; 4]` -> `[16; 4]`); Graph
+    /// Drift `[15, 10, 9, 2]`, both VM rows and the discard counts (zero)
+    /// are unchanged.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
@@ -1338,7 +1343,7 @@ mod tests {
             (
                 "graph_prepared",
                 Policy::Selection,
-                [15, 15, 15, 15],
+                [16, 16, 16, 16],
                 [0, 0],
             ),
             ("vm_prepared", Policy::Drift, [22, 16, 16, 9], [0, 0]),
