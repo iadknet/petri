@@ -51,9 +51,8 @@ Invariants:
    `mutation.capacity: CapacityMutationConfig`; `energy.lifecycle.max_energy`
    becomes the range's upper bound and stays the v3-lab birth sentinel.
    Normalization runs in the table's order; the `sensor_scale`, β and u
-   defaults are the comparison's and the sweep's picks (invariants 6 and 9),
-   and until they run the code carries `Reference` and the grid's smallest
-   pair.
+   defaults are the comparison's and the sweep's picks (invariants 6 and 9,
+   ruled 2026-10-21).
 
    | Field | Default | Normalization (else the fallback) |
    | --- | --- | --- |
@@ -62,9 +61,9 @@ Invariants:
    | `energy.capacity.min` | 50.0 | finite in `[1, reference]`; else `min(50, reference)` |
    | `energy.capacity.founder` | 200.0 | finite in `[min, max_energy]`; else `reference` |
    | `energy.lifecycle.initial_energy` | 20.0 | finite in `[0, founder]`; else `min(20, founder)`: a founder is never provisioned above its capacity |
-   | `energy.capacity.move_cost_slope` (β) | sweep | finite in `[0, 1]`; else the default |
-   | `energy.capacity.upkeep_per_unit` (u) | sweep | finite `≥ 0`; else the default |
-   | `energy.capacity.sensor_scale` | comparison | `Reference` or `Own` |
+   | `energy.capacity.move_cost_slope` (β) | 1.0 (sweep pick) | finite in `[0, 1]`; else the default |
+   | `energy.capacity.upkeep_per_unit` (u) | 0.002 (sweep pick) | finite `≥ 0`; else the default |
+   | `energy.capacity.sensor_scale` | `Reference` (comparison ruling) | `Reference` or `Own` |
    | `mutation.capacity.chance` | 0.1 | in `[0, 1]`; else the default |
    | `mutation.capacity.log_step` | 0.25 | finite `≥ 0`; else the default |
 
@@ -156,7 +155,9 @@ Invariants:
    among pairs at which all three worlds persist to tick 2,000 with plateau
    population at or above 70% of the T27.F01 goal epoch's, the largest
    `β × u` wins, ties to the larger β; if none qualifies, (0.5, 0.0005) is
-   taken and the breach recorded.
+   taken and the breach recorded. Result (readings file, `81202517`): only
+   (1.0, 0.002) qualified in all three worlds; the other pairs fell under
+   the Orchards bar and (1.0, 0.0005) went extinct in Canyon at tick 658.
 
    | Stage | Arms | Fixed | Readings per world |
    | --- | --- | --- | --- |
@@ -259,7 +260,8 @@ expected within the ordinary thresholds against the T27.F01 epoch, and the
 deterministic blocks change because every birth draws. The gate and goal
 epochs are re-pinned in the closing commit. Expected directions are in the
 table; no other indicator has a predeclared direction. The ruled scale, β
-and u: `<set after the comparison and sweep, before the final runs>`.
+and u, set before the final runs: `Reference`, 1.0, 0.002 (the only pair
+qualifying under invariant 9's rule; readings file, commit `81202517`).
 
 | Reading | Expected | A different reading says |
 | --- | --- | --- |
