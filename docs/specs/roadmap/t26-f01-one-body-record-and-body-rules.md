@@ -193,7 +193,7 @@ wrong.
 ## Verification
 
 - [x] Characterization and inheritance-order tests:
-      `cargo test -p v3-core` -> 2326 passed, 0 failed, 10 ignored; names listed in
+      `cargo test -p v3-core` -> 2326 passed, 0 failed, 10 ignored; names in
       `docs/progress/readings/t26-f01.md`.
 - [x] `cargo test -p v3-core --test viability` -> 30 passed, 0 failed;
       `tests/applied_trajectory.rs` and `tests/reproducibility.rs` pass with
@@ -204,18 +204,18 @@ wrong.
       --all-targets` and `cargo fmt --all --check` -> clean.
 - [ ] `make rust-test-slow` -> pending (recruitment-paths readings and
       lab end-to-end runs unchanged).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> pending: summary line,
-      output path, every survivor resolved as killed, equivalent, or deferred.
+- [x] `make rust-mutants-ci` (97a9f8dd): 65 tested, 2 missed, 46 caught,
+      17 unviable, 0 timeouts, `~/.local/share/petri-tools/mutants/t26-f01/mutants.out`.
+      Equivalent: `actions/mod.rs:136` `<=`, `:48` `>=` (no-op when equal).
 - [x] Gate (`make bench PROFILE=gate FEATURE=t26-f01-one-body-record-and-body-rules`,
       HEAD 52fc5b88): v3-cli exit 0 (`measurement_evidence.cli_exit`), outer
-      `make` exit 0 (observed from the shell; the summary's `outer_exit` is
+      `make` exit 0 (from the shell; the summary's `outer_exit` is
       null); `severe=false`; every deterministic counter equal to the F09
       epoch (delta 0.000000%, level ok). Summary
       `docs/progress/features/t26-f01-one-body-record-and-body-rules.json`
       (26,107 bytes); local raw
       `.bench-artifacts/t26-f01-one-body-record-and-body-rules/gate.json`
-      (129,588 bytes, sha256 `46f9acef...ab62b27`, verified_local); the raw
-      report is not staged.
+      (129,588 bytes, sha256 `46f9acef...ab62b27`, verified_local), not staged.
 - [ ] `make check` -> pending.
 
 ## Performance and Goal Impact
