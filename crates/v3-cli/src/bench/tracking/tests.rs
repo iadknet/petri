@@ -1055,10 +1055,20 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     };
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
     sim.stats.mortality.record(DeathCause::MeshRamp);
+    let mut action_charges = ActionCharges::default();
+    let mut failed_action_effort = FailedActionEffort::default();
+    for ((action, charge), failed) in ActionType::ALL
+        .into_iter()
+        .zip([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+        .zip([0.0, 1.5, 2.5, 0.25, 4.5, 5.5])
+    {
+        action_charges[action] = charge;
+        failed_action_effort[action] = failed;
+    }
     sim.stats.energy_flows = EnergyFlows {
         food_intake_by_type: vec![0.123456789, -2.0, 0.0],
-        action_charges: ActionCharges([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
-        failed_action_effort: FailedActionEffort([0.0, 1.5, 2.5, 0.25, 4.5, 5.5]),
+        action_charges,
+        failed_action_effort,
         vm_compute: 7.0,
         priority_bid: 8.0,
         graph_compute: 9.0,
