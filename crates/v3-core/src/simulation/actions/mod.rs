@@ -233,6 +233,7 @@ mod tests {
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;
+    use proptest::strategy::Strategy as _;
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
@@ -2098,7 +2099,7 @@ mod tests {
         /// bit pattern of `before`, NaN payloads included.
         #[test]
         fn exchange_bite_reports_only_a_positive_exact_debit(
-            before in proptest::strategy::Strategy::prop_map(proptest::num::u32::ANY, f32::from_bits),
+            before in proptest::num::u32::ANY.prop_map(f32::from_bits),
             bite in proptest::num::f32::POSITIVE | proptest::num::f32::NORMAL,
         ) {
             if let Some((amount, after)) = exchange_bite(before, bite) {

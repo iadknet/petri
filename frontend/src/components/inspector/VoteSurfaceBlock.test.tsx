@@ -2,12 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { DirectedVoteKind, VoteKind, VoteSink } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace } from "../../types/trace.ts";
-import {
-	VOTE_KINDS,
-	VOTE_SINK_COUNT,
-	driveSinkIndex,
-	voteSinkIndex,
-} from "../../types/vote-sinks.ts";
+import { ZERO_VOTES } from "../../types/trace.ts";
+import { VOTE_KINDS, driveSinkIndex, voteSinkIndex } from "../../types/vote-sinks.ts";
 import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
 
 function makeTick(passes: MeshPassTrace[], commitCounts: number[], heading = "N"): TickTrace {
@@ -36,7 +32,7 @@ function makeTick(passes: MeshPassTrace[], commitCounts: number[], heading = "N"
 
 /** A vote vector, zero except at the given sinks. */
 function votesAt(entries: readonly [number, number][] = []): number[] {
-	const votes = Array.from({ length: VOTE_SINK_COUNT }, () => 0);
+	const votes = [...ZERO_VOTES];
 	for (const [index, value] of entries) votes[index] = value;
 	return votes;
 }

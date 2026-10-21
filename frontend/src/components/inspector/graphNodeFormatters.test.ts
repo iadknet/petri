@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { VOTE_SINK_COUNT } from "../../types/trace.ts";
+import {
+	VOTE_SINK_COUNT,
+	driveSinkIndex,
+	voteSinkFromIndex,
+	voteSinkIndex,
+} from "../../types/vote-sinks.ts";
 import {
 	describeComputeKind,
 	describeGraphSource,
 	describeOutputSink,
-	driveSinkIndex,
-	voteSinkFromIndex,
-	voteSinkIndex,
 	voteSinkLabel,
 } from "./graphNodeFormatters.ts";
 
