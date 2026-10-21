@@ -152,6 +152,12 @@
 //! and they join the gene's mutation targets), which moves the sampled
 //! digest (fd1d7d5a... -> 23580944...); the gestation-rate-0.0 sampled
 //! digest and both guard digests hold.
+//! Re-pinned by T25.F10 commit 2 after two agreeing runs: a gene costs one
+//! unit and its members nothing, so every grouped genome's supply draw,
+//! carry cost, replication multiplier and gestation move, which moves all
+//! four digests (sampled 23580944... -> 66daa632..., gestation rate 0.0
+//! b60acab7... -> 449159b3...; guard cca5541d... -> 15de1150..., rate 0.0
+//! 55e51cf0... -> 919473fb...); the founder-only viability digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -163,11 +169,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "235809449e19a1e2f925a78ab507b24c54baa8a571f95c34d566dc900103f0bf"
+        "66daa632bb2c10ccd382e3a1f99283283f4dfa6bf5f626cd716b10d7d59db374"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "b60acab7d1480d6c4e6177bc5a3b0484c7e21ee515827e9e162aba3d81f9f5cc"
+        "449159b3ff9ccadb1a40a6dcf14fd4a08c7ead5c5bdb728e1df569bb87929970"
     );
 }
 
@@ -240,11 +246,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "cca5541dd4f9eb6bc2e8ae52d1880d7d4075b1f6d1abdda8295dd42db85c7e01"
+        "15de1150bd51daf4f6cdd6ba06bd7dfa5ed67853e13ed55481b384672549c25a"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "55e51cf090472f2762bb0ad763e522cf352af85df90112013acc2d87778d8360"
+        "919473fba32b51049b2e3b91d97d4692ba98dc1ddc08778684e14bd19345b000"
     );
 }
 

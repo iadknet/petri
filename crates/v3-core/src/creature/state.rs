@@ -778,13 +778,23 @@ mod tests {
     /// sink edges = 60, so it pays `80 * genome_carry_cost_per_unit` per tick.
     /// The replication cost's anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to
     /// the same measurement, so the founder's multiplier is exactly 1.0. The
-    /// ForageFirst profiles carry one more 2-input compute node: 83.
+    /// ForageFirst profiles carry one more 2-input compute node: 83. No
+    /// founder carries an edge group, so the T25.F10 unit rule (a gene one
+    /// unit, its members nothing) leaves every founder size and the anchor
+    /// unchanged: remeasured, not recalibrated.
     #[test]
     fn founder_is_eighty_units() {
         use crate::config::FounderProfile;
         use crate::creature::founder::{founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 
+        let no_group = |genome: &CreatureGenome| {
+            genome.nodes.iter().all(|node| match &node.backend_def {
+                BackendDef::Graph(def) => def.groups().is_empty(),
+                BackendDef::Vm(_) => true,
+            })
+        };
         let genome = founder_genome(FounderProfile::V3Alpha1);
+        assert!(no_group(&genome), "the founder carries no edge group");
         assert_eq!(genome.genome_size(), 80);
         assert_eq!(genome.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
         for profile in [
@@ -793,7 +803,9 @@ mod tests {
             FounderProfile::ForageFirstSparseRichOffspring,
             FounderProfile::ForageFirstSparseBalanced,
         ] {
-            assert_eq!(founder_genome(profile).genome_size(), 83, "{profile:?}");
+            let genome = founder_genome(profile);
+            assert!(no_group(&genome), "{profile:?}");
+            assert_eq!(genome.genome_size(), 83, "{profile:?}");
         }
     }
 

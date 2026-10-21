@@ -27,7 +27,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.00001,
 		defaultValue: 0.0001,
 		tooltip:
-			"Energy charged each tick per genome unit (each node, instruction, input, edge…), junk included",
+			"Energy charged each tick per genome unit (each node, instruction, input, ungrouped edge; an edge group is one unit, its members free), junk included",
 	},
 	{
 		path: "energy.lifecycle.genome_replication_cost_per_unit",

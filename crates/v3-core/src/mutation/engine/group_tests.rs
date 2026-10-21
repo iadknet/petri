@@ -258,7 +258,8 @@ fn every_node(genome: &CreatureGenome) -> Vec<usize> {
 }
 
 /// A committed `DetachGraphEdge` counts one detach and no removal while
-/// members remain, moves no genome unit and keeps the record (T25.F08).
+/// members remain, keeps the record and adds one genome unit, the detached
+/// edge (T25.F08, T25.F10).
 #[test]
 fn a_committed_detach_counts_one_graph_edge_detached() {
     let (genome, idx, _) = grouped_founder();
@@ -282,7 +283,7 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
             }
         );
         assert_eq!(scope, None, "a detach reports no attribute scope");
-        assert_eq!(detached.genome_size(), genome.genome_size());
+        assert_eq!(detached.genome_size(), genome.genome_size() + 1);
         let def = graph_mut(&mut detached.nodes[idx]);
         assert_eq!(def.groups().len(), 1);
         assert_eq!(def.members(GroupId::new(0)).count(), 7);
@@ -290,7 +291,8 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
 }
 
 /// A last member's `DetachGraphEdge` removes the group: one detach, one
-/// removal, and the record's genome unit goes (T25.F08 invariant 3).
+/// removal, and the record's genome unit becomes the detached edge's
+/// (T25.F08 invariant 3, T25.F10).
 #[test]
 fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
     let (mut genome, idx, _) = grouped_founder();
@@ -319,7 +321,7 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
         }
     );
     assert!(graph_mut(&mut detached.nodes[idx]).groups().is_empty());
-    assert_eq!(detached.genome_size() + 1, genome.genome_size());
+    assert_eq!(detached.genome_size(), genome.genome_size());
     let mut summary = MutationSummary::zero();
     summary.record_group_edits(edits);
     assert_eq!(
@@ -365,8 +367,9 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
 }
 
 /// The `genome_size` change of the record and member a sole member's detach
-/// turns into one independent edge: −1 while a member counts as an edge.
-const SOLE_MEMBER_DETACH_DELTA: i64 = -1;
+/// turns into one independent edge: `+1 − 1`, the record's unit becomes
+/// the edge's (T25.F10).
+const SOLE_MEMBER_DETACH_DELTA: i64 = 0;
 
 /// Invariant 1: a sole direction member and a sole fact member under each
 /// detaching operator (`DetachGraphEdge`, `RetargetGraphEdge`,
@@ -563,28 +566,23 @@ fn expected_delta(
     before: &CgpGraphBackendDef,
     after: &CgpGraphBackendDef,
 ) -> Option<Vec<i64>> {
-    let member_counts: Vec<i64> = (0..before.groups().len())
-        .map(|i| before.members(GroupId::new(i as u16)).count() as i64)
-        .collect();
     match op {
-        MutationOperator::GraphAddRingGroup | MutationOperator::GraphAddRandomizedRingGroup => {
-            Some(vec![9])
-        }
-        MutationOperator::GraphAddDirectionPairGroup
-        | MutationOperator::GraphAddRandomizedDirectionPairGroup => Some(vec![13]),
+        MutationOperator::GraphAddRingGroup
+        | MutationOperator::GraphAddRandomizedRingGroup
+        | MutationOperator::GraphAddDirectionPairGroup
+        | MutationOperator::GraphAddRandomizedDirectionPairGroup => Some(vec![1]),
         MutationOperator::GraphDetachGraphEdge => {
             Some(vec![if after.groups().len() < before.groups().len() {
-                -1
-            } else {
                 0
+            } else {
+                1
             }])
         }
-        MutationOperator::GraphRemoveGroup => {
-            Some(member_counts.iter().map(|n| -(n + 1)).collect())
-        }
+        MutationOperator::GraphRemoveGroup => Some(vec![-1]),
         MutationOperator::GraphRemoveGraphEdge if after.groups().len() < before.groups().len() => {
-            Some(vec![-2])
+            Some(vec![-1])
         }
+        MutationOperator::GraphRemoveGraphEdge if member_removed(before, after) => Some(vec![0]),
         MutationOperator::GraphAlterGroupScale
         | MutationOperator::GraphShiftGroupOffset
         | MutationOperator::GraphRetargetGroupKind
@@ -596,6 +594,18 @@ fn expected_delta(
         | MutationOperator::GraphMutateGroupRetention => Some(vec![0]),
         _ => None,
     }
+}
+
+/// Whether a committed edit removed a member: fewer members after it.
+fn member_removed(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> bool {
+    let members = |def: &CgpGraphBackendDef| {
+        def.output_sinks()
+            .iter()
+            .flat_map(|sink| sink.inputs.iter())
+            .filter(|edge| edge.membership().is_some())
+            .count()
+    };
+    members(after) < members(before)
 }
 
 /// One generated group: kind, offset, scale, the members to drop (a bit per
@@ -677,9 +687,10 @@ proptest! {
     /// random events of all four domains, the mesh layer's share drawn over
     /// [0, 1]: every applied event leaves every Graph backend valid, the gate
     /// never rejects one, and each group operator changes `genome_size` by
-    /// its declared amount (`AddRingGroup` +9, `AddDirectionPairGroup` +13,
-    /// `RemoveGroup` −(n + 1), a last
-    /// member's `RemoveGraphEdge` −2, the three record edits 0).
+    /// its declared amount under the unit rule (T25.F10): every creation +1,
+    /// `DetachGraphEdge` +1 or 0 when the record goes, `RemoveGroup` −1, a
+    /// member's `RemoveGraphEdge` 0 or −1 when the record goes, the record
+    /// edits 0).
     #[test]
     fn every_applied_event_keeps_the_graph_invariants(
         seed in any::<u64>(),

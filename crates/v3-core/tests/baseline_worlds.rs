@@ -221,10 +221,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// and they join the gene's mutation targets), which moves the rate-0.0
 /// identity, whose run recruits a pair gene (2081929543008060806 ->
 /// 14067834609445145015); the default identity holds.
+/// Re-pinned by T25.F10 commit 2 after two agreeing runs: a gene costs one
+/// unit and its members nothing, so every grouped genome's supply draw,
+/// carry cost, replication multiplier and gestation move, which moves the
+/// rate-0.0 identity (14067834609445145015 -> 17266400608968368299); the
+/// default identity holds, and the founder-only viability digests hold.
 #[test]
 fn legacy_default_short_run_identity() {
     assert_eq!(short_run_identity(None), 2537487317403075458);
-    assert_eq!(short_run_identity(Some(0.0)), 14067834609445145015);
+    assert_eq!(short_run_identity(Some(0.0)), 17266400608968368299);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

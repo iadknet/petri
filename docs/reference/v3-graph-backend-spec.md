@@ -331,9 +331,10 @@ weight is its `own_weight`.
   charge: members wire their sinks, so a group on a dormant graph makes the
   visit entered (Section 8) and pays one minimum visit, as the first zero
   vote edge does.
-- A group record is one `genome_size()` unit and each member one edge unit,
-  so a full `Ring` group is nine units (T25.F02's projection charge). Its
-  ring is consumed through its members; `Prune` never deletes it.
+- A group record is one `genome_size()` unit and its members nothing
+  (T25.F10), so a `Ring` group is one unit with or without holes; a
+  detached member is an ordinary edge at one unit. Its ring is consumed
+  through its members; `Prune` never deletes it.
 - The VM has no group (T11.F18 parity exemption): a VM node reaches one by
   `SwapNodeBackend` to Graph.
 
@@ -356,7 +357,7 @@ take the sink.
 
 - Creation materializes the twelve non-zero-pattern members (`x` at relative
   NE, E, SE, SW, W, NW; `y` at N, NE, SE, S, SW, NW) at own weight 0 and scale
-  0: thirteen `genome_size()` units, silent. A member on a zero-pattern
+  0: one `genome_size()` unit, silent. A member on a zero-pattern
   direction is valid (a loaded genome may carry one) and never created.
 - Invariants as for `Ring`, keyed by `(sub_idx, direction)` instead of the
   ring channel: `input_refs[ref_idx]` declares `pair` and every member reads
@@ -365,6 +366,23 @@ take the sink.
   keeping every member's relative coordinate (holes and zero-pattern members
   included), so an edit and its inverse return an equal genome. Detach,
   removal and the last member's removal behave as for `Ring`.
+- **Fact members** (T25.F10): a `DirectionPair` gene may carry members on
+  its kind's drive sink `Drive K`, each reading one of the pair's declared
+  `facts` (`InputLeaf { ref_idx, fact }`); the role is read from the sink
+  (a member's site is `Direction(d)` or `Drive`), so no field marks it.
+  Only recruitment's pair case creates them: one container primitive builds
+  the record, the twelve direction members and one fact member per fact in
+  `facts` order, all born 0, static, scope `Edge`. A fact member's pattern
+  is 0 by role, so its genomic weight is its own weight, the scale never
+  reaches it and a `Group`-scope fact learner credits nothing.
+  Validation keys a pair member by `(sub_idx, site)`, admits a drive site
+  only on the record's kind and only for a `DirectionPair` record, and
+  requires a direction member's field in `{x, y}` and a fact member's in
+  `facts`. A shift leaves fact members on their drive; a retarget moves them
+  to `Drive K'` and needs that sink (`can_host_facts`). A fact member
+  detaches own-only: its own weight bits and its seed entry stay exactly as
+  stored. The gene goes with its last member of either role, so it may
+  outlive its direction members. The whole gene costs one unit.
 
 ---
 
@@ -707,8 +725,8 @@ contribution:
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
   any wired sink, vote and parameter sinks included. An edge-group record is
   one `genome_size()` and one `functional_complexity()` unit; its members are
-  sink edges that wire their sinks, and its ring is consumed through them
-  (T25.F03).
+  sink edges that wire their sinks at no `genome_size()` unit (T25.F10), and
+  its ring is consumed through them (T25.F03).
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.
 
