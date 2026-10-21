@@ -1123,7 +1123,10 @@ fn founder_only_trajectory_digest_is_pinned() {
     // 90 -> 92 births (old digest 85a067f4...), rate 0.0 94 -> 95 (old
     // digest 6384951f...), carrying cost off 89 -> 90 (old digest
     // 4940c9c6...); restoring (0.5, 0.0005) restores all three. Measured on
-    // macOS aarch64.
+    // macOS aarch64. The GNU/Linux x86_64 pins (old c6d8c806..., ed256c6b...,
+    // 73f3ae65...) were re-measured at the same births with an x86_64 test
+    // binary (cross-built for x86_64-unknown-linux-gnu) run under emulated
+    // Ubuntu 24.04 (glibc 2.39), which reproduced all three 08b1584c pins.
     assert_eq!(
         founder_only_trajectory(None),
         (
@@ -1131,7 +1134,7 @@ fn founder_only_trajectory_digest_is_pinned() {
             0,
             platform_digest(
                 "a16496cf5a6f064250317584351843f09239dc72e7e9b3729be7949268926167",
-                "c6d8c806f500d34c4648ecdbe7942adddc9a94ad0138551e343029f1cc741a88"
+                "b29898f6c0d6ceae897db21a4615e1d7f2b6f466ac2330222ac7f5ba93a21de7"
             )
         )
     );
@@ -1148,7 +1151,7 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
             0,
             platform_digest(
                 "58c474d109b1f35e6b1e8f52d10fdf4dcc4ae5d16fd30af1e44a12b07d726149",
-                "ed256c6b450e61a586720ab39bb6b3d678ad264cdee09b9692c4c84888af5062"
+                "7b6210766076b2c100ba7083cdee9c7e07f5a65fe23aa33f7b6b40f0c133efc5"
             )
         )
     );
@@ -1186,7 +1189,7 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
             0,
             platform_digest(
                 "b04233ae9cd239b1e11a7382f420766a664661904d6d9ae51211bf38bd186956",
-                "73f3ae652d91a994ac10470e6134353087df26173e1192aa6c9e16f5848fe604"
+                "71543e36de7009177082f5cb75b36e549c0f45650352bc18e9f600064a13ed84"
             )
         )
     );
