@@ -3,7 +3,7 @@ import { ACTION_LOG_FIELDS } from "./ActionLogSection.tsx";
 import { AGE_COST_ALL_FIELDS } from "./AgeEnergyCostSection.tsx";
 import { COMPLEXITY_COST_ALL_FIELDS } from "./ComplexityEnergyCostSection.tsx";
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
-import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
+import { ENERGY_CAPACITY_FIELDS, ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import {
 	FOOD_GRAZING_FIELDS,
 	FOOD_GRAZING_TOGGLES,
@@ -26,6 +26,7 @@ export const RUNTIME_PATCH_FIELDS: AnyFieldDef[] = [
 	...FOOD_PARAMETERS_FIELDS,
 	...POPULATION_FIELDS,
 	...ENERGY_LIFECYCLE_FIELDS,
+	...ENERGY_CAPACITY_FIELDS,
 	...ENERGY_COSTS_FIELDS,
 	...COMPLEXITY_COST_ALL_FIELDS,
 	...AGE_COST_ALL_FIELDS,
@@ -115,6 +116,17 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 					"energy.lifecycle.energy_decay_per_tick",
 					"energy.costs.eat_reward_per_food",
 					"energy.lifecycle.genome_carry_cost_per_unit",
+				),
+			},
+			{
+				title: "Capacity",
+				fields: pick(
+					"energy.capacity.reference",
+					"energy.capacity.min",
+					"energy.capacity.founder",
+					"energy.capacity.move_cost_slope",
+					"energy.capacity.upkeep_per_unit",
+					"energy.capacity.sensor_scale",
 				),
 			},
 			{
@@ -234,6 +246,10 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 			{
 				title: "Experimental arms",
 				fields: pick("mutation.neutral_input_recruitment"),
+			},
+			{
+				title: "Capacity drift",
+				fields: pick("mutation.capacity.chance", "mutation.capacity.log_step"),
 			},
 			{
 				title: "Colour drift",

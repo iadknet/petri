@@ -117,7 +117,9 @@ export function WorldViewport() {
 				fertilityGrid: worldView.worldStatic?.food_fertility_u8 ?? null,
 				fertilityRevision: worldView.worldStaticRevision,
 				showFertilityOverlay: viewport.showFertilityOverlay,
-				maxEnergy: useConfigStore.getState().serverConfig?.energy.lifecycle.max_energy ?? null,
+				// The energy bar's scale is the reference capacity (T26.F02),
+				// the same for every creature.
+				maxEnergy: useConfigStore.getState().serverConfig?.energy.capacity.reference ?? null,
 			});
 		});
 
@@ -245,12 +247,12 @@ export function WorldViewport() {
 		});
 	}, []);
 
-	// Re-render when the configured max energy (energy gauge scale) changes
+	// Re-render when the reference capacity (energy gauge scale) changes
 	useEffect(() => {
 		return useConfigStore.subscribe((state, prev) => {
 			if (
-				state.serverConfig?.energy.lifecycle.max_energy !==
-				prev.serverConfig?.energy.lifecycle.max_energy
+				state.serverConfig?.energy.capacity.reference !==
+				prev.serverConfig?.energy.capacity.reference
 			) {
 				rendererRef.current?.invalidate();
 			}

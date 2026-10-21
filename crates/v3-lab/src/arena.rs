@@ -90,10 +90,10 @@ pub fn validate(config: &SimulationConfig, start_energy: f32) -> Result<(), LabE
             lifecycle.min_reproduce_energy, lifecycle.max_energy
         )));
     }
-    if !(start_energy.is_finite() && start_energy > 0.0 && start_energy <= lifecycle.max_energy) {
+    let founder_capacity = config.energy.capacity.founder;
+    if !(start_energy.is_finite() && start_energy > 0.0 && start_energy <= founder_capacity) {
         return Err(LabError::Config(format!(
-            "start energy {start_energy} must be in (0, max_energy {}]",
-            lifecycle.max_energy
+            "start energy {start_energy} must be in (0, energy.capacity.founder {founder_capacity}]"
         )));
     }
     if config.world.edge_mode != WorldEdgeMode::Wrap {
@@ -236,6 +236,20 @@ mod tests {
         let config = arena_config(48);
         assert!(validate(&config, f32::MIN_POSITIVE).is_ok());
         assert!(validate(&config, 0.0).is_err());
+    }
+
+    /// The start energy is bounded by the founder's capacity, not by
+    /// `max_energy` (T26.F02): the instrument's body cannot store more.
+    #[test]
+    fn start_energy_is_bounded_by_the_founder_capacity() {
+        let config = arena_config(48);
+        assert_eq!(config.energy.capacity.founder, 200.0);
+        assert!(config.energy.lifecycle.max_energy > 300.0);
+        assert!(validate(&config, 200.0).is_ok());
+        let error = validate(&config, 300.0).unwrap_err();
+        assert!(error.to_string().contains("capacity.founder"), "{error}");
+        let larger = json!({"energy": {"capacity": {"founder": 400.0}}});
+        assert!(resolve_arm(Some(&larger), 48, 300.0).is_ok());
     }
 
     #[test]

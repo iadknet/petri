@@ -18,6 +18,7 @@ describe("stat labels", () => {
 	it("names the energy sink behind a death, passing unknown keys through as words", () => {
 		expect(deathCauseLabel("action_move")).toBe("Moving");
 		expect(deathCauseLabel("predation")).toBe("Killed by a predator");
+		expect(deathCauseLabel("capacity_upkeep")).toBe("Capacity upkeep");
 		expect(deathCauseLabel("brand_new_sink")).toBe("brand new sink");
 	});
 

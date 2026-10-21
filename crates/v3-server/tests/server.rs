@@ -2112,7 +2112,11 @@ async fn get_creature_returns_full_detail() {
     assert!(body["position"]["x"].is_number(), "missing position.x");
     assert!(body["position"]["y"].is_number(), "missing position.y");
     assert!(body["energy"].is_number(), "missing energy");
-    assert!(body["max_energy"].is_number(), "missing max_energy");
+    assert_eq!(
+        body["max_energy"].as_f64(),
+        Some(200.0),
+        "the detail max_energy is the founder body's capacity, not lifecycle.max_energy"
+    );
     assert!(body.get("reproductive_reserve").is_none());
     assert!(body.get("reproductive_reserve_capacity").is_none());
     assert!(body["age"].is_number(), "missing age");

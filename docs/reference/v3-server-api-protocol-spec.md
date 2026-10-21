@@ -188,7 +188,7 @@ Request (conceptual v3alpha12 shape):
   "energy": {
     "lifecycle": {
       "initial_energy": 20.0,
-      "max_energy": 200.0,
+      "max_energy": 800.0,
       "energy_decay_per_tick": 0.5,
       "min_reproduce_energy": 30.0,
       "min_reproduce_age": 20,
@@ -502,7 +502,7 @@ Response:
     "energy": {
       "lifecycle": {
         "initial_energy": 20.0,
-        "max_energy": 200.0,
+        "max_energy": 800.0,
         "energy_decay_per_tick": 0.5,
         "min_reproduce_energy": 30.0,
         "min_reproduce_age": 20,
@@ -737,7 +737,7 @@ Response (full, no query parameters):
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
-  "max_energy": 20.0,
+  "max_energy": 200.0,
   "age": 84,
   "generation": 3,
   "heading": "NE",
@@ -775,7 +775,7 @@ Field definitions:
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
-| `max_energy` | f32 | Maximum energy (from config). |
+| `max_energy` | f32 | The creature's own energy capacity (`body.capacity`, T26.F02): the cap its credits are clamped at, in `[energy.capacity.min, energy.lifecycle.max_energy]`. |
 | `age` | u64 | Ticks alive. |
 | `generation` | u64 | Reproduction generation (0 = founder). |
 | `heading` | string | Direction of the creature's last committed `Move` (`"N"` to `"NW"`); at birth the step from its parent, at seeding a drawn direction (T11.F30). |

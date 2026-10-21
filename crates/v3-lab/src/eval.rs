@@ -806,11 +806,9 @@ mod tests {
         assert_eq!(score.moves_blocked, 5);
         let actor = setup.creature(CreatureId::default(), founder, 9, start);
         let lifecycle = &setup.config.energy.lifecycle;
-        let per_tick = setup.config.energy.adjusted_action_cost(
-            setup.config.energy.costs.move_cost,
-            actor.cached_complexity,
-            0,
-        ) + lifecycle.energy_decay_per_tick;
+        // The body's move rule at age 0 (T26.F02): the founder body sits at
+        // the reference, so the factor is 1.
+        let per_tick = actor.move_effort(&setup.config.energy) + lifecycle.energy_decay_per_tick;
         assert!(per_tick > lifecycle.energy_decay_per_tick);
         let energy = score.energy_end.value();
         assert!((100.0 - energy - 5.0 * per_tick).abs() < 1e-3, "{energy}");
@@ -863,14 +861,13 @@ mod tests {
             9,
         );
         assert_eq!(score.death_tick, None);
-        let complexity = setup
-            .creature(CreatureId::default(), founder, 9, start)
-            .cached_complexity;
+        let mut actor = setup.creature(CreatureId::default(), founder, 9, start);
         let energy_config = &setup.config.energy;
         let mut expected = 200.0_f32;
         for age in 0..u64::from(LIFETIME) {
-            expected -=
-                energy_config.adjusted_action_cost(energy_config.costs.move_cost, complexity, age);
+            // The body's move rule at each age (T26.F02).
+            actor.age = age;
+            expected -= actor.move_effort(energy_config);
             expected -= energy_config.lifecycle.energy_decay_per_tick;
         }
         let energy = score.energy_end.value();
