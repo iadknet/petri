@@ -217,11 +217,11 @@ fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // window; seeds 22 and 23 also fail the check. Removing the catalog entry
     // restores seed 21. T25.F08 commit 2 (the randomized creation operators
     // and `DetachGraphEdge` remap every Graph draw): seed 24 to 25. At seed
-    // 24 a traced target dies of a move at tick 49, inside its window. The
-    // T26.F02 sweep defaults (beta 1.0, u 0.002): seed 25 to 29. At seed 25 a
-    // traced target dies of a move at tick 47, inside its window; seeds 26 to
-    // 28 also lose a target inside its window. Restoring (0.5, 0.0005)
-    // restores seed 25.
+    // 24 a traced target dies of a move at tick 49, inside its window. Seed
+    // 25 to 29 in T26.F02: at seed 25 a traced target dies of a move at tick
+    // 47, inside its window, already on main at 08b1584c (the same tick-47
+    // failure, before any T26.F02 change); seeds 26 to 28 also lose a target
+    // inside its window.
     for budget in [Some(WINDOW_BUDGET), None] {
         let traced = with_vm_founders(seed_simulation(equivalence_config(), 29));
         let plain = with_vm_founders(seed_simulation(equivalence_config(), 29));
