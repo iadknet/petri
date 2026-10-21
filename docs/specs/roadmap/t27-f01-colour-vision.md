@@ -133,7 +133,7 @@ a valid result), and cannot show the feature wrong.
 - [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed at 6cba76cc (and after each commit before the rebase). The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at 6cba76cc, measured at `mutation.per_unit_rate` 0.
 - [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at 6cba76cc.
 - [x] Mutation gate: CI fresh (39573198443) at 1aeb2ee4 (c26fb4f2 after the rebase onto main 0c43ae7c, same production code; not re-run, per the rebase contract): `144 mutants tested: 14 missed, 117 caught, 13 unviable, 0 timeouts`; `~/.local/share/petri-tools/mutants/t27-f01/mutants.out`, all `colour.rs`. Killed by `channels_to_rgb_matches_reference_across_every_hue` (8/8 on iterate): 31:36, 45:10 `==`, 46:11 ×2, 49:18, 49:23 ×2, 49:28. Equivalent, each boundary's sides agree (0 reachable inputs differ): `<=` at 22:18, 42:10, 48:10, 51:10, 54:10; `>=` at 45:10.
-- [x] Gate and goal (2026-10-21, HEAD 182c43f0): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+17.6%), `vm_steps` flag +28.2%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `decided_passes` +72.1%, accepted by the user. Raw gate 129,167 B `98253a75...b26585`, raw goal 706,943,675 B `cb502110...745cb` (both `verified_local`, 2026-10-21); summaries 25,889 B and 533,714 B. Series entries and both epochs re-pinned at 1772dda7.
+- [x] Gate and goal (rebased onto main 0c43ae7c, 2026-10-21, HEAD b372521a, each profile run once): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json` compared against main's T25.F10 epochs, raw hash, bytes and time checked, no full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+1.5%), `vm_steps` flag +32.5%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `vm_steps` +122.2%, `plasticity_updates` +93.2%, `pass_cap_hits` +61.8%, trajectory readings reported to the user. Raw gate 129,399 B `324a684e...5ec`, raw goal 707,146,075 B `a0120685...f8d` (both `verified_local`); summaries 25,953 B and 552,170 B. Pre-rebase provenance and the F09-epoch acceptance: the readings file.
 - [x] Slow tier: `make rust-test-slow` → exit 0 at 6cba76cc (recruitment-paths 3 passed, lab 6 passed); the recruitment-paths reading holds through the rebase.
 - [ ] Close: `make check` at the tested commit, after the gate and goal re-run on the rebased tree.
 
@@ -164,23 +164,23 @@ result and the long-run reading is deferred to T27.F02's goal-long run. No
 diversity or cognition indicator is added. Both epochs are re-pinned in the
 closing commit.
 
-**Measured verdict (2026-10-21, HEAD 182c43f0, final code b697f58d, each profile run once).**
+**Measured verdict (rebased onto main 0c43ae7c, 2026-10-21, HEAD b372521a, each profile run once).**
 Viability 30 passed. Gate: v3-cli exit 0 (`measurement_evidence.cli_exit`),
 outer `make` exit 0; `severe=false`; `wall_clock.level` `ok` (present, so the
-host matches the epoch host): `wall_clock_ms_per_creature_tick` 0.0031029 vs
-the F09 epoch 0.0026384 (+17.6%), inside the 25% flag band; one counter flag,
-`vm_steps` 0.040014 vs 0.031219 (+28.2%). Goal: v3-cli exit 3
+host matches the epoch host): `wall_clock_ms_per_creature_tick` 0.0035271 vs
+the T25.F10 epoch 0.0034752 (+1.5%), inside the 25% flag band; one counter
+flag, `vm_steps` 0.040416 vs 0.030503 (+32.5%). Goal: v3-cli exit 3
 (`measurement_evidence.cli_exit`, successful artifact pair with a severe),
-outer `make` exit 2 (`Error 3`); `severe=true`, one severe: `decided_passes`
-0.003873 vs 0.002251 (+72.1%, severe at 50%), which the user accepted
-(2026-10-21) as a trajectory reading; both epochs re-pinned here; two flags, `graph_relax_iters` +10.4% and
-`actions_applied` +12.9%; goal wall clock 0.0125132 vs 0.0093403 (+34.0%,
-`flag`, not fatal). Colour-channel use rows (descriptive): the founder cohort
-declares none; at tick 2000 the selected cohorts show causal colour use only in
-Confluence (slot 2 red causal in 4 of 7 parents, `OwnBlue` in 9 of 9) and one
-causal `OwnGreen` in Orchards, none in Canyon; rows in the readings file. Raw
-gate 129,167 B, sha256 `98253a75...b26585`; raw goal 706,943,675 B, sha256
-`cb502110...745cb`; summaries 25,889 B and 533,714 B.
+outer `make` exit 2 (`Error 3`); `severe=true`, three severes, each a
+trajectory reading with no predeclared direction: `vm_steps` 1.813306 vs
+0.816242 (+122.2%), `plasticity_updates` 5.547447 vs 2.871468 (+93.2%),
+`pass_cap_hits` 0.004281 vs 0.002646 (+61.8%), led by Orchards (per-world
+rows in the readings file); six flags; goal wall clock 0.0121639 vs 0.0164701 (-26.2%,
+`ok`). Colour-channel use rows (descriptive): the founder cohort declares none;
+at tick 2000 the selected cohorts show causal own-colour use in Orchards and
+Confluence, none in Canyon, and no causal seen-creature colour channel; rows in
+the readings file. Raw gate 129,399 B, sha256 `324a684e...5ec`; raw goal
+707,146,075 B, sha256 `a0120685...f8d`; summaries 25,953 B and 552,170 B.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f01-colour-vision.json),
   [goal](../../progress/features/t27-f01-colour-vision-goal.json).
