@@ -754,15 +754,15 @@ impl Active {
             self.emit(run, "creature.genome", sim.tick, extra, Some(body));
         }
         let start = Start {
-            lineage: creature.identity.lineage_id,
+            lineage: creature.body.identity.lineage_id,
             generation: creature.generation,
             genome_size: creature.cached_genome_size,
             genome_hash: hash.clone(),
             age: creature.age,
         };
         let mut root = Attributes::default();
-        root.int("petri.lineage_id", creature.identity.lineage_id);
-        root.int("petri.kin_tag", creature.identity.kin_tag);
+        root.int("petri.lineage_id", creature.body.identity.lineage_id);
+        root.int("petri.kin_tag", creature.body.identity.kin_tag);
         root.int("petri.generation", creature.generation);
         root.int("petri.age_start", creature.age);
         root.int("petri.genome_size", creature.cached_genome_size);

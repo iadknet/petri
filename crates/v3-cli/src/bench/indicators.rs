@@ -807,7 +807,7 @@ pub(super) fn neighborhood_read_for_seed(
         genomes.push(NeighborhoodReadGenome {
             rank: rank as u64,
             creature_id: format!("{creature_id:?}"),
-            lineage_id: creature.identity.lineage_id,
+            lineage_id: creature.body.identity.lineage_id,
             generation: creature.generation,
             genome_size,
             total_nodes: nodes,

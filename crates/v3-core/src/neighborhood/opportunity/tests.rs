@@ -173,7 +173,7 @@ fn arms_follow_creature_order_and_descendants_inherit_them() {
     let sim = seed_arms(&config, run_seed(0, 0), &genomes);
     for (k, (_, creature)) in sim.creatures.iter().enumerate() {
         let arm = Arm::ALL[k % 8];
-        assert_eq!(Arm::of_lineage(creature.identity.lineage_id), arm);
+        assert_eq!(Arm::of_lineage(creature.body.identity.lineage_id), arm);
         let expected = match arm {
             Arm::Founder => &genomes.founder,
             Arm::Incumbent => &genomes.incumbents[0],
@@ -204,10 +204,10 @@ fn arms_follow_creature_order_and_descendants_inherit_them() {
             crate::simulation::run_tick(&mut replay, &mut None);
             for (id, creature) in &replay.creatures {
                 if seen.insert(id) {
-                    per_arm[Arm::of_lineage(creature.identity.lineage_id).index()] += 1;
+                    per_arm[Arm::of_lineage(creature.body.identity.lineage_id).index()] += 1;
                     assert_eq!(
                         creature.genome,
-                        *match Arm::of_lineage(creature.identity.lineage_id) {
+                        *match Arm::of_lineage(creature.body.identity.lineage_id) {
                             Arm::Founder => &genomes.founder,
                             Arm::Incumbent => &genomes.incumbents[0],
                             Arm::Authored(family) => &genomes.authored[family.index() as usize],

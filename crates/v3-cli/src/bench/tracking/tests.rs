@@ -486,7 +486,7 @@ fn the_observed_grid_separates_clades_by_where_they_stand() {
         (Position::new(19, 19), 2),
     ]) {
         sim.creatures[*id].position = position;
-        sim.creatures[*id].identity.lineage_id = lineage_id;
+        sim.creatures[*id].body.identity.lineage_id = lineage_id;
     }
 
     let grid = OccupancyGrid::observe(&sim);
@@ -527,8 +527,11 @@ fn population_readings_average_the_living_population_and_count_its_clades() {
     assert_eq!(readings.shannon_entropy_nats, six(4.0_f64.ln()));
     assert_eq!(
         readings.shannon_entropy_nats,
-        lineage_diversity(42, sim.creatures.values().map(|c| c.identity.lineage_id))
-            .shannon_entropy_nats,
+        lineage_diversity(
+            42,
+            sim.creatures.values().map(|c| c.body.identity.lineage_id)
+        )
+        .shannon_entropy_nats,
         "the checkpoint reading and the terminal reading share one computation"
     );
 }
@@ -1720,7 +1723,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
     let food_type_count = sim.config.world.food.types.len();
     // Two clades: founder 3 keeps its lineage, everyone else joins lineage 1.
     for (index, creature) in sim.creatures.values_mut().enumerate() {
-        creature.identity.lineage_id = if index == 3 { 3 } else { 1 };
+        creature.body.identity.lineage_id = if index == 3 { 3 } else { 1 };
         creature.energy = index as f32;
         creature.lifetime_action_attempted_count = 1;
         creature.lifetime_actions_attempted_by_type = [0, 0, 1, 0, 0];
@@ -1740,7 +1743,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
     assert_eq!(profiles.definition, "surviving-clade-profile-v1");
     assert_eq!(
         profiles.rows.len() as u64,
-        clade_diversity(sim.creatures.values().map(|c| c.identity.lineage_id)).0
+        clade_diversity(sim.creatures.values().map(|c| c.body.identity.lineage_id)).0
     );
     assert_eq!(
         profiles

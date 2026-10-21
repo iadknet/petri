@@ -13,6 +13,7 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::{
     CreatureId, InputReference, NodeId, Position, WorldAction, WorldInputKey,
 };
+use v3_core::creature::body::{HeritableBody, Phenotype};
 use v3_core::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -22,10 +23,6 @@ use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, VmTrace};
 use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
-
-const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
-const FOUNDER_ACTIVE_CHANNEL: usize = 0;
-const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 fn sample_vm_program() -> Vec<VmInstruction> {
     vec![
@@ -296,10 +293,10 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
             pos,
             100.0,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });

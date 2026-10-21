@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::EnergyLifecycleConfig;
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::genome::vote::{
     ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
@@ -532,10 +533,14 @@ fn vm_eats_when_food_here() {
         pos,
         30.0,
         0,
-        [0; 6],
-        0,
-        [true; 6],
-        CreatureIdentityState::default(),
+        HeritableBody {
+            phenotype: Phenotype {
+                channels: [0; 6],
+                active_channel: 0,
+                polarity: [true; 6],
+            },
+            identity: CreatureIdentityState::default(),
+        },
         [0.0; 16],
     );
 
@@ -625,10 +630,14 @@ fn vm_noop_when_no_food() {
         pos,
         30.0,
         0,
-        [0; 6],
-        0,
-        [true; 6],
-        CreatureIdentityState::default(),
+        HeritableBody {
+            phenotype: Phenotype {
+                channels: [0; 6],
+                active_channel: 0,
+                polarity: [true; 6],
+            },
+            identity: CreatureIdentityState::default(),
+        },
         [0.0; 16],
     );
     let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());

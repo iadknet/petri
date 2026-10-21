@@ -1,5 +1,6 @@
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, NodeId, Position, WorldAction};
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -113,10 +114,10 @@ pub(super) fn make_sim_two_creatures(
             Position::new(5, 5),
             energy_a,
             0,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -129,10 +130,10 @@ pub(super) fn make_sim_two_creatures(
             Position::new(5, 4),
             energy_b,
             0,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -166,10 +167,10 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
             pos,
             energy,
             0,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -206,10 +207,10 @@ pub(super) fn make_sim_with_custom_genome(
             pos,
             energy,
             0,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });

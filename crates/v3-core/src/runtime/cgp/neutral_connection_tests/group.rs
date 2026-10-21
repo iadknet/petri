@@ -522,6 +522,7 @@ mod pair {
     use super::*;
     use crate::config::WorldEdgeMode;
     use crate::contracts::{CreatureId, Position};
+    use crate::creature::body::{HeritableBody, Phenotype};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
@@ -555,10 +556,14 @@ mod pair {
             position,
             50.0,
             0,
-            [0; 6],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype {
+                    channels: [0; 6],
+                    active_channel: 0,
+                    polarity: [true; 6],
+                },
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     }

@@ -400,15 +400,17 @@ fn fill_nearby_banks(
 
         // Identity
         fields[nearby_idx::KIN_AFFINITY] =
-            compute_kin_affinity(observer.identity.kin_tag, target.identity.kin_tag);
+            compute_kin_affinity(observer.body.identity.kin_tag, target.body.identity.kin_tag);
         fields[nearby_idx::LINEAGE_MATCH] =
-            if observer.identity.lineage_id == target.identity.lineage_id {
+            if observer.body.identity.lineage_id == target.body.identity.lineage_id {
                 1.0
             } else {
                 0.0
             };
-        fields[nearby_idx::PHENOTYPE_SIMILARITY] =
-            compute_phenotype_similarity(&observer.phenotype_channels, &target.phenotype_channels);
+        fields[nearby_idx::PHENOTYPE_SIMILARITY] = compute_phenotype_similarity(
+            &observer.body.phenotype.channels,
+            &target.body.phenotype.channels,
+        );
     }
 
     nearby
@@ -435,6 +437,7 @@ fn compute_phenotype_similarity(a: &[u8; 6], b: &[u8; 6]) -> f32 {
 mod tests {
     use super::*;
     use crate::config::WorldEdgeMode;
+    use crate::creature::body::{HeritableBody, Phenotype};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
@@ -456,10 +459,14 @@ mod tests {
             pos,
             energy,
             0,
-            phenotype,
-            0,
-            [true; 6],
-            identity,
+            HeritableBody {
+                phenotype: Phenotype {
+                    channels: phenotype,
+                    active_channel: 0,
+                    polarity: [true; 6],
+                },
+                identity,
+            },
             [0.0; 16],
         )
     }

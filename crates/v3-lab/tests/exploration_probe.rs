@@ -686,7 +686,7 @@ fn eval_rule(
     use slotmap::SlotMap;
     use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
     use v3_core::creature::action_log::ActionType;
-    use v3_core::creature::identity::CreatureIdentityState;
+    use v3_core::creature::body::HeritableBody;
     use v3_core::creature::state::{CreatureState, SHARED_MEMORY_SLOTS};
     use v3_core::kernel::WorldState;
     use v3_core::simulation::{run_tick, Simulation};
@@ -713,10 +713,7 @@ fn eval_rule(
             scene.start,
             rule.start(),
             0,
-            setup.phenotype.channels,
-            setup.phenotype.active_channel,
-            setup.phenotype.polarity,
-            CreatureIdentityState::founder(0, scene.seed),
+            HeritableBody::founder(0, scene.seed),
             [0.0; SHARED_MEMORY_SLOTS],
         )
     });

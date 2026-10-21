@@ -434,7 +434,7 @@ pub(super) struct CladeMemberReading {
 impl CladeMemberReading {
     fn observe(creature: &v3_core::creature::state::CreatureState) -> Self {
         Self {
-            lineage_id: creature.identity.lineage_id,
+            lineage_id: creature.body.identity.lineage_id,
             energy: creature.energy,
             age: creature.age,
             generation: creature.generation,
@@ -1007,7 +1007,7 @@ impl OccupancyGrid {
             sim.world.height,
             sim.creatures
                 .values()
-                .map(|creature| (creature.position, creature.identity.lineage_id)),
+                .map(|creature| (creature.position, creature.body.identity.lineage_id)),
         );
         Self {
             cells_x: OCCUPANCY_CELLS_PER_AXIS,
@@ -1143,7 +1143,7 @@ impl PopulationReadings {
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
         let means = crate::structure_means(sim);
         let (surviving_founder_clade_count, shannon_entropy_nats) =
-            clade_diversity(sim.creatures.values().map(|c| c.identity.lineage_id));
+            clade_diversity(sim.creatures.values().map(|c| c.body.identity.lineage_id));
         Self {
             mean_genome_size: means.genome_size,
             mean_mesh_nodes: means.mesh_nodes,

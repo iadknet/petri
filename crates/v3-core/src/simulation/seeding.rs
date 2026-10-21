@@ -6,18 +6,13 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
+use crate::creature::body::HeritableBody;
 use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::genome::CreatureGenome;
-use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::patterns::{generate_pattern_seeded, PatternBounds};
 use crate::simulation::simulation::Simulation;
-
-/// Founder phenotype baseline — 6 HSL-mapped channels that produce RGB [204, 61, 61].
-const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
-const FOUNDER_ACTIVE_CHANNEL: usize = 0;
-const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 /// Seed a new simulation from a `SimulationConfig` and a deterministic seed.
 ///
@@ -93,7 +88,6 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
             &config.energy.lifecycle,
         );
         let energy = config.energy.lifecycle.initial_energy;
-        let identity = CreatureIdentityState::founder(founder_index, seed);
         // One draw per founder, in placement order (T11.F30).
         let heading = Direction::ALL[rng.gen_range(0..Direction::ALL.len())];
         // Insert into slotmap to get an id, then fill with actual state.
@@ -104,10 +98,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 pos,
                 energy,
                 0,
-                FOUNDER_CHANNELS,
-                FOUNDER_ACTIVE_CHANNEL,
-                FOUNDER_POLARITY,
-                identity,
+                HeritableBody::founder(founder_index, seed),
                 [0.0; crate::creature::state::SHARED_MEMORY_SLOTS],
             );
             founder.heading = heading;
@@ -248,16 +239,8 @@ mod tests {
         // All founders should have the canonical baseline phenotype.
         for (_, creature) in &sim.creatures {
             assert_eq!(
-                creature.phenotype_channels, FOUNDER_CHANNELS,
-                "channels mismatch"
-            );
-            assert_eq!(
-                creature.phenotype_active_channel, FOUNDER_ACTIVE_CHANNEL,
-                "active channel mismatch"
-            );
-            assert_eq!(
-                creature.phenotype_channel_polarity, FOUNDER_POLARITY,
-                "polarity mismatch"
+                creature.body.phenotype,
+                crate::creature::body::Phenotype::FOUNDER
             );
         }
     }
@@ -283,7 +266,7 @@ mod tests {
         let mut lineage_ids: Vec<u32> = sim
             .creatures
             .values()
-            .map(|c| c.identity.lineage_id)
+            .map(|c| c.body.identity.lineage_id)
             .collect();
         lineage_ids.sort();
         let expected: Vec<u32> = (0..lineage_ids.len() as u32).collect();
@@ -293,7 +276,11 @@ mod tests {
     #[test]
     fn founder_kin_tags_are_unique() {
         let sim = seed_simulation(small_config(), 42);
-        let kin_tags: HashSet<u32> = sim.creatures.values().map(|c| c.identity.kin_tag).collect();
+        let kin_tags: HashSet<u32> = sim
+            .creatures
+            .values()
+            .map(|c| c.body.identity.kin_tag)
+            .collect();
         assert_eq!(
             kin_tags.len(),
             sim.creature_count(),
@@ -307,8 +294,8 @@ mod tests {
         let s1 = seed_simulation(cfg.clone(), 42);
         let s2 = seed_simulation(cfg, 42);
         // Collect identities in lineage_id order for stable comparison.
-        let mut ids1: Vec<_> = s1.creatures.values().map(|c| c.identity).collect();
-        let mut ids2: Vec<_> = s2.creatures.values().map(|c| c.identity).collect();
+        let mut ids1: Vec<_> = s1.creatures.values().map(|c| c.body.identity).collect();
+        let mut ids2: Vec<_> = s2.creatures.values().map(|c| c.body.identity).collect();
         ids1.sort_by_key(|i| i.lineage_id);
         ids2.sort_by_key(|i| i.lineage_id);
         assert_eq!(ids1, ids2);

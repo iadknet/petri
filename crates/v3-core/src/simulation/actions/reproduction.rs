@@ -3,10 +3,9 @@ use rand::Rng;
 use super::cgp_reproduction;
 use crate::contracts::{CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
+use crate::creature::body::HeritableBody;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
-use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::{CreatureState, PendingBirth};
-use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
@@ -385,9 +384,6 @@ fn spawn_child(
     let child_genome = sim.creatures[parent_id].genome.clone();
     let child_shared_memory = sim.creatures[parent_id].shared_memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
-    let child_channels = sim.creatures[parent_id].phenotype_channels;
-    let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
-    let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
     let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
     // T11.F17: the parent's own recent dispatches bias the offspring's targets.
     // Passed unresolved, so a zero-event birth derives nothing.
@@ -514,26 +510,14 @@ fn spawn_child(
     let child_birth_mutation_operators = child_birth_mutation_operators.into_boxed_slice();
     let child_birth_edge_class = summary.birth_edge_class();
 
-    // Step 11: Phenotype mutation — triggered only when at least one genome event was applied.
-    let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
-        mutate_phenotype(
-            child_channels,
-            child_active_channel,
-            child_polarity,
-            &sim.config.mutation.phenotype,
-            rng,
-        )
-    } else {
-        (child_channels, child_active_channel, child_polarity)
-    };
-
-    // Step 11b: Identity inheritance — child inherits parent identity, kin-tag
-    // mutates only when genome mutation applied events.
-    let parent_identity = sim.creatures[parent_id].identity;
-    let mut child_identity = CreatureIdentityState::inherit(&parent_identity);
-    if summary.applied_events > 0 {
-        child_identity.mutate_kin_tag(rng);
-    }
+    // Step 11: Body inheritance — phenotype then kin-tag mutation, drawn only
+    // when at least one genome event was applied.
+    let child_body = HeritableBody::inherit(
+        &sim.creatures[parent_id].body,
+        summary.applied_events > 0,
+        &sim.config.mutation.phenotype,
+        rng,
+    );
 
     // Step 12: Lamarckian inheritance happens in the constructors below,
     // which build the newborn's weights from the draft's seeds.
@@ -552,10 +536,7 @@ fn spawn_child(
                 target,
                 transfer,
                 child_generation,
-                child_channels,
-                child_active_channel,
-                child_polarity,
-                child_identity,
+                child_body,
                 child_shared_memory,
                 parent_cached_complexity,
                 parent_cached_genome_size,
@@ -568,10 +549,7 @@ fn spawn_child(
                 target,
                 transfer,
                 child_generation,
-                child_channels,
-                child_active_channel,
-                child_polarity,
-                child_identity,
+                child_body,
                 child_shared_memory,
             )
         };

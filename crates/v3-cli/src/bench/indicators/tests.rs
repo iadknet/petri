@@ -959,7 +959,7 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
         let row = &actual.genomes[genome_index];
         assert_eq!(row.rank, rank as u64);
         assert_eq!(row.creature_id, format!("{creature_id:?}"));
-        assert_eq!(row.lineage_id, creature.identity.lineage_id);
+        assert_eq!(row.lineage_id, creature.body.identity.lineage_id);
         assert_eq!(row.generation, creature.generation);
         assert_eq!(row.genome_size, creature.genome.genome_size());
         assert_eq!(row.total_nodes, creature.genome.nodes.len() as u64);

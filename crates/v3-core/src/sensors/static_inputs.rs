@@ -147,6 +147,7 @@ mod tests {
     use super::*;
     use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, NodeId, Position};
+    use crate::creature::body::{HeritableBody, Phenotype};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -180,10 +181,14 @@ mod tests {
             pos,
             20.0,
             0,
-            [128, 64, 32, 10, 20, 30],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype {
+                    channels: [128, 64, 32, 10, 20, 30],
+                    active_channel: 0,
+                    polarity: [true; 6],
+                },
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     }
@@ -289,10 +294,14 @@ mod tests {
             Position::new(1, 1),
             20.0,
             5,
-            [0; 6],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype {
+                    channels: [0; 6],
+                    active_channel: 0,
+                    polarity: [true; 6],
+                },
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         );
         creature.age = 42;
