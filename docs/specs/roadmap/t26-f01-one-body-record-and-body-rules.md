@@ -61,10 +61,11 @@ Invariants:
    and `HeritableBody { phenotype: Phenotype, identity: CreatureIdentityState }`,
    both `Copy` with public fields. `CreatureState` carries one `body` field
    in place of the four loose fields; every reader (`sensors/reducers.rs`,
-   the server's `state.rs` and `http/creature.rs`, the lab's `eval.rs`,
-   tests) reads through it. The lab's own `Phenotype` type is deleted in
-   favour of the core one; the server response is built from the record
-   with the same values.
+   the server's `state.rs` and `http/creature.rs`, tests) reads through it.
+   The lab's own `Phenotype` type and its always-founder `Setup.phenotype`
+   field are deleted; lab creatures take `HeritableBody::founder(0, seed)`,
+   the values they had. The server response is built from the record with
+   the same values.
 2. **The founder.** `Phenotype::FOUNDER` is the public constant the private
    `seeding.rs` constants become, and `HeritableBody::founder(founder_index,
    startup_seed)` pairs it with `CreatureIdentityState::founder`; seeding
@@ -158,7 +159,12 @@ wrong.
       the kill bonus, observe before each cap, signed reverse flows), a birth
       whose litter exceeds `max_energy` kept uncapped, the move charge on a
       successful and a blocked move, and the inheritance draw order
-      (phenotype then kin tag when mutated; no draw otherwise).
+      (phenotype then kin tag when mutated, pinned on main's child-body
+      values). The unmutated no-draw case is not observable through
+      `apply_reproduce` (genome mutation consumes the same stream first), so
+      it is pinned directly on `HeritableBody::inherit` by a property test,
+      with the unchanged trajectory and reproducibility pins as the
+      end-to-end reading.
 - [x] `creature/body.rs`: `Phenotype`, `Phenotype::FOUNDER`,
       `HeritableBody`, `founder`, `inherit`; `mutate_phenotype` over
       `Phenotype`; `seeding.rs` uses `founder`; the lab's `Phenotype`
