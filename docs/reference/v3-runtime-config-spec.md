@@ -109,7 +109,7 @@ Type posture:
 | `mutation.executed_bias` | `f64` | `0.9` | Probability that a mutation target is drawn from the nodes the parent's brain dispatched within `executed_window_ticks`, in all four domains. Clamp finite values to `[0.0, 1.0]`; NaN/infinite normalize to `0.9`. Disabled (treated as `0.0`) while genome-size pressure restricts a birth. |
 | `mutation.executed_window_ticks` | `u64` | `100` | How many ticks back a node dispatch still counts as recently executed. `0` normalizes to `100`. |
 | `mutation.capacity.chance` | `f32` | `0.1` | Chance per birth that the child's energy capacity mutates (T26.F02). Must be finite and in `[0.0, 1.0]`; other values fall back to `0.1`. A missing block or field takes the default. |
-| `mutation.capacity.log_step` | `f32` | `0.25` | Half-width of the capacity mutation's uniform log-space step. Must be finite and `>= 0.0`; other values fall back to `0.25`. |
+| `mutation.capacity.log_step` | `f32` | `0.25` | Half-width of the capacity mutation's uniform log-space step. Must be finite and in `[0.0, ln(energy.lifecycle.max_energy / energy.capacity.min)]` (one step spans at most the range), normalized after both bounds; other values fall back to `min(0.25, that bound)`. |
 
 Capacity mutation (T26.F02) is not a mutation engine domain either: at
 reproduction step 11 every birth draws one `f32` against

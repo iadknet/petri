@@ -298,6 +298,49 @@ fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
     assert_eq!(flows.maximum_energy_clamp_loss, 0.0);
 }
 
+/// Every newborn's capacity is clamped to the range in force at its birth
+/// (T26.F02 invariant 2): after a live patch lowers `max_energy` to 100, the
+/// next unmutated newborn of a 200 parent is born at 100 while the parent
+/// keeps 200, and the cap holds each body at its own capacity.
+#[test]
+fn a_lowered_range_clamps_the_next_unmutated_newborn_but_not_its_parent() {
+    let (mut sim, ids) = sim_with(&[(Position::new(2, 2), 200.0), (Position::new(7, 7), 200.0)]);
+    let (early, late) = (ids[0], ids[1]);
+    sim.config.mutation.capacity.chance = 0.0;
+    for &id in &ids {
+        sim.creatures[id].age = sim.config.energy.lifecycle.min_reproduce_age;
+    }
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
+    let mut known = ids.clone();
+    let mut deliver = |sim: &mut Simulation, parent: CreatureId| {
+        let result = apply_reproduce(parent, sim, Direction::N, 0.5, &mut rng);
+        assert_eq!(result, ReproductionActionResult::Conceived);
+        let newborn = sim
+            .creatures
+            .keys()
+            .find(|id| !known.contains(id))
+            .expect("one newborn");
+        known.push(newborn);
+        newborn
+    };
+    let first = deliver(&mut sim, early);
+    assert_eq!(sim.creatures[first].body.capacity, 200.0);
+
+    sim.config.energy.lifecycle.max_energy = 100.0;
+    let newborn = deliver(&mut sim, late);
+    assert_eq!(sim.creatures[newborn].body.capacity, 100.0);
+    assert_eq!(sim.creatures[late].body.capacity, 200.0);
+
+    for (id, cap) in [(late, 200.0), (newborn, 100.0)] {
+        sim.creatures[id].energy = 1_000.0;
+        assert_eq!(
+            super::cap_energy(&mut sim.creatures[id]),
+            debit(1_000.0, cap)
+        );
+        assert_eq!(sim.creatures[id].energy, cap);
+    }
+}
+
 /// A litter within the child's capacity is credited whole: no overflow.
 #[test]
 fn a_litter_within_the_childs_capacity_books_no_overflow() {

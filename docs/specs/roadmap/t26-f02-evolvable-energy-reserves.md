@@ -218,9 +218,9 @@ flows would show it wrong.
       predeclared (invariant 8).
 - [x] Comparison, the `sensor_scale` ruling, the sweep, the defaults set
       (invariants 6, 9).
-- [ ] Review remediation: newborn clamp and `log_step` bound with their
-      tests, the two Reference comparison arms on the goal path, the
-      `WORKAROUND(T26.F02)` marker, decay kept in `Phase0Charge`.
+- [x] Review remediation: newborn clamp and `log_step` bound with their
+      tests, the `WORKAROUND(T26.F02)` marker, decay kept in `Phase0Charge`.
+- [ ] The two Reference comparison arms on the goal path.
 - [ ] gate, goal and goal-long on the final defaults; mutation gate; slow tier.
 
 ## Verification
@@ -231,6 +231,9 @@ flows would show it wrong.
 - [x] `cargo test --workspace --no-fail-fast` -> all pass but the v3-cli
       gate severe test (awaits the gate re-pin); fmt, clippy, frontend build
       and vitest (675) clean.
+- [x] After the review remediation: viability 30 passed, no pin moved;
+      `cargo test -p v3-core --no-fail-fast` and its `telemetry-seams` lib
+      tests pass; check, fmt and `make rust-clippy` clean.
 - [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, summary
       line, output path, every survivor resolved as killed, equivalent, or

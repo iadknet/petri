@@ -143,12 +143,14 @@ pub fn advance_shared_memory(
 }
 
 /// The energy one living creature is charged in the Phase 0 energy-decay
-/// sub-step (T26.F02): the `f32` `base`, the world-level decay plus the
-/// per-tick maintenance cost of the structure it carries, junk included, and
-/// the body's signed capacity `upkeep`. Not scaled by the complexity or age
-/// action multipliers, exactly as `energy_decay_per_tick` is not.
+/// sub-step (T26.F02): the world-level `decay`, the `f32` `base`, that decay
+/// plus the per-tick maintenance cost of the structure it carries, junk
+/// included, and the body's signed capacity `upkeep`. Not scaled by the
+/// complexity or age action multipliers, exactly as `energy_decay_per_tick`
+/// is not.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Phase0Charge {
+    pub(crate) decay: f32,
     pub(crate) base: f32,
     pub(crate) upkeep: f32,
 }
@@ -169,6 +171,7 @@ impl Phase0Charge {
     /// signed `upkeep`.
     pub(crate) fn new(decay: f32, carry_per_unit: f32, genome_size: u32, upkeep: f32) -> Self {
         Self {
+            decay,
             base: decay + carry_per_unit * genome_size as f32,
             upkeep,
         }
@@ -186,11 +189,11 @@ impl Phase0Charge {
     /// applied debit's remainder. Attribution uses the charge's rounded
     /// intermediates: `LifecycleDecay` when `before − decay ≤ 0`, else
     /// `GenomeCarrying` when `before − base ≤ 0`, else `CapacityUpkeep`.
-    pub(crate) fn settle(self, before: f32, decay: f32) -> Phase0Settlement {
+    pub(crate) fn settle(self, before: f32) -> Phase0Settlement {
         use super::energy_accounting::{applied_debit, decay_partition, DeathCause};
         let after = before - self.applied();
-        let (decay_share, carrying) = decay_partition(before, before - self.base, decay);
-        let cause = if before - decay <= 0.0 {
+        let (decay_share, carrying) = decay_partition(before, before - self.base, self.decay);
+        let cause = if before - self.decay <= 0.0 {
             DeathCause::LifecycleDecay
         } else if before - self.base <= 0.0 {
             DeathCause::GenomeCarrying
@@ -256,7 +259,7 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
             creature.cached_genome_size,
             creature.body.upkeep(capacity),
         )
-        .settle(energy_before, lifecycle.energy_decay_per_tick);
+        .settle(energy_before);
         creature.energy = settled.after;
         let flows = &mut sim.stats.energy_flows;
         flows.lifecycle_decay += settled.decay;

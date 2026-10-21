@@ -222,6 +222,7 @@ fn traced_and_untraced_runs_are_identical_for_vm_founders() {
     // 47, inside its window, already on main at 08b1584c on macOS aarch64
     // (the same tick-47 failure, before any T26.F02 change); seeds 26 to 28 also lose a target
     // inside its window.
+    // WORKAROUND(T26.F02): an equivalence oracle that retains death-tick actions
     for budget in [Some(WINDOW_BUDGET), None] {
         let traced = with_vm_founders(seed_simulation(equivalence_config(), 29));
         let plain = with_vm_founders(seed_simulation(equivalence_config(), 29));
