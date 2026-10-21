@@ -24,8 +24,8 @@ pin that moves is a defect.
   coupling, kept as the track says).
 - No per-creature capacity, no carrying cost, no upkeep: T26.F02.
 - The other readers of `max_energy` keep reading the config value: sensor
-  normalization denominators, reproduce thresholds, the server's
-  `max_energy` field and the v3-lab birth sentinel. T26.F02 rules on each.
+  normalization denominators, reproduce thresholds and the v3-lab birth
+  sentinel. T26.F02 rules on each.
 - Eat's zero floor and observe-after-cap order, predation's
   observe-before-cap order and its signed reverse transfers, and birth's
   direct litter assignment stay as they are.
@@ -56,10 +56,14 @@ The code this feature changes, as it stands on main at `ced01959`:
 
 Invariants:
 
-1. **The record.** `crates/v3-core/src/creature/body.rs` holds
+1. **The record.** `crates/v3-core/src/creature/phenotype.rs` is a leaf
+   module holding
    `Phenotype { channels: [u8; 6], active_channel: usize, polarity: [bool; 6] }`
-   and `HeritableBody { phenotype: Phenotype, identity: CreatureIdentityState }`,
-   both `Copy` with public fields. `CreatureState` carries one `body` field
+   and `Phenotype::FOUNDER`; `crates/v3-core/src/creature/body.rs` holds
+   `HeritableBody { phenotype: Phenotype, identity: CreatureIdentityState }`.
+   Both are `Copy` with public fields. `body.rs` imports `mutate_phenotype`
+   from `mutation/phenotype.rs`, which imports only the leaf, so there is no
+   import cycle and the mutation keeps taking and returning the record. `CreatureState` carries one `body` field
    in place of the four loose fields; every reader (`sensors/reducers.rs`,
    the server's `state.rs` and `http/creature.rs`, tests) reads through it.
    The lab's own `Phenotype` type and its always-founder `Setup.phenotype`
@@ -86,8 +90,11 @@ Invariants:
    and delegates to `new_with_cached_fields`, so the construction body
    exists once.
 5. **The cap rule.** `CreatureState::energy_cap(&self, lifecycle:
-   &EnergyLifecycleConfig) -> f32` returns `lifecycle.max_energy`; the
-   three credit sites are its only readers. One shared step in
+   &EnergyLifecycleConfig) -> f32` returns `lifecycle.max_energy`; its
+   readers are the three credit sites and the server's creature detail
+   `max_energy` field (`v3-server/src/http/creature.rs`), which reports the
+   same value today and the creature's own capacity once T26.F02 lands.
+   One shared step in
    `simulation/actions/mod.rs`, beside `pay_effort`, applies a cap to a
    creature's energy and books the excess into
    `flows.maximum_energy_clamp_loss`, in the comparison form the predation
@@ -165,8 +172,9 @@ wrong.
       it is pinned directly on `HeritableBody::inherit` by a property test,
       with the unchanged trajectory and reproducibility pins as the
       end-to-end reading.
-- [x] `creature/body.rs`: `Phenotype`, `Phenotype::FOUNDER`,
-      `HeritableBody`, `founder`, `inherit`; `mutate_phenotype` over
+- [x] `creature/phenotype.rs`: `Phenotype`, `Phenotype::FOUNDER`;
+      `creature/body.rs`: `HeritableBody`, `founder`, `inherit`;
+      `mutate_phenotype` over
       `Phenotype`; `seeding.rs` uses `founder`; the lab's `Phenotype`
       deleted (invariants 1–3).
 - [x] Constructors take `body`; `new` delegates to `new_with_cached_fields`;
@@ -243,6 +251,6 @@ none.
 - Decision: the `applied_events > 0` gate on phenotype and kin-tag mutation
   is inherited coupling and stays (track Notes).
 - Deferred: routing the other `max_energy` readers (sensor denominators,
-  reproduce thresholds, server field, lab sentinel) through a per-creature
+  reproduce thresholds, lab sentinel) through a per-creature
   rule is T26.F02's, which also re-derives the lab test oracles that compute
   the move charge from config (`v3-lab/src/eval.rs` tests) when it scales it.
