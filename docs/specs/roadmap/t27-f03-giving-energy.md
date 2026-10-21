@@ -202,10 +202,10 @@ show the feature wrong.
 ## Verification
 
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> 30 passed, first; `cargo test -p v3-core --features telemetry-seams` -> 2290 lib, all pass; `cargo test --workspace --exclude v3-core` -> pass but `gate_profile_has_no_severe_regression_against_series_references` (`decided_passes` 0 -> 0.000238; the closing epoch re-pin owns it); `npm test` -> 681 passed; check, clippy, fmt clean.
-- [ ] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
+- [x] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Slow tier: `make rust-test-slow` -> `<result>`, recruitment-paths rows re-pinned.
-- [ ] Gate and goal: summaries at `docs/progress/features/t27-f03-giving-energy.json` and `-goal.json`, raw hash/byte count checked, series entries point to them, no full report staged.
+- [ ] Gate and goal: measured (see Performance). Open: series entries, epoch re-pin on acceptance.
 
 ## Performance and Goal Impact
 
@@ -240,7 +240,21 @@ failure.
 | mutation draws | re-pinned (commits 2 and 3) |
 | epochs | re-pinned in the closing commit, on acceptance of any `severe` |
 
-**Measured verdict.** Pending.
+**Measured verdict** (HEAD 66aaac72; details in the readings file).
+
+| Profile | CLI exit / outer exit | `severe` | Threshold verdict |
+| --- | --- | --- | --- |
+| viability | 0 / 0 | n/a | 30 passed |
+| gate | 3 / 2 | true | `decided_passes` 0.000238 vs 0.000000: severe, predeclared (draw stream); wall +17.1%, ok; all other counters within 6% |
+| goal | 3 / 2 | true | `decided_passes` 0.004672 vs 0.002874 (+62.56%): severe, a behavior-indicator trajectory reading, direction not predeclared; all other counters ok |
+
+| Goal reading | Orchards | Canyon | Confluence |
+| --- | ---: | ---: | ---: |
+| gifts `Transferred` / attempted | 2,822 / 104,152 | 220 / 3,184 | 8,051 / 197,335 |
+| steals transferred / kills | 5,375 / 791 | 387 / 51 | 6,618 / 925 |
+| final population (vs T27.F01) | 4,921 (-43.9%) | 337 (-51.3%) | 3,310 (-24.5%) |
+
+Flow pairs match; no extinction; both severes await the user's acceptance.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f03-giving-energy.json),
   [goal](../../progress/features/t27-f03-giving-energy-goal.json).
