@@ -56,6 +56,17 @@ fn cap_energy(
     }
 }
 
+/// One exchange bite taken from a holder of `before` energy (T27.F03):
+/// `min(bite, before)` when `before` is positive, else nothing (a comparison,
+/// so a `NaN` energy yields nothing). Returns `(amount, after)` only when the
+/// debit changes the stored energy; a bite the holder's `f32` resolution
+/// absorbs is `None`.
+fn exchange_bite(before: f32, bite: f32) -> Option<(f32, f32)> {
+    let amount = if before > 0.0 { bite.min(before) } else { 0.0 };
+    let after = before - amount;
+    (after.to_bits() != before.to_bits()).then_some((amount, after))
+}
+
 /// What a transfer action moved: its result, the energy debited from the
 /// side that gives it up, and the counterpart creature, `None` when the target
 /// cell held none.

@@ -85,9 +85,7 @@ pub fn apply_steal_energy(
     // only when it changes the victim's stored energy.
     let debit = victim_id.and_then(|victim_id| {
         let before = sim.creatures[victim_id].energy;
-        let amount = if before > 0.0 { bite.min(before) } else { 0.0 };
-        let after = before - amount;
-        (after.to_bits() != before.to_bits()).then_some((victim_id, amount, before, after))
+        super::exchange_bite(before, bite).map(|(amount, after)| (victim_id, amount, before, after))
     });
     let Some((victim_id, amount, before, after)) = debit else {
         sim.stats.predation_actions_rejected_total += 1;

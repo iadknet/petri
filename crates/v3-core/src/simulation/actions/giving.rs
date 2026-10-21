@@ -77,16 +77,14 @@ pub fn apply_give_energy(
     };
 
     let before = sim.creatures[giver_id].energy;
-    let amount = if before > 0.0 { bite.min(before) } else { 0.0 };
-    let after = before - amount;
-    if after.to_bits() == before.to_bits() {
+    let Some((amount, after)) = super::exchange_bite(before, bite) else {
         return reject(
             sim,
             effort,
             GiveActionResult::RejectedNothingToGive,
             Some(recipient_id),
         );
-    }
+    };
 
     let giver = &mut sim.creatures[giver_id];
     giver.energy = after;
