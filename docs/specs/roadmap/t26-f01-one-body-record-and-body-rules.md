@@ -190,14 +190,18 @@ wrong.
 - [x] `cargo test -p v3-core --test viability` -> 30 passed, 0 failed;
       `tests/applied_trajectory.rs` and `tests/reproducibility.rs` pass with
       unchanged pins.
-- [ ] `make rust-test-slow` -> `<result>` (recruitment-paths readings and
+- [x] `cargo test -p v3-lab -p v3-server -p v3-telemetry -p v3-cli` -> 718
+      passed, 0 failed, 19 ignored.
+- [x] `cargo check --workspace --all-targets`, `cargo clippy --workspace
+      --all-targets` and `cargo fmt --all --check` -> clean.
+- [ ] `make rust-test-slow` -> pending (recruitment-paths readings and
       lab end-to-end runs unchanged).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate summary at `docs/progress/features/t26-f01.json`, deterministic
-      blocks equal to the F09 epoch, local raw hash and byte count checked,
-      no new full report staged.
-- [ ] `make check` -> `<exit>`.
+- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> pending: summary line,
+      output path, every survivor resolved as killed, equivalent, or deferred.
+- [ ] Gate summary at `docs/progress/features/t26-f01.json` -> pending:
+      deterministic blocks equal to the F09 epoch, local raw hash and byte
+      count checked, no new full report staged.
+- [ ] `make check` -> pending.
 
 ## Performance and Goal Impact
 

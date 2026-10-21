@@ -193,6 +193,14 @@ mod tests {
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
+    /// A founder-phenotype body with the default identity.
+    fn founder_body() -> HeritableBody {
+        HeritableBody {
+            phenotype: Phenotype::FOUNDER,
+            identity: CreatureIdentityState::default(),
+        }
+    }
+
     /// Create a simulation with two creatures: attacker at `pos_a` and victim at `pos_v`.
     fn make_sim_two_creatures(
         pos_a: Position,
@@ -215,10 +223,7 @@ mod tests {
                 pos_a,
                 energy_a,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -231,10 +236,7 @@ mod tests {
                 pos_v,
                 energy_v,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -270,10 +272,7 @@ mod tests {
                 pos,
                 energy,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });

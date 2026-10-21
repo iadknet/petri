@@ -155,11 +155,7 @@ mod tests {
         let active_channel = 1;
         let polarity = [true; 6];
         let mut rng = SmallRng::seed_from_u64(42);
-        let Phenotype {
-            channels: _,
-            active_channel: new_channel,
-            polarity: _,
-        } = mutate_phenotype(
+        let child = mutate_phenotype(
             Phenotype {
                 channels,
                 active_channel,
@@ -168,6 +164,7 @@ mod tests {
             &cfg,
             &mut rng,
         );
+        let new_channel = child.active_channel;
         assert_eq!(new_channel, active_channel, "channel should not change");
     }
 
@@ -182,11 +179,7 @@ mod tests {
         let active_channel = 0;
         let polarity = [true; 6];
         let mut rng = SmallRng::seed_from_u64(42);
-        let Phenotype {
-            channels: _,
-            active_channel: new_channel,
-            polarity: _,
-        } = mutate_phenotype(
+        let child = mutate_phenotype(
             Phenotype {
                 channels,
                 active_channel,
@@ -195,6 +188,7 @@ mod tests {
             &cfg,
             &mut rng,
         );
+        let new_channel = child.active_channel;
         assert_ne!(
             new_channel, active_channel,
             "channel should change to a different one"
@@ -214,11 +208,7 @@ mod tests {
         let active_channel = 1;
         let polarity = [true; 6]; // all add direction
         let mut rng = SmallRng::seed_from_u64(42);
-        let Phenotype {
-            channels: new_ch,
-            active_channel: _,
-            polarity: _,
-        } = mutate_phenotype(
+        let child = mutate_phenotype(
             Phenotype {
                 channels,
                 active_channel,
@@ -227,6 +217,7 @@ mod tests {
             &cfg,
             &mut rng,
         );
+        let new_ch = child.channels;
         // Only channel 1 should change.
         assert_eq!(new_ch[0], 100, "channel 0 unchanged");
         assert_eq!(new_ch[1], 105, "channel 1 should add 5");
@@ -247,11 +238,7 @@ mod tests {
         let active_channel = 0;
         let polarity = [false; 6]; // all subtract direction
         let mut rng = SmallRng::seed_from_u64(0);
-        let Phenotype {
-            channels: new_ch,
-            active_channel: _,
-            polarity: _,
-        } = mutate_phenotype(
+        let child = mutate_phenotype(
             Phenotype {
                 channels,
                 active_channel,
@@ -260,6 +247,7 @@ mod tests {
             &cfg,
             &mut rng,
         );
+        let new_ch = child.channels;
         assert_eq!(new_ch[0], 5u8.wrapping_sub(10), "expected wrapping sub");
         for (i, &val) in new_ch.iter().enumerate().skip(1) {
             assert_eq!(val, 5, "channel {i} unchanged");
@@ -278,11 +266,7 @@ mod tests {
         let active_channel = 0;
         let polarity = [true; 6]; // all add initially
         let mut rng = SmallRng::seed_from_u64(1);
-        let Phenotype {
-            channels: new_ch,
-            active_channel: _,
-            polarity: new_pol,
-        } = mutate_phenotype(
+        let child = mutate_phenotype(
             Phenotype {
                 channels,
                 active_channel,
@@ -291,6 +275,8 @@ mod tests {
             &cfg,
             &mut rng,
         );
+        let new_ch = child.channels;
+        let new_pol = child.polarity;
         assert!(!new_pol[0], "polarity 0 should be flipped to false");
         assert_eq!(new_ch[0], 90, "channel 0 should subtract 10 after flip");
     }

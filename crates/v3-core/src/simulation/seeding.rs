@@ -166,6 +166,7 @@ pub fn seed_simulation_with_perception_mix(
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
+    use crate::creature::body::Phenotype;
     use crate::creature::genome::BackendDef;
     use crate::sensors::perception::genome_uses_extended_perception;
     use std::collections::HashSet;
@@ -238,10 +239,7 @@ mod tests {
         let sim = seed_simulation(small_config(), 42);
         // All founders should have the canonical baseline phenotype.
         for (_, creature) in &sim.creatures {
-            assert_eq!(
-                creature.body.phenotype,
-                crate::creature::body::Phenotype::FOUNDER
-            );
+            assert_eq!(creature.body.phenotype, Phenotype::FOUNDER);
         }
     }
 
