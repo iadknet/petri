@@ -203,9 +203,24 @@ show the feature wrong.
 
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> 30 passed, first; `cargo test -p v3-core --features telemetry-seams` -> 2290 lib, all pass; `cargo test --workspace --exclude v3-core` -> pass but `gate_profile_has_no_severe_regression_against_series_references` (`decided_passes` 0 -> 0.000238; the closing epoch re-pin owns it); `npm test` -> 681 passed; check, clippy, fmt clean.
 - [x] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
-- [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
+- [x] Mutation gate: fresh `make rust-mutants-ci`, 16 survivors resolved (table below; runs in the readings file).
 - [x] Slow tier: `make rust-test-slow` -> 9 passed; Graph Drift pin 15 -> 16.
 - [ ] Gate and goal: measured (see Performance). Open: series entries, epoch re-pin on acceptance.
+
+| Mutation gate | Record |
+| --- | --- |
+| Fresh run | `make rust-mutants-ci` on `473f2c52` vs merge base `08b1584c`, Actions run 39665303997 |
+| Summary line | `rust-mutants-merge: 4 shards, 269 mutants tested: 16 missed, 191 caught, 62 unviable, 0 timeouts` |
+| Output | `~/.local/share/petri-tools/mutants/t27-f03/mutants.out.fresh/` (`missed.txt` 16, `timeout.txt` 0) |
+| `giving.rs:32:9` `as_key` -> `""`, -> `"xyzzy"` | killed: `give_result_keys_match_public_contract` (`actions/mod.rs:2100`) |
+| `mod.rs:65:28` `>` -> `>=` in `exchange_bite` | equivalent: at `before` = ±0 the amount is `min(bite, 0)`, which never lowers the stored energy, so the `after < before` guard returns `None` either way |
+| `mod.rs:67:13` `>` -> `>=` in `exchange_bite` | equivalent: an amount of 0 leaves `after == before`, which the `after < before` conjunct already rejects |
+| `predation.rs:111:36` `==` -> `!=`; `112:35` `+=` -> `*=`, `-=` | killed (feature-gated): `telemetry-seams` code, compiled out of the default test run; a `--features telemetry-seams` feedback pass caught all three (`tick/tests/window_seam.rs` victim-damage tests) |
+| `energy_accounting.rs:222:60` `-` -> `+` in `net_action_overdraft` | killed: `netting_an_overdraft_leaves_earlier_charges_untouched` (`energy_accounting.rs:331`) |
+| `tick.rs:1106:53` `!=` -> `==` in `execute_steal_energy` | killed: `a_steal_succeeds_for_the_outcome_bank_only_when_it_takes_energy` (`tick/tests/giving.rs:201`) |
+| `tick.rs:787:17`, `788:17` `+` -> `*`, `-` in `TickComputeStats::commit` (4) | killed: `tick_compute_commit_sums_every_kind_into_actions_applied` (`tick/tests/energy_accounting.rs:642`) |
+| `window_seam.rs:132:9` `FlowMarks::of` -> `Default::default()` | equivalent (feature-gated): compiled out by default; unviable with `telemetry-seams` (`FlowMarks` has no `Default`) |
+| `windows.rs:327:5` `action_label` -> `"xyzzy".into()`, `String::new()` | killed: `action_labels_name_every_kind` (`v3-telemetry/src/windows/tests.rs:964`) |
 
 ## Performance and Goal Impact
 
