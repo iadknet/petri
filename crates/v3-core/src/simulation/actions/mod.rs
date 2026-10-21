@@ -167,6 +167,9 @@ pub fn apply_move(
 }
 
 #[cfg(test)]
+mod body_rules_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
