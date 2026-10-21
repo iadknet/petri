@@ -26,15 +26,13 @@ use std::collections::HashMap;
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
 use v3_core::creature::action_log::{ActionResult, ActionType};
+use v3_core::creature::body::{HeritableBody, Phenotype};
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_core::simulation::actions::ReproductionActionResult;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
-const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
-const FOUNDER_ACTIVE_CHANNEL: usize = 0;
-const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 /// Starting energy for hand-placed founders in single-creature scenarios:
 /// above the default founder gate (32) so the founder reproduces when the
 /// scenario allows it. Set on the creature, not through `initial_energy`,
@@ -355,10 +353,10 @@ fn creatures_can_eat_food() {
             pos,
             start_energy,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -419,10 +417,10 @@ fn founder_eats_primary_type_and_preserves_other_food() {
             pos,
             cfg.energy.lifecycle.initial_energy,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -467,10 +465,10 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             pos,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -532,10 +530,10 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
             start,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -582,10 +580,10 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             start,
             cfg.energy.lifecycle.initial_energy,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -627,7 +625,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
         if sim
             .creatures
             .values()
-            .any(|c| c.phenotype_channels != FOUNDER_CHANNELS)
+            .any(|c| c.body.phenotype.channels != Phenotype::FOUNDER.channels)
         {
             ever_diverged = true;
             break;
@@ -757,10 +755,10 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             pos,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });
@@ -774,7 +772,8 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
 
     if let Some(child) = child {
         assert_eq!(
-            child.phenotype_channels, FOUNDER_CHANNELS,
+            child.body.phenotype.channels,
+            Phenotype::FOUNDER.channels,
             "child phenotype must be identical to parent when per_unit_rate=0.0"
         );
     }
@@ -810,10 +809,10 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
             pos,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            parent_identity,
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: parent_identity,
+            },
             [0.0; 16],
         )
     });
@@ -824,11 +823,11 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
 
     if let Some(child) = sim.creatures.values().find(|c| c.generation == 1) {
         assert_eq!(
-            child.identity.lineage_id, parent_identity.lineage_id,
+            child.body.identity.lineage_id, parent_identity.lineage_id,
             "child lineage_id must match parent"
         );
         assert_eq!(
-            child.identity.kin_tag, parent_identity.kin_tag,
+            child.body.identity.kin_tag, parent_identity.kin_tag,
             "child kin_tag must be unchanged when per_unit_rate=0.0"
         );
     }

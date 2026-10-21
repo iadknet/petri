@@ -174,6 +174,7 @@ mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
     use crate::contracts::Position;
+    use crate::creature::body::{HeritableBody, Phenotype};
     use crate::creature::founder::{
         founder_genome, founder_reproduce_policy, v3alpha1_founder_genome,
     };
@@ -218,10 +219,10 @@ mod tests {
                 pos,
                 energy,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -421,10 +422,10 @@ mod tests {
                 pos1,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -435,10 +436,10 @@ mod tests {
                 pos2,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -605,10 +606,10 @@ mod tests {
                 pos,
                 80.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -619,10 +620,10 @@ mod tests {
                 north,
                 80.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -955,7 +956,7 @@ mod tests {
             sim.config.mutation.genome_size_pressure_enabled = true;
             sim.config.mutation.genome_size_cap = 1;
 
-            let parent_channels = sim.creatures[parent_id].phenotype_channels;
+            let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
@@ -969,7 +970,7 @@ mod tests {
                     .find(|c| c.generation == parent_generation + 1)
                     .expect("child must exist when reproduction spawned");
                 assert_ne!(
-                    child.phenotype_channels, parent_channels,
+                    child.body.phenotype.channels, parent_channels,
                     "applied event must still trigger phenotype mutation"
                 );
                 observed = true;
@@ -1012,7 +1013,7 @@ mod tests {
                 targets: vec![],
             }];
 
-            let parent_channels = sim.creatures[parent_id].phenotype_channels;
+            let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
@@ -1026,7 +1027,7 @@ mod tests {
                     .find(|c| c.generation == parent_generation + 1)
                     .expect("child must exist when reproduction spawned");
                 assert_eq!(
-                    child.phenotype_channels, parent_channels,
+                    child.body.phenotype.channels, parent_channels,
                     "skipped-only mutation event must not trigger phenotype mutation"
                 );
                 observed = true;
@@ -1284,10 +1285,10 @@ mod tests {
                 pos1,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1298,10 +1299,10 @@ mod tests {
                 pos2,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1437,10 +1438,10 @@ mod tests {
                 pos,
                 energy,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1627,10 +1628,10 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1649,10 +1650,10 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1827,10 +1828,10 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -1849,10 +1850,10 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });

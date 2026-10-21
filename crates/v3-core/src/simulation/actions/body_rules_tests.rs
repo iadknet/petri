@@ -10,6 +10,7 @@ use super::{apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, Position};
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -42,10 +43,7 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
                 position,
                 energy,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::founder(3, 77),
+                HeritableBody::founder(3, 77),
                 [0.0; 16],
             )
         });
@@ -312,10 +310,15 @@ fn a_blocked_move_charges_the_move_effort_as_failed() {
 
 // ── inheritance ──────────────────────────────────────────────────────────────
 
+/// The parent body every fixture creature carries.
+fn parent_body() -> HeritableBody {
+    HeritableBody::founder(3, 77)
+}
+
 /// A birth from a founder whose genome mutates (`per_unit_rate`) with
 /// phenotype switch and flip chances that make every phenotype draw count.
-/// Returns the child's phenotype triple and identity.
-fn child_body(per_unit_rate: f64, seed: u64) -> ([u8; 6], usize, [bool; 6], CreatureIdentityState) {
+/// Returns the child's body.
+fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 80.0)]);
     let parent = ids[0];
     sim.config.mutation.per_unit_rate = per_unit_rate;
@@ -325,45 +328,41 @@ fn child_body(per_unit_rate: f64, seed: u64) -> ([u8; 6], usize, [bool; 6], Crea
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
-    let child = sim
-        .creatures
+    sim.creatures
         .values()
         .find(|creature| creature.id != parent)
-        .expect("one child");
-    (
-        child.phenotype_channels,
-        child.phenotype_active_channel,
-        child.phenotype_channel_polarity,
-        child.identity,
-    )
+        .expect("one child")
+        .body
 }
 
 /// The draws after genome mutation, phenotype first and kin tag second,
 /// pinned on main: swapping them moves these values.
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
-    let (channels, active, polarity, identity) = child_body(0.5, 7);
-    let parent = CreatureIdentityState::founder(3, 77);
-    assert_eq!(identity.lineage_id, parent.lineage_id);
-    assert_eq!((identity.kin_tag ^ parent.kin_tag).count_ones(), 1);
+    let parent = parent_body();
+    let child = child_body(0.5, 7);
+    assert_eq!(child.identity.lineage_id, parent.identity.lineage_id);
     assert_eq!(
-        (channels, active, polarity, identity.kin_tag),
-        PINNED_MUTATED_CHILD
+        (child.identity.kin_tag ^ parent.identity.kin_tag).count_ones(),
+        1
+    );
+    assert_eq!(
+        child,
+        HeritableBody {
+            phenotype: Phenotype {
+                channels: [0, 0, 92, 91, 138, 138],
+                active_channel: 3,
+                polarity: [true, true, true, false, true, true],
+            },
+            identity: CreatureIdentityState {
+                lineage_id: 3,
+                kin_tag: 3_756_156_572,
+            },
+        }
     );
 }
 
-const PINNED_MUTATED_CHILD: ([u8; 6], usize, [bool; 6], u32) = (
-    [0, 0, 92, 91, 138, 138],
-    3,
-    [true, true, true, false, true, true],
-    3_756_156_572,
-);
-
 #[test]
 fn an_unmutated_birth_copies_the_parent_body() {
-    let (channels, active, polarity, identity) = child_body(0.0, 7);
-    assert_eq!(channels, [0, 0, 92, 92, 138, 138]);
-    assert_eq!(active, 0);
-    assert_eq!(polarity, [true; 6]);
-    assert_eq!(identity, CreatureIdentityState::founder(3, 77));
+    assert_eq!(child_body(0.0, 7), parent_body());
 }

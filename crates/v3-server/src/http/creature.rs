@@ -427,7 +427,7 @@ pub async fn get_creature(
         .get(creature_id)
         .ok_or_else(|| AppError::NotFound(format!("creature {id} not found")))?;
 
-    let rgb = channels_to_rgb(creature.phenotype_channels);
+    let rgb = channels_to_rgb(creature.body.phenotype.channels);
     let exclude: std::collections::HashSet<&str> = query
         .exclude
         .as_deref()
@@ -488,9 +488,9 @@ pub async fn get_creature(
         complexity: creature.cached_complexity,
         genome_size: creature.genome.genome_size(),
         phenotype: CreaturePhenotypeResponse {
-            channels: creature.phenotype_channels,
-            active_channel: creature.phenotype_active_channel,
-            polarity: creature.phenotype_channel_polarity,
+            channels: creature.body.phenotype.channels,
+            active_channel: creature.body.phenotype.active_channel,
+            polarity: creature.body.phenotype.polarity,
             rgb,
         },
         latest_tick,

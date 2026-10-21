@@ -172,10 +172,10 @@ pub fn seed_arms(config: &SimulationConfig, run_seed: u64, genomes: &ArmGenomes)
     for (k, id) in ids.into_iter().enumerate() {
         let seeded = &sim.creatures[id];
         assert_eq!(
-            seeded.identity.lineage_id as usize, k,
+            seeded.body.identity.lineage_id as usize, k,
             "founders number in creature order"
         );
-        let arm = Arm::of_lineage(seeded.identity.lineage_id);
+        let arm = Arm::of_lineage(seeded.body.identity.lineage_id);
         let genome = genomes.genome(arm, incumbent_turn).clone();
         if arm == Arm::Incumbent {
             incumbent_turn += 1;
@@ -186,10 +186,7 @@ pub fn seed_arms(config: &SimulationConfig, run_seed: u64, genomes: &ArmGenomes)
             seeded.position,
             seeded.energy,
             seeded.generation,
-            seeded.phenotype_channels,
-            seeded.phenotype_active_channel,
-            seeded.phenotype_channel_polarity,
-            seeded.identity,
+            seeded.body,
             seeded.shared_memory,
         );
         sim.creatures[id] = rebuilt;
@@ -226,7 +223,7 @@ pub struct ReplicateRun {
 }
 
 fn arm_of(creature: &CreatureState) -> Arm {
-    Arm::of_lineage(creature.identity.lineage_id)
+    Arm::of_lineage(creature.body.identity.lineage_id)
 }
 
 /// The exposure of `family`'s arm creatures `ids` at this tick: `exposed`

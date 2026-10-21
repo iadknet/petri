@@ -2,6 +2,7 @@ use super::super::{run_tick, sort_by_priority_bid};
 use super::support::*;
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{CreatureId, Position, WorldAction};
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -96,10 +97,10 @@ fn insert_test_creature(
             position,
             50.0,
             0,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     })

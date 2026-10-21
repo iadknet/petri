@@ -9,6 +9,7 @@ use super::support::*;
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::founder::vm_decision_founder_genome;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction, VoteSink,
@@ -45,10 +46,10 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
             old.position,
             old.energy,
             old.generation,
-            [0, 0, 92, 92, 138, 138],
-            0,
-            [true; 6],
-            old.identity,
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: old.body.identity,
+            },
             old.shared_memory,
         );
         sim.creatures[id] = rebuilt;

@@ -15,6 +15,7 @@ pub use records::*;
 
 use crate::config::SimulationConfig;
 use crate::contracts::{Direction, Position, WorldAction};
+use crate::creature::body::{HeritableBody, Phenotype};
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -67,10 +68,10 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                 centre,
                 50.0,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });

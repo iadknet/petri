@@ -8,6 +8,7 @@
 use slotmap::SlotMap;
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
+use v3_core::creature::body::{HeritableBody, Phenotype};
 use v3_core::creature::genome::CreatureGenome;
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::CreatureState;
@@ -15,10 +16,6 @@ use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::domain::{BackendTrace, GraphTrace, TickTrace};
 use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
-
-pub(crate) const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
-pub(crate) const FOUNDER_ACTIVE_CHANNEL: usize = 0;
-pub(crate) const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 /// A tiny, zero-growth, zero-mutation world config for deterministic fixtures.
 ///
@@ -55,10 +52,10 @@ pub(crate) fn insert_creature(
             position,
             energy,
             generation,
-            FOUNDER_CHANNELS,
-            FOUNDER_ACTIVE_CHANNEL,
-            FOUNDER_POLARITY,
-            CreatureIdentityState::default(),
+            HeritableBody {
+                phenotype: Phenotype::FOUNDER,
+                identity: CreatureIdentityState::default(),
+            },
             [0.0; 16],
         )
     });

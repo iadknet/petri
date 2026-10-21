@@ -267,7 +267,7 @@ impl PopulationCensus {
         self.world_inputs_read_sum += creature.last_mesh_world_reads.len() as u64;
         *self
             .lineage_counts
-            .entry(creature.identity.lineage_id)
+            .entry(creature.body.identity.lineage_id)
             .or_insert(0) += 1;
     }
 
@@ -431,7 +431,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             y: creature.position.y,
             energy: creature.energy,
             generation: creature.generation,
-            phenotype_rgb: channels_to_rgb(creature.phenotype_channels),
+            phenotype_rgb: channels_to_rgb(creature.body.phenotype.channels),
         });
     }
     let creature_count = creatures.len();

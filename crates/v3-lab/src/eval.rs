@@ -20,13 +20,13 @@ use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{CreatureId, Direction, Position};
+use v3_core::creature::body::HeritableBody;
 use v3_core::creature::genome::{BackendDef, CreatureGenome};
-use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::{CreatureState, DispatchRecord, SHARED_MEMORY_SLOTS};
 use v3_core::kernel::WorldState;
 use v3_core::simulation::actions::{apply_move, apply_typed_eat};
 use v3_core::simulation::energy_accounting::EnergyFlows;
-use v3_core::simulation::{run_tick, seed_simulation, SimStats, Simulation};
+use v3_core::simulation::{run_tick, SimStats, Simulation};
 
 use crate::geodesic::{step_toward, Field, Terrain};
 use crate::scene::{nearest, Scene};
@@ -38,38 +38,6 @@ const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
 /// tick-dependent input moves.
 pub const SCENE_START_TICK: u64 = 62_680;
 
-/// The founder phenotype triple, read from one production-seeded founder
-/// (`seeding.rs` keeps the constants private).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Phenotype {
-    pub channels: [u8; 6],
-    pub active_channel: usize,
-    pub polarity: [bool; 6],
-}
-
-impl Phenotype {
-    /// Read the triple from one `seed_simulation` founder of `config`.
-    ///
-    /// # Panics
-    ///
-    /// If `config` seeds no creature.
-    #[must_use]
-    pub fn founder(config: &SimulationConfig) -> Self {
-        let mut probe = config.clone();
-        probe.world.width = 8;
-        probe.world.height = 8;
-        probe.world.terrain.clear();
-        probe.population.initial_creatures = 1;
-        let sim = seed_simulation(probe, 0);
-        let founder = sim.creatures.values().next().expect("one founder seeded");
-        Self {
-            channels: founder.phenotype_channels,
-            active_channel: founder.phenotype_active_channel,
-            polarity: founder.phenotype_channel_polarity,
-        }
-    }
-}
-
 /// What every evaluation of an arm shares.
 #[derive(Debug, Clone)]
 pub struct Setup {
@@ -78,7 +46,6 @@ pub struct Setup {
     pub lifetime: u32,
     /// World tick each scene starts at, [`SCENE_START_TICK`].
     pub start_tick: u64,
-    pub phenotype: Phenotype,
     pub scoring: Scoring,
 }
 
@@ -123,13 +90,11 @@ impl Scoring {
 impl Setup {
     #[must_use]
     pub fn new(config: SimulationConfig, start_energy: f32, lifetime: u32) -> Self {
-        let phenotype = Phenotype::founder(&config);
         Self {
             config,
             start_energy,
             lifetime,
             start_tick: SCENE_START_TICK,
-            phenotype,
             scoring: Scoring::BITES_AND_PROGRESS,
         }
     }
@@ -154,10 +119,7 @@ impl Setup {
             position,
             self.start_energy,
             0,
-            self.phenotype.channels,
-            self.phenotype.active_channel,
-            self.phenotype.polarity,
-            CreatureIdentityState::founder(0, seed),
+            HeritableBody::founder(0, seed),
             [0.0; SHARED_MEMORY_SLOTS],
         )
     }

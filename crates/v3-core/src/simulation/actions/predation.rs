@@ -187,6 +187,7 @@ mod tests {
     use super::*;
     use crate::config::SimulationConfig;
     use crate::contracts::{CreatureId, Position};
+    use crate::creature::body::{HeritableBody, Phenotype};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
@@ -217,10 +218,10 @@ mod tests {
                 pos_a,
                 energy_a,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -233,10 +234,10 @@ mod tests {
                 pos_v,
                 energy_v,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });
@@ -272,10 +273,10 @@ mod tests {
                 pos,
                 energy,
                 0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: CreatureIdentityState::default(),
+                },
                 [0.0; 16],
             )
         });

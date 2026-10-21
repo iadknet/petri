@@ -1646,7 +1646,7 @@ async fn health_carries_population_census_and_cumulative_vitals() {
         / count;
     let mut lineages: HashMap<u32, f64> = HashMap::new();
     for c in &creatures {
-        *lineages.entry(c.identity.lineage_id).or_insert(0.0) += 1.0;
+        *lineages.entry(c.body.identity.lineage_id).or_insert(0.0) += 1.0;
     }
     let entropy: f64 = lineages
         .values()
