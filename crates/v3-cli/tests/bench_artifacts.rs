@@ -192,12 +192,38 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
-/// Undoes T25.F08 commit 1 on the resolved goal recipes: re-inserting
-/// `mutation.structured_heritable_refinement: true` recovers the T25.F02
-/// commit-3 digests, whose values it returns.
-fn undo_t25_f08(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
+/// Undoes T26.F02 on the resolved goal recipes: removing
+/// `energy.capacity` and `mutation.capacity` and restoring `max_energy` 200
+/// recovers the T25.F08 digests, whose values it returns.
+fn undo_t26_f02(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
     let values = configs.map(|config| {
         let mut value = serde_json::to_value(config).unwrap();
+        for block in ["energy", "mutation"] {
+            assert!(value[block]
+                .as_object_mut()
+                .unwrap()
+                .remove("capacity")
+                .is_some());
+        }
+        value["energy"]["lifecycle"]["max_energy"] = json!(200.0);
+        value
+    });
+    assert_eq!(
+        values.each_ref().map(value_digest),
+        [
+            "sha256:62fcf74bafeb6ab75f0e1c882eeafce73720c892441d65872706cc6d14159f24",
+            "sha256:3d595bef955f186a5ef59278bae6e741a233cc4bd7c4b989bfa77558a52d54b8",
+            "sha256:e4d5bef9de074f0d1d1376c2f312c85c64c489fe6b484451948727a7bcbc5454",
+        ]
+    );
+    values
+}
+
+/// Undoes T25.F08 commit 1 on the goal recipes' T25.F08 values:
+/// re-inserting `mutation.structured_heritable_refinement: true` recovers the
+/// T25.F02 commit-3 digests, whose values it returns.
+fn undo_t25_f08(values: [Value; 3]) -> [Value; 3] {
+    let values = values.map(|mut value| {
         assert_eq!(
             value["mutation"]
                 .as_object_mut()
@@ -282,6 +308,10 @@ fn undo_t25_f02(values: [Value; 3]) -> [Value; 3] {
 /// digests. T25.F08 commit 1 re-pinned all three after two agreeing runs:
 /// the resolved `MutationConfig` drops `structured_heritable_refinement`;
 /// re-inserting it at `true` recovers the T25.F02 commit-3 digests.
+/// T26.F02 re-pinned all three after two agreeing runs: the resolved config
+/// adds `energy.capacity` and `mutation.capacity` and `max_energy` defaults
+/// to 800; removing both blocks and restoring 200 recovers the T25.F08
+/// digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -297,13 +327,13 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:62fcf74bafeb6ab75f0e1c882eeafce73720c892441d65872706cc6d14159f24",
-            "sha256:3d595bef955f186a5ef59278bae6e741a233cc4bd7c4b989bfa77558a52d54b8",
-            "sha256:e4d5bef9de074f0d1d1376c2f312c85c64c489fe6b484451948727a7bcbc5454",
+            "sha256:a1cd00975a547e72f7e5274b06ca3ca1e67df437a1fa1a4a2dfb41e33d3ab16a",
+            "sha256:10d7267790d036579d1b268559bc5a5c4ee7524e8b655c17963fea236b9903e2",
+            "sha256:0f3d2bee0b8f2f388590ceed62760bb1d60742ad9749673715d44ba690116b33",
         ]
     );
 
-    let input_values = undo_t25_f02(undo_t25_f08(configs));
+    let input_values = undo_t25_f02(undo_t25_f08(undo_t26_f02(configs)));
     assert_eq!(
         input_values.each_ref().map(value_digest),
         [

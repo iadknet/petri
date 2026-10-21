@@ -595,8 +595,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // survives (14, 37, 40, 50, 51 and 53 are the first six). T25.F09 commit
     // 3 (the six retention operators remap every Graph draw): seed 14 goes
     // extinct; seed 2 is the lowest of 0..=200 that survives (2, 15, 18, 37,
-    // 53 and 79 are the first six).
-    params.seeds = vec![2];
+    // 53 and 79 are the first six). T26.F02 (the capacity chance drawn on
+    // every birth shifts every later draw): seed 2 goes extinct at tick 87;
+    // seed 4 is the lowest of 0..=200 that survives (4, 11, 20, 33, 40 and
+    // 42 are the first six). Removing the capacity draw restores seed 2.
+    params.seeds = vec![4];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

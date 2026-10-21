@@ -187,6 +187,21 @@ fn empty_readings() -> PopulationReadings {
         occupancy_grid: grid_for(0),
         pair_groups: None,
         plasticity_census: plasticity_for(0),
+        capacity: None,
+    }
+}
+
+/// A capacity block every statistic of which reads `value`.
+fn capacity_block(value: f64) -> crate::bench::capacity::CapacityDistribution {
+    crate::bench::capacity::CapacityDistribution {
+        min: six(value),
+        p10: six(value),
+        median: six(value),
+        p90: six(value),
+        max: six(value),
+        mean: six(value),
+        at_min_fraction: six(0.0),
+        at_max_fraction: six(0.0),
     }
 }
 
@@ -211,6 +226,7 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         occupancy_grid: grid_for(population),
         pair_groups: Some(pair_groups_for(tick)),
         plasticity_census: plasticity_for(population),
+        capacity: Some(capacity_block(tick as f64)),
     }
 }
 
@@ -569,6 +585,7 @@ proptest! {
             occupancy_grid: Some(grid_for(population)),
             pair_groups: None,
             plasticity_census: Some(plasticity_for(population)),
+            capacity: (population > 0).then(|| capacity_block(population as f64)),
             tracking: WorldTracking::default(),
         };
 
@@ -590,6 +607,7 @@ proptest! {
         prop_assert_eq!(&decoded.sensor_census, &sample.sensor_census);
         prop_assert_eq!(&decoded.occupancy_grid, &sample.occupancy_grid);
         prop_assert_eq!(&decoded.plasticity_census, &sample.plasticity_census);
+        prop_assert_eq!(&decoded.capacity, &sample.capacity);
         prop_assert_eq!(&decoded.tracking, &sample.tracking);
 
         let mut stripped: serde_json::Value =
@@ -607,6 +625,7 @@ proptest! {
             "sensor_census",
             "occupancy_grid",
             "plasticity_census",
+            "capacity",
         ] {
             object.remove(key);
         }
@@ -622,6 +641,7 @@ proptest! {
         prop_assert_eq!(historical.shannon_entropy_nats, None);
         prop_assert_eq!(historical.sensor_census, None);
         prop_assert_eq!(historical.occupancy_grid, None);
+        prop_assert_eq!(historical.capacity, None);
     }
 }
 
@@ -1405,6 +1425,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
     assert_eq!(legacy.shannon_entropy_nats, None);
     assert_eq!(legacy.sensor_census, None);
     assert_eq!(legacy.occupancy_grid, None);
+    assert_eq!(legacy.capacity, None);
 
     let sample = PersistenceSample {
         tick: 100,
@@ -1423,6 +1444,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         occupancy_grid: Some(grid_for(5)),
         pair_groups: Some(pair_groups_for(100)),
         plasticity_census: Some(plasticity_for(5)),
+        capacity: Some(capacity_block(200.0)),
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],

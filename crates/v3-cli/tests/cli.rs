@@ -18,6 +18,9 @@ fn default_config() -> SimulationConfig {
     cfg.world.food.growth_rate = 0.25;
     cfg.energy.lifecycle.max_energy = 160.0;
     cfg.energy.costs.reproduce_cost = 1.0;
+    // The 160 maximum pulls the reference and founder capacity down with it
+    // (T26.F02), so every founder's cap and energy scale is 160.
+    cfg.normalize();
     cfg
 }
 

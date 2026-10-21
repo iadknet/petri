@@ -6,6 +6,7 @@
 //! wall-clock as an unasserted secondary signal.
 
 pub mod artifacts;
+pub mod capacity;
 mod comparison;
 pub mod drives;
 mod indicators;
