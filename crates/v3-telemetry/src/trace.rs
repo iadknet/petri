@@ -424,25 +424,16 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
     a.double(config_key("mutation.executed_bias"), mutation.executed_bias);
     // The move factor and the birth's capacity draw and cap (T26.F02).
     let capacity = &config.energy.capacity;
-    for (field, value) in [
-        ("reference", capacity.reference),
-        ("min", capacity.min),
-        ("move_cost_slope", capacity.move_cost_slope),
+    for (key, value) in [
+        ("energy.capacity.reference", capacity.reference),
+        ("energy.capacity.min", capacity.min),
+        ("energy.capacity.move_cost_slope", capacity.move_cost_slope),
+        ("energy.lifecycle.max_energy", lifecycle.max_energy),
+        ("mutation.capacity.chance", mutation.capacity.chance),
+        ("mutation.capacity.log_step", mutation.capacity.log_step),
     ] {
-        a.double(config_key(&format!("energy.capacity.{field}")), value);
+        a.double(config_key(key), value);
     }
-    a.double(
-        config_key("energy.lifecycle.max_energy"),
-        lifecycle.max_energy,
-    );
-    a.double(
-        config_key("mutation.capacity.chance"),
-        mutation.capacity.chance,
-    );
-    a.double(
-        config_key("mutation.capacity.log_step"),
-        mutation.capacity.log_step,
-    );
     a.double(
         config_key("predation.steal_cost_rate"),
         config.predation.steal_cost_rate,
