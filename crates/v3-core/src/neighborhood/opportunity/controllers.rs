@@ -8,13 +8,13 @@
 //! before the pilot and never tuned on assay outcomes.
 
 use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::food_idx;
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome};
-use crate::sensors::perception::food_idx;
 
 use super::super::input_use::catalog::{addressed, Addressed, Channel};
 

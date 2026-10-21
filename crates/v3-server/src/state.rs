@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use slotmap::Key;
 use tokio::sync::{broadcast, Mutex};
 use v3_core::config::SimulationConfig;
+use v3_core::creature::colour::channels_to_rgb;
 use v3_core::creature::state::CreatureState;
-use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::{seed_simulation, Simulation};
 

@@ -14,7 +14,7 @@ pub use food_type_id::OrdinaryFoodTypeId;
 pub use ids::{CreatureId, NodeId};
 pub use inputs::{
     barrier_idx, food_idx, nearby_idx, occupancy_idx, DirectionPair, DynamicIntrospectionKey,
-    InputReference, StaticIntrospectionKey, WorldInputKey,
+    InputReference, NearbyField, StaticIntrospectionKey, WorldInputKey,
 };
 pub use position::Position;
 pub use routing::{RouteTarget, MAX_GATE_SLOTS};

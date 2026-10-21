@@ -1,4 +1,4 @@
-//! The `neighborhood-coverage-v2` contexts (T11.F26): recorded terminal-world
+//! The `neighborhood-coverage-v3` contexts (T11.F26): recorded terminal-world
 //! snapshots, authored contexts that set one channel group `neighborhood-v2`
 //! leaves at zero, and long sequences over them. Any change to these rules
 //! bumps [`super::COVERAGE_VERSION`].
@@ -6,7 +6,8 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use crate::sensors::perception::{nearby_idx, SensorSnapshot};
+use crate::contracts::nearby_idx;
+use crate::sensors::perception::SensorSnapshot;
 use crate::simulation::{assemble_full_sensor_inputs, Simulation};
 
 use super::super::battery::Scenario;
@@ -45,10 +46,17 @@ use Range::{Binary, NonPositive, Signed, Unit};
 const AREA_FOOD: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit];
 const AREA_BARRIER: [Range; 7] = [Unit, Unit, Signed, Signed, Signed, Signed, Unit];
 const AREA_OCCUPANCY: [Range; 7] = [Unit, Signed, Signed, Signed, Signed, Unit, Unit];
-/// One `NearbyCreature` slot, in `nearby_idx` order, cycled over the slots.
-const NEARBY_SLOT: [Range; nearby_idx::FIELDS_PER_SLOT] = [
-    Binary, Signed, Signed, Unit, Unit, Binary, Unit, Binary, Unit,
-];
+/// One `NearbyCreature` slot, in `nearby_idx` order, cycled over the slots;
+/// set through the named indices so an added or reordered field cannot take
+/// another field's range.
+const NEARBY_SLOT: [Range; nearby_idx::FIELDS_PER_SLOT] = {
+    let mut ranges = [Unit; nearby_idx::FIELDS_PER_SLOT];
+    ranges[nearby_idx::PRESENT] = Binary;
+    ranges[nearby_idx::REPRODUCE_READY] = Binary;
+    ranges[nearby_idx::REL_X] = Signed;
+    ranges[nearby_idx::REL_Y] = Signed;
+    ranges
+};
 /// `PreviousOutcome` read ranges by `OutcomeChannel`: EnergyDelta [-1, 1],
 /// ActionSuccess [0, 1], DamageDelta [-1, 0], OffspringSuccess {0, 1}.
 const OUTCOMES: [Range; 4] = [Signed, Unit, NonPositive, Binary];

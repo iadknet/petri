@@ -3,9 +3,9 @@ import type { InputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
 import directionPairsFixture from "./directionPairs.json";
 import {
-	DIRECTION_PAIRS,
 	describeInputRef,
 	directionName,
+	directionPairs,
 	formatAction,
 	formatActionList,
 	formatInputRef,
@@ -14,6 +14,7 @@ import {
 	isRingSensor,
 	parseWorldInputRef,
 } from "./inputRefUtils.ts";
+import nearbyFieldsFixture from "./nearbyFields.json";
 
 describe("formatAction", () => {
 	it("formats current server world action variants", () => {
@@ -144,22 +145,40 @@ describe("formatInputRefWithSubIndex", () => {
 
 	it("names nearby-creature fields by rank, nearest first", () => {
 		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 0)).toBe("Nearest1.present");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 12)).toBe("Nearest2.dist");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 12)).toBe("Nearest2.dy");
 		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 5)).toBe("Nearest1.ready");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 13)).toBe("Nearest2.energy");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 15)).toBe("Nearest2.kin");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 14)).toBe("Nearest2.energy");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 16)).toBe("Nearest2.kin");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 17)).toBe("Nearest2.red");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 7)).toBe("Nearest1.red");
 	});
 
-	it("names the nine nearby-creature fields of every rank in layout order", () => {
-		const fields = ["present", "dx", "dy", "dist", "energy", "ready", "kin", "lineage", "similar"];
-		for (let channel = 0; channel < 36; channel++) {
-			const slot = Math.floor(channel / 9);
-			expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, channel)).toBe(
-				`Nearest${slot + 1}.${fields[channel % 9]}`,
-			);
+	it("names every field of the nearbyFields fixture at every rank, in layout order", () => {
+		const { slots, fields } = nearbyFieldsFixture;
+		expect(fields.map((field) => field.name)).toEqual([
+			"present",
+			"dx",
+			"dy",
+			"dist",
+			"energy",
+			"ready",
+			"kin",
+			"red",
+			"green",
+			"blue",
+		]);
+		for (let slot = 0; slot < slots; slot++) {
+			fields.forEach((field, index) => {
+				const channel = slot * fields.length + index;
+				const described = describeInputRef({ World: "NearbyCreature" }, channel);
+				expect(described.label).toBe(`Nearest${slot + 1}.${field.name}`);
+				expect(described.description).toContain(field.description.slice(1));
+			});
 		}
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 35)).toBe("Nearest4.similar");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 36)).toBe("Nearby[36]");
+		const width = slots * fields.length;
+		expect(width).toBe(40);
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 39)).toBe("Nearest4.blue");
+		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 40)).toBe("Nearby[40]");
 	});
 
 	it("names decision-state and queue sub-values", () => {
@@ -187,7 +206,7 @@ describe("describeInputRef", () => {
 
 	it("explains every ring direction and nearby rank", () => {
 		expect(describeInputRef({ World: "NeighborOccupiedRing" }, 4).description).toMatch(/south/i);
-		expect(describeInputRef({ World: "NearbyCreature" }, 9).description).toMatch(/2nd-nearest/);
+		expect(describeInputRef({ World: "NearbyCreature" }, 10).description).toMatch(/2nd-nearest/);
 	});
 });
 
@@ -244,8 +263,17 @@ describe("parseWorldInputRef", () => {
 	});
 });
 
-describe("DIRECTION_PAIRS", () => {
-	it("equals the shared fixture the v3-core declaration is pinned to", () => {
-		expect(DIRECTION_PAIRS).toEqual(directionPairsFixture);
+describe("directionPairs", () => {
+	it("reads every family's pairs from the fixture v3-core is pinned to", () => {
+		for (const [key, pairs] of Object.entries(directionPairsFixture)) {
+			expect(directionPairs({ World: key } as InputReference)).toEqual(pairs);
+		}
+		expect(directionPairs({ World: "NearbyCreature" })[1]).toEqual({
+			x: 11,
+			y: 12,
+			facts: [10, 13, 14, 15, 16, 17, 18, 19],
+		});
+		expect(directionPairs({ World: "NeighborBarrierRing" })).toEqual([]);
+		expect(directionPairs("ActionQueue")).toEqual([]);
 	});
 });

@@ -4,11 +4,12 @@
 //! run from fresh cognition state, exactly as `neighborhood-v2` snapshots.
 
 use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::food_idx;
 use crate::contracts::{Direction, WorldAction};
 use crate::creature::genome::CreatureGenome;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::MeshOutput;
-use crate::sensors::perception::{food_idx, PerceptionSnapshot, SensorSnapshot};
+use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::{age_fraction, StaticInputs};
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 

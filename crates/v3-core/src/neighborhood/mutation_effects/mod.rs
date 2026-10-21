@@ -41,8 +41,8 @@ pub use contexts::Group;
 use contexts::{recorded_contexts, Extension};
 use records::{run_panel_executions, PanelExecution, TracedBattery};
 
-pub const VERSION: &str = "mutation-effects-v4";
-pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v2";
+pub const VERSION: &str = "mutation-effects-v5";
+pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v3";
 /// Proposal seed: `PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER * cohort +
 /// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`, where
 /// `parent_index` is the parent's zero-based ordinal within its cohort, not

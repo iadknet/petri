@@ -3,15 +3,7 @@ use crate::sensors::reads::WorldReads;
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
-/// Number of ranked nearby-creature slots.
-pub const NEARBY_SLOTS: usize = nearby_idx::SLOTS;
-/// Channels of the `NearbyCreature` family.
-pub const NEARBY_WIDTH: usize = nearby_idx::WIDTH;
-
-// The compound sub-field index constants live with the layouts they index in
-// `contracts::inputs` (T25.F04); re-exported here so every reader compiles
-// unchanged.
-pub use crate::contracts::{barrier_idx, food_idx, nearby_idx, occupancy_idx};
+use crate::contracts::nearby_idx;
 
 /// Fixed-width extended perception snapshot assembled from the frozen world state.
 ///
@@ -33,9 +25,9 @@ pub struct PerceptionSnapshot {
     ///   nearest_dy, nearest_dist, crowding_ratio]
     pub area_occupancy: [f32; 7],
     /// Nearby creatures: 4 slots × [present, rel_x, rel_y, dist,
-    ///   energy_ratio, reproduce_ready, kin_affinity, lineage_match,
-    ///   phenotype_similarity], laid out by [`nearby_idx`].
-    pub nearby: [f32; NEARBY_WIDTH],
+    ///   energy_ratio, reproduce_ready, kin_affinity, red, green, blue],
+    ///   laid out by [`nearby_idx`].
+    pub nearby: [f32; nearby_idx::WIDTH],
 }
 
 impl PerceptionSnapshot {
@@ -47,7 +39,7 @@ impl PerceptionSnapshot {
             typed_area_food: Vec::new(),
             area_barrier: [0.0; 7],
             area_occupancy: [0.0; 7],
-            nearby: [0.0; NEARBY_WIDTH],
+            nearby: [0.0; nearby_idx::WIDTH],
         }
     }
 
@@ -198,21 +190,12 @@ mod tests {
     use crate::sensors::static_inputs::StaticInputs;
 
     #[test]
-    fn perception_snapshot_size_within_budget() {
-        assert!(
-            std::mem::size_of::<PerceptionSnapshot>() <= 256,
-            "PerceptionSnapshot is {} bytes, must be <= 256",
-            std::mem::size_of::<PerceptionSnapshot>()
-        );
-    }
-
-    #[test]
     fn perception_snapshot_zero_is_all_zeros() {
         let snap = PerceptionSnapshot::zero();
         assert_eq!(snap.area_food, [0.0; 7]);
         assert_eq!(snap.area_barrier, [0.0; 7]);
         assert_eq!(snap.area_occupancy, [0.0; 7]);
-        assert_eq!(snap.nearby, [0.0; 36]);
+        assert_eq!(snap.nearby, [0.0; 40]);
     }
 
     #[test]

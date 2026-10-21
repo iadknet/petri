@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha11";
+pub const PROTOCOL_VERSION: &str = "v3alpha12";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -58,8 +58,8 @@ mod tests {
     /// T25.F09 gave every genome plasticity config and every genome group a
     /// `retention`, a breaking payload change.
     #[test]
-    fn protocol_version_is_v3alpha11() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha11");
+    fn protocol_version_is_v3alpha12() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha12");
     }
 
     #[test]

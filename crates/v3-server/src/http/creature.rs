@@ -5,13 +5,13 @@ use slotmap::{Key, KeyData};
 use std::collections::{BTreeMap, BTreeSet};
 use v3_core::contracts::{CreatureId, InputReference};
 use v3_core::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
+use v3_core::creature::colour::channels_to_rgb;
 use v3_core::creature::genome::cgp::{EdgeSurface, OutputSinkKind};
 use v3_core::creature::genome::mesh_annotations::{
     derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
     MeshWriteClass,
 };
 use v3_core::creature::genome::{BackendDef, VmInstruction};
-use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::runtime::OUTPUT_SLOT_COUNT;
 use v3_core::sensors::static_inputs::assemble_static_inputs;

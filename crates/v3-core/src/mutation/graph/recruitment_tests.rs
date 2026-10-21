@@ -231,7 +231,8 @@ proptest! {
         // `DirectionPair` gene of twelve born-0 direction members over the
         // kind's eight direction sinks plus its fact members on the kind's
         // drive (T25.F10), every edge a member: 15 for an area family
-        // (T25.F04), 19 for a creature slot (T25.F05).
+        // (T25.F04), 20 for a creature slot (T25.F05, ten fields since
+        // T27.F01).
         let grouped = after_graph.groups().len() - before_graph.groups().len();
         prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
@@ -251,7 +252,7 @@ proptest! {
                 crate::creature::genome::cgp::Shape::DirectionPair { .. } => {
                     prop_assert!(whole);
                     prop_assert_eq!(changed, 9);
-                    prop_assert!(added == 15 || added == 19, "{}", added);
+                    prop_assert!(added == 15 || added == 20, "{}", added);
                     prop_assert!((1..=30).contains(&added));
                     prop_assert_eq!(after_graph.members(id).count(), added);
                 }
@@ -542,7 +543,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
     use crate::creature::genome::vote::DirectedVoteKind;
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
-        (nearby(), 2, vec![18, 21, 22, 23, 24, 25, 26]),
+        (nearby(), 2, vec![20, 23, 24, 25, 26, 27, 28, 29]),
     ] {
         let mut fixture = node();
         recruit_source_with_pair(
@@ -631,8 +632,8 @@ fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family
 }
 
 /// A slot family under `WholeFamily` on an undirected destination wires the
-/// drawn slot's nine channels ascending, born 0, never the family's 36
-/// (T25.F05); under `SingleChannel` it keeps one edge.
+/// drawn slot's ten channels ascending, born 0, never the family's 40
+/// (T25.F05, T27.F01); under `SingleChannel` it keeps one edge.
 #[test]
 fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
     for slot in 0..4u8 {
@@ -653,8 +654,8 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
             .unwrap()
             .inputs
             .to_vec();
-        let base = 9 * u16::from(slot);
-        let want: Vec<_> = (base..base + 9)
+        let base = 10 * u16::from(slot);
+        let want: Vec<_> = (base..base + 10)
             .map(|sub_idx| {
                 GraphEdge::new(
                     GraphSource::InputLeaf {
@@ -666,7 +667,7 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
             })
             .collect();
         assert_eq!(eat, want, "slot {slot}");
-        assert_eq!(def.edges().count(), 9);
+        assert_eq!(def.edges().count(), 10);
         assert_eq!(crate::creature::genome::cgp::validate_graph(&whole), Ok(()));
     }
     let mut single = node();

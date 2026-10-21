@@ -1,7 +1,9 @@
 import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
 import { VOTE_KINDS } from "../../types/trace.ts";
+import directionPairsFixture from "./directionPairs.json";
 import { directionName, directionWord } from "./directions.ts";
+import nearbyFields from "./nearbyFields.json";
 import { formatVoteSink, voteSinkFromIndex } from "./voteSinks.ts";
 
 export { directionName } from "./directions.ts";
@@ -55,7 +57,7 @@ const SENSOR_DESCRIPTIONS: Record<string, string> = {
 	AreaFoodSummary: "Summary of the food the creature can see.",
 	AreaBarrierSummary: "Summary of the barriers the creature can see.",
 	AreaOccupancySummary: "Summary of the other creatures the creature can see.",
-	NearbyCreature: "Position, vitals and relatedness of the 4 nearest visible creatures.",
+	NearbyCreature: "Position, vitals, kinship and colour of the 4 nearest visible creatures.",
 };
 
 interface SubField {
@@ -78,29 +80,8 @@ export interface DirectionPair {
 	facts: readonly number[];
 }
 
-/**
- * The hand mirror of `WorldInputKey::direction_pairs()` (T25.F04), pinned
- * against it through `directionPairs.json`.
- */
-export const DIRECTION_PAIRS: Record<string, readonly DirectionPair[]> = {
-	AreaFoodSummary: [
-		{ x: 1, y: 2, facts: [0, 5, 6] },
-		{ x: 3, y: 4, facts: [0, 5, 6] },
-	],
-	AreaBarrierSummary: [
-		{ x: 2, y: 3, facts: [0, 1, 6] },
-		{ x: 4, y: 5, facts: [0, 1, 6] },
-	],
-	AreaOccupancySummary: [
-		{ x: 1, y: 2, facts: [0, 5, 6] },
-		{ x: 3, y: 4, facts: [0, 5, 6] },
-	],
-	NearbyCreature: [0, 1, 2, 3].map((slot) => ({
-		x: 9 * slot + 1,
-		y: 9 * slot + 2,
-		facts: [0, 3, 4, 5, 6, 7, 8].map((field) => 9 * slot + field),
-	})),
-};
+/** `WorldInputKey::direction_pairs()`, from the fixture v3-core pins. */
+const DIRECTION_PAIRS: Record<string, readonly DirectionPair[]> = directionPairsFixture;
 
 /** The pairs `ref` declares; none for a non-world reference. */
 export function directionPairs(ref: InputReference | undefined): readonly DirectionPair[] {
@@ -148,25 +129,6 @@ const AREA_FIELDS: Record<string, readonly SubField[]> = {
 		{ name: "crowding", description: "How crowded the view is, closer creatures counting more." },
 	],
 };
-
-/** Per-creature fields of the nearby family, in `nearby_idx` order: 4 slots
- * of 9, nearest first. */
-const NEARBY_FIELDS: Record<string, readonly SubField[]> = {
-	NearbyCreature: [
-		{ name: "present", description: "1 when this slot holds a creature, 0 when empty." },
-		{ name: "dx", description: "x offset, as a fraction of vision radius (+ = east)." },
-		{ name: "dy", description: "y offset, as a fraction of vision radius (+ = south)." },
-		{ name: "dist", description: "Distance (1 = edge of view)." },
-		{ name: "energy", description: "Energy as a fraction of max energy." },
-		{ name: "ready", description: "1 when it has the energy and age to reproduce." },
-		{ name: "kin", description: "Kin-tag similarity (1 = identical tags)." },
-		{ name: "lineage", description: "1 when it shares this creature's lineage." },
-		{ name: "similar", description: "Body (phenotype) similarity (1 = identical)." },
-	],
-};
-
-/** Number of ranked slots in the nearby family (`nearby_idx::SLOTS`). */
-const NEARBY_SLOTS = 4;
 
 const OUTCOME_FIELDS: readonly SubField[] = [
 	{
@@ -376,11 +338,11 @@ export function describeInputRef(ref: InputReference, subIdx: number): InputDesc
 		return { ...described, description: `${described.description}${food}` };
 	}
 
-	const nearby = NEARBY_FIELDS[parsed.key];
-	if (nearby) {
-		const slot = Math.floor(subIdx / nearby.length);
-		const nearbyField = nearby[subIdx % nearby.length];
-		if (slot >= NEARBY_SLOTS || !nearbyField) return raw();
+	if (parsed.key === "NearbyCreature") {
+		const { slots, fields } = nearbyFields;
+		const slot = Math.floor(subIdx / fields.length);
+		const nearbyField = fields[subIdx % fields.length];
+		if (slot >= slots || !nearbyField) return raw();
 		return {
 			label: `Nearest${slot + 1}.${nearbyField.name}`,
 			description: `The ${ORDINALS[slot]} visible creature: ${lowerFirst(nearbyField.description)} All 0 when the slot is empty.`,

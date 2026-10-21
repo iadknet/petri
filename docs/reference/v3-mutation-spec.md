@@ -595,16 +595,16 @@ added/removed/retyped — only their edges are evolvable.
   draw) and creates one silent `DirectionPair` gene at offset `d` through
   one container primitive: twelve direction members plus one born-0 fact
   member into `Drive K` per fact of the pair, in facts order (T25.F10): 15
-  members for an area family, 19 for a creature slot, one `genome_size()`
-  unit beside its declarations.
+  members for an area family, 20 for a creature slot (eight facts since
+  T27.F01), one `genome_size()` unit beside its declarations.
   The reference is declared once and shared. SingleChannel keeps its
   one-edge plan and draws, an area family on an undirected destination its
   whole-family edges. `NearbyCreature`, whose pairs are its slots
   (`slot_pairs()`, T25.F05), takes the pair draw on every destination: on a
   directed sink the pair case above wires a whole neighbor, its offset to the
-  eight direction votes and its seven other fields to the drive; on any other
-  sink the drawn slot's nine channels `9k..9k+9`, ascending and born 0,
-  never the family's 36. The WholeFamily universe
+  eight direction votes and its eight other fields to the drive; on any other
+  sink the drawn slot's ten channels `10k..10k+10`, ascending and born 0,
+  never the family's 40. The WholeFamily universe
   drops pair-declaring families when the graph cannot host a group or any
   kind's `Drive` sink is absent, so a drawn pair plan always completes; ring
   admission is unchanged.
