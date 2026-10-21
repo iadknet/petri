@@ -1297,27 +1297,22 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     );
 }
 
+/// T25.F10: a pair gene adds one unit, with or without its fact members.
 #[test]
-fn a_pair_group_adds_thirteen_units() {
-    let units = |def: &CgpGraphBackendDef| {
-        def.output_sinks()
-            .iter()
-            .map(|sink| sink.inputs.len())
-            .sum::<usize>()
-            + def.groups().len()
-    };
+fn a_pair_gene_adds_one_unit() {
     let base = CgpGraphBackendDef::new_with_fixed_outputs();
-    let mut grouped = base.clone();
-    grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, &[]);
-    assert_eq!(units(&grouped) - units(&base), 13);
     let genome = |def| crate::creature::genome::CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
         nodes: vec![pair_node(def, pair_refs())],
     };
-    assert_eq!(
-        genome(grouped).genome_size() - genome(base).genome_size(),
-        13
-    );
+    for facts in [&[][..], pair_layout().facts] {
+        let mut grouped = base.clone();
+        grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, facts);
+        assert_eq!(
+            genome(grouped).genome_size() - genome(base.clone()).genome_size(),
+            1
+        );
+    }
 }
 
 #[test]

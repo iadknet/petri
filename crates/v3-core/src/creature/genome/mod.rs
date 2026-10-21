@@ -287,11 +287,13 @@ impl CreatureGenome {
     /// Total structural size: sum of all discrete genome components.
     ///
     /// Counts every mesh node, input ref, route target, VM instruction and
-    /// constant, graph compute node, and edge on both graph surfaces (compute
-    /// inputs and sink inputs, group members included), plus one unit per
-    /// edge-group record (T25.F03): a `Ring` group of eight members costs nine
-    /// units. A wired sink adds nothing of itself; a synapse is one unit
-    /// wherever it sits. Equal
+    /// constant, graph compute node, compute edge and sink edge with no
+    /// membership, plus one unit per edge-group record (T25.F03, T25.F10):
+    /// a gene costs one unit and its members of either role nothing,
+    /// whatever their corrections, learning configuration, scope or
+    /// retention (the genomic bottleneck, an explicit economic discount); a
+    /// hole costs nothing and a detached member is an ordinary edge. A wired
+    /// sink adds nothing of itself. Only genomic state counts. Equal
     /// weights, includes junk DNA, no reachability analysis. Read by the
     /// carrying cost, the per-unit mutation supply, the replication cost,
     /// gestation and the size-pressure gate (`genome_size_cap`).
@@ -312,12 +314,16 @@ impl CreatureGenome {
                     for cn in graph.compute_nodes() {
                         score += cn.inputs.len() as u32;
                     }
-                    // Sink edges only: a sink itself is scaffolding.
+                    // Ungrouped sink edges only: a sink itself is
+                    // scaffolding, and a member is paid for by its record.
                     for sink in graph.output_sinks() {
-                        score += sink.inputs.len() as u32;
+                        score += sink
+                            .inputs
+                            .iter()
+                            .filter(|edge| edge.membership().is_none())
+                            .count() as u32;
                     }
-                    // An edge-group record (T25.F03); its members are
-                    // counted as sink edges above.
+                    // One unit per gene (T25.F03, T25.F10).
                     score += graph.groups().len() as u32;
                 }
             }

@@ -65,9 +65,11 @@ and fixed structural outputs (the sinks). The fixed catalog holds 98 sinks: 24 `
 `RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 30 `ActionVote` (three kind drives included, T11.F30), and 4
 `ActionParam`, one per decoded parameter field (T11.F27, T02.F08); the vote and parameter sinks are how a graph acts
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
-`genome_size` charges one unit per edge on both graph surfaces and nothing
-for a sink itself, so unwired sinks add nothing to it (T25.F02), and one unit
-per edge-group record (T25.F03); the founder is 80 units.
+`genome_size` charges one unit per compute edge and per sink edge with no
+membership and nothing for a sink itself, so unwired sinks add nothing to it
+(T25.F02), and one unit per edge-group record with nothing for its members of
+either role (T25.F03, T25.F10: a gene costs one unit, an explicit economic
+discount); the founder carries no group and is 80 units.
 A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
 (T25.F06: learning attributes live on the edge; a compute node is `{kind,
 inputs}`, and a genome with a node-level `plasticity` key fails to

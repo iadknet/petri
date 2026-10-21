@@ -410,7 +410,14 @@ added/removed/retyped — only their edges are evolvable.
   first member and never join a group: the pushed edge carries no
   membership and every group keeps its record and member set (T25.F08).
   Each committed detach and group removal is counted
-  (`graph_edges_detached_total`, `groups_removed_total`).
+  (`graph_edges_detached_total`, `groups_removed_total`). Under the T25.F10
+  unit rule a member costs nothing, so a detach adds one unit beside the
+  operator's own delta, less the record's when its last member goes (a sole
+  member's detach adds nothing); removing a member is 0, or −1 with the
+  record. Supply stays `Binomial(genome_size(), per_unit_rate)` while every
+  edge-targeting operator still picks among all materialized edges, members
+  included: a genome of intact `n`-member genes draws about `n + 1` times
+  fewer events for the same targets (the intended supply-and-target law).
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
   order: all 98 sinks, the 30 vote sinks and the four parameter sinks
@@ -585,9 +592,11 @@ added/removed/retyped — only their edges are evolvable.
   Pair case (T25.F04): under WholeFamily, a pair-declaring family (sensor
   spec Section 5.7) landing on a directed sink `K(d)` draws one pair
   `gen_range(0..direction_pairs().len())` after the destination (the only new
-  draw) and creates one silent `DirectionPair` group at offset `d` (twelve
-  members) plus one born-0 ungrouped edge into `Drive K` per fact of the
-  pair, in facts order: 15 edges for an area family, 19 for a creature slot.
+  draw) and creates one silent `DirectionPair` gene at offset `d` through
+  one container primitive: twelve direction members plus one born-0 fact
+  member into `Drive K` per fact of the pair, in facts order (T25.F10): 15
+  members for an area family, 19 for a creature slot, one `genome_size()`
+  unit beside its declarations.
   The reference is declared once and shared. SingleChannel keeps its
   one-edge plan and draws, an area family on an undirected destination its
   whole-family edges. `NearbyCreature`, whose pairs are its slots
@@ -638,22 +647,24 @@ added/removed/retyped — only their edges are evolvable.
   coin, no value draw) and detaches it as a retarget does: its own weight
   becomes `compose(own, scale, pattern)` bitwise, its membership and scope
   clear, its plasticity stays, it moves to the end of its sink's
-  independent prefix, and its seed composes (T25.F07 invariant 6). A last
+  independent prefix, and its seed composes (T25.F07 invariant 6). A fact
+  member (T25.F10) detaches own-only: its own weight bits and its seed entry
+  stay exactly as stored. A last
   member's detach removes the record and renumbers higher `GroupId`s. A
   committed detach counts one `graph_edges_detached`, and one
   `groups_removed` when the record went.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
-  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +9 | Increasing |
-  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +13 | Increasing |
+  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
+  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 and no fact members (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
   | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
   | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
-  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink | Neutral |
-  | `RemoveGroup` | 2 | same | the group; removes the record and every member, renumbering higher `GroupId`s; `Δgenome_size` −(n + 1) for n members | Decreasing |
-  | `AddRandomizedRingGroup` | 2 | as `AddRingGroup` | `AddRingGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +9 | Increasing |
-  | `AddRandomizedDirectionPairGroup` | 2 | as `AddDirectionPairGroup` | `AddDirectionPairGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +13 | Increasing |
-  | `DetachGraphEdge` | 2 | a Graph node with a member | one member uniformly in canonical order; detaches it; `Δgenome_size` 0, or −1 when the record goes | Neutral |
+  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink, a fact member to the new kind's drive; a gene with a fact member skips after its draws when that drive is absent | Neutral |
+  | `RemoveGroup` | 2 | same | the group; removes the record and every member of either role, renumbering higher `GroupId`s; `Δgenome_size` −1 | Decreasing |
+  | `AddRandomizedRingGroup` | 2 | as `AddRingGroup` | `AddRingGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
+  | `AddRandomizedDirectionPairGroup` | 2 | as `AddDirectionPairGroup` | `AddDirectionPairGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
+  | `DetachGraphEdge` | 2 | a Graph node with a member | one member uniformly in canonical order; detaches it (a fact member own-only); `Δgenome_size` +1, or 0 when the record goes | Neutral |
 
   Restricted size pressure admits only `RemoveGroup` of these nine. A shift or
   retarget re-inserts each member at its new sink in the I10 position, so it

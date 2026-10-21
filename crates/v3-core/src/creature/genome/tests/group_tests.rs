@@ -56,11 +56,10 @@ fn founder_with_ring() -> (CreatureGenome, usize, u16) {
 }
 
 proptest! {
-    /// A `Ring` group costs nine units, eight members and one record, so the
-    /// replacement of a projection is size-neutral; a surviving group of `n`
-    /// members costs `n + 1`.
+    /// A `Ring` gene costs one unit, its record, and its members nothing
+    /// (T25.F10): a surviving gene of any number of members costs 1.
     #[test]
-    fn a_ring_group_costs_its_members_plus_one_record(
+    fn a_ring_gene_costs_one_unit_whatever_its_holes(
         groups in prop::collection::vec((0usize..3, 0u8..8, 0usize..8), 0..6),
     ) {
         let (mut genome, idx, ring) = founder_with_ring();
@@ -69,13 +68,13 @@ proptest! {
         for (kind, offset, lost) in groups {
             let def = graph_mut(&mut genome.nodes[idx]);
             let id = def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
-            prop_assert_eq!(genome.genome_size(), expected + 9);
+            prop_assert_eq!(genome.genome_size(), expected + 1);
             let def = graph_mut(&mut genome.nodes[idx]);
             for _ in 0..lost {
                 let member = def.members(id).next().unwrap();
                 def.remove_edge(member);
             }
-            expected += 9 - lost as u32;
+            expected += 1;
             prop_assert_eq!(genome.genome_size(), expected);
         }
         prop_assert!(validate_graph(&genome.nodes[idx]).is_ok());

@@ -171,6 +171,13 @@
       "before": "pair-groups-v1: members counted every member present of a reachable DirectionPair group; a recruited pair's facts were ungrouped drive edges outside the block",
       "after": "pair-groups-v2: members counts direction members present, and the block and every row gain facts (fact members present) and own_nonzero (members of either role with |own_weight| > 1e-3), reachable-pair readings as the block is",
       "comparison": "members is like-for-like across F10 (it counted only direction members before fact members existed); facts and own_nonzero have no predecessor, and the block's version changes for every sample, zero-group samples included"
+    },
+    {
+      "feature": "T25.F10",
+      "counter": "genome_size (and mean_genome_size, genome_size_creature_ticks)",
+      "before": "edges only, group record 1: every edge on both surfaces one unit, group members included, plus one unit per edge-group record (a Ring group 9, a pair group 13, a recruited pair gene 13 plus its ungrouped facts)",
+      "after": "ungrouped edges only, group record 1, members 0: a gene of either shape costs one unit whatever its members, holes cost nothing and a detached member is an ordinary edge",
+      "comparison": "unchanged for a genome without groups (the founders: 80, ForageFirst 83); smaller for every grouped genome, so mean_genome_size, the carry charge, the replication multiplier, gestation, the size-pressure roll and the per-unit mutation supply are not like-for-like across F10 where groups exist"
     }
   ],
   "goal_worlds": {
