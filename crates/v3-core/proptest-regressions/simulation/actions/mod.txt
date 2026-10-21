@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc f7cb5852dbc8083bbd6e543755185d4932cbc293785df3993950b94c8a0502d5 # shrinks to profile = V3Alpha1, unit = 0.0, age = 20
+cc 1068ee7431bf0b00513ff07fed6ed177afd1026af7d593d5751cc38164957024 # shrinks to before = NaN, bite = 3145617700000000.0
