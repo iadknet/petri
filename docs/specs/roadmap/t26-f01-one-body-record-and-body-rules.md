@@ -206,9 +206,16 @@ wrong.
       lab end-to-end runs unchanged).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> pending: summary line,
       output path, every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate summary at `docs/progress/features/t26-f01.json` -> pending:
-      deterministic blocks equal to the F09 epoch, local raw hash and byte
-      count checked, no new full report staged.
+- [x] Gate (`make bench PROFILE=gate FEATURE=t26-f01-one-body-record-and-body-rules`,
+      HEAD 52fc5b88): v3-cli exit 0 (`measurement_evidence.cli_exit`), outer
+      `make` exit 0 (observed from the shell; the summary's `outer_exit` is
+      null); `severe=false`; every deterministic counter equal to the F09
+      epoch (delta 0.000000%, level ok). Summary
+      `docs/progress/features/t26-f01-one-body-record-and-body-rules.json`
+      (26,107 bytes); local raw
+      `.bench-artifacts/t26-f01-one-body-record-and-body-rules/gate.json`
+      (129,588 bytes, sha256 `46f9acef...ab62b27`, verified_local); the raw
+      report is not staged.
 - [ ] `make check` -> pending.
 
 ## Performance and Goal Impact
@@ -224,9 +231,25 @@ cost to accept. Predeclared changes by artifact: trajectory pins none,
 serialization fingerprints none, mutation draws none. Predeclared re-pins:
 none.
 
-**Measured verdict.** `<pending>`
+**Measured verdict (2026-10-21, HEAD 52fc5b88, gate run once).** v3-cli exit 0,
+outer `make` exit 0, `severe=false`, no flag, no threshold crossing against the
+F09 epoch. Byte-identity reading: all nine deterministic per-creature-tick
+counters equal the F09 epoch to six places (mesh_hops 5.716312, vm_steps
+0.031219, graph_relax_iters 5.664662, plasticity_updates 0.157256,
+actions_applied 1.637232, births 0.026297, pass_cap_hits 0.004623, passes
+2.688388, decided_passes 0.000584; 143,855 creature-ticks, 3,783 births, final
+populations 634, 632, 645). Predeclared trajectory pins, fingerprints and
+draws: unchanged; no re-pin. Exception to read, not a gate result:
+`comparison.references[0].wall_clock.level` is `severe` (0.017019 vs epoch
+0.002638 ms per creature-tick, +545%; total 2,448 ms vs 380 ms), a non-fatal
+level (`wall_levels_fatal=false`, so `comparison.severe` stays false). Context
+only, not a conclusion: right after the run other sessions' builds and tests
+were running (load average about 26 on 8 cores; `bench-wait` gates only the
+start), and the deterministic counters show no compute change. The profile was
+not rerun (once per closure); the orchestrator decides whether the wall-clock
+level needs a quiet-host rerun.
 
-- Summary of the declared profile: [gate](../../progress/features/t26-f01.json).
+- Summary of the declared profile: [gate](../../progress/features/t26-f01-one-body-record-and-body-rules.json).
 - Full readings: [`docs/progress/readings/t26-f01.md`](../../progress/readings/t26-f01.md).
 
 ## Success Criteria
