@@ -105,19 +105,28 @@ Phase 0 sub-steps (canonical order):
 2. Food growth (per-cell, world-level), using the updated depletion layer and
    the recovered grazing modifiers.
 3. Creature aging (`age_ticks += 1` for each living creature).
-4. Energy decay and genome carrying cost, as one combined subtraction for each
-   living creature:
-   `energy -= energy_decay_per_tick + genome_carry_cost_per_unit * genome_size`,
-   where `genome_size` is the creature's total genome size cached at birth
-   (junk included). Neither term is scaled by the complexity or age action
-   multipliers.
+4. Energy decay, genome carrying cost and capacity upkeep (T26.F02), as one
+   combined `f32` subtraction for each living creature:
+   `base = energy_decay_per_tick + genome_carry_cost_per_unit * genome_size`,
+   `upkeep = upkeep_per_unit * (capacity - reference)` (signed: negative for
+   a body below the reference), `energy -= max(base + upkeep, 0)`, where
+   `genome_size` is the creature's total genome size cached at birth (junk
+   included). No term is scaled by the complexity or age action multipliers.
+   At `capacity = reference` the upkeep is `0.0` and the charge is `base` bit
+   for bit. Booking: `lifecycle_decay` and `genome_carrying` take the
+   decay-first partition of `before - base`; `capacity_upkeep` takes the
+   applied debit's signed remainder, so the zero floor's shortfall lands
+   there. Attribution uses the charge's rounded `f32` intermediates:
+   `LifecycleDecay` when `before - decay <= 0`, else `GenomeCarrying` when
+   `before - base <= 0`, else `CapacityUpkeep`; a body at the reference is
+   never attributed to upkeep.
 5. Death removal: remove all creatures with `energy <= 0.0`. A creature the
    combined charge in sub-step 4 takes to or below zero is removed here, in
    the same tick.
 
 Canonical food growth behavior is owned by `v3-world-grid-spec.md`.
-Canonical `energy_decay_per_tick` and `genome_carry_cost_per_unit` defaults are
-owned by `v3-runtime-config-spec.md`.
+Canonical `energy_decay_per_tick`, `genome_carry_cost_per_unit` and
+`energy.capacity` defaults are owned by `v3-runtime-config-spec.md`.
 Canonical occupancy depletion and grazing behavior and defaults are owned by
 `v3-world-grid-spec.md`.
 

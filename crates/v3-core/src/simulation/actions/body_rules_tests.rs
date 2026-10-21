@@ -325,9 +325,11 @@ fn eat_caps_at_the_bodys_own_capacity() {
     sim.config.world.food.types[0].energy_per_unit = Some(40.0);
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.5);
-    let mut flows = EnergyFlows::default();
-    flows.food_intake_by_type = vec![0.0; sim.config.world.food.types.len()];
-    apply_typed_eat(
+    let mut flows = EnergyFlows {
+        food_intake_by_type: vec![0.0; sim.config.world.food.types.len()],
+        ..EnergyFlows::default()
+    };
+    let eaten = apply_typed_eat(
         &mut sim.creatures[id],
         &mut sim.world,
         &sim.config,
@@ -335,6 +337,7 @@ fn eat_caps_at_the_bodys_own_capacity() {
         0.0,
         &mut flows,
     );
+    assert!(eaten > 0.0);
     assert_eq!(flows.maximum_energy_clamp_loss, debit(65.0, 50.0));
     assert_eq!(sim.creatures[id].energy, 50.0 - eat_effort(&sim, id));
 }

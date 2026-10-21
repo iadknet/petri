@@ -181,16 +181,23 @@ pub enum DynamicIntrospectionKey {
 }
 ```
 
-Resolved values (T17.F02), both fractions of
-`energy.lifecycle.max_energy` clamped to `[0.0, 1.0]`:
-- `EnergyCurrent = clamp(energy / max_energy, 0, 1)`: the live energy. The VM
-  reads its `effective` energy mid-dispatch (what it has left after the
+Resolved values (T17.F02), both fractions of the creature's energy scale
+clamped to `[0.0, 1.0]`:
+- `EnergyCurrent = clamp(energy / energy_scale, 0, 1)`: the live energy. The
+  VM reads its `effective` energy mid-dispatch (what it has left after the
   charges it already owes); a negative `effective` reads `0.0`.
-- `EnergyConsumedThisTick = clamp(consumed / max_energy, 0, 1)`: energy
+- `EnergyConsumedThisTick = clamp(consumed / energy_scale, 0, 1)`: energy
   consumed since turn start, including the VM's owed dispatch debt.
 
-The denominator travels on the sensor snapshot (`StaticInputs::max_energy`)
-from the tick loop's lifecycle config; no runtime copy of the default exists.
+The energy scale (T26.F02) is one per-creature denominator for every energy
+read, `HeritableBody::energy_scale`: `energy.capacity.reference` for every
+creature under `energy.capacity.sensor_scale = "reference"` (the default), the
+creature's own capacity under `"own"`. Under `"reference"` a creature above
+the reference reads `1.0` at and above the reference, and the founder's 0.16
+gate opens at 32 energy at every capacity; under `"own"` it opens at
+`0.16 × capacity`. The scale travels on the sensor snapshot
+(`StaticInputs::energy_scale`), assembled at turn start; no runtime copy of
+the default exists.
 
 `HopsThisTick` (T19.F05) is the raw count of mesh hops dispatched this tick,
 the dispatch in flight included (the counter rises before the dispatch). It
@@ -233,9 +240,9 @@ by `OutcomeChannel` discriminant:
 
 | `sub_idx` | Channel | Read |
 | --- | --- | --- |
-| 0 | `EnergyDelta` | `clamp(delta / max_energy, -1, 1)` |
+| 0 | `EnergyDelta` | `clamp(delta / energy_scale, -1, 1)` |
 | 1 | `ActionSuccess` | succeeded / attempted, `0` when none attempted (`NoOp` succeeds) |
-| 2 | `DamageDelta` | `clamp(-damage / max_energy, -1, 0)` |
+| 2 | `DamageDelta` | `clamp(-damage / energy_scale, -1, 0)` |
 | 3 | `OffspringSuccess` | offspring spawned, a raw count |
 
 A newborn reads zeros until its first full tick; nothing is inherited.
@@ -420,7 +427,9 @@ Area-summary denominator rule:
 
 ### 6.4 Nearby Creature Vitals (`NearbyCreature` fields 4–5)
 
-- `energy_ratio = clamp(target.energy / energy.lifecycle.max_energy, 0.0, 1.0)`
+- `energy_ratio = clamp(target.energy / target_energy_scale, 0.0, 1.0)`, with
+  the target's own energy scale (Section 3, T26.F02); `0.0` for a
+  non-positive scale
 - `reproduce_ready = 1.0` if
   `target.energy >= energy.lifecycle.min_reproduce_energy` and
   `target.age >= energy.lifecycle.min_reproduce_age`, else `0.0`

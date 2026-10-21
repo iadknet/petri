@@ -151,6 +151,9 @@ Rules:
   - `kin_tag` is derived deterministically from startup seed and `lineage_id`
 - Profile selection is a run-level startup input; the API offers no
   per-founder profile selection.
+- Every founder's body carries `energy.capacity.founder` as its capacity
+  (T26.F02) and is provisioned `energy.lifecycle.initial_energy`, which
+  normalization keeps at or below that capacity.
 - Startup phenotype baseline is deterministic and uniform for seeded founders.
   Canonical founder phenotype baseline values (RGB, channel weights, polarity)
   are defined in `v3-phenotype-spec.md` Section 3.
@@ -184,8 +187,9 @@ CreatureGenome {
 
 The five input references are primary FoodHere, live EnergyCurrent, AgeTicks,
 primary NeighborFoodRing, and NeighborOccupiedRing. Three compute nodes apply
-strict energy `Threshold` (a fraction of `max_energy`, the scale
-`EnergyCurrent` reads on), age `Threshold((min_reproduce_age - 0.5) / age_reference_ticks)` (the scale
+strict energy `Threshold` (a fraction of the energy scale `EnergyCurrent`
+reads on, `energy.capacity.reference` under the default sensor scale,
+T26.F02), age `Threshold((min_reproduce_age - 0.5) / age_reference_ticks)` (the scale
 `AgeTicks` reads on, both values from the lifecycle config at seeding, exact at
 every integer age while `min_reproduce_age <= age_reference_ticks`), and
 Multiply of
@@ -218,16 +222,17 @@ transfer fraction (the `Constant` wired into `ActionParam(ReproduceTransferFract
 share of the parent's post-cost energy the child starts with) in Node 1; the 2-node mesh, its input references, compute nodes, and output
 wiring are shared by every profile. The energy threshold is the founder's own
 constant on the unit scale (it gates on fullness and is not recomputed from
-`max_energy`); at the default `max_energy` (200) each sits at least 2.0 above
+the scale); at the default scale (the 200 reference capacity) each sits at
+least 2.0 above
 `min_reproduce_energy`, and every fraction clears the `initial_energy` litter
 floor at its own threshold after the age-1.0 attempt effort and reproduce
 cost, so before senescence (through age 130 at default economics) a founder
 attempt above its gate is never refused on energy; older founders may waste
 attempts as the age multiplier grows. A lifecycle where
-`threshold * max_energy - 1.0 < min_reproduce_energy` pins the founder at its
+`threshold * reference - 1.0 < min_reproduce_energy` pins the founder at its
 gate (`v3-runtime-config-spec.md` Section 4).
 
-| Profile | Wire name | Strict energy threshold (fraction of `max_energy`) | Energy at default `max_energy` | Transfer fraction | Priority |
+| Profile | Wire name | Strict energy threshold (fraction of the energy scale) | Energy at the default scale (200) | Transfer fraction | Priority |
 | --- | --- | ---: | ---: | ---: | --- |
 | V3Alpha1 | `v3_alpha1` | 0.16 | 32 | 2/3 | Reproduce, local forage, Move fallback |
 | ForageFirstSparse | `forage_first_sparse` | 0.16 | 32 | 2/3 | Local forage, Reproduce, forage fallback |

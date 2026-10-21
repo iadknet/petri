@@ -108,6 +108,17 @@ Type posture:
 | `mutation.reachable_bias.input_ref` | `f64` | `0.0` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
 | `mutation.executed_bias` | `f64` | `0.9` | Probability that a mutation target is drawn from the nodes the parent's brain dispatched within `executed_window_ticks`, in all four domains. Clamp finite values to `[0.0, 1.0]`; NaN/infinite normalize to `0.9`. Disabled (treated as `0.0`) while genome-size pressure restricts a birth. |
 | `mutation.executed_window_ticks` | `u64` | `100` | How many ticks back a node dispatch still counts as recently executed. `0` normalizes to `100`. |
+| `mutation.capacity.chance` | `f32` | `0.1` | Chance per birth that the child's energy capacity mutates (T26.F02). Must be finite and in `[0.0, 1.0]`; other values fall back to `0.1`. A missing block or field takes the default. |
+| `mutation.capacity.log_step` | `f32` | `0.25` | Half-width of the capacity mutation's uniform log-space step. Must be finite and `>= 0.0`; other values fall back to `0.25`. |
+
+Capacity mutation (T26.F02) is not a mutation engine domain either: at
+reproduction step 11 every birth draws one `f32` against
+`mutation.capacity.chance`, after the phenotype and kin-tag draws, and on a
+hit draws `δ` uniformly in `[-log_step, log_step]` and sets the child's
+capacity to `parent capacity × e^δ` clamped to
+`[energy.capacity.min, energy.lifecycle.max_energy]`. The draw is taken on
+every birth, mutated or not, and is outside the engine, so the engine's draws
+are unchanged.
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -151,8 +162,14 @@ config still carrying the field fails to load until it is removed.
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. Also the litter floor: a reproduce attempt whose child would start under it is rejected. |
-| `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. Also the denominator of the brain's `EnergyCurrent` and `EnergyConsumedThisTick` reads (T17.F02). Founder hazard: every founder profile gates on a fixed fraction of `max_energy` (Section 5.1 of `v3-startup-seeding-spec.md`); a lifecycle where `unit_threshold * max_energy - 1.0 < min_reproduce_energy` pins the founder at its gate (every attempt refused on energy). The default (`0.16 * 200 = 32 >= 30 + 2`) satisfies it. |
+| `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and in `[0.0, energy.capacity.founder]`; other values fall back to `min(20.0, founder)`, so a founder is never provisioned above its capacity. Also the litter floor: a reproduce attempt whose child would start under it is rejected. |
+| `energy.lifecycle.max_energy` | `f32` | `800.0` | Must be finite and `>= 1.0`; invalid values fall back to `800.0`. The upper bound of the heritable capacity range (Energy capacity below), not a creature's cap, and the v3-lab birth sentinel (`min_reproduce_energy = max_energy + 1`). |
+| `energy.capacity.reference` | `f32` | `200.0` | The neutral capacity (T26.F02). Must be finite and in `[1.0, max_energy]`; other values fall back to `min(200.0, max_energy)`. |
+| `energy.capacity.min` | `f32` | `50.0` | Lower bound of the capacity range. Must be finite and in `[1.0, reference]`; other values fall back to `min(50.0, reference)`. |
+| `energy.capacity.founder` | `f32` | `200.0` | Every founder's capacity. Must be finite and in `[min, max_energy]`; other values fall back to `reference`. |
+| `energy.capacity.move_cost_slope` | `f32` | `0.5` | β of the move rule. Must be finite and in `[0.0, 1.0]`; other values fall back to `0.5`. Held at the T26.F02 grid's smallest value until its sweep picks the default. |
+| `energy.capacity.upkeep_per_unit` | `f32` | `0.0005` | u of the upkeep rule. Must be finite and `>= 0.0`; other values fall back to `0.0005`. Held at the T26.F02 grid's smallest value until its sweep picks the default. |
+| `energy.capacity.sensor_scale` | enum | `"reference"` | The energy sensors' denominator: `"reference"` (`energy.capacity.reference` for every creature) or `"own"` (the creature's capacity). Held at `"reference"` until the T26.F02 comparison rules. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
@@ -174,6 +191,36 @@ config still carrying the field fails to load until it is removed.
 | `energy.age_cost.grace_ticks` | `u64` | `100` | Age through which the multiplier remains 1.0. A missing field defaults to `100`. |
 | `energy.age_cost.age_cap` | `u64` | `200` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). If the cap is at or before the grace age, the maximum applies on the first tick after grace. |
 | `energy.age_cost.max_multiplier` | `f32` | `10.0` | Must be finite and `>= 1.0`; invalid values fall back to `10.0`. Maximum multiplier reached at or beyond `age_cap`. |
+
+Normalization runs in the order `max_energy`, `reference`, `min`, `founder`,
+`initial_energy`, `move_cost_slope`, `upkeep_per_unit`, then
+`mutation.capacity`: each bound is checked against the ones normalized before
+it. A missing `energy.capacity` or `mutation.capacity` block, or a missing
+field inside one, takes the default.
+
+Energy capacity (T26.F02):
+- Every creature's body carries a heritable `capacity` in energy units, in
+  `[capacity.min, lifecycle.max_energy]`; founders start at
+  `capacity.founder`, children inherit it with the mutation of Section 3.
+- The cap: every energy credit (eat, the predation transfer and kill bonus,
+  and the birth's litter) is capped at the creature's own capacity. The three
+  credit sites book the excess to `energy_flows.maximum_energy_clamp_loss`,
+  the birth to `energy_flows.offspring_capacity_overflow`.
+- The move rule: the move base is multiplied by
+  `(1 − β) + β·(capacity / reference)`, computed in `f64`, before the
+  complexity and age multipliers and the noop floor. At the reference the
+  factor is exactly `1.0`.
+- The upkeep rule: Phase 0 adds the signed `u·(capacity − reference)` to the
+  decay and carrying charge and subtracts `max(sum, 0)`
+  (`v3-tick-orchestration-spec.md` Section 3). At the reference it is `0.0`,
+  so the founder's economy at the default founder capacity is unchanged.
+- The sensor scale: every energy sensor read divides by the creature's energy
+  scale, the reference under `"reference"` and its own capacity under
+  `"own"` (`v3-sensor-spec.md`). Founder hazard: every founder profile gates
+  on a fixed fraction of that scale (Section 5.1 of
+  `v3-startup-seeding-spec.md`); a configuration where
+  `unit_threshold * reference - 1.0 < min_reproduce_energy` pins the founder
+  at its gate. The default (`0.16 * 200 = 32 >= 30 + 2`) satisfies it.
 
 Genome carrying cost:
 - Every living creature pays `genome_carry_cost_per_unit * genome_size()`
