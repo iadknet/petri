@@ -15,6 +15,14 @@ use crate::simulation::Simulation;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
+/// A founder-phenotype body with the default identity.
+fn founder_body() -> HeritableBody {
+    HeritableBody {
+        phenotype: Phenotype::FOUNDER,
+        identity: CreatureIdentityState::default(),
+    }
+}
+
 /// A cognition result committing `actions` with no compute charge.
 pub(super) fn decision(actions: Vec<WorldAction>) -> MeshOutput {
     MeshOutput {
@@ -114,10 +122,7 @@ pub(super) fn make_sim_two_creatures(
             Position::new(5, 5),
             energy_a,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -130,10 +135,7 @@ pub(super) fn make_sim_two_creatures(
             Position::new(5, 4),
             energy_b,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -167,10 +169,7 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
             pos,
             energy,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -201,18 +200,7 @@ pub(super) fn make_sim_with_custom_genome(
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            genome,
-            pos,
-            energy,
-            0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
-            [0.0; 16],
-        )
+        CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
     });
     world.place_creature(pos, id);
 

@@ -33,6 +33,14 @@ use v3_core::mutation::MutationEngine;
 use v3_core::simulation::actions::ReproductionActionResult;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
+/// A founder-phenotype body with the default identity.
+fn founder_body() -> HeritableBody {
+    HeritableBody {
+        phenotype: Phenotype::FOUNDER,
+        identity: CreatureIdentityState::default(),
+    }
+}
+
 /// Starting energy for hand-placed founders in single-creature scenarios:
 /// above the default founder gate (32) so the founder reproduces when the
 /// scenario allows it. Set on the creature, not through `initial_energy`,
@@ -353,10 +361,7 @@ fn creatures_can_eat_food() {
             pos,
             start_energy,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -417,10 +422,7 @@ fn founder_eats_primary_type_and_preserves_other_food() {
             pos,
             cfg.energy.lifecycle.initial_energy,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -465,10 +467,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             pos,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -530,10 +529,7 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
             start,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -580,10 +576,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             start,
             cfg.energy.lifecycle.initial_energy,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });
@@ -755,10 +748,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             pos,
             FOUNDER_SCENARIO_ENERGY,
             0,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-            },
+            founder_body(),
             [0.0; 16],
         )
     });

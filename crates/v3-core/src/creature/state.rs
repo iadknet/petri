@@ -470,6 +470,18 @@ mod tests {
     use crate::creature::identity::CreatureIdentityState;
     use slotmap::SlotMap;
 
+    /// A body with `channels`, the founder's active channel and polarity, and
+    /// the default identity.
+    fn body(channels: [u8; 6]) -> HeritableBody {
+        HeritableBody {
+            phenotype: Phenotype {
+                channels,
+                ..Phenotype::FOUNDER
+            },
+            identity: CreatureIdentityState::default(),
+        }
+    }
+
     fn minimal_genome() -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -496,14 +508,7 @@ mod tests {
             Position::new(5, 5),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [128, 64, 32, 10, 20, 30],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([128, 64, 32, 10, 20, 30]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         assert_eq!(state.age, 0);
@@ -532,14 +537,7 @@ mod tests {
             Position::new(5, 5),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             mem,
         );
         assert!((state.shared_memory[3] - 1.5).abs() < f32::EPSILON);
@@ -558,14 +556,7 @@ mod tests {
             Position::new(0, 0),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         assert!(state.graph_runtime.dispatch_record.is_empty());
@@ -648,14 +639,7 @@ mod tests {
             Position::new(0, 0),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         assert_eq!(&*state.cached_reachable_nodes, &[0]);
@@ -697,14 +681,7 @@ mod tests {
             Position::new(0, 0),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         // Only node 0 should be reachable
@@ -722,14 +699,7 @@ mod tests {
             Position::new(0, 0),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
             42,
             7,
@@ -754,14 +724,7 @@ mod tests {
             Position::new(0, 0),
             20.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         state.record_action_attempt(ActionType::StealEnergy);
@@ -799,14 +762,7 @@ mod tests {
                 Position::new(0, 0),
                 20.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype {
-                        channels: [0; 6],
-                        active_channel: 0,
-                        polarity: [true; 6],
-                    },
-                    identity: CreatureIdentityState::default(),
-                },
+                body([0; 6]),
                 [0.0; SHARED_MEMORY_SLOTS],
             );
             assert_eq!(state.cached_genome_size, expected);
@@ -851,14 +807,7 @@ mod tests {
             Position::new(3, 7),
             50.0,
             2,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
         assert_eq!(state.position, Position::new(3, 7));
@@ -947,14 +896,7 @@ mod tests {
             Position::new(0, 0),
             10.0,
             0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-            },
+            body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
 

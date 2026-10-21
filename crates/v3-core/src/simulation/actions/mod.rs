@@ -208,6 +208,14 @@ mod tests {
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
+    /// A founder-phenotype body with the default identity.
+    fn founder_body() -> HeritableBody {
+        HeritableBody {
+            phenotype: Phenotype::FOUNDER,
+            identity: CreatureIdentityState::default(),
+        }
+    }
+
     fn small_config() -> SimulationConfig {
         let mut cfg = SimulationConfig::default();
         cfg.world.width = 10;
@@ -236,18 +244,7 @@ mod tests {
         world.reconfigure_food(cfg.world.food.clone());
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                genome,
-                pos,
-                energy,
-                0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
-                [0.0; 16],
-            )
+            CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -445,10 +442,7 @@ mod tests {
                 pos1,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -459,10 +453,7 @@ mod tests {
                 pos2,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -629,10 +620,7 @@ mod tests {
                 pos,
                 80.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -643,10 +631,7 @@ mod tests {
                 north,
                 80.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1308,10 +1293,7 @@ mod tests {
                 pos1,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1322,10 +1304,7 @@ mod tests {
                 pos2,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1455,18 +1434,7 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                genome,
-                pos,
-                energy,
-                0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
-                [0.0; 16],
-            )
+            CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -1651,10 +1619,7 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1673,10 +1638,7 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1851,10 +1813,7 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
@@ -1873,10 +1832,7 @@ mod tests {
                 victim_pos,
                 50.0,
                 0,
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: CreatureIdentityState::default(),
-                },
+                founder_body(),
                 [0.0; 16],
             )
         });
