@@ -158,38 +158,39 @@ mod tests {
     use super::*;
     use crate::mutation::input_ref::input_reference_universe;
     use crate::neighborhood::input_use::catalog::Family;
+    use proptest::prelude::*;
     use rand::rngs::SmallRng;
     use rand::{RngCore, SeedableRng};
 
-    /// A `StepRng` that counts the draws taken from it.
-    struct CountingStepRng {
-        inner: rand::rngs::mock::StepRng,
+    /// An RNG that returns `values` in order, repeating the last, and counts
+    /// the draws taken from it. `next_u32` truncates, as `StepRng` does.
+    struct ScriptedRng {
+        values: Vec<u64>,
         draws: usize,
     }
 
-    impl CountingStepRng {
-        fn new(value: u64) -> Self {
-            Self {
-                inner: rand::rngs::mock::StepRng::new(value, 0),
-                draws: 0,
-            }
+    impl ScriptedRng {
+        fn new(values: Vec<u64>) -> Self {
+            Self { values, draws: 0 }
         }
     }
 
-    impl RngCore for CountingStepRng {
+    impl RngCore for ScriptedRng {
         fn next_u32(&mut self) -> u32 {
-            self.draws += 1;
-            self.inner.next_u32()
+            self.next_u64() as u32
         }
 
         fn next_u64(&mut self) -> u64 {
+            let value = self.values[self.draws.min(self.values.len() - 1)];
             self.draws += 1;
-            self.inner.next_u64()
+            value
         }
 
         fn fill_bytes(&mut self, dest: &mut [u8]) {
-            self.draws += 1;
-            self.inner.fill_bytes(dest);
+            for chunk in dest.chunks_mut(8) {
+                let bytes = self.next_u64().to_le_bytes();
+                chunk.copy_from_slice(&bytes[..chunk.len()]);
+            }
         }
 
         fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
@@ -204,16 +205,22 @@ mod tests {
         ((index << 32) + (1_u64 << 31)) / INPUT_BUCKETS.len() as u64
     }
 
+    /// The midpoint of sub-index `index`'s u64 bucket in a `usize` range of
+    /// `len`: selects that index with no rejection, like [`catalog_draw`].
+    fn sub_draw(index: usize, len: usize) -> u64 {
+        ((((index as u128) << 64) + (1_u128 << 63)) / len as u128) as u64
+    }
+
     /// The reference table index `index` yields and the draws it took.
     fn draw_at(index: u64, food_type_count: usize) -> (InputReference, usize) {
-        let mut rng = CountingStepRng::new(catalog_draw(index));
+        let mut rng = ScriptedRng::new(vec![catalog_draw(index)]);
         let reference = random_input_reference_for_food_types(&mut rng, food_type_count);
         (reference, rng.draws)
     }
 
     #[test]
     fn typed_sampler_single_food_mode_does_not_draw_extra_food_type_rng() {
-        let mut rng = CountingStepRng::new(0);
+        let mut rng = ScriptedRng::new(vec![0]);
         let sampled = random_input_reference_for_food_types(&mut rng, 1);
         assert_eq!(
             sampled,
@@ -229,7 +236,7 @@ mod tests {
 
     #[test]
     fn typed_sampler_multi_food_mode_draws_for_food_type_idx() {
-        let mut rng = CountingStepRng::new(0);
+        let mut rng = ScriptedRng::new(vec![0]);
         let sampled = random_input_reference_for_food_types(&mut rng, 3);
         assert_eq!(
             sampled,
@@ -315,9 +322,52 @@ mod tests {
         }
     }
 
+    /// Every reference the sampler can produce at `food_type_count` food
+    /// types, by driving each table index and each of its sub-draws: the
+    /// script length is the draw count the sampler must take.
+    fn every_sampler_output(food_type_count: usize) -> Vec<InputReference> {
+        let mut outputs = Vec::new();
+        for (index, bucket) in INPUT_BUCKETS.iter().enumerate() {
+            let key = catalog_draw(index as u64);
+            let scripts: Vec<(Vec<u64>, Option<InputReference>)> = match bucket {
+                Bucket::Fixed(_) => vec![(vec![key], None)],
+                Bucket::Food(family) if food_type_count > 1 => (0..food_type_count)
+                    .map(|t| {
+                        let expected =
+                            InputReference::World(family.key(OrdinaryFoodTypeId::new(t as u16)));
+                        (vec![key, sub_draw(t, food_type_count)], Some(expected))
+                    })
+                    .collect(),
+                Bucket::Food(family) => vec![(
+                    vec![key],
+                    Some(InputReference::World(
+                        family.key(OrdinaryFoodTypeId::default()),
+                    )),
+                )],
+                Bucket::Upstream => (0..OUTPUT_SLOT_COUNT)
+                    .map(|slot| {
+                        let script = vec![key, sub_draw(slot, OUTPUT_SLOT_COUNT)];
+                        (script, Some(InputReference::UpstreamSlot(slot)))
+                    })
+                    .collect(),
+            };
+            for (script, expected) in scripts {
+                let mut rng = ScriptedRng::new(script.clone());
+                let reference = random_input_reference_for_food_types(&mut rng, food_type_count);
+                assert_eq!(rng.draws, script.len(), "index {index}: {reference:?}");
+                if let Some(expected) = expected {
+                    assert_eq!(reference, expected, "index {index}");
+                }
+                outputs.push(reference);
+            }
+        }
+        outputs
+    }
+
     /// The agreement test (T27.F01 invariant 7): the references the sampler
-    /// draws are exactly `input_reference_universe`, every world key is in
-    /// it, and `Family::of` gives every named member its own family.
+    /// can draw, enumerated exhaustively, are exactly
+    /// `input_reference_universe`, every world key is in it, and
+    /// `Family::of` gives every named member its own family.
     #[test]
     fn the_sampler_and_the_universe_agree() {
         for food_type_count in [1_usize, 3] {
@@ -325,17 +375,12 @@ mod tests {
             let as_set: BTreeSet<_> = universe.iter().map(|r| format!("{r:?}")).collect();
             assert_eq!(as_set.len(), universe.len(), "no duplicate");
 
-            let mut rng = SmallRng::seed_from_u64(27_001);
-            let drawn: BTreeSet<_> = (0..40_000)
-                .map(|_| {
-                    format!(
-                        "{:?}",
-                        random_input_reference_for_food_types(&mut rng, food_type_count)
-                    )
-                })
+            let drawn: BTreeSet<_> = every_sampler_output(food_type_count)
+                .iter()
+                .map(|r| format!("{r:?}"))
                 .collect();
             assert_eq!(drawn, as_set, "food types {food_type_count}");
-            assert!(universe.contains(&InputReference::UpstreamSlot(23)));
+            assert!(universe.contains(&InputReference::UpstreamSlot(OUTPUT_SLOT_COUNT - 1)));
 
             let food = (0..food_type_count).map(|t| OrdinaryFoodTypeId::new(t as u16));
             for key in WorldInputKey::universe(food) {
@@ -354,6 +399,22 @@ mod tests {
             if food_type_count == 1 {
                 assert_eq!(named.len(), 20, "20 named families");
             }
+        }
+    }
+
+    proptest! {
+        /// Whatever the RNG state, a sampled reference is a universe member.
+        #[test]
+        fn every_sampled_reference_is_in_the_universe(
+            seed in any::<u64>(),
+            food_type_count in 0_usize..=4,
+        ) {
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let reference = random_input_reference_for_food_types(&mut rng, food_type_count);
+            prop_assert!(
+                input_reference_universe(food_type_count).contains(&reference),
+                "{reference:?}"
+            );
         }
     }
 
