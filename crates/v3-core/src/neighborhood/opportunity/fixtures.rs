@@ -6,7 +6,9 @@
 use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::food_idx;
 use crate::contracts::{Direction, WorldAction};
+use crate::creature::colour::unit_rgb;
 use crate::creature::genome::CreatureGenome;
+use crate::creature::phenotype::Phenotype;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::MeshOutput;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -115,7 +117,7 @@ impl Context {
                     neighbor_barrier: barriers,
                     neighbor_occupied: [0.0; 8],
                     age_ticks: age_fraction(50, lifecycle.age_reference_ticks),
-                    own_colour: [0.0; 3],
+                    own_colour: unit_rgb(Phenotype::FOUNDER.channels),
                     max_energy: lifecycle.max_energy,
                     previous_outcome: [0.0; 4],
                 },
