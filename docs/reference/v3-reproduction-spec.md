@@ -174,7 +174,8 @@ Constraints:
 - If genome mutation was applied (`MutationSummary.applied_events > 0`),
   phenotype mutates per `v3-phenotype-spec.md` Section 5 algorithm.
 - If no genome mutation occurred (`applied_events == 0`), offspring inherits
-  parent phenotype exactly (RGB, channel weights, and channel polarity).
+  the parent's `Phenotype` exactly (six channels, active channel and
+  polarity).
 - Phenotype mutation is NOT a mutation engine domain; it is a separate pathway
   evaluated in this reproduction flow after `MutationEngine` returns.
 
