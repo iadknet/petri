@@ -1426,6 +1426,54 @@ mod tests {
         let error = resolve_bench_profile(&args).expect_err("seeds must parse as u64");
         assert!(error.contains("--seeds"), "unexpected error: {error}");
     }
+    /// T26.F02 invariant 9: every override a comparison or sweep arm sets
+    /// reaches the built config through `--profile sweep --config`.
+    #[test]
+    fn recipe_sweep_carries_the_capacity_arm_overrides() {
+        use v3_core::config::SensorScale;
+        let path = std::env::temp_dir().join(format!(
+            "petri-sweep-capacity-recipe-{}.json",
+            std::process::id()
+        ));
+        for (founder, scale, slope, upkeep, chance, rate) in [
+            (50.0, "own", 0.0, 0.0, 0.0, 0.0),
+            (800.0, "reference", 1.0, 0.002, 0.1, 0.0060625),
+        ] {
+            let recipe = serde_json::json!({
+                "world": {"width": 12, "height": 9},
+                "population": {"initial_creatures": 3},
+                "energy": {"capacity": {
+                    "founder": founder,
+                    "sensor_scale": scale,
+                    "move_cost_slope": slope,
+                    "upkeep_per_unit": upkeep
+                }},
+                "mutation": {"per_unit_rate": rate, "capacity": {"chance": chance}}
+            });
+            std::fs::write(&path, recipe.to_string()).unwrap();
+            let args = BenchArgs {
+                config: Some(path.clone()),
+                seeds: Some("1".into()),
+                ticks: Some(1),
+                ..bench_args(BenchProfile::Sweep)
+            };
+            let config = bench::build_config(&resolve_bench_profile(&args).unwrap().params);
+            let capacity = &config.energy.capacity;
+            assert_eq!(capacity.founder, founder);
+            let expected_scale = if scale == "own" {
+                SensorScale::Own
+            } else {
+                SensorScale::Reference
+            };
+            assert_eq!(capacity.sensor_scale, expected_scale);
+            assert_eq!(capacity.move_cost_slope, slope);
+            assert_eq!(capacity.upkeep_per_unit, upkeep);
+            assert_eq!(config.mutation.capacity.chance, chance);
+            assert_eq!(config.mutation.per_unit_rate, rate);
+        }
+        std::fs::remove_file(&path).unwrap();
+    }
+
     #[test]
     fn recipe_sweep_resolves_defaults_and_explicit_overrides() {
         let path =

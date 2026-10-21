@@ -146,8 +146,13 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // by T27.F01 commit 2: the 30-bucket input draw and the own-colour
     // `Swap` alternatives remap every mutation draw and seed 14 goes
     // extinct; of 0..=600, seeds 145, 175, 268, 319 and 513 survive the
-    // horizon and 145 is the lowest.
-    const SEED: u64 = 145;
+    // horizon and 145 is the lowest. Moved from 145 to 831 by T26.F02: the
+    // capacity chance drawn on every birth shifts every later draw and seed
+    // 145 goes extinct at tick 149; of 0..=2000 seeds 52, 831, 1184 and 1871
+    // survive the horizon, and 831 is the lowest that ends with more than
+    // one creature, which the occupancy-grid test needs. Removing the
+    // capacity draw restores seed 145.
+    const SEED: u64 = 831;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -230,7 +235,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // 129 goes extinct and seed 14 survives (see the post-tick-state test).
     // T27.F01 commit 2: seed 14 goes extinct and seed 145 survives (see the
     // post-tick-state test).
-    const SEED: u64 = 145;
+    const SEED: u64 = 831;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -380,7 +385,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // moved it from 14 to 145: seed 14 goes extinct; of the seeds of 0..=600
     // that survive the horizon (145, 175, 268, 319, 513), 145 is the lowest
     // and ends over four cells.
-    const SEED: u64 = 145;
+    const SEED: u64 = 831;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

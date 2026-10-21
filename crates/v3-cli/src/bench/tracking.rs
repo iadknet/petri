@@ -840,6 +840,10 @@ pub struct PersistenceSample {
     /// extinction, absent in reports stored before T25.F06.
     #[serde(default)]
     pub plasticity_census: Option<PlasticityCensusBlock>,
+    /// The living population's heritable energy capacity (T26.F02). `null`
+    /// at extinction and absent in reports stored before T26.F02.
+    #[serde(default)]
+    pub capacity: Option<super::capacity::CapacityDistribution>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
 }
@@ -1147,6 +1151,7 @@ pub(super) struct PopulationReadings {
     occupancy_grid: OccupancyGrid,
     pair_groups: Option<super::pair_groups::PairGroups>,
     plasticity_census: PlasticityCensusBlock,
+    capacity: Option<super::capacity::CapacityDistribution>,
 }
 
 impl PopulationReadings {
@@ -1167,6 +1172,7 @@ impl PopulationReadings {
             occupancy_grid: OccupancyGrid::observe(sim),
             pair_groups: super::pair_groups::PairGroups::observe(sim),
             plasticity_census: PlasticityCensusBlock::observe(sim),
+            capacity: super::capacity::CapacityDistribution::observe(sim),
         }
     }
 }
@@ -1267,6 +1273,7 @@ impl PersistenceAccumulator {
                 occupancy_grid: Some(readings.occupancy_grid),
                 pair_groups: readings.pair_groups.filter(|_| alive),
                 plasticity_census: Some(readings.plasticity_census),
+                capacity: readings.capacity.filter(|_| alive),
                 tracking: tracking(),
             });
         }

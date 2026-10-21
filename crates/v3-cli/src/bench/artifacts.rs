@@ -276,6 +276,7 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                                 "occupancy_grid",
                                 "pair_groups",
                                 "plasticity_census",
+                                "capacity",
                             ],
                         )
                         .as_object()
@@ -592,9 +593,10 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
 /// Persistence checkpoint fields the page reads, each kept whole, and
 /// `mean_wired_sinks` (T25.F02), `mean_ring_groups` and
 /// `mean_ring_group_members` (T25.F03), `pair_groups` (T25.F04) and
-/// `plasticity_census` (T25.F06), which the page does not read but the
-/// readings do; `keep_sample` projects `pair_groups` further.
-const KEPT_SAMPLE_FIELDS: [&str; 17] = [
+/// `plasticity_census` (T25.F06) and `capacity` (T26.F02), which the page
+/// does not read but the readings do; `keep_sample` projects `pair_groups`
+/// further.
+const KEPT_SAMPLE_FIELDS: [&str; 18] = [
     "tick",
     "population",
     "mean_energy",
@@ -612,6 +614,7 @@ const KEPT_SAMPLE_FIELDS: [&str; 17] = [
     "sensor_census",
     "pair_groups",
     "plasticity_census",
+    "capacity",
 ];
 /// `pair_groups` aggregates every checkpoint keeps; `rows` is kept only on
 /// each world's last checkpoint (T25.F04). `facts` and `own_nonzero`
@@ -1389,6 +1392,24 @@ mod tests {
         let extinct = &kept["per_seed"][1]["samples"];
         assert_eq!(extinct[0]["pair_groups"], aggregates);
         assert_eq!(extinct[1]["pair_groups"], Value::Null);
+    }
+
+    /// T26.F02: every checkpoint keeps the whole `capacity` block, `null`
+    /// at extinction.
+    #[test]
+    fn capacity_survives_the_kept_persistence_projection() {
+        let block = json!({"min": "50.000000", "p10": "60.000000",
+            "median": "200.000000", "p90": "400.000000", "max": "800.000000",
+            "mean": "250.000000", "at_min_fraction": "0.100000",
+            "at_max_fraction": "0.050000"});
+        let persistence = json!({"per_seed": [{"seed": 1, "samples": [
+            {"tick": 100, "capacity": block},
+            {"tick": 200, "capacity": null}
+        ]}]});
+        let kept = keep_persistence(&persistence);
+        let samples = &kept["per_seed"][0]["samples"];
+        assert_eq!(samples[0]["capacity"], block);
+        assert_eq!(samples[1]["capacity"], Value::Null);
     }
 
     /// T25.F04: `mutation_supply` rides whole through the case projection,
