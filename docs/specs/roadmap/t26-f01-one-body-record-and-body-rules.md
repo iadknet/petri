@@ -1,6 +1,6 @@
 # T26.F01 — One Body Record and Body Rules
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-20
 **Feature**: T26.F01
 **Track**: [T26 — Body Traits](../../roadmaps/t26-body-traits.md)
@@ -187,7 +187,7 @@ wrong.
 - [x] Reference docs corrected: reproduction step order, phenotype-spec
       §§2–5 synchronized with the six-channel model and transport
       visibility, identity-spec §4 (invariant 8).
-- [ ] Closing: gate summary, mutation record, slow tier result recorded in
+- [x] Closing: gate summary, mutation record, slow tier result recorded in
       Verification.
 
 ## Verification
@@ -202,8 +202,8 @@ wrong.
       passed, 0 failed, 19 ignored.
 - [x] `cargo check --workspace --all-targets`, `cargo clippy --workspace
       --all-targets` and `cargo fmt --all --check` -> clean.
-- [ ] `make rust-test-slow` -> pending (recruitment-paths readings and
-      lab end-to-end runs unchanged).
+- [x] `make rust-test-slow` (74e7f06a) -> exit 0: v3-core 3 passed, v3-lab
+      6 passed; recruitment-paths readings and lab runs unchanged.
 - [x] `make rust-mutants-ci` (97a9f8dd): 65 tested, 2 missed, 46 caught,
       17 unviable, 0 timeouts, `~/.local/share/petri-tools/mutants/t26-f01/mutants.out`.
       Equivalent: `actions/mod.rs:136` `<=`, `:48` `>=` (no-op when equal).
@@ -216,7 +216,7 @@ wrong.
       (26,107 bytes); local raw
       `.bench-artifacts/t26-f01-one-body-record-and-body-rules/gate.json`
       (129,588 bytes, sha256 `46f9acef...ab62b27`, verified_local), not staged.
-- [ ] `make check` -> pending.
+- [x] `make check` (tested commit 74e7f06a) -> exit 0.
 
 ## Performance and Goal Impact
 
@@ -242,29 +242,26 @@ populations 634, 632, 645). Predeclared trajectory pins, fingerprints and
 draws: unchanged; no re-pin. Exception to read, not a gate result:
 `comparison.references[0].wall_clock.level` is `severe` (0.017019 vs epoch
 0.002638 ms per creature-tick, +545%; total 2,448 ms vs 380 ms), a non-fatal
-level (`wall_levels_fatal=false`, so `comparison.severe` stays false). Context
-only, not a conclusion: right after the run other sessions' builds and tests
-were running (load average about 26 on 8 cores; `bench-wait` gates only the
-start), and the deterministic counters show no compute change. The profile was
-not rerun (once per closure); the orchestrator decides whether the wall-clock
-level needs a quiet-host rerun.
+level (`wall_levels_fatal=false`). Other sessions' builds ran during the run
+(load average about 26 on 8 cores) and the deterministic counters show no
+compute change; the orchestrator accepted the level as host load, no rerun.
 
 - Summary of the declared profile: [gate](../../progress/features/t26-f01-one-body-record-and-body-rules.json).
 - Full readings: [`docs/progress/readings/t26-f01.md`](../../progress/readings/t26-f01.md).
 
 ## Success Criteria
 
-- [ ] Phenotype and kin identity are one `HeritableBody`, one constructor
+- [x] Phenotype and kin identity are one `HeritableBody`, one constructor
       argument on both paths, built for founders by one function and
       inherited by one call that keeps the phenotype-then-kin-tag draw order.
-- [ ] The upper energy cap comes from `energy_cap` and one shared step at
+- [x] The upper energy cap comes from `energy_cap` and one shared step at
       eat and both predation sites; the move effort comes from `move_effort`;
       every caller's floor, ordering and signed flows are unchanged, shown by
       the characterization tests.
-- [ ] No pin moved: the existing trajectory, reproducibility and viability
+- [x] No pin moved: the existing trajectory, reproducibility and viability
       tests, the gate's deterministic blocks and the slow-tier readings are
       identical to main's.
-- [ ] `make check` exits 0; the mutation record has every survivor resolved.
+- [x] `make check` exits 0; the mutation record has every survivor resolved.
 
 ## Notes for AI Agents
 
