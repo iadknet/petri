@@ -830,7 +830,12 @@ the full suite was just run on the same code), and commit. Then:
    rebase `worktree-<tnn-fnn>` onto `main` without asking, resolve the
    conflicts, and re-verify: `make check` on the rebased content only when the
    commits `main` gained touch code, `make check-docs` when they touch only
-   documentation. Record the new tested commit, then fast-forward. Report the
+   documentation. When those commits change simulation behavior, re-run every
+   profile the spec declares (gate, goal, goal-long) on the rebased tree and
+   record those readings in place of the invalidated ones, keeping the
+   superseded summaries' provenance in the readings file, so no reading omits
+   a feature that merged first; this replaces invalidated verification and is
+   not a second closure run. Record the new tested commit, then fast-forward. Report the
    rebase and its re-verification. Stop and report only when the conflicts
    cannot be resolved on the feature's own terms or the re-verification fails.
 3. `git worktree remove .claude/worktrees/<tnn-fnn>` and

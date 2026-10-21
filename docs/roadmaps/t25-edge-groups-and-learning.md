@@ -19,13 +19,14 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 ## Track Success Criteria
 
 - [ ] One owner edits the graph, one captures a parent's learned state as a child's birth seeds, and one builds the running brain from them; no mutation operator keeps birth alignment by hand, and no struct literal builds an edge outside the constructors.
-- [ ] An edge costs one genome unit wherever it lives and a group record one; no wired-sink unit remains, and the founder anchor is re-pinned.
+- [ ] No wired-sink unit remains and the founder anchor was re-pinned (F02); every edge outside a group costs one genome unit, and a group's cost follows F10's gene rule (the uniform one-unit-per-member rule was F02's outcome, superseded by F10 on 2026-10-20).
 - [ ] Ring projections are edge groups: eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts them as edges, reads membership from the genome, and no reader re-derives explicit membership (derived wiring analyses keep their own definitions over non-member edges).
 - [ ] A direction-pair group born silent on a creature, food, barrier or crowd offset is retained and its scale moves off zero in a 40,000-tick goal-long run on at least one standard goal world.
 - [ ] The three creature families are one `NearbyCreature` family declared once in `contracts::inputs`.
 - [ ] Learning mode, reward source, trace decay and the Lamarckian flag are per-edge heritable attributes on both surfaces; vote edges can learn; no cost knob or lazy initializer remains.
 - [ ] Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
 - [ ] Group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators with a bijection test.
+- [ ] A group costs one genome unit however many members it has and however they have changed; a pair recruitment's direction members and drive facts belong to one group, so a recruitment costs one unit, not its silent edges; runtime learning never changes the size.
 - [ ] A learned edge weight and a learned group scale relax toward their birth values at a heritable per-edge or per-group retention, the founder stays at no decay, and the goal run reads the retention distribution beside the plasticity census.
 
 ## Executable Features
@@ -48,6 +49,9 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   - Goal: A mutation in a developmental gene changes every synapse it builds, a mutation at one synapse changes only that one: group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators.
 - [x] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
   - Goal: Early LTP decays back to baseline: a learned synapse and a learned group scale relax toward the value they were born with at a heritable rate, so learning that is no longer reinforced fades instead of wandering.
+
+- [ ] **T25.F10 — Group Genes Cost as Genes** — Depends on: T25.F09
+  - Goal: The genomic bottleneck: one developmental gene wires many synapses, so a creature pays to carry and copy the gene, not every synapse it built.
 
 ## Notes for AI Agents
 
@@ -83,6 +87,46 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   the goal run reads the `ρ` distribution descriptively and does not settle
   long-horizon selection. Decay toward the genomic weight, toward zero and an
   energy cost on the deviation are rejected there.
+- Decided (user, 2026-10-20): F10 revises F02's uniform rule ("an edge
+  costs one genome unit wherever it lives") after the
+  [interaction features design note](../strategy/interaction-features-design-2026-10-20.md)
+  §8 showed that one slot recruitment under the eight-signal design adds 28
+  silent edges, each paying mutation supply, carry, replication, gestation
+  and the optional size-pressure gate. Contract sketch, after the
+  [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
+  round 2:
+  - **One unit per group (user, 2026-10-20, simplifying the round-3
+    template rule).** A group record costs one unit, and its members cost
+    nothing more, whatever their own corrections, learning configuration,
+    scope or retention. A hole costs nothing; a detached member is an
+    ordinary edge at one unit. Only genomic state counts: runtime learning
+    and birth seeds never change the birth-cached size. No template or
+    exception tracking exists. This is an explicit economic discount, not
+    compression: members still store their own weights and settings (review
+    round 5 finding 3; the user kept the rule with this label).
+  - **Fact members.** A pair recruitment's drive facts (T25.F04) become a
+    second member role of the same gene: one edge per fact field into
+    `Drive K`, born at weight 0, no shared scale. F10 owns their
+    validation, relocation, deletion, detach and seed handling inside the
+    graph container, so a recruitment's 12 + 16 edges cost one unit.
+    Ordinary slot-fact wiring outside a recruitment is unchanged.
+  - **Intended consequence.** Supply is drawn from size before targets, and
+    weight mutation picks one materialized edge, so a genome dominated by
+    intact n-member genes draws about n+1 times fewer events for the same
+    targets. That is the genomic-bottleneck outcome. The spec characterizes
+    the resulting supply and target law rather than promising preserved
+    member rates.
+  - **Founder.** The founder has no groups, so its 80 units and the rate
+    0.0060625 should not move. The spec remeasures them and recalibrates
+    only if they do.
+  - **Bloat risk.** Cheap silent groups may accumulate (the program-1 bloat
+    finding; duplicate silent groups are allowed), and per-member variation
+    inside a group is free to carry. Deferred: T27.F02's goal-long run reads
+    group count, materialized-member count and members with nonzero own
+    corrections, with compute and energy, naming every feature closed in
+    between.
+  - **Verification.** Viability first, gate + goal. T25's goal-long
+    allowance is spent by F02 and F04.
 - Decided (F08, 2026-10-19): `Slots` deleted on nine empty post-F05
   refinement-by-key readings (F05, F06, F07 goal); `RefineHeritableStructure`,
   `mutation.structured_heritable_refinement` and the inferred-set code are
