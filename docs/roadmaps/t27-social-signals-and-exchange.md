@@ -16,14 +16,14 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Track Success Criteria
 
-- [ ] Each NearbyCreature slot carries the seen creature's red, green and blue, and the creature senses its own; the lineage oracle `LINEAGE_MATCH` and the genotype comparison `PHENOTYPE_SIMILARITY` are retired, and `KIN_AFFINITY` stays as the one self-referent matching sense.
+- [x] Each NearbyCreature slot carries the seen creature's red, green and blue, and the creature senses its own; the lineage oracle `LINEAGE_MATCH` and the genotype comparison `PHENOTYPE_SIMILARITY` are retired, and `KIN_AFFINITY` stays as the one self-referent matching sense.
 - [ ] A creature holds eight signal values it writes like memory, pays per tick for their magnitude through a named ledger bucket, and its neighbours read them per slot one tick later; no channel carries an assigned meaning.
 - [ ] Giving and stealing each move one fixed bite per action through named ledger flows; a zero transfer is a failure, and the steal amount parameter is gone.
 - [ ] Signals and giving run in all three goal worlds, and their goal readings report occurrences and use, including zero.
 
 ## Executable Features
 
-- [ ] **T27.F01 — Colour Vision** — Depends on: None
+- [x] **T27.F01 — Colour Vision** — Depends on: None
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
 - [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
   - Goal: Song and scent: a creature broadcasts eight held signals that cost energy to sustain, and its neighbours perceive them, so meaning can arise from who sends what.
