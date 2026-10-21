@@ -65,7 +65,7 @@ Invariants:
    | `energy.capacity.upkeep_per_unit` (u) | 0.002 (sweep pick) | finite `≥ 0`; else the default |
    | `energy.capacity.sensor_scale` | `Reference` (comparison ruling) | `Reference` or `Own` |
    | `mutation.capacity.chance` | 0.1 | in `[0, 1]`; else the default |
-   | `mutation.capacity.log_step` | 0.25 | finite `≥ 0`; else the default |
+   | `mutation.capacity.log_step` | 0.25 | finite in `[0, ln(max_energy / min)]` (one step can at most span the range; the sampler's `−step..=step` width must stay finite); else `min(0.25, that bound)` |
 
 2. **The trait.** `HeritableBody` gains `capacity: f32` and drops `Eq`.
    `founder(index, seed, capacity)` takes the founder capacity; seeding and
@@ -75,11 +75,17 @@ Invariants:
    `rng.gen::<f32>() < mutation.capacity.chance`; when it fires it draws
    `δ = rng.gen_range(-log_step..=log_step)` and sets
    `capacity = (parent.capacity × δ.exp()).clamp(min, max_energy)`; a miss
-   draws nothing more. The child's capacity is drawn at delivery (step 11),
-   after the litter was deducted at conception.
+   draws nothing more. Every newborn's capacity, mutated or not, is clamped
+   to the range in force at its birth, so a live patch of the bounds reaches
+   the next generation without a draw. The child's capacity is drawn at
+   delivery (step 11), after the litter was deducted at conception.
 3. **The cap rule.** `energy_cap` returns `self.body.capacity`; the three
-   credit sites and the detail response read it unchanged. Capacity stays in
-   `[min, max_energy]`, so `energy ≤ max_energy` and the lab sentinel hold.
+   credit sites and the detail response read it unchanged. A capacity is in
+   the range in force at its bearer's birth, so under an unpatched config
+   `energy ≤ max_energy` and the lab sentinel hold; a live patch that lowers
+   `max_energy` below a living capacity leaves that body's cap where it was
+   (as a lowered `max_energy` always left stored energy until the next
+   credit) and is neither rejected nor applied retroactively.
 4. **The move rule.** `move_effort` returns
    `action_effort(costs.move_cost × factor, complexity, age)` with the
    factor `HeritableBody::move_factor(&self, &EnergyCapacityConfig)` =
@@ -120,11 +126,8 @@ Invariants:
    persists to tick 2,000 with births per reproduce attempt at or above half
    the C = 200 arm's (zero attempts or births in any arm or control world
    fails); otherwise `Reference` does, the other value staying as an
-   attribution control. Ruling (2026-10-21, readings file): `Reference` is
-   the default; the C = 50 `Own` arm persisted but reproduced at 1.7% /
-   3.9% / 1.7% of the C = 200 arm's births per attempt (Orchards / Canyon /
-   Confluence), the C = 800 `Own` arm at 103% / 116% / 112%, and the C = 800
-   `Reference` arm matched C = 200 in every number (mean energy 22–29).
+   attribution control. Ruling (2026-10-21): `Reference`; the numbers are
+   in invariant 9's table.
 7. **Birth.** `cap_energy` becomes one cap primitive that applies the body
    cap and returns the applied excess; the three credit sites book it to
    `maximum_energy_clamp_loss` in their present order, and `spawn_child`,
@@ -155,15 +158,15 @@ Invariants:
    among pairs at which all three worlds persist to tick 2,000 with plateau
    population at or above 70% of the T27.F01 goal epoch's, the largest
    `β × u` wins, ties to the larger β; if none qualifies, (0.5, 0.0005) is
-   taken and the breach recorded. Result (readings file, `81202517`): only
-   (1.0, 0.002) qualified in all three worlds; the other pairs fell under
-   the Orchards bar and (1.0, 0.0005) went extinct in Canyon at tick 658.
+   taken and the breach recorded. Results: the table's last two rows.
 
    | Stage | Arms | Fixed | Readings per world |
    | --- | --- | --- | --- |
    | Arm mechanics (both stages) | the three goal worlds at 2,000 ticks, one seed each, as scratch copies of the goal recipes carrying the arm's overrides through `PROFILE=sweep --config` (a scratch build through `PROFILE=goal` only where the sweep profile lacks a reading) | — | the readings file records each arm's overrides, command and local summary hash (`.bench-artifacts/t26-f02/sweep/`, never committed) |
    | Unchanged-brain comparison | `founder` 200; `founder` 50 and 800 each under `Reference` and `Own` (five arms) | `mutation.per_unit_rate` 0 and `mutation.capacity.chance` 0, so no brain, body or capacity mutation (each arm's summary must show zero applied mutation events); β = u = 0 | persistence, plateau and trough, births per attempt, attempts rejected on energy and on the litter (reproduction failures), and separately the storage benefit: mean energy and `maximum_energy_clamp_loss` per creature-tick against the founder-200 arm |
    | β/u sweep | β ∈ {0.5, 1.0} × u ∈ {0.0005, 0.002} (four arms) | the ruled `sensor_scale`, capacity evolvable at the defaults | persistence, plateau and trough, the capacity block, `capacity_upkeep` and move flows per creature-tick |
+   | Comparison result (2026-10-21, readings file) | the C = 50 `Own` arm persisted but reproduced at 1.7% / 3.9% / 1.7% of the C = 200 arm's births per attempt (Orchards / Canyon / Confluence; 90–96% of attempts rejected on energy); the C = 800 `Own` arm at 103% / 116% / 112%; the C = 800 `Reference` arm matched C = 200 in every number (mean energy 22–29) | — | ruling: `Reference` (one bound fails the rule) |
+   | Sweep result (readings file, `81202517`) | only (1.0, 0.002) qualified in all three worlds; the other pairs fell under the Orchards bar (5301 / 5676 / 5657 vs 6118.6) and (1.0, 0.0005) went extinct in Canyon at tick 658; capacity means at 2,000 ticks under the pick 88 / 161 / 110, at_max 0 | — | pick: β = 1.0, u = 0.002 |
 10. **Readings.** `PersistenceSample` gains `capacity:
     Option<CapacityDistribution { min, p10, median, p90, max, mean,
     at_min_fraction, at_max_fraction }>` over living creatures, `null` at
@@ -205,46 +208,29 @@ flows would show it wrong.
 
 ## Implementation Tasks
 
-- [x] Config: `EnergyCapacityConfig`, `CapacityMutationConfig`, `max_energy`
-      800, normalization and its tests.
-- [x] Body: `capacity`, `founder(.., capacity)`, `inherit` with the
-      capacity draws, `move_factor` and `upkeep`, property tests for the
-      neutral point, the bounds, positivity and the draw order.
-- [x] Cap and move rules read the body (invariants 3–4); characterization
-      tests at the reference; the lab oracles re-derived.
-- [x] Phase 0 `Phase0Charge`, `capacity_upkeep`, `DeathCause::CapacityUpkeep`
-      and the booking and attribution tests (invariant 5).
-- [x] Birth cap step, `offspring_capacity_overflow`, the required fixture and
-      the ledger identity test (invariant 7).
-- [x] Sensor scale: the per-creature `energy_scale` under both
-      `sensor_scale` values at the read sites and their tests (invariant 6).
-- [x] Lab, server detail doc, frontend bar scale, config types and panel
-      group (invariant 11).
-- [x] Telemetry: the two flows, the cause, the three phase groups'
-      attributes, the family and dashboards-check rows.
-- [x] Bench: `CapacityDistribution` in `PopulationReadings` and
-      `PersistenceSample`; the two flows in `EnergyFlowTracking`'s mapping;
-      schema and tests.
-- [x] Reference docs: runtime-config §4, sensor, tick-orchestration §3,
-      reproduction steps 11–14, startup-seeding §5.1, server-protocol.
-- [x] `cargo test -p v3-core --test viability` first; re-pin the trajectory
-      and reproducibility pins as predeclared.
-- [x] Comparison, the `sensor_scale` ruling recorded in invariant 6, then
-      the sweep (invariant 9); the chosen scale, β and u set as defaults.
+- [x] Config, body, cap, move, Phase 0 and birth rules with their property,
+      characterization and fixture tests (invariants 1–5, 7); the lab
+      oracles re-derived.
+- [x] Sensor scale under both values (invariant 6); lab, server, frontend
+      (invariant 11); telemetry flows, cause and phase attributes; bench
+      capacity block and flow mapping; reference docs.
+- [x] Viability first; trajectory and reproducibility re-pins as
+      predeclared (invariant 8).
+- [x] Comparison, the `sensor_scale` ruling, the sweep, the defaults set
+      (invariants 6, 9).
+- [ ] Review remediation: newborn clamp and `log_step` bound with their
+      tests, the two Reference comparison arms on the goal path, the
+      `WORKAROUND(T26.F02)` marker, decay kept in `Phase0Charge`.
 - [ ] gate, goal and goal-long on the final defaults; mutation gate; slow tier.
 
 ## Verification
 
-- [x] `cargo test -p v3-core --test viability` -> 30 passed on macOS
-      aarch64 at the sweep defaults (re-pinned). GNU/Linux x86_64 digests:
-      an x86_64 test binary under emulated Ubuntu 24.04 (glibc 2.39), which
-      reproduced the `08b1584c` pins, measured the new ones; CI's
-      `ubuntu-24.04` confirmation is pending.
-- [x] `cargo test --workspace --no-fail-fast` -> all pass but v3-cli
-      `gate_profile_has_no_severe_regression_against_series_references`
-      (awaits the gate epoch re-pin); `cargo fmt --all --check`,
-      `make rust-clippy`, `make frontend-build` and `npx vitest run`
-      (675 passed) clean.
+- [x] `cargo test -p v3-core --test viability` -> 30 passed (macOS aarch64,
+      re-pinned); x86_64 digests measured under emulated Ubuntu 24.04, CI
+      confirmation pending (readings file).
+- [x] `cargo test --workspace --no-fail-fast` -> all pass but the v3-cli
+      gate severe test (awaits the gate re-pin); fmt, clippy, frontend build
+      and vitest (675) clean.
 - [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, summary
       line, output path, every survivor resolved as killed, equivalent, or
@@ -266,8 +252,7 @@ expected within the ordinary thresholds against the T27.F01 epoch, and the
 deterministic blocks change because every birth draws. The gate and goal
 epochs are re-pinned in the closing commit. Expected directions are in the
 table; no other indicator has a predeclared direction. The ruled scale, β
-and u, set before the final runs: `Reference`, 1.0, 0.002 (the only pair
-qualifying under invariant 9's rule; readings file, commit `81202517`).
+and u, set before the final runs: `Reference`, 1.0, 0.002 (invariant 9).
 
 | Reading | Expected | A different reading says |
 | --- | --- | --- |
@@ -296,8 +281,8 @@ qualifying under invariant 9's rule; readings file, commit `81202517`).
 - [ ] The comparison and sweep tables exist; the defaults are the sweep's pick
       under the predeclared rule.
 - [ ] The goal and goal-long summaries report the capacity distribution,
-      boundary mass and trend per world, and the readings file names which
-      predeclared outcome each world shows.
+      boundary mass and trend per world; the readings file names each
+      world's predeclared outcome.
 
 ## Notes for AI Agents
 
@@ -309,6 +294,11 @@ qualifying under invariant 9's rule; readings file, commit `81202517`).
   `offspring_capacity_overflow`, not refunded.
 - Decision: in-feature refactors R1–R6, R8 and R9 of the preparatory audit
   in `docs/progress/readings/t26-f02.md` are this feature's scope.
+- Deferred: `tick/tests/window_seam.rs` reseeds its equivalence scene
+  (25→29, as four earlier features did) because the oracle drops a traced
+  target's actions when it dies inside its window; marked
+  `WORKAROUND(T26.F02)`; the fix (an oracle retaining death-tick actions)
+  belongs to the next feature touching the window seam.
 - Deferred: the lab's scripted stepper (`v3-lab/src/eval.rs`) charges decay
   only by its header contract, so no capacity upkeep (zero at the founder
   capacity the lab seeds); a lab feature seeding other capacities adds it.
