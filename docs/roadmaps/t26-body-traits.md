@@ -21,7 +21,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Executable Features
 
-- [ ] **T26.F01 — One Body Record and Body Rules** — Depends on: None
+- [x] **T26.F01 — One Body Record and Body Rules** — Depends on: None
   - Goal: Heredity builds a body as well as a brain, as an egg carries its pigment and markings beside its nervous system: colour and kin identity travel in one inherited body record, and the energy cap and the cost of moving are each one body rule, with no behavior change.
 - [ ] **T26.F02 — Evolvable Energy Reserves** — Depends on: T26.F01
   - Goal: Fat: a creature inherits how much energy it can store; a larger store survives lean times but costs more to move and keep, a smaller one is cheaper, and today's capacity is the neutral point.
