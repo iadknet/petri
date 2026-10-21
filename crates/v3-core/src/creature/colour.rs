@@ -134,6 +134,39 @@ mod tests {
         );
     }
 
+    /// CSS Color 4 `hslToRgb`, in f64: an independent formulation of the same
+    /// HSL mapping (no piecewise hue ramp), returning channels on [0, 255].
+    fn reference_hsl_to_rgb(h: f64, s: f64, l: f64) -> [f64; 3] {
+        let a = s * l.min(1.0 - l);
+        let f = |n: f64| {
+            let k = (n + h * 12.0) % 12.0;
+            (l - a * (k - 3.0).min(9.0 - k).clamp(-1.0, 1.0)) * 255.0
+        };
+        [f(0.0), f(8.0), f(4.0)]
+    }
+
+    #[test]
+    fn channels_to_rgb_matches_reference_across_every_hue() {
+        // Every hue byte, at the founder's saturation and lightness and at the
+        // full-saturation, mid-lightness and the floor/ceiling extremes: each
+        // hue sector (the red channel's wrap above 2/3 and the blue channel's
+        // shift below 1/3 included) agrees with the reference.
+        for (sat, lit) in [(92u8, 138u8), (255, 127), (0, 0), (255, 255)] {
+            let s = f64::from(MIN_SAT) + f64::from(sat) / 255.0 * f64::from(SAT_RANGE);
+            let l = f64::from(MIN_LIT) + f64::from(lit) / 255.0 * f64::from(LIT_RANGE);
+            for hue in 0..=255u8 {
+                let rgb = channels_to_rgb([hue, 0, sat, sat, lit, lit]);
+                let expected = reference_hsl_to_rgb(f64::from(hue) / 255.0, s, l);
+                for c in 0..3 {
+                    assert!(
+                        (f64::from(rgb[c]) - expected[c]).abs() <= 0.5 + 1e-3,
+                        "hue {hue} sat {sat} lit {lit} channel {c}: {rgb:?} vs {expected:?}"
+                    );
+                }
+            }
+        }
+    }
+
     proptest::proptest! {
         /// Every channel array reads as three unit values equal to its RGB
         /// over 255.
