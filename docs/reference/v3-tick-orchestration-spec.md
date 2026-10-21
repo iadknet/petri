@@ -266,6 +266,21 @@ subset `energy_flows.failed_action_effort.<action>`.
   the attacker's credit is capped. Kill and bonus rules are owned by the
   predation action.
 
+### GiveEnergy
+
+- Deduct the effort of base `energy.costs.noop_cost` (the floor) before the
+  target resolves (T27.F03).
+- The recipient is the creature on the neighbour cell in the give's
+  direction, never the giver; none is `RejectedNoRecipient` (logged
+  `NoRecipient`). The gift is `min(exchange.bite, giver.energy)` after the
+  effort when the giver's energy is positive, else nothing; a gift is
+  `Transferred` only when the giver's stored energy changed, else
+  `RejectedNothingToGive` (logged `EnergyConstraints`), booked as failed
+  effort. The giver books `gift_debit` (pending cause `Gift`), the
+  recipient `gift_credit`, then the recipient is capped, the excess booked as
+  `maximum_energy_clamp_loss`. A giver left at or below zero is removed
+  right after this dispatch (below).
+
 ### Energy after action
 
 Energy may become zero or negative after action application. The acting

@@ -816,21 +816,27 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // Re-pinned by T27.F03 commit 2: retiring `StealEnergyAmount` narrows the
 // edge-surface draw to `c + 97`, which moves the copy and split
 // `vote_edge_added` seeds back (copy 417 -> 713, split 4890 -> 653).
+// Re-pinned by T27.F03 commit 3: `GiveEnergy`'s nine sinks widen the vote
+// catalog to 39 and the edge-surface draw to `c + 106`, and the `AddVote`
+// sink draw covers 39, which moves every Graph seed and the VM vote seeds
+// (`cue_added` 4251 -> 5649, copy 713 -> 268, split 653 -> 268,
+// `ring_added` 82914 -> 12947, `vote_east` 2189 -> 39910, `vote_to_east`
+// 79414 -> 33754).
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[4251, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[4251];
-const GRAPH_COPY_SEEDS: &[u64] = &[713, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[653, SWAP];
+const GRAPH_BLANK_SEEDS: &[u64] = &[5649, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[5649];
+const GRAPH_COPY_SEEDS: &[u64] = &[268, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[268, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 /// Ring born into `Move(E)`, remove north, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[82_914, 0, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[12_947, 0, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
-const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 79_414, SWAP];
+const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 33_754, SWAP];
 /// Cue, read, vote, swap.
-const VM_BLANK_SEEDS: &[u64] = &[201, 1279, 2189, SWAP];
+const VM_BLANK_SEEDS: &[u64] = &[201, 1279, 39_910, SWAP];
 /// Cue, read, vote.
-const VM_DETOUR_SEEDS: &[u64] = &[201, 1279, 2189];
+const VM_DETOUR_SEEDS: &[u64] = &[201, 1279, 39_910];
 
 /// Every starting form's plan with its pinned seeds, in the fixed family
 /// order.

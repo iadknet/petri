@@ -53,10 +53,11 @@ Boundary intent:
 ## 2. Pass Loop and Action Selection
 
 A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
-from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, the eight
+from `entry_node_id`; nodes vote into the 39-sink vote vector `V` (`Eat`, the eight
 `Directed(K, d)` sinks of each directed kind `K` in `Move`, `Reproduce`,
-`StealEnergy` order, the drives `Drive(Move)`,
-`Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
+`StealEnergy`, `GiveEnergy` order, the drives `Drive(Move)`,
+`Drive(Reproduce)`, `Drive(StealEnergy)`, `Drive(GiveEnergy)`, `Terminate`,
+`Decide`) and write the
 three-field parameter surface `action_params` (indexed by `ActionParamField`:
 `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`); at the pass
 end at most one
@@ -85,7 +86,7 @@ pass:
   reaches max_mesh_hops), or EnergyExhausted; all keep V and the queue
   pass end:
     best[Eat] = Eat; E[Eat] = V[Eat] - C[Eat] * unit
-    for K in {Move, Reproduce, StealEnergy}:
+    for K in {Move, Reproduce, StealEnergy, GiveEnergy}:
       best[K] = first maximum of V over K's eight direction sinks visited in
                 the order (h + k) mod 8, k in 0..8 (never the drive)
       E[K] = (V[Drive(K)] + V[best[K]]) - C[K] * unit
@@ -106,8 +107,8 @@ food type from `EatFoodType` (rounded, non-finite or negative reads type 0)
 and its leave share from `EatLeaveShare` (clamped to `[0, 1]`, non-finite
 reads 0, T02.F08),
 `Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
-`[0, 1]`, non-finite reads 0). `Move` and `StealEnergy` read no field (a
-steal moves the fixed `exchange.bite`, T27.F03), and
+`[0, 1]`, non-finite reads 0). `Move`, `StealEnergy` and `GiveEnergy` read no
+field (a steal or a give moves the fixed `exchange.bite`, T27.F03), and
 the drives, `Terminate` and `Decide`
 never commit and decode to `NoOp`. The parameter surface is zeroed
 at tick start, overwritten per visit, and read at commit.

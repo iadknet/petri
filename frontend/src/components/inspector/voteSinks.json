@@ -1,6 +1,6 @@
 {
-	"voteKinds": ["Eat", "Move", "Reproduce", "StealEnergy"],
-	"directedKinds": ["Move", "Reproduce", "StealEnergy"],
+	"voteKinds": ["Eat", "Move", "Reproduce", "StealEnergy", "GiveEnergy"],
+	"directedKinds": ["Move", "Reproduce", "StealEnergy", "GiveEnergy"],
 	"voteSinks": [
 		"Eat",
 		{ "Directed": ["Move", 0] },
@@ -27,9 +27,18 @@
 		{ "Directed": ["StealEnergy", 5] },
 		{ "Directed": ["StealEnergy", 6] },
 		{ "Directed": ["StealEnergy", 7] },
+		{ "Directed": ["GiveEnergy", 0] },
+		{ "Directed": ["GiveEnergy", 1] },
+		{ "Directed": ["GiveEnergy", 2] },
+		{ "Directed": ["GiveEnergy", 3] },
+		{ "Directed": ["GiveEnergy", 4] },
+		{ "Directed": ["GiveEnergy", 5] },
+		{ "Directed": ["GiveEnergy", 6] },
+		{ "Directed": ["GiveEnergy", 7] },
 		{ "Drive": "Move" },
 		{ "Drive": "Reproduce" },
 		{ "Drive": "StealEnergy" },
+		{ "Drive": "GiveEnergy" },
 		"Terminate",
 		"Decide"
 	],
@@ -43,6 +52,7 @@
 		{ "name": "Eat", "code": 1 },
 		{ "name": "Move", "code": 2 },
 		{ "name": "Reproduce", "code": 3 },
-		{ "name": "StealEnergy", "code": 4 }
+		{ "name": "StealEnergy", "code": 4 },
+		{ "name": "GiveEnergy", "code": 5 }
 	]
 }

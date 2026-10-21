@@ -45,10 +45,11 @@ fn the_founder_carries_four_fanouts_of_sixteen_edges_and_no_drive() {
     for profile in [FounderProfile::default()] {
         let census = census_of(&[founder_genome(profile)]);
         assert_eq!(census.fanout_totals(), (4, 16), "{profile:?}");
-        let [moves, reproduce, steal] = census.kinds;
+        let [moves, reproduce, steal, give] = census.kinds;
         assert_eq!((moves.fanouts, moves.fanout_edges), (3, 12));
         assert_eq!((reproduce.fanouts, reproduce.fanout_edges), (1, 4));
         assert_eq!((steal.fanouts, steal.fanout_edges), (0, 0));
+        assert_eq!((give.fanouts, give.fanout_edges), (0, 0));
         for row in census.kinds {
             assert_eq!(row.drive_carriers, 0);
             assert_eq!(row.drive_edges + row.drive_vm_paths, 0);

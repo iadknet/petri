@@ -120,13 +120,13 @@ mod tests {
             (VoteSink::Directed(DirectedVoteKind::Move, 4), 0.54),
             (VoteSink::Directed(DirectedVoteKind::Move, 6), 0.66),
         ]);
-        let selection = select(&votes, &[0; 4], None, N);
+        let selection = select(&votes, &[0; VOTE_KIND_COUNT], None, N);
         assert_eq!(selection.committed(), Some((VoteSink::Eat, 1.0)));
         assert_eq!(
             selection.best[VoteKind::Move.index()],
             VoteSink::Directed(DirectedVoteKind::Move, 2)
         );
-        let second = select(&votes, &[1, 0, 0, 0], Some(VoteKind::Eat), N);
+        let second = select(&votes, &[1, 0, 0, 0, 0], Some(VoteKind::Eat), N);
         assert_eq!(second.winner, Some(VoteKind::Move));
         assert_eq!(
             second.best[VoteKind::Move.index()],
@@ -140,14 +140,17 @@ mod tests {
             (VoteSink::Eat, 1.0),
             (VoteSink::Directed(DirectedVoteKind::Move, 2), 1.0),
         ]);
-        assert_eq!(select(&votes, &[0; 4], None, N).winner, Some(VoteKind::Eat));
         assert_eq!(
-            select(&votes, &[0; 4], Some(VoteKind::Move), N).winner,
+            select(&votes, &[0; VOTE_KIND_COUNT], None, N).winner,
+            Some(VoteKind::Eat)
+        );
+        assert_eq!(
+            select(&votes, &[0; VOTE_KIND_COUNT], Some(VoteKind::Move), N).winner,
             Some(VoteKind::Move)
         );
         // An incumbent that is not tied at the top does not win.
         assert_eq!(
-            select(&votes, &[0, 1, 0, 0], Some(VoteKind::Move), N).winner,
+            select(&votes, &[0, 1, 0, 0, 0], Some(VoteKind::Move), N).winner,
             Some(VoteKind::Eat)
         );
     }
@@ -155,9 +158,9 @@ mod tests {
     #[test]
     fn nothing_positive_selects_nothing() {
         let votes = votes_with(&[(VoteSink::Terminate, 5.0), (VoteSink::Decide, 5.0)]);
-        assert_eq!(select(&votes, &[0; 4], None, N).winner, None);
+        assert_eq!(select(&votes, &[0; VOTE_KIND_COUNT], None, N).winner, None);
         let votes = votes_with(&[(VoteSink::Directed(DirectedVoteKind::Move, 1), 1.0)]);
-        assert_eq!(select(&votes, &[0, 1, 0, 0], None, N).winner, None);
+        assert_eq!(select(&votes, &[0, 1, 0, 0, 0], None, N).winner, None);
     }
 
     #[test]
@@ -165,7 +168,7 @@ mod tests {
         for kind in DirectedVoteKind::ALL {
             let votes = votes_with(&[(kind.drive(), 0.5)]);
             for (h, heading) in Direction::ALL.into_iter().enumerate() {
-                let selection = select(&votes, &[0; 4], None, heading);
+                let selection = select(&votes, &[0; VOTE_KIND_COUNT], None, heading);
                 assert_eq!(selection.committed(), Some((kind.sink(h as u8), 0.5)));
             }
         }
@@ -179,7 +182,9 @@ mod tests {
             (VoteSink::Directed(DirectedVoteKind::Move, 0), 1.0),
             (VoteSink::Directed(DirectedVoteKind::Move, 3), 1.0),
         ]);
-        let best = |heading| select(&votes, &[0; 4], None, heading).best[VoteKind::Move.index()];
+        let best = |heading| {
+            select(&votes, &[0; VOTE_KIND_COUNT], None, heading).best[VoteKind::Move.index()]
+        };
         assert_eq!(
             best(Direction::NE),
             VoteSink::Directed(DirectedVoteKind::Move, 3)
@@ -202,7 +207,7 @@ mod tests {
             (VoteSink::Directed(DirectedVoteKind::Move, 3), 2.0),
         ]);
         assert_eq!(
-            select(&votes, &[0; 4], None, Direction::NW).best[VoteKind::Move.index()],
+            select(&votes, &[0; VOTE_KIND_COUNT], None, Direction::NW).best[VoteKind::Move.index()],
             VoteSink::Directed(DirectedVoteKind::Move, 3)
         );
     }
@@ -214,7 +219,7 @@ mod tests {
             (VoteSink::Drive(DirectedVoteKind::Move), 0.7),
             (VoteSink::Eat, 1.0),
         ]);
-        let selection = select(&votes, &[0; 4], None, N);
+        let selection = select(&votes, &[0; VOTE_KIND_COUNT], None, N);
         assert_eq!(
             selection.best[VoteKind::Move.index()],
             VoteSink::Directed(DirectedVoteKind::Move, 5)
@@ -226,10 +231,10 @@ mod tests {
             (VoteSink::Directed(DirectedVoteKind::Reproduce, 2), 1.0),
             (VoteSink::Drive(DirectedVoteKind::Reproduce), -1.5),
         ]);
-        assert_eq!(select(&votes, &[0; 4], None, N).winner, None);
+        assert_eq!(select(&votes, &[0; VOTE_KIND_COUNT], None, N).winner, None);
         // `Eat` has no drive: another kind's drive never reaches it.
         let votes = votes_with(&[(VoteSink::Drive(DirectedVoteKind::StealEnergy), 3.0)]);
-        let selection = select(&votes, &[0; 4], None, N);
+        let selection = select(&votes, &[0; VOTE_KIND_COUNT], None, N);
         assert_eq!(selection.effective[VoteKind::Eat.index()], 0.0);
         assert_eq!(selection.winner, Some(VoteKind::StealEnergy));
     }
@@ -251,11 +256,12 @@ mod tests {
         /// incumbent or the lowest index among the tied.
         #[test]
         fn selection_matches_the_commit_rule_definition(
-            votes in prop::array::uniform30(any_vote()),
-            bars in prop::array::uniform4(0u32..4),
+            votes in prop::collection::vec(any_vote(), VOTE_SINK_COUNT),
+            bars in prop::array::uniform5(0u32..4),
             previous in prop::option::of(0usize..VOTE_KIND_COUNT),
             heading in 0usize..8,
         ) {
+            let votes: VoteVector = votes.try_into().unwrap();
             let previous = previous.and_then(VoteKind::from_index);
             let heading = Direction::ALL[heading];
             let selection = select(&votes, &bars, previous, heading);
@@ -295,10 +301,11 @@ mod tests {
         /// minus its bar.
         #[test]
         fn an_unwired_drive_under_north_is_the_lowest_index_rule(
-            mut votes in prop::array::uniform30(any_vote()),
-            bars in prop::array::uniform4(0u32..4),
+            votes in prop::collection::vec(any_vote(), VOTE_SINK_COUNT),
+            bars in prop::array::uniform5(0u32..4),
             previous in prop::option::of(0usize..VOTE_KIND_COUNT),
         ) {
+            let mut votes: VoteVector = votes.try_into().unwrap();
             for kind in DirectedVoteKind::ALL {
                 votes[kind.drive().index()] = 0.0;
             }

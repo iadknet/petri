@@ -36,13 +36,19 @@ pub enum VoteKind {
     Move,
     Reproduce,
     StealEnergy,
+    GiveEnergy,
 }
 
 impl VoteKind {
     /// Catalog order, which is also the per-kind counter order: `Eat`, then
     /// the directed kinds' vote kinds in [`DirectedVoteKind::ALL`] order.
-    pub const ALL: [Self; VOTE_KIND_COUNT] =
-        [Self::Eat, Self::Move, Self::Reproduce, Self::StealEnergy];
+    pub const ALL: [Self; VOTE_KIND_COUNT] = [
+        Self::Eat,
+        Self::Move,
+        Self::Reproduce,
+        Self::StealEnergy,
+        Self::GiveEnergy,
+    ];
 
     /// Index in `0..VOTE_KIND_COUNT`, the position in the per-kind counters.
     #[must_use]
@@ -52,6 +58,7 @@ impl VoteKind {
             Self::Move => 1,
             Self::Reproduce => 2,
             Self::StealEnergy => 3,
+            Self::GiveEnergy => 4,
         }
     }
 
@@ -189,12 +196,19 @@ pub enum DirectedVoteKind {
     Move,
     Reproduce,
     StealEnergy,
+    /// Pass one exchange bite to the neighbour (T27.F03).
+    GiveEnergy,
 }
 
 impl DirectedVoteKind {
     /// Catalog order, the order `AddRingGroup` and `RetargetGroupKind` draw
     /// over.
-    pub const ALL: [Self; 3] = [Self::Move, Self::Reproduce, Self::StealEnergy];
+    pub const ALL: [Self; 4] = [
+        Self::Move,
+        Self::Reproduce,
+        Self::StealEnergy,
+        Self::GiveEnergy,
+    ];
 
     /// Position in [`Self::ALL`].
     #[must_use]
@@ -203,6 +217,7 @@ impl DirectedVoteKind {
             Self::Move => 0,
             Self::Reproduce => 1,
             Self::StealEnergy => 2,
+            Self::GiveEnergy => 3,
         }
     }
 
@@ -235,6 +250,7 @@ impl DirectedVoteKind {
             Self::Move => VoteKind::Move,
             Self::Reproduce => VoteKind::Reproduce,
             Self::StealEnergy => VoteKind::StealEnergy,
+            Self::GiveEnergy => VoteKind::GiveEnergy,
         }
     }
 }
@@ -304,13 +320,19 @@ mod tests {
                 VoteSink::Directed(DirectedVoteKind::StealEnergy, d).index(),
                 17 + d as usize
             );
+            assert_eq!(
+                VoteSink::Directed(DirectedVoteKind::GiveEnergy, d).index(),
+                25 + d as usize
+            );
         }
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::Move).index(), 25);
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::Reproduce).index(), 26);
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::StealEnergy).index(), 27);
-        assert_eq!(VoteSink::Terminate.index(), 28);
-        assert_eq!(VoteSink::Decide.index(), 29);
-        assert_eq!(VOTE_SINK_COUNT, 30);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Move).index(), 33);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Reproduce).index(), 34);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::StealEnergy).index(), 35);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::GiveEnergy).index(), 36);
+        assert_eq!(VoteSink::Terminate.index(), 37);
+        assert_eq!(VoteSink::Decide.index(), 38);
+        assert_eq!(VOTE_SINK_COUNT, 39);
+        assert_eq!(VOTE_KIND_COUNT, 5);
     }
 
     #[test]

@@ -572,6 +572,37 @@ fn steal_north_genome() -> CreatureGenome {
     }
 }
 
+/// Gives one bite to the north neighbor (T27.F03).
+fn give_north_genome() -> CreatureGenome {
+    let sink = crate::creature::genome::vote::DirectedVoteKind::GiveEnergy
+        .sink(0)
+        .index() as u8;
+    vm_program_genome(vec![
+        VmInstruction::AddVote { sink, src: 0 },
+        VmInstruction::Halt,
+    ])
+}
+
+/// The window's charge for a give is its own ledger row; the gift's credit
+/// is the recipient's, so the giver's applied action carries no reward.
+#[test]
+fn a_give_charges_its_effort_and_credits_no_reward_to_the_giver() {
+    let (mut sim, giver, recipient) = make_sim_two_creatures(100.0, 80.0);
+    sim.creatures[giver].genome = give_north_genome();
+    sim.creatures[recipient].genome = vm_program_genome(vec![VmInstruction::Halt]);
+    let mut trace = Some(ActiveTrace::new(giver, 1));
+    run_tick(&mut sim, &mut trace);
+    let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
+    let give = &outcome.applied[0];
+    assert_eq!(give.entry.action_type, ActionType::GiveEnergy);
+    assert_eq!(give.entry.result, ActionResult::Success);
+    assert!(give.charge > 0.0);
+    let ledger = sim.stats.energy_flows.action_charges;
+    assert!((give.charge - ledger[ActionType::GiveEnergy]).abs() < 1e-9);
+    assert_eq!(give.reward, 0.0);
+    assert!(sim.stats.energy_flows.gift_credit > 0.0);
+}
+
 #[test]
 fn a_steal_credits_its_reward_and_the_victim_records_damage() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);

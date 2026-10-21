@@ -4,7 +4,7 @@ import catalog from "../components/inspector/voteSinks.json";
  * Action types — serialized as string variant names from Rust's `ActionType`
  * enum; the values come from the Rust-pinned `voteSinks.json` catalog.
  */
-export type ActionType = "NoOp" | "Eat" | "Move" | "Reproduce" | "StealEnergy";
+export type ActionType = "NoOp" | "Eat" | "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
 
 export const ActionType = Object.freeze(
 	Object.fromEntries(catalog.actionTypes.map(({ name }) => [name, name])),
@@ -22,6 +22,7 @@ export const ActionResult = {
 	PopulationCap: "PopulationCap",
 	TransferredAndKilled: "TransferredAndKilled",
 	NoVictim: "NoVictim",
+	NoRecipient: "NoRecipient",
 } as const;
 
 export type ActionResult = (typeof ActionResult)[keyof typeof ActionResult];

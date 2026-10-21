@@ -12,11 +12,12 @@ pub enum ActionType {
     Move = 2,
     Reproduce = 3,
     StealEnergy = 4,
+    GiveEnergy = 5,
 }
 
-/// Number of meaningful action type discriminants (NoOp..StealEnergy).
-pub const ACTION_TYPE_COUNT: u8 = 5;
-const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
+/// Number of meaningful action type discriminants (NoOp..GiveEnergy).
+pub const ACTION_TYPE_COUNT: u8 = 6;
+const _: () = assert!(ActionType::GiveEnergy as u8 + 1 == ACTION_TYPE_COUNT);
 
 impl ActionType {
     /// Every action type in discriminant order, for fixed-order reports.
@@ -26,6 +27,7 @@ impl ActionType {
         Self::Move,
         Self::Reproduce,
         Self::StealEnergy,
+        Self::GiveEnergy,
     ];
 
     /// Stable diagnostics key for this action type.
@@ -39,6 +41,7 @@ impl ActionType {
             Self::Move => "Move",
             Self::Reproduce => "Reproduce",
             Self::StealEnergy => "StealEnergy",
+            Self::GiveEnergy => "GiveEnergy",
         }
     }
 
@@ -51,6 +54,7 @@ impl ActionType {
             Self::Move => "move",
             Self::Reproduce => "reproduce",
             Self::StealEnergy => "steal_energy",
+            Self::GiveEnergy => "give_energy",
         }
     }
 
@@ -84,6 +88,9 @@ pub enum WorldAction {
     /// Attempt to take one exchange bite of energy from the neighbour in the
     /// given direction (T27.F03).
     StealEnergy { direction: Direction },
+    /// Pass one exchange bite of energy to the neighbour in the given
+    /// direction (T27.F03).
+    GiveEnergy { direction: Direction },
 }
 
 impl WorldAction {
@@ -111,6 +118,7 @@ impl WorldAction {
             WorldAction::Move(_) => ActionType::Move,
             WorldAction::Reproduce { .. } => ActionType::Reproduce,
             WorldAction::StealEnergy { .. } => ActionType::StealEnergy,
+            WorldAction::GiveEnergy { .. } => ActionType::GiveEnergy,
         }
     }
 
@@ -121,7 +129,8 @@ impl WorldAction {
         match self {
             WorldAction::Move(direction)
             | WorldAction::Reproduce { direction, .. }
-            | WorldAction::StealEnergy { direction, .. } => Some(*direction),
+            | WorldAction::StealEnergy { direction, .. }
+            | WorldAction::GiveEnergy { direction } => Some(*direction),
             WorldAction::NoOp | WorldAction::Eat { .. } => None,
         }
     }
@@ -145,7 +154,8 @@ impl WorldAction {
                 },
                 1,
             ) => *energy_transfer_fraction,
-            (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
+            (WorldAction::StealEnergy { direction }, 0)
+            | (WorldAction::GiveEnergy { direction }, 0) => direction.to_index() as f32,
             _ => 0.0,
         }
     }
@@ -243,6 +253,19 @@ mod tests {
     }
 
     #[test]
+    fn a_give_is_type_five_and_reads_its_direction_in_slot_zero() {
+        let action = WorldAction::GiveEnergy {
+            direction: Direction::SE,
+        };
+        assert_eq!(action.action_type(), ActionType::GiveEnergy);
+        assert_eq!(action.action_type() as u8, 5);
+        assert_eq!(action.direction(), Some(Direction::SE));
+        assert_eq!(action.param(0), Direction::SE.to_index() as f32);
+        assert_eq!(action.param(1).to_bits(), 0.0f32.to_bits());
+        assert_eq!(ActionType::GiveEnergy.flow_key(), "give_energy");
+    }
+
+    #[test]
     fn a_steal_carries_only_its_direction_and_reads_no_slot_one() {
         let action = WorldAction::StealEnergy {
             direction: Direction::NW,
@@ -266,6 +289,9 @@ mod tests {
             },
             WorldAction::StealEnergy {
                 direction: Direction::S,
+            },
+            WorldAction::GiveEnergy {
+                direction: Direction::SW,
             },
         ];
         for action in actions {

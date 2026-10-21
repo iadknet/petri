@@ -2,6 +2,8 @@ use crate::contracts::{CreatureId, Direction};
 use crate::creature::action_log::ActionType;
 use crate::simulation::simulation::Simulation;
 
+use super::TransferOutcome;
+
 /// Spatial record of a single predation event for frontend visualization.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PredationEventRecord {
@@ -34,16 +36,6 @@ impl PredationActionResult {
             Self::RejectedNoVictim => "RejectedNoVictim",
         }
     }
-}
-
-/// What a transfer action moved: its result, the energy debited from the
-/// side that gives it up, and the counterpart creature, `None` when the target
-/// cell held none.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TransferOutcome<R> {
-    pub result: R,
-    pub amount: f32,
-    pub counterpart: Option<CreatureId>,
 }
 
 /// Apply a StealEnergy action: take one bite of energy from the neighbour in

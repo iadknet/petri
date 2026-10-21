@@ -98,8 +98,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // to the old shape restores the old value. Re-pinned by T27.F03 commit
     // 2: retiring `StealEnergyAmount` narrows the `WriteActionParam` field
     // draw to `0..3` and the Graph sink surface to 97, and a steal moves the
-    // bite (12995421853181291158 -> 2846634796153140363).
-    assert_eq!(hash, 2846634796153140363, "pin of the recruitment-Off path");
+    // bite (12995421853181291158 -> 2846634796153140363). Re-pinned by
+    // T27.F03 commit 3 after two agreeing runs: kind draws `0..4`,
+    // `RetargetGroupKind` `0..3`, sink draws 39 / 106 and the widened
+    // decision sub-index draws (2846634796153140363 -> 7677103501026316003).
+    assert_eq!(hash, 7677103501026316003, "pin of the recruitment-Off path");
 }
 
 #[test]

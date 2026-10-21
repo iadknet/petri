@@ -95,7 +95,7 @@ fn w1_founder_forage_with_food_is_eat_then_the_best_move() {
     // Pass 2: Eat's bar is 1, Move E 0.86 wins; pass 3: Move −0.14.
     assert_eq!(tick.passes[1].effective_votes[VoteKind::Eat.index()], 0.0);
     assert!((tick.passes[2].effective_votes[VoteKind::Move.index()] + 0.14).abs() < 1e-6);
-    assert_eq!(tick.output.commit_counts, [1, 1, 0, 0]);
+    assert_eq!(tick.output.commit_counts, [1, 1, 0, 0, 0]);
 }
 
 #[test]

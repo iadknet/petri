@@ -10,6 +10,7 @@ const ACTION_COLORS: Record<string, string> = {
 	Move: "#60a5fa",
 	Reproduce: "#fbbf24",
 	StealEnergy: "#f87171",
+	GiveEnergy: "#c084fc",
 };
 
 const MAX_ACTION_DOTS = 50;

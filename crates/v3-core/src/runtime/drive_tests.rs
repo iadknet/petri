@@ -71,7 +71,7 @@ fn a_move_commit_turns_the_heading_for_the_later_passes_of_the_tick() {
         ]
     );
     assert_eq!(tick.output.heading, Direction::E);
-    assert_eq!(tick.passes[1].bars, [0, 1, 0, 0]);
+    assert_eq!(tick.passes[1].bars, [0, 1, 0, 0, 0]);
     assert_eq!(
         tick.passes[1].best[VoteKind::Reproduce.index()],
         VoteSink::Directed(DirectedVoteKind::Reproduce, 2)
