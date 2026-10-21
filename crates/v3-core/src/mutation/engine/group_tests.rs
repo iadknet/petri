@@ -605,14 +605,34 @@ fn member_removed(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> bo
     members(after) < members(before)
 }
 
+/// The shape of one generated group.
+#[derive(Clone, Copy, Debug)]
+enum GroupShape {
+    /// A `Ring` group on an appended occupied-ring reference.
+    Ring,
+    /// A `DirectionPair` gene on occupancy pair `pair`; `with_facts` adds its
+    /// fact members (T25.F10). The last member of a fact-bearing gene is a
+    /// fact member (the drive sinks follow every direction sink), so the
+    /// drops generate fact holes and fact-only survivors as well as sole
+    /// direction members.
+    Pair { pair: u8, with_facts: bool },
+}
+
 /// One generated group: kind, offset, scale, the members to drop (a bit per
-/// member in canonical order, the last always kept) and the shape (0 a
-/// `Ring`; 1 or 2 a `DirectionPair` gene on pair `(shape − 1) mod 2`, 3 or
-/// 4 the same gene with its fact members, T25.F10). The last member of a
-/// fact-bearing gene is a fact member (the drive sinks follow every
-/// direction sink), so the drops generate fact holes and fact-only
-/// survivors as well as sole direction members.
-type GroupSpec = (usize, u8, f32, u16, u8);
+/// member in canonical order, the last always kept) and the shape.
+type GroupSpec = (usize, u8, f32, u16, GroupShape);
+
+/// Draws a `GroupSpec` over every shape: a ring, or each occupancy pair with
+/// and without its fact members.
+fn group_spec() -> impl Strategy<Value = GroupSpec> {
+    let pairs = InputReference::World(WorldInputKey::AreaOccupancySummary)
+        .direction_pairs()
+        .len();
+    let pair = (0..u8::try_from(pairs).unwrap(), any::<bool>())
+        .prop_map(|(pair, with_facts)| GroupShape::Pair { pair, with_facts });
+    let shape = prop_oneof![1 => Just(GroupShape::Ring), 4 => pair];
+    (0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), shape)
+}
 
 /// Adds one group per entry of `groups` to the Graph `node`: a `Ring` reads
 /// an appended occupied-ring reference, a `DirectionPair` an appended
@@ -629,11 +649,10 @@ fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
     for &(kind, offset, scale, drop, shape) in groups {
         let kind = DirectedVoteKind::ALL[kind];
         let id = match shape {
-            0 => def.add_group(Shape::Ring { ring_ref: ring }, kind, offset),
-            _ => {
-                let pair = (shape - 1) % 2;
+            GroupShape::Ring => def.add_group(Shape::Ring { ring_ref: ring }, kind, offset),
+            GroupShape::Pair { pair, with_facts } => {
                 let layout = area.direction_pairs()[usize::from(pair)];
-                let facts = if shape > 2 { layout.facts } else { &[] };
+                let facts = if with_facts { layout.facts } else { &[] };
                 def.add_pair_group(summary, pair, layout, kind, offset, facts)
             }
         };
@@ -693,8 +712,8 @@ proptest! {
         seed in any::<u64>(),
         mesh_layer_probability in 0.0f64..=1.0,
         groups in [
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..5), 0..4),
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..5), 0..4),
+            prop::collection::vec(group_spec(), 0..4),
+            prop::collection::vec(group_spec(), 0..4),
         ],
     ) {
         let mut genome = grouped_mixed_genome(&groups);
