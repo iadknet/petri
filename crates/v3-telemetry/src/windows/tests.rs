@@ -957,3 +957,37 @@ fn run_started_records_the_three_settings() {
         .unwrap();
     assert_eq!(ended.attribute("petri.samples_skipped"), Some("0"));
 }
+
+/// `petri.committed` and the record's `sel` list name each action kind by its
+/// fixed label and direction or food index.
+#[test]
+fn action_labels_name_every_kind() {
+    use v3_core::contracts::{Direction, OrdinaryFoodTypeId};
+    let cases = [
+        (WorldAction::NoOp, "noop"),
+        (WorldAction::eat(OrdinaryFoodTypeId::new(3)), "eat:3"),
+        (WorldAction::Move(Direction::E), "move:2"),
+        (
+            WorldAction::Reproduce {
+                direction: Direction::S,
+                energy_transfer_fraction: 0.5,
+            },
+            "reproduce:4",
+        ),
+        (
+            WorldAction::StealEnergy {
+                direction: Direction::W,
+            },
+            "steal:6",
+        ),
+        (
+            WorldAction::GiveEnergy {
+                direction: Direction::NW,
+            },
+            "give:7",
+        ),
+    ];
+    for (action, label) in cases {
+        assert_eq!(action_label(&action), label);
+    }
+}

@@ -324,6 +324,37 @@ mod tests {
             prop_assert_eq!(f[ActionType::NoOp], 0.0);
         }
 
+        /// Netting reaches only what this action charged: every row's charge
+        /// from earlier actions survives, the overdraft taken from this
+        /// action's increment alone, the rest returned as the remainder.
+        #[test]
+        fn netting_an_overdraft_leaves_earlier_charges_untouched(
+            row in 0usize..ActionType::ALL.len(),
+            prior in 1.0f64..1.0e6,
+            charged in 0.0f64..1.0e6,
+            overshoot in 0.0f64..1.0e6,
+        ) {
+            let action = ActionType::ALL[row];
+            let mut flows = EnergyFlows::default();
+            for k in ActionType::ALL {
+                flows.action_charges[k] = prior;
+            }
+            let before = (flows.action_charges, flows.failed_action_effort);
+            flows.action_charges[action] += charged;
+            let gross = flows.action_charges[action];
+            let increment = gross - prior;
+            let remainder = flows.net_action_overdraft(before, overshoot);
+            let c = flows.action_charges;
+            for k in ActionType::ALL {
+                if k != action {
+                    prop_assert_eq!(c[k], prior);
+                }
+            }
+            let share = overshoot.min(increment);
+            prop_assert_eq!(c[action], gross - share);
+            prop_assert_eq!(remainder, overshoot - share);
+        }
+
         #[test]
         fn pending_cause_retains_first_crossing_until_positive_recovery(
             positive in 0.001f64..1.0e6,
