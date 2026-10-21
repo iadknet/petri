@@ -123,12 +123,15 @@ baseline is edited to pass.
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
       Otherwise `Not run: Verification Plan`.
-- [ ] For each declared benchmark profile: summary stored at
+- [x] For each declared benchmark profile (gate, goal; 2026-10-21, HEAD `474faf70`): summary stored at
       `docs/progress/features/<id>.json` (gate), `<id>-goal.json` or
       `<id>-goal-long.json`, local raw hash/byte count and verification time
       checked, series entry points to the summary, and no new full report
-      staged. Otherwise `Not run: Verification Plan`.
-- [x] Viability first: `cargo test -p v3-core --test viability` before and after each commit -> 30 pass, founder-only digests unchanged.
+      staged. Otherwise `Not run: Verification Plan`. Summaries `t25-f10.json` and
+      `t25-f10-goal.json`, hashes, bytes, exit statuses and verdicts in
+      [Performance and Goal Impact](#performance-and-goal-impact); series `closed`
+      entries added, epoch baselines unchanged, no raw report staged.
+- [x] Viability first: `cargo test -p v3-core --test viability` before and after each commit -> 30 pass, founder-only digests unchanged; re-run at the final code `474faf70` before the gate (2026-10-21): 30 pass.
 - [ ] Slow tier: `make rust-test-slow` -> recruitment-paths readings re-pinned with their cause.
 
 ## Performance and Goal Impact
@@ -175,11 +178,38 @@ member appearing is a reading. The long-run bloat question
 (cheap silent genes accumulating, free per-member variation) stays open
 (Notes).
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-21, HEAD `474faf70`, each command run once).** No `severe` on either
+profile; no counter flagged on the gate; two goal counters flagged; one predeclared hypothesis
+contradicted in one world.
 
-- Summaries of the declared profiles: [gate](../../progress/features/t25-f10-group-genes-cost-as-genes.json),
-  [goal](../../progress/features/t25-f10-group-genes-cost-as-genes-goal.json).
-- Full readings: [`docs/progress/readings/t25-f10.md`](../../progress/readings/t25-f10.md).
+| Command | CLI exit (source) | Outer exit (observed) | `severe` | Verdict |
+| --- | --- | --- | --- | --- |
+| `cargo test -p v3-core --test viability` | not applicable | 0 | not applicable | 30 pass |
+| `make bench PROFILE=gate FEATURE=t25-f10` | 0 (`measurement_evidence.cli_exit`) | 0 | false | no flag |
+| `make bench PROFILE=goal FEATURE=t25-f10` | 0 (`measurement_evidence.cli_exit`) | 0 | false | `mesh_hops` +10.45% and `plasticity_updates` +17.09% flagged |
+
+| Reading (F10 vs F09) | Orchards | Canyon | Confluence | Against the predeclaration |
+| --- | --- | --- | --- | --- |
+| gate wall per creature-tick | +17.56% (aggregate, level ok) | | | contradicts the +/-5% hypothesis, below the 25% flag |
+| goal `mesh_hops` / `plasticity_updates` per creature-tick | +4.3% / -10.7% | +4.0% / +83.3% | +21.6% / +72.9% | aggregate +10.45% / +17.09% flagged |
+| `mean_genome_size` at tick 2000 | 99.88 vs 103.26 | 94.26 vs 97.66 | 120.60 vs 110.64 | lower in two worlds; Confluence higher, contradicts |
+| attempted events per birth | 0.5464 vs 0.5613 | 0.4945 vs 0.5032 | 0.6210 vs 0.5834 | same split |
+| `mean_ring_groups` | 0.482 vs 0.410 | 0.330 vs 0.076 | 0.758 vs 0.296 | a reading |
+| `pair_groups` groups (F09) | 176 (283) | 0 (30) | 734 (229) | a reading |
+| `facts` / `own_nonzero` | 141 / 0 | 0 / 0 | 115 / 9 | a reading; zero read in Canyon |
+| `genome_carrying` energy (F09) | 98,977 (104,381) | 18,472 (18,647) | 75,048 (71,241) | per-unit rate unchanged |
+
+The nine gate counters are all ok (largest `pass_cap_hits` -23.21%). The goal flags sit where the
+reachable pair genes rose most (Confluence), which fits the carrier-dependent cost but is not
+isolated by this run. Wall clock per creature-tick rose +76.33% (flag) in every phase, including
+`food_growth_ms`, which F10 does not touch, under a host load of 19 to 23 on 8 cores; it is
+host-confounded and was not re-run. The summary carries no fact-hole or detached-fact-member count.
+
+- Summaries of the declared profiles: [gate](../../progress/features/t25-f10.json) (26,402 bytes),
+  [goal](../../progress/features/t25-f10-goal.json) (535,371 bytes). Raw reports stay in the main
+  checkout's ignored `.bench-artifacts/t25-f10/`: gate 130,748 bytes, sha256 `912373db735ab94b524de5ae57561794bb0eeb95f435bcfdef2bb910d6f2107e`;
+  goal 706,642,932 bytes, sha256 `6a132055c179f3971f7cd5e75bef06863fb78f0e2e0bb41535bb596ab46b6978`.
+- Full readings: [`docs/progress/readings/t25-f10.md`](../../progress/readings/t25-f10.md#benchmark-readings-2026-10-21-head-474faf70-tree-clean-each-command-run-once).
 
 ## Success Criteria
 
