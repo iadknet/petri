@@ -246,11 +246,9 @@ title seen only.)*
     (Wagner 2000) or to concealment (Mitri 2009).
   - Lachmann et al. show that what must be costly is deviation. A cheater must
     pay through the receiver's response.
-  - For Petri this argues for a small production cost (natural: muscle or
-    chromatophore work), such as the existing per-action floor. A large
-    handicap tax would mostly suppress use.
-  - Honesty then comes from receivers evolving to ignore unreliable senders,
-    which needs the colour/kin cue from §1.
+  - For Petri, the user's 2026-10-21 ruling supersedes any cost
+    recommendation drawn from this literature: signals have no
+    signal-specific energy cost or honesty mechanism.
 - **How many channels.** No controlled study of channel count was found. Every
   successful case used one signal, sometimes graded (a light; a female's
   sound). JaxLife's message vector was ignored at large population. Start with
