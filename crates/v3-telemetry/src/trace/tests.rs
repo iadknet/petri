@@ -253,6 +253,7 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "mutation.executed_bias",
         "predation.steal_cost_rate",
         "predation.kill_complexity_bonus_multiplier",
+        "exchange.bite",
     ]);
     let reward_learning = config_keys(&[]);
     [

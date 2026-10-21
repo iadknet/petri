@@ -55,7 +55,9 @@ Version contract:
   (T27.F03) serializes a directed vote sink as `{"Directed":[kind,d]}`
   (`{"Directed":["Move",3]}` where `{"Move":3}` stood) in genome
   `ActionVote` sinks, `AddVote` instructions and trace `best` entries; a
-  drive keeps `{"Drive":"Move"}`. `v3alpha12`
+  drive keeps `{"Drive":"Move"}`; the `StealEnergyAmount` parameter field is
+  retired (an `ActionParam` sink or `WorldAction::StealEnergy` names no
+  amount, `{"StealEnergy":{"direction":"N"}}`). `v3alpha12`
   (T27.F01) widened the `debug_perception` `nearby` array to 40: each
   slot's fields 7 to 9 are the seen colour where `lineage_match` and
   `phenotype_similarity` stood, and added the static input keys `OwnRed`,

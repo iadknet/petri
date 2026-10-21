@@ -36,8 +36,7 @@
 	"actionParamFields": [
 		{ "field": "EatFoodType", "kind": "Eat" },
 		{ "field": "EatLeaveShare", "kind": "Eat" },
-		{ "field": "ReproduceTransferFraction", "kind": "Reproduce" },
-		{ "field": "StealEnergyAmount", "kind": "StealEnergy" }
+		{ "field": "ReproduceTransferFraction", "kind": "Reproduce" }
 	],
 	"actionTypes": [
 		{ "name": "NoOp", "code": 0 },

@@ -416,6 +416,7 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         config_key("predation.kill_complexity_bonus_multiplier"),
         config.predation.kill_complexity_bonus_multiplier,
     );
+    a.double(config_key("exchange.bite"), config.exchange.bite);
 }
 
 /// What one tick trace is made of, read on the simulation thread.

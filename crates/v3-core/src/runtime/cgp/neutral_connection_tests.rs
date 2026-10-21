@@ -69,15 +69,15 @@ fn sensors() -> SensorSnapshot {
 fn side() -> MeshSideOutputs {
     let mut side = MeshSideOutputs::new(8);
     for _ in 0..5 {
-        side.action_queue.push(WorldAction::StealEnergy {
+        side.action_queue.push(WorldAction::Reproduce {
             direction: Direction::NW,
-            amount: 0.75,
+            energy_transfer_fraction: 0.75,
         });
     }
     side.votes = ramp(0.0);
     side.previous_pass_votes = ramp(0.5);
     side.commit_counts = [1, 2, 3, 4];
-    side.action_params = [0.25, 0.5, 0.75, 1.0];
+    side.action_params = [0.25, 0.5, 0.75];
     side.work_counters.mesh_hops = 6;
     side
 }
@@ -193,7 +193,7 @@ fn reference_cases() -> Vec<(InputReference, Vec<f32>)> {
             R::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
             vec![6.0],
         ),
-        (R::ActionQueue, [4.0, 7.0, 0.75].repeat(5)),
+        (R::ActionQueue, [3.0, 7.0, 0.75].repeat(5)),
         (R::ActionVotes, side().votes.to_vec()),
         (R::PreviousPassVotes, side().previous_pass_votes.to_vec()),
         (R::CommitCounts, vec![1.0, 2.0, 3.0, 4.0]),
@@ -390,7 +390,7 @@ fn active_graph() -> CgpGraphBackendDef {
         ),
         (OutputSinkKind::RouterGate(0), memory(0, false), 1.0),
         (
-            OutputSinkKind::ActionParam(ActionParamField::StealEnergyAmount),
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
             memory(0, false),
             1.0,
         ),

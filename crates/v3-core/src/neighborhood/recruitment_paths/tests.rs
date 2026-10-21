@@ -1032,6 +1032,8 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// the three drive sinks remap the sink, surface and `AddVote` draws.
 /// T02.F08 moved the copy and split `GraphAddGraphEdge` seeds (713 -> 417,
 /// 653 -> 4890): the `EatLeaveShare` sink widens the edge-surface draw.
+/// T27.F03 commit 2 moves them back (417 -> 713, 4890 -> 653): retiring
+/// `StealEnergyAmount` narrows the draw to `c + 97`.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1053,8 +1055,8 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         record,
         [
             ("graph_blank", vec![(InputRefAdd, 4251), swap], None),
-            ("graph_copy", vec![(GraphAddGraphEdge, 417), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 4890), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 713), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 653), swap], None),
             (
                 "vm_blank",
                 vec![

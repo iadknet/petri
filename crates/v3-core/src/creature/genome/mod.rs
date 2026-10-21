@@ -913,6 +913,17 @@ mod tests {
         );
     }
 
+    /// T27.F03: the retired `StealEnergyAmount` field names no sink, so a
+    /// genome carrying it fails to deserialize.
+    #[test]
+    fn a_retired_steal_amount_sink_is_rejected() {
+        let json = serde_json::to_string(&all_param_fields_genome()).unwrap();
+        let new = r#"{"ActionParam":"ReproduceTransferFraction"}"#;
+        assert!(json.contains(new), "{json}");
+        let old_json = json.replacen(new, r#"{"ActionParam":"StealEnergyAmount"}"#, 1);
+        assert!(serde_json::from_str::<CreatureGenome>(&old_json).is_err());
+    }
+
     /// T11.F27 boundary: a pre-F27 genome carrying an old `ActionParam` sink
     /// or an old `WriteActionParam { slot_idx, .. }` fails to deserialize.
     #[test]
@@ -922,10 +933,6 @@ mod tests {
             (
                 r#"{"ActionParam":"EatFoodType"}"#,
                 r#"{"ActionParam":["Eat",0]}"#,
-            ),
-            (
-                r#"{"ActionParam":"StealEnergyAmount"}"#,
-                r#"{"ActionParam":["StealEnergy",1]}"#,
             ),
             (
                 r#"{"WriteActionParam":{"field_idx":0,"src":0}}"#,

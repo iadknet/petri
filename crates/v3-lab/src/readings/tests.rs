@@ -595,8 +595,9 @@ fn a_genome_file_breaking_a_graph_invariant_is_refused() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// A genome file stored before T27.F03 (format 7, `{"Move":d}` vote
-/// sinks), before T27.F01 (format 6, a 36-wide creature
+/// A genome file stored before T27.F03 commit 2 (format 8, a
+/// `StealEnergyAmount` field), before T27.F03 commit 1 (format 7,
+/// `{"Move":d}` vote sinks), before T27.F01 (format 6, a 36-wide creature
 /// family), before T25.F09 (format 5, no `retention`), before
 /// T25.F07 (format 4, members without a scope), before T25.F06 (format 3,
 /// node-level plasticity), before T25.F05 (format 2, three creature
@@ -607,15 +608,15 @@ fn a_genome_file_of_an_earlier_format_is_refused() {
     let dir = std::env::temp_dir().join(format!("petri-lab-format-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("old.json");
-    assert_eq!(crate::summary::GENOME_FORMAT, 8);
-    for format in [1, 2, 3, 4, 5, 6, 7] {
+    assert_eq!(crate::summary::GENOME_FORMAT, 9);
+    for format in [1, 2, 3, 4, 5, 6, 7, 8] {
         let mut file =
             crate::GenomeFile::new(v3_core::creature::founder::v3alpha1_founder_genome());
         file.genome_format = format;
         std::fs::write(&path, serde_json::to_vec(&file).unwrap()).unwrap();
         let error = crate::GenomeFile::load(&path).unwrap_err();
         assert!(
-            format!("{error}").contains(&format!("genome_format {format} is not 8")),
+            format!("{error}").contains(&format!("genome_format {format} is not 9")),
             "{error}"
         );
     }

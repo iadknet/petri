@@ -119,6 +119,9 @@ export const MOCK_CONFIG: SimulationConfig = {
 		steal_cost_rate: 0.2,
 		kill_complexity_bonus_multiplier: 0.05,
 	},
+	exchange: {
+		bite: 8,
+	},
 	action_log: {
 		capacity: 500,
 	},

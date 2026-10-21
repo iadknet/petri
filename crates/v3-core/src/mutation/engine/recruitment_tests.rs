@@ -95,11 +95,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // shape): a directed vote sink reads `{"Directed":["Move",3]}` and
     // `Directed(Move, 3)` where `{"Move":3}` and `Move(3)` stood
     // (2059421590127301874 -> 12995421853181291158); mapping that text back
-    // to the old shape restores the old value.
-    assert_eq!(
-        hash, 12995421853181291158,
-        "pin of the recruitment-Off path"
-    );
+    // to the old shape restores the old value. Re-pinned by T27.F03 commit
+    // 2: retiring `StealEnergyAmount` narrows the `WriteActionParam` field
+    // draw to `0..3` and the Graph sink surface to 97, and a steal moves the
+    // bite (12995421853181291158 -> 2846634796153140363).
+    assert_eq!(hash, 2846634796153140363, "pin of the recruitment-Off path");
 }
 
 #[test]

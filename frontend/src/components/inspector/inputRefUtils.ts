@@ -149,7 +149,7 @@ const OUTCOME_FIELDS: readonly SubField[] = [
 const QUEUE_FIELDS: readonly SubField[] = [
 	{ name: "type", description: `Action code: ${actionCodeLegend()}.` },
 	{ name: "param0", description: "Direction index (N=0 … NW=7); for Eat, the food type." },
-	{ name: "param1", description: "Reproduce: energy share given; StealEnergy: amount requested." },
+	{ name: "param1", description: "Reproduce: energy share given; Eat: the share left." },
 ];
 
 const SCALAR_LABELS: Record<string, { label: string; description: string }> = {

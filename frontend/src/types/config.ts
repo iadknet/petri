@@ -254,6 +254,11 @@ export interface PredationConfig {
 	kill_complexity_bonus_multiplier: number;
 }
 
+/** The energy exchange between neighbours (T27.F03). */
+export interface ExchangeConfig {
+	bite: number;
+}
+
 export interface ActionLogConfig {
 	capacity: number;
 }
@@ -269,6 +274,7 @@ export interface SimulationConfig {
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;
 	predation: PredationConfig;
+	exchange: ExchangeConfig;
 	action_log: ActionLogConfig;
 	shared_memory: SharedMemoryConfig;
 }

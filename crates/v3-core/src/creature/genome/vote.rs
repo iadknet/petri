@@ -18,7 +18,7 @@ pub const VOTE_SINK_COUNT: usize =
 /// Directions a directed vote sink covers — the `Direction::ALL` index range.
 pub const VOTE_DIRECTION_COUNT: u8 = 8;
 /// Action-parameter fields: the fields `decode_commit` reads (T11.F27).
-pub const ACTION_PARAM_FIELD_COUNT: usize = 4;
+pub const ACTION_PARAM_FIELD_COUNT: usize = 3;
 
 /// Catalog index of the first drive sink: the direction sinks end here.
 const FIRST_DRIVE_SINK: usize = 1 + VOTE_DIRECTION_COUNT as usize * DIRECTED_VOTE_KIND_COUNT;
@@ -76,8 +76,6 @@ pub enum ActionParamField {
     EatLeaveShare,
     /// The energy fraction a `Reproduce` commit transfers to the child.
     ReproduceTransferFraction,
-    /// The energy a `StealEnergy` commit takes.
-    StealEnergyAmount,
 }
 
 impl ActionParamField {
@@ -87,7 +85,6 @@ impl ActionParamField {
         Self::EatFoodType,
         Self::EatLeaveShare,
         Self::ReproduceTransferFraction,
-        Self::StealEnergyAmount,
     ];
 
     /// Position in [`Self::ALL`], in `0..ACTION_PARAM_FIELD_COUNT`.
@@ -97,7 +94,6 @@ impl ActionParamField {
             Self::EatFoodType => 0,
             Self::EatLeaveShare => 1,
             Self::ReproduceTransferFraction => 2,
-            Self::StealEnergyAmount => 3,
         }
     }
 
@@ -107,7 +103,6 @@ impl ActionParamField {
         match self {
             Self::EatFoodType | Self::EatLeaveShare => VoteKind::Eat,
             Self::ReproduceTransferFraction => VoteKind::Reproduce,
-            Self::StealEnergyAmount => VoteKind::StealEnergy,
         }
     }
 }
@@ -276,22 +271,13 @@ mod tests {
                 ActionParamField::EatFoodType,
                 ActionParamField::EatLeaveShare,
                 ActionParamField::ReproduceTransferFraction,
-                ActionParamField::StealEnergyAmount,
             ]
         );
         for (index, field) in ActionParamField::ALL.into_iter().enumerate() {
             assert_eq!(field.index(), index);
         }
         let kinds = ActionParamField::ALL.map(ActionParamField::kind);
-        assert_eq!(
-            kinds,
-            [
-                VoteKind::Eat,
-                VoteKind::Eat,
-                VoteKind::Reproduce,
-                VoteKind::StealEnergy
-            ]
-        );
+        assert_eq!(kinds, [VoteKind::Eat, VoteKind::Eat, VoteKind::Reproduce]);
         for field in ActionParamField::ALL {
             let json = serde_json::to_string(&field).unwrap();
             assert_eq!(json, format!("\"{field:?}\""));

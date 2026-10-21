@@ -7,7 +7,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::simulation::actions::{
-    apply_reproduce, apply_steal_energy, BarrierReaderState, MoveBlockedCause,
+    apply_reproduce, steal_with_bite, BarrierReaderState, MoveBlockedCause,
     ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
@@ -503,7 +503,7 @@ fn steal_energy_dispatch_transfers_and_removes_victim() {
     sim.config.predation.steal_cost_rate = 0.0;
     let victim_pos = Position::new(5, 4);
 
-    let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0).result;
+    let result = steal_with_bite(attacker_id, &mut sim, Direction::N, 20.0).result;
 
     assert_eq!(
         result,
@@ -530,7 +530,7 @@ fn killed_creature_steal_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.predation.steal_cost_rate = 0.0;
 
-    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = steal_with_bite(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,
@@ -538,7 +538,7 @@ fn killed_creature_steal_action_does_not_panic() {
     assert!(!sim.creatures.contains_key(b_id), "B should be dead");
 
     if sim.creatures.contains_key(b_id) {
-        let _result = apply_steal_energy(b_id, &mut sim, Direction::S, 10.0).result;
+        let _result = steal_with_bite(b_id, &mut sim, Direction::S, 10.0).result;
     }
 }
 
@@ -547,7 +547,7 @@ fn killed_creature_reproduce_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.predation.steal_cost_rate = 0.0;
 
-    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = steal_with_bite(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,

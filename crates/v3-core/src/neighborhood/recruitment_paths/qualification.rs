@@ -813,12 +813,15 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // Re-pinned by T02.F08: the `EatLeaveShare` parameter sink widens the
 // edge-surface draw to `c + 98`, which moves the copy and split
 // `vote_edge_added` seeds (copy 713 -> 417, split 653 -> 4890).
+// Re-pinned by T27.F03 commit 2: retiring `StealEnergyAmount` narrows the
+// edge-surface draw to `c + 97`, which moves the copy and split
+// `vote_edge_added` seeds back (copy 417 -> 713, split 4890 -> 653).
 
 const SWAP: u64 = 0;
 const GRAPH_BLANK_SEEDS: &[u64] = &[4251, SWAP];
 const GRAPH_DETOUR_SEEDS: &[u64] = &[4251];
-const GRAPH_COPY_SEEDS: &[u64] = &[417, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[4890, SWAP];
+const GRAPH_COPY_SEEDS: &[u64] = &[713, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[653, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 /// Ring born into `Move(E)`, remove north, swap.
 const GRAPH_UNPREPARED_SEEDS: &[u64] = &[82_914, 0, SWAP];

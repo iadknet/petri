@@ -418,7 +418,6 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{NodeId, RouteTarget};
-    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -1149,8 +1148,8 @@ mod tests {
         if let BackendDef::Vm(vm) = &mut middle.backend_def {
             vm.constants[0] = 5.0;
         }
-        // The consumer steals the bus value: it writes upstream slot 0 into
-        // the `StealEnergyAmount` field and votes one steal.
+        // The consumer eats the bus value's food type: it writes upstream
+        // slot 0 into the `EatFoodType` field and votes one eat.
         let mut consumer = node(2, &[], false);
         consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
         if let BackendDef::Vm(vm) = &mut consumer.backend_def {
@@ -1161,8 +1160,8 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    field_idx: crate::creature::genome::vote::ActionParamField::StealEnergyAmount
-                        .index() as u8,
+                    field_idx: crate::creature::genome::vote::ActionParamField::EatFoodType.index()
+                        as u8,
                     src: 0,
                 },
                 VmInstruction::LoadConst {
@@ -1170,11 +1169,7 @@ mod tests {
                     const_idx: 0,
                 },
                 VmInstruction::AddVote {
-                    sink: crate::creature::genome::vote::VoteSink::Directed(
-                        DirectedVoteKind::StealEnergy,
-                        0,
-                    )
-                    .index() as u8,
+                    sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,
@@ -1189,17 +1184,15 @@ mod tests {
         assert_ne!(baseline, actual);
         assert_eq!(
             actual.snapshots[0],
-            vec![crate::contracts::WorldAction::StealEnergy {
-                direction: crate::contracts::Direction::N,
-                amount: 3.0,
-            }]
+            vec![crate::contracts::WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::new(3)
+            )]
         );
         assert_eq!(
             baseline.snapshots[0],
-            vec![crate::contracts::WorldAction::StealEnergy {
-                direction: crate::contracts::Direction::N,
-                amount: 5.0,
-            }]
+            vec![crate::contracts::WorldAction::eat(
+                crate::config::OrdinaryFoodTypeId::new(5)
+            )]
         );
         assert_eq!(reading(&g).knockout_count, 1); // overwritten producer is silent
     }

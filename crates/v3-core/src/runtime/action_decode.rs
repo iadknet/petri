@@ -10,8 +10,9 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// Decode the action a pass commits (T19.F04): the direction is the winning
 /// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
 /// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
-/// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction` and
-/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. A drive,
+/// an unwired field eats the whole cell) and `Reproduce`
+/// `ReproduceTransferFraction`; `Move` and `StealEnergy` read nothing (a
+/// steal moves the fixed exchange bite, T27.F03). A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
@@ -30,12 +31,7 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
                         params[ActionParamField::ReproduceTransferFraction.index()],
                     ),
                 },
-                DirectedVoteKind::StealEnergy => WorldAction::StealEnergy {
-                    direction,
-                    amount: clamp_non_negative_finite(
-                        params[ActionParamField::StealEnergyAmount.index()],
-                    ),
-                },
+                DirectedVoteKind::StealEnergy => WorldAction::StealEnergy { direction },
             }
         }
         VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
@@ -72,23 +68,11 @@ pub(crate) fn clamp_unit_interval(v: f32) -> f32 {
     }
 }
 
-/// Clamp to non-negative finite: NaN/Inf/negative → 0.0.
-#[inline]
-fn clamp_non_negative_finite(v: f32) -> f32 {
-    if v.is_finite() && v >= 0.0 {
-        v
-    } else {
-        0.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use ActionParamField::{
-        EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount,
-    };
+    use ActionParamField::{EatFoodType, EatLeaveShare, ReproduceTransferFraction};
 
     /// A parameter surface holding `fields` and zero elsewhere.
     fn surface(fields: &[(ActionParamField, f32)]) -> ActionParams {
@@ -123,12 +107,9 @@ mod tests {
             assert_eq!(
                 decode_commit(
                     VoteSink::Directed(DirectedVoteKind::StealEnergy, d),
-                    &surface(&[(StealEnergyAmount, 3.0)])
+                    &[9.0; ACTION_PARAM_FIELD_COUNT]
                 ),
-                WorldAction::StealEnergy {
-                    direction,
-                    amount: 3.0,
-                }
+                WorldAction::StealEnergy { direction }
             );
         }
     }
@@ -154,11 +135,7 @@ mod tests {
         assert_eq!(
             decode_commit(
                 VoteSink::Eat,
-                &surface(&[
-                    (EatFoodType, 3.0),
-                    (ReproduceTransferFraction, 8.0),
-                    (StealEnergyAmount, 8.0)
-                ])
+                &surface(&[(EatFoodType, 3.0), (ReproduceTransferFraction, 8.0),])
             ),
             WorldAction::eat(OrdinaryFoodTypeId::new(3))
         );
@@ -209,22 +186,6 @@ mod tests {
             decode_commit(VoteSink::Decide, &[1.0; ACTION_PARAM_FIELD_COUNT]),
             WorldAction::NoOp
         );
-    }
-
-    #[test]
-    fn steal_amount_is_non_negative_finite() {
-        for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
-            assert_eq!(
-                decode_commit(
-                    VoteSink::Directed(DirectedVoteKind::StealEnergy, 0),
-                    &surface(&[(StealEnergyAmount, raw)])
-                ),
-                WorldAction::StealEnergy {
-                    direction: Direction::N,
-                    amount: 0.0,
-                }
-            );
-        }
     }
 
     /// T17.F01 invariant 1: the reproduce parameter leaves decode as a
@@ -293,7 +254,7 @@ mod tests {
         #[test]
         fn a_field_never_changes_another_kinds_commit(
             field_index in 0..ActionParamField::ALL.len(),
-            base in prop::array::uniform4(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
+            base in prop::array::uniform3(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
             value in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
         ) {
             let field = ActionParamField::ALL[field_index];

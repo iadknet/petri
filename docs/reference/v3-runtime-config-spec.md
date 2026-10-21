@@ -279,12 +279,16 @@ Action effort (T16.F02):
   outcome: `EnergyConfig::action_effort(base, complexity, age)` =
   `adjusted_action_cost(max(base, noop_cost), complexity, age)`, with base
   `move_cost`, `eat_cost`, `noop_cost`, `reproduce_attempt_cost`, or
-  `predation.steal_cost_rate` times the sanitized requested amount.
+  `predation.steal_cost_rate` times `exchange.bite` (T27.F03; at the
+  defaults 0.05 × 8.0 = 0.4, the floor).
+- `exchange.bite` (default 8.0, finite and positive, else 8.0) is the
+  energy one steal takes: `min(bite, victim.energy)` when the victim's energy
+  is positive, else nothing, a zero-transfer failure.
 - The actions share the multiplier, so no effort is below `NoOp`'s, and
   `NoOp`'s is above zero. A base at or above `noop_cost` is charged exactly
   `adjusted_action_cost(base, …)`.
 - A failure (a blocked move, an eat finding no food, a rejected reproduce, a
-  steal with no victim) pays its effort and nothing more; there is no
+  steal with no victim or nothing to take) pays its effort and nothing more; there is no
   failed-action penalty and no startup ramp. A config naming the retired
   `energy.costs.failed_action_penalty` or `startup` section fails to resolve.
 
