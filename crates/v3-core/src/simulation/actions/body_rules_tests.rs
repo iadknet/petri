@@ -470,6 +470,10 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
     sim.config.mutation.per_unit_rate = per_unit_rate;
     sim.config.mutation.phenotype.channel_change_chance = 0.5;
     sim.config.mutation.phenotype.polarity_flip_chance = 0.5;
+    // The capacity coin is still drawn after the kin tag (T26.F02), but at
+    // chance 0 it never fires, so the pins below read the phenotype and
+    // kin-tag rules rather than whether the coin missed at this seed.
+    sim.config.mutation.capacity.chance = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
