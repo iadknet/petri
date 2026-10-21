@@ -351,10 +351,7 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
     }
     let kept = def.members(id).next().unwrap();
     assert_eq!(def.members(id).count(), 1);
-    assert_eq!(
-        def.member_site(kept) == Some(crate::creature::genome::cgp::MemberSite::Drive),
-        fact
-    );
+    assert_eq!(def.is_fact_member(kept), fact);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {

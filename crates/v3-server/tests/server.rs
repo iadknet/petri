@@ -2896,7 +2896,6 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
 #[tokio::test]
 async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::MemberSite;
     use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::BackendDef;
 
@@ -2931,10 +2930,7 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
             if remove_one {
                 let member = def.members(group).next().unwrap();
                 def.remove_edge(member);
-                let fact = def
-                    .members(group)
-                    .find(|&m| def.member_site(m) == Some(MemberSite::Drive))
-                    .unwrap();
+                let fact = def.members(group).find(|&m| def.is_fact_member(m)).unwrap();
                 def.edge_mut(fact).set_weight(0.375);
             }
         }

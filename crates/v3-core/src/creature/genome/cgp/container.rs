@@ -723,6 +723,13 @@ impl CgpGraphBackendDef {
         )
     }
 
+    /// Whether the edge at `occurrence` is a fact member: a member on its
+    /// group's kind's drive sink (T25.F10).
+    #[must_use]
+    pub fn is_fact_member(&self, occurrence: EdgeOccurrence) -> bool {
+        self.member_site(occurrence) == Some(MemberSite::Drive)
+    }
+
     /// One row per sink, one genomic weight per sink edge in order: the
     /// runtime weight table of this graph (T25.F03).
     #[must_use]
@@ -1302,7 +1309,7 @@ impl CgpGraphBackendDef {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             panic!("detach_at: only a sink edge is a member");
         };
-        let fact = self.member_site(occurrence) == Some(MemberSite::Drive);
+        let fact = self.is_fact_member(occurrence);
         let mut edge = self.output_sinks.0[sink].inputs.0.remove(occurrence.index);
         let mut seed = self
             .birth_seeds

@@ -6,7 +6,7 @@
 use rand::Rng;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, MemberSite, Scope, Shape};
+use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, Scope, Shape};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::MutationSkipReason;
@@ -238,9 +238,7 @@ pub(crate) fn retarget_kind(
         .filter(|&kind| kind != group.kind())
         .nth(pick)
         .expect("two other kinds");
-    let has_facts = def
-        .members(id)
-        .any(|member| def.member_site(member) == Some(MemberSite::Drive));
+    let has_facts = def.members(id).any(|member| def.is_fact_member(member));
     if has_facts && !def.can_host_facts(kind) {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
