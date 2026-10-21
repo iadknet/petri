@@ -109,15 +109,13 @@ baseline is edited to pass.
 
 ## Implementation Tasks
 
-- [x] Commit 1 (fact members, `9d92ad1b`), tests first: the member site (audit R1), `pattern_at` 0 by role (R5), `check_local_invariants` and `validate_graph` by role (R2), `can_host_facts` (R4), the one-primitive gene build in recruitment (R3) and its direct callers, `relocate_group` and `RetargetGroupKind` applicability, the own-only detach of a fact member with its `-0.0` and seed-presence tests (R8), seeds, the invariant and seed-alignment property generators extended to both roles (invariant 1); `pair-groups-v2` with its fixture test, the summary keep-list and conversion fixture (R9) and the series entry; `graph_weights` and the inspector facts line; mutation-on pins re-pinned with the fact-member cause.
-- [x] Commit 2 (size rule, `61c5b8d1`), tests first: `genome_size` (invariant 1) with unit tests for a `Ring` gene, a pair gene with facts, a hole and a detached member; `expected_delta` re-pinned; the founder test (invariant 5); every mutation-on pin re-pinned with the size cause; the `genome_size` series entry; reference specs and the tooltip.
+- [x] Commit 1 (fact members, `9d92ad1b`), tests first: invariants 2, 3 and 6 with audit R1–R5, R8 and R9 (member site, role-based pattern and validation, `can_host_facts`, the one-primitive gene build and its callers, relocation, own-only detach, both-role property generators, `pair-groups-v2` with keep-list and fixtures, `graph_weights`, the inspector facts line); mutation-on pins re-pinned with the fact-member cause.
+- [x] Commit 2 (size rule, `61c5b8d1`), tests first: invariants 1 and 5 (`genome_size` unit tests for a `Ring` gene, a pair gene with facts, a hole, a detached member; `expected_delta`; the founder test), the `genome_size` series entry, reference specs and the tooltip; mutation-on pins re-pinned with the size cause.
 - [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
-- [x] Focused tests or checks at `61c5b8d1`: `cargo check --workspace --all-targets` clean; `cargo test -p v3-core --no-fail-fast` all pass (lib 2,220, 9 ignored slow); `cargo test -p v3-cli -p v3-server -p v3-lab -p v3-telemetry --no-fail-fast` all pass; `npx vitest run src/components/inspector/ src/components/config-panel` 357 pass; `biome check` clean on the touched files. Re-pinned with their cause: `applied_trajectory` (commit 1 the sampled digest; commit 2 all four), `baseline_worlds` rate-0.0 identity (both commits), the `--lib` known-deleting lineage fixture (commit 2: arm 12 batch 1 lineage 12, the first `Deleted` lineage of batches 0-40, lineages 0-15), the inspector's `group.rs` fingerprint (commit 1); v3-cli trajectory and `bench_artifacts` digests held. The lineage search is recorded in the [readings](../../progress/readings/t25-f10.md#fixture-re-pin-searches).
-- [x] Self-review pass (single-pass `simplify`; `CgpGraphBackendDef::is_fact_member` replaces nine `member_site(..) == Some(MemberSite::Drive)` tests, no behavior change) and invariant 3's broadcast pin `mutation::graph::hebbian::tests::a_group_broadcast_from_a_direction_member_reaches_the_fact_members` (passes on the commit-2 code): `cargo test -p v3-core --test viability` 30 pass; `cargo fmt --all --check` clean; `cargo check --workspace --all-targets` clean; `cargo test -p v3-core --no-fail-fast` all pass (lib 2,221, 9 ignored slow); `cargo test -p v3-cli -p v3-server -p v3-lab --no-fail-fast` all pass; no digest moved.
-- [x] Review remediation (code-health P2, test-only): the invariant property's group shape is the test-local enum `GroupShape { Ring, Pair { pair, with_facts } }` drawn by one `group_spec()` strategy (ring 1 : pair 4, the pair range from `direction_pairs()`), replacing the `0u8..5` byte decoded through `% 2` and `> 2`: `cargo fmt --all --check` clean; `cargo test -p v3-core --lib mutation::engine::group_tests` 13 pass; `cargo check --workspace --all-targets` clean.
+- [x] Focused tests and checks on the build commits (`61c5b8d1`), the self-review pass (`is_fact_member` replaces nine site tests; the broadcast pin `hebbian::tests::a_group_broadcast_from_a_direction_member_reaches_the_fact_members`) and the test-only review remediation (`GroupShape` strategy in `group_tests`): `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `cargo test -p v3-core --no-fail-fast` (lib 2,221, 9 ignored slow), `cargo test -p v3-cli -p v3-server -p v3-lab -p v3-telemetry --no-fail-fast`, inspector and config-panel `vitest` (357) and `biome check` all pass; every moved pin re-pinned with its cause, listed with the lineage search in the [readings](../../progress/readings/t25-f10.md#fixture-re-pin-searches).
 - [ ] When the Verification Plan declares the mutation gate: fresh
       `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
@@ -199,16 +197,27 @@ contradicted in one world.
 | `facts` / `own_nonzero` | 141 / 0 | 0 / 0 | 115 / 9 | a reading; zero read in Canyon |
 | `genome_carrying` energy (F09) | 98,977 (104,381) | 18,472 (18,647) | 75,048 (71,241) | per-unit rate unchanged |
 
-The nine gate counters are all ok (largest `pass_cap_hits` -23.21%). The goal flags sit where the
-reachable pair genes rose most (Confluence), which fits the carrier-dependent cost but is not
-isolated by this run. Wall clock per creature-tick rose +76.33% (flag) in every phase, including
-`food_growth_ms`, which F10 does not touch, under a host load of 19 to 23 on 8 cores; it is
-host-confounded and was not re-run. The summary carries no fact-hole or detached-fact-member count.
+The nine gate counters are all ok. The goal flags sit where reachable pair genes rose most
+(Confluence), fitting the carrier-dependent cost without isolating it. Goal wall clock per
+creature-tick rose +76.33% (flag) in every phase, `food_growth_ms` included, under a host load of 19
+to 23 on 8 cores with sibling test runs: host-confounded. The summary carries no fact-hole or
+detached-fact-member count.
 
-- Summaries of the declared profiles: [gate](../../progress/features/t25-f10.json) (26,402 bytes),
-  [goal](../../progress/features/t25-f10-goal.json) (535,371 bytes). Raw reports stay in the main
-  checkout's ignored `.bench-artifacts/t25-f10/`: gate 130,748 bytes, sha256 `912373db735ab94b524de5ae57561794bb0eeb95f435bcfdef2bb910d6f2107e`;
-  goal 706,642,932 bytes, sha256 `6a132055c179f3971f7cd5e75bef06863fb78f0e2e0bb41535bb596ab46b6978`.
+**Rulings (spec owner, 2026-10-21; reasoning in the readings).** The Confluence rise is a
+trajectory reading, not a contradiction: every falsifier of the claim holds, the cross-run direction
+was a hypothesis, and the genes carried (734 pair, 0.758 ring per creature, three-fold F09's) account
+for about one unit of the ten-unit rise; it is the first short-horizon reading of the track's bloat
+risk, carried to T27.F02 (Notes). Not a blocker; no acceptance needed. Neither wall reading blocks or
+needs acceptance (gate inside the predeclared 25% band; goal a non-fatal flag with its host-load
+mechanism recorded); because the gate epoch re-pins to this summary and its wall becomes the next
+reference, the gate alone is re-run once on a quiet host by a fresh benchmark specialist before the
+mutation gate and that summary replaces this one; the goal is not re-run (once per closure; its
+counters are deterministic) and its wall stands as host-confounded. With no `severe`, both epochs
+re-pin to F10's summaries in the closing commit, as every T25 closure has done, without user
+acceptance.
+
+- Summaries of the declared profiles: [gate](../../progress/features/t25-f10.json),
+  [goal](../../progress/features/t25-f10-goal.json); raw paths, hashes and byte counts in the readings.
 - Full readings: [`docs/progress/readings/t25-f10.md`](../../progress/readings/t25-f10.md#benchmark-readings-2026-10-21-head-474faf70-tree-clean-each-command-run-once).
 
 ## Success Criteria
@@ -225,5 +234,5 @@ host-confounded and was not re-run. The summary carries no fact-hole or detached
 - Decision: a fact member's role is read from its sink, not stored; its pattern is 0 by role; it is created only by recruitment's pair case (the track's "ordinary slot-fact wiring outside a recruitment is unchanged").
 - Decision: `ComplexityEffect` labels are unchanged; the size pressure gate restricts by functional-structure direction, and `DetachGraphEdge` stays `Neutral` although it adds one unit.
 - Decision: the founder's anchor and rate are remeasured, not recalibrated (track Notes: the founder has no group).
-- Deferred: the long-run bloat reading (genes per creature, materialized members, members with nonzero own corrections, compute and energy) goes to T27.F02's goal-long run, which names every feature closed in between; `pair-groups-v2` carries the reachable-pair counts, and the all-genome, both-shape counts (unreachable genes, `Ring` members' corrections) are that run's to add.
+- Deferred: the long-run bloat reading (genes per creature, materialized members, members with nonzero own corrections, compute and energy) goes to T27.F02's goal-long run, which names every feature closed in between; `pair-groups-v2` carries the reachable-pair counts, and the all-genome, both-shape counts (unreachable genes, `Ring` members' corrections) are that run's to add. Its 2,000-tick baseline is F10's goal: Confluence 734 reachable pair genes and 0.758 ring genes per creature against F09's 229 and 0.296, `mean_genome_size` 120.60 against 110.64, `own_nonzero` 9.
 - Deferred: `mutation/engine/mod.rs` `group_edits` and `mutation/graph/mod.rs` `GraphOperator::random` keep their `WORKAROUND(T25.F08)` markers unchanged; fact members are counted by their membership as any member, so the tally stays correct, neither workaround is extended, and F10 writes no `WORKAROUND(T25.F10)` marker (audit R6, R10; R7 is a test oracle, not a workaround).
