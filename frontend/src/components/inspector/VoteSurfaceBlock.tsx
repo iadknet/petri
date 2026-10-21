@@ -1,14 +1,14 @@
 import { memo } from "react";
 import type { VoteKind } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace, WorldAction } from "../../types/trace.ts";
-import { VOTE_KINDS, VOTE_SINK_COUNT } from "../../types/trace.ts";
 import {
+	VOTE_KINDS,
+	VOTE_SINK_COUNT,
 	driveSinkIndex,
-	formatVoteSink,
 	voteSinkFromIndex,
 	voteSinkIndex,
-	voteSinkLabel,
-} from "./graphNodeFormatters.ts";
+} from "../../types/vote-sinks.ts";
+import { formatVoteSink, voteSinkLabel } from "./graphNodeFormatters.ts";
 import { formatAction } from "./inputRefUtils.ts";
 
 interface VoteSurfaceBlockProps {
