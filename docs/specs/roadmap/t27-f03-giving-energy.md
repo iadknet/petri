@@ -17,7 +17,7 @@ lossless, the recipient credited through T26.F01's cap rule with the excess
 booked as clamp loss, the gift booked as paired ledger flows. `StealEnergy`
 moves the same bite from the victim, its `StealEnergyAmount` parameter is
 retired, and a zero transfer is a failure for both. The track row's
-directed-kind catalog refactor (`VoteSink::Directed`, a `voteSinks.json`
+directed-kind catalog refactor (`VoteSink::Directed`, a `vote-sinks.json`
 fixture, charge arrays indexed by action type) is folded in, and the
 zero-transfer fix lands as its own commit.
 
@@ -47,7 +47,7 @@ zero-transfer fix lands as its own commit.
 | Steal today | `simulation/actions/predation.rs`, `simulation/tick.rs:1098-1130` (`execute_steal_energy`), `contracts/actions.rs` (`WorldAction::StealEnergy { direction, amount }`, `action_type`, `param`), `config/simulation.rs:910-926` (`PredationConfig`) | The path the bite rule replaces. |
 | Ledger | `simulation/energy_accounting.rs` (`DeathCause::ALL` 15, `ActionCharges`, `FailedActionEffort`, `EnergyFlows`, `net_action_overdraft`), `creature/action_log.rs` (`ActionType` 5, `ActionResult` 9 variants), `simulation/stats.rs:438-454`, `simulation/outcomes.rs` | Where a transfer is booked and logged. |
 | Exports | `v3-cli/src/bench/tracking.rs` (`PredationTracking`, `ActionChargeTracking`, `FailedActionEffortTracking`, `EnergyFlowTracking` `applied-energy-flows-v3`, `by_cause`), `v3-cli/src/bench/drives.rs`, `v3-telemetry/src/metrics.rs:556-562,646-662,902-927,1159-1165`, `metrics/tests.rs`, `trace.rs:342-418` (`actions` phase attributes), `scripts/telemetry-dashboards-check`, `v3-server/src/state.rs:100-126,222-226`, `v3-server/src/types.rs` (`v3alpha12`), `v3-lab/src/summary.rs` (`GENOME_FORMAT` 7), `neighborhood/mutation_effects/mod.rs:45` (`neighborhood-coverage-v3`), `neighborhood/input_use/mod.rs:48` (`input-use-v3`) | Every surface that names a kind, a charge or a flow. |
-| Frontend | `components/inspector/voteSinks.ts`, `types/trace.ts:146-158`, `types/genome.ts:84-125`, `types/action-log.ts`, `edgeGroupWeights.ts:36-42`, `graphNodeFormatters.ts:151-230`, `inputRefUtils.ts:15-25,151-153`, `vmInstructionFormat.ts:167`, `VitalsBanner.tsx:12`, `stats/statLabels.ts:70`; the `nearbyFields.json` pattern (`contracts/inputs.rs:583-600`) | The hand mirrors the fixture replaces and the pin pattern. |
+| Frontend | `components/inspector/voteSinks.ts` (formatting; data accessors are now `types/vote-sinks.ts`), `types/trace.ts:146-158`, `types/genome.ts:84-125`, `types/action-log.ts`, `edgeGroupWeights.ts:36-42`, `graphNodeFormatters.ts:151-230`, `inputRefUtils.ts:15-25,151-153`, `vmInstructionFormat.ts:167`, `VitalsBanner.tsx:12`, `stats/statLabels.ts:70`; the `nearbyFields.json` pattern (`contracts/inputs.rs:583-600`) | The hand mirrors the fixture replaces and the pin pattern. |
 | Pins | `tests/viability.rs` founder-only digests (must not move), `tests/applied_trajectory.rs`, `tests/baseline_worlds.rs`, `tests/reproducibility.rs`, `tests/recruitment_paths.rs` and the `--lib` rows, `mutation/graph/recruitment_tests.rs`, `creature/genome/mod.rs:900-940` (serde shapes), `census.rs:160-174`, the v3-cli trajectory fixtures, the gate and goal deterministic blocks, `docs/progress/benchmark-series.json` epochs | The predeclared re-pins (Performance section). |
 | Reference specs | `v3-graph-backend-spec.md:60-66,180-205,240-260`; `v3-mesh-execution-spec.md:52-112`; `v3-vm-isa-spec.md:90,99,366-384`; `v3-mutation-spec.md:419-426,657-662`; `v3-sensor-spec.md:224` (`CommitCounts`) and the `ActionVotes` rows; `v3-tick-orchestration-spec.md:217,254-259`; `v3-runtime-config-spec.md:276-290` and the `predation` section; `v3-server-api-protocol-spec.md` §2, `:685`, `:796` | Every sentence that names the catalog sizes, the steal amount or the rate. |
 
@@ -67,7 +67,7 @@ Invariants:
    `{"Drive":"Move"}`. A new kind touches `DirectedVoteKind`, `VoteKind`,
    `ActionType`, `WorldAction`, a decoder arm and its action, never the
    index arithmetic.
-2. **One fixture.** `frontend/src/components/inspector/voteSinks.json` holds
+2. **One fixture.** `frontend/src/types/vote-sinks.json` holds
    `voteKinds`, `directedKinds`, `voteSinks` (the serde value of every sink in
    index order), `actionParamFields` (`{ field, kind }` in catalog order) and
    `actionTypes` (discriminant order, with codes); a Rust test in `vote.rs`
@@ -250,7 +250,7 @@ failure.
 
 - [ ] A brain can vote `GiveEnergy` toward a direction; a committed give moves `min(bite, giver energy)` to the creature there, booked as `gift_debit` / `gift_credit` with any excess over the cap as clamp loss, and a give with no recipient or nothing to give fails and pays the floor.
 - [ ] A committed steal moves `min(bite, victim energy)`; `StealEnergyAmount` is gone; no `Transferred` is counted without a positive transfer.
-- [ ] `VoteSink::Directed`, `voteSinks.json` and the `ActionType`-indexed charge arrays are the one catalog; the frontend keeps no hand copy.
+- [ ] `VoteSink::Directed`, `vote-sinks.json` and the `ActionType`-indexed charge arrays are the one catalog; the frontend keeps no hand copy.
 - [ ] The three goal worlds report their `giving` and `predation` occurrences, zero included; viability, gate, goal, mutation gate and slow tier ran as declared.
 
 ## Notes for AI Agents
@@ -260,7 +260,7 @@ failure.
 - Decision: a transfer is `min(bite, available)`; a non-positive or `NaN` available energy transfers nothing (a comparison, as T26.F01's cap); a giver may exhaust itself giving, attributed to `Gift`, as a parent may through `ParentalTransfer`; each side's flow is its own applied `f32` change, never a mirrored nominal amount.
 - Decision: a new directed kind is appended to `DirectedVoteKind::ALL` and invariant 1's index rule places it; T28.F01's kinds follow the same rule.
 - Decision: a give with no recipient logs `ActionResult::NoRecipient`, with nothing to give `EnergyConstraints`; a steal whose victim has nothing to take is `RejectedNoVictim`.
-- Decision: the catalog reaches the frontend through one Rust-pinned `voteSinks.json`; the frontend keeps no hand copy of it.
+- Decision: the catalog reaches the frontend through one Rust-pinned `vote-sinks.json`; the frontend keeps no hand copy of it.
 - Decision: the per-kind charge ledger is indexed by `ActionType` and every consumer iterates `ActionType::ALL`; the NoOp failed-effort slot exists and stays zero.
 - Deferred: the long-run reading of whether gives are used, by whom and toward whom, goes to T27.F02's goal-long run, the track's carrier.
 - Deferred: a gift event record or overlay and per-creature gift counters, until a reading shows gifts in use.

@@ -78,7 +78,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   also carries T25.F10's deferred reading: group, materialized-member and
   corrected-member counts beside genome size, compute and energy.
 - F03 folds in the directed-kind catalog refactor (`VoteSink::Directed`,
-  a `voteSinks.json` fixture covering `VoteKind`, `ActionParamField` and
+  a `vote-sinks.json` fixture covering `VoteKind`, `ActionParamField` and
   `OutputSinkKind`, charge arrays indexed by action type). It lands the
   zero-transfer fix as its own commit with a predeclared re-pin. Give is
   lossless: the recipient is credited through T26.F01's cap function, the
