@@ -69,15 +69,17 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                     && matches!(&family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty());
                 if let (true, Some((kind, _))) = (pair, DirectedVoteKind::of_sink(vote)) {
                     // A pair family under WholeFamily landing on a directed
-                    // sink is one silent `DirectionPair` group plus its facts
-                    // into the kind's drive (T25.F04), refined through the
-                    // scale: one step moves only the kind's direction votes.
+                    // sink is one silent `DirectionPair` gene, its fact
+                    // members on the kind's drive (T25.F04, T25.F10), refined
+                    // through the scale: one step moves only the kind's
+                    // direction votes (a fact member's pattern is 0).
                     let def = graph(&node);
                     assert_eq!(def.groups().len(), 1);
                     assert_eq!(def.groups()[0].scale(), 0.0);
-                    assert_eq!(def.edges().filter(|e| e.membership().is_some()).count(), 12);
+                    assert_eq!(def.edges().filter(|e| e.membership().is_some()).count(), 15);
                     let drive = def.sink(OutputSinkKind::ActionVote(kind.drive())).unwrap();
                     assert_eq!(drive.inputs.len(), 3);
+                    assert!(drive.inputs.iter().all(|e| e.membership().is_some()));
                     assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
                     let mut refined = node.clone();
                     group::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))

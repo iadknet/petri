@@ -147,6 +147,11 @@
 //! every Graph draw, which moves all four digests (sampled 5beb9f71... ->
 //! fd1d7d5a..., gestation rate 0.0 23a0754d... -> b60acab7...; guard
 //! 3d299de5... -> cca5541d..., rate 0.0 7d7ae0e2... -> 55e51cf0...).
+//! Re-pinned by T25.F10 commit 1 after two agreeing runs: a recruited pair
+//! gene's facts become fact members (genome text names their membership,
+//! and they join the gene's mutation targets), which moves the sampled
+//! digest (fd1d7d5a... -> 23580944...); the gestation-rate-0.0 sampled
+//! digest and both guard digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -158,7 +163,7 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "fd1d7d5a7800c773540a9856a39b1dcfe479a105c76f2fac89352e9b19d33064"
+        "235809449e19a1e2f925a78ab507b24c54baa8a571f95c34d566dc900103f0bf"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),

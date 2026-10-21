@@ -112,7 +112,7 @@ proptest! {
             if *pair {
                 let ref_idx = pairs[index.index(pairs.len())];
                 let layout = refs[usize::from(ref_idx)].direction_pairs()[0];
-                def.add_pair_group(ref_idx, 0, layout, kind, *offset);
+                def.add_pair_group(ref_idx, 0, layout, kind, *offset, &[]);
             } else {
                 let ring_ref = rings[index.index(rings.len())];
                 def.add_group(Shape::Ring { ring_ref }, kind, *offset);
@@ -163,7 +163,7 @@ proptest! {
         let summary = node.input_refs.len() as u16;
         node.input_refs.push(area.clone());
         let layout = area.direction_pairs()[1];
-        graph_mut(node).add_pair_group(summary, 1, layout, DirectedVoteKind::StealEnergy, offset);
+        graph_mut(node).add_pair_group(summary, 1, layout, DirectedVoteKind::StealEnergy, offset, &[]);
         prop_assert!(!prunable_indices(node).contains(&usize::from(ring)));
         prop_assert!(!prunable_indices(node).contains(&usize::from(summary)));
         let mut rng = SmallRng::seed_from_u64(seed);

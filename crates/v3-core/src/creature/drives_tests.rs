@@ -209,7 +209,14 @@ fn pair_members_are_not_a_fanout() {
     use crate::contracts::{InputReference, WorldInputKey};
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_pair_group(0, 0, area.direction_pairs()[0], DirectedVoteKind::Move, 2);
+    let id = def.add_pair_group(
+        0,
+        0,
+        area.direction_pairs()[0],
+        DirectedVoteKind::Move,
+        2,
+        &[],
+    );
     def.group_mut(id).set_scale(1.0);
     let mut genome = graph_genome(def);
     genome.nodes[0].input_refs = vec![area];

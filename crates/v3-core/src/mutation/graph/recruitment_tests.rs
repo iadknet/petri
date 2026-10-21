@@ -228,9 +228,10 @@ proptest! {
         // A ring family landing on a directed vote sink becomes one silent
         // `Ring` group of eight born-0 members in place of its edges
         // (T25.F03); a pair family under WholeFamily, one silent
-        // `DirectionPair` group of twelve born-0 members over the kind's eight
-        // direction sinks plus its facts into the kind's drive: 15 edges for an
-        // area family (T25.F04), 19 for a creature slot (T25.F05).
+        // `DirectionPair` gene of twelve born-0 direction members over the
+        // kind's eight direction sinks plus its fact members on the kind's
+        // drive (T25.F10), every edge a member: 15 for an area family
+        // (T25.F04), 19 for a creature slot (T25.F05).
         let grouped = after_graph.groups().len() - before_graph.groups().len();
         prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
@@ -252,7 +253,7 @@ proptest! {
                     prop_assert_eq!(changed, 9);
                     prop_assert!(added == 15 || added == 19, "{}", added);
                     prop_assert!((1..=30).contains(&added));
-                    prop_assert_eq!(after_graph.members(id).count(), 12);
+                    prop_assert_eq!(after_graph.members(id).count(), added);
                 }
             }
         }
@@ -536,8 +537,8 @@ fn drive_edges(
 }
 
 #[test]
-fn a_pair_family_on_a_directed_sink_becomes_one_group_and_its_facts_into_the_drive() {
-    use crate::creature::genome::cgp::{GroupId, Shape};
+fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive() {
+    use crate::creature::genome::cgp::{GroupId, Membership, Scope, Shape};
     use crate::creature::genome::vote::DirectedVoteKind;
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
@@ -565,21 +566,32 @@ fn a_pair_family_on_a_directed_sink_becomes_one_group_and_its_facts_into_the_dri
                 0.0
             )
         );
-        assert_eq!(def.members(GroupId::new(0)).count(), 12);
+        assert_eq!(def.members(GroupId::new(0)).count(), 12 + facts.len());
         let drive: Vec<_> = drive_edges(def, DirectedVoteKind::StealEnergy);
         let want: Vec<_> = facts
             .iter()
             .map(|&sub_idx| {
-                GraphEdge::new(
+                (
                     GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx,
                     },
-                    0.0,
+                    Some(Membership {
+                        group: GroupId::new(0),
+                        scope: Scope::Edge,
+                    }),
                 )
             })
             .collect();
-        assert_eq!(drive, want, "the facts in order, born 0, ungrouped");
+        let got: Vec<_> = drive
+            .iter()
+            .map(|edge| (edge.source(), edge.membership()))
+            .collect();
+        assert_eq!(
+            got, want,
+            "the gene's fact members in order, born 0 (T25.F10)"
+        );
+        assert!(drive.iter().all(|edge| edge.plasticity().is_none()));
         assert_eq!(def.edges().count(), 12 + facts.len());
         assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
         let node_genome = fixture.clone();

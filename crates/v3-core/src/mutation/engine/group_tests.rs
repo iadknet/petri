@@ -328,6 +328,92 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
     );
 }
 
+/// A one-node genome whose only edge is the sole surviving member of a
+/// fact-bearing pair gene: a fact member when `fact`, else a direction
+/// member.
+fn sole_member_genome(fact: bool) -> CreatureGenome {
+    let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
+    let layout = area.direction_pairs()[0];
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = def.add_pair_group(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+    def.group_mut(id).set_scale(0.5);
+    let keep = if fact {
+        def.members(id).last()
+    } else {
+        def.members(id).next()
+    }
+    .unwrap();
+    let doomed: Vec<_> = def.members(id).filter(|&m| m != keep).collect();
+    for member in doomed.into_iter().rev() {
+        def.remove_edge(member);
+    }
+    let kept = def.members(id).next().unwrap();
+    assert_eq!(def.members(id).count(), 1);
+    assert_eq!(
+        def.member_site(kept) == Some(crate::creature::genome::cgp::MemberSite::Drive),
+        fact
+    );
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![area],
+            backend_def: BackendDef::Graph(def),
+            targets: vec![],
+        }],
+    }
+}
+
+/// The `genome_size` change of the record and member a sole member's detach
+/// turns into one independent edge: −1 while a member counts as an edge.
+const SOLE_MEMBER_DETACH_DELTA: i64 = -1;
+
+/// Invariant 1: a sole direction member and a sole fact member under each
+/// detaching operator (`DetachGraphEdge`, `RetargetGraphEdge`,
+/// `GraphRawFieldMutation`, the split form of `AddInternalGraphNode`)
+/// change `genome_size` by the operator's own delta plus the detach's.
+#[test]
+fn a_sole_members_detach_moves_genome_size_by_the_unit_rule() {
+    for fact in [false, true] {
+        let genome = sole_member_genome(fact);
+        assert_eq!(validate_graph(&genome.nodes[0]), Ok(()));
+        let all = every_node(&genome);
+        // The operator's own delta: a split adds an identity node and its
+        // input edge; the others add nothing.
+        for (op, own) in [
+            (GraphOperator::DetachGraphEdge, 0),
+            (GraphOperator::RetargetGraphEdge, 0),
+            (GraphOperator::GraphRawFieldMutation, 0),
+            (GraphOperator::AddInternalGraphNode, 2),
+        ] {
+            let mut detached_once = false;
+            for seed in 0..64 {
+                let mut mutated = genome.clone();
+                let (result, edits, _) = apply_graph_event(
+                    &mut mutated,
+                    op,
+                    &mut TargetSelector::reachable_only(&all, 0.0),
+                    &mut SmallRng::seed_from_u64(seed),
+                    &MutationConfig::default(),
+                    2,
+                );
+                if result.is_err() || edits.groups_removed == 0 {
+                    continue;
+                }
+                detached_once = true;
+                assert_eq!(edits.detached, 1, "{op:?} fact {fact}");
+                let delta = i64::from(mutated.genome_size()) - i64::from(genome.genome_size());
+                assert_eq!(
+                    delta,
+                    own + SOLE_MEMBER_DETACH_DELTA,
+                    "{op:?} fact {fact} seed {seed}"
+                );
+            }
+            assert!(detached_once, "{op:?} fact {fact} detached its member");
+        }
+    }
+}
+
 /// The thirteen attribute operators (T25.F09 adds the three edge retention
 /// operators, `retention.rs`) report the scope their committed change
 /// landed on (T25.F08 invariant 8): `Group` when a member was picked and
@@ -513,8 +599,12 @@ fn expected_delta(
 }
 
 /// One generated group: kind, offset, scale, the members to drop (a bit per
-/// member, the first always kept) and the shape (0 a `Ring`, 1 or 2 a
-/// `DirectionPair` on that pair index minus one).
+/// member in canonical order, the last always kept) and the shape (0 a
+/// `Ring`; 1 or 2 a `DirectionPair` gene on pair `(shape − 1) mod 2`, 3 or
+/// 4 the same gene with its fact members, T25.F10). The last member of a
+/// fact-bearing gene is a fact member (the drive sinks follow every
+/// direction sink), so the drops generate fact holes and fact-only
+/// survivors as well as sole direction members.
 type GroupSpec = (usize, u8, f32, u16, u8);
 
 /// Adds one group per entry of `groups` to the Graph `node`: a `Ring` reads
@@ -534,15 +624,17 @@ fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
         let id = match shape {
             0 => def.add_group(Shape::Ring { ring_ref: ring }, kind, offset),
             _ => {
-                let pair = shape - 1;
+                let pair = (shape - 1) % 2;
                 let layout = area.direction_pairs()[usize::from(pair)];
-                def.add_pair_group(summary, pair, layout, kind, offset)
+                let facts = if shape > 2 { layout.facts } else { &[] };
+                def.add_pair_group(summary, pair, layout, kind, offset, facts)
             }
         };
         def.group_mut(id).set_scale(scale);
         let members: Vec<_> = def.members(id).collect();
+        let last = members.len() - 1;
         for (index, occurrence) in members.into_iter().enumerate().rev() {
-            if index > 0 && drop & (1 << index) != 0 {
+            if index < last && drop & (1 << index) != 0 {
                 def.remove_edge(occurrence);
             }
         }
@@ -593,8 +685,8 @@ proptest! {
         seed in any::<u64>(),
         mesh_layer_probability in 0.0f64..=1.0,
         groups in [
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..3), 0..4),
-            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..3), 0..4),
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..5), 0..4),
+            prop::collection::vec((0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), 0u8..5), 0..4),
         ],
     ) {
         let mut genome = grouped_mixed_genome(&groups);

@@ -6,7 +6,7 @@
 use rand::Rng;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, Scope, Shape};
+use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, MemberSite, Scope, Shape};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::creature::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::MutationSkipReason;
@@ -132,7 +132,7 @@ pub(crate) fn add_pair_in_form(
     let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
     let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
     let layout = input_refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
-    let id = def.add_pair_group(ref_idx, pair, layout, kind, offset);
+    let id = def.add_pair_group(ref_idx, pair, layout, kind, offset, &[]);
     draw_learning(def, id, form, rng);
     Ok(())
 }
@@ -177,8 +177,9 @@ pub(crate) fn add_in_form(
 /// `DetachGraphEdge` (T25.F08): one member uniformly in canonical order,
 /// one draw and no other, then the F03 detach ([`cgp::detach`]): its own
 /// weight becomes `compose(own, scale, pattern)` bitwise, it leaves its
-/// group keeping its plasticity, its seed composes (T25.F07 invariant 6),
-/// and a last member's detach removes the group.
+/// group keeping its plasticity, its seed composes (T25.F07 invariant 6;
+/// a fact member detaches own-only, T25.F10), and a last member's detach
+/// removes the group.
 pub(crate) fn detach_member(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
@@ -221,7 +222,10 @@ pub(crate) fn shift_offset(
 }
 
 /// `RetargetGroupKind`: `gen_range(0..2)` over the other two kinds in
-/// catalog order; every member moves to its new sink.
+/// catalog order; every member moves to its new sink, a fact member to the
+/// new kind's drive. A gene with a fact member is not retargeted to a kind
+/// that cannot host facts ([`CgpGraphBackendDef::can_host_facts`],
+/// T25.F10): the event skips after its draws.
 pub(crate) fn retarget_kind(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
@@ -234,6 +238,12 @@ pub(crate) fn retarget_kind(
         .filter(|&kind| kind != group.kind())
         .nth(pick)
         .expect("two other kinds");
+    let has_facts = def
+        .members(id)
+        .any(|member| def.member_site(member) == Some(MemberSite::Drive));
+    if has_facts && !def.can_host_facts(kind) {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
     def.relocate_group(id, kind, group.offset());
     Ok(())
 }
