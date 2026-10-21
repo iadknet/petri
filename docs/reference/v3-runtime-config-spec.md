@@ -167,9 +167,9 @@ config still carrying the field fails to load until it is removed.
 | `energy.capacity.reference` | `f32` | `200.0` | The neutral capacity (T26.F02). Must be finite and in `[1.0, max_energy]`; other values fall back to `min(200.0, max_energy)`. |
 | `energy.capacity.min` | `f32` | `50.0` | Lower bound of the capacity range. Must be finite and in `[1.0, reference]`; other values fall back to `min(50.0, reference)`. |
 | `energy.capacity.founder` | `f32` | `200.0` | Every founder's capacity. Must be finite and in `[min, max_energy]`; other values fall back to `reference`. |
-| `energy.capacity.move_cost_slope` | `f32` | `0.5` | β of the move rule. Must be finite and in `[0.0, 1.0]`; other values fall back to `0.5`. Held at the T26.F02 grid's smallest value until its sweep picks the default. |
-| `energy.capacity.upkeep_per_unit` | `f32` | `0.0005` | u of the upkeep rule. Must be finite and `>= 0.0`; other values fall back to `0.0005`. Held at the T26.F02 grid's smallest value until its sweep picks the default. |
-| `energy.capacity.sensor_scale` | enum | `"reference"` | The energy sensors' denominator: `"reference"` (`energy.capacity.reference` for every creature) or `"own"` (the creature's capacity). Held at `"reference"` until the T26.F02 comparison rules. |
+| `energy.capacity.move_cost_slope` | `f32` | `1.0` | β of the move rule, the T26.F02 sweep's pick. Must be finite and in `[0.0, 1.0]`; other values fall back to `1.0`. |
+| `energy.capacity.upkeep_per_unit` | `f32` | `0.002` | u of the upkeep rule, the T26.F02 sweep's pick. Must be finite and `>= 0.0`; other values fall back to `0.002`. |
+| `energy.capacity.sensor_scale` | enum | `"reference"` | The energy sensors' denominator: `"reference"` (`energy.capacity.reference` for every creature) or `"own"` (the creature's capacity). `"reference"` is the T26.F02 comparison's ruling. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |

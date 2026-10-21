@@ -311,7 +311,10 @@ fn undo_t25_f02(values: [Value; 3]) -> [Value; 3] {
 /// T26.F02 re-pinned all three after two agreeing runs: the resolved config
 /// adds `energy.capacity` and `mutation.capacity` and `max_energy` defaults
 /// to 800; removing both blocks and restoring 200 recovers the T25.F08
-/// digests.
+/// digests. The T26.F02 sweep defaults (`move_cost_slope` 1.0,
+/// `upkeep_per_unit` 0.002) re-pinned all three after two agreeing runs
+/// (a1cd0097..., 10d72677..., 0f3d2bee...); restoring (0.5, 0.0005)
+/// recovers them.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -327,9 +330,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:a1cd00975a547e72f7e5274b06ca3ca1e67df437a1fa1a4a2dfb41e33d3ab16a",
-            "sha256:10d7267790d036579d1b268559bc5a5c4ee7524e8b655c17963fea236b9903e2",
-            "sha256:0f3d2bee0b8f2f388590ceed62760bb1d60742ad9749673715d44ba690116b33",
+            "sha256:09bd4d5d686b314b1149c867858d64cf726310b61ba921f6e768c0df8c865f7f",
+            "sha256:f9aca208e604ea0aa573cd562cd704d87c7c598ffa2a7524c084f7e7bbdc29a4",
+            "sha256:bcfa2253f0c1ec68acd0916de78bdcad09e97f6f25e3a81d6d8cd66957c183d9",
         ]
     );
 

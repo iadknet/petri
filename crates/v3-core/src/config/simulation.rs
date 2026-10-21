@@ -611,10 +611,10 @@ const DEFAULT_MAX_ENERGY: f32 = 800.0;
 const DEFAULT_CAPACITY_REFERENCE: f32 = 200.0;
 const DEFAULT_CAPACITY_MIN: f32 = 50.0;
 const DEFAULT_INITIAL_ENERGY: f32 = 20.0;
-/// β: the grid's smallest value, held until the T26.F02 sweep picks one.
-const DEFAULT_MOVE_COST_SLOPE: f32 = 0.5;
-/// u: the grid's smallest value, held until the T26.F02 sweep picks one.
-const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.0005;
+/// β: the T26.F02 sweep's pick (`docs/progress/readings/t26-f02.md`).
+const DEFAULT_MOVE_COST_SLOPE: f32 = 1.0;
+/// u: the T26.F02 sweep's pick (`docs/progress/readings/t26-f02.md`).
+const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.002;
 const DEFAULT_CAPACITY_MUTATION_CHANCE: f32 = 0.1;
 const DEFAULT_CAPACITY_LOG_STEP: f32 = 0.25;
 
@@ -1695,11 +1695,11 @@ mod tests {
     }
 
     #[test]
-    fn capacity_defaults_are_the_reference_body_and_the_grids_smallest_pair() {
+    fn capacity_defaults_are_the_reference_body_and_the_sweep_pick() {
         let cfg = SimulationConfig::default();
         let cap = &cfg.energy.capacity;
         assert_eq!((cap.reference, cap.min, cap.founder), (200.0, 50.0, 200.0));
-        assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (0.5, 0.0005));
+        assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (1.0, 0.002));
         assert_eq!(cap.sensor_scale, SensorScale::Reference);
         assert_eq!(
             (cfg.mutation.capacity.chance, cfg.mutation.capacity.log_step),
@@ -1813,18 +1813,18 @@ mod tests {
             cfg.mutation.capacity.chance = chance;
             cfg.mutation.capacity.log_step = log_step;
             cfg.normalize();
-            assert_eq!(cfg.energy.capacity.move_cost_slope, 0.5);
-            assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0005);
+            assert_eq!(cfg.energy.capacity.move_cost_slope, 1.0);
+            assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.002);
             assert_eq!(cfg.mutation.capacity.chance, 0.1);
             assert_eq!(cfg.mutation.capacity.log_step, 0.25);
         }
         let mut cfg = SimulationConfig::default();
-        cfg.energy.capacity.move_cost_slope = 1.0;
+        cfg.energy.capacity.move_cost_slope = 0.25;
         cfg.energy.capacity.upkeep_per_unit = 0.0;
         cfg.mutation.capacity.chance = 0.0;
         cfg.mutation.capacity.log_step = 0.0;
         cfg.normalize();
-        assert_eq!(cfg.energy.capacity.move_cost_slope, 1.0);
+        assert_eq!(cfg.energy.capacity.move_cost_slope, 0.25);
         assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0);
         assert_eq!(cfg.mutation.capacity.chance, 0.0);
         assert_eq!(cfg.mutation.capacity.log_step, 0.0);

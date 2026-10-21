@@ -237,11 +237,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// capacity chance after the kin-tag draw, which shifts every later draw
 /// (default 6408902103238049453 -> 14059995974793206223, rate 0.0
 /// 12885579396041597214 -> 7853259137754474046); with the capacity draw
-/// removed both identities hold.
+/// removed both identities hold. Re-pinned by the T26.F02 sweep defaults
+/// (beta 0.5 -> 1.0, u 0.0005 -> 0.002) after two agreeing runs (default
+/// 14059995974793206223 -> 12505458608371593438, rate 0.0
+/// 7853259137754474046 -> 17623746894553768688); restoring (0.5, 0.0005)
+/// restores both.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 14059995974793206223);
-    assert_eq!(short_run_identity(Some(0.0)), 7853259137754474046);
+    assert_eq!(short_run_identity(None), 12505458608371593438);
+    assert_eq!(short_run_identity(Some(0.0)), 17623746894553768688);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.
