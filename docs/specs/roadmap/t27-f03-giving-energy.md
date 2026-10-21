@@ -77,10 +77,11 @@ Invariants:
    catalog remains in TypeScript, and the `inputRefUtils.test.ts` parity
    pattern covers the new fixture.
 3. **Charge arrays.** `ActionCharges` and `FailedActionEffort` are
-   `[f64; ACTION_TYPE_COUNT]` newtypes indexed by `ActionType`, with
+   `[f64; ACTION_TYPE_COUNT]` newtypes indexed by `ActionType` (declared in
+   `contracts/actions.rs`, re-exported by `creature::action_log`), with
    `ActionType::flow_key()` (`noop`, `eat`, `move`, `reproduce`,
    `steal_energy`, `give_energy`); `net_action_overdraft`, the v3-cli
-   `energy_flows` export (ordered maps keyed by flow key, definition
+   `energy_flows` export (`BTreeMap`s keyed by flow key, definition
    `applied-energy-flows-v4`) and the telemetry `action_charge.<key>` /
    `failed_action_effort.<key>` points and the creature-window
    `FlowMarks::of` charge sum (`tick/window_seam.rs`) iterate
@@ -96,7 +97,8 @@ Invariants:
 4. **The bite.** `SimulationConfig.exchange: ExchangeConfig { bite: f32 }`,
    default 8.0, normalized finite and positive (fallback 8.0), recorded on
    the actions phase span as `petri.config.exchange.bite` and in the
-   `run.started` body with no edit. `PredationConfig` is unchanged:
+   `run.started` body with no edit, and offered by the frontend config panel
+   like every live-patchable value. `PredationConfig` is unchanged:
    `steal_cost_rate` (0.05) now scales the bite, so steal's effort base is
    `steal_cost_rate × bite`, which at the defaults is the floor.
    `ActionParamField::StealEnergyAmount` is retired: `ACTION_PARAM_FIELD_COUNT`
@@ -128,8 +130,8 @@ Invariants:
    | Surface | Change |
    | --- | --- |
    | `SimStats` | `give_actions_attempted_total`, `give_actions_transferred_total`, `give_actions_rejected_total`, `give_actions_by_result: HashMap<GiveActionResult, u64>`, `last_tick_give`, reset like the predation fields |
-   | goal summary | a `giving` block beside `predation` (`GivingTracking`: the three totals, `actions_by_result` keyed by `GiveActionResult::as_key`); `energy_flows.gift_debit` / `gift_credit`; `mortality.by_cause` carries the new keys through `DeathCause::ALL`; `drives` lists four kinds (`drives-v2`) |
-   | server | stats payload gains `give` beside `steal`, `give_actions_attempted_total`, `give_actions_transferred_total`, `give_actions_rejected_total`, and `give_actions_by_result` in the health payload beside `predation_actions_by_result`; `PROTOCOL_VERSION` `v3alpha13` in commit 1 with a §2 history line naming the `Directed` shape, extended in commits 2 and 3 with the retired amount, the `GiveEnergy` action and the stats fields |
+   | goal summary | a `giving` block beside `predation` (`GivingTracking`: the three totals, `actions_by_result` keyed by `GiveActionResult::as_key`), kept in the committed summary (`KEPT_CASE_BLOCKS`); `energy_flows.gift_debit` / `gift_credit`; `mortality.by_cause` carries the new keys through `DeathCause::ALL`; `drives` lists four kinds (`drives-v2`) |
+   | server | every payload carrying the predation fields (stats, health, the WS status event) gains `give` beside `steal`, `give_actions_attempted_total`, `give_actions_transferred_total`, `give_actions_rejected_total`, and `give_actions_by_result` beside `predation_actions_by_result`; `PROTOCOL_VERSION` `v3alpha13` in commit 1 with a §2 history line naming the `Directed` shape, extended in commits 2 and 3 with the retired amount, the `GiveEnergy` action and the stats fields |
    | telemetry | families in the Telemetry table; `petri.drive_kind` `give_energy`; dashboard `always_names` |
    | versions | `GENOME_FORMAT` bumps in each commit that changes a persisted representation or its meaning: 8 (commit 1, sink serde), 9 (commit 2, `field_idx` meaning), 10 (commit 3, catalog indices); `neighborhood-coverage-v4` (39 sink rows); `input-use-v4` (`CommitCounts` width 5, `ActionVotes` / `PreviousPassVotes` width 39 change channel meanings); `mutation-effects-v5` stands (input-field contexts untouched) |
 7. **Reach.** `can_host_facts(GiveEnergy)` is true (it has a drive), so ring,
@@ -200,10 +202,10 @@ show the feature wrong.
 ## Verification
 
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> 30 passed, first in each commit; `cargo test -p v3-core --features telemetry-seams --lib` -> 2288 passed; `--tests` -> pass; `cargo test --workspace --exclude v3-core` -> pass but `gate_profile_has_no_severe_regression_against_series_references` (`decided_passes` 0 -> 0.000238; the closing epoch re-pin owns it); `npm test` -> 680 passed; clippy, fmt clean.
-- [ ] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides `exchange` or `predation`); per world the `giving` and `predation` blocks, `gift_debit` / `gift_credit`, `predation_attacker_credit`, `kills_total` and the `gift`, `action_give_energy`, `action_steal_energy` mortality counts, zero included, in the readings file.
+- [ ] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Slow tier: `make rust-test-slow` -> `<result>`, recruitment-paths rows re-pinned.
-- [ ] Gate and goal: summaries at `docs/progress/features/t27-f03-giving-energy.json` and `-goal.json`, local raw hash/byte count and verification time checked, series entries point to the summaries, no new full report staged.
+- [ ] Gate and goal: summaries at `docs/progress/features/t27-f03-giving-energy.json` and `-goal.json`, raw hash/byte count checked, series entries point to them, no full report staged.
 
 ## Performance and Goal Impact
 
@@ -260,5 +262,5 @@ failure.
 - Decision: a give with no recipient logs `ActionResult::NoRecipient`, with nothing to give `EnergyConstraints`; a steal whose victim has nothing to take is `RejectedNoVictim`.
 - Decision: the catalog reaches the frontend through one Rust-pinned `voteSinks.json`; the frontend keeps no hand copy of it.
 - Decision: the per-kind charge ledger is indexed by `ActionType` and every consumer iterates `ActionType::ALL`; the NoOp failed-effort slot exists and stays zero.
-- Deferred: the long-run reading of whether gives are used, by whom and toward whom (parental care or otherwise) goes to T27.F02's goal-long run, the track's carrier.
-- Deferred: a gift event record and map overlay, and per-creature given/received counters, until a reading shows gifts in use.
+- Deferred: the long-run reading of whether gives are used, by whom and toward whom, goes to T27.F02's goal-long run, the track's carrier.
+- Deferred: a gift event record or overlay and per-creature gift counters, until a reading shows gifts in use.
