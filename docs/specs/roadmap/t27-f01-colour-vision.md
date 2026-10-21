@@ -133,7 +133,7 @@ a valid result), and cannot show the feature wrong.
 - [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed after each commit through b697f58d. The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at both commits; b697f58d is test- and comment-only and `applied_trajectory` (2) and `baseline_worlds` (19) pass there unchanged.
 - [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at b697f58d.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred; the full survivor list stays here.
-- [ ] Gate and goal: summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable.
+- [x] Gate and goal (2026-10-21, HEAD 182c43f0): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+17.6%), `vm_steps` flag +28.2%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `decided_passes` +72.1%, a trajectory reading reported to the user. Raw gate 129,167 B `98253a75...b26585`, raw goal 706,943,675 B `cb502110...745cb` (both `verified_local`, 2026-10-21); summaries 25,889 B and 533,714 B. The series entries (`closed` and the epoch re-pin) are written in the closing commit; the colour use rows are in the readings file.
 - [ ] Slow tier: `make rust-test-slow` → exit 0 after the recruitment-paths readings are re-pinned, the moved rows recorded in the readings file.
 - [ ] Close: `make check` exited 0 at the tested commit.
 
@@ -164,7 +164,24 @@ result and the long-run reading is deferred to T27.F02's goal-long run. No
 diversity or cognition indicator is added. Both epochs are re-pinned in the
 closing commit.
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-21, HEAD 182c43f0, final code b697f58d, each profile run once).**
+Viability 30 passed. Gate: v3-cli exit 0 (`measurement_evidence.cli_exit`),
+outer `make` exit 0; `severe=false`; `wall_clock.level` `ok` (present, so the
+host matches the epoch host): `wall_clock_ms_per_creature_tick` 0.0031029 vs
+the F09 epoch 0.0026384 (+17.6%), inside the 25% flag band; one counter flag,
+`vm_steps` 0.040014 vs 0.031219 (+28.2%). Goal: v3-cli exit 3
+(`measurement_evidence.cli_exit`, successful artifact pair with a severe),
+outer `make` exit 2 (`Error 3`); `severe=true`, one severe: `decided_passes`
+0.003873 vs 0.002251 (+72.1%, severe at 50%), a trajectory reading under the
+changed draw stream with no predeclared direction, to be reported to the user
+and re-pinned at closure; two flags, `graph_relax_iters` +10.4% and
+`actions_applied` +12.9%; goal wall clock 0.0125132 vs 0.0093403 (+34.0%,
+`flag`, not fatal). Colour-channel use rows (descriptive): the founder cohort
+declares none; at tick 2000 the selected cohorts show causal colour use only in
+Confluence (slot 2 red causal in 4 of 7 parents, `OwnBlue` in 9 of 9) and one
+causal `OwnGreen` in Orchards, none in Canyon; rows in the readings file. Raw
+gate 129,167 B, sha256 `98253a75...b26585`; raw goal 706,943,675 B, sha256
+`cb502110...745cb`; summaries 25,889 B and 533,714 B.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f01-colour-vision.json),
   [goal](../../progress/features/t27-f01-colour-vision-goal.json).
