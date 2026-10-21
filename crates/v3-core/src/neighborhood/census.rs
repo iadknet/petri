@@ -118,6 +118,7 @@ mod tests {
     use crate::config::FounderProfile;
     use crate::config::SimulationConfig;
     use crate::creature::founder::founder_genome;
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::vote::VOTE_SINK_COUNT;
 
     fn founder_census() -> OneEdgeCensus {
@@ -163,11 +164,12 @@ mod tests {
     #[test]
     fn a_unit_edge_into_an_unused_kind_never_kills_the_founder() {
         let census = founder_census();
-        for row in census
-            .rows
-            .iter()
-            .filter(|row| matches!(row.sink, VoteSink::StealEnergy(_)))
-        {
+        for row in census.rows.iter().filter(|row| {
+            matches!(
+                row.sink,
+                VoteSink::Directed(DirectedVoteKind::StealEnergy, _)
+            )
+        }) {
             assert_eq!(row.tally.dead, 0, "{:?}", row.sink);
         }
     }

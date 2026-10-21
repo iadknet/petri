@@ -34,7 +34,7 @@ fn a_flat_channel_with_a_positive_drive_moves_along_the_heading() {
         assert_eq!(tick.output.heading, heading);
         assert_eq!(
             tick.passes[0].best[VoteKind::Move.index()],
-            VoteSink::Move(heading.to_index() as u8)
+            VoteSink::Directed(DirectedVoteKind::Move, heading.to_index() as u8)
         );
         assert_eq!(tick.passes[0].effective_votes[VoteKind::Move.index()], 0.5);
     }
@@ -46,7 +46,10 @@ fn a_move_commit_turns_the_heading_for_the_later_passes_of_the_tick() {
     // the drive commits it toward the new heading, not the starting `N`.
     let genome = genome(vec![vm_voter(
         0,
-        &[(VoteSink::Move(2), 1.0), (DRIVE_REPRODUCE, 0.5)],
+        &[
+            (VoteSink::Directed(DirectedVoteKind::Move, 2), 1.0),
+            (DRIVE_REPRODUCE, 0.5),
+        ],
         &[],
     )]);
     let tick = run_tick_heading(
@@ -71,7 +74,7 @@ fn a_move_commit_turns_the_heading_for_the_later_passes_of_the_tick() {
     assert_eq!(tick.passes[1].bars, [0, 1, 0, 0]);
     assert_eq!(
         tick.passes[1].best[VoteKind::Reproduce.index()],
-        VoteSink::Reproduce(2)
+        VoteSink::Directed(DirectedVoteKind::Reproduce, 2)
     );
 }
 
@@ -79,8 +82,8 @@ fn a_move_commit_turns_the_heading_for_the_later_passes_of_the_tick() {
 fn only_a_move_commit_changes_the_heading() {
     let voters = [
         vec![(VoteSink::Eat, 1.0)],
-        vec![(VoteSink::Reproduce(3), 1.0)],
-        vec![(VoteSink::StealEnergy(5), 1.0)],
+        vec![(VoteSink::Directed(DirectedVoteKind::Reproduce, 3), 1.0)],
+        vec![(VoteSink::Directed(DirectedVoteKind::StealEnergy, 5), 1.0)],
         vec![],
     ];
     for votes in voters {
@@ -99,7 +102,11 @@ fn only_a_move_commit_changes_the_heading() {
             .any(|a| matches!(a, WorldAction::Move(_))));
         assert_eq!(tick.output.heading, Direction::SW, "{votes:?}");
     }
-    let genome = genome(vec![vm_voter(0, &[(VoteSink::Move(6), 1.0)], &[])]);
+    let genome = genome(vec![vm_voter(
+        0,
+        &[(VoteSink::Directed(DirectedVoteKind::Move, 6), 1.0)],
+        &[],
+    )]);
     let tick = run_tick_heading(
         &genome,
         Senses::default(),
@@ -118,7 +125,7 @@ fn a_graph_drive_edge_and_a_negative_drive_gate_the_kind() {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     graph
-        .vote(VoteSink::Move(4), &[(one, 0.3)])
+        .vote(VoteSink::Directed(DirectedVoteKind::Move, 4), &[(one, 0.3)])
         .vote(DRIVE_MOVE, &[(one, 0.4)]);
     let genome_on = genome(vec![graph.build(0, vec![], &[])]);
     let tick = run_tick_heading(
@@ -139,7 +146,7 @@ fn a_graph_drive_edge_and_a_negative_drive_gate_the_kind() {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     graph
-        .vote(VoteSink::Move(4), &[(one, 0.3)])
+        .vote(VoteSink::Directed(DirectedVoteKind::Move, 4), &[(one, 0.3)])
         .vote(DRIVE_MOVE, &[(one, -0.4)]);
     let genome_off = genome(vec![graph.build(0, vec![], &[])]);
     let tick = run_tick_heading(

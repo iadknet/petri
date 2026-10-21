@@ -4,6 +4,7 @@
 //! `split_existing_edge` splits every introspection edge function-preservingly
 //! (T25.F02 retired the T11.F08 exclusion with the learning charge).
 
+use crate::creature::genome::vote::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -190,7 +191,7 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
             ),
             OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
             ),
             OutputSink::new(

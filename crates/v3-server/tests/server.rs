@@ -2938,7 +2938,7 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
     edit(false).await;
     let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha12");
+    assert_eq!(body["protocol_version"], "v3alpha13");
     let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
     assert_eq!(edges.len(), 12, "{body}");
     let mut genomic: Vec<f64> = edges

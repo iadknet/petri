@@ -418,6 +418,7 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{NodeId, RouteTarget};
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -1169,7 +1170,11 @@ mod tests {
                     const_idx: 0,
                 },
                 VmInstruction::AddVote {
-                    sink: crate::creature::genome::vote::VoteSink::StealEnergy(0).index() as u8,
+                    sink: crate::creature::genome::vote::VoteSink::Directed(
+                        DirectedVoteKind::StealEnergy,
+                        0,
+                    )
+                    .index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,

@@ -1,4 +1,5 @@
-import type { InputReference, VmInstruction, VoteKind, VoteSink } from "./genome.ts";
+import { VOTE_SINK_COUNT } from "../components/inspector/voteSinks.ts";
+import type { InputReference, VmInstruction, VoteSink } from "./genome.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -147,16 +148,7 @@ export type WorldAction =
 	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
 	| { StealEnergy: { direction: string; amount: number } };
 
-/** Vote sinks in the catalog: Eat, 8 each of Move/Reproduce/StealEnergy, a
- * drive per directed kind, Terminate, Decide. */
-export const VOTE_SINK_COUNT = 30;
-/** Action kinds carrying a vote commit counter, in `commit_counts` order. */
-export const VOTE_KINDS: readonly VoteKind[] = Object.freeze([
-	"Eat",
-	"Move",
-	"Reproduce",
-	"StealEnergy",
-]);
+export { VOTE_KINDS, VOTE_SINK_COUNT } from "../components/inspector/voteSinks.ts";
 /** `PreviousOutcome` channels, in `previous_outcome` order. */
 export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
 	"EnergyDelta",

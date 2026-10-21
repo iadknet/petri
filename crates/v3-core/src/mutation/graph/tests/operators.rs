@@ -6,6 +6,7 @@
 //! compound reference, and the graph raw-field operator changes exactly one
 //! field by one unit.
 
+use crate::creature::genome::vote::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -176,7 +177,7 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
             ),
             OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
             ),
             OutputSink::new(
@@ -238,7 +239,7 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
             ),
             OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
             ),
             OutputSink::new(

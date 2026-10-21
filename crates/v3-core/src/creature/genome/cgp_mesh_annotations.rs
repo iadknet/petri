@@ -107,6 +107,7 @@ mod tests {
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::vote::{ActionParamField, VoteSink};
 
     /// A node wired only through a group's members writes the action
@@ -255,7 +256,7 @@ mod tests {
             .with_compute_nodes(Vec::new())
             .with_output_sinks(vec![
                 OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Move(0)),
+                    OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
                     vec![leaf_edge(0)],
                 ),
                 OutputSink::new(

@@ -55,7 +55,12 @@ function pass(
 		pass_index,
 		end_reason,
 		votes: ZERO_VOTES,
-		best: ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+		best: [
+			"Eat",
+			{ Directed: ["Move", 0] },
+			{ Directed: ["Reproduce", 0] },
+			{ Directed: ["StealEnergy", 0] },
+		],
 		bars: [0, 0, 0, 0],
 		effective_votes: [0, 0, 0, 0],
 		committed,

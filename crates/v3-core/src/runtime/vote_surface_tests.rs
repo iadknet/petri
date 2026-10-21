@@ -8,6 +8,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{
@@ -187,11 +188,11 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
                         const_idx: 0,
                     },
                     VmInstruction::AddVote {
-                        sink: VoteSink::Move(2).index() as u8,
+                        sink: VoteSink::Directed(DirectedVoteKind::Move, 2).index() as u8,
                         src: 0,
                     },
                     VmInstruction::AddVote {
-                        sink: VoteSink::Move(2).index() as u8,
+                        sink: VoteSink::Directed(DirectedVoteKind::Move, 2).index() as u8,
                         src: 0,
                     },
                     VmInstruction::Halt,
@@ -201,7 +202,10 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
         }],
     };
     let output = run(&genome, 100.0, 4);
-    assert_eq!(output.votes[VoteSink::Move(2).index()], 3.0);
+    assert_eq!(
+        output.votes[VoteSink::Directed(DirectedVoteKind::Move, 2).index()],
+        3.0
+    );
     assert_eq!(output.votes.iter().filter(|v| **v != 0.0).count(), 1);
     // A vote of 3.0 commits three moves.
     assert_eq!(output.commit_counts, [0, 3, 0, 0]);
@@ -282,7 +286,7 @@ fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
                     },
                     VmInstruction::Mul { dst: 1, a: 0, b: 0 },
                     VmInstruction::AddVote {
-                        sink: VoteSink::Reproduce(0).index() as u8,
+                        sink: VoteSink::Directed(DirectedVoteKind::Reproduce, 0).index() as u8,
                         src: 1,
                     },
                     VmInstruction::Halt,
@@ -292,7 +296,10 @@ fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
         }],
     };
     let output = run(&genome, 100.0, 4);
-    assert_eq!(output.votes[VoteSink::Reproduce(0).index()], 1e9);
+    assert_eq!(
+        output.votes[VoteSink::Directed(DirectedVoteKind::Reproduce, 0).index()],
+        1e9
+    );
     assert!(output.votes.iter().all(|v| v.is_finite()));
 }
 
@@ -376,14 +383,17 @@ fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
             0,
             2.0,
             &[
-                OutputSinkKind::ActionVote(VoteSink::StealEnergy(5)),
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 5)),
                 OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
             ],
             &[],
         )],
     };
     let output = run(&genome, 100.0, 4);
-    assert_eq!(output.votes[VoteSink::StealEnergy(5).index()], 2.0);
+    assert_eq!(
+        output.votes[VoteSink::Directed(DirectedVoteKind::StealEnergy, 5).index()],
+        2.0
+    );
     // A vote of 2.0 commits two steals; the parameter surface is read at
     // each commit (asserted in `pass_loop_tests`).
     assert_eq!(output.commit_counts, [0, 0, 0, 2]);
@@ -437,13 +447,19 @@ fn an_exhausted_graph_visit_leaves_the_vote_vector_untouched() {
             voting_graph_node(
                 1,
                 3.0,
-                &[OutputSinkKind::ActionVote(VoteSink::Move(0))],
+                &[OutputSinkKind::ActionVote(VoteSink::Directed(
+                    DirectedVoteKind::Move,
+                    0,
+                ))],
                 &[],
             ),
         ],
     };
     let affordable = run(&genome, 100.0, 4);
-    assert_eq!(affordable.votes[VoteSink::Move(0).index()], 3.0);
+    assert_eq!(
+        affordable.votes[VoteSink::Directed(DirectedVoteKind::Move, 0).index()],
+        3.0
+    );
 
     // Same genome, only enough energy for the VM node: the graph visit is
     // entered, charged, and exhausted before its effects pass.
@@ -453,7 +469,10 @@ fn an_exhausted_graph_visit_leaves_the_vote_vector_untouched() {
         crate::runtime::trace::domain::TerminationReason::EnergyExhausted
     );
     assert_eq!(exhausted.votes[VoteSink::Eat.index()], 6.0);
-    assert_eq!(exhausted.votes[VoteSink::Move(0).index()], 0.0);
+    assert_eq!(
+        exhausted.votes[VoteSink::Directed(DirectedVoteKind::Move, 0).index()],
+        0.0
+    );
 }
 
 #[test]
@@ -466,7 +485,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 1,
                 -0.5,
                 &[
-                    OutputSinkKind::ActionVote(VoteSink::Reproduce(3)),
+                    OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 3)),
                     OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
                 ],
                 &[0],

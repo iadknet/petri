@@ -68,7 +68,7 @@ use v3_core::simulation::Simulation;
 
 /// The vote a reactive fixture casts on `Move(E)`: one unit, one commit.
 const MOVE_VOTE: f32 = 1.0;
-/// `VoteSink::Move(E)`'s catalog index (`Direction::ALL[2] == Direction::E`).
+/// `VoteSink::Directed(DirectedVoteKind::Move, E)`'s catalog index (`Direction::ALL[2] == Direction::E`).
 const MOVE_E_SINK: u8 = 3;
 
 fn food_here_ref() -> InputReference {

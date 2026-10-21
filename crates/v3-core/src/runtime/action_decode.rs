@@ -1,6 +1,8 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
-use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
+use crate::creature::genome::vote::{
+    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
+};
 
 /// The parameter surface a commit reads, indexed by `ActionParamField::index`.
 pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
@@ -18,17 +20,24 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
             type_idx: decode_food_type_idx(params[ActionParamField::EatFoodType.index()]),
             leave: clamp_unit_interval(params[ActionParamField::EatLeaveShare.index()]),
         },
-        VoteSink::Move(d) => WorldAction::Move(sink_direction(d)),
-        VoteSink::Reproduce(d) => WorldAction::Reproduce {
-            direction: sink_direction(d),
-            energy_transfer_fraction: clamp_unit_interval(
-                params[ActionParamField::ReproduceTransferFraction.index()],
-            ),
-        },
-        VoteSink::StealEnergy(d) => WorldAction::StealEnergy {
-            direction: sink_direction(d),
-            amount: clamp_non_negative_finite(params[ActionParamField::StealEnergyAmount.index()]),
-        },
+        VoteSink::Directed(kind, d) => {
+            let direction = sink_direction(d);
+            match kind {
+                DirectedVoteKind::Move => WorldAction::Move(direction),
+                DirectedVoteKind::Reproduce => WorldAction::Reproduce {
+                    direction,
+                    energy_transfer_fraction: clamp_unit_interval(
+                        params[ActionParamField::ReproduceTransferFraction.index()],
+                    ),
+                },
+                DirectedVoteKind::StealEnergy => WorldAction::StealEnergy {
+                    direction,
+                    amount: clamp_non_negative_finite(
+                        params[ActionParamField::StealEnergyAmount.index()],
+                    ),
+                },
+            }
+        }
         VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
     }
 }
@@ -95,12 +104,15 @@ mod tests {
         for (d, direction) in Direction::ALL.into_iter().enumerate() {
             let d = d as u8;
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[9.0; ACTION_PARAM_FIELD_COUNT]),
+                decode_commit(
+                    VoteSink::Directed(DirectedVoteKind::Move, d),
+                    &[9.0; ACTION_PARAM_FIELD_COUNT]
+                ),
                 WorldAction::Move(direction)
             );
             assert_eq!(
                 decode_commit(
-                    VoteSink::Reproduce(d),
+                    VoteSink::Directed(DirectedVoteKind::Reproduce, d),
                     &surface(&[(ReproduceTransferFraction, 0.25)])
                 ),
                 WorldAction::Reproduce {
@@ -110,7 +122,7 @@ mod tests {
             );
             assert_eq!(
                 decode_commit(
-                    VoteSink::StealEnergy(d),
+                    VoteSink::Directed(DirectedVoteKind::StealEnergy, d),
                     &surface(&[(StealEnergyAmount, 3.0)])
                 ),
                 WorldAction::StealEnergy {
@@ -128,7 +140,10 @@ mod tests {
         let last = Direction::ALL[Direction::ALL.len() - 1];
         for d in [8, 9, u8::MAX] {
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[0.0; ACTION_PARAM_FIELD_COUNT]),
+                decode_commit(
+                    VoteSink::Directed(DirectedVoteKind::Move, d),
+                    &[0.0; ACTION_PARAM_FIELD_COUNT]
+                ),
                 WorldAction::Move(last)
             );
         }
@@ -201,7 +216,7 @@ mod tests {
         for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
             assert_eq!(
                 decode_commit(
-                    VoteSink::StealEnergy(0),
+                    VoteSink::Directed(DirectedVoteKind::StealEnergy, 0),
                     &surface(&[(StealEnergyAmount, raw)])
                 ),
                 WorldAction::StealEnergy {
@@ -230,7 +245,7 @@ mod tests {
                 energy_transfer_fraction,
                 ..
             } = decode_commit(
-                VoteSink::Reproduce(0),
+                VoteSink::Directed(DirectedVoteKind::Reproduce, 0),
                 &surface(&[(ReproduceTransferFraction, raw)]),
             )
             else {
@@ -294,7 +309,7 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Reproduce(2), &surface(&[(ReproduceTransferFraction, raw)]))
+            } = decode_commit(VoteSink::Directed(DirectedVoteKind::Reproduce, 2), &surface(&[(ReproduceTransferFraction, raw)]))
             else {
                 panic!("expected Reproduce");
             };

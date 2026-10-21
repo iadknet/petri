@@ -91,7 +91,15 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // `gen_range(0..30)` over the bucket table and the three own-colour keys
     // join the width-1 introspection `Swap` alternatives
     // (5304583554271412245 -> 2059421590127301874).
-    assert_eq!(hash, 2059421590127301874, "pin of the recruitment-Off path");
+    // Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug`
+    // shape): a directed vote sink reads `{"Directed":["Move",3]}` and
+    // `Directed(Move, 3)` where `{"Move":3}` and `Move(3)` stood
+    // (2059421590127301874 -> 12995421853181291158); mapping that text back
+    // to the old shape restores the old value.
+    assert_eq!(
+        hash, 12995421853181291158,
+        "pin of the recruitment-Off path"
+    );
 }
 
 #[test]

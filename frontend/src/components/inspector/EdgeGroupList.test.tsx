@@ -12,7 +12,7 @@ const leaf = (ref_idx: number, sub_idx: number, own_weight: number, group?: numb
 /** A Move group at offset 1 on ring 1 missing its channel-3 member. */
 function grouped(): GraphBackendDef {
 	const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-		kind: { ActionVote: { Move: d } },
+		kind: { ActionVote: { Directed: ["Move", d] } },
 		inputs: [] as GraphEdge[],
 	}));
 	for (let channel = 0; channel < 8; channel++) {
@@ -137,7 +137,7 @@ describe("EdgeGroupList", () => {
 		// offset 2 without its x member at relative E (sink 4), plus a
 		// hand-built zero-pattern x member at relative N (sink 2).
 		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-			kind: { ActionVote: { Move: d } },
+			kind: { ActionVote: { Directed: ["Move", d] } },
 			inputs: [] as GraphEdge[],
 		}));
 		const birth: [number, number][] = [
@@ -188,7 +188,7 @@ describe("EdgeGroupList", () => {
 		// nearestDist 5, max 6); a StealEnergy gene at offset 0 whose fact
 		// `max` is a hole.
 		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-			kind: { ActionVote: { StealEnergy: d } },
+			kind: { ActionVote: { Directed: ["StealEnergy", d] } },
 			inputs: [] as GraphEdge[],
 		}));
 		for (const r of [1, 2, 3, 5, 6, 7]) sinks[r]?.inputs.push(leaf(0, 3, 0, 0));

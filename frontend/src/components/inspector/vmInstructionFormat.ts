@@ -8,6 +8,7 @@ import {
 import { describeInputRef } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
+import { actionCodeLegend } from "./voteSinks.ts";
 import { voteSinkFromIndex } from "./voteSinks.ts";
 
 export interface ReadableInstruction {
@@ -164,7 +165,7 @@ function describeOperands(
 		case "ReadActionQueueLength":
 		case "ReadActionQueueType":
 		case "ReadActionQueueParam":
-			return "Actions already committed this tick. Type codes: 0 none, 1 Eat, 2 Move, 3 Reproduce, 4 StealEnergy.";
+			return `Actions already committed this tick. Type codes: ${actionCodeLegend()}.`;
 		default:
 			return undefined;
 	}

@@ -595,6 +595,11 @@ fn a_steal_credits_its_reward_and_the_victim_records_damage() {
     assert!(steal.reward > 0.0);
     assert!(steal.charge > 0.0);
 
+    // The window's charge sums every `ActionType` row, so the one steal of
+    // the tick reads as exactly its own row's ledger delta.
+    let ledger = sim.stats.energy_flows.action_charges;
+    assert!((steal.charge - ledger[ActionType::StealEnergy]).abs() < 1e-9);
+
     let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);
     sim.creatures[attacker].genome = steal_north_genome();
     sim.creatures[victim].genome = vm_program_genome(vec![VmInstruction::Halt]);
