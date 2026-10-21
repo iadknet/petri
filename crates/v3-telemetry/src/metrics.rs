@@ -612,6 +612,7 @@ fn energy(f: &mut Families, s: &SimStats) {
         ("mesh_ramp".to_owned(), flows.mesh_ramp),
         ("lifecycle_decay".to_owned(), flows.lifecycle_decay),
         ("genome_carrying".to_owned(), flows.genome_carrying),
+        ("capacity_upkeep".to_owned(), flows.capacity_upkeep),
         (
             "parental_transfer_debit".to_owned(),
             flows.parental_transfer_debit,
@@ -619,6 +620,10 @@ fn energy(f: &mut Families, s: &SimStats) {
         (
             "offspring_energy_credit".to_owned(),
             flows.offspring_energy_credit,
+        ),
+        (
+            "offspring_capacity_overflow".to_owned(),
+            flows.offspring_capacity_overflow,
         ),
         (
             "predation_victim_debit".to_owned(),

@@ -195,6 +195,8 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
     let world_update = config_keys(&[
         "energy.lifecycle.energy_decay_per_tick",
         "energy.lifecycle.genome_carry_cost_per_unit",
+        "energy.capacity.reference",
+        "energy.capacity.upkeep_per_unit",
         "shared_memory.decay_rate",
     ]);
     let mut food_growth = config_keys(&[
@@ -215,7 +217,12 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
             food_growth.insert(config_key(&format!("world.food.types.{index}.{field}")));
         }
     }
-    let sensor_assembly = config_keys(&["runtime.perception.vision_radius", "world.edge_mode"]);
+    let sensor_assembly = config_keys(&[
+        "runtime.perception.vision_radius",
+        "world.edge_mode",
+        "energy.capacity.reference",
+        "energy.capacity.sensor_scale",
+    ]);
     let cognition = config_keys(&[
         "runtime.max_mesh_hops",
         "runtime.max_vm_steps",
@@ -251,6 +258,12 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "mutation.genome_size_pressure_enabled",
         "mutation.mesh_layer_probability",
         "mutation.executed_bias",
+        "energy.capacity.reference",
+        "energy.capacity.min",
+        "energy.capacity.move_cost_slope",
+        "energy.lifecycle.max_energy",
+        "mutation.capacity.chance",
+        "mutation.capacity.log_step",
         "predation.steal_cost_rate",
         "predation.kill_complexity_bonus_multiplier",
     ]);
