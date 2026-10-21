@@ -9,11 +9,12 @@ use super::support::*;
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
-use crate::creature::body::{HeritableBody, Phenotype};
+use crate::creature::body::HeritableBody;
 use crate::creature::founder::vm_decision_founder_genome;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction, VoteSink,
 };
+use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::runtime::trace::domain::TickTrace;
 use crate::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};

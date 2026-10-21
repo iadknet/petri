@@ -15,9 +15,10 @@ pub use records::*;
 
 use crate::config::SimulationConfig;
 use crate::contracts::{Direction, Position, WorldAction};
-use crate::creature::body::{HeritableBody, Phenotype};
+use crate::creature::body::HeritableBody;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
+use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::runtime::trace::recording::ActiveTrace;

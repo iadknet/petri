@@ -437,9 +437,10 @@ fn compute_phenotype_similarity(a: &[u8; 6], b: &[u8; 6]) -> f32 {
 mod tests {
     use super::*;
     use crate::config::WorldEdgeMode;
-    use crate::creature::body::{HeritableBody, Phenotype};
+    use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::phenotype::Phenotype;
     use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
 
     fn make_world(w: u16, h: u16) -> WorldState {

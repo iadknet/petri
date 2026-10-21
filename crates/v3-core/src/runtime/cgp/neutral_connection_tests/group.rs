@@ -522,9 +522,10 @@ mod pair {
     use super::*;
     use crate::config::WorldEdgeMode;
     use crate::contracts::{CreatureId, Position};
-    use crate::creature::body::{HeritableBody, Phenotype};
+    use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::phenotype::Phenotype;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use crate::sensors::perception::PerceptionConfig;

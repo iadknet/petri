@@ -1,11 +1,12 @@
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, NodeId, Position, WorldAction};
-use crate::creature::body::{HeritableBody, Phenotype};
+use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::creature::identity::CreatureIdentityState;
+use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::runtime::trace::domain::TerminationReason;

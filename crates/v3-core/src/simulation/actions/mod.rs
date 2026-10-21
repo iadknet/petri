@@ -197,11 +197,12 @@ mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
     use crate::contracts::Position;
-    use crate::creature::body::{HeritableBody, Phenotype};
+    use crate::creature::body::HeritableBody;
     use crate::creature::founder::{
         founder_genome, founder_reproduce_policy, v3alpha1_founder_genome,
     };
     use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::phenotype::Phenotype;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;

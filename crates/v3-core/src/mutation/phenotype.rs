@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::config::PhenotypeConfig;
-use crate::creature::body::Phenotype;
+use crate::creature::phenotype::Phenotype;
 
 // ─── HSL-to-RGB mapping constants ────────────────────────────────────────────
 
