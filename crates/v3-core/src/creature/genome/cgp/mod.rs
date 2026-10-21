@@ -21,7 +21,8 @@ pub use container::{
 };
 pub use edge::{GraphEdge, GraphSource, Membership, Scope};
 pub use group::{
-    compose, detach, pair_birth_members, pair_relative, ring_offset, Group, GroupId, Shape,
+    compose, detach, pair_birth_members, pair_relative, ring_offset, Group, GroupId, MemberSite,
+    Shape,
 };
 
 // ── Compute layer ───────────────────────────────────────────────────────────

@@ -5,9 +5,44 @@
 //! real sink edges whose [`super::Membership`] names it. A member's genomic
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
-use super::{CgpGraphBackendDef, EdgeOccurrence};
+use super::{CgpGraphBackendDef, EdgeOccurrence, OutputSinkKind};
 use crate::contracts::{compass_x, compass_y, DirectionPair, InputReference};
 use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
+
+/// Where a member sits relative to its group's kind `K` (T25.F10): a
+/// **direction member** on a direction sink `K(d)`, or a **fact member** of
+/// a `DirectionPair` gene on `K`'s drive sink. The role is read from the
+/// sink, never stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MemberSite {
+    /// The direction sink `K(d)`, `d < 8`.
+    Direction(u8),
+    /// The drive sink `Drive K`.
+    Drive,
+}
+
+impl MemberSite {
+    /// The site a sink of kind `sink` offers a member of a kind-`kind`
+    /// group; `None` for any other sink, another kind's included.
+    #[must_use]
+    pub fn of(sink: OutputSinkKind, kind: DirectedVoteKind) -> Option<Self> {
+        if sink == Self::Drive.sink(kind) {
+            return Some(Self::Drive);
+        }
+        sink.direction()
+            .filter(|&(on, _)| on == kind)
+            .map(|(_, d)| Self::Direction(d))
+    }
+
+    /// The sink this site names for a kind-`kind` group.
+    #[must_use]
+    pub const fn sink(self, kind: DirectedVoteKind) -> OutputSinkKind {
+        match self {
+            Self::Direction(d) => OutputSinkKind::ActionVote(kind.sink(d)),
+            Self::Drive => OutputSinkKind::ActionVote(kind.drive()),
+        }
+    }
+}
 
 /// Index of a group in its graph's `groups` list.
 #[derive(

@@ -268,7 +268,7 @@ mod tests {
         });
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 2);
+            def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 2, &[]);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {

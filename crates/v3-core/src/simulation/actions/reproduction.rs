@@ -1308,7 +1308,7 @@ mod tests {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("a Graph node")
         };
-        let id = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 3);
+        let id = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 3, &[]);
         def.group_mut(id).set_scale(scale);
         genome
     }

@@ -299,7 +299,14 @@ fn ring_rules_ignore_a_pair_group() {
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let pair_def = || {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_pair_group(0, 1, area.direction_pairs()[1], DirectedVoteKind::Move, 0);
+        let id = def.add_pair_group(
+            0,
+            1,
+            area.direction_pairs()[1],
+            DirectedVoteKind::Move,
+            0,
+            &[],
+        );
         def.group_mut(id).set_scale(1.0);
         def
     };

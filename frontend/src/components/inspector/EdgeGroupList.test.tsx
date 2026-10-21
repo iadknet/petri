@@ -183,6 +183,51 @@ describe("EdgeGroupList", () => {
 		expect(screen.getByTestId("tooltip")).toHaveTextContent("1.000 × 0.00 + 0.125 = 0.125");
 	});
 
+	it("lists a pair gene's fact members on a facts line with own weights and holes", () => {
+		// AreaFoodSummary pair 1 (nearestDx 3, nearestDy 4, facts amount 0,
+		// nearestDist 5, max 6); a StealEnergy gene at offset 0 whose fact
+		// `max` is a hole.
+		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
+			kind: { ActionVote: { StealEnergy: d } },
+			inputs: [] as GraphEdge[],
+		}));
+		for (const r of [1, 2, 3, 5, 6, 7]) sinks[r]?.inputs.push(leaf(0, 3, 0, 0));
+		for (const r of [0, 1, 3, 4, 5, 7]) sinks[r]?.inputs.push(leaf(0, 4, 0, 0));
+		sinks.push({
+			kind: { ActionVote: { Drive: "StealEnergy" } },
+			inputs: [leaf(0, 1, 0.5), leaf(0, 0, 0, 0), leaf(0, 5, 0.25, 0)],
+		});
+		render(
+			<EdgeGroupList
+				graphDef={{
+					compute_nodes: [],
+					output_sinks: sinks,
+					groups: [
+						{
+							shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
+							kind: "StealEnergy",
+							offset: 0,
+							scale: 2,
+							inherit_scale: false,
+							retention: 1,
+						},
+					],
+				}}
+				inputRefs={[{ World: { AreaFoodSummary: { type_idx: 0 } } }]}
+				graphWeights={null}
+			/>,
+		);
+		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("12/12 ●●●●●●●●●●●●");
+		expect(screen.getByTestId("edge-group-facts")).toHaveTextContent("facts 2/3 ●●○");
+		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(12);
+		const facts = screen.getAllByTestId("edge-group-fact");
+		expect(facts).toHaveLength(2);
+		expect(facts[0]).toHaveTextContent("amount → StealEnergy drive own=0.000");
+		expect(facts[1]).toHaveTextContent("nearestDist → StealEnergy drive own=0.250");
+		fireEvent.mouseEnter(screen.getByText(/own=0\.250/));
+		expect(screen.getByTestId("tooltip")).toHaveTextContent("2.000 × 0.00 + 0.250 = 0.250");
+	});
+
 	it("renders nothing without groups", () => {
 		const { container } = render(
 			<EdgeGroupList

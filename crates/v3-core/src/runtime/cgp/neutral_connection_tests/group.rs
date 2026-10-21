@@ -614,7 +614,7 @@ mod pair {
     ) -> [f32; 8] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let layout = reference.direction_pairs()[usize::from(pair)];
-        let id = def.add_pair_group(0, pair, layout, kind, offset);
+        let id = def.add_pair_group(0, pair, layout, kind, offset, &[]);
         def.group_mut(id).set_scale(1.0);
         let votes = effects_at(&def, std::slice::from_ref(reference), sensors)
             .side
@@ -737,7 +737,7 @@ mod pair {
             }
             let mut grouped = base.clone();
             let layout = refs[0].direction_pairs()[usize::from(pair)];
-            let id = grouped.add_pair_group(0, pair, layout, kind, offset);
+            let id = grouped.add_pair_group(0, pair, layout, kind, offset, &[]);
             grouped.group_mut(id).set_scale(scale);
             let members: Vec<_> = grouped.members(id).collect();
             prop_assert_eq!(members.len(), 12);

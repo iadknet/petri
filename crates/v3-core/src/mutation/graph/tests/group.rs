@@ -571,7 +571,7 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let offset = expected.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-        let group = want.add_pair_group(ref_idx, pair, layout, kind, offset);
+        let group = want.add_pair_group(ref_idx, pair, layout, kind, offset, &[]);
         replay_learning(&mut want, group, &mut expected);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
@@ -648,7 +648,7 @@ fn unit_operators_pick_uniformly_over_both_shapes() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
         let layout = refs[1].direction_pairs()[1];
-        let id = def.add_pair_group(1, 1, layout, DirectedVoteKind::Reproduce, 6);
+        let id = def.add_pair_group(1, 1, layout, DirectedVoteKind::Reproduce, 6, &[]);
         def.group_mut(id).set_scale(0.25);
         def
     };
@@ -783,7 +783,7 @@ fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, GroupId)
         let kind = DirectedVoteKind::ALL[rng.gen_range(0..3)];
         let offset = rng.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
-        want.add_pair_group(ref_idx, pair, layout, kind, offset)
+        want.add_pair_group(ref_idx, pair, layout, kind, offset, &[])
     } else {
         let rings = [1u16, 2, 3];
         let ring_ref = rings[rng.gen_range(0..rings.len())];
@@ -1028,4 +1028,56 @@ fn add_graph_edge_never_joins_a_group() {
         onto_a_group_sink,
         "some push lands on a sink holding a group"
     );
+}
+
+/// T25.F10: `RetargetGroupKind` moves a gene's fact members to the new
+/// kind's drive, and skips, after its draws, when that kind cannot host
+/// facts; a gene without facts retargets regardless.
+#[test]
+fn retarget_kind_moves_fact_members_only_to_a_kind_that_can_host_them() {
+    let refs = vec![area_food(0)];
+    let layout = refs[0].direction_pairs()[1];
+    let gene = |facts: &[u16]| {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        def.add_pair_group(0, 1, layout, DirectedVoteKind::Move, 2, facts);
+        // Reproduce loses its drive sink.
+        let drive = OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive());
+        edit_sinks(&mut def, |sinks| sinks.retain(|sink| sink.kind != drive));
+        def
+    };
+    let (mut moved, mut skipped) = (false, false);
+    for seed in 0..32 {
+        let mut def = gene(layout.facts);
+        let before = def.clone();
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let target = {
+            let mut expected = SmallRng::seed_from_u64(seed);
+            expected.gen_range(0..1);
+            [DirectedVoteKind::Reproduce, DirectedVoteKind::StealEnergy][expected.gen_range(0..2)]
+        };
+        let mut factless = gene(&[]);
+        assert_eq!(
+            group::retarget_kind(&mut factless, &mut SmallRng::seed_from_u64(seed)),
+            Ok(())
+        );
+        let result = group::retarget_kind(&mut def, &mut rng);
+        if target == DirectedVoteKind::Reproduce {
+            assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+            skipped = true;
+            continue;
+        }
+        assert_eq!(result, Ok(()));
+        moved = true;
+        assert_ne!(def, before);
+        let drive = def
+            .sink_surface(OutputSinkKind::ActionVote(target.drive()))
+            .unwrap();
+        let facts = def
+            .members(id(0))
+            .filter(|&member| member.surface == drive)
+            .count();
+        assert_eq!(facts, layout.facts.len());
+        assert!(validate_graph(&graph_node(refs.clone(), def)).is_ok());
+    }
+    assert!(moved && skipped);
 }

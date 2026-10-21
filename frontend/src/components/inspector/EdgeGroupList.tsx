@@ -274,12 +274,21 @@ function PairRow({
 				}`;
 	const role = (member: GroupMember): "x" | "y" | "?" =>
 		member.channel === fields?.x ? "x" : member.channel === fields?.y ? "y" : "?";
+	// A fact member (T25.F10) sits on the kind's drive: no sink direction.
+	const directions = members.filter((member) => member.direction !== undefined);
+	const factMembers = members.filter((member) => member.direction === undefined);
+	const declaredFacts = fields?.facts ?? [];
+	const presentFacts = new Set(factMembers.map((member) => member.channel));
+	const factLabel = (channel: number) =>
+		ref === undefined
+			? `field ${channel}`
+			: (describeInputRef(ref, channel).label.split(".").pop() ?? `field ${channel}`);
 	const relative = (member: GroupMember) =>
 		member.direction === undefined ? undefined : (member.direction - group.offset + 8) % 8;
 	const coordinate = (member: GroupMember) => `${role(member)}:${relative(member)}`;
-	const present = new Set(members.map(coordinate));
+	const present = new Set(directions.map(coordinate));
 	const presentAtBirth = PAIR_BIRTH_KEYS.map((key) => present.has(key));
-	const extra = members.filter((member) => !PAIR_BIRTH_SET.has(coordinate(member)));
+	const extra = directions.filter((member) => !PAIR_BIRTH_SET.has(coordinate(member)));
 	return (
 		<GroupRowShell
 			name={
@@ -304,10 +313,26 @@ function PairRow({
 						{presentAtBirth.map((here) => (here ? "●" : "○")).join("")}
 						{extra.length > 0 ? ` +${extra.length}` : ""}
 					</Tip>
+					{factMembers.length > 0 ? (
+						<Tip
+							data-testid="edge-group-facts"
+							content="Fact members present over the pair's declared facts, wired into the kind's drive; each weighs its own weight alone (● present, ○ hole)."
+						>
+							facts {declaredFacts.filter((fact) => presentFacts.has(fact)).length}/
+							{declaredFacts.length}{" "}
+							{declaredFacts.map((fact) => (presentFacts.has(fact) ? "●" : "○")).join("")}
+						</Tip>
+					) : null}
 				</>
 			}
 		>
-			{members.map((member) => (
+			{factMembers.map((member) => (
+				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-fact">
+					{factLabel(member.channel)} → {group.kind} drive{" "}
+					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
+				</li>
+			))}
+			{directions.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
 					{role(member)}:{directionName(relative(member) ?? 0)} → {group.kind}[
 					{directionName(member.direction ?? 0)}]{" "}

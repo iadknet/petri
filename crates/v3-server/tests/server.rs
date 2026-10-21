@@ -2896,6 +2896,7 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
 #[tokio::test]
 async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
     use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::MemberSite;
     use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::BackendDef;
 
@@ -2922,17 +2923,19 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let group = def.add_pair_group(
-                ref_idx,
-                0,
-                area.direction_pairs()[0],
-                DirectedVoteKind::Move,
-                0,
-            );
+            // The second gene carries its fact members (T25.F10).
+            let layout = area.direction_pairs()[0];
+            let facts = if remove_one { layout.facts } else { &[] };
+            let group = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
             def.group_mut(group).set_scale(2.0);
             if remove_one {
                 let member = def.members(group).next().unwrap();
                 def.remove_edge(member);
+                let fact = def
+                    .members(group)
+                    .find(|&m| def.member_site(m) == Some(MemberSite::Drive))
+                    .unwrap();
+                def.edge_mut(fact).set_weight(0.375);
             }
         }
     };
@@ -2972,8 +2975,17 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
     let edges = nodes[0]["edges"].as_array().unwrap();
     assert_eq!(
         edges.len(),
-        12 + 11,
-        "two groups: twelve and eleven members"
+        12 + 11 + 3,
+        "two groups: twelve, then eleven direction members and three facts"
+    );
+    // A fact member's genomic weight is its own weight: pattern 0 by role.
+    assert_eq!(
+        edges
+            .iter()
+            .filter(|edge| edge["genomic"].as_f64() == Some(0.375))
+            .count(),
+        1,
+        "{body}"
     );
 }
 

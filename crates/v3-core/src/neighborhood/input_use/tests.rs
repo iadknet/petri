@@ -723,7 +723,14 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    let id = def.add_pair_group(0, 1, area.direction_pairs()[1], DirectedVoteKind::Move, 3);
+    let id = def.add_pair_group(
+        0,
+        1,
+        area.direction_pairs()[1],
+        DirectedVoteKind::Move,
+        3,
+        &[],
+    );
     def.group_mut(id).set_scale(0.75);
     let genome = genome(vec![node]);
     let family = channel(&area, 0).family;

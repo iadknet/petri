@@ -1032,7 +1032,7 @@ fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
         panic!("the founder entry is a graph node");
     };
-    let id = graph.add_pair_group(summary, 1, layout, DirectedVoteKind::Move, 2);
+    let id = graph.add_pair_group(summary, 1, layout, DirectedVoteKind::Move, 2, &[]);
     graph.group_mut(id).set_scale(0.75);
     (genome, entry)
 }

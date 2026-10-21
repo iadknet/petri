@@ -164,6 +164,13 @@
       "before": "plasticity_scale_snaps_total counted learned-scale writes whose stored value lay outside the bound (only an unseeded genomic scale's first write); drift_sum was |learned - genomic|",
       "after": "every learned quantity starts at its clamped birth value, so no write can snap and the counter is deleted; drift_sum is |learned - birth| (lifetime learning; a Lamarckian edge's ancestral component and an out-of-clamp start no longer count)",
       "comparison": "drift_sum is not like-for-like across F09 where Lamarckian edges or inherited scales carry seeds; plasticity_scale_snaps_total has no successor"
+    },
+    {
+      "feature": "T25.F10",
+      "counter": "pair_groups (pair-groups-v1 -> pair-groups-v2)",
+      "before": "pair-groups-v1: members counted every member present of a reachable DirectionPair group; a recruited pair's facts were ungrouped drive edges outside the block",
+      "after": "pair-groups-v2: members counts direction members present, and the block and every row gain facts (fact members present) and own_nonzero (members of either role with |own_weight| > 1e-3), reachable-pair readings as the block is",
+      "comparison": "members is like-for-like across F10 (it counted only direction members before fact members existed); facts and own_nonzero have no predecessor, and the block's version changes for every sample, zero-group samples included"
     }
   ],
   "goal_worlds": {

@@ -63,9 +63,10 @@ impl Plan {
     /// vote sink `K(d)` becomes one silent `Ring` group on `ref_idx` into `K`
     /// at offset `(d − channel) mod 8`, eight members at own weight 0 and
     /// scale 0, in place of its edges (T25.F03). A pair plan landing on
-    /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` group
-    /// at offset `d` (twelve members) plus one born-0 edge into `Drive K` per
-    /// fact of the pair, in `facts` order (T25.F04). A slot plan landing
+    /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` gene
+    /// at offset `d` built by one container primitive: twelve direction
+    /// members and one born-0 fact member into `Drive K` per fact of the
+    /// pair, in `facts` order (T25.F04, T25.F10). A slot plan landing
     /// elsewhere takes the drawn slot's channels, ascending, as its sources
     /// (T25.F05). Every other plan appends its sources at weight 0.
     fn append(self, node: &mut NodeGenome, destination: usize, pair: Option<u8>) {
@@ -78,16 +79,7 @@ impl Plan {
             (self.pairs, directed, pair)
         {
             let layout = pairs[usize::from(pair)];
-            def.add_pair_group(ref_idx, pair, layout, kind, d);
-            let drive = def
-                .sink_surface(OutputSinkKind::ActionVote(kind.drive()))
-                .expect("the preflight admits a pair family only beside every drive sink");
-            for &sub_idx in layout.facts {
-                def.push_edge(
-                    drive,
-                    GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, 0.0),
-                );
-            }
+            def.add_pair_group(ref_idx, pair, layout, kind, d, layout.facts);
             return;
         }
         if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
@@ -138,8 +130,9 @@ struct Admission<'a> {
     /// ([`CgpGraphBackendDef::can_host_group`]); when not, ring families
     /// leave the universe, so a drawn ring plan always completes.
     hosts_ring_group: bool,
-    /// Whether a pair family's group and facts edges can be placed: a group
-    /// can be hosted and every kind's `Drive` sink is present (T25.F04);
+    /// Whether a pair family's gene can be placed: a group can be hosted
+    /// and every kind can host fact members
+    /// ([`CgpGraphBackendDef::can_host_facts`], T25.F04, T25.F10);
     /// when not, pair-declaring families leave the `WholeFamily` universe.
     hosts_pair_plan: bool,
 }
@@ -148,10 +141,9 @@ impl<'a> Admission<'a> {
     fn new(references: &'a [InputReference], def: &CgpGraphBackendDef) -> Self {
         let hosts_ring_group = def.can_host_group();
         let hosts_pair_plan = hosts_ring_group
-            && DirectedVoteKind::ALL.into_iter().all(|kind| {
-                def.sink_surface(OutputSinkKind::ActionVote(kind.drive()))
-                    .is_some()
-            });
+            && DirectedVoteKind::ALL
+                .into_iter()
+                .all(|kind| def.can_host_facts(kind));
         let mut existing = HashMap::new();
         for (index, reference) in references.iter().enumerate().take(65536) {
             existing

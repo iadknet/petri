@@ -614,8 +614,9 @@ const KEPT_SAMPLE_FIELDS: [&str; 17] = [
     "plasticity_census",
 ];
 /// `pair_groups` aggregates every checkpoint keeps; `rows` is kept only on
-/// each world's last checkpoint (T25.F04).
-const KEPT_PAIR_GROUP_FIELDS: [&str; 9] = [
+/// each world's last checkpoint (T25.F04). `facts` and `own_nonzero`
+/// (T25.F10) ride beside `members`.
+const KEPT_PAIR_GROUP_FIELDS: [&str; 11] = [
     "version",
     "creatures",
     "carriers",
@@ -623,6 +624,8 @@ const KEPT_PAIR_GROUP_FIELDS: [&str; 9] = [
     "groups_nonzero",
     "groups_unreachable",
     "members",
+    "facts",
+    "own_nonzero",
     "add_applied_total",
     "inherited_nonzero_births_total",
 ];
@@ -1352,13 +1355,15 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
 mod tests {
     use super::*;
 
-    /// T25.F04: every checkpoint keeps the `pair_groups` aggregates, and
-    /// `rows` survives only on each world's last checkpoint.
+    /// T25.F04: every checkpoint keeps the `pair_groups` aggregates (with
+    /// T25.F10's `facts` and `own_nonzero`), and `rows` survives only on
+    /// each world's last checkpoint.
     #[test]
     fn pair_groups_keep_rows_only_on_the_last_sample() {
-        let aggregates = json!({"version": "pair-groups-v1", "creatures": 5,
+        let aggregates = json!({"version": "pair-groups-v2", "creatures": 5,
             "carriers": 3, "groups": 2, "groups_nonzero": 1, "groups_unreachable": 0,
-            "members": 24, "add_applied_total": 7, "inherited_nonzero_births_total": 4});
+            "members": 24, "facts": 5, "own_nonzero": 3, "add_applied_total": 7,
+            "inherited_nonzero_births_total": 4});
         let mut block = aggregates.clone();
         block["rows"] = json!([{"family": "AreaFoodSummary", "kind": "Move", "offset": 0}]);
         block["unknown"] = json!(1);

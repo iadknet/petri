@@ -584,7 +584,7 @@ mod tests {
         let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
         let layout = area.direction_pairs()[1];
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_group(0, 1, layout, DirectedVoteKind::StealEnergy, 5);
+        def.add_pair_group(0, 1, layout, DirectedVoteKind::StealEnergy, 5, &[]);
         let node = NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![area.clone()],

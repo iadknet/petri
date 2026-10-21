@@ -821,7 +821,7 @@ pub struct PersistenceSample {
     #[serde(default)]
     pub occupancy_grid: Option<OccupancyGrid>,
     /// The `DirectionPair` groups the living population carries on reachable
-    /// nodes (T25.F04, `pair-groups-v1`). `null` at extinction, absent in
+    /// nodes (T25.F04, `pair-groups-v2` since T25.F10). `null` at extinction, absent in
     /// reports stored before T25.F04.
     #[serde(default)]
     pub pair_groups: Option<super::pair_groups::PairGroups>,

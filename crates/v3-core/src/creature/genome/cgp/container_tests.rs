@@ -969,7 +969,7 @@ fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.5),
     );
-    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset);
+    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset, &[]);
     (def, id)
 }
 
@@ -1308,7 +1308,7 @@ fn a_pair_group_adds_thirteen_units() {
     };
     let base = CgpGraphBackendDef::new_with_fixed_outputs();
     let mut grouped = base.clone();
-    grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0);
+    grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, &[]);
     assert_eq!(units(&grouped) - units(&base), 13);
     let genome = |def| crate::creature::genome::CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
@@ -1367,7 +1367,8 @@ proptest! {
     }
 
     /// A pair group's shift or retarget followed by its inverse returns an
-    /// equal def, holes and a ring group beside it included.
+    /// equal def, direction and fact holes, fact members (T25.F10) and a
+    /// ring group beside it included.
     #[test]
     fn pair_shift_then_unshift_is_identity(
         kind in 0usize..3,
@@ -1375,8 +1376,13 @@ proptest! {
         step in 1u8..8,
         other_kind in 0usize..3,
         holes in any::<u16>(),
+        with_facts in any::<bool>(),
     ) {
-        let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
+        let (mut def, id) = if with_facts {
+            fact_gene(DirectedVoteKind::ALL[kind], offset)
+        } else {
+            paired(DirectedVoteKind::ALL[kind], offset)
+        };
         def.add_group(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
         let members: Vec<_> = def.members(id).collect();
         // Punch holes, keeping the first member.
@@ -1530,8 +1536,9 @@ enum SeedOp {
     SetSource(usize, bool),
     SetPlasticity(usize),
     AddGroup(u8),
+    AddPairGene(u8),
     Relocate(u8),
-    Detach,
+    Detach(usize),
     RemoveGroup,
     SetScope(usize),
     SetInheritScale,
@@ -1550,8 +1557,9 @@ fn seed_op_strategy() -> impl Strategy<Value = SeedOp> {
         (0usize..64, any::<bool>()).prop_map(|(i, same)| SeedOp::SetSource(i, same)),
         (0usize..64).prop_map(SeedOp::SetPlasticity),
         (0u8..8).prop_map(SeedOp::AddGroup),
+        (0u8..8).prop_map(SeedOp::AddPairGene),
         (0u8..8).prop_map(SeedOp::Relocate),
-        Just(SeedOp::Detach),
+        (0usize..64).prop_map(SeedOp::Detach),
         Just(SeedOp::RemoveGroup),
         (0usize..64).prop_map(SeedOp::SetScope),
         Just(SeedOp::SetInheritScale),
@@ -1579,14 +1587,15 @@ proptest! {
     /// as its scale (in `(0.9, 1.5)`, so an integer own tag plus a scale tag
     /// is unique too) and, when seeded, the tag as its seed. Through any
     /// sequence of primitives on both surfaces (push, remove, split, the
-    /// source and weight writes, group creation, relocation, detach and
-    /// removal, scope, `inherit_scale` and scale writes, node removal, a
-    /// draft's clone) each row and the group slots stay aligned with their
-    /// edges and records (node duplication copies rows and is pinned by
-    /// `cgp_reproduction`'s copy-remove property): a seed is its own tag
-    /// exactly while the model keeps the tag seeded, `None` otherwise; a
-    /// detached member's seed is its composed weight when its edge or its
-    /// group was seeded.
+    /// source and weight writes, `Ring` and fact-bearing pair gene creation
+    /// (T25.F10), relocation, detach and removal, scope, `inherit_scale` and
+    /// scale writes, node removal, a draft's clone) each row and the group
+    /// slots stay aligned with their edges and records (node duplication
+    /// copies rows and is pinned by `cgp_reproduction`'s copy-remove
+    /// property): a seed is its own tag exactly while the model keeps the
+    /// tag seeded, `None` otherwise; a detached direction member's seed is
+    /// its composed weight when its edge or its group was seeded, a detached
+    /// fact member keeps its own bits and seed entry.
     #[test]
     fn seed_rows_follow_their_edges_through_every_primitive(
         ops in prop::collection::vec(seed_op_strategy(), 1..40),
@@ -1631,7 +1640,7 @@ proptest! {
         }
         let mut seeded_scales: std::collections::BTreeSet<u32> =
             def.groups().iter().map(|group| group.scale().to_bits()).collect();
-        let refs = ring_refs();
+        let refs = pair_refs();
         for op in ops {
             let sites: Vec<EdgeOccurrence> = def.edge_sites().collect();
             let pick = |i: usize| sites.get(i % sites.len().max(1)).copied();
@@ -1692,20 +1701,37 @@ proptest! {
                         tag_group(&mut def, id, &mut fresh);
                     }
                 }
+                SeedOp::AddPairGene(offset) => {
+                    if def.can_host_group() && def.groups().len() < 3 {
+                        let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset, facts());
+                        prop_assert_eq!(def.birth_seeds().unwrap().group_value(id), None);
+                        tag_group(&mut def, id, &mut fresh);
+                    }
+                }
                 SeedOp::Relocate(offset) => {
                     if !def.groups().is_empty() {
                         def.relocate_group(GroupId::new(0), DirectedVoteKind::Reproduce, offset);
                     }
                 }
-                SeedOp::Detach => {
-                    if let Some(member) = def.groups().first().and_then(|_| def.members(GroupId::new(0)).next()) {
+                SeedOp::Detach(i) => {
+                    let members: Vec<EdgeOccurrence> = if def.groups().is_empty() { Vec::new() } else { def.members(GroupId::new(0)).collect() };
+                    if let Some(&member) = members.get(i % members.len().max(1)) {
+                        let fact = def.member_site(member) == Some(MemberSite::Drive);
                         let pattern = def.member_pattern(member, &refs);
                         let own = def.edge_at(member).own_weight();
                         let scale = def.groups()[0].scale();
-                        let seeded = seeded_tags.remove(&own.to_bits()) || seeded_scales.contains(&scale.to_bits());
+                        let edge_seeded = seeded_tags.remove(&own.to_bits());
+                        // A fact member detaches own-only (T25.F10): its bits
+                        // and its seed entry stay; a direction member's seed
+                        // composes when its edge or its group was seeded.
+                        let seeded = edge_seeded || (!fact && seeded_scales.contains(&scale.to_bits()));
                         let (detached, _) = def.detach_at(member, pattern);
                         let composed = def.edge_at(detached).own_weight();
-                        prop_assert_eq!(composed, compose(own, scale, pattern));
+                        if fact {
+                            prop_assert_eq!(composed.to_bits(), own.to_bits());
+                        } else {
+                            prop_assert_eq!(composed, compose(own, scale, pattern));
+                        }
                         if seeded {
                             seeded_tags.insert(composed.to_bits());
                         }
@@ -1912,4 +1938,315 @@ fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_group_seed
         (seeds.value(member), seeds.group_value(id)),
         (Some(2.0), None)
     );
+}
+
+// ── Fact members (T25.F10) ──────────────────────────────────────────────────
+
+/// The pair's declared facts.
+fn facts() -> &'static [u16] {
+    pair_layout().facts
+}
+
+/// `paired` with the pair's fact members, after an independent edge on the
+/// kind's drive: one gene, twelve direction members and three facts.
+fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    def.push_edge(
+        EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
+        GraphEdge::new(leaf(0), 0.5),
+    );
+    let drive = drive_sink(&def, kind);
+    def.push_edge(drive, GraphEdge::new(leaf(0), -0.5));
+    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset, facts());
+    (def, id)
+}
+
+/// The fact members of `id`, in canonical order.
+fn fact_members(def: &CgpGraphBackendDef, id: GroupId) -> Vec<EdgeOccurrence> {
+    def.members(id)
+        .filter(|&member| def.member_site(member) == Some(MemberSite::Drive))
+        .collect()
+}
+
+fn drive_sink(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> EdgeSurface {
+    def.sink_surface(OutputSinkKind::ActionVote(kind.drive()))
+        .unwrap()
+}
+
+/// Invariant 3: the pair gene is the record, twelve direction members and
+/// one fact member per declared fact on its kind's drive, after the drive's
+/// independent edge, every one born 0, static, at `Edge`, with pattern 0.
+#[test]
+fn a_pair_gene_places_one_fact_member_per_fact_on_its_kinds_drive() {
+    for kind in DirectedVoteKind::ALL {
+        let (mut def, id) = fact_gene(kind, 5);
+        assert_eq!(def.members(id).count(), 12 + facts().len());
+        let found = fact_members(&def, id);
+        let mut fields: Vec<u16> = found
+            .iter()
+            .map(|&member| match def.edge_at(member).source() {
+                GraphSource::InputLeaf { ref_idx, sub_idx } => {
+                    assert_eq!(ref_idx, PAIR_REF);
+                    sub_idx
+                }
+                other => panic!("a fact member reads a leaf, not {other:?}"),
+            })
+            .collect();
+        let mut want = facts().to_vec();
+        want.sort_unstable();
+        fields.sort_unstable();
+        assert_eq!(fields, want);
+        let drive = drive_sink(&def, kind);
+        for (k, &member) in found.iter().enumerate() {
+            assert_eq!(member.surface, drive);
+            assert_eq!(member.index, k + 1, "after the independent prefix");
+            let edge = def.edge_at(member);
+            assert_eq!(edge.own_weight(), 0.0);
+            assert_eq!(edge.plasticity(), None);
+            assert_eq!(edge.membership().unwrap().scope, Scope::Edge);
+            assert_eq!(def.member_pattern(member, &pair_refs()), 0.0);
+        }
+        // Pattern 0 by role: the scale never reaches a fact member.
+        def.group_mut(id).set_scale(3.0);
+        for &member in &found {
+            def.edge_mut(member).set_weight(0.25);
+            assert_eq!(def.genomic_weight(member, &pair_refs()), 0.25);
+        }
+        assert_eq!(validate_graph(&pair_node(def, pair_refs())), Ok(()));
+    }
+}
+
+/// `can_host_facts` reads only the kind's drive sink; a gene with facts
+/// asks for it.
+#[test]
+fn can_host_facts_needs_the_kinds_drive_sink() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    assert!(DirectedVoteKind::ALL
+        .into_iter()
+        .all(|kind| def.can_host_facts(kind)));
+    let drive = OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive());
+    def.output_sinks.0.retain(|sink| sink.kind != drive);
+    assert!(!def.can_host_facts(DirectedVoteKind::Reproduce));
+    assert!(def.can_host_facts(DirectedVoteKind::Move));
+    assert!(def.can_host_group());
+    let result = std::panic::catch_unwind(move || {
+        def.add_pair_group(
+            PAIR_REF,
+            1,
+            pair_layout(),
+            DirectedVoteKind::Reproduce,
+            0,
+            facts(),
+        );
+    });
+    assert!(result.is_err());
+}
+
+/// Relocation: a shift leaves fact members on their drive, a retarget
+/// moves them to the new kind's drive keeping own weight, plasticity, scope
+/// and seed; the inverse restores the def and its seeds.
+#[test]
+fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
+    let (mut def, id) = fact_gene(DirectedVoteKind::Move, 2);
+    for (k, member) in fact_members(&def, id).into_iter().enumerate() {
+        def.edge_mut(member).set_weight(k as f32 - 0.5);
+        def.edge_mut(member).set_plasticity(plastic());
+        def.edge_mut(member).set_scope(Scope::Group);
+    }
+    let seeds: Vec<(EdgeOccurrence, f32)> = def
+        .members(id)
+        .enumerate()
+        .map(|(k, member)| (member, 50.0 + k as f32))
+        .collect();
+    seed_with(&mut def, &seeds, &[(id, 4.0)]);
+    let snapshot = |def: &CgpGraphBackendDef| {
+        fact_members(def, id)
+            .into_iter()
+            .map(|member| {
+                (
+                    *def.edge_at(member),
+                    def.birth_seeds().unwrap().value(member),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let facts_before = snapshot(&def);
+    let original = def.clone();
+    let original_seeds = def.birth_seeds().unwrap().clone();
+
+    def.relocate_group(id, DirectedVoteKind::Move, 3);
+    let move_drive = drive_sink(&def, DirectedVoteKind::Move);
+    assert!(fact_members(&def, id)
+        .iter()
+        .all(|member| member.surface == move_drive));
+    assert_eq!(snapshot(&def), facts_before);
+
+    def.relocate_group(id, DirectedVoteKind::StealEnergy, 3);
+    let steal_drive = drive_sink(&def, DirectedVoteKind::StealEnergy);
+    let moved = fact_members(&def, id);
+    assert_eq!(moved.len(), facts().len());
+    assert!(moved.iter().all(|member| member.surface == steal_drive));
+    assert_eq!(snapshot(&def), facts_before);
+    assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
+
+    def.relocate_group(id, DirectedVoteKind::Move, 2);
+    assert_eq!(def, original);
+    assert_eq!(def.birth_seeds().unwrap(), &original_seeds);
+}
+
+/// Validation by role: a fact member reads one of its pair's facts on its
+/// own kind's drive, only in a `DirectionPair` gene; a direction member
+/// never reads a fact; a repeated fact is a duplicate.
+#[test]
+fn validate_graph_checks_each_member_role_by_its_site() {
+    let (def, id) = fact_gene(DirectedVoteKind::Move, 1);
+    let refs = pair_refs();
+    assert_eq!(
+        validate_graph(&pair_node(def.clone(), refs.clone())),
+        Ok(())
+    );
+    let fact = fact_members(&def, id)[0];
+    let EdgeSurface::SinkInput(drive) = fact.surface else {
+        unreachable!()
+    };
+    let rewrite = |def: &mut CgpGraphBackendDef, at: EdgeOccurrence, sub_idx: u16| {
+        let EdgeSurface::SinkInput(sink) = at.surface else {
+            unreachable!()
+        };
+        def.output_sinks.0[sink].inputs.0[at.index].source = GraphSource::InputLeaf {
+            ref_idx: PAIR_REF,
+            sub_idx,
+        };
+        resort(def, sink);
+    };
+    // A fact member reading the pair's x field.
+    let mut x_on_drive = def.clone();
+    rewrite(&mut x_on_drive, fact, PX);
+    assert_eq!(x_on_drive.check_local_invariants(), Ok(()));
+    assert_eq!(
+        validate_graph(&pair_node(x_on_drive, refs.clone())),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+    // A direction member reading a fact.
+    let direction = def.members(id).next().unwrap();
+    let mut fact_on_direction = def.clone();
+    rewrite(&mut fact_on_direction, direction, facts()[0]);
+    assert_eq!(
+        validate_graph(&pair_node(fact_on_direction, refs.clone())),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+    // A fact member on another kind's drive.
+    let mut other_drive = def.clone();
+    let edge = other_drive.output_sinks.0[drive]
+        .inputs
+        .0
+        .remove(fact.index);
+    let EdgeSurface::SinkInput(steal) = drive_sink(&def, DirectedVoteKind::StealEnergy) else {
+        unreachable!()
+    };
+    other_drive.output_sinks.0[steal].inputs.0.push(edge);
+    assert_eq!(
+        other_drive.check_local_invariants(),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+    // A repeated fact member.
+    let mut duplicate = def.clone();
+    let copied = *duplicate.edge_at(fact);
+    duplicate.output_sinks.0[drive]
+        .inputs
+        .0
+        .insert(fact.index, copied);
+    assert_eq!(
+        duplicate.check_local_invariants(),
+        Err(GraphInvariantViolation::DuplicateMember)
+    );
+    // A `Ring` member on its kind's drive.
+    let (mut ringed, ring_id) = grouped(DirectedVoteKind::Move, 0);
+    let member = ringed.members(ring_id).next().unwrap();
+    let EdgeSurface::SinkInput(sink) = member.surface else {
+        unreachable!()
+    };
+    let edge = ringed.output_sinks.0[sink].inputs.0.remove(member.index);
+    let EdgeSurface::SinkInput(move_drive) = drive_sink(&ringed, DirectedVoteKind::Move) else {
+        unreachable!()
+    };
+    ringed.output_sinks.0[move_drive].inputs.0.push(edge);
+    assert_eq!(
+        ringed.check_local_invariants(),
+        Err(GraphInvariantViolation::MemberShape)
+    );
+}
+
+/// Deletion: removing a fact member leaves a fact hole; a gene outlives its
+/// direction members, and a fact-only survivor validates and round-trips
+/// genome JSON; its last member's removal drops the record.
+#[test]
+fn a_fact_only_survivor_is_a_valid_gene_until_its_last_member_goes() {
+    let (mut def, id) = fact_gene(DirectedVoteKind::Reproduce, 4);
+    let hole = fact_members(&def, id)[1];
+    def.remove_edge(hole);
+    assert_eq!(fact_members(&def, id).len(), facts().len() - 1);
+    loop {
+        let direction = def
+            .members(id)
+            .find(|&member| def.member_site(member) != Some(MemberSite::Drive));
+        let Some(direction) = direction else { break };
+        def.remove_edge(direction);
+    }
+    assert_eq!(def.groups().len(), 1);
+    assert_eq!(def.members(id).count(), facts().len() - 1);
+    let node = pair_node(def.clone(), pair_refs());
+    assert_eq!(validate_graph(&node), Ok(()));
+    let loaded: NodeGenome = serde_json::from_str(&serde_json::to_string(&node).unwrap()).unwrap();
+    assert_eq!(loaded, node);
+    assert_eq!(validate_graph(&loaded), Ok(()));
+    while let Some(member) = def.groups().first().and_then(|_| def.members(id).next()) {
+        def.remove_edge(member);
+    }
+    assert!(def.groups().is_empty());
+}
+
+/// R8: a fact member detaches own-only: its bits (`-0.0` included) and its
+/// seed entry stay as stored, `None` staying `None` beside a group seed;
+/// it moves to the independent prefix of its drive; the last member's
+/// detach drops the record.
+#[test]
+fn a_fact_member_detaches_own_only() {
+    let (mut def, id) = fact_gene(DirectedVoteKind::Move, 0);
+    def.group_mut(id).set_scale(0.5);
+    let found = fact_members(&def, id);
+    def.edge_mut(found[0]).set_weight(-0.0);
+    def.edge_mut(found[1]).set_weight(0.75);
+    seed_with(&mut def, &[(found[1], 9.0)], &[(id, 12.0)]);
+    let refs = pair_refs();
+    let drive = drive_sink(&def, DirectedVoteKind::Move);
+
+    let (at, removed) = detach(&mut def, found[0], &refs);
+    assert!(!removed);
+    assert_eq!(at.surface, drive);
+    assert_eq!(at.index, 1, "the end of the independent prefix");
+    let edge = def.edge_at(at);
+    assert_eq!(edge.membership(), None);
+    assert_eq!(edge.own_weight().to_bits(), (-0.0f32).to_bits());
+    assert_eq!(
+        def.birth_seeds().unwrap().value(at),
+        None,
+        "no seed manufactured from the group seed"
+    );
+
+    let seeded = fact_members(&def, id)[0];
+    assert_eq!(def.edge_at(seeded).own_weight(), 0.75);
+    let (at, _) = detach(&mut def, seeded, &refs);
+    assert_eq!(def.edge_at(at).own_weight().to_bits(), 0.75f32.to_bits());
+    assert_eq!(def.birth_seeds().unwrap().value(at), Some(9.0));
+    assert_eq!(
+        validate_graph(&pair_node(def.clone(), refs.clone())),
+        Ok(())
+    );
+
+    while let Some(member) = def.groups().first().and_then(|_| def.members(id).next()) {
+        detach(&mut def, member, &refs);
+    }
+    assert!(def.groups().is_empty());
+    assert!(def.birth_seeds().unwrap().group_slots().is_empty());
 }

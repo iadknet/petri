@@ -870,7 +870,7 @@ fn a_node_voting_only_through_pair_members_is_a_motor_node() {
         (DirectedVoteKind::Reproduce, false),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 6);
+        def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 6, &[]);
         let genome = one_node(node(0, vec![area.clone()], BackendDef::Graph(def)));
         assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
     }

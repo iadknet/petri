@@ -12,7 +12,7 @@ use std::ops::Deref;
 
 use super::edge::{GraphEdge, GraphSource};
 use super::edge::{Membership, Scope};
-use super::group::{compose, pair_birth_members, Group, GroupId, Shape};
+use super::group::{compose, pair_birth_members, Group, GroupId, MemberSite, Shape};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
@@ -442,23 +442,26 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
             return Err(GraphInvariantViolation::ShapeReference);
         }
     }
-    // I4's pair role: every `DirectionPair` member reads its pair's `x` or
-    // `y` field.
+    // I4's pair roles (T25.F10): a direction member reads its pair's `x` or
+    // `y` field, a fact member one of its pair's `facts`.
     for sink in def.output_sinks.iter() {
         for edge in sink.inputs.iter() {
             let Some(Membership { group, .. }) = edge.membership else {
                 continue;
             };
-            let Some(pair) = def.groups[group.index()]
-                .shape
-                .resolve_pair(&node.input_refs)
-            else {
+            let record = &def.groups[group.index()];
+            let Some(pair) = record.shape.resolve_pair(&node.input_refs) else {
                 continue;
             };
             let GraphSource::InputLeaf { sub_idx, .. } = edge.source else {
                 return Err(GraphInvariantViolation::MemberShape);
             };
-            if sub_idx != pair.x && sub_idx != pair.y {
+            let fits = match MemberSite::of(sink.kind, record.kind) {
+                Some(MemberSite::Direction(_)) => sub_idx == pair.x || sub_idx == pair.y,
+                Some(MemberSite::Drive) => pair.facts.contains(&sub_idx),
+                None => false,
+            };
+            if !fits {
                 return Err(GraphInvariantViolation::MemberShape);
             }
         }
@@ -684,9 +687,11 @@ impl CgpGraphBackendDef {
         )
     }
 
-    /// The pattern of member `edge` on a sink of kind `sink`: its group's at
-    /// the member's field and the sink's direction (`u16::MAX` / `u8::MAX`,
-    /// pattern 0 for a pair group, when either is absent).
+    /// The pattern of member `edge` on a sink of kind `sink`: 0 for a fact
+    /// member, by role, before any geometry (T25.F10); otherwise its group's
+    /// at the member's field and the sink's direction (pattern 0 for a
+    /// member that reads no input leaf or sits on no direction sink of its
+    /// group's kind).
     fn pattern_at(
         &self,
         edge: &GraphEdge,
@@ -694,12 +699,28 @@ impl CgpGraphBackendDef {
         input_refs: &[InputReference],
     ) -> f32 {
         let Membership { group, .. } = edge.membership.expect("pattern_at: a member");
-        let sub_idx = match edge.source {
-            GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
-            _ => u16::MAX,
+        let record = &self.groups[group.index()];
+        let (GraphSource::InputLeaf { sub_idx, .. }, Some(MemberSite::Direction(direction))) =
+            (edge.source, MemberSite::of(sink, record.kind))
+        else {
+            return 0.0;
         };
-        let direction = sink.direction().map_or(u8::MAX, |(_, d)| d);
-        self.groups[group.index()].pattern(input_refs, sub_idx, direction)
+        record.pattern(input_refs, sub_idx, direction)
+    }
+
+    /// The site of the member at `occurrence` relative to its group's kind
+    /// (T25.F10); `None` for an ungrouped edge or a member off its kind's
+    /// sinks (a broken genome).
+    #[must_use]
+    pub fn member_site(&self, occurrence: EdgeOccurrence) -> Option<MemberSite> {
+        let EdgeSurface::SinkInput(sink) = occurrence.surface else {
+            return None;
+        };
+        let Membership { group, .. } = self.edge_at(occurrence).membership?;
+        MemberSite::of(
+            self.output_sinks[sink].kind,
+            self.groups[group.index()].kind,
+        )
     }
 
     /// One row per sink, one genomic weight per sink edge in order: the
@@ -1077,13 +1098,23 @@ impl CgpGraphBackendDef {
     pub fn can_host_group(&self) -> bool {
         self.groups.len() < usize::from(u16::MAX)
             && Kind::ALL.into_iter().all(|kind| {
-                (0..VOTE_DIRECTION_COUNT).all(|d| self.direction_sink(kind, d).is_some())
+                (0..VOTE_DIRECTION_COUNT)
+                    .all(|d| self.site_sink(kind, MemberSite::Direction(d)).is_some())
             })
     }
 
-    /// The catalog index of `kind`'s direction-`d` sink, when present.
-    fn direction_sink(&self, kind: Kind, d: u8) -> Option<usize> {
-        let target = OutputSinkKind::ActionVote(kind.sink(d));
+    /// Whether a gene of kind `kind` can carry fact members: `kind`'s drive
+    /// sink is present (T25.F10). Recruitment's pair preflight and
+    /// `RetargetGroupKind` read it.
+    #[must_use]
+    pub fn can_host_facts(&self, kind: Kind) -> bool {
+        self.site_sink(kind, MemberSite::Drive).is_some()
+    }
+
+    /// The catalog index of the sink `site` names for a kind-`kind` group,
+    /// when present.
+    fn site_sink(&self, kind: Kind, site: MemberSite) -> Option<usize> {
+        let target = site.sink(kind);
         self.output_sinks
             .iter()
             .position(|sink| sink.kind == target)
@@ -1122,7 +1153,7 @@ impl CgpGraphBackendDef {
             let direction = (channel + offset) % VOTE_DIRECTION_COUNT;
             self.insert_member(
                 Self::new_member(id, ring_ref, u16::from(channel)),
-                direction,
+                MemberSite::Direction(direction),
                 None,
             );
         }
@@ -1130,14 +1161,20 @@ impl CgpGraphBackendDef {
         id
     }
 
-    /// Create a `DirectionPair` group on pair `pair` (`layout`, the pair
+    /// Create a `DirectionPair` gene on pair `pair` (`layout`, the pair
     /// `input_refs[ref_idx]` declares there) into `kind` at `offset`: one
-    /// record at scale 0 and the twelve members whose pattern is non-zero
-    /// ([`super::pair_birth_members`]) at own weight 0. A new group is silent.
+    /// record at scale 0, the twelve direction members whose pattern is
+    /// non-zero ([`super::pair_birth_members`]), then one fact member on
+    /// `kind`'s drive sink per field of `facts`, in `facts` order (T25.F10):
+    /// every member born at own weight 0, static, scope `Edge`, no seed. A
+    /// new gene is silent. `AddDirectionPairGroup` passes no facts;
+    /// recruitment's pair case passes `layout.facts`.
     ///
     /// # Panics
     ///
-    /// If [`Self::can_host_group`] is false or `offset >= 8`.
+    /// If [`Self::can_host_group`] is false, `offset >= 8`, a field of
+    /// `facts` is not one of `layout.facts`, or `facts` is non-empty and
+    /// [`Self::can_host_facts`] is false for `kind`.
     pub fn add_pair_group(
         &mut self,
         ref_idx: u16,
@@ -1145,10 +1182,30 @@ impl CgpGraphBackendDef {
         layout: DirectionPair,
         kind: Kind,
         offset: u8,
+        facts: &[u16],
     ) -> GroupId {
+        assert!(
+            facts.iter().all(|field| layout.facts.contains(field)),
+            "add_pair_group: every fact member reads one of the pair's facts"
+        );
+        assert!(
+            facts.is_empty() || self.can_host_facts(kind),
+            "add_pair_group: fact members need the kind's drive sink"
+        );
         let id = self.push_group_record(Shape::DirectionPair { ref_idx, pair }, kind, offset);
         for (field, direction) in pair_birth_members(layout, offset) {
-            self.insert_member(Self::new_member(id, ref_idx, field), direction, None);
+            self.insert_member(
+                Self::new_member(id, ref_idx, field),
+                MemberSite::Direction(direction),
+                None,
+            );
+        }
+        for &field in facts {
+            self.insert_member(
+                Self::new_member(id, ref_idx, field),
+                MemberSite::Drive,
+                None,
+            );
         }
         self.debug_assert_groups();
         id
@@ -1192,13 +1249,15 @@ impl CgpGraphBackendDef {
     /// Move `group` to `kind` at `offset` (`ShiftGroupOffset`,
     /// `RetargetGroupKind`): every member leaves its sink and is re-inserted
     /// at its new sink in the I10 position, keeping its own weight. A `Ring`
-    /// member moves by its channel; a `DirectionPair` member on direction `d`
-    /// moves to `(d + offset − old_offset) mod 8`, so every member's
-    /// relative coordinate, holes included, is preserved.
+    /// member moves by its channel; a `DirectionPair` direction member on
+    /// direction `d` moves to `(d + offset − old_offset) mod 8`, so every
+    /// member's relative coordinate, holes included, is preserved; a fact
+    /// member moves to the new kind's drive sink (T25.F10).
     ///
     /// # Panics
     ///
-    /// If `offset >= 8`.
+    /// If `offset >= 8`, or the group has a fact member and
+    /// [`Self::can_host_facts`] is false for `kind`.
     pub fn relocate_group(&mut self, group: GroupId, kind: Kind, offset: u8) {
         assert!(
             offset < VOTE_DIRECTION_COUNT,
@@ -1211,15 +1270,18 @@ impl CgpGraphBackendDef {
         record.kind = kind;
         record.offset = offset;
         let record = *record;
-        for (edge, direction, seed) in moved {
-            let direction = match record.shape {
-                Shape::Ring { .. } => {
+        for (edge, site, seed) in moved {
+            let site = match (record.shape, site) {
+                (_, MemberSite::Drive) => MemberSite::Drive,
+                (Shape::Ring { .. }, MemberSite::Direction(_)) => {
                     let (_, channel) = Self::member_key(&edge).expect("a member");
-                    member_direction(&record, channel)
+                    MemberSite::Direction(member_direction(&record, channel))
                 }
-                Shape::DirectionPair { .. } => (direction + n - old.offset + offset) % n,
+                (Shape::DirectionPair { .. }, MemberSite::Direction(d)) => {
+                    MemberSite::Direction((d + n - old.offset + offset) % n)
+                }
             };
-            self.insert_member(edge, direction, seed);
+            self.insert_member(edge, site, seed);
         }
         self.debug_assert_groups();
     }
@@ -1227,9 +1289,11 @@ impl CgpGraphBackendDef {
     /// Detach the member at `occurrence` with its group's `pattern` there:
     /// its own weight becomes its genomic weight
     /// `compose(own, scale, pattern)`, bitwise, its membership is cleared and
-    /// it moves to the end of its sink's independent prefix. Detaching a
-    /// group's last member removes the group. Returns the edge's new
-    /// occurrence and whether the group was removed.
+    /// it moves to the end of its sink's independent prefix. A fact member
+    /// (T25.F10) detaches own-only: its own weight bits and its seed entry
+    /// stay exactly as stored and `pattern` is not read. Detaching a group's
+    /// last member removes the group. Returns the edge's new occurrence and
+    /// whether the group was removed.
     pub fn detach_at(
         &mut self,
         occurrence: EdgeOccurrence,
@@ -1238,29 +1302,32 @@ impl CgpGraphBackendDef {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             panic!("detach_at: only a sink edge is a member");
         };
+        let fact = self.member_site(occurrence) == Some(MemberSite::Drive);
         let mut edge = self.output_sinks.0[sink].inputs.0.remove(occurrence.index);
-        let seed = self
+        let mut seed = self
             .birth_seeds
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
         let Membership { group, .. } = edge.membership.expect("detach_at: the edge is a member");
-        let scale = self.groups[group.index()].scale;
-        // The composed seed (T25.F07 invariant 6): what the detached edge
-        // weighed at the parent, from the edge's and the group's seeds, each
-        // falling back to its genomic value; no flag read and no clamp
-        // (`from_seeds` clamps at construction).
-        let group_seed = self
-            .birth_seeds
-            .as_ref()
-            .and_then(|seeds| seeds.group_value(group));
-        let seed = (seed.is_some() || group_seed.is_some()).then(|| {
-            compose(
-                seed.unwrap_or(edge.own_weight),
-                group_seed.unwrap_or(scale),
-                pattern,
-            )
-        });
-        edge.own_weight = compose(edge.own_weight, scale, pattern);
+        if !fact {
+            let scale = self.groups[group.index()].scale;
+            // The composed seed (T25.F07 invariant 6): what the detached
+            // edge weighed at the parent, from the edge's and the group's
+            // seeds, each falling back to its genomic value; no flag read and
+            // no clamp (`from_seeds` clamps at construction).
+            let group_seed = self
+                .birth_seeds
+                .as_ref()
+                .and_then(|seeds| seeds.group_value(group));
+            seed = (seed.is_some() || group_seed.is_some()).then(|| {
+                compose(
+                    seed.unwrap_or(edge.own_weight),
+                    group_seed.unwrap_or(scale),
+                    pattern,
+                )
+            });
+            edge.own_weight = compose(edge.own_weight, scale, pattern);
+        }
         edge.membership = None;
         let at = self.first_member(sink);
         self.output_sinks.0[sink].inputs.0.insert(at, edge);
@@ -1304,14 +1371,14 @@ impl CgpGraphBackendDef {
         Some((group, channel))
     }
 
-    /// Insert member `edge` with `seed` on its group's direction-`direction`
-    /// sink in the I10 position.
-    fn insert_member(&mut self, edge: GraphEdge, direction: u8, seed: Option<f32>) {
+    /// Insert member `edge` with `seed` on the sink `site` names for its
+    /// group's kind, in the I10 position.
+    fn insert_member(&mut self, edge: GraphEdge, site: MemberSite, seed: Option<f32>) {
         let key = Self::member_key(&edge);
         let (group, _) = key.expect("a member");
         let sink = self
-            .direction_sink(self.groups[group.index()].kind, direction)
-            .expect("a group's graph carries every direction sink");
+            .site_sink(self.groups[group.index()].kind, site)
+            .expect("a group's graph carries every sink its members sit on");
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
             .iter()
@@ -1324,11 +1391,18 @@ impl CgpGraphBackendDef {
     }
 
     /// Remove every member of `group` from its sink, in canonical order,
-    /// each with its sink's direction (0 off a direction sink) and its seed.
-    fn take_members(&mut self, group: GroupId) -> Vec<(GraphEdge, u8, Option<f32>)> {
+    /// each with its site and its seed.
+    fn take_members(&mut self, group: GroupId) -> Vec<(GraphEdge, MemberSite, Option<f32>)> {
+        let kind = self.groups[group.index()].kind;
         let mut taken = Vec::with_capacity(usize::from(2 * VOTE_DIRECTION_COUNT));
         for (sink_idx, sink) in self.output_sinks.0.iter_mut().enumerate() {
-            let direction = sink.kind.direction().map_or(0, |(_, d)| d);
+            let Some(site) = MemberSite::of(sink.kind, kind) else {
+                debug_assert!(
+                    !sink.inputs.iter().any(|edge| edge.is_member_of(group)),
+                    "a member sits on a sink of its group's kind"
+                );
+                continue;
+            };
             let mut seeds = self
                 .birth_seeds
                 .as_mut()
@@ -1338,7 +1412,7 @@ impl CgpGraphBackendDef {
                 if sink.inputs[index].is_member_of(group) {
                     let edge = sink.inputs.0.remove(index);
                     let seed = seeds.as_mut().and_then(|row| row.remove(index));
-                    taken.push((edge, direction, seed));
+                    taken.push((edge, site, seed));
                 } else {
                     index += 1;
                 }
@@ -1377,8 +1451,9 @@ impl CgpGraphBackendDef {
 
     /// The invariants that need only the def (I2–I6, I10, `offset < 8`). A
     /// group's member set is keyed by channel for a `Ring` and by
-    /// `(sub_idx, direction)` for a `DirectionPair`; the pair's field roles
-    /// need the input references ([`validate_graph`]).
+    /// `(sub_idx, site)` for a `DirectionPair` (a drive site only on the
+    /// record's kind, T25.F10); the pair's field roles need the input
+    /// references ([`validate_graph`]).
     pub(crate) fn check_local_invariants(&self) -> Result<(), GraphInvariantViolation> {
         use GraphInvariantViolation as V;
         if self.groups.len() > usize::from(u16::MAX) {
@@ -1416,7 +1491,7 @@ impl CgpGraphBackendDef {
         let mut members = vec![0u32; self.groups.len()];
         let mut ring_channels = vec![0u8; self.groups.len()];
         let mut pair_coordinates = std::collections::HashSet::new();
-        for (sink_idx, sink) in self.output_sinks.iter().enumerate() {
+        for sink in self.output_sinks.iter() {
             let mut previous: Option<(GroupId, u16)> = None;
             let mut in_members = false;
             for edge in sink.inputs.iter() {
@@ -1437,27 +1512,27 @@ impl CgpGraphBackendDef {
                 let Some(record) = self.groups.get(group.index()) else {
                     return Err(V::GroupIdOutOfRange);
                 };
-                let on_kind = sink
-                    .kind
-                    .direction()
-                    .filter(|&(kind, _)| kind == record.kind)
-                    .map(|(_, d)| d);
                 let reads_shape_ref = matches!(
                     edge.source,
                     GraphSource::InputLeaf { ref_idx, .. } if ref_idx == record.shape.ref_idx()
                 );
-                let fits = match record.shape {
-                    Shape::Ring { .. } => {
-                        sub_idx < u16::from(VOTE_DIRECTION_COUNT)
-                            && reads_shape_ref
-                            && self.direction_sink(record.kind, member_direction(record, sub_idx))
-                                == Some(sink_idx)
-                    }
-                    Shape::DirectionPair { .. } => reads_shape_ref && on_kind.is_some(),
-                };
-                if !fits {
+                // A `Ring` member sits on the direction sink of its channel;
+                // a `DirectionPair` member on a direction sink of its kind
+                // or, as a fact member, on its kind's drive (T25.F10).
+                let site = MemberSite::of(sink.kind, record.kind).filter(|&site| {
+                    reads_shape_ref
+                        && match (record.shape, site) {
+                            (Shape::Ring { .. }, MemberSite::Direction(d)) => {
+                                sub_idx < u16::from(VOTE_DIRECTION_COUNT)
+                                    && member_direction(record, sub_idx) == d
+                            }
+                            (Shape::Ring { .. }, MemberSite::Drive) => false,
+                            (Shape::DirectionPair { .. }, _) => true,
+                        }
+                });
+                let Some(site) = site else {
                     return Err(V::MemberShape);
-                }
+                };
                 let fresh = match record.shape {
                     Shape::Ring { .. } => {
                         let bit = 1u8 << sub_idx;
@@ -1465,9 +1540,7 @@ impl CgpGraphBackendDef {
                         ring_channels[group.index()] |= bit;
                         fresh
                     }
-                    Shape::DirectionPair { .. } => {
-                        pair_coordinates.insert((group, sub_idx, on_kind.expect("fits")))
-                    }
+                    Shape::DirectionPair { .. } => pair_coordinates.insert((group, sub_idx, site)),
                 };
                 if !fresh {
                     return Err(V::DuplicateMember);
