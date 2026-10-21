@@ -1,4 +1,4 @@
-use super::super::{phase_0_energy_charge, run_phase_0};
+use super::super::{run_phase_0, Phase0Charge};
 use super::support::*;
 use crate::config::SimulationConfig;
 use crate::contracts::Position;
@@ -203,18 +203,21 @@ fn phase_0_records_the_carrier_outcome_under_its_birth_edge_class() {
 
 #[test]
 fn phase_0_charge_is_decay_plus_the_rate_times_the_genome_size() {
-    assert_eq!(phase_0_energy_charge(0.5, 1e-4, 111), 0.5 + 111.0 * 1e-4);
+    assert_eq!(
+        Phase0Charge::new(0.5, 1e-4, 111, 0.0).base,
+        0.5 + 111.0 * 1e-4
+    );
 }
 
 #[test]
 fn phase_0_charge_at_rate_one_and_no_decay_is_the_genome_size() {
-    assert_eq!(phase_0_energy_charge(0.0, 1.0, 250), 250.0);
+    assert_eq!(Phase0Charge::new(0.0, 1.0, 250, 0.0).base, 250.0);
 }
 
 #[test]
 fn phase_0_charge_without_a_rate_or_without_a_genome_is_the_decay_alone() {
-    assert_eq!(phase_0_energy_charge(0.5, 0.0, 6246), 0.5);
-    assert_eq!(phase_0_energy_charge(0.5, 1e-4, 0), 0.5);
+    assert_eq!(Phase0Charge::new(0.5, 0.0, 6246, 0.0).base, 0.5);
+    assert_eq!(Phase0Charge::new(0.5, 1e-4, 0, 0.0).base, 0.5);
 }
 
 #[test]
@@ -316,7 +319,7 @@ proptest! {
         size in 0u32..20_000,
     ) {
         prop_assert_eq!(
-            phase_0_energy_charge(decay, rate, size),
+            Phase0Charge::new(decay, rate, size, 0.0).base,
             decay + rate * size as f32
         );
     }
@@ -330,8 +333,8 @@ proptest! {
         extra in 1u32..20_000,
     ) {
         prop_assert!(
-            phase_0_energy_charge(decay, rate, size + extra)
-                >= phase_0_energy_charge(decay, rate, size)
+            Phase0Charge::new(decay, rate, size + extra, 0.0).base
+                >= Phase0Charge::new(decay, rate, size, 0.0).base
         );
     }
 
@@ -344,8 +347,8 @@ proptest! {
         size in 0u32..20_000,
     ) {
         prop_assert!(
-            phase_0_energy_charge(decay, rate + extra, size)
-                >= phase_0_energy_charge(decay, rate, size)
+            Phase0Charge::new(decay, rate + extra, size, 0.0).base
+                >= Phase0Charge::new(decay, rate, size, 0.0).base
         );
     }
 
@@ -357,8 +360,8 @@ proptest! {
         rate in 0.0f32..1.0,
         size in 0u32..20_000,
     ) {
-        prop_assert_eq!(phase_0_energy_charge(decay, 0.0, size).to_bits(), decay.to_bits());
-        prop_assert_eq!(phase_0_energy_charge(decay, rate, 0).to_bits(), decay.to_bits());
+        prop_assert_eq!(Phase0Charge::new(decay, 0.0, size, 0.0).base.to_bits(), decay.to_bits());
+        prop_assert_eq!(Phase0Charge::new(decay, rate, 0, 0.0).base.to_bits(), decay.to_bits());
     }
 
     /// A non-negative decay and a non-negative rate never credit energy.
@@ -368,6 +371,105 @@ proptest! {
         rate in 0.0f32..1.0,
         size in 0u32..20_000,
     ) {
-        prop_assert!(phase_0_energy_charge(decay, rate, size) >= 0.0);
+        prop_assert!(Phase0Charge::new(decay, rate, size, 0.0).base >= 0.0);
     }
+
+    /// At the reference (upkeep `0.0`) the settled charge is today's bit for
+    /// bit: one subtraction of `base`, today's decay-first booking, a zero
+    /// upkeep flow and never a death attributed to upkeep.
+    #[test]
+    fn a_reference_body_settles_todays_charge(
+        before in -10.0f32..1_000.0,
+        decay in 0.0f32..10.0,
+        rate in 0.0f32..1.0,
+        size in 0u32..20_000,
+    ) {
+        use crate::simulation::energy_accounting::{decay_partition, DeathCause};
+        let charge = Phase0Charge::new(decay, rate, size, 0.0);
+        let settled = charge.settle(before, decay);
+        prop_assert_eq!(settled.after.to_bits(), (before - charge.base).to_bits());
+        let (decay_share, carrying) = decay_partition(before, before - charge.base, decay);
+        prop_assert_eq!(settled.decay.to_bits(), decay_share.to_bits());
+        prop_assert_eq!(settled.carrying.to_bits(), carrying.to_bits());
+        prop_assert_eq!(settled.upkeep, 0.0);
+        if before > 0.0 && settled.after <= 0.0 {
+            prop_assert_ne!(settled.cause, DeathCause::CapacityUpkeep);
+        }
+    }
+
+    /// The three shares always sum to the applied debit, the applied charge
+    /// is never negative, and a body below the reference books a
+    /// non-positive upkeep.
+    #[test]
+    fn the_settled_shares_sum_to_the_applied_debit(
+        before in 0.0f32..1_000.0,
+        decay in 0.0f32..10.0,
+        rate in 0.0f32..0.01,
+        size in 0u32..2_000,
+        upkeep in -2.0f32..2.0,
+    ) {
+        let charge = Phase0Charge::new(decay, rate, size, upkeep);
+        let settled = charge.settle(before, decay);
+        prop_assert!(charge.applied() >= 0.0);
+        prop_assert!(settled.after <= before);
+        let applied = f64::from(before) - f64::from(settled.after);
+        prop_assert_eq!(settled.decay + settled.carrying + settled.upkeep, applied);
+        if upkeep <= 0.0 {
+            prop_assert!(settled.upkeep <= 0.0);
+        }
+    }
+}
+
+/// A large body's upkeep is charged beside decay and carrying and booked to
+/// `capacity_upkeep`; a death it causes is attributed to `CapacityUpkeep`.
+#[test]
+fn phase_0_charges_and_attributes_a_large_bodys_upkeep() {
+    use crate::simulation::energy_accounting::DeathCause;
+    let (mut sim, id) = make_sim_with_one_creature(1.0);
+    let lifecycle = &mut sim.config.energy.lifecycle;
+    lifecycle.energy_decay_per_tick = 0.25;
+    lifecycle.genome_carry_cost_per_unit = 0.0;
+    sim.config.energy.capacity.upkeep_per_unit = 0.0025;
+    sim.creatures[id].body.capacity = 600.0; // upkeep 0.0025 × 400 = 1.0
+    run_phase_0(&mut sim);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.lifecycle_decay, 0.25);
+    assert_eq!(flows.genome_carrying, 0.0);
+    assert_eq!(flows.capacity_upkeep, 1.0);
+    assert!(!sim.creatures.contains_key(id));
+    assert_eq!(sim.stats.mortality.count(DeathCause::CapacityUpkeep), 1);
+}
+
+/// A small body's negative upkeep lowers the charge, and the zero floor's
+/// shortfall lands in `capacity_upkeep`: the creature is never credited.
+#[test]
+fn a_small_bodys_negative_upkeep_is_floored_at_zero_charge() {
+    let (mut sim, id) = make_sim_with_one_creature(10.0);
+    let lifecycle = &mut sim.config.energy.lifecycle;
+    lifecycle.energy_decay_per_tick = 0.5;
+    lifecycle.genome_carry_cost_per_unit = 0.0;
+    sim.config.energy.capacity.upkeep_per_unit = 0.01;
+    sim.creatures[id].body.capacity = 50.0; // upkeep 0.01 × -150 = -1.5
+    run_phase_0(&mut sim);
+    assert_eq!(sim.creatures[id].energy, 10.0);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.lifecycle_decay, 0.5);
+    assert_eq!(flows.capacity_upkeep, -0.5);
+}
+
+/// T26.F02 invariant 5's attribution fixture: `before = 1`,
+/// `decay = 2^-25`, `carry × size = 1 − 2^-24`. The `f32` base rounds to
+/// exactly 1, so `before − base = 0` and the death is the carrying cost's,
+/// though the exact sum is below 1: a body at the reference is never
+/// attributed to upkeep.
+#[test]
+fn a_reference_death_on_the_rounded_base_is_attributed_to_carrying() {
+    use crate::simulation::energy_accounting::DeathCause;
+    let decay = 2.0f32.powi(-25);
+    let charge = Phase0Charge::new(decay, 1.0 - 2.0f32.powi(-24), 1, 0.0);
+    assert_eq!(charge.base, 1.0);
+    let settled = charge.settle(1.0, decay);
+    assert_eq!(settled.after, 0.0);
+    assert_eq!(settled.cause, DeathCause::GenomeCarrying);
+    assert_eq!(settled.upkeep, 0.0);
 }

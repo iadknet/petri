@@ -87,10 +87,11 @@ fn seeded_fixture(seed: u64) -> Simulation {
     sim
 }
 
-/// One entry per creature, in `SlotMap` order: position, energy as
-/// raw bits, age, generation, and the genome, compared by the genome's derived
-/// `PartialEq`. Floats go through `to_bits`, so equality is bit-for-bit.
-type CreatureFingerprint<'a> = (Position, u32, u64, u64, &'a CreatureGenome);
+/// One entry per creature, in `SlotMap` order: position, energy and
+/// capacity as raw bits, age, generation, and the genome, compared by the
+/// genome's derived `PartialEq`. Floats go through `to_bits`, so equality is
+/// bit-for-bit.
+type CreatureFingerprint<'a> = (Position, u32, u32, u64, u64, &'a CreatureGenome);
 
 fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
     sim.creatures
@@ -99,6 +100,7 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
             (
                 c.position,
                 c.energy.to_bits(),
+                c.body.capacity.to_bits(),
                 c.age,
                 c.generation,
                 &c.genome,
@@ -198,8 +200,10 @@ fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
             f.graph_compute,
             f.lifecycle_decay,
             f.genome_carrying,
+            f.capacity_upkeep,
             f.parental_transfer_debit,
             f.offspring_energy_credit,
+            f.offspring_capacity_overflow,
             f.predation_victim_debit,
             f.predation_attacker_credit,
             f.predation_kill_bonus_credit,

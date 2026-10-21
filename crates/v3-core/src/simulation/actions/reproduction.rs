@@ -511,11 +511,13 @@ fn spawn_child(
     let child_birth_edge_class = summary.birth_edge_class();
 
     // Step 11: Body inheritance — phenotype then kin-tag mutation, drawn only
-    // when at least one genome event was applied.
+    // when at least one genome event was applied, then the capacity draws
+    // drawn on every birth.
     let child_body = HeritableBody::inherit(
         &sim.creatures[parent_id].body,
         summary.applied_events > 0,
-        &sim.config.mutation.phenotype,
+        &sim.config.mutation,
+        &sim.config.energy,
         rng,
     );
 
@@ -558,6 +560,10 @@ fn spawn_child(
         child.heading = direction;
         child
     });
+    // The child is built with the whole litter; its body caps it here, and
+    // the excess is the parent's transfer the child cannot store.
+    sim.stats.energy_flows.offspring_capacity_overflow +=
+        super::cap_energy(&mut sim.creatures[child_id]);
     sim.stats.energy_flows.offspring_energy_credit += f64::from(sim.creatures[child_id].energy);
     sim.action_logs
         .insert(child_id, ActionLog::new(sim.config.action_log.capacity));

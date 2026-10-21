@@ -118,7 +118,7 @@ impl Context {
                     neighbor_occupied: [0.0; 8],
                     age_ticks: age_fraction(50, lifecycle.age_reference_ticks),
                     own_colour: unit_rgb(Phenotype::FOUNDER.channels),
-                    max_energy: lifecycle.max_energy,
+                    energy_scale: crate::config::EnergyCapacityConfig::default().reference,
                     previous_outcome: [0.0; 4],
                 },
                 typed_local_food: TypedFoodLocalSnapshot {

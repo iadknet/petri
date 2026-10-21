@@ -39,6 +39,7 @@ fn founder_body() -> HeritableBody {
     HeritableBody {
         phenotype: Phenotype::FOUNDER,
         identity: CreatureIdentityState::default(),
+        capacity: 200.0,
     }
 }
 
@@ -803,6 +804,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: parent_identity,
+                capacity: 200.0,
             },
             [0.0; 16],
         )
@@ -1113,13 +1115,19 @@ fn founder_only_trajectory_digest_is_pinned() {
     // and 1 tick; default 97 -> 91 births (old digest 0d6295a9...), rate 0.0
     // 94 -> 94 births (old digest 4cd55a73...). The old size rule and anchor
     // 97 together restore both digests.
+    // T26.F02 (the capacity chance drawn on every birth, after the kin-tag
+    // draw): default 91 -> 90 births (old digest 63650331...), rate 0.0
+    // 94 -> 94 (old digest 3a9d028b...), carrying cost off 89 -> 89 (old
+    // digest 361f913d...); removing the capacity draw restores all three.
+    // Measured on macOS aarch64; the GNU/Linux x86_64 pins are not
+    // re-measured here.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            91,
+            90,
             0,
             platform_digest(
-                "63650331ad3dfb2b0b6ef85079a86671fb014f5be0ef2dfd445c719c369e85b7",
+                "85a067f43a6f9376588279f97ee95aaf3758f3fea5b2ebf9aee06ec669f06239",
                 "c6d8c806f500d34c4648ecdbe7942adddc9a94ad0138551e343029f1cc741a88"
             )
         )
@@ -1136,7 +1144,7 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
             94,
             0,
             platform_digest(
-                "3a9d028b4fa039161ab47fc719c957cd0fff9c4ddaa88b9c58265a13695b75b8",
+                "6384951ff2f009f8982a104be38895df81c39b983d205e3ce9f578a2bbe7a13e",
                 "ed256c6b450e61a586720ab39bb6b3d678ad264cdee09b9692c4c84888af5062"
             )
         )
@@ -1174,7 +1182,7 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
             89,
             0,
             platform_digest(
-                "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f",
+                "4940c9c658bca8529afaa12bc13ca7bcffd55ce1a71f4d0655247d635ec3ed56",
                 "73f3ae652d91a994ac10470e6134353087df26173e1192aa6c9e16f5848fe604"
             )
         )

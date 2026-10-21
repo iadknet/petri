@@ -167,6 +167,13 @@
 //! 449159b3... -> 95ef1cbb...; guard 15de1150... -> c7e77b62..., rate 0.0
 //! 919473fb... -> 7488a15f...). With `mutation.per_unit_rate` 0 the sampled
 //! run is byte-identical (bd8dca14..., gestation rate 0.0 d3b71fcd...).
+//! Re-pinned by T26.F02 after two agreeing runs: every birth draws the
+//! capacity chance after the kin-tag draw, which shifts every later draw and
+//! moves all four digests (sampled a5a9f6e4... -> e145bf0f..., gestation
+//! rate 0.0 95ef1cbb... -> 5e94f066...; guard c7e77b62... -> fd13dc02...,
+//! rate 0.0 7488a15f... -> a0579f08...). With the capacity draw removed all
+//! four digests hold: every founder sits at the reference, so the cap, move
+//! and upkeep rules and the sensor scale are today's.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -178,11 +185,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "a5a9f6e4da13cace123302810025f8b3751be33b9ecf5657e5dd4920bf493fd1"
+        "e145bf0fe88a29c1d54ef82aab2f0b34e5438a9600d3ba71dd2b81244ecfed75"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "95ef1cbb91fd84ffb9e8ab776c92bf4849039819efe0d2f6bf0bfc7e58d73398"
+        "5e94f066efa78e0f757a8138e90d93a484c15dea27872dfb7b3d186a4081dd36"
     );
 }
 
@@ -255,11 +262,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "c7e77b620d6a887b9183cfb301818ea7c99aa06462f8f6f6716960ed674c9150"
+        "fd13dc023980a742495e8c78d6b6f56a3da6dfd292e3988ab6d498a6be8bdb44"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "7488a15fcd86a374eb979867a7c9e18d5787fc63d2fc49ea4ae39fc85a513ca0"
+        "a0579f084865db4438c4d29f69353e5cf8a406095a0509438e8eb12a506d8ae9"
     );
 }
 

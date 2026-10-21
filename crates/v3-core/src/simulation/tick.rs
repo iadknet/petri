@@ -143,15 +143,68 @@ pub fn advance_shared_memory(
 }
 
 /// The energy one living creature is charged in the Phase 0 energy-decay
-/// sub-step: the world-level decay plus the per-tick maintenance cost of the
-/// structure it carries, junk included. Not scaled by the complexity or age
+/// sub-step (T26.F02): the `f32` `base`, the world-level decay plus the
+/// per-tick maintenance cost of the structure it carries, junk included, and
+/// the body's signed capacity `upkeep`. Not scaled by the complexity or age
 /// action multipliers, exactly as `energy_decay_per_tick` is not.
-pub(crate) fn phase_0_energy_charge(
-    energy_decay_per_tick: f32,
-    genome_carry_cost_per_unit: f32,
-    genome_size: u32,
-) -> f32 {
-    energy_decay_per_tick + genome_carry_cost_per_unit * genome_size as f32
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Phase0Charge {
+    pub(crate) base: f32,
+    pub(crate) upkeep: f32,
+}
+
+/// One creature's settled Phase 0 charge: its energy after, the applied
+/// debit's three shares, and the sink a death it causes is attributed to.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Phase0Settlement {
+    pub(crate) after: f32,
+    pub(crate) decay: f64,
+    pub(crate) carrying: f64,
+    pub(crate) upkeep: f64,
+    pub(crate) cause: super::energy_accounting::DeathCause,
+}
+
+impl Phase0Charge {
+    /// `base = decay + carry_per_unit × genome_size` in `f32`, beside the
+    /// signed `upkeep`.
+    pub(crate) fn new(decay: f32, carry_per_unit: f32, genome_size: u32, upkeep: f32) -> Self {
+        Self {
+            base: decay + carry_per_unit * genome_size as f32,
+            upkeep,
+        }
+    }
+
+    /// The one `f32` subtraction Phase 0 applies, `max(base + upkeep, 0)`:
+    /// a small body's negative upkeep never credits energy. At `upkeep = 0`
+    /// it is `base` bit for bit.
+    pub(crate) fn applied(self) -> f32 {
+        (self.base + self.upkeep).max(0.0)
+    }
+
+    /// Charge `before`. Decay and carrying are booked by today's
+    /// decay-first partition of `before − base`; the signed upkeep takes the
+    /// applied debit's remainder. Attribution uses the charge's rounded
+    /// intermediates: `LifecycleDecay` when `before − decay ≤ 0`, else
+    /// `GenomeCarrying` when `before − base ≤ 0`, else `CapacityUpkeep`.
+    pub(crate) fn settle(self, before: f32, decay: f32) -> Phase0Settlement {
+        use super::energy_accounting::{applied_debit, decay_partition, DeathCause};
+        let after = before - self.applied();
+        let (decay_share, carrying) = decay_partition(before, before - self.base, decay);
+        let cause = if before - decay <= 0.0 {
+            DeathCause::LifecycleDecay
+        } else if before - self.base <= 0.0 {
+            DeathCause::GenomeCarrying
+        } else {
+            DeathCause::CapacityUpkeep
+        };
+        Phase0Settlement {
+            after,
+            decay: decay_share,
+            carrying,
+            upkeep: applied_debit(before, after) - decay_share - carrying,
+            cause,
+        }
+    }
 }
 
 /// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
@@ -160,7 +213,8 @@ pub(crate) fn phase_0_energy_charge(
 /// 1. Food growth
 /// 2. Creature aging (+1 per creature)
 /// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
-///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
+///    cost `genome_carry_cost_per_unit * cached_genome_size` and the signed
+///    capacity upkeep, floored at zero, as one charge: [`Phase0Charge`])
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 ///
 /// `run_tick` runs the same two halves with a clock between them: step 1 is
@@ -189,32 +243,27 @@ fn run_phase_0_food_growth(sim: &mut Simulation) {
 
 /// Phase 0 steps 2 to 4: aging, energy decay, death removal.
 fn run_phase_0_creatures(sim: &mut Simulation) {
-    use super::energy_accounting::{decay_partition, DeathCause};
     // Steps 2 & 3: Age, energy decay, and shared memory snapshot + decay
     let decay_rate = sim.config.shared_memory.decay_rate;
     let lifecycle = &sim.config.energy.lifecycle;
+    let capacity = &sim.config.energy.capacity;
     for (_, creature) in sim.creatures.iter_mut() {
         creature.age += 1;
         let energy_before = creature.energy;
-        creature.energy -= phase_0_energy_charge(
+        let settled = Phase0Charge::new(
             lifecycle.energy_decay_per_tick,
             lifecycle.genome_carry_cost_per_unit,
             creature.cached_genome_size,
-        );
-        let (decay, carrying) = decay_partition(
-            energy_before,
-            creature.energy,
-            lifecycle.energy_decay_per_tick,
-        );
-        sim.stats.energy_flows.lifecycle_decay += decay;
-        sim.stats.energy_flows.genome_carrying += carrying;
-        sim.stats.energy_flows.genome_size_creature_ticks += u64::from(creature.cached_genome_size);
-        let cause = if energy_before - lifecycle.energy_decay_per_tick <= 0.0 {
-            DeathCause::LifecycleDecay
-        } else {
-            DeathCause::GenomeCarrying
-        };
-        creature.observe_energy(energy_before, cause);
+            creature.body.upkeep(capacity),
+        )
+        .settle(energy_before, lifecycle.energy_decay_per_tick);
+        creature.energy = settled.after;
+        let flows = &mut sim.stats.energy_flows;
+        flows.lifecycle_decay += settled.decay;
+        flows.genome_carrying += settled.carrying;
+        flows.capacity_upkeep += settled.upkeep;
+        flows.genome_size_creature_ticks += u64::from(creature.cached_genome_size);
+        creature.observe_energy(energy_before, settled.cause);
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
@@ -283,7 +332,7 @@ fn assemble_sensor_inputs_with(
         .filter(|&&id| sim.creatures.contains_key(id))
         .map(|&id| {
             let creature = &sim.creatures[id];
-            let local = assemble_static_inputs(&sim.world, creature, &sim.config.energy.lifecycle);
+            let local = assemble_static_inputs(&sim.world, creature, &sim.config.energy);
             let typed_local_food = if uses_typed_local_food(&creature.genome) {
                 assemble_typed_food_local_snapshot(&sim.world, creature.position)
             } else {

@@ -44,7 +44,7 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
                 position,
                 energy,
                 0,
-                HeritableBody::founder(3, 77),
+                HeritableBody::founder(3, 77, 200.0),
                 [0.0; 16],
             )
         });
@@ -95,7 +95,7 @@ fn eat_effort(sim: &Simulation, id: CreatureId) -> f32 {
 #[test]
 fn eat_caps_a_credit_above_the_maximum_and_books_the_excess() {
     let (sim, id, flows) = eat_once(195.0, 40.0);
-    let max = sim.config.energy.lifecycle.max_energy;
+    let max = sim.creatures[id].energy_cap();
     let credited = 195.0_f32 + 0.5 * 40.0;
     assert_eq!(flows.food_intake_by_type[0], debit(credited, 195.0));
     assert_eq!(flows.maximum_energy_clamp_loss, debit(credited, max));
@@ -123,7 +123,7 @@ fn eat_floors_a_negative_credit_to_zero_and_books_the_floor() {
 #[test]
 fn eat_caps_a_positive_infinite_credit() {
     let (sim, id, flows) = eat_once(10.0, f32::INFINITY);
-    let max = sim.config.energy.lifecycle.max_energy;
+    let max = sim.creatures[id].energy_cap();
     assert_eq!(flows.food_intake_by_type[0], f64::INFINITY);
     assert_eq!(flows.maximum_energy_clamp_loss, f64::INFINITY);
     assert_eq!(flows.zero_floor_credit, 0.0);
@@ -181,7 +181,7 @@ proptest::proptest! {
         reward in proptest::num::f32::ANY,
     ) {
         let (sim, id, flows) = eat_once(energy, reward);
-        let max = sim.config.energy.lifecycle.max_energy;
+        let max = sim.creatures[id].energy_cap();
         let credited = energy + 0.5 * reward;
         let clamped = credited.clamp(0.0, max);
         proptest::prop_assert!(same_f32(sim.creatures[id].energy, clamped - eat_effort(&sim, id)));
@@ -218,7 +218,7 @@ fn steal(victim_energy: f32) -> (Simulation, CreatureId, PredationActionResult, 
 fn predation_observes_the_full_transfer_before_capping_it() {
     let (sim, attacker, result, after_effort) = steal(50.0);
     assert_eq!(result, PredationActionResult::Transferred);
-    let max = sim.config.energy.lifecycle.max_energy;
+    let max = sim.creatures[attacker].energy_cap();
     let transferred = after_effort + 20.0;
     assert!(transferred > max, "the fixture must put the cap in play");
     let flows = &sim.stats.energy_flows;
@@ -236,7 +236,7 @@ fn predation_observes_the_full_transfer_before_capping_it() {
 fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
     let (sim, attacker, result, after_effort) = steal(10.0);
     assert_eq!(result, PredationActionResult::TransferredAndKilled);
-    let max = sim.config.energy.lifecycle.max_energy;
+    let max = sim.creatures[attacker].energy_cap();
     let transferred = after_effort + 10.0;
     assert!(
         transferred > max,
@@ -268,26 +268,136 @@ fn predation_under_the_cap_books_no_clamp_loss() {
 
 // ── birth ────────────────────────────────────────────────────────────────────
 
+/// T26.F02 invariant 7's required fixture: a parent at the reference (200)
+/// delivers a litter of 100 to a child of capacity 50. Every fired capacity
+/// draw lands on 50 in a `[50, 50]` range, so the child is built with 100,
+/// capped to 50, and the overflow and the credit book 50 each; the parent's
+/// debit is their sum, exactly.
 #[test]
-fn a_birth_whose_litter_exceeds_the_maximum_is_not_capped() {
-    let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 80.0)]);
+fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
+    let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 200.0)]);
     let parent = ids[0];
-    sim.config.energy.lifecycle.max_energy = 20.0;
+    sim.config.mutation.capacity.chance = 1.0;
+    sim.config.energy.lifecycle.max_energy = 50.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
+    assert_eq!(sim.creatures[parent].body.capacity, 200.0);
     let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
+    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.75, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let child = sim
         .creatures
         .values()
         .find(|creature| creature.id != parent)
         .expect("one child");
-    assert!(
-        child.energy > 20.0,
-        "litter {} must stay uncapped",
-        child.energy
+    assert_eq!(child.body.capacity, 50.0);
+    assert_eq!(child.energy, 50.0);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.parental_transfer_debit, 100.0);
+    assert_eq!(flows.offspring_capacity_overflow, 50.0);
+    assert_eq!(flows.offspring_energy_credit, 50.0);
+    assert_eq!(flows.maximum_energy_clamp_loss, 0.0);
+}
+
+/// A litter within the child's capacity is credited whole: no overflow.
+#[test]
+fn a_litter_within_the_childs_capacity_books_no_overflow() {
+    let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 80.0)]);
+    let parent = ids[0];
+    sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
+    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
+    assert_eq!(result, ReproductionActionResult::Conceived);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.offspring_capacity_overflow, 0.0);
+    assert_eq!(flows.offspring_energy_credit, flows.parental_transfer_debit);
+}
+
+// ── capacity ─────────────────────────────────────────────────────────────────
+
+/// The three credit sites cap at the body's own capacity, not at
+/// `max_energy`: a body of 50 eating from 45 stops at 50.
+#[test]
+fn eat_caps_at_the_bodys_own_capacity() {
+    let pos = Position::new(3, 3);
+    let (mut sim, ids) = sim_with(&[(pos, 45.0)]);
+    let id = ids[0];
+    sim.creatures[id].body.capacity = 50.0;
+    sim.config.world.food.types[0].energy_per_unit = Some(40.0);
+    sim.world
+        .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.5);
+    let mut flows = EnergyFlows::default();
+    flows.food_intake_by_type = vec![0.0; sim.config.world.food.types.len()];
+    apply_typed_eat(
+        &mut sim.creatures[id],
+        &mut sim.world,
+        &sim.config,
+        OrdinaryFoodTypeId::new(0),
+        0.0,
+        &mut flows,
     );
-    assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
+    assert_eq!(flows.maximum_energy_clamp_loss, debit(65.0, 50.0));
+    assert_eq!(sim.creatures[id].energy, 50.0 - eat_effort(&sim, id));
+}
+
+/// A body away from the reference scales the move base by its move factor
+/// before the multipliers: at β = 0.5 a body of 800 pays 2.5× the base.
+#[test]
+fn a_large_body_pays_its_move_factor_on_the_move_base() {
+    let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0)]);
+    let id = ids[0];
+    sim.creatures[id].body.capacity = 800.0;
+    sim.config.energy.capacity.move_cost_slope = 0.5;
+    let creature = &sim.creatures[id];
+    let expected = sim.config.energy.action_effort(
+        sim.config.energy.costs.move_cost * 2.5,
+        creature.cached_complexity,
+        creature.age,
+    );
+    assert_eq!(creature.move_effort(&sim.config.energy), expected);
+}
+
+proptest::proptest! {
+    /// Over the normalized ranges (`reference` up to 2^24, `min` down to 1,
+    /// β up to 1) the move effort is positive, never below the NoOp effort,
+    /// and at the reference exactly today's effort.
+    #[test]
+    fn move_effort_is_floored_positive_and_neutral_at_the_reference(
+        reference in proptest::sample::select(vec![1.0f32, 50.0, 200.0, 16_777_216.0]),
+        share in 0.0f32..=1.0,
+        slope in 0.0f32..=1.0,
+        move_cost in 0.0f32..=10.0,
+        age in 0u64..=2_000,
+    ) {
+        let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0)]);
+        let id = ids[0];
+        let energy = &mut sim.config.energy;
+        energy.capacity.reference = reference;
+        energy.capacity.min = 1.0;
+        energy.capacity.move_cost_slope = slope;
+        energy.costs.move_cost = move_cost;
+        energy.lifecycle.max_energy = reference * 4.0;
+        let creature = &mut sim.creatures[id];
+        creature.age = age;
+        creature.body.capacity = 1.0 + share * (reference * 4.0 - 1.0);
+        let effort = creature.move_effort(&sim.config.energy);
+        let noop = sim.config.energy.action_effort(
+            sim.config.energy.costs.noop_cost,
+            creature.cached_complexity,
+            creature.age,
+        );
+        proptest::prop_assert!(effort > 0.0);
+        proptest::prop_assert!(effort >= noop);
+        creature.body.capacity = reference;
+        let today = sim.config.energy.action_effort(
+            move_cost,
+            creature.cached_complexity,
+            creature.age,
+        );
+        proptest::prop_assert_eq!(
+            creature.move_effort(&sim.config.energy).to_bits(),
+            today.to_bits()
+        );
+    }
 }
 
 // ── move ─────────────────────────────────────────────────────────────────────
@@ -345,7 +455,7 @@ fn a_blocked_move_charges_the_move_effort_as_failed() {
 
 /// The parent body every fixture creature carries.
 fn parent_body() -> HeritableBody {
-    HeritableBody::founder(3, 77)
+    HeritableBody::founder(3, 77, 200.0)
 }
 
 /// A birth from a founder whose genome mutates (`per_unit_rate`) with
@@ -396,6 +506,7 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
                 lineage_id: 3,
                 kin_tag: 3_756_156_572,
             },
+            capacity: 200.0,
         }
     );
 }

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 89df8a60c8001f2d5799fb7d943a9e733db6b828897fd38c2c87ec2dd4dcc142 # shrinks to parent = HeritableBody { phenotype: Phenotype { channels: [0, 0, 0, 0, 0, 0], active_channel: 0, polarity: [false, false, false, false, false, false] }, identity: CreatureIdentityState { lineage_id: 0, kin_tag: 0 }, capacity: 50.0 }, mutated = false, chance = 0.0, seed = 0

@@ -448,7 +448,7 @@ fn a_successful_eat_credits_then_pays_its_effort() {
         .set_food_type(Position::new(5, 5), OrdinaryFoodTypeId::default(), 1.0);
     let effort = effort(&sim, id, sim.config.energy.costs.eat_cost);
     execute(&mut sim, id, eat);
-    let max = sim.config.energy.lifecycle.max_energy;
+    let max = sim.creatures[id].energy_cap();
     assert_eq!(sim.creatures[id].energy.to_bits(), (max - effort).to_bits());
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.action_charges.eat, applied_debit(max, max - effort));

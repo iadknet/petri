@@ -564,6 +564,7 @@ mod pair {
                     polarity: [true; 6],
                 },
                 identity: CreatureIdentityState::default(),
+                capacity: 200.0,
             },
             [0.0; 16],
         )

@@ -46,7 +46,7 @@ fn sensors() -> SensorSnapshot {
             neighbor_food: ramp(0.0),
             neighbor_barrier: ramp(0.125),
             neighbor_occupied: ramp(0.25),
-            max_energy: 200.0,
+            energy_scale: 200.0,
             age_ticks: 10.0,
             own_colour: [0.8, 0.25, 0.375],
             previous_outcome: ramp(-0.5),

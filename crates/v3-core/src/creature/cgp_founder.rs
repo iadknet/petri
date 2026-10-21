@@ -28,8 +28,8 @@ pub(crate) fn age_gate_threshold(min_reproduce_age_ticks: u64, age_reference_tic
 
 /// Build the founder sensor graph from primary food, energy, age, and occupancy.
 ///
-/// `reproduce_energy_threshold` is a fraction of `max_energy` (the scale
-/// `EnergyCurrent` reads on); the age gate is derived from the two tick
+/// `reproduce_energy_threshold` is a fraction of the energy scale
+/// `EnergyCurrent` reads on (T26.F02); the age gate is derived from the two tick
 /// counts by `age_gate_threshold`.
 #[must_use]
 pub(crate) fn build_cgp_founder_graph_with_thresholds(

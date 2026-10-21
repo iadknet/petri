@@ -1135,7 +1135,7 @@ fn neutral_recruitment_costs_follow_applied_genome_growth() {
     use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
     use crate::creature::genome::vote::VoteSink;
     use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
-    use crate::simulation::tick::phase_0_energy_charge;
+    use crate::simulation::tick::Phase0Charge;
     let config = crate::config::SimulationConfig::default();
     let parent = v3alpha1_founder_genome();
     let families = [
@@ -1158,11 +1158,13 @@ fn neutral_recruitment_costs_follow_applied_genome_growth() {
             let growth = child.genome_size() - parent.genome_size();
             assert!(growth > 0);
             let lifecycle = &config.energy.lifecycle;
-            let carrying = phase_0_energy_charge(
+            let carrying = Phase0Charge::new(
                 0.0,
                 lifecycle.genome_carry_cost_per_unit,
                 child.genome_size(),
-            );
+                0.0,
+            )
+            .base;
             let base = base_reproduce_charge(&child);
             let (_, transferred, charge) =
                 charged_reproduction(child.clone(), lifecycle.genome_replication_cost_per_unit);

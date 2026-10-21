@@ -90,7 +90,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             neighbor_occupied,
             age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
             own_colour: unit_rgb(Phenotype::FOUNDER.channels),
-            max_energy: lifecycle.max_energy,
+            energy_scale: crate::config::EnergyCapacityConfig::default().reference,
             previous_outcome: [0.0; 4],
         },
         typed_local_food: TypedFoodLocalSnapshot {

@@ -108,11 +108,8 @@ pub fn apply_steal_energy(
         attacker.observe_energy(before, DeathCause::Predation);
 
     // Step 7: Cap attacker energy at its body's cap.
-    super::cap_energy(
-        &mut sim.creatures[attacker_id],
-        &sim.config.energy.lifecycle,
-        &mut sim.stats.energy_flows,
-    );
+    sim.stats.energy_flows.maximum_energy_clamp_loss +=
+        super::cap_energy(&mut sim.creatures[attacker_id]);
 
     // Step 8: Check kill.
     if sim.creatures[victim_id].energy <= 0.0 {
@@ -128,11 +125,8 @@ pub fn apply_steal_energy(
         attacker.energy += bonus;
         sim.stats.energy_flows.predation_kill_bonus_credit -=
             attacker.observe_energy(before, DeathCause::Predation);
-        super::cap_energy(
-            &mut sim.creatures[attacker_id],
-            &sim.config.energy.lifecycle,
-            &mut sim.stats.energy_flows,
-        );
+        sim.stats.energy_flows.maximum_energy_clamp_loss +=
+            super::cap_energy(&mut sim.creatures[attacker_id]);
 
         // Remove victim from world, slotmap, and action logs.
         sim.remove_creature(victim_id);
@@ -199,6 +193,7 @@ mod tests {
         HeritableBody {
             phenotype: Phenotype::FOUNDER,
             identity: CreatureIdentityState::default(),
+            capacity: 200.0,
         }
     }
 
@@ -521,7 +516,7 @@ mod tests {
         let (mut sim, attacker_id, _victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 195.0, Position::new(5, 4), 50.0);
         sim.config.predation.steal_cost_rate = 0.0;
-        let max_energy = sim.config.energy.lifecycle.max_energy; // 200.0
+        let max_energy = sim.creatures[attacker_id].energy_cap(); // 200.0
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 

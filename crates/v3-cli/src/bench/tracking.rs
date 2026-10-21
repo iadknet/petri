@@ -231,9 +231,17 @@ pub struct EnergyFlowTracking {
     pub mesh_ramp: String,
     pub lifecycle_decay: String,
     pub genome_carrying: String,
+    /// Signed Phase 0 capacity upkeep (T26.F02); absent from reports stored
+    /// before it.
+    #[serde(default)]
+    pub capacity_upkeep: String,
     pub genome_size_creature_ticks: u64,
     pub parental_transfer_debit: String,
     pub offspring_energy_credit: String,
+    /// Litter above the child's capacity (T26.F02); absent from reports
+    /// stored before it.
+    #[serde(default)]
+    pub offspring_capacity_overflow: String,
     pub predation_victim_debit: String,
     pub predation_attacker_credit: String,
     pub predation_kill_bonus_credit: String,
@@ -270,9 +278,11 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             mesh_ramp: six(flows.mesh_ramp),
             lifecycle_decay: six(flows.lifecycle_decay),
             genome_carrying: six(flows.genome_carrying),
+            capacity_upkeep: six(flows.capacity_upkeep),
             genome_size_creature_ticks: flows.genome_size_creature_ticks,
             parental_transfer_debit: six(flows.parental_transfer_debit),
             offspring_energy_credit: six(flows.offspring_energy_credit),
+            offspring_capacity_overflow: six(flows.offspring_capacity_overflow),
             predation_victim_debit: six(flows.predation_victim_debit),
             predation_attacker_credit: six(flows.predation_attacker_credit),
             predation_kill_bonus_credit: six(flows.predation_kill_bonus_credit),

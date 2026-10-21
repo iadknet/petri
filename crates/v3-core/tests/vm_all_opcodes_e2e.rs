@@ -297,6 +297,7 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
+                capacity: 200.0,
             },
             [0.0; 16],
         )

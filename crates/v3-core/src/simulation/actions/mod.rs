@@ -6,7 +6,7 @@ pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRec
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
-use crate::config::{EnergyConfig, EnergyLifecycleConfig, OrdinaryFoodTypeId, SimulationConfig};
+use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -36,18 +36,18 @@ fn charge_effort(creature: &mut CreatureState, effort: f32, cause: DeathCause) -
 }
 
 /// Cap `creature`'s energy at its body's cap ([`CreatureState::energy_cap`])
-/// and book the excess as `maximum_energy_clamp_loss`. The comparison leaves
-/// a `NaN` energy unchanged and caps `+∞`. The caller observes the credit
-/// it capped; the cap itself is not observed.
-fn cap_energy(
-    creature: &mut CreatureState,
-    lifecycle: &EnergyLifecycleConfig,
-    flows: &mut EnergyFlows,
-) {
-    let cap = creature.energy_cap(lifecycle);
+/// and return the applied excess (`0.0` when under the cap), which the
+/// caller books to its flow. The comparison leaves a `NaN` energy unchanged
+/// and caps `+∞`. The caller observes the credit it capped; the cap itself
+/// is not observed.
+fn cap_energy(creature: &mut CreatureState) -> f64 {
+    let cap = creature.energy_cap();
     if creature.energy > cap {
-        flows.maximum_energy_clamp_loss += applied_debit(creature.energy, cap);
+        let excess = applied_debit(creature.energy, cap);
         creature.energy = cap;
+        excess
+    } else {
+        0.0
     }
 }
 
@@ -137,7 +137,7 @@ pub fn apply_typed_eat(
             creature.energy = 0.0;
             flows.zero_floor_credit += applied_debit(0.0, credited);
         }
-        cap_energy(creature, &config.energy.lifecycle, flows);
+        flows.maximum_energy_clamp_loss += cap_energy(creature);
         creature.observe_energy(before, DeathCause::ActionEat);
     }
     let effort = pay_effort(
@@ -214,6 +214,7 @@ mod tests {
         HeritableBody {
             phenotype: Phenotype::FOUNDER,
             identity: CreatureIdentityState::default(),
+            capacity: 200.0,
         }
     }
 
@@ -325,7 +326,7 @@ mod tests {
         sim.config.energy.costs.eat_cost = 2.0;
         // Place max food to ensure energy would exceed max without cap.
         sim.world.set_food(pos, 1.0);
-        let max = sim.config.energy.lifecycle.max_energy;
+        let max = sim.creatures[id].energy_cap();
         let creature = sim.creatures.get_mut(id).unwrap();
         let _ = apply_typed_eat(
             creature,
@@ -1863,8 +1864,8 @@ mod tests {
     fn founder_past_the_margin_age_is_refused_at_its_gate() {
         let profile = FounderProfile::V3Alpha1;
         let policy = founder_reproduce_policy(profile);
-        let max_energy = SimulationConfig::default().energy.lifecycle.max_energy;
-        let energy = (policy.energy_threshold * max_energy).next_up();
+        let scale = SimulationConfig::default().energy.capacity.reference;
+        let energy = (policy.energy_threshold * scale).next_up();
         let (mut sim, id) =
             make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
         sim.creatures[id].age = FOUNDER_MARGIN_MAX_AGE + 1;
@@ -1880,7 +1881,7 @@ mod tests {
 
     proptest::proptest! {
         /// T17.F01 invariant 5: every founder profile, at any energy strictly
-        /// above its gate up to `max_energy` and any age from
+        /// above its gate up to its 200 capacity and any age from
         /// `min_reproduce_age` through [`FOUNDER_MARGIN_MAX_AGE`], is accepted
         /// by `apply_reproduce` on default economics when it emits its own
         /// transfer fraction.
@@ -1897,10 +1898,12 @@ mod tests {
             age in 20u64..=FOUNDER_MARGIN_MAX_AGE,
         ) {
             let policy = founder_reproduce_policy(profile);
-            let max_energy = SimulationConfig::default().energy.lifecycle.max_energy;
-            // The gate is a fraction of `max_energy` (T17.F02); strictly
+            // The founder's energy scale and capacity are both the 200
+            // reference (T26.F02).
+            let max_energy = SimulationConfig::default().energy.capacity.reference;
+            // The gate is a fraction of the energy scale (T17.F02); strictly
             // above it: the smallest f32 above the raw threshold when `unit`
-            // draws 0.0, `max_energy` when it draws 1.0.
+            // draws 0.0, the capacity when it draws 1.0.
             let threshold = policy.energy_threshold * max_energy;
             let energy = (threshold + unit * (max_energy - threshold)).max(threshold.next_up());
             let (mut sim, id) = make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
@@ -2038,7 +2041,7 @@ mod tests {
     #[test]
     fn empty_eat_does_not_clamp_energy_after_live_maximum_is_lowered() {
         let (mut sim, id) = make_sim_one_creature(Position::new(3, 3), 50.0);
-        sim.config.energy.lifecycle.max_energy = 20.0;
+        sim.creatures[id].body.capacity = 20.0;
         sim.config.energy.costs.eat_cost = 2.0;
         assert_eq!(
             apply_typed_eat(

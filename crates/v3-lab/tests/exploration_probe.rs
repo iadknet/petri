@@ -713,7 +713,7 @@ fn eval_rule(
             scene.start,
             rule.start(),
             0,
-            HeritableBody::founder(0, scene.seed),
+            HeritableBody::founder(0, scene.seed, config.energy.capacity.founder),
             [0.0; SHARED_MEMORY_SLOTS],
         )
     });
@@ -790,8 +790,7 @@ fn eval_rule(
         if rule.refunds() && attempted {
             #[allow(clippy::cast_possible_truncation)]
             let refund = refused_effort as f32;
-            creature.energy =
-                (creature.energy + refund).min(sim.config.energy.lifecycle.max_energy);
+            creature.energy = (creature.energy + refund).min(creature.energy_cap());
         }
         match rule {
             Rule::Ceiling20 => creature.energy = creature.energy.min(20.0),
