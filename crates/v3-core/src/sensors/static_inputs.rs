@@ -1,5 +1,6 @@
 use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
 use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
+use crate::creature::colour::unit_rgb;
 use crate::creature::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -28,6 +29,9 @@ pub struct StaticInputs {
     /// Creature's age as a saturating fraction of
     /// `EnergyLifecycleConfig::age_reference_ticks`, in [0.0, 1.0].
     pub age_ticks: f32,
+    /// The creature's own colour on the unit scale
+    /// (`creature::colour::unit_rgb`): `OwnRed`, `OwnGreen`, `OwnBlue`.
+    pub own_colour: [f32; 3],
     /// `EnergyLifecycleConfig::max_energy`: the denominator for the live
     /// energy introspection reads.
     pub max_energy: f32,
@@ -89,6 +93,9 @@ impl StaticInputs {
     pub fn resolve_static(&self, key: &StaticIntrospectionKey) -> f32 {
         match key {
             StaticIntrospectionKey::AgeTicks => self.age_ticks,
+            StaticIntrospectionKey::OwnRed => self.own_colour[0],
+            StaticIntrospectionKey::OwnGreen => self.own_colour[1],
+            StaticIntrospectionKey::OwnBlue => self.own_colour[2],
         }
     }
 }
@@ -137,6 +144,7 @@ pub fn assemble_static_inputs(
         neighbor_barrier,
         neighbor_occupied,
         age_ticks: age_fraction(creature.age, lifecycle.age_reference_ticks),
+        own_colour: unit_rgb(creature.body.phenotype.channels),
         max_energy: lifecycle.max_energy,
         previous_outcome: previous_outcome_read(&creature.previous_outcome, lifecycle.max_energy),
     }

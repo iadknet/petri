@@ -155,6 +155,15 @@ const QUEUE_FIELDS: readonly SubField[] = [
 
 const SCALAR_LABELS: Record<string, { label: string; description: string }> = {
 	AgeTicks: { label: "Age", description: "Age as a fraction of the reference age (caps at 1)." },
+	OwnRed: { label: "OwnRed", description: "Own red: this creature's own red channel (0 to 1)." },
+	OwnGreen: {
+		label: "OwnGreen",
+		description: "Own green: this creature's own green channel (0 to 1).",
+	},
+	OwnBlue: {
+		label: "OwnBlue",
+		description: "Own blue: this creature's own blue channel (0 to 1).",
+	},
 	EnergyCurrent: { label: "Energy", description: "Current energy as a fraction of max energy." },
 	EnergyConsumedThisTick: {
 		label: "EnergySpent",

@@ -386,6 +386,7 @@ mod tests {
             neighbor_occupied: [0.0; 8],
             max_energy: 200.0,
             age_ticks: 0.084,
+            own_colour: [0.0; 3],
             previous_outcome: [0.25, 0.5, 0.0, 1.0],
         };
         let snapshot = StaticInputsSnapshot::from(&si);

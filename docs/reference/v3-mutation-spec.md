@@ -694,19 +694,25 @@ added/removed/retyped — only their edges are evolvable.
   landing on a direction sink stays this one ordinary edge, never joining an
   edge group (T25.F03).
 
-  The new reference is one `gen_range(0..27)` key draw (T19.F05):
+  The new reference is one `gen_range(0..30)` key draw into the one bucket
+  table, `sampling::INPUT_BUCKETS` (T27.F01); `input_reference_universe`
+  (the `Swap` partition, recruitment's enumeration) is the same table
+  expanded over the food types and the 24 upstream slots, deduplicated in
+  table order. Recruitment's family weights (`universe_entries`) are a
+  separate declaration.
 
   | Index | Reference | Extra draw |
   | --- | --- | --- |
   | 0, 1 | `FoodHere`, `NeighborFoodRing` | food type, with more than one food type |
   | 2, 3 | `NeighborBarrierRing`, `NeighborOccupiedRing` | none |
   | 4 | `StaticIntrospection(AgeTicks)` | none |
-  | 5, 6 | `DynamicIntrospection(EnergyCurrent)`, `(EnergyConsumedThisTick)` | none |
-  | 7 | `ActionQueue` | none |
-  | 8 | `AreaFoodSummary` | food type, with more than one food type |
-  | 9 to 13 | `AreaBarrierSummary`, `NearbyCreature` (10, 11 and 12, T25.F05), `AreaOccupancySummary` | none |
-  | 14 to 18 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
-  | 19 to 26 | `UpstreamSlot` | the slot |
+  | 5 to 7 | `StaticIntrospection(OwnRed)`, `(OwnGreen)`, `(OwnBlue)` (T27.F01) | none |
+  | 8, 9 | `DynamicIntrospection(EnergyCurrent)`, `(EnergyConsumedThisTick)` | none |
+  | 10 | `ActionQueue` | none |
+  | 11 | `AreaFoodSummary` | food type, with more than one food type |
+  | 12 to 16 | `AreaBarrierSummary`, `NearbyCreature` (13, 14 and 15, T25.F05), `AreaOccupancySummary` | none |
+  | 17 to 21 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
+  | 22 to 29 | `UpstreamSlot` (eight buckets, the slot over all 24) | the slot |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
   `GraphSource::InputLeaf { ref_idx }` on any edge container (a group's
   members address its ring), and no VM `ReadInput { ref_idx }` anywhere

@@ -54,7 +54,8 @@ Version contract:
 - Breaking payload changes require protocol-version bump. `v3alpha12`
   (T27.F01) widened the `debug_perception` `nearby` array to 40: each
   slot's fields 7 to 9 are the seen colour where `lineage_match` and
-  `phenotype_similarity` stood. `v3alpha11`
+  `phenotype_similarity` stood, and added the static input keys `OwnRed`,
+  `OwnGreen` and `OwnBlue` a genome's `input_refs` may carry. `v3alpha11`
   (T25.F09) gave every genome `plasticity` config and every genome group a
   `retention`, always written. `v3alpha10`
   (T25.F07) gave every genome membership a `scope` (`"Edge"` or `"Group"`)

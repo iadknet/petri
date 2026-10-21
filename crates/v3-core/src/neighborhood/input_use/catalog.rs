@@ -1,4 +1,4 @@
-//! The `input-use-v3` catalog: the 17 named input families the mutation
+//! The `input-use-v3` catalog: the 20 named input families the mutation
 //! engine draws, `UpstreamSlot` (one channel per slot), and the separate
 //! shared-memory inventory, with the channel each read actually addresses
 //! under `runtime::inputs::resolve_input`.
@@ -9,7 +9,7 @@ use crate::contracts::{
 use crate::mutation::compound::sub_value_count;
 
 /// One input family. Food families carry their food type. Declaration order
-/// follows the buckets of `mutation::sampling::random_input_reference_for_food_types`,
+/// follows `mutation::sampling::INPUT_BUCKETS`,
 /// then `UpstreamSlot`, then the two shared-memory banks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Family {
@@ -18,6 +18,9 @@ pub enum Family {
     NeighborBarrierRing,
     NeighborOccupiedRing,
     AgeTicks,
+    OwnRed,
+    OwnGreen,
+    OwnBlue,
     EnergyCurrent,
     EnergyConsumedThisTick,
     ActionQueue,
@@ -61,7 +64,12 @@ impl Family {
                 WorldInputKey::AreaOccupancySummary => Self::AreaOccupancySummary,
                 WorldInputKey::NearbyCreature => Self::NearbyCreature,
             },
-            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks) => Self::AgeTicks,
+            InputReference::StaticIntrospection(key) => match key {
+                StaticIntrospectionKey::AgeTicks => Self::AgeTicks,
+                StaticIntrospectionKey::OwnRed => Self::OwnRed,
+                StaticIntrospectionKey::OwnGreen => Self::OwnGreen,
+                StaticIntrospectionKey::OwnBlue => Self::OwnBlue,
+            },
             InputReference::DynamicIntrospection(key) => match key {
                 DynamicIntrospectionKey::EnergyCurrent => Self::EnergyCurrent,
                 DynamicIntrospectionKey::EnergyConsumedThisTick => Self::EnergyConsumedThisTick,

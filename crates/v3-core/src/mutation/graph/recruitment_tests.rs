@@ -279,9 +279,10 @@ fn admissible_sampling_pool_contains_all_declared_families_and_channels() {
     let fixture = node();
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
     let single = admission.families(Arm::SingleChannel, 2);
-    assert_eq!(single.len(), 48);
+    // The three own-colour keys join both universes (T27.F01).
+    assert_eq!(single.len(), 51);
     let whole = admission.families(Arm::WholeFamily, 2);
-    assert_eq!(whole.len(), 24);
+    assert_eq!(whole.len(), 27);
     for reference in input_reference_universe(2) {
         assert!(single.contains(&SourceFamily::Input(reference.clone())));
         if !matches!(

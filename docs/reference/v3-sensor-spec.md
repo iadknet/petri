@@ -148,6 +148,9 @@ Resolved once per acting-creature turn from current creature state:
 ```rust
 pub enum StaticIntrospectionKey {
     AgeTicks,
+    OwnRed,
+    OwnGreen,
+    OwnBlue,
 }
 ```
 
@@ -155,6 +158,11 @@ Resolved value (T17.F02):
 - `AgeTicks = min(age / energy.lifecycle.age_reference_ticks, 1)`, computed
   as `f32` division by the configured span; `0.0` at birth, saturating at
   `1.0` from `age_reference_ticks` on.
+- `OwnRed`, `OwnGreen`, `OwnBlue` (T27.F01) =
+  `creature::colour::channels_to_rgb(phenotype_channels)[c] / 255.0`, in
+  `[0.0, 1.0]`: the creature's own colour, exactly what a neighbour's
+  `NearbyCreature` slot reads of it in the same tick (Section 6.5). Each is
+  scalar.
 
 There is no generation input: a body cannot sense its ancestor count.
 
