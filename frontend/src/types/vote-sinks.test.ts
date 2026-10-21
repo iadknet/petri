@@ -3,6 +3,8 @@ import { ActionType } from "./action-log.ts";
 import {
 	VOTE_KINDS as TRACE_VOTE_KINDS,
 	VOTE_SINK_COUNT as TRACE_VOTE_SINK_COUNT,
+	ZERO_DECISION_INPUTS,
+	ZERO_KIND_COUNTS,
 } from "./trace.ts";
 import catalogFixture from "./vote-sinks.json";
 import {
@@ -36,6 +38,8 @@ describe("vote-sinks.json parity", () => {
 		expect(TRACE_VOTE_SINK_COUNT).toBe(VOTE_SINK_COUNT);
 		expect(VOTE_KINDS).toEqual(catalogFixture.voteKinds);
 		expect(TRACE_VOTE_KINDS).toEqual(VOTE_KINDS);
+		expect(ZERO_DECISION_INPUTS.commit_counts).toEqual(VOTE_KINDS.map(() => 0));
+		expect(ZERO_KIND_COUNTS).toEqual(VOTE_KINDS.map(() => 0));
 		expect(DIRECTED_VOTE_KINDS).toEqual(catalogFixture.directedKinds);
 		expect(ACTION_PARAM_FIELDS).toEqual(catalogFixture.actionParamFields.map(({ field }) => field));
 		expect(ACTION_TYPES).toEqual(catalogFixture.actionTypes);
