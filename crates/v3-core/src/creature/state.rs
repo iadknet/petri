@@ -463,11 +463,11 @@ const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
 mod tests {
     use super::*;
     use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
-    use crate::creature::body::Phenotype;
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::phenotype::Phenotype;
     use slotmap::SlotMap;
 
     /// A body with `channels`, the founder's active channel and polarity, and

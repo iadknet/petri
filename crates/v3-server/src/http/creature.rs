@@ -481,7 +481,7 @@ pub async fn get_creature(
             y: creature.position.y,
         },
         energy: creature.energy,
-        max_energy: sim.config.energy.lifecycle.max_energy,
+        max_energy: creature.energy_cap(&sim.config.energy.lifecycle),
         age: creature.age,
         generation: creature.generation,
         heading: creature.heading,

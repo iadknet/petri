@@ -147,11 +147,12 @@ mod tests {
     use super::*;
     use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, NodeId, Position};
-    use crate::creature::body::{HeritableBody, Phenotype};
+    use crate::creature::body::HeritableBody;
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::identity::CreatureIdentityState;
+    use crate::creature::phenotype::Phenotype;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use proptest::prelude::*;

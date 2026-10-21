@@ -39,7 +39,7 @@ This document does not define:
 ## 2. Phenotype State Model
 
 Per-creature phenotype state is the `Phenotype` record
-(`crates/v3-core/src/creature/body.rs`), carried with the kin identity in the
+(`crates/v3-core/src/creature/phenotype.rs`), carried with the kin identity in the
 creature's heritable body (`HeritableBody`, field `CreatureState::body`):
 
 | Field | Type | Description |

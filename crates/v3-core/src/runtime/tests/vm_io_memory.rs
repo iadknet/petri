@@ -1,10 +1,11 @@
 use super::*;
 use crate::config::EnergyLifecycleConfig;
-use crate::creature::body::{HeritableBody, Phenotype};
+use crate::creature::body::HeritableBody;
 use crate::creature::genome::vote::{
     ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
 use crate::creature::identity::CreatureIdentityState;
+use crate::creature::phenotype::Phenotype;
 
 // ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
 

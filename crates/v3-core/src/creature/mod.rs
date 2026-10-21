@@ -7,6 +7,7 @@ pub mod genome;
 pub mod identity;
 pub(crate) mod newborn;
 pub mod parseability;
+pub mod phenotype;
 pub mod plasticity_census;
 pub mod ring_rules;
 pub mod sensor_census;
