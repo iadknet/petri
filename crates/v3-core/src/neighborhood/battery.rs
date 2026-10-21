@@ -18,7 +18,9 @@ use rand::{Rng, SeedableRng};
 
 use crate::config::{EnergyLifecycleConfig, RuntimeConfig};
 use crate::contracts::WorldAction;
+use crate::creature::colour::unit_rgb;
 use crate::creature::genome::CreatureGenome;
+use crate::creature::phenotype::Phenotype;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::runtime::MeshOutput;
@@ -87,7 +89,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             neighbor_barrier: [0.0; 8],
             neighbor_occupied,
             age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
-            own_colour: [0.0; 3],
+            own_colour: unit_rgb(Phenotype::FOUNDER.channels),
             max_energy: lifecycle.max_energy,
             previous_outcome: [0.0; 4],
         },
@@ -502,6 +504,19 @@ mod tests {
     use super::*;
     use crate::config::{FounderProfile, RuntimeConfig};
     use crate::creature::founder::founder_genome;
+
+    #[test]
+    fn every_scenario_reads_the_founder_colour_as_its_own() {
+        let founder = crate::creature::colour::unit_rgb(Phenotype::FOUNDER.channels);
+        let battery = Battery::generate(2);
+        for scenario in battery
+            .snapshots
+            .iter()
+            .chain(battery.sequences.iter().flatten())
+        {
+            assert_eq!(scenario.sensors.local.own_colour, founder);
+        }
+    }
 
     #[test]
     fn generate_is_deterministic_for_a_fixed_food_type_count() {

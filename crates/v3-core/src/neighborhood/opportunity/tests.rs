@@ -338,3 +338,14 @@ fn opportunity_readings_print() {
         );
     }
 }
+
+/// A creature-less fixture reads the founder colour as its own (invariant 3).
+#[test]
+fn fixture_scenarios_read_the_founder_colour_as_their_own() {
+    use super::fixtures::competence_contexts;
+    let founder =
+        crate::creature::colour::unit_rgb(crate::creature::phenotype::Phenotype::FOUNDER.channels);
+    for context in competence_contexts(Family::Vector) {
+        assert_eq!(context.scenario().sensors.local.own_colour, founder);
+    }
+}
