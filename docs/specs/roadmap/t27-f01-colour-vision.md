@@ -1,6 +1,6 @@
 # T27.F01 — Colour Vision
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-21
 **Feature**: T27.F01
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
@@ -124,18 +124,18 @@ a valid result), and cannot show the feature wrong.
 
 - [x] Commit 1 (layout, tests first): the layout pin rewritten over the real reducer before the change; `creature::colour` (invariant 4); `nearby_idx` ten fields with `FIELDS` and the two retired fields deleted (1, 2); pairs, partition test, `directionPairs.json` and `nearbyFields.json` with their Rust pins (5, 6); the frontend importing both fixtures with its parity tests over them; the 256-byte test, the index re-export and the aliases deleted, and the width readers (9); the named-index contexts array with `neighborhood-coverage-v3` and `mutation-effects-v5`, and `input-use-v3` because the family's channel meanings change (8, 7); `GENOME_FORMAT` 7 and `PROTOCOL_VERSION` `v3alpha12` whose §2 history line names this commit's surface, the 40-wide `nearby` payload (10); the sensor, identity and protocol reference specs and the mutation spec's pair case (12); every mutation-on pin this commit moves re-pinned, each with its cause from invariant 10's commit-1 list (sensed values, width, slot edge count), founder-only pins unmoved. Verified by the layout pin, the partition test, the two fixture pins, the frontend tests and `cargo test -p v3-core`.
 - [x] Commit 2 (self inputs and the bucket table, tests first; depends on commit 1): `OwnRed`, `OwnGreen`, `OwnBlue`, `StaticInputs.own_colour`, resolution and the symmetry test (3); `INPUT_BUCKETS` with the sampler and the universe reading it, `universe_entries` unchanged, and the agreement test (7); the three `Family` variants under the `input-use-v3` already in force (7, 8); `SCALAR_LABELS` (6); the mutation spec sampler table and the protocol history line extended with the three static keys (10, 12); every mutation-on pin this commit moves re-pinned, each with its cause from invariant 10's commit-2 list (draw range, universe order, `Swap` alternatives). Verified by the symmetry and agreement tests, the sampler index tests and `cargo test -p v3-core`.
-- [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
+- [x] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
-- [x] Tests: `cargo test -p v3-core --no-fail-fast` (the layout pin, the symmetry test, the agreement test, the two fixture pins, the partition test), `cargo test -p v3-cli --lib bench`, `cargo test -p v3-server`, `cargo test -p v3-telemetry`, `cargo test -p v3-lab` → results recorded here. At b697f58d: v3-core 2,310 passed, 0 failed, 10 ignored (the exhaustive sampler-universe agreement test and the membership proptest included). At 1e28f469, unchanged since outside v3-core tests: v3-cli `--lib bench` 132 passed, `--test cli` 20 and `--test bench` 13 passed; v3-server 168, v3-telemetry 78, v3-lab 211 passed, 0 failed. Re-pins by artifact and cause: the readings file.
+- [x] Tests: `cargo test -p v3-core --no-fail-fast` (the layout pin, the symmetry test, the agreement test, the two fixture pins, the partition test), `cargo test -p v3-cli --lib bench`, `cargo test -p v3-server`, `cargo test -p v3-telemetry`, `cargo test -p v3-lab` → results recorded here. At b697f58d: v3-core 2,310 passed, 0 failed, 10 ignored. At 1e28f469, unchanged since outside v3-core tests: v3-cli `--lib bench` 132 passed, `--test cli` 20 and `--test bench` 13 passed; v3-server 168, v3-telemetry 78, v3-lab 211 passed, 0 failed. Re-pins by artifact and cause: the readings file.
 - [x] Frontend: `npx vitest run src/components/inspector` and `npx biome check` on the touched files → results recorded here. At 1e28f469, no frontend change since: `npx vitest run src/components/inspector src/types`: 44 files, 311 tests passed; `npx biome check src/components/inspector src/types` clean (110 files); `npx tsc -b` exit 0.
 - [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed after each commit through b697f58d. The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at both commits; b697f58d is test- and comment-only and `applied_trajectory` (2) and `baseline_worlds` (19) pass there unchanged.
 - [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at b697f58d.
 - [x] Mutation gate: CI fresh (39573198443) at 1aeb2ee4: `144 mutants tested: 14 missed, 117 caught, 13 unviable, 0 timeouts`; `~/.local/share/petri-tools/mutants/t27-f01/mutants.out`, all `colour.rs`. Killed by `channels_to_rgb_matches_reference_across_every_hue` (8/8 on iterate): 31:36, 45:10 `==`, 46:11 ×2, 49:18, 49:23 ×2, 49:28. Equivalent, each boundary's sides agree (0 reachable inputs differ): `<=` at 22:18, 42:10, 48:10, 51:10, 54:10; `>=` at 45:10.
-- [x] Gate and goal (2026-10-21, HEAD 182c43f0): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+17.6%), `vm_steps` flag +28.2%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `decided_passes` +72.1%, a trajectory reading reported to the user. Raw gate 129,167 B `98253a75...b26585`, raw goal 706,943,675 B `cb502110...745cb` (both `verified_local`, 2026-10-21); summaries 25,889 B and 533,714 B. The series entries (`closed` and the epoch re-pin) are written in the closing commit; the colour use rows are in the readings file.
-- [ ] Slow tier: `make rust-test-slow` → exit 0 after the recruitment-paths readings are re-pinned, the moved rows recorded in the readings file.
-- [ ] Close: `make check` exited 0 at the tested commit.
+- [x] Gate and goal (2026-10-21, HEAD 182c43f0): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+17.6%), `vm_steps` flag +28.2%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `decided_passes` +72.1%, accepted by the user. Raw gate 129,167 B `98253a75...b26585`, raw goal 706,943,675 B `cb502110...745cb` (both `verified_local`, 2026-10-21); summaries 25,889 B and 533,714 B. Series entries and both epochs re-pinned at 1772dda7.
+- [x] Slow tier: `make rust-test-slow` → exit 0 at 10e7e50c (recruitment-paths 3 passed, lab 6 passed) after one re-pin (readings file).
+- [x] Close: `make check` exited 0 at the tested commit 10e7e50c.
 
 ## Performance and Goal Impact
 
@@ -188,10 +188,10 @@ gate 129,167 B, sha256 `98253a75...b26585`; raw goal 706,943,675 B, sha256
 
 ## Success Criteria
 
-- [ ] A creature's nearby slot carries the seen creature's red, green and blue, its own three channels are drawable, resolvable self inputs, `LINEAGE_MATCH` and `PHENOTYPE_SIMILARITY` no longer exist, and `KIN_AFFINITY` is unchanged (invariants 1–3, pinned).
-- [ ] The nearby field names, the pairs and the input buckets each have one declaration: the two fixtures are Rust-pinned and frontend-imported, and the sampler/universe agreement test passes (invariants 6, 7).
-- [ ] Founder-only trajectories are byte-identical; every moved mutation-on pin is re-pinned with its one cause (invariant 10).
-- [ ] The Verification Plan's checks ran on the final code and the goal readings report colour-channel use per world, zero included.
+- [x] A creature's nearby slot carries the seen creature's red, green and blue, its own three channels are drawable, resolvable self inputs, `LINEAGE_MATCH` and `PHENOTYPE_SIMILARITY` no longer exist, and `KIN_AFFINITY` is unchanged (invariants 1–3, pinned).
+- [x] The nearby field names, the pairs and the input buckets each have one declaration: the two fixtures are Rust-pinned and frontend-imported, and the sampler/universe agreement test passes (invariants 6, 7).
+- [x] Founder-only trajectories are byte-identical; every moved mutation-on pin is re-pinned with its one cause (invariant 10).
+- [x] The Verification Plan's checks ran on the final code and the goal readings report colour-channel use per world, zero included.
 
 ## Notes for AI Agents
 
@@ -205,3 +205,4 @@ gate 129,167 B, sha256 `98253a75...b26585`; raw goal 706,943,675 B, sha256
 - Decision: `lineage_id` stays as observation-only telemetry (lineage indicators, server lineage map, window records).
 - Deferred: the long-run reading of whether colour channels become behavior (retention of a colour-reading recruitment past 2,000 ticks, any colour-conditioned action) goes to T27.F02's goal-long run, the track's carrier.
 - Deferred: the retina (per-direction RGB, design note §3 A3) until a reading shows slot colour in use.
+- Cost: `/usage` not collected; implementer 4 passes, 8 advisor consults; 1 spec-owner resume; 3 Codex rounds plus a confirm job, final `ready`; review P2 1 correctness, P3 1 code health, design none.
