@@ -238,6 +238,13 @@ fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig)
             if let Some(edge_mode) = edge_mode {
                 a.text(config_key("world.edge_mode"), edge_mode);
             }
+            // The energy reads' denominator (T26.F02).
+            let capacity = &config.energy.capacity;
+            a.double(config_key("energy.capacity.reference"), capacity.reference);
+            a.text(
+                config_key("energy.capacity.sensor_scale"),
+                capacity.sensor_scale.as_key(),
+            );
         }
         3 => cognition(a, config),
         4 => actions(a, config),
@@ -255,6 +262,13 @@ fn world_update(a: &mut Attributes, config: &SimulationConfig) {
     a.double(
         config_key("energy.lifecycle.genome_carry_cost_per_unit"),
         lifecycle.genome_carry_cost_per_unit,
+    );
+    // The signed capacity upkeep beside decay and carrying (T26.F02).
+    let capacity = &config.energy.capacity;
+    a.double(config_key("energy.capacity.reference"), capacity.reference);
+    a.double(
+        config_key("energy.capacity.upkeep_per_unit"),
+        capacity.upkeep_per_unit,
     );
     a.double(
         config_key("shared_memory.decay_rate"),
@@ -408,6 +422,27 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         mutation.mesh_layer_probability,
     );
     a.double(config_key("mutation.executed_bias"), mutation.executed_bias);
+    // The move factor and the birth's capacity draw and cap (T26.F02).
+    let capacity = &config.energy.capacity;
+    for (field, value) in [
+        ("reference", capacity.reference),
+        ("min", capacity.min),
+        ("move_cost_slope", capacity.move_cost_slope),
+    ] {
+        a.double(config_key(&format!("energy.capacity.{field}")), value);
+    }
+    a.double(
+        config_key("energy.lifecycle.max_energy"),
+        lifecycle.max_energy,
+    );
+    a.double(
+        config_key("mutation.capacity.chance"),
+        mutation.capacity.chance,
+    );
+    a.double(
+        config_key("mutation.capacity.log_step"),
+        mutation.capacity.log_step,
+    );
     a.double(
         config_key("predation.steal_cost_rate"),
         config.predation.steal_cost_rate,
