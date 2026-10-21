@@ -1,6 +1,6 @@
 # T27.F01 — Colour Vision
 
-**Status**: Complete
+**Status**: In Progress
 **Last updated**: 2026-10-21
 **Feature**: T27.F01
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
@@ -128,14 +128,14 @@ a valid result), and cannot show the feature wrong.
 
 ## Verification
 
-- [x] Tests: `cargo test -p v3-core --no-fail-fast` (the layout pin, the symmetry test, the agreement test, the two fixture pins, the partition test), `cargo test -p v3-cli --lib bench`, `cargo test -p v3-server`, `cargo test -p v3-telemetry`, `cargo test -p v3-lab` → results recorded here. At b697f58d: v3-core 2,310 passed, 0 failed, 10 ignored. At 1e28f469, unchanged since outside v3-core tests: v3-cli `--lib bench` 132 passed, `--test cli` 20 and `--test bench` 13 passed; v3-server 168, v3-telemetry 78, v3-lab 211 passed, 0 failed. Re-pins by artifact and cause: the readings file.
-- [x] Frontend: `npx vitest run src/components/inspector` and `npx biome check` on the touched files → results recorded here. At 1e28f469, no frontend change since: `npx vitest run src/components/inspector src/types`: 44 files, 311 tests passed; `npx biome check src/components/inspector src/types` clean (110 files); `npx tsc -b` exit 0.
-- [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed after each commit through b697f58d. The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at both commits; b697f58d is test- and comment-only and `applied_trajectory` (2) and `baseline_worlds` (19) pass there unchanged.
-- [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at b697f58d.
+- [x] Tests: `cargo test -p v3-core --no-fail-fast` (the layout pin, the symmetry test, the agreement test, the two fixture pins, the partition test), `cargo test -p v3-cli`, `cargo test -p v3-server`, `cargo test -p v3-telemetry`, `cargo test -p v3-lab` → at 6cba76cc (rebased onto main 0c43ae7c): v3-core 2,341 passed, 0 failed, 10 ignored; v3-cli 261 passed, 3 ignored; v3-server 168, v3-telemetry 78, v3-lab 211 passed, 0 failed. Re-pins by artifact and cause, including the rebase: the readings file.
+- [x] Frontend: `npx vitest run src/components/inspector src/types` at 6cba76cc: 44 files, 312 tests passed; `npx biome check src/components/inspector src/types` clean (110 files); `npx tsc -b` exit 0.
+- [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed at 6cba76cc (and after each commit before the rebase). The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at 6cba76cc, measured at `mutation.per_unit_rate` 0.
+- [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at 6cba76cc.
 - [x] Mutation gate: CI fresh (39573198443) at 1aeb2ee4: `144 mutants tested: 14 missed, 117 caught, 13 unviable, 0 timeouts`; `~/.local/share/petri-tools/mutants/t27-f01/mutants.out`, all `colour.rs`. Killed by `channels_to_rgb_matches_reference_across_every_hue` (8/8 on iterate): 31:36, 45:10 `==`, 46:11 ×2, 49:18, 49:23 ×2, 49:28. Equivalent, each boundary's sides agree (0 reachable inputs differ): `<=` at 22:18, 42:10, 48:10, 51:10, 54:10; `>=` at 45:10.
 - [x] Gate and goal (2026-10-21, HEAD 182c43f0): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json`, local raw hash and byte count and verification time checked, series entry points to the summary, no new full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use and an unevaluated cohort as unavailable. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+17.6%), `vm_steps` flag +28.2%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `decided_passes` +72.1%, accepted by the user. Raw gate 129,167 B `98253a75...b26585`, raw goal 706,943,675 B `cb502110...745cb` (both `verified_local`, 2026-10-21); summaries 25,889 B and 533,714 B. Series entries and both epochs re-pinned at 1772dda7.
-- [x] Slow tier: `make rust-test-slow` → exit 0 at 10e7e50c (recruitment-paths 3 passed, lab 6 passed) after one re-pin (readings file).
-- [x] Close: `make check` exited 0 at the tested commit 10e7e50c.
+- [x] Slow tier: `make rust-test-slow` → exit 0 at 6cba76cc (recruitment-paths 3 passed, lab 6 passed); the recruitment-paths reading holds through the rebase.
+- [ ] Close: `make check` at the tested commit, after the gate and goal re-run on the rebased tree.
 
 ## Performance and Goal Impact
 
