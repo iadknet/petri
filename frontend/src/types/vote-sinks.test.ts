@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ActionType } from "./action-log.ts";
+import type { DirectedVoteKind, VoteKind } from "./genome.ts";
 import {
 	VOTE_KINDS as TRACE_VOTE_KINDS,
 	VOTE_SINK_COUNT as TRACE_VOTE_SINK_COUNT,
@@ -29,6 +30,25 @@ const ACTION_TYPE_WITNESS: Record<ActionType, true> = {
 	GiveEnergy: true,
 };
 
+/** Every member of the handwritten `VoteKind` union, checked exhaustive by the
+ * compiler. */
+const VOTE_KIND_WITNESS: Record<VoteKind, true> = {
+	Eat: true,
+	Move: true,
+	Reproduce: true,
+	StealEnergy: true,
+	GiveEnergy: true,
+};
+
+/** Every member of the handwritten `DirectedVoteKind` union, checked exhaustive
+ * by the compiler. */
+const DIRECTED_VOTE_KIND_WITNESS: Record<DirectedVoteKind, true> = {
+	Move: true,
+	Reproduce: true,
+	StealEnergy: true,
+	GiveEnergy: true,
+};
+
 /** The frontend reads the catalog only through the Rust-pinned fixture
  * (`vote.rs` pins `vote-sinks.json`; T27.F03 invariant 2). */
 describe("vote-sinks.json parity", () => {
@@ -45,6 +65,10 @@ describe("vote-sinks.json parity", () => {
 		expect(ACTION_TYPES).toEqual(catalogFixture.actionTypes);
 		expect(Object.values(ActionType)).toEqual(fixtureNames);
 		expect(Object.keys(ACTION_TYPE_WITNESS).sort()).toEqual([...fixtureNames].sort());
+		expect(Object.keys(VOTE_KIND_WITNESS).sort()).toEqual([...catalogFixture.voteKinds].sort());
+		expect(Object.keys(DIRECTED_VOTE_KIND_WITNESS).sort()).toEqual(
+			[...catalogFixture.directedKinds].sort(),
+		);
 	});
 
 	it("indexes every fixture sink at its position", () => {
