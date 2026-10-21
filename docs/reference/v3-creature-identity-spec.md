@@ -90,8 +90,16 @@ Canonical rules:
 - if `MutationSummary.applied_events > 0`, child mutates `kin_tag` using the
   mutation rule in Section 5.
 
+Carrier: the identity travels in the creature's heritable body record
+(`HeritableBody`, `crates/v3-core/src/creature/body.rs`) beside the
+phenotype, and one call, `HeritableBody::inherit(parent_body, applied_events
+> 0, config, rng)`, inherits both: when mutated, the phenotype mutates first
+(`v3-phenotype-spec.md` Section 5) and the `kin_tag` second; otherwise
+nothing is drawn.
+
 Ownership split:
 - reproduction owns **when** this trigger is evaluated;
+- the body record owns the **order** of the phenotype and kin-tag draws;
 - creature identity owns **how** `kin_tag` mutates.
 
 This keeps the generic mutation engine free of lifecycle-specific side effects.

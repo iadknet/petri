@@ -151,7 +151,7 @@ wrong.
 
 ## Implementation Tasks
 
-- [ ] Characterization tests first, on main's behavior, in one commit, run
+- [x] Characterization tests first, on main's behavior, in one commit, run
       after `cargo test -p v3-core --test viability`: eat (floor, cap, both
       bookings, observe order, and the `+∞`, `−∞` and `NaN` credit cases),
       predation (cap after the transfer and after
@@ -159,18 +159,18 @@ wrong.
       whose litter exceeds `max_energy` kept uncapped, the move charge on a
       successful and a blocked move, and the inheritance draw order
       (phenotype then kin tag when mutated; no draw otherwise).
-- [ ] `creature/body.rs`: `Phenotype`, `Phenotype::FOUNDER`,
+- [x] `creature/body.rs`: `Phenotype`, `Phenotype::FOUNDER`,
       `HeritableBody`, `founder`, `inherit`; `mutate_phenotype` over
       `Phenotype`; `seeding.rs` uses `founder`; the lab's `Phenotype`
       deleted (invariants 1–3).
-- [ ] Constructors take `body`; `new` delegates to `new_with_cached_fields`;
+- [x] Constructors take `body`; `new` delegates to `new_with_cached_fields`;
       the 53 call sites and every reader migrated; test literals replaced by
       `Phenotype::FOUNDER` with their identity values kept (invariants 2, 4).
-- [ ] `energy_cap` and the shared cap step; eat and both predation sites use
+- [x] `energy_cap` and the shared cap step; eat and both predation sites use
       them (invariant 5).
-- [ ] `move_effort` and the split charge path; `apply_move` uses them
+- [x] `move_effort` and the split charge path; `apply_move` uses them
       (invariant 6).
-- [ ] Reference docs corrected: reproduction step order, phenotype-spec
+- [x] Reference docs corrected: reproduction step order, phenotype-spec
       §§2–5 synchronized with the six-channel model and transport
       visibility, identity-spec §4 (invariant 8).
 - [ ] Closing: gate summary, mutation record, slow tier result recorded in
@@ -178,10 +178,10 @@ wrong.
 
 ## Verification
 
-- [ ] Characterization and inheritance-order tests:
-      `cargo test -p v3-core` -> `<result>`; names listed in
+- [x] Characterization and inheritance-order tests:
+      `cargo test -p v3-core` -> 2326 passed, 0 failed, 10 ignored; names listed in
       `docs/progress/readings/t26-f01.md`.
-- [ ] `cargo test -p v3-core --test viability` -> `<result>`;
+- [x] `cargo test -p v3-core --test viability` -> 30 passed, 0 failed;
       `tests/applied_trajectory.rs` and `tests/reproducibility.rs` pass with
       unchanged pins.
 - [ ] `make rust-test-slow` -> `<result>` (recruitment-paths readings and

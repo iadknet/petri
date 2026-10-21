@@ -282,10 +282,12 @@ runtime config contract: `v3-runtime-config-spec.md`.
   9. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally draws the requested event count;
       see v3-mutation-spec.md Section 4.1)
- 10. derive child identity from parent identity:
-       - inherit lineage_id unchanged
-       - mutate kin_tag only if MutationSummary.applied_events > 0
- 11. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
+ 10. inherit the child's body in one call, HeritableBody::inherit
+     (creature/body.rs), copying the parent's phenotype and identity
+     (lineage_id unchanged); only if MutationSummary.applied_events > 0:
+ 11.   mutate the phenotype per v3-phenotype-spec.md, then
+       mutate kin_tag per v3-creature-identity-spec.md (this draw order;
+       no draw when no event applied)
  12. spawn child immediately; occupy cell now
 ```
 

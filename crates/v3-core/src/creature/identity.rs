@@ -27,8 +27,9 @@ impl CreatureIdentityState {
     /// Inherit identity from parent to child per v3-creature-identity-spec.md Section 4.
     ///
     /// - `lineage_id` is inherited unchanged.
-    /// - `kin_tag` is inherited unchanged (caller must apply `mutate_kin_tag` separately
-    ///   when `MutationSummary.applied_events > 0`).
+    /// - `kin_tag` is inherited unchanged; `HeritableBody::inherit`
+    ///   (`creature::body`) applies `mutate_kin_tag` when
+    ///   `MutationSummary.applied_events > 0`.
     #[must_use]
     pub fn inherit(parent: &Self) -> Self {
         *parent

@@ -38,31 +38,39 @@ This document does not define:
 
 ## 2. Phenotype State Model
 
-Per-creature phenotype state:
+Per-creature phenotype state is the `Phenotype` record
+(`crates/v3-core/src/creature/body.rs`), carried with the kin identity in the
+creature's heritable body (`HeritableBody`, field `CreatureState::body`):
 
-| Field | Type | Visibility | Description |
-| --- | --- | --- | --- |
-| `phenotype_rgb` | `[u8; 3]` | API/frame payloads | Visible color (R, G, B channels). |
-| `phenotype_active_channel` | `usize` | Internal only | Currently active channel index (0=R, 1=G, 2=B). |
-| `phenotype_channel_polarity` | `[bool; 3]` | Internal only | Direction of walk per channel (`true` = increment, `false` = decrement). |
+| Field | Type | Description |
+| --- | --- | --- |
+| `channels` | `[u8; 6]` | Six internal channels: `[0] + [1]` (wrapping) give the hue, the mean of `[2]` and `[3]` the saturation (mapped to `[0.35, 1.0]`), the mean of `[4]` and `[5]` the lightness (mapped to `[0.25, 0.75]`). |
+| `active_channel` | `usize` | The channel a mutation steps (`0..6`). |
+| `polarity` | `[bool; 6]` | Step direction per channel (`true` = increment, `false` = decrement). |
+
+The visible colour is derived, not stored: `channels_to_rgb(channels)`
+(`mutation/phenotype.rs`) maps the channels through HSL to `[u8; 3]` RGB.
 
 Visibility rules:
-- `phenotype_rgb` is exposed in frame payloads and creature state.
-- `phenotype_active_channel` and `phenotype_channel_polarity` are internal
-  simulation state; they are NOT exposed in API responses, frame payloads, or
-  WebSocket events.
+- Frame payloads and creature snapshots carry only the derived
+  `phenotype_rgb`.
+- The creature detail response (`GET /v3/simulation/creature/:id`,
+  `v3-server/src/http/creature.rs`) carries the whole record as
+  `phenotype: { channels, active_channel, polarity, rgb }`.
 
 ---
 
 ## 3. Founder Baseline
 
-All startup-seeded founders use a single canonical phenotype baseline:
+All startup-seeded founders use one canonical phenotype, the public constant
+`Phenotype::FOUNDER`, paired with the founder identity by
+`HeritableBody::founder(founder_index, startup_seed)`:
 
 | Field | Value |
 | --- | --- |
-| `phenotype_rgb` | `[204, 61, 61]` |
-| `phenotype_active_channel` | `0` (red) |
-| `phenotype_channel_polarity` | `[true, true, true]` |
+| `channels` | `[0, 0, 92, 92, 138, 138]` (RGB `[204, 61, 61]`) |
+| `active_channel` | `0` |
+| `polarity` | `[true; 6]` |
 
 v3alpha1 policy:
 - Founder phenotype baseline is a fixed constant.
@@ -80,16 +88,19 @@ Core rule:
 
 Trigger semantics:
 - After the `MutationEngine` processes the offspring genome and returns a
-  `MutationSummary`, the reproduction flow evaluates the trigger condition.
+  `MutationSummary`, the reproduction flow calls
+  `HeritableBody::inherit(parent_body, applied_events > 0, config, rng)`.
 - If `MutationSummary.applied_events > 0` (at least one genome mutation event
-  was applied), phenotype also mutates using the algorithm in Section 5.
+  was applied), the phenotype mutates using the algorithm in Section 5, and
+  then the kin tag mutates (`v3-creature-identity-spec.md` Section 5): the
+  phenotype draws come first.
 - If `MutationSummary.applied_events == 0` (no genome mutation occurred),
-  offspring inherits the parent's exact `phenotype_rgb`,
-  `phenotype_active_channel`, and `phenotype_channel_polarity` unchanged.
+  the offspring inherits the parent's exact `Phenotype` and no draw is made.
 
 Ownership boundary:
-- This trigger is evaluated in the reproduction flow after `MutationEngine`
-  returns, not inside the mutation engine itself.
+- Reproduction evaluates the trigger after `MutationEngine` returns, not
+  inside the mutation engine itself; the body record owns the order of the
+  phenotype and kin-tag draws; this file owns how the phenotype mutates.
 - The mutation engine has no knowledge of phenotype state.
 - Canonical reproduction action flow is in `v3-reproduction-spec.md`.
 
@@ -101,37 +112,39 @@ When the trigger condition is met (`applied_events > 0`), phenotype mutates as
 follows:
 
 ```text
-mutate_phenotype(parent_rgb, parent_active_channel, parent_polarity, config, rng):
-  1. if rng.random() < config.channel_change_chance:
-       child_active_channel = pick uniformly from the other 2 channels
+mutate_phenotype(parent: Phenotype, config, rng) -> Phenotype:
+  1. if rng.gen::<f32>() < config.channel_change_chance:
+       child.active_channel = pick uniformly from the other 5 channels
      else:
-       child_active_channel = parent_active_channel
-  2. if rng.random() < config.polarity_flip_chance:
-       child_polarity[child_active_channel] = !parent_polarity[child_active_channel]
+       child.active_channel = parent.active_channel
+  2. if rng.gen::<f32>() < config.polarity_flip_chance:
+       child.polarity[child.active_channel] = !parent.polarity[child.active_channel]
      else:
-       child_polarity = copy(parent_polarity)
+       child.polarity = copy(parent.polarity)
   3. step = max(config.channel_step, 1)
-     if child_polarity[child_active_channel] is true:
-       child_rgb[child_active_channel] = parent_rgb[child_active_channel] wrapping_add step
+     if child.polarity[child.active_channel] is true:
+       child.channels[child.active_channel] = parent value wrapping_add step
      else:
-       child_rgb[child_active_channel] = parent_rgb[child_active_channel] wrapping_sub step
-     (other channels keep parent RGB)
-  4. return (child_rgb, child_active_channel, child_polarity)
+       child.channels[child.active_channel] = parent value wrapping_sub step
+     (other channels keep the parent's values)
+  4. return child
 ```
 
 Step details:
 
 1. **Channel switch**: With probability `channel_change_chance`, switch the
-   active channel to one of the other two channels chosen uniformly at random.
-   Otherwise, the active channel is inherited unchanged. This creates
-   persistent directional drift within a single channel, with rare switches.
+   active channel to one of the other five channels chosen uniformly at
+   random (one further draw). Otherwise, the active channel is inherited
+   unchanged. This creates persistent directional drift within a single
+   channel, with rare switches.
 2. **Polarity flip**: With probability `polarity_flip_chance`, flip the
    active channel's polarity. All other channels retain parent polarity.
-3. **RGB step**: Apply `+channel_step` or `-channel_step` to the active
-   channel's RGB value using the (possibly flipped) polarity as sign direction.
+3. **Channel step**: Apply `+channel_step` or `-channel_step` to the active
+   channel using the (possibly flipped) polarity as sign direction.
    Arithmetic uses **wrapping u8** semantics (overflow wraps around 0/255).
-   All other channels retain parent RGB.
-4. **Return**: Output the child phenotype state.
+   All other channels retain the parent's values; the RGB colour follows
+   through `channels_to_rgb`.
+4. **Return**: Output the child phenotype.
 
 ---
 
