@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-10-13
+**Last updated**: 2026-10-20
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
 closed, what made evolution start working and the findings it carried
@@ -20,6 +20,9 @@ attributed to the feature whose closure moved it.
 ## Track Roadmaps
 
 - [ ] **T25 — Edge Groups and Per-Edge Learning** — [Roadmap](roadmaps/t25-edge-groups-and-learning.md) — Depends on: None
+- [ ] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
+- [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
+- [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
 
 ## Final Success Criteria
 
@@ -34,7 +37,11 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 - Every mechanism feature is grounded in a natural analog and reaches
   creatures through the world or the body, never through a sensor or a
   computation invented for the feature. Only geometry may be built in: which
-  sensor field corresponds to which direction. Its roadmap goal line names
+  sensor field corresponds to which direction. The one sensed exception is
+  self-referent matching: how closely another creature's carried cue
+  matches one's own, as an animal smells kin (user, 2026-10-20; today the
+  kin-tag affinity). Ordinary condition readings of another body (its
+  energy, its readiness) are facts, not comparisons. Its roadmap goal line names
   the analog first. Measurement features are exempt.
 - Brain and sensorimotor features improve what evolution can find on its
   own; they never target a specific behavior. Specific sensors and scenes are
@@ -61,11 +68,22 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 - Findings carried from program 1 and not yet owned by a row: genome bloat
   at depth with size pressure off; reproduction possibly decoupled from
   condition; edge and VM barrier avoiders that fail live; memory visible only
-  past 20,000 ticks; the unbounded steal request, and that every live steal
-  requests 0 energy (2026-10-12 probe).
+  past 20,000 ticks. The unbounded steal request and the zero-energy live
+  steals (2026-10-12 probe) are owned by T27.F03.
 
-Priority order for new starts: T25.F01, T25.F02, T25.F03, T25.F04, T25.F05,
-T25.F06, T25.F07, T25.F08, T25.F09.
+Priority order for new starts: T26.F01, T25.F10, T27.F01, T26.F02, T27.F03,
+T27.F02, T28.F01, T28.F02.
+
+- T26–T28 were placed on 2026-10-20 at the user's direction from the
+  [interaction features design note](strategy/interaction-features-design-2026-10-20.md),
+  which records the user's decisions and the prior art. The rows are grouped
+  by code surface so rows can run in concurrent sessions, reconciling shared
+  catalogs at integration: wave 1 T26.F01, T25.F10 and T27.F01; wave 2
+  T26.F02 and T27.F03; wave 3 T27.F02 and T28.F01; then T28.F02. T25.F10 (group
+  genes cost as genes) was added to the completed T25 track the same day,
+  because it revises T25.F02's size rule. The
+  [T26–T28 design review](progress/readings/t26-t28-design-review.md) records
+  the Codex plan-design-review and its dispositions.
 
 - T25 was placed on 2026-10-13 at the user's direction from the
   [edge groups and learning design note](strategy/edge-groups-and-learning-design-2026-10-13.md),
