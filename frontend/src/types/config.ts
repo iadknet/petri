@@ -192,11 +192,25 @@ export interface AgeEnergyCostConfig {
 	max_multiplier: number;
 }
 
+/** Which denominator the energy sensor reads divide by (T26.F02). */
+export type SensorScale = "reference" | "own";
+
+/** The heritable energy capacity's range and cost rules (T26.F02). */
+export interface EnergyCapacityConfig {
+	reference: number;
+	min: number;
+	founder: number;
+	move_cost_slope: number;
+	upkeep_per_unit: number;
+	sensor_scale: SensorScale;
+}
+
 export interface EnergyConfig {
 	lifecycle: LifecycleEnergyConfig;
 	costs: CostsConfig;
 	complexity_cost: ComplexityEnergyCostConfig;
 	age_cost: AgeEnergyCostConfig;
+	capacity: EnergyCapacityConfig;
 }
 
 export interface VmConfig {
@@ -221,6 +235,12 @@ export interface ReachableBiasConfig {
 /** Native Graph input recruitment (T20.F04); `WholeFamily` is the default. */
 export type NeutralInputRecruitment = "Off" | "SingleChannel" | "WholeFamily";
 
+/** The capacity mutation drawn on every birth (T26.F02). */
+export interface CapacityMutationConfig {
+	chance: number;
+	log_step: number;
+}
+
 export interface MutationConfig {
 	neutral_input_recruitment: NeutralInputRecruitment;
 	per_unit_rate: number;
@@ -232,6 +252,7 @@ export interface MutationConfig {
 	reachable_bias: ReachableBiasConfig;
 	executed_bias: number;
 	executed_window_ticks: number;
+	capacity: CapacityMutationConfig;
 }
 
 export interface PerceptionRuntimeConfig {

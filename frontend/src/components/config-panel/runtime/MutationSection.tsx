@@ -172,7 +172,31 @@ export const MUTATION_ENUMS: EnumFieldDef[] = [
 	},
 ];
 
+/** The capacity mutation drawn on every birth (T26.F02). */
+export const MUTATION_CAPACITY_FIELDS: FieldDef[] = [
+	{
+		path: "mutation.capacity.chance",
+		label: "Capacity Mutation Chance",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.1,
+		tooltip: "Chance per birth that the child's energy capacity changes",
+	},
+	{
+		path: "mutation.capacity.log_step",
+		label: "Capacity Log Step",
+		min: 0,
+		max: 2,
+		step: 0.01,
+		defaultValue: 0.25,
+		tooltip:
+			"Largest change of a capacity mutation, in log space: the capacity is multiplied by e^\u03b4 with \u03b4 drawn evenly in \u00b1 this step",
+	},
+];
+
 export const MUTATION_ALL_FIELDS: AnyFieldDef[] = [
+	...MUTATION_CAPACITY_FIELDS,
 	...MUTATION_FIELDS,
 	...MUTATION_TOGGLES,
 	...MUTATION_ENUMS,

@@ -48,6 +48,8 @@ struct CreatureDetailResponse<'a> {
     id: u64,
     position: CreaturePositionResponse,
     energy: f32,
+    /// The creature's own energy capacity (`body.capacity`, T26.F02): the
+    /// cap every credit is clamped at, not the configured `max_energy`.
     max_energy: f32,
     age: u64,
     generation: u64,

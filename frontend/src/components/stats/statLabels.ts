@@ -59,6 +59,7 @@ export function mutationOperatorLabel(key: string): string {
 const DEATH_CAUSES: Record<string, string> = {
 	lifecycle_decay: "Ageing upkeep",
 	genome_carrying: "Genome upkeep",
+	capacity_upkeep: "Capacity upkeep",
 	vm_compute: "VM compute",
 	graph_compute: "Graph compute",
 	mesh_ramp: "Mesh ramp cost",

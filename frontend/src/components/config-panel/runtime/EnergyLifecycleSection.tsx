@@ -1,14 +1,15 @@
-import type { FieldDef } from "../shared/types.ts";
+import type { AnyFieldDef, EnumFieldDef, FieldDef } from "../shared/types.ts";
 
 export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 	{
 		path: "energy.lifecycle.max_energy",
-		label: "Max Energy",
+		label: "Max Capacity",
 		min: 1,
 		max: 1000,
 		step: 1,
-		defaultValue: 200.0,
-		tooltip: "Upper bound on creature energy \u2014 excess is clamped",
+		defaultValue: 800.0,
+		tooltip:
+			"Upper bound of the inherited energy capacity; each creature's own capacity caps its energy",
 	},
 	{
 		path: "energy.lifecycle.energy_decay_per_tick",
@@ -89,4 +90,77 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		defaultValue: 100.0,
 		tooltip: "Starting energy given to newborn creatures",
 	},
+];
+
+/** The heritable energy capacity (T26.F02): range, cost rules and sensor scale. */
+export const ENERGY_CAPACITY_NUMBER_FIELDS: FieldDef[] = [
+	{
+		path: "energy.capacity.reference",
+		label: "Reference Capacity",
+		min: 1,
+		max: 1000,
+		step: 1,
+		defaultValue: 200.0,
+		tooltip:
+			"The neutral capacity: a body here pays the base move cost and no upkeep, and the energy sensors read on this scale",
+	},
+	{
+		path: "energy.capacity.min",
+		label: "Min Capacity",
+		min: 1,
+		max: 1000,
+		step: 1,
+		defaultValue: 50.0,
+		tooltip: "Lower bound of the inherited capacity, at most the reference",
+	},
+	{
+		path: "energy.capacity.founder",
+		label: "Founder Capacity",
+		min: 1,
+		max: 1000,
+		step: 1,
+		defaultValue: 200.0,
+		tooltip: "Every founder's capacity at seeding; takes effect on restart",
+	},
+	{
+		path: "energy.capacity.move_cost_slope",
+		label: "Move Cost Slope",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.5,
+		tooltip:
+			"How much a body's size scales its move cost: the base is multiplied by (1 \u2212 slope) + slope \u00d7 capacity / reference",
+	},
+	{
+		path: "energy.capacity.upkeep_per_unit",
+		label: "Upkeep / Capacity Unit",
+		min: 0,
+		max: 0.01,
+		step: 0.0001,
+		defaultValue: 0.0005,
+		slider: false,
+		tooltip:
+			"Energy charged each tick per capacity unit above the reference, and refunded against the tick's other upkeep below it",
+	},
+];
+
+export const ENERGY_CAPACITY_ENUMS: EnumFieldDef[] = [
+	{
+		path: "energy.capacity.sensor_scale",
+		label: "Energy Sensor Scale",
+		testId: "config-field-energy-capacity-sensor-scale",
+		defaultValue: "reference",
+		options: [
+			{ value: "reference", label: "Reference capacity" },
+			{ value: "own", label: "Own capacity" },
+		],
+		tooltip:
+			"What the energy sensors divide by: the reference capacity for every creature, or each creature's own capacity",
+	},
+];
+
+export const ENERGY_CAPACITY_FIELDS: AnyFieldDef[] = [
+	...ENERGY_CAPACITY_NUMBER_FIELDS,
+	...ENERGY_CAPACITY_ENUMS,
 ];

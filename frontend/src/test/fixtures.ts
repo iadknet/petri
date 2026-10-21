@@ -83,6 +83,14 @@ export const MOCK_CONFIG: SimulationConfig = {
 			age_cap: 200,
 			max_multiplier: 10.0,
 		},
+		capacity: {
+			reference: 100,
+			min: 50,
+			founder: 100,
+			move_cost_slope: 0.5,
+			upkeep_per_unit: 0.0005,
+			sensor_scale: "reference",
+		},
 	},
 	runtime: {
 		max_mesh_hops: 128,
@@ -114,6 +122,7 @@ export const MOCK_CONFIG: SimulationConfig = {
 		},
 		executed_bias: 0.9,
 		executed_window_ticks: 100,
+		capacity: { chance: 0.1, log_step: 0.25 },
 	},
 	predation: {
 		steal_cost_rate: 0.2,
