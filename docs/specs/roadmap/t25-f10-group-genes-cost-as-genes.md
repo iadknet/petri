@@ -214,7 +214,7 @@ the median F10/F09-now ratio recorded in the readings. At or below 1.25 the pred
 (the excess over the stored F09 is host drift), the flag is recorded with that mechanism, closure
 proceeds and both epochs re-pin to F10's summaries in the closing commit without user acceptance, as
 every T25 closure has done; above 1.25 it is an unpredeclared compute cost on a feature that adds no
-per-tick work, a defect to find before closure (user informed).
+per-tick work, a defect to find before closure (user informed). Reading taken: ratio 0.998, host drift.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f10.json),
   [goal](../../progress/features/t25-f10-goal.json); raw paths, hashes and byte counts in the readings.
