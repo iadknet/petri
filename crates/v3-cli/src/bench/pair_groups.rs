@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use v3_core::creature::genome::cgp::{GroupId, MemberSite, Shape};
+use v3_core::creature::genome::cgp::{GroupId, Shape};
 use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::types::MutationOperator;
@@ -109,7 +109,7 @@ impl PairGroups {
                     let id = GroupId::new(u16::try_from(id).expect("groups below u16::MAX"));
                     let (mut members, mut facts, mut own_nonzero) = (0u64, 0u64, 0u64);
                     for member in def.members(id) {
-                        if def.member_site(member) == Some(MemberSite::Drive) {
+                        if def.is_fact_member(member) {
                             facts += 1;
                         } else {
                             members += 1;
@@ -233,15 +233,18 @@ mod tests {
                     def.remove_edge(member);
                 }
                 Gene::Facts => {
-                    let is_fact = |def: &v3_core::creature::genome::cgp::CgpGraphBackendDef, m| {
-                        def.member_site(m) == Some(MemberSite::Drive)
-                    };
-                    let hole = def.members(id).filter(|&m| is_fact(def, m)).last().unwrap();
+                    let hole = def
+                        .members(id)
+                        .filter(|&m| def.is_fact_member(m))
+                        .last()
+                        .unwrap();
                     def.remove_edge(hole);
-                    let fact = def.members(id).find(|&m| is_fact(def, m)).unwrap();
+                    let fact = def.members(id).find(|&m| def.is_fact_member(m)).unwrap();
                     def.edge_mut(fact).set_weight(-0.25);
-                    let directions: Vec<_> =
-                        def.members(id).filter(|&m| !is_fact(def, m)).collect();
+                    let directions: Vec<_> = def
+                        .members(id)
+                        .filter(|&m| !def.is_fact_member(m))
+                        .collect();
                     def.edge_mut(directions[0]).set_weight(0.5);
                     def.edge_mut(directions[1]).set_weight(NONZERO_FLOOR);
                 }

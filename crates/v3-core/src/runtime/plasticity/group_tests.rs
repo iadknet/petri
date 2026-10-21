@@ -8,7 +8,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::genome::cgp::{
     BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource, GroupId, MemberSite, OutputSinkKind, Scope, Shape,
+    GraphSource, GroupId, OutputSinkKind, Scope, Shape,
 };
 use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::{
@@ -740,7 +740,7 @@ fn a_fact_member_weighs_and_learns_without_the_scale() {
     def.group_mut(id).set_scale(0.5);
     let facts: Vec<EdgeOccurrence> = members(&def, id)
         .into_iter()
-        .filter(|&member| def.member_site(member) == Some(MemberSite::Drive))
+        .filter(|&member| def.is_fact_member(member))
         .collect();
     assert_eq!(facts.len(), 3);
     let classic = hebbian(HebbianRule::Classic, 1.0, 4.0);

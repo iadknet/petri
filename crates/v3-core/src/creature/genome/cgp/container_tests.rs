@@ -1711,7 +1711,7 @@ proptest! {
                 SeedOp::Detach(i) => {
                     let members: Vec<EdgeOccurrence> = if def.groups().is_empty() { Vec::new() } else { def.members(GroupId::new(0)).collect() };
                     if let Some(&member) = members.get(i % members.len().max(1)) {
-                        let fact = def.member_site(member) == Some(MemberSite::Drive);
+                        let fact = def.is_fact_member(member);
                         let pattern = def.member_pattern(member, &refs);
                         let own = def.edge_at(member).own_weight();
                         let scale = def.groups()[0].scale();
@@ -1959,7 +1959,7 @@ fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId
 /// The fact members of `id`, in canonical order.
 fn fact_members(def: &CgpGraphBackendDef, id: GroupId) -> Vec<EdgeOccurrence> {
     def.members(id)
-        .filter(|&member| def.member_site(member) == Some(MemberSite::Drive))
+        .filter(|&member| def.is_fact_member(member))
         .collect()
 }
 
@@ -2182,9 +2182,7 @@ fn a_fact_only_survivor_is_a_valid_gene_until_its_last_member_goes() {
     def.remove_edge(hole);
     assert_eq!(fact_members(&def, id).len(), facts().len() - 1);
     loop {
-        let direction = def
-            .members(id)
-            .find(|&member| def.member_site(member) != Some(MemberSite::Drive));
+        let direction = def.members(id).find(|&member| !def.is_fact_member(member));
         let Some(direction) = direction else { break };
         def.remove_edge(direction);
     }
