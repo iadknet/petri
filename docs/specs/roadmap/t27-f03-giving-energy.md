@@ -254,7 +254,13 @@ failure.
 | steals transferred / kills | 5,375 / 791 | 387 / 51 | 6,618 / 925 |
 | final population (vs T27.F01) | 4,921 (-43.9%) | 337 (-51.3%) | 3,310 (-24.5%) |
 
-Flow pairs match; no extinction; both severes await the user's acceptance.
+| Not fitting the predeclaration | Predeclared | Measured | Reading |
+| --- | --- | --- | --- |
+| goal `decided_passes` | no direction | +62.6%, up in all three worlds (+70% / +130% / +88%); the compute counters fell (`vm_steps` −47%, `plasticity_updates` −40%, `mesh_hops` −21%) | a behavior indicator (passes ended by `Decide`), not a compute regression: a trajectory reading under the changed draws and real transfers; the epoch re-pins on the user's acceptance |
+| give volume | "near zero" | 104,152 / 3,184 / 197,335 attempts, 2.7% / 6.9% / 4.1% finding a recipient | the blind-attempt rate of an unwired kind that mutation wires, the same mechanism that gave the steal kind its volume (123,592 / 8,126 / 130,299 attempts here); the near-zero expectation was wrong, the direction was never predeclared, and no requirement depends on it |
+| final populations | no direction | −43.9% / −51.3% / −24.5%, no extinction; exchange-attributed deaths (`gift`, `action_give_energy`, `predation`) are 1,811 / 90 / 2,571 of 222,534 / 56,269 / 198,343 deaths, under 1.3% in each world | a trajectory reading of a boom/bust series (T27.F01's Orchards goal sat at the cap, 2.0M clamp loss), not a direct mortality effect of the bite; the user decides acceptance and owns any change to the 8.0 bite |
+
+Flow pairs match to rounding and no `Transferred` lacks a flow; no extinction; both severes await the user's acceptance.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f03-giving-energy.json),
   [goal](../../progress/features/t27-f03-giving-energy-goal.json).
