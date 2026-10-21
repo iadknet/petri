@@ -9,17 +9,15 @@
 
 Fat: a creature inherits how much energy it can store. The body record
 carries a `capacity` in energy units, bounded to [50, 800], mutated in log
-space at birth; the creature's energy cap is its own capacity, a larger body
-pays more per move and more upkeep per tick, a smaller one less, and at the
-founder's 200 both rules are today's, so the founder's economy is unchanged.
-The goal and goal-long runs report the capacity distribution, boundary mass
-and trend per world; the server and inspector report each creature's own
-capacity.
+space at birth; the energy cap is the creature's own capacity, a larger body
+pays more per move and per tick, a smaller one less, and at the founder's
+200 both rules are today's. The goal and goal-long runs report the capacity
+distribution, boundary mass and trend per world; the server and inspector
+report each creature's own capacity.
 
 ## Non-Goals
 
-- No new sensor input key: the energy reads keep their keys and change only
-  their denominator (invariant 6).
+- No new sensor input key (invariant 6 changes only the denominator).
 - No change to the litter rule, `min_reproduce_energy`, gestation, the eat
   and predation cap sites' order and bookings, or the noop floor.
 - No lab assay (invariant 9's arms are goal-world runs) and no per-creature
@@ -28,10 +26,9 @@ capacity.
 ## Inputs and Invariants
 
 Inputs: the T26 row and Notes (design note §3 D; review findings 5, 7, 11);
-T26.F01's Goal, Inputs and Invariants and Performance predeclaration; the
-options and the preparatory audit in
-[`docs/progress/readings/t26-f02.md`](../../progress/readings/t26-f02.md).
-The code this feature changes, on main at `08b1584c`:
+T26.F01's Goal, Inputs and Invariants and predeclaration; the options and
+audit in [`docs/progress/readings/t26-f02.md`](../../progress/readings/t26-f02.md).
+The code changed, on main at `08b1584c`:
 
 | Site | Today |
 | --- | --- |
@@ -74,8 +71,8 @@ Invariants:
 2. **The trait.** `HeritableBody` gains `capacity: f32` and drops `Eq`.
    `founder(index, seed, capacity)` takes the founder capacity; seeding and
    the lab pass `energy.capacity.founder`. `inherit(&parent, mutated,
-   &MutationConfig, &EnergyConfig, rng)` keeps the gated phenotype-then-kin-tag
-   draws exactly as F01 left them and then, on every birth, draws
+   &MutationConfig, &EnergyConfig, rng)` keeps F01's gated
+   phenotype-then-kin-tag draws, then on every birth draws
    `rng.gen::<f32>() < mutation.capacity.chance`; when it fires it draws
    `δ = rng.gen_range(-log_step..=log_step)` and sets
    `capacity = (parent.capacity × δ.exp()).clamp(min, max_energy)`; a miss
@@ -90,17 +87,16 @@ Invariants:
    `(1 − β) + β·(capacity/reference)`, computed in `f64` and converted to
    `f32`: at `capacity = reference` it is exactly 1.0 for every `f32` β, and
    over the normalized ranges it is positive, which the `f32` form
-   `1 + β·(ratio − 1)` is not. The noop floor keeps the effort at or above
-   the NoOp effort; a property test over the normalized ranges, including
-   `reference = 2²⁴, min = 1, β = 1`, asserts positivity, the floor, and
-   today's effort bit for bit at the reference.
+   `1 + β·(ratio − 1)` is not. A property test over the normalized ranges,
+   including `reference = 2²⁴, min = 1, β = 1`, asserts positivity, the noop
+   floor, and today's effort bit for bit at the reference.
 5. **Upkeep.** Phase 0 computes today's `f32` sum `base = decay + carry ×
    genome_size`, the signed upkeep `HeritableBody::upkeep(&self,
    &EnergyCapacityConfig)` = `u·(capacity − reference)`, and charges one
    `f32` subtraction of `max(base + upkeep, 0)`; at the reference the upkeep
-   is `0.0` and the charge is today's bit for bit. A `Phase0Charge { base,
-   upkeep }` value replaces `phase_0_energy_charge` and the inline
-   attribution. `lifecycle_decay` and `genome_carrying` are booked by today's
+   is `0.0` and the charge is today's bit for bit. `Phase0Charge { base,
+   upkeep }` replaces the inline charge and attribution.
+   `lifecycle_decay` and `genome_carrying` are booked by today's
    `decay_partition(before, before − base, decay)`, byte for byte today's at
    the reference; the new signed flow `capacity_upkeep` takes
    `applied − decay − carrying` (negative for a small body; the zero floor's
@@ -116,17 +112,16 @@ Invariants:
    denominator, `StaticInputs::energy_scale` (the nearby read takes the
    target's): under `sensor_scale = Reference` it is
    `energy.capacity.reference` for every creature, so the trait changes
-   absolute storage only, the founder's 0.16 gate opens at 32 energy at
-   every capacity and a creature above the reference reads 1.0; under `Own`
-   it is the creature's capacity, so the gate opens at 8 energy at C = 50
-   and 128 at C = 800. The absolute reproductive condition is unchanged
-   under both. The ruling is provisional until the comparison of
-   invariant 9: `Own` becomes the default only if, at both bounds and in all
-   three worlds, the `Own` arm persists to tick 2,000 with births per
-   reproduce attempt at or above half the C = 200 arm's (an arm or control
-   world with zero attempts or zero births fails the test); otherwise
-   `Reference` does, and the other value stays as an attribution control.
-   The ruling is recorded here before the sweep runs.
+   absolute storage only (the founder's 0.16 gate opens at 32 energy at
+   every capacity; above the reference reads 1.0); under `Own` it is the
+   creature's capacity (the gate opens at 8 energy at C = 50, 128 at
+   C = 800). The absolute reproductive condition is unchanged under both.
+   The ruling is provisional until invariant 9's comparison: `Own` becomes
+   the default only if, at both bounds in all three worlds, the `Own` arm
+   persists to tick 2,000 with births per reproduce attempt at or above half
+   the C = 200 arm's (zero attempts or births in any arm or control world
+   fails); otherwise `Reference` does, the other value staying as an
+   attribution control. The ruling is recorded here before the sweep.
 7. **Birth.** `cap_energy` becomes one cap primitive that applies the body
    cap and returns the applied excess; the three credit sites book it to
    `maximum_energy_clamp_loss` in their present order, and `spawn_child`,
@@ -134,46 +129,45 @@ Invariants:
    `offspring_capacity_overflow`; `offspring_energy_credit` books the capped
    energy. At any tick
    `parental_transfer_debit = offspring_energy_credit + offspring_capacity_overflow + gestation_lost + pending litter stock`
-   (living creatures' `pending_birth.litter_energy`, which the bench already
-   sums), within the `f32` rounding of each conception's debit; exactly
+   (living creatures' `pending_birth.litter_energy`), within the `f32`
+   rounding of each conception's debit; exactly
    representable fixtures pin it exactly for a delivered, a lost and an
    in-gestation birth. The required fixture: a parent at the reference
    delivers a litter of 100 to a child of capacity 50; the child starts at
    50, the overflow books 50, the credit 50.
 8. **Determinism and pins.** The capacity draws are the only new draws,
    after the kin-tag draw; no tick-phase order changes. Predeclared by
-   artifact: trajectory pins move (`tests/applied_trajectory.rs`,
-   `tests/reproducibility.rs` fingerprints, the gate's deterministic
-   blocks); mutation-engine draws unchanged (the capacity draws are outside
-   the engine); the recruitment-paths slow-tier readings unchanged (one-tick
-   scenes, no births). `tests/viability.rs` passes with its assertions
-   unweakened.
-9. **Coefficients.** An arm is the three goal worlds at 2,000 ticks, one
-   seed each, run as scratch copies of the goal recipes carrying the arm's
-   overrides through `PROFILE=sweep --config` (a scratch build through
-   `PROFILE=goal` only where the sweep profile lacks a reading); the
-   readings file records each arm's overrides, command and local summary
-   hash (`.bench-artifacts/t26-f02/sweep/`, never committed). The
-   comparison runs first and the ruling of invariant 6 follows; the sweep
-   then runs under the ruled scale. Choice rule for β and u: among pairs at
-   which all three worlds persist to tick 2,000 with plateau population at
-   or above 70% of the T27.F01 goal epoch's, the largest `β × u` wins, ties
-   to the larger β; if none qualifies, (0.5, 0.0005) is taken and the breach
-   recorded.
+   artifact: every pin that depends on a trajectory with births moves
+   (`applied_trajectory.rs`, `reproducibility.rs` fingerprints, the gate's
+   deterministic blocks, the viability and baseline-world digests, seeded
+   fixtures) and the config digests move with the new fields; a re-pin is
+   accepted only when disabling the capacity draw restores the old value,
+   which its comment records. Mutation-engine draws and the recruitment-paths
+   slow-tier readings (one-tick scenes, no births) are unchanged.
+   `tests/viability.rs` passes with its assertions unweakened; its GNU/Linux
+   x86_64 digests are measured on the `ubuntu-24.04` CI runner before
+   closure, never left stale.
+9. **Coefficients.** The comparison runs first, invariant 6's ruling
+   follows, then the sweep under the ruled scale. Choice rule for β and u:
+   among pairs at which all three worlds persist to tick 2,000 with plateau
+   population at or above 70% of the T27.F01 goal epoch's, the largest
+   `β × u` wins, ties to the larger β; if none qualifies, (0.5, 0.0005) is
+   taken and the breach recorded.
 
    | Stage | Arms | Fixed | Readings per world |
    | --- | --- | --- | --- |
-   | Unchanged-brain comparison | `founder` 200; `founder` 50 and 800 each under `Reference` and `Own` (five arms) | `mutation.per_unit_rate` 0 and `mutation.capacity.chance` 0, so no brain, body or capacity mutation (each arm's summary must show zero applied mutation events); β = u = 0 | persistence, plateau and trough, mean energy, births per attempt, attempts rejected on energy and on the litter, share of creatures above 200 at the end: reproduction failures separately from any storage benefit |
+   | Arm mechanics (both stages) | the three goal worlds at 2,000 ticks, one seed each, as scratch copies of the goal recipes carrying the arm's overrides through `PROFILE=sweep --config` (a scratch build through `PROFILE=goal` only where the sweep profile lacks a reading) | — | the readings file records each arm's overrides, command and local summary hash (`.bench-artifacts/t26-f02/sweep/`, never committed) |
+   | Unchanged-brain comparison | `founder` 200; `founder` 50 and 800 each under `Reference` and `Own` (five arms) | `mutation.per_unit_rate` 0 and `mutation.capacity.chance` 0, so no brain, body or capacity mutation (each arm's summary must show zero applied mutation events); β = u = 0 | persistence, plateau and trough, births per attempt, attempts rejected on energy and on the litter (reproduction failures), and separately the storage benefit: mean energy and `maximum_energy_clamp_loss` per creature-tick against the founder-200 arm |
    | β/u sweep | β ∈ {0.5, 1.0} × u ∈ {0.0005, 0.002} (four arms) | the ruled `sensor_scale`, capacity evolvable at the defaults | persistence, plateau and trough, the capacity block, `capacity_upkeep` and move flows per creature-tick |
 10. **Readings.** `PersistenceSample` gains `capacity:
     Option<CapacityDistribution { min, p10, median, p90, max, mean,
     at_min_fraction, at_max_fraction }>` over living creatures, `null` at
-    extinction and absent in earlier reports; the boundary fractions count
-    capacities equal to `min` and to `max_energy`.
+    extinction; the boundary fractions count capacities equal to `min` and
+    `max_energy`.
 11. **Lab, server, frontend.** `validate` requires
     `start_energy ≤ energy.capacity.founder`; the exploration probe's
     refund caps through `energy_cap`; the detail `max_energy` is the
-    creature's capacity, documented as such; the canvas energy bar divides by
+    creature's capacity; the canvas energy bar divides by
     `energy.capacity.reference`; the config types and panel carry the new
     fields.
 
@@ -193,10 +187,10 @@ Invariants:
 ## Verification Plan
 
 **Question.** Capacity is a heritable, bounded trait with linear costs
-neutral at 200, so the founder's economy is unchanged while the capacity
-distribution can move under selection; a changed founder charge, a capacity
-outside the bounds, or a goal-long distribution fixed at a bound while the
-cost flows read as negligible would show it wrong.
+neutral at 200, so the founder's economy is unchanged while capacity can
+move under selection; a changed founder charge, a capacity outside the
+bounds, or a goal-long distribution fixed at a bound with negligible cost
+flows would show it wrong.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -226,10 +220,8 @@ cost flows read as negligible would show it wrong.
 - [x] Bench: `CapacityDistribution` in `PopulationReadings` and
       `PersistenceSample`; the two flows in `EnergyFlowTracking`'s mapping;
       schema and tests.
-- [x] Reference docs: `v3-runtime-config-spec.md` §4, `v3-sensor-spec.md`,
-      `v3-tick-orchestration-spec.md` §3, `v3-reproduction-spec.md` steps
-      11–14, `v3-startup-seeding-spec.md` §5.1,
-      `v3-server-api-protocol-spec.md`.
+- [x] Reference docs: runtime-config §4, sensor, tick-orchestration §3,
+      reproduction steps 11–14, startup-seeding §5.1, server-protocol.
 - [x] `cargo test -p v3-core --test viability` first; re-pin the trajectory
       and reproducibility pins as predeclared.
 - [ ] Comparison, the `sensor_scale` ruling recorded in invariant 6, then
@@ -261,18 +253,16 @@ multiply-add per creature-tick, a multiply per move, one or two draws per
 birth and an O(population) pass per persistence sample; gate wall-clock is
 expected within the ordinary thresholds against the T27.F01 epoch, and the
 deterministic blocks change because every birth draws. The gate and goal
-epochs are re-pinned in the closing commit. Expected directions: the three
-worlds' 2,000-tick persistence should match the T27.F01 goal epoch within
-its ordinary variation; the capacity distribution starts at 200 and, under
-`Reference`, because the founder's absolute thresholds leave a store above
-200 unused while the cost is real, mean capacity is expected to fall and
-mass at 50 to rise over the goal-long run; under `Own` a larger store is
-filled before the gate opens, so mean capacity may rise instead. A rise in
-mean capacity or mass at 800 says the storage benefit is real; a
-distribution still centered at 200 with the `capacity_upkeep` and move
-flows negligible says the tradeoff is effectively free. No other indicator
-has a predeclared direction. The ruled scale, β and u: `<set after the
-comparison and sweep, before the final runs>`.
+epochs are re-pinned in the closing commit. Expected directions are in the
+table; no other indicator has a predeclared direction. The ruled scale, β
+and u: `<set after the comparison and sweep, before the final runs>`.
+
+| Reading | Expected | A different reading says |
+| --- | --- | --- |
+| 2,000-tick persistence, three worlds | matches the T27.F01 goal epoch within its ordinary variation (the founder's economy is identical at the reference) | a changed founder economy: a defect |
+| Mean capacity and mass at 50 over the goal-long run, under `Reference` | mean falls, mass at 50 rises: the founder's absolute thresholds leave a store above 200 unused while the cost is real | rising mean capacity or mass at 800: the storage benefit is real |
+| The same under `Own` | mean capacity may rise: a larger store is filled before the gate opens | — |
+| Distribution still centered at 200 with negligible `capacity_upkeep` and move flows | not expected | the tradeoff is effectively free |
 
 **Measured verdict.** `<one line per profile>`
 
@@ -299,12 +289,16 @@ comparison and sweep, before the final runs>`.
 
 ## Notes for AI Agents
 
-- Decision: the energy-read denominator (`sensor_scale`) is ruled by the
-  predeclared rule of invariant 6 after the unchanged-brain comparison, as
-  the design note §3 D requires, and the other value stays as an attribution
-  control.
+- Decision: the energy-read denominator (`sensor_scale`) is ruled by
+  invariant 6's predeclared rule after the unchanged-brain comparison
+  (design note §3 D); the other value stays as an attribution control.
 - Decision: the capacity draws are on every birth, after the gated
   phenotype-then-kin-tag draws; a newborn's excess provisioning is booked as
   `offspring_capacity_overflow`, not refunded.
 - Decision: in-feature refactors R1–R6, R8 and R9 of the preparatory audit
   in `docs/progress/readings/t26-f02.md` are this feature's scope.
+- Deferred: the lab's scripted stepper (`v3-lab/src/eval.rs`) charges decay
+  only by its header contract, so no capacity upkeep (zero at the founder
+  capacity the lab seeds); a lab feature seeding other capacities adds it.
+  The root `world-recipe-*.json` presets keep their explicit `max_energy`,
+  which bounds their range by invariant 1; they are not goal recipes.
