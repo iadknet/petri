@@ -183,12 +183,12 @@ contradicted in one world.
 | Command | CLI exit (source) | Outer exit (observed) | `severe` | Verdict |
 | --- | --- | --- | --- | --- |
 | `cargo test -p v3-core --test viability` | not applicable | 0 | not applicable | 30 pass |
-| `make bench PROFILE=gate FEATURE=t25-f10` | 0 (`measurement_evidence.cli_exit`) | 0 | false | no flag |
+| `make bench PROFILE=gate FEATURE=t25-f10` | 0 (`measurement_evidence.cli_exit`) | 0 | false | wall flag |
 | `make bench PROFILE=goal FEATURE=t25-f10` | 0 (`measurement_evidence.cli_exit`) | 0 | false | `mesh_hops` +10.45% and `plasticity_updates` +17.09% flagged |
 
 | Reading (F10 vs F09) | Orchards | Canyon | Confluence | Against the predeclaration |
 | --- | --- | --- | --- | --- |
-| gate wall per creature-tick | +17.56% (aggregate, level ok) | | | contradicts the +/-5% hypothesis, below the 25% flag |
+| gate wall per creature-tick | +31.72% (quiet-host re-run, level flag; first run +17.56%) | | | contradicts the +/-5% hypothesis, above the 25% flag, not fatal; readings |
 | goal `mesh_hops` / `plasticity_updates` per creature-tick | +4.3% / -10.7% | +4.0% / +83.3% | +21.6% / +72.9% | aggregate +10.45% / +17.09% flagged |
 | `mean_genome_size` at tick 2000 | 99.88 vs 103.26 | 94.26 vs 97.66 | 120.60 vs 110.64 | lower in two worlds; Confluence higher, contradicts |
 | attempted events per birth | 0.5464 vs 0.5613 | 0.4945 vs 0.5032 | 0.6210 vs 0.5834 | same split |
@@ -208,7 +208,7 @@ trajectory reading, not a contradiction: every falsifier of the claim holds, the
 was a hypothesis, and the genes carried (734 pair, 0.758 ring per creature, three-fold F09's) account
 for about one unit of the ten-unit rise; it is the first short-horizon reading of the track's bloat
 risk, carried to T27.F02 (Notes). Not a blocker; no acceptance needed. Neither wall reading blocks or
-needs acceptance (gate inside the predeclared 25% band; goal a non-fatal flag with its host-load
+needs acceptance (gate a non-fatal wall flag; goal a non-fatal flag with its host-load
 mechanism recorded); because the gate epoch re-pins to this summary and its wall becomes the next
 reference, the gate alone is re-run once on a quiet host by a fresh benchmark specialist before the
 mutation gate and that summary replaces this one; the goal is not re-run (once per closure; its
