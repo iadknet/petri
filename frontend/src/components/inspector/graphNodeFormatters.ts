@@ -6,17 +6,13 @@ import type {
 	OutputSinkKind,
 	VoteSink,
 } from "../../types/genome.ts";
+import { ACTION_PARAM_FIELDS } from "../../types/vote-sinks.ts";
 import { directionWord } from "./directions.ts";
 import { describeInputRef } from "./inputRefUtils.ts";
-import { ACTION_PARAM_FIELDS, formatVoteSink } from "./voteSinks.ts";
+import { formatVoteSink } from "./voteSinks.ts";
 
-export {
-	driveSinkIndex,
-	formatVoteSink,
-	voteSinkFromIndex,
-	voteSinkIndex,
-	voteSinkLabel,
-} from "./voteSinks.ts";
+export { driveSinkIndex, voteSinkFromIndex, voteSinkIndex } from "../../types/vote-sinks.ts";
+export { formatVoteSink, voteSinkLabel } from "./voteSinks.ts";
 
 export function getKindName(kind: ComputeNodeKind): string {
 	if (typeof kind === "string") return kind;

@@ -1,5 +1,5 @@
-import { VOTE_SINK_COUNT } from "../components/inspector/voteSinks.ts";
 import type { InputReference, VmInstruction, VoteSink } from "./genome.ts";
+import { VOTE_SINK_COUNT } from "./vote-sinks.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ export type WorldAction =
 	| { StealEnergy: { direction: string } }
 	| { GiveEnergy: { direction: string } };
 
-export { VOTE_KINDS, VOTE_SINK_COUNT } from "../components/inspector/voteSinks.ts";
+export { VOTE_KINDS, VOTE_SINK_COUNT } from "./vote-sinks.ts";
 /** `PreviousOutcome` channels, in `previous_outcome` order. */
 export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
 	"EnergyDelta",

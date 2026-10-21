@@ -1,8 +1,8 @@
-import catalog from "../components/inspector/voteSinks.json";
+import catalog from "./vote-sinks.json";
 
 /**
  * Action types — serialized as string variant names from Rust's `ActionType`
- * enum; the values come from the Rust-pinned `voteSinks.json` catalog.
+ * enum; the values come from the Rust-pinned `vote-sinks.json` catalog.
  */
 export type ActionType = "NoOp" | "Eat" | "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
 
