@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t25-f09-learned-weight-decay.json",
+    "epoch_baseline": "docs/progress/features/t25-f10.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -183,7 +183,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t25-f09-learned-weight-decay-goal.json",
+    "epoch_baseline": "docs/progress/features/t25-f10-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",

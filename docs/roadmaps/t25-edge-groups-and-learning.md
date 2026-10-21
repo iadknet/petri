@@ -50,7 +50,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 - [x] **T25.F09 — Learned-Weight Decay** — Depends on: T25.F08
   - Goal: Early LTP decays back to baseline: a learned synapse and a learned group scale relax toward the value they were born with at a heritable rate, so learning that is no longer reinforced fades instead of wandering.
 
-- [ ] **T25.F10 — Group Genes Cost as Genes** — Depends on: T25.F09
+- [x] **T25.F10 — Group Genes Cost as Genes** — Depends on: T25.F09
   - Goal: The genomic bottleneck: one developmental gene wires many synapses, so a creature pays to carry and copy the gene, not every synapse it built.
 
 ## Notes for AI Agents

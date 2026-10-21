@@ -1,6 +1,6 @@
 # T25.F10 — Group Genes Cost as Genes
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-21
 **Feature**: T25.F10
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -108,7 +108,7 @@ acceptance rule; nothing is tuned, and no threshold or baseline is edited.
 
 - [x] Commit 1 (fact members, `9d92ad1b`), tests first: invariants 2, 3 and 6 with audit R1–R5, R8 and R9 (member site, role-based pattern and validation, `can_host_facts`, the one-primitive gene build and its callers, relocation, own-only detach, both-role property generators, `pair-groups-v2` with keep-list and fixtures, `graph_weights`, the inspector facts line); mutation-on pins re-pinned with the fact-member cause.
 - [x] Commit 2 (size rule, `61c5b8d1`), tests first: invariants 1 and 5 (`genome_size` unit tests for a `Ring` gene, a pair gene with facts, a hole, a detached member; `expected_delta`; the founder test), the `genome_size` series entry, reference specs and the tooltip; mutation-on pins re-pinned with the size cause.
-- [ ] Verification Plan as declared; epochs re-pinned in the closing commit.
+- [x] Verification Plan as declared; epochs re-pinned in the closing commit.
 
 ## Verification
 
@@ -121,9 +121,10 @@ acceptance rule; nothing is tuned, and no threshold or baseline is edited.
       staged. Otherwise `Not run: Verification Plan`. Summaries `t25-f10.json` and
       `t25-f10-goal.json`, hashes, bytes, exit statuses and verdicts in
       [Performance and Goal Impact](#performance-and-goal-impact); series `closed`
-      entries added, epoch baselines unchanged, no raw report staged.
+      entries added, gate and goal-worlds epochs re-pinned to them at closure, no raw report staged.
 - [x] Viability first: `cargo test -p v3-core --test viability` before and after each commit -> 30 pass, founder-only digests unchanged; re-run at the final code `474faf70` before the gate (2026-10-21): 30 pass.
-- [ ] Slow tier: `make rust-test-slow` -> recruitment-paths readings re-pinned with their cause.
+- [x] Slow tier: `make rust-test-slow` at `7a23edc3` (2026-10-21) -> exit 0, 3 + 6 pass; the recruitment-paths readings held, so none was re-pinned.
+- [x] `make check` at the tested commit `7a23edc3` (2026-10-21) -> exit 0.
 
 ## Performance and Goal Impact
 
@@ -218,11 +219,11 @@ per-tick work, a defect to find before closure (user informed). Reading taken: r
 
 ## Success Criteria
 
-- [ ] `genome_size()` charges one unit per group record and nothing for a member of either role, a hole or runtime state, and a detached member one unit, pinned by unit tests and the engine's per-operator delta test (invariant 1).
-- [ ] Recruitment's pair case builds one gene of direction and fact members through one container primitive with an unchanged draw order; fact members validate, relocate, delete, detach and carry seeds inside the container, weigh their own weight only and cost nothing (invariants 2–3).
-- [ ] The founder has no group, measures 80 units at rate `0.0060625`, and the founder-only viability digests are unchanged in every commit (invariant 5).
-- [ ] `pair-groups-v2` reports `facts` and `own_nonzero`; the server, inspector and reference specs state the new rule (invariant 6).
-- [ ] The Verification Plan ran as declared; the goal readings are recorded in the readings file per world, including zero; every re-pin names its cause (invariant 7).
+- [x] `genome_size()` charges one unit per group record and nothing for a member of either role, a hole or runtime state, and a detached member one unit, pinned by unit tests and the engine's per-operator delta test (invariant 1).
+- [x] Recruitment's pair case builds one gene of direction and fact members through one container primitive with an unchanged draw order; fact members validate, relocate, delete, detach and carry seeds inside the container, weigh their own weight only and cost nothing (invariants 2–3).
+- [x] The founder has no group, measures 80 units at rate `0.0060625`, and the founder-only viability digests are unchanged in every commit (invariant 5).
+- [x] `pair-groups-v2` reports `facts` and `own_nonzero`; the server, inspector and reference specs state the new rule (invariant 6).
+- [x] The Verification Plan ran as declared; the goal readings are recorded in the readings file per world, including zero; every re-pin names its cause (invariant 7).
 
 ## Notes for AI Agents
 
@@ -232,3 +233,4 @@ per-tick work, a defect to find before closure (user informed). Reading taken: r
 - Decision: the founder's anchor and rate are remeasured, not recalibrated (track Notes: the founder has no group).
 - Deferred: the long-run bloat reading (genes per creature, materialized members, members with nonzero own corrections, compute and energy) goes to T27.F02's goal-long run, which names every feature closed in between; `pair-groups-v2` carries the reachable-pair counts, and the all-genome, both-shape counts (unreachable genes, `Ring` members' corrections) are that run's to add. Its 2,000-tick baseline is F10's goal: Confluence 734 reachable pair genes and 0.758 ring genes per creature against F09's 229 and 0.296, `mean_genome_size` 120.60 against 110.64, `own_nonzero` 9.
 - Deferred: `mutation/engine/mod.rs` `group_edits` and `mutation/graph/mod.rs` `GraphOperator::random` keep their `WORKAROUND(T25.F08)` markers unchanged; fact members are counted by their membership as any member, so the tally stays correct, neither workaround is extended, and F10 writes no `WORKAROUND(T25.F10)` marker (audit R6, R10; R7 is a test oracle, not a workaround).
+- Cost: `/usage` totals not recorded (user command, not run in the session); implementer passes 3 (build, self-review, test-only remediation), advisor consults 2, 2, 2; spec-owner resumes after Plan 3; Codex challenge rounds 2, final `ready`; Codex review findings: correctness 0, design 0, code health 1 P2 (remediated).
