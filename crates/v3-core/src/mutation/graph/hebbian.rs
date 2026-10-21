@@ -1017,6 +1017,44 @@ mod tests {
         assert_eq!(tails, [true, true]);
     }
 
+    /// T25.F10 invariant 3: a `Group`-scope broadcast selected on a
+    /// direction member of a fact-bearing `DirectionPair` gene lands on the
+    /// gene's fact members as on its direction members.
+    #[test]
+    fn a_group_broadcast_from_a_direction_member_reaches_the_fact_members() {
+        use crate::contracts::{InputReference, WorldInputKey};
+        let layout =
+            InputReference::World(WorldInputKey::AreaOccupancySummary).direction_pairs()[0];
+        let mut original = CgpGraphBackendDef::new_with_fixed_outputs();
+        let id = original.add_pair_group(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+        let (facts, directions): (Vec<_>, Vec<_>) = original
+            .members(id)
+            .partition(|&member| original.is_fact_member(member));
+        assert_eq!(facts.len(), layout.facts.len());
+        assert!(!facts.is_empty() && !directions.is_empty());
+        let mut broadcasts = 0;
+        for seed in 0..128 {
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, can_enable_hebbian, &mut expected);
+            if original.is_fact_member(picked) || coin != Some(true) {
+                continue;
+            }
+            let config = draw_hebbian_config(&mut expected);
+            let mut def = original.clone();
+            let scope = enable_hebbian_in_def(&mut def, &mut rng(seed)).unwrap();
+            assert_eq!(scope, Scope::Group, "seed {seed}");
+            for &member in facts.iter().chain(&directions) {
+                assert_eq!(
+                    def.edge_at(member).plasticity(),
+                    Some(config),
+                    "seed {seed} member {member:?}"
+                );
+            }
+            broadcasts += 1;
+        }
+        assert!(broadcasts > 0, "a direction member's Group coin was drawn");
+    }
+
     /// `EnableRewardModulation` on a heterogeneous group sets one modulation
     /// on every admitted member, each keeping its rule, rate, clamp and flag;
     /// `DisableRewardModulation` clears the modulation alone.
