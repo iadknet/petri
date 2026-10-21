@@ -116,12 +116,16 @@ Invariants:
    every capacity; above the reference reads 1.0); under `Own` it is the
    creature's capacity (the gate opens at 8 energy at C = 50, 128 at
    C = 800). The absolute reproductive condition is unchanged under both.
-   The ruling is provisional until invariant 9's comparison: `Own` becomes
-   the default only if, at both bounds in all three worlds, the `Own` arm
+   The rule, fixed before invariant 9's comparison: `Own` becomes the
+   default only if, at both bounds in all three worlds, the `Own` arm
    persists to tick 2,000 with births per reproduce attempt at or above half
    the C = 200 arm's (zero attempts or births in any arm or control world
    fails); otherwise `Reference` does, the other value staying as an
-   attribution control. The ruling is recorded here before the sweep.
+   attribution control. Ruling (2026-10-21, readings file): `Reference` is
+   the default; the C = 50 `Own` arm persisted but reproduced at 1.7% /
+   3.9% / 1.7% of the C = 200 arm's births per attempt (Orchards / Canyon /
+   Confluence), the C = 800 `Own` arm at 103% / 116% / 112%, and the C = 800
+   `Reference` arm matched C = 200 in every number (mean energy 22–29).
 7. **Birth.** `cap_energy` becomes one cap primitive that applies the body
    cap and returns the applied excess; the three credit sites book it to
    `maximum_energy_clamp_loss` in their present order, and `spawn_child`,
