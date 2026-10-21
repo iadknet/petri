@@ -1,6 +1,6 @@
 # T27.F01 — Colour Vision
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-21
 **Feature**: T27.F01
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
@@ -133,9 +133,9 @@ a valid result), and cannot show the feature wrong.
 - [x] Viability first: `cargo test -p v3-core --test viability` → founder-only digests unchanged: 30 passed at 6cba76cc (and after each commit before the rebase). The mutation-off trajectory digests (`applied_trajectory` bd8dca14..., `baseline_worlds` 8324246536663749152) hold at 6cba76cc, measured at `mutation.per_unit_rate` 0.
 - [x] Static checks: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` → clean at 6cba76cc.
 - [x] Mutation gate: CI fresh (39573198443) at 1aeb2ee4 (c26fb4f2 after the rebase onto main 0c43ae7c, same production code; not re-run, per the rebase contract): `144 mutants tested: 14 missed, 117 caught, 13 unviable, 0 timeouts`; `~/.local/share/petri-tools/mutants/t27-f01/mutants.out`, all `colour.rs`. Killed by `channels_to_rgb_matches_reference_across_every_hue` (8/8 on iterate): 31:36, 45:10 `==`, 46:11 ×2, 49:18, 49:23 ×2, 49:28. Equivalent, each boundary's sides agree (0 reachable inputs differ): `<=` at 22:18, 42:10, 48:10, 51:10, 54:10; `>=` at 45:10.
-- [x] Gate and goal (rebased onto main 0c43ae7c, 2026-10-21, HEAD b372521a, each profile run once): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json` compared against main's T25.F10 epochs, raw hash, bytes and time checked, no full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+1.5%), `vm_steps` flag +32.5%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `vm_steps` +122.2%, `plasticity_updates` +93.2%, `pass_cap_hits` +61.8%, trajectory readings reported to the user. Raw gate 129,399 B `324a684e...5ec`, raw goal 707,146,075 B `a0120685...f8d` (both `verified_local`); summaries 25,953 B and 552,170 B. Pre-rebase provenance and the F09-epoch acceptance: the readings file.
+- [x] Gate and goal (rebased onto main 0c43ae7c, 2026-10-21, HEAD b372521a, each profile run once): summaries at `docs/progress/features/t27-f01-colour-vision.json` and `-goal.json` compared against main's T25.F10 epochs, raw hash, bytes and time checked, no full report staged; the gate's `wall_clock.level` quoted; the goal `input_use` rows for the colour channels and own-colour families quoted in the readings file per evaluated cohort, an absent row reported as zero use. Viability 30 passed (exit 0). Gate: CLI exit 0 (`measurement_evidence.cli_exit`), `make` exit 0, `severe=false`, `wall_clock.level` `ok` (+1.5%), `vm_steps` flag +32.5%. Goal: CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2, `severe=true` on `vm_steps` +122.2%, `plasticity_updates` +93.2%, `pass_cap_hits` +61.8%, accepted by the user 2026-10-21; series entries and both epochs re-pinned to these summaries. Raw gate 129,399 B `324a684e...5ec`, raw goal 707,146,075 B `a0120685...f8d` (both `verified_local`); summaries 25,953 B and 552,170 B. Pre-rebase provenance and the F09-epoch acceptance: the readings file.
 - [x] Slow tier: `make rust-test-slow` → exit 0 at 6cba76cc (recruitment-paths 3 passed, lab 6 passed); the recruitment-paths reading holds through the rebase.
-- [ ] Close: `make check` at the tested commit, after the gate and goal re-run on the rebased tree.
+- [x] Close: `make check` exited 0 at the tested commit f6bb3a82.
 
 ## Performance and Goal Impact
 
@@ -205,4 +205,4 @@ the readings file. Raw gate 129,399 B, sha256 `324a684e...5ec`; raw goal
 - Decision: `lineage_id` stays as observation-only telemetry (lineage indicators, server lineage map, window records).
 - Deferred: the long-run reading of whether colour channels become behavior (retention of a colour-reading recruitment past 2,000 ticks, any colour-conditioned action) goes to T27.F02's goal-long run, the track's carrier.
 - Deferred: the retina (per-direction RGB, design note §3 A3) until a reading shows slot colour in use.
-- Cost: `/usage` not collected; implementer 4 passes, 8 advisor consults; 1 spec-owner resume; 3 Codex rounds plus a confirm job, final `ready`; review P2 1 correctness, P3 1 code health, design none.
+- Cost: `/usage` not collected; implementer 5 passes (one a rebase), 10 advisor consults; 2 spec-owner resumes; 3 Codex rounds plus a confirm job, final `ready`; review P2 1 correctness, P3 1 code health, design none.
