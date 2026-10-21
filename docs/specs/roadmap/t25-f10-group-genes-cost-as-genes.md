@@ -94,12 +94,9 @@ bloat readings are summary blocks.
 has, that a pair recruitment's facts ride in its gene, and that the founder's
 80 units and rate do not move; a founder size other than 80, a moved
 founder-only digest, a gene whose members still count, or a fact member that
-weighs through its scale shows it wrong. A gate `severe` on any
-counter is a trajectory reading under the changed supply (Performance:
-directions predeclared only for the same genome's size and expected supply),
-and under the workflow's rule it blocks closure until the user accepts it or
-remediation removes it; it is never tuned away, and no threshold or stored
-baseline is edited to pass.
+weighs through its scale shows it wrong. A gate counter `severe` is a
+trajectory reading under the changed supply and follows the workflow's
+acceptance rule; nothing is tuned, and no threshold or baseline is edited.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -111,7 +108,7 @@ baseline is edited to pass.
 
 - [x] Commit 1 (fact members, `9d92ad1b`), tests first: invariants 2, 3 and 6 with audit R1–R5, R8 and R9 (member site, role-based pattern and validation, `can_host_facts`, the one-primitive gene build and its callers, relocation, own-only detach, both-role property generators, `pair-groups-v2` with keep-list and fixtures, `graph_weights`, the inspector facts line); mutation-on pins re-pinned with the fact-member cause.
 - [x] Commit 2 (size rule, `61c5b8d1`), tests first: invariants 1 and 5 (`genome_size` unit tests for a `Ring` gene, a pair gene with facts, a hole, a detached member; `expected_delta`; the founder test), the `genome_size` series entry, reference specs and the tooltip; mutation-on pins re-pinned with the size cause.
-- [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
+- [ ] Verification Plan as declared; epochs re-pinned in the closing commit.
 
 ## Verification
 
@@ -207,14 +204,17 @@ detached-fact-member count.
 trajectory reading, not a contradiction: every falsifier of the claim holds, the cross-run direction
 was a hypothesis, and the genes carried (734 pair, 0.758 ring per creature, three-fold F09's) account
 for about one unit of the ten-unit rise; it is the first short-horizon reading of the track's bloat
-risk, carried to T27.F02 (Notes). Not a blocker; no acceptance needed. Neither wall reading blocks or
-needs acceptance (gate a non-fatal wall flag; goal a non-fatal flag with its host-load
-mechanism recorded); because the gate epoch re-pins to this summary and its wall becomes the next
-reference, the gate alone is re-run once on a quiet host by a fresh benchmark specialist before the
-mutation gate and that summary replaces this one; the goal is not re-run (once per closure; its
-counters are deterministic) and its wall stands as host-confounded. With no `severe`, both epochs
-re-pin to F10's summaries in the closing commit, as every T25 closure has done, without user
-acceptance.
+risk, carried to T27.F02 (Notes). Not a blocker; no acceptance needed. The goal wall +76% is a non-fatal flag with its host-load
+mechanism recorded; not re-run (once per closure; counters deterministic). The gate wall is a flag
+(+31.72% on the quiet-host re-run, counters byte-identical to the loaded first run and below F09)
+whose mechanism is not isolated, and the predeclaration requires a flag's mechanism, so one paired
+attribution reading is taken before the mutation gate: the merge base `ced01959` (F09 code) built in
+a scratch worktree and the final code run back to back on the same host, two alternating gate pairs,
+the median F10/F09-now ratio recorded in the readings. At or below 1.25 the predeclaration holds
+(the excess over the stored F09 is host drift), the flag is recorded with that mechanism, closure
+proceeds and both epochs re-pin to F10's summaries in the closing commit without user acceptance, as
+every T25 closure has done; above 1.25 it is an unpredeclared compute cost on a feature that adds no
+per-tick work, a defect to find before closure (user informed).
 
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f10.json),
   [goal](../../progress/features/t25-f10-goal.json); raw paths, hashes and byte counts in the readings.
