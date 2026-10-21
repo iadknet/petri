@@ -161,6 +161,38 @@ fn eat_leaves_a_nan_energy_nan() {
     assert!(sim.creatures[id].energy.is_nan());
 }
 
+/// Equal as stored values: the same number, or both `NaN`.
+fn same_f32(a: f32, b: f32) -> bool {
+    a == b || (a.is_nan() && b.is_nan())
+}
+
+fn same_f64(a: f64, b: f64) -> bool {
+    a == b || (a.is_nan() && b.is_nan())
+}
+
+proptest::proptest! {
+    /// For every starting energy and reward, finite or not, the eat's floor
+    /// and cap give the energy and bookings of `clamp(0.0, max_energy)`
+    /// with `max(0.0)` bookings, the form it replaced.
+    #[test]
+    fn eat_floor_and_cap_equal_the_clamp_form(
+        energy in proptest::num::f32::ANY,
+        reward in proptest::num::f32::ANY,
+    ) {
+        let (sim, id, flows) = eat_once(energy, reward);
+        let max = sim.config.energy.lifecycle.max_energy;
+        let credited = energy + 0.5 * reward;
+        let clamped = credited.clamp(0.0, max);
+        proptest::prop_assert!(same_f32(sim.creatures[id].energy, clamped - eat_effort(&sim, id)));
+        proptest::prop_assert!(same_f64(
+            flows.maximum_energy_clamp_loss,
+            debit(credited, clamped).max(0.0)
+        ));
+        proptest::prop_assert!(same_f64(flows.zero_floor_credit, debit(clamped, credited).max(0.0)));
+        proptest::prop_assert!(same_f64(flows.food_intake_by_type[0], debit(credited, energy)));
+    }
+}
+
 // ── predation ────────────────────────────────────────────────────────────────
 
 /// Attacker at 195 north-adjacent to a victim at `victim_energy`, stealing

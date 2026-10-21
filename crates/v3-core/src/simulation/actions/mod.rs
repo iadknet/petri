@@ -6,7 +6,7 @@ pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRec
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
-use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
+use crate::config::{EnergyConfig, EnergyLifecycleConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -23,9 +23,32 @@ pub(super) fn pay_effort(
     base: f32,
     cause: DeathCause,
 ) -> f64 {
+    let effort = energy.action_effort(base, creature.cached_complexity, creature.age);
+    charge_effort(creature, effort, cause)
+}
+
+/// Debit `creature` an already computed `effort` and return the applied
+/// debit, observed against `cause`.
+fn charge_effort(creature: &mut CreatureState, effort: f32, cause: DeathCause) -> f64 {
     let before = creature.energy;
-    creature.energy -= energy.action_effort(base, creature.cached_complexity, creature.age);
+    creature.energy -= effort;
     creature.observe_energy(before, cause)
+}
+
+/// Cap `creature`'s energy at its body's cap ([`CreatureState::energy_cap`])
+/// and book the excess as `maximum_energy_clamp_loss`. The comparison leaves
+/// a `NaN` energy unchanged and caps `+∞`. The caller observes the credit
+/// it capped; the cap itself is not observed.
+fn cap_energy(
+    creature: &mut CreatureState,
+    lifecycle: &EnergyLifecycleConfig,
+    flows: &mut EnergyFlows,
+) {
+    let cap = creature.energy_cap(lifecycle);
+    if creature.energy > cap {
+        flows.maximum_energy_clamp_loss += applied_debit(creature.energy, cap);
+        creature.energy = cap;
+    }
 }
 
 /// Classification for rejected move actions.
@@ -107,10 +130,14 @@ pub fn apply_typed_eat(
             .unwrap_or(config.energy.costs.eat_reward_per_food);
         let before = creature.energy;
         let credited = creature.energy + eaten * reward;
-        creature.energy = credited.clamp(0.0, config.energy.lifecycle.max_energy);
         flows.food_intake_by_type[usize::from(type_idx.get())] += applied_debit(credited, before);
-        flows.maximum_energy_clamp_loss += applied_debit(credited, creature.energy).max(0.0);
-        flows.zero_floor_credit += applied_debit(creature.energy, credited).max(0.0);
+        creature.energy = credited;
+        // A comparison, not `max(0.0)`: a NaN credit stays NaN.
+        if credited < 0.0 {
+            creature.energy = 0.0;
+            flows.zero_floor_credit += applied_debit(0.0, credited);
+        }
+        cap_energy(creature, &config.energy.lifecycle, flows);
         creature.observe_energy(before, DeathCause::ActionEat);
     }
     let effort = pay_effort(
@@ -153,12 +180,8 @@ pub fn apply_move(
         false
     };
 
-    let effort = pay_effort(
-        creature,
-        &config.energy,
-        config.energy.costs.move_cost,
-        DeathCause::ActionMove,
-    );
+    let move_effort = creature.move_effort(&config.energy);
+    let effort = charge_effort(creature, move_effort, DeathCause::ActionMove);
     flows.action_charges.r#move += effort;
     if !succeeded {
         flows.failed_action_effort.r#move += effort;
