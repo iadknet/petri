@@ -90,17 +90,20 @@ pub(crate) static INPUT_BUCKETS: [Bucket; BUCKET_COUNT as usize] = [
 ];
 
 /// Every reference [`INPUT_BUCKETS`] can produce with `food_type_count`
-/// food types, deduplicated in table order: a bucket repeating an earlier
-/// one adds nothing.
+/// food types, in table order: a bucket repeating the one before it adds
+/// nothing. Repeats are adjacent runs (`NearbyCreature`, `Upstream`); the
+/// agreement test's no-duplicate assertion pins that.
 pub(crate) fn bucket_references(food_type_count: usize) -> Vec<InputReference> {
-    let mut references = Vec::new();
+    let food_types = capped_food_types(food_type_count);
+    let mut references =
+        Vec::with_capacity(INPUT_BUCKETS.len() + 3 * food_types + OUTPUT_SLOT_COUNT);
     for (index, bucket) in INPUT_BUCKETS.iter().enumerate() {
-        if INPUT_BUCKETS[..index].contains(bucket) {
+        if index > 0 && INPUT_BUCKETS[index - 1] == *bucket {
             continue;
         }
         match bucket {
             Bucket::Food(family) => {
-                references.extend((0..capped_food_types(food_type_count)).map(|idx| {
+                references.extend((0..food_types).map(|idx| {
                     InputReference::World(family.key(OrdinaryFoodTypeId::new(idx as u16)))
                 }))
             }
