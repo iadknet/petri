@@ -123,8 +123,8 @@ acceptance rule; nothing is tuned, and no threshold or baseline is edited.
       [Performance and Goal Impact](#performance-and-goal-impact); series `closed`
       entries added, gate and goal-worlds epochs re-pinned to them at closure, no raw report staged.
 - [x] Viability first: `cargo test -p v3-core --test viability` before and after each commit -> 30 pass, founder-only digests unchanged; re-run at the final code `474faf70` before the gate (2026-10-21): 30 pass.
-- [x] Slow tier: `make rust-test-slow` at `7a23edc3` (2026-10-21) -> exit 0, 3 + 6 pass; the recruitment-paths readings held, so none was re-pinned.
-- [x] `make check` at the tested commit `7a23edc3` (2026-10-21) -> exit 0.
+- [x] Slow tier: `make rust-test-slow` at `baee1d33` (rebased onto `de7c8c36`) -> exit 0, 3 + 6 pass; the recruitment-paths readings held, so none was re-pinned.
+- [x] `make check` at the tested commit `baee1d33` -> exit 0; profiles not re-run (T26.F01, merged first, changes no behavior).
 
 ## Performance and Goal Impact
 
@@ -233,4 +233,4 @@ per-tick work, a defect to find before closure (user informed). Reading taken: r
 - Decision: the founder's anchor and rate are remeasured, not recalibrated (track Notes: the founder has no group).
 - Deferred: the long-run bloat reading (genes per creature, materialized members, members with nonzero own corrections, compute and energy) goes to T27.F02's goal-long run, which names every feature closed in between; `pair-groups-v2` carries the reachable-pair counts, and the all-genome, both-shape counts (unreachable genes, `Ring` members' corrections) are that run's to add. Its 2,000-tick baseline is F10's goal: Confluence 734 reachable pair genes and 0.758 ring genes per creature against F09's 229 and 0.296, `mean_genome_size` 120.60 against 110.64, `own_nonzero` 9.
 - Deferred: `mutation/engine/mod.rs` `group_edits` and `mutation/graph/mod.rs` `GraphOperator::random` keep their `WORKAROUND(T25.F08)` markers unchanged; fact members are counted by their membership as any member, so the tally stays correct, neither workaround is extended, and F10 writes no `WORKAROUND(T25.F10)` marker (audit R6, R10; R7 is a test oracle, not a workaround).
-- Cost: `/usage` totals not recorded (user command, not run in the session); implementer passes 3 (build, self-review, test-only remediation), advisor consults 2, 2, 2; spec-owner resumes after Plan 3; Codex challenge rounds 2, final `ready`; Codex review findings: correctness 0, design 0, code health 1 P2 (remediated).
+- Cost: `/usage` totals not recorded (user command); implementer passes 3 (build, self-review, test-only remediation), advisor consults 2, 2, 2; spec-owner resumes after Plan 3; Codex challenge rounds 2, final `ready`; Codex review findings: correctness 0, design 0, code health 1 P2 (remediated).
