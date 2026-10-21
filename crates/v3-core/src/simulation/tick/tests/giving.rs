@@ -193,3 +193,43 @@ fn a_giver_exhausted_by_its_gift_is_removed_after_its_dispatch() {
         f64::from(sim.creatures[recipient].energy) - 30.0
     );
 }
+
+/// A steal is a success for the outcome bank exactly when it takes energy: a
+/// victim holding nothing makes it `RejectedNoVictim`, read next tick as
+/// `ActionSuccess` 0.
+#[test]
+fn a_steal_succeeds_for_the_outcome_bank_only_when_it_takes_energy() {
+    use crate::creature::genome::OutcomeChannel;
+    use crate::simulation::outcomes::OutcomeAccumulator;
+    use rand::SeedableRng;
+
+    for (victim_energy, success) in [(30.0, 1.0), (0.0, 0.0)] {
+        // Arrange
+        let (mut sim, attacker, _victim) = make_sim_two_creatures(50.0, victim_energy);
+        let mut outcomes = OutcomeAccumulator::default();
+        outcomes.snapshot_energy(attacker, 50.0);
+
+        // Act
+        super::super::run_phase_2(
+            &mut sim,
+            vec![(
+                attacker,
+                decision(vec![WorldAction::StealEnergy {
+                    direction: Direction::N,
+                }]),
+            )],
+            &mut outcomes,
+            &mut rand::rngs::SmallRng::seed_from_u64(11),
+        );
+
+        // Assert
+        let bank = outcomes
+            .compute_signal_bank(attacker, sim.creatures[attacker].energy)
+            .expect("the attacker was snapshotted");
+        assert_eq!(
+            bank.signals[OutcomeChannel::ActionSuccess as usize],
+            success,
+            "victim energy {victim_energy}"
+        );
+    }
+}

@@ -636,6 +636,28 @@ fn tick_compute_passes_and_decided_passes_accumulate_across_creatures_and_ticks(
     assert_eq!(stats.decided_passes_total, 6);
 }
 
+/// `actions_applied_total` adds every kind's per-tick applied count, the
+/// steal and give columns included.
+#[test]
+fn tick_compute_commit_sums_every_kind_into_actions_applied() {
+    // Arrange
+    let mut stats = crate::simulation::stats::SimStats {
+        last_tick_move: 1,
+        last_tick_eat: 2,
+        last_tick_noop: 3,
+        last_tick_reproduce: 4,
+        last_tick_steal: 5,
+        last_tick_give: 6,
+        ..Default::default()
+    };
+
+    // Act
+    super::super::TickComputeStats::default().commit(&mut stats);
+
+    // Assert
+    assert_eq!(stats.actions_applied_total, 21);
+}
+
 /// T16.F02 invariant 5: `failed_action_effort.k` adds the very debit
 /// `action_charges.k` records whenever the attempt failed.
 #[test]

@@ -2094,6 +2094,17 @@ mod tests {
             proptest::prop_assert_eq!(result.as_key(), key);
         }
 
+        /// The give breakdown's transport keys (`give_actions_by_result` in
+        /// the server and bench reports) are the stable variant names.
+        #[test]
+        fn give_result_keys_match_public_contract((result, key) in proptest::sample::select(vec![
+            (GiveActionResult::Transferred, "Transferred"),
+            (GiveActionResult::RejectedNoRecipient, "RejectedNoRecipient"),
+            (GiveActionResult::RejectedNothingToGive, "RejectedNothingToGive"),
+        ])) {
+            proptest::prop_assert_eq!(result.as_key(), key);
+        }
+
         /// Every bite `exchange_bite` reports moves a positive amount that
         /// lowers the holder's energy by exactly that amount, for any `f32`
         /// bit pattern of `before`, NaN payloads included.
