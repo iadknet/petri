@@ -403,13 +403,13 @@ mod tests {
         assert_eq!(VoteSink::Decide.index(), VOTE_SINK_COUNT - 1);
     }
 
-    /// The frontend's `voteSinks.json` is the declared catalog (T27.F03
+    /// The frontend's `vote-sinks.json` is the declared catalog (T27.F03
     /// invariant 2), as `nearbyFields.json` is the nearby fields.
     #[test]
     fn the_frontend_fixture_equals_the_declared_catalog() {
         use crate::contracts::ActionType;
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../../frontend/src/components/inspector/voteSinks.json"
+            "../../../../../frontend/src/types/vote-sinks.json"
         ))
         .expect("fixture parses");
         let action_types: Vec<_> = ActionType::ALL

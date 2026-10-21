@@ -1,9 +1,10 @@
 import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
+import { VOTE_KINDS, voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import directionPairsFixture from "./directionPairs.json";
 import { directionName, directionWord } from "./directions.ts";
 import nearbyFields from "./nearbyFields.json";
-import { VOTE_KINDS, actionCodeLegend, formatVoteSink, voteSinkFromIndex } from "./voteSinks.ts";
+import { actionCodeLegend, formatVoteSink } from "./voteSinks.ts";
 
 export { directionName } from "./directions.ts";
 

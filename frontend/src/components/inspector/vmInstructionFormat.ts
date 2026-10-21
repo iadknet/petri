@@ -1,4 +1,5 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
+import { voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import {
 	actionParamDescription,
 	actionParamTargetLabel,
@@ -9,7 +10,6 @@ import { describeInputRef } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
 import { actionCodeLegend } from "./voteSinks.ts";
-import { voteSinkFromIndex } from "./voteSinks.ts";
 
 export interface ReadableInstruction {
 	label: string;
