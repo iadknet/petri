@@ -386,7 +386,7 @@ proptest! {
     ) {
         use crate::simulation::energy_accounting::{decay_partition, DeathCause};
         let charge = Phase0Charge::new(decay, rate, size, 0.0);
-        let settled = charge.settle(before, decay);
+        let settled = charge.settle(before);
         prop_assert_eq!(settled.after.to_bits(), (before - charge.base).to_bits());
         let (decay_share, carrying) = decay_partition(before, before - charge.base, decay);
         prop_assert_eq!(settled.decay.to_bits(), decay_share.to_bits());
@@ -409,7 +409,7 @@ proptest! {
         upkeep in -2.0f32..2.0,
     ) {
         let charge = Phase0Charge::new(decay, rate, size, upkeep);
-        let settled = charge.settle(before, decay);
+        let settled = charge.settle(before);
         prop_assert!(charge.applied() >= 0.0);
         prop_assert!(settled.after <= before);
         let applied = f64::from(before) - f64::from(settled.after);
@@ -468,7 +468,7 @@ fn a_reference_death_on_the_rounded_base_is_attributed_to_carrying() {
     let decay = 2.0f32.powi(-25);
     let charge = Phase0Charge::new(decay, 1.0 - 2.0f32.powi(-24), 1, 0.0);
     assert_eq!(charge.base, 1.0);
-    let settled = charge.settle(1.0, decay);
+    let settled = charge.settle(1.0);
     assert_eq!(settled.after, 0.0);
     assert_eq!(settled.cause, DeathCause::GenomeCarrying);
     assert_eq!(settled.upkeep, 0.0);

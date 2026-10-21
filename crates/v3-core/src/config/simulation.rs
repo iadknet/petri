@@ -1248,9 +1248,17 @@ impl SimulationConfig {
             normalize_f32_finite_in(cap.move_cost_slope, 0.0, 1.0, DEFAULT_MOVE_COST_SLOPE);
         cap.upkeep_per_unit =
             normalize_f32_finite_nonneg(cap.upkeep_per_unit, DEFAULT_UPKEEP_PER_UNIT);
+        // One step spans at most the range, so the sampler's
+        // `-step..=step` width stays finite.
+        let log_step_bound = (max_energy / cap.min).ln();
         let mc = &mut self.mutation.capacity;
         mc.chance = normalize_f32_finite_in(mc.chance, 0.0, 1.0, DEFAULT_CAPACITY_MUTATION_CHANCE);
-        mc.log_step = normalize_f32_finite_nonneg(mc.log_step, DEFAULT_CAPACITY_LOG_STEP);
+        mc.log_step = normalize_f32_finite_in(
+            mc.log_step,
+            0.0,
+            log_step_bound,
+            DEFAULT_CAPACITY_LOG_STEP.min(log_step_bound),
+        );
     }
 }
 
@@ -1828,6 +1836,26 @@ mod tests {
         assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0);
         assert_eq!(cfg.mutation.capacity.chance, 0.0);
         assert_eq!(cfg.mutation.capacity.log_step, 0.0);
+    }
+
+    #[test]
+    fn normalize_bounds_the_log_step_by_the_capacity_range() {
+        // Above ln(800 / 50) at the defaults, or so wide the sampler's
+        // width overflows: the 0.25 default.
+        for log_step in [7.0, 2e38] {
+            let mut cfg = SimulationConfig::default();
+            cfg.mutation.capacity.log_step = log_step;
+            cfg.normalize();
+            assert_eq!(cfg.mutation.capacity.log_step, 0.25);
+        }
+        // A range narrower than one default step falls back to its bound.
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.max_energy = 60.0;
+        cfg.energy.capacity.reference = 60.0;
+        cfg.energy.capacity.founder = 60.0;
+        cfg.mutation.capacity.log_step = 0.25;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.capacity.log_step, (60.0f32 / 50.0).ln());
     }
 
     #[test]

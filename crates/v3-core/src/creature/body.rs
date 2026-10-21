@@ -41,12 +41,15 @@ impl HeritableBody {
         }
     }
 
-    /// The child's body: a copy of `parent`'s; when the birth `mutated` (at
-    /// least one genome mutation event applied), a phenotype mutation
-    /// followed by a kin-tag mutation; then, on every birth, one
-    /// `f32` draw against `mutation.capacity.chance` and, when it fires, a
-    /// uniform log-space step `δ ∈ [-log_step, log_step]` with the capacity
-    /// `(parent × e^δ)` clamped to `[capacity.min, lifecycle.max_energy]`.
+    /// The child's body: a copy of `parent`'s with the capacity clamped to
+    /// the range in force at this birth, `[capacity.min,
+    /// lifecycle.max_energy]`, so a live patch of the bounds reaches the next
+    /// generation without a draw; when the birth `mutated` (at least one
+    /// genome mutation event applied), a phenotype mutation followed by a
+    /// kin-tag mutation; then, on every birth, one `f32` draw against
+    /// `mutation.capacity.chance` and, when it fires, a uniform log-space
+    /// step `δ ∈ [-log_step, log_step]` with the capacity `(parent × e^δ)`
+    /// clamped to the same range.
     #[must_use]
     pub fn inherit(
         parent: &Self,
@@ -55,10 +58,11 @@ impl HeritableBody {
         energy: &EnergyConfig,
         rng: &mut impl Rng,
     ) -> Self {
+        let (min, max) = (energy.capacity.min, energy.lifecycle.max_energy);
         let mut child = Self {
             phenotype: parent.phenotype,
             identity: CreatureIdentityState::inherit(&parent.identity),
-            capacity: parent.capacity,
+            capacity: parent.capacity.clamp(min, max),
         };
         if mutated {
             child.phenotype = mutate_phenotype(child.phenotype, &mutation.phenotype, rng);
@@ -67,8 +71,7 @@ impl HeritableBody {
         if rng.gen::<f32>() < mutation.capacity.chance {
             let step = mutation.capacity.log_step;
             let delta = rng.gen_range(-step..=step);
-            child.capacity = (parent.capacity * delta.exp())
-                .clamp(energy.capacity.min, energy.lifecycle.max_energy);
+            child.capacity = (parent.capacity * delta.exp()).clamp(min, max);
         }
         child
     }
@@ -195,6 +198,27 @@ mod tests {
         assert_eq!(body.energy_scale(&config), 50.0);
     }
 
+    /// A `log_step` at its normalized bound, `ln(max_energy / min)` over the
+    /// widest range, samples without panic.
+    #[test]
+    fn a_log_step_at_its_bound_samples() {
+        let mut cfg = crate::config::SimulationConfig::default();
+        cfg.energy.lifecycle.max_energy = f32::MAX;
+        cfg.energy.capacity.min = 1.0;
+        let bound = f32::MAX.ln();
+        cfg.mutation.capacity.chance = 1.0;
+        cfg.mutation.capacity.log_step = bound;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.capacity.log_step, bound);
+        let parent = HeritableBody::founder(0, 0, 200.0);
+        let mut rng = SmallRng::seed_from_u64(7);
+        for _ in 0..64 {
+            let child =
+                HeritableBody::inherit(&parent, false, &cfg.mutation, &cfg.energy, &mut rng);
+            assert!((1.0..=f32::MAX).contains(&child.capacity));
+        }
+    }
+
     proptest! {
         /// An inheritance draws, in order: the phenotype mutation and the
         /// kin-tag mutation when `mutated`; the capacity chance on every
@@ -215,6 +239,7 @@ mod tests {
             let mut expected_rng = SmallRng::seed_from_u64(seed);
             let mut expected = HeritableBody {
                 identity: CreatureIdentityState::inherit(&parent.identity),
+                capacity: parent.capacity.clamp(50.0, 800.0),
                 ..parent
             };
             if mutated {
@@ -243,6 +268,25 @@ mod tests {
             let mut expected_rng = SmallRng::seed_from_u64(seed);
             let _: f32 = expected_rng.gen();
             prop_assert_eq!(rng.gen::<u64>(), expected_rng.gen::<u64>());
+        }
+
+        /// An unmutated newborn's capacity is its parent's clamped to the
+        /// range in force at its birth, whatever range the parent was born in.
+        #[test]
+        fn an_unmutated_newborn_is_clamped_to_the_range_at_its_birth(
+            parent in body(),
+            min in 1.0f32..=400.0,
+            span in 0.0f32..=800.0,
+            seed in any::<u64>(),
+        ) {
+            let mut energy = EnergyConfig::default();
+            energy.capacity.min = min;
+            energy.lifecycle.max_energy = min + span;
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let child = HeritableBody::inherit(
+                &parent, false, &mutation(0.0, 0.25), &energy, &mut rng,
+            );
+            prop_assert_eq!(child.capacity, parent.capacity.clamp(min, min + span));
         }
 
         /// A mutated inheritance keeps the lineage and flips one kin-tag bit.
