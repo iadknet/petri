@@ -158,6 +158,15 @@
 //! four digests (sampled 23580944... -> 66daa632..., gestation rate 0.0
 //! b60acab7... -> 449159b3...; guard cca5541d... -> 15de1150..., rate 0.0
 //! 55e51cf0... -> 919473fb...); the founder-only viability digests hold.
+//! Re-pinned by T27.F01 (rebase: T27.F01 combined with T26.F01 + T25.F10)
+//! after two agreeing runs: the `NearbyCreature` family is 40 wide (slot
+//! fields 7 to 9 sense colour where lineage and similarity stood), a slot
+//! recruitment places 20 edges, the key draw is `gen_range(0..30)` over the
+//! one bucket table and the universe follows the table order, which moves
+//! all four digests (sampled 66daa632... -> a5a9f6e4..., gestation rate 0.0
+//! 449159b3... -> 95ef1cbb...; guard 15de1150... -> c7e77b62..., rate 0.0
+//! 919473fb... -> 7488a15f...). With `mutation.per_unit_rate` 0 the sampled
+//! run is byte-identical (bd8dca14..., gestation rate 0.0 d3b71fcd...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -169,11 +178,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "66daa632bb2c10ccd382e3a1f99283283f4dfa6bf5f626cd716b10d7d59db374"
+        "a5a9f6e4da13cace123302810025f8b3751be33b9ecf5657e5dd4920bf493fd1"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "449159b3ff9ccadb1a40a6dcf14fd4a08c7ead5c5bdb728e1df569bb87929970"
+        "95ef1cbb91fd84ffb9e8ab776c92bf4849039819efe0d2f6bf0bfc7e58d73398"
     );
 }
 
@@ -246,11 +255,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "15de1150bd51daf4f6cdd6ba06bd7dfa5ed67853e13ed55481b384672549c25a"
+        "c7e77b620d6a887b9183cfb301818ea7c99aa06462f8f6f6716960ed674c9150"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "919473fba32b51049b2e3b91d97d4692ba98dc1ddc08778684e14bd19345b000"
+        "7488a15fcd86a374eb979867a7c9e18d5787fc63d2fc49ea4ae39fc85a513ca0"
     );
 }
 

@@ -369,7 +369,12 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 }
 
 /// The draws after genome mutation, phenotype first and kin tag second,
-/// pinned on main: swapping them moves these values.
+/// pinned on main: swapping them moves these values. Re-pinned by T27.F01
+/// (rebase: T27.F01 combined with T26.F01 + T25.F10): the 40-wide
+/// `NearbyCreature` family and the 30-bucket key draw change the genome
+/// mutation's draws before the phenotype step (channels
+/// `[0, 0, 92, 91, 138, 138]`, active 3 -> `[0, 0, 93, 92, 138, 138]`,
+/// active 2, polarity all adding); the kin tag holds.
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
     let parent = parent_body();
@@ -383,9 +388,9 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
         child,
         HeritableBody {
             phenotype: Phenotype {
-                channels: [0, 0, 92, 91, 138, 138],
-                active_channel: 3,
-                polarity: [true, true, true, false, true, true],
+                channels: [0, 0, 93, 92, 138, 138],
+                active_channel: 2,
+                polarity: [true; 6],
             },
             identity: CreatureIdentityState {
                 lineage_id: 3,
