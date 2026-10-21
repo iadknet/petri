@@ -38,11 +38,21 @@ pub mod occupancy_idx {
     pub const CROWDING_RATIO: usize = 6;
 }
 
-/// `NearbyCreature` layout (T25.F05): `SLOTS` ranked slots of
+/// One `NearbyCreature` field's display name and description: the
+/// declaration the frontend's `nearbyFields.json` fixture is pinned to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct NearbyField {
+    pub name: &'static str,
+    pub description: &'static str,
+}
+
+/// `NearbyCreature` layout (T25.F05, T27.F01): `SLOTS` ranked slots of
 /// `FIELDS_PER_SLOT` fields; slot `k` field `f` is channel `k * FIELDS_PER_SLOT + f`.
 pub mod nearby_idx {
+    use super::NearbyField;
+
     pub const SLOTS: usize = 4;
-    pub const FIELDS_PER_SLOT: usize = 9;
+    pub const FIELDS_PER_SLOT: usize = 10;
     /// The family's channel count.
     pub const WIDTH: usize = SLOTS * FIELDS_PER_SLOT;
     pub const PRESENT: usize = 0;
@@ -52,8 +62,36 @@ pub mod nearby_idx {
     pub const ENERGY_RATIO: usize = 4;
     pub const REPRODUCE_READY: usize = 5;
     pub const KIN_AFFINITY: usize = 6;
-    pub const LINEAGE_MATCH: usize = 7;
-    pub const PHENOTYPE_SIMILARITY: usize = 8;
+    /// The seen creature's colour, each channel over 255 (T27.F01).
+    pub const RED: usize = 7;
+    pub const GREEN: usize = 8;
+    pub const BLUE: usize = 9;
+
+    const fn field(name: &'static str, description: &'static str) -> NearbyField {
+        NearbyField { name, description }
+    }
+
+    /// Each field's name and description, in layout order.
+    pub const FIELDS: [NearbyField; FIELDS_PER_SLOT] = {
+        let mut fields = [field("", ""); FIELDS_PER_SLOT];
+        fields[PRESENT] = field(
+            "present",
+            "1 when this slot holds a creature, 0 when empty.",
+        );
+        fields[REL_X] = field("dx", "x offset, as a fraction of vision radius (+ = east).");
+        fields[REL_Y] = field(
+            "dy",
+            "y offset, as a fraction of vision radius (+ = south).",
+        );
+        fields[DIST] = field("dist", "Distance (1 = edge of view).");
+        fields[ENERGY_RATIO] = field("energy", "Energy as a fraction of max energy.");
+        fields[REPRODUCE_READY] = field("ready", "1 when it has the energy and age to reproduce.");
+        fields[KIN_AFFINITY] = field("kin", "Kin-tag similarity (1 = identical tags).");
+        fields[RED] = field("red", "Red channel of its colour (0 to 1).");
+        fields[GREEN] = field("green", "Green channel of its colour (0 to 1).");
+        fields[BLUE] = field("blue", "Blue channel of its colour (0 to 1).");
+        fields
+    };
 }
 
 /// One `(x, y)` offset a world family senses toward a thing, and the thing's
@@ -71,7 +109,7 @@ pub struct DirectionPair {
 }
 
 // Field indices are `usize` for array indexing; the largest
-// (`nearby_idx::WIDTH - 1`, 35) fits `u16`, so the casts are lossless.
+// (`nearby_idx::WIDTH - 1`, 39) fits `u16`, so the casts are lossless.
 const fn pair(x: usize, y: usize, facts: &'static [u16]) -> DirectionPair {
     DirectionPair {
         x: x as u16,
@@ -131,8 +169,9 @@ const NEARBY_FACT_FIELDS: [usize; nearby_idx::FIELDS_PER_SLOT - 2] = [
     nearby_idx::ENERGY_RATIO,
     nearby_idx::REPRODUCE_READY,
     nearby_idx::KIN_AFFINITY,
-    nearby_idx::LINEAGE_MATCH,
-    nearby_idx::PHENOTYPE_SIMILARITY,
+    nearby_idx::RED,
+    nearby_idx::GREEN,
+    nearby_idx::BLUE,
 ];
 const NEARBY_FACTS: [[u16; NEARBY_FACT_FIELDS.len()]; nearby_idx::SLOTS] = {
     let mut facts = [[0; NEARBY_FACT_FIELDS.len()]; nearby_idx::SLOTS];
@@ -147,7 +186,7 @@ const NEARBY_FACTS: [[u16; NEARBY_FACT_FIELDS.len()]; nearby_idx::SLOTS] = {
     }
     facts
 };
-/// Slot `k`: `(rel_x, rel_y)`, facts the slot's seven other fields; the
+/// Slot `k`: `(rel_x, rel_y)`, facts the slot's eight other fields; the
 /// four pairs partition the layout.
 const NEARBY_PAIRS: [DirectionPair; nearby_idx::SLOTS] = {
     let mut pairs = [pair(0, 0, &[]); nearby_idx::SLOTS];
@@ -183,7 +222,7 @@ pub enum WorldInputKey {
     AreaBarrierSummary,
     /// Compound: area occupancy summary (7 sub-values). See v3-sensor-spec.md Section 5.3.
     AreaOccupancySummary,
-    /// Compound: the nearby creatures (4 slots × 9 fields = 36 sub-values,
+    /// Compound: the nearby creatures (4 slots × 10 fields = 40 sub-values,
     /// laid out by [`nearby_idx`]). See v3-sensor-spec.md Section 5.4.
     NearbyCreature,
 }
@@ -424,8 +463,8 @@ mod tests {
                 WorldInputKey::NearbyCreature,
                 (0..4u16)
                     .map(|k| {
-                        let base = 9 * k;
-                        let facts = [0, 3, 4, 5, 6, 7, 8].map(|f| base + f).to_vec();
+                        let base = 10 * k;
+                        let facts = [0, 3, 4, 5, 6, 7, 8, 9].map(|f| base + f).to_vec();
                         (base + 1, base + 2, facts)
                     })
                     .collect(),
@@ -495,15 +534,8 @@ mod tests {
             occupancy_idx::CROWDING_RATIO,
         ];
         assert!(area.iter().all(|&last| last + 1 == 7));
-        assert_eq!(
-            nearby_idx::PHENOTYPE_SIMILARITY + 1,
-            nearby_idx::FIELDS_PER_SLOT
-        );
-        assert_eq!(WorldInputKey::NearbyCreature.compound_width(), 36);
-        assert_eq!(
-            crate::sensors::perception::food_idx::NEAREST_DY,
-            food_idx::NEAREST_DY
-        );
+        assert_eq!(nearby_idx::BLUE + 1, nearby_idx::FIELDS_PER_SLOT);
+        assert_eq!(WorldInputKey::NearbyCreature.compound_width(), 40);
     }
 
     #[test]
@@ -540,6 +572,26 @@ mod tests {
             }
         }
         assert_eq!(fixture, serde_json::Value::Object(declared));
+    }
+
+    /// The frontend's `nearbyFields.json` is the declared field table
+    /// (T27.F01 invariant 6), as `directionPairs.json` is the pairs.
+    #[test]
+    fn the_frontend_fixture_equals_the_declared_nearby_fields() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../frontend/src/components/inspector/nearbyFields.json"
+        ))
+        .expect("fixture parses");
+        let declared = serde_json::json!({
+            "slots": nearby_idx::SLOTS,
+            "fields": nearby_idx::FIELDS,
+        });
+        assert_eq!(fixture, declared);
+        let names: Vec<_> = nearby_idx::FIELDS.iter().map(|f| f.name).collect();
+        assert_eq!(
+            names,
+            ["present", "dx", "dy", "dist", "energy", "ready", "kin", "red", "green", "blue"]
+        );
     }
 
     #[test]

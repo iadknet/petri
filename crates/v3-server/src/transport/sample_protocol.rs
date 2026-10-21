@@ -94,7 +94,7 @@ pub struct PerceptionDebugSnapshotPayload {
     pub area_food: [f32; 7],
     pub area_barrier: [f32; 7],
     pub area_occupancy: [f32; 7],
-    /// The `NearbyCreature` family, 4 slots × 9 fields (T25.F05).
+    /// The `NearbyCreature` family, 4 slots × 10 fields (T27.F01).
     #[serde(serialize_with = "v3_core::runtime::trace::domain::serialize_array")]
     pub nearby: [f32; v3_core::contracts::nearby_idx::WIDTH],
 }

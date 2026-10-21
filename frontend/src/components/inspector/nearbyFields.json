@@ -1,0 +1,15 @@
+{
+	"slots": 4,
+	"fields": [
+		{ "name": "present", "description": "1 when this slot holds a creature, 0 when empty." },
+		{ "name": "dx", "description": "x offset, as a fraction of vision radius (+ = east)." },
+		{ "name": "dy", "description": "y offset, as a fraction of vision radius (+ = south)." },
+		{ "name": "dist", "description": "Distance (1 = edge of view)." },
+		{ "name": "energy", "description": "Energy as a fraction of max energy." },
+		{ "name": "ready", "description": "1 when it has the energy and age to reproduce." },
+		{ "name": "kin", "description": "Kin-tag similarity (1 = identical tags)." },
+		{ "name": "red", "description": "Red channel of its colour (0 to 1)." },
+		{ "name": "green", "description": "Green channel of its colour (0 to 1)." },
+		{ "name": "blue", "description": "Blue channel of its colour (0 to 1)." }
+	]
+}

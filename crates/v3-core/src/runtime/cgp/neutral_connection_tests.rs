@@ -262,8 +262,8 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
     }
     assert_eq!(
         sources.len(),
-        241,
-        "209 declared channels and 32 memory slots"
+        245,
+        "213 declared channels and 32 memory slots"
     );
     let votes: Vec<_> = VoteSink::all().collect();
     assert_eq!(votes.len(), 30);

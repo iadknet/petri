@@ -16,7 +16,7 @@ export interface PerceptionDebugSnapshot {
 	area_food: number[];
 	area_barrier: number[];
 	area_occupancy: number[];
-	/** `NearbyCreature`: 4 slots × 9 fields. */
+	/** `NearbyCreature`: 4 slots × 10 fields. */
 	nearby: number[];
 }
 

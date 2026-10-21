@@ -50,8 +50,9 @@ State semantics:
 
 Visibility posture:
 - raw identity values are internal simulation state;
-- sensor-facing logic consumes bounded derived values such as
-  `lineage_match` and `kin_affinity` from `v3-sensor-spec.md`;
+- sensor-facing logic consumes one bounded derived value, `kin_affinity`
+  from `v3-sensor-spec.md`; `lineage_id` is observation-only (lineage
+  indicators, the server lineage map, window records) and no sensor reads it;
 - identity state is not part of canonical frame payloads or public status APIs
   in v3alpha1.
 
@@ -126,12 +127,12 @@ expectations.
 
 ## 6. Sensor-Facing Derived Values
 
-Identity state is consumed by sensors only through bounded derived values:
-- `lineage_match = 1.0` when lineage IDs match, else `0.0`
+Identity state is consumed by sensors only through one bounded derived value
+(T27.F01 retired `lineage_match`):
 - `kin_affinity = 1.0 - (popcount(observer.kin_tag ^ target.kin_tag) / 32.0)`
 
-Canonical formulas and any future nearby-creature identity-bank layout are
-owned by `v3-sensor-spec.md`.
+Canonical formulas and the nearby-creature layout are owned by
+`v3-sensor-spec.md`.
 
 ---
 

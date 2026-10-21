@@ -2,7 +2,7 @@
 //! (inheritance) and `mutation::phenotype` (how it mutates) import.
 
 /// The six-channel internal colour phenotype (HSL-mapped; converted to RGB by
-/// `mutation::phenotype::channels_to_rgb` for the wire format) and the state
+/// `creature::colour::channels_to_rgb` for the wire format) and the state
 /// that steers its mutation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Phenotype {

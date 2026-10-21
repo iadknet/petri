@@ -4,12 +4,10 @@
 //! from the set of visible cells computed by the visibility module.
 
 use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::CreatureId;
+use crate::contracts::{barrier_idx, food_idx, nearby_idx, occupancy_idx, CreatureId};
+use crate::creature::colour::unit_rgb;
 use crate::creature::state::CreatureState;
-use crate::sensors::perception::{
-    barrier_idx, food_idx, nearby_idx, occupancy_idx, PerceptionConfig, PerceptionSnapshot,
-    NEARBY_SLOTS, NEARBY_WIDTH,
-};
+use crate::sensors::perception::{PerceptionConfig, PerceptionSnapshot};
 use crate::sensors::visibility::VisibleCell;
 
 use crate::kernel::WorldState;
@@ -311,7 +309,7 @@ fn rank_nearby_creatures(
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
-) -> [f32; NEARBY_WIDTH] {
+) -> [f32; nearby_idx::WIDTH] {
     let mut candidates: Vec<NearbyCandidate> = Vec::new();
     for cell in visible {
         if cell.dx == 0 && cell.dy == 0 {
@@ -356,10 +354,10 @@ fn fill_nearby_banks(
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
-) -> [f32; NEARBY_WIDTH] {
-    let mut nearby = [0.0f32; NEARBY_WIDTH];
+) -> [f32; nearby_idx::WIDTH] {
+    let mut nearby = [0.0f32; nearby_idx::WIDTH];
 
-    for (slot, candidate) in candidates.iter().take(NEARBY_SLOTS).enumerate() {
+    for (slot, candidate) in candidates.iter().take(nearby_idx::SLOTS).enumerate() {
         let Some(target) = creatures.get(candidate.creature_id) else {
             continue;
         };
@@ -398,19 +396,11 @@ fn fill_nearby_banks(
             0.0
         };
 
-        // Identity
+        // Identity and colour
         fields[nearby_idx::KIN_AFFINITY] =
             compute_kin_affinity(observer.body.identity.kin_tag, target.body.identity.kin_tag);
-        fields[nearby_idx::LINEAGE_MATCH] =
-            if observer.body.identity.lineage_id == target.body.identity.lineage_id {
-                1.0
-            } else {
-                0.0
-            };
-        fields[nearby_idx::PHENOTYPE_SIMILARITY] = compute_phenotype_similarity(
-            &observer.body.phenotype.channels,
-            &target.body.phenotype.channels,
-        );
+        fields[nearby_idx::RED..=nearby_idx::BLUE]
+            .copy_from_slice(&unit_rgb(target.body.phenotype.channels));
     }
 
     nearby
@@ -420,17 +410,6 @@ fn fill_nearby_banks(
 fn compute_kin_affinity(a: u32, b: u32) -> f32 {
     let hamming = (a ^ b).count_ones();
     (1.0 - hamming as f32 / 32.0).clamp(0.0, 1.0)
-}
-
-/// Compute phenotype similarity: `1.0 - mean_abs_channel_delta / 255.0`.
-fn compute_phenotype_similarity(a: &[u8; 6], b: &[u8; 6]) -> f32 {
-    let sum: u32 = a
-        .iter()
-        .zip(b.iter())
-        .map(|(&ca, &cb)| (ca as i32 - cb as i32).unsigned_abs())
-        .sum();
-    let mean_delta = sum as f32 / 6.0;
-    (1.0 - mean_delta / 255.0).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -486,19 +465,6 @@ mod tests {
     fn kin_affinity_one_bit_different() {
         let affinity = compute_kin_affinity(0b0000, 0b0001);
         assert!((affinity - (1.0 - 1.0 / 32.0)).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn phenotype_similarity_identical() {
-        let a = [100, 200, 50, 30, 20, 10];
-        assert!((compute_phenotype_similarity(&a, &a) - 1.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn phenotype_similarity_max_difference() {
-        let a = [0, 0, 0, 0, 0, 0];
-        let b = [255, 255, 255, 255, 255, 255];
-        assert!((compute_phenotype_similarity(&a, &b) - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -936,15 +902,17 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    /// Slot `k`'s nine merged fields, in `nearby_idx` order.
+    /// Slot `k`'s ten fields, in `nearby_idx` order.
     fn merged_slot(snap: &PerceptionSnapshot, k: usize) -> Vec<f32> {
         let width = nearby_idx::FIELDS_PER_SLOT;
         snap.nearby[k * width..(k + 1) * width].to_vec()
     }
 
-    /// The layout pin (T25.F05 invariant 2): slot `k`'s position, vitals and
-    /// identity at channels `9k..9k+9`, each field at its F04 value, written
-    /// before the three banks merged and kept as the pin of the same values.
+    /// The layout pin (T27.F01 invariants 1 and 2): slot `k` at channels
+    /// `10k..10k+10`, fields 0–6 at their T25.F05 values (the identity
+    /// comparisons retired), fields 7–9 the seen creature's RGB over 255.
+    /// The two creatures' colours differ in every channel, so a swapped
+    /// colour field cannot pass.
     #[test]
     fn merged_nearby_creature_equals_core_vitals_identity_per_slot() {
         let mut world = make_world(20, 20);
@@ -957,25 +925,27 @@ mod tests {
         let observer_id = creatures
             .insert_with_key(|id| make_creature(id, origin, 50.0, observer_identity, [0; 6]));
         world.place_creature(origin, observer_id);
-        // Slot 0: one cell east, same lineage, one kin bit apart, of age.
+        // Slot 0: one cell east, one kin bit apart, of age; the founder's
+        // colour, RGB (204, 61, 61).
         let near = crate::contracts::Position::new(11, 10);
         let near_identity = CreatureIdentityState {
             lineage_id: 42,
             kin_tag: 0xAAAA_AAAB,
         };
-        let near_id =
-            creatures.insert_with_key(|id| make_creature(id, near, 30.0, near_identity, [51; 6]));
+        let near_id = creatures.insert_with_key(|id| {
+            make_creature(id, near, 30.0, near_identity, [0, 0, 92, 92, 138, 138])
+        });
         creatures[near_id].age = 25;
         world.place_creature(near, near_id);
-        // Slot 1: two west and one south, another lineage, every kin bit
-        // apart, under age.
+        // Slot 1: two west and one south, every kin bit apart, under age;
+        // RGB (13, 89, 174).
         let far = crate::contracts::Position::new(8, 11);
         let far_identity = CreatureIdentityState {
             lineage_id: 7,
             kin_tag: 0x5555_5555,
         };
         let far_id = creatures.insert_with_key(|id| {
-            make_creature(id, far, 160.0, far_identity, [255, 0, 0, 0, 0, 0])
+            make_creature(id, far, 160.0, far_identity, [150, 0, 200, 200, 60, 60])
         });
         world.place_creature(far, far_id);
 
@@ -1000,8 +970,9 @@ mod tests {
                 30.0 / 200.0,
                 1.0,
                 31.0 / 32.0,
-                1.0,
-                1.0 - 51.0 / 255.0,
+                204.0 / 255.0,
+                61.0 / 255.0,
+                61.0 / 255.0,
             ],
             vec![
                 1.0,
@@ -1011,15 +982,16 @@ mod tests {
                 160.0 / 200.0,
                 0.0,
                 0.0,
-                0.0,
-                1.0 - 42.5 / 255.0,
+                13.0 / 255.0,
+                89.0 / 255.0,
+                174.0 / 255.0,
             ],
-            vec![0.0; 9],
-            vec![0.0; 9],
+            vec![0.0; 10],
+            vec![0.0; 10],
         ];
         for (k, want) in want.iter().enumerate() {
             let got = merged_slot(&snap, k);
-            assert_eq!(got.len(), 9);
+            assert_eq!(got.len(), 10);
             for (field, (got, want)) in got.iter().zip(want).enumerate() {
                 assert!(
                     (got - want).abs() < 1e-6,
@@ -1027,51 +999,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn identity_lineage_match() {
-        let mut world = make_world(20, 20);
-        let origin = crate::contracts::Position::new(10, 10);
-
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
-        let obs_identity = CreatureIdentityState {
-            lineage_id: 42,
-            kin_tag: 0xAAAAAAAA,
-        };
-        let observer_id =
-            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, obs_identity, [0; 6]));
-        world.place_creature(origin, observer_id);
-
-        // Same lineage neighbor
-        let n_pos = crate::contracts::Position::new(11, 10);
-        let n_identity = CreatureIdentityState {
-            lineage_id: 42,
-            kin_tag: 0xAAAAAAAA,
-        };
-        let _n_id =
-            creatures.insert_with_key(|id| make_creature(id, n_pos, 30.0, n_identity, [0; 6]));
-        world.place_creature(n_pos, _n_id);
-
-        let table = get_visibility_table(2);
-        let visible = compute_visible_cells(origin, &world, table);
-        let config = PerceptionConfig::default();
-
-        let snap = assemble_perception(
-            observer_id,
-            &creatures[observer_id],
-            visible.cells(),
-            &world,
-            &creatures,
-            &config,
-        );
-
-        // Same lineage → lineage_match = 1.0
-        assert!((snap.nearby[nearby_idx::LINEAGE_MATCH] - 1.0).abs() < f32::EPSILON);
-        // Same kin_tag → kin_affinity = 1.0
-        assert!((snap.nearby[nearby_idx::KIN_AFFINITY] - 1.0).abs() < f32::EPSILON);
-        // Same phenotype → phenotype_similarity = 1.0
-        assert!((snap.nearby[nearby_idx::PHENOTYPE_SIMILARITY] - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

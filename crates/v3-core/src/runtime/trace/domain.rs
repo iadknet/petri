@@ -189,13 +189,13 @@ pub struct PerceptionDebugSnapshot {
     pub area_food: [f32; 7],
     pub area_barrier: [f32; 7],
     pub area_occupancy: [f32; 7],
-    /// The `NearbyCreature` family, 4 slots × 9 fields (T25.F05).
+    /// The `NearbyCreature` family, 4 slots × 10 fields (T27.F01).
     #[serde(serialize_with = "serialize_array")]
     pub nearby: [f32; crate::contracts::nearby_idx::WIDTH],
 }
 
 /// Serialize an array of any length as a sequence: serde derives arrays only
-/// up to 32 elements, and `NearbyCreature` is 36 wide.
+/// up to 32 elements, and `NearbyCreature` is 40 wide.
 ///
 /// # Errors
 ///

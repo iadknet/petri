@@ -51,7 +51,7 @@ Compound inputs in v3alpha1:
 - `World(AreaFoodSummary { type_idx })` — 7 sub-values
 - `World(AreaBarrierSummary)` — 7 sub-values
 - `World(AreaOccupancySummary)` — 7 sub-values
-- `World(NearbyCreature)` — 36 sub-values
+- `World(NearbyCreature)` — 40 sub-values
 - `ActionVotes`, `PreviousPassVotes` — 30 sub-values (Section 3.6)
 - `CommitCounts` — 4 sub-values (Section 3.6)
 - `PreviousOutcome` — 4 sub-values (Section 3.7)
@@ -138,6 +138,8 @@ Shared posture:
 - all invalid/missing compound accesses return `0.0`
 - area summaries use one global `runtime.perception.vision_radius`
 - visibility considers only cells visible under the contract in Section 4
+- `NearbyCreature` reads the position, vitals, kinship and colour of the four
+  nearest visible creatures (Section 5.4)
 
 ### 3.2 Static Introspection
 
@@ -321,10 +323,11 @@ is computed for a single configured ordinary-food type.
 
 ### 5.4 `NearbyCreature`
 
-4 ranked slots × 9 fields = `36` (T25.F05: one family where
+4 ranked slots × 10 fields = `40` (T25.F05: one family where
 `NearbyCreatureCore`, `NearbyCreatureVitals` and `NearbyCreatureIdentity`
-stood, every field at its former value). Slot `k` field `f` is channel
-`9k + f` (`nearby_idx::SLOTS`, `nearby_idx::FIELDS_PER_SLOT`).
+stood; T27.F01: the two identity comparisons replaced by the seen colour).
+Slot `k` field `f` is channel `10k + f` (`nearby_idx::SLOTS`,
+`nearby_idx::FIELDS_PER_SLOT`); `nearby_idx::FIELDS` names each field.
 
 Per-slot order:
 - 0 `present`
@@ -334,8 +337,9 @@ Per-slot order:
 - 4 `energy_ratio`
 - 5 `reproduce_ready`
 - 6 `kin_affinity`
-- 7 `lineage_match`
-- 8 `phenotype_similarity`
+- 7 `red`
+- 8 `green`
+- 9 `blue`
 
 Ranking order:
 1. ascending Euclidean distance
@@ -359,7 +363,7 @@ group reads (graph backend spec, "Direction-pair edge groups"):
 | `AreaFoodSummary` (any food type) | `(gradient_x, gradient_y)` 1, 2; `(nearest_dx, nearest_dy)` 3, 4 | 0, 5, 6 |
 | `AreaBarrierSummary` | 2, 3; 4, 5 | 0, 1, 6 |
 | `AreaOccupancySummary` | `(center_x, center_y)` 1, 2; 3, 4 | 0, 5, 6 |
-| `NearbyCreature` | slot `k`: `(rel_x, rel_y)` `9k+1`, `9k+2` | `9k`, `9k+3` to `9k+8` |
+| `NearbyCreature` | slot `k`: `(rel_x, rel_y)` `10k+1`, `10k+2` | `10k`, `10k+3` to `10k+9` |
 
 Every other key declares none. `NearbyCreature`'s four pairs partition its
 layout, one pair per slot, so `WorldInputKey::slot_pairs()` is true for it
@@ -413,13 +417,17 @@ Area-summary denominator rule:
   `target.energy >= energy.lifecycle.min_reproduce_energy` and
   `target.age >= energy.lifecycle.min_reproduce_age`, else `0.0`
 
-### 6.5 Nearby Creature Identity (`NearbyCreature` fields 6–8)
+### 6.5 Nearby Creature Identity and Colour (`NearbyCreature` fields 6–9)
 
-- `lineage_match = 1.0` if lineage IDs match, else `0.0`
-- `kin_affinity = 1.0 - (popcount(observer.kin_tag ^ target.kin_tag) / 32.0)`
-- `phenotype_similarity = 1.0 - (mean_abs_channel_delta / 255.0)`
+- `kin_affinity = 1.0 - (popcount(observer.kin_tag ^ target.kin_tag) / 32.0)`,
+  clamped to `[0.0, 1.0]`
+- `red`, `green`, `blue` =
+  `creature::colour::channels_to_rgb(target.phenotype_channels)[c] / 255.0`,
+  in `[0.0, 1.0]`, computed when perception is assembled: the colour the
+  creature shows, not a comparison with the observer's
 
-Clamp identity similarity values to `[0.0, 1.0]`.
+No field compares lineage or hidden colour genes; `lineage_id` is
+observation-only telemetry.
 
 Missing/absent conventions:
 - out-of-range compound `sub_idx` returns `0.0`
