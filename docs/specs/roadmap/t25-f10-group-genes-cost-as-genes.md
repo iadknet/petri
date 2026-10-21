@@ -113,11 +113,7 @@ acceptance rule; nothing is tuned, and no threshold or baseline is edited.
 ## Verification
 
 - [x] Focused tests and checks on the build commits (`61c5b8d1`), the self-review pass (`is_fact_member` replaces nine site tests; the broadcast pin `hebbian::tests::a_group_broadcast_from_a_direction_member_reaches_the_fact_members`) and the test-only review remediation (`GroupShape` strategy in `group_tests`): `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `cargo test -p v3-core --no-fail-fast` (lib 2,221, 9 ignored slow), `cargo test -p v3-cli -p v3-server -p v3-lab -p v3-telemetry --no-fail-fast`, inspector and config-panel `vitest` (357) and `biome check` all pass; every moved pin re-pinned with its cause, listed with the lineage search in the [readings](../../progress/readings/t25-f10.md#fixture-re-pin-searches).
-- [ ] When the Verification Plan declares the mutation gate: fresh
-      `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
-      Otherwise `Not run: Verification Plan`.
+- [x] Mutation gate (fresh `make rust-mutants-ci`, run 39573015727, `210228ab` vs `ced01959`): `4 shards, 81 mutants tested: 0 missed, 69 caught, 12 unviable, 0 timeouts`; output `~/.local/share/petri-tools/mutants/t25-f10/mutants.out`; no survivors ([readings](../../progress/readings/t25-f10.md#mutation-gate-2026-10-21)).
 - [x] For each declared benchmark profile (gate, goal; 2026-10-21, HEAD `474faf70`): summary stored at
       `docs/progress/features/<id>.json` (gate), `<id>-goal.json` or
       `<id>-goal-long.json`, local raw hash/byte count and verification time
