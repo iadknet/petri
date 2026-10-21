@@ -58,13 +58,13 @@ fn cap_energy(
 
 /// One exchange bite taken from a holder of `before` energy (T27.F03):
 /// `min(bite, before)` when `before` is positive, else nothing (a comparison,
-/// so a `NaN` energy yields nothing). Returns `(amount, after)` only when the
-/// debit changes the stored energy; a bite the holder's `f32` resolution
-/// absorbs is `None`.
+/// so a `NaN` energy yields nothing). Returns `(amount, after)` only when a
+/// positive amount lowers the stored energy; a bite the holder's `f32`
+/// resolution absorbs is `None`.
 fn exchange_bite(before: f32, bite: f32) -> Option<(f32, f32)> {
     let amount = if before > 0.0 { bite.min(before) } else { 0.0 };
     let after = before - amount;
-    (after.to_bits() != before.to_bits()).then_some((amount, after))
+    (amount > 0.0 && after < before).then_some((amount, after))
 }
 
 /// What a transfer action moved: its result, the energy debited from the
@@ -2092,5 +2092,26 @@ mod tests {
         ])) {
             proptest::prop_assert_eq!(result.as_key(), key);
         }
+
+        /// Every bite `exchange_bite` reports moves a positive amount that
+        /// lowers the holder's energy by exactly that amount, for any `f32`
+        /// bit pattern of `before`, NaN payloads included.
+        #[test]
+        fn exchange_bite_reports_only_a_positive_exact_debit(
+            before in proptest::strategy::Strategy::prop_map(proptest::num::u32::ANY, f32::from_bits),
+            bite in proptest::num::f32::POSITIVE | proptest::num::f32::NORMAL,
+        ) {
+            if let Some((amount, after)) = exchange_bite(before, bite) {
+                proptest::prop_assert!(amount > 0.0);
+                proptest::prop_assert!(after < before);
+                proptest::prop_assert_eq!(after, before - amount);
+            }
+        }
+    }
+
+    #[test]
+    fn exchange_bite_from_a_signaling_nan_moves_nothing() {
+        assert_eq!(exchange_bite(f32::from_bits(0x7F80_0001), 8.0), None);
+        assert_eq!(exchange_bite(f32::INFINITY, 8.0), None);
     }
 }
