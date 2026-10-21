@@ -201,7 +201,7 @@ show the feature wrong.
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-core --test viability` -> 30 passed, first in each commit; `cargo test -p v3-core --features telemetry-seams --lib` -> 2288 passed; `--tests` -> pass; `cargo test --workspace --exclude v3-core` -> pass but `gate_profile_has_no_severe_regression_against_series_references` (`decided_passes` 0 -> 0.000238; the closing epoch re-pin owns it); `npm test` -> 680 passed; clippy, fmt clean.
+- [x] Focused tests: `cargo test -p v3-core --test viability` -> 30 passed, first; `cargo test -p v3-core --features telemetry-seams` -> 2288 lib, all pass; `cargo test --workspace --exclude v3-core` -> pass but `gate_profile_has_no_severe_regression_against_series_references` (`decided_passes` 0 -> 0.000238; the closing epoch re-pin owns it); `npm test` -> 680 passed; check, clippy, fmt clean.
 - [ ] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback), its summary line, output path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Slow tier: `make rust-test-slow` -> `<result>`, recruitment-paths rows re-pinned.
