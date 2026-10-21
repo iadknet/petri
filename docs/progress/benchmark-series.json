@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t27-f01-colour-vision.json",
+    "epoch_baseline": "docs/progress/features/t27-f03-giving-energy.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -83,7 +83,8 @@
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json",
       "docs/progress/features/t25-f09-learned-weight-decay.json",
       "docs/progress/features/t25-f10.json",
-      "docs/progress/features/t27-f01-colour-vision.json"
+      "docs/progress/features/t27-f01-colour-vision.json",
+      "docs/progress/features/t27-f03-giving-energy.json"
     ]
   },
   "goal": {
@@ -184,7 +185,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t27-f01-colour-vision-goal.json",
+    "epoch_baseline": "docs/progress/features/t27-f03-giving-energy-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -242,7 +243,8 @@
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json",
       "docs/progress/features/t25-f09-learned-weight-decay-goal.json",
       "docs/progress/features/t25-f10-goal.json",
-      "docs/progress/features/t27-f01-colour-vision-goal.json"
+      "docs/progress/features/t27-f01-colour-vision-goal.json",
+      "docs/progress/features/t27-f03-giving-energy-goal.json"
     ]
   },
   "goal_worlds_long": {
