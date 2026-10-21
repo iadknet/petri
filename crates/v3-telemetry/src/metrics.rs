@@ -21,7 +21,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
     Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
-use v3_core::contracts::WorldInputKey;
+use v3_core::contracts::{ActionType, WorldInputKey};
 use v3_core::creature::drives::DriveCensus;
 use v3_core::creature::genome::cgp::Scope;
 use v3_core::creature::genome::vote::DirectedVoteKind;
@@ -603,8 +603,6 @@ fn counters(f: &mut Families, s: &SimStats) {
 /// Energy flows, genome carrying and phase wall time.
 fn energy(f: &mut Families, s: &SimStats) {
     let flows = &s.energy_flows;
-    let charges = &flows.action_charges;
-    let failed = &flows.failed_action_effort;
     let mut flow_points: Vec<(String, f64)> = vec![
         ("vm_compute".to_owned(), flows.vm_compute),
         ("priority_bid".to_owned(), flows.priority_bid),
@@ -642,25 +640,19 @@ fn energy(f: &mut Families, s: &SimStats) {
             flows.external_removal_loss,
         ),
         ("gestation_lost".to_owned(), flows.gestation_lost),
-        ("action_charge.noop".to_owned(), charges.noop),
-        ("action_charge.eat".to_owned(), charges.eat),
-        ("action_charge.move".to_owned(), charges.r#move),
-        ("action_charge.reproduce".to_owned(), charges.reproduce),
-        (
-            "action_charge.steal_energy".to_owned(),
-            charges.steal_energy,
-        ),
-        ("failed_action_effort.move".to_owned(), failed.r#move),
-        ("failed_action_effort.eat".to_owned(), failed.eat),
-        (
-            "failed_action_effort.reproduce".to_owned(),
-            failed.reproduce,
-        ),
-        (
-            "failed_action_effort.steal_energy".to_owned(),
-            failed.steal_energy,
-        ),
     ];
+    flow_points.extend(ActionType::ALL.iter().map(|&action| {
+        (
+            format!("action_charge.{}", action.flow_key()),
+            flows.action_charges[action],
+        )
+    }));
+    flow_points.extend(ActionType::ALL.iter().map(|&action| {
+        (
+            format!("failed_action_effort.{}", action.flow_key()),
+            flows.failed_action_effort[action],
+        )
+    }));
     flow_points.extend(
         flows
             .food_intake_by_type

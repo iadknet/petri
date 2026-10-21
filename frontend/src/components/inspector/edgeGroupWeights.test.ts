@@ -21,8 +21,8 @@ describe("compose", () => {
 
 describe("sinkDirection", () => {
 	it("reads a directed vote's direction and nothing else", () => {
-		expect(sinkDirection({ ActionVote: { Move: 3 } })).toBe(3);
-		expect(sinkDirection({ ActionVote: { Reproduce: 5 } })).toBe(5);
+		expect(sinkDirection({ ActionVote: { Directed: ["Move", 3] } })).toBe(3);
+		expect(sinkDirection({ ActionVote: { Directed: ["Reproduce", 5] } })).toBe(5);
 		expect(sinkDirection({ ActionVote: "Eat" })).toBeUndefined();
 		expect(sinkDirection(undefined)).toBeUndefined();
 	});

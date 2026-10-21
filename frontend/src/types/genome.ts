@@ -83,9 +83,7 @@ export interface ComputeNode {
  * `Drive` votes for its directed kind without naming a direction (T11.F30). */
 export type VoteSink =
 	| "Eat"
-	| { Move: number }
-	| { Reproduce: number }
-	| { StealEnergy: number }
+	| { Directed: [DirectedVoteKind, number] }
 	| { Drive: DirectedVoteKind }
 	| "Terminate"
 	| "Decide";
@@ -99,14 +97,6 @@ export type ActionParamField =
 	| "EatLeaveShare"
 	| "ReproduceTransferFraction"
 	| "StealEnergyAmount";
-
-/** Catalog order: the Graph sink order and the VM `field_idx` addressing. */
-export const ACTION_PARAM_FIELDS: readonly ActionParamField[] = Object.freeze([
-	"EatFoodType",
-	"EatLeaveShare",
-	"ReproduceTransferFraction",
-	"StealEnergyAmount",
-]);
 
 export type OutputSinkKind =
 	| { CustomOutput: number }

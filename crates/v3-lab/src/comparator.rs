@@ -2,6 +2,7 @@
 //! `input-opportunity-v1` controllers, never tuned on assay outcomes.
 
 use v3_core::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::{BackendDef, CreatureGenome, VoteSink};
 use v3_core::neighborhood::opportunity::controllers::{
     controller, AUTHORED_REF, RING_INHIBITION, VOTE_NODE,
@@ -46,7 +47,10 @@ pub fn barrier_comparator(founder: &CreatureGenome) -> CreatureGenome {
     };
     for direction in RING_MOVES {
         let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(direction)))
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
+                DirectedVoteKind::Move,
+                direction,
+            )))
             .expect("the fixed catalog holds every move sink");
         graph.push_edge(
             surface,
@@ -111,7 +115,8 @@ mod tests {
         };
         assert_eq!(graph.compute_nodes(), vector.compute_nodes());
         for direction in 0..8u8 {
-            let sink = OutputSinkKind::ActionVote(VoteSink::Move(direction));
+            let sink =
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, direction));
             let edges = &graph.sink(sink).unwrap().inputs;
             let before = &vector.sink(sink).unwrap().inputs;
             let ring: Vec<&GraphEdge> = edges

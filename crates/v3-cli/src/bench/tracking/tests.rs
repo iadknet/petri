@@ -1056,19 +1056,8 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     sim.stats.mortality.record(DeathCause::MeshRamp);
     sim.stats.energy_flows = EnergyFlows {
         food_intake_by_type: vec![0.123456789, -2.0, 0.0],
-        action_charges: ActionCharges {
-            noop: 1.0,
-            eat: 2.0,
-            r#move: 3.0,
-            reproduce: 4.0,
-            steal_energy: 5.0,
-        },
-        failed_action_effort: FailedActionEffort {
-            r#move: 2.5,
-            eat: 1.5,
-            reproduce: 0.25,
-            steal_energy: 4.5,
-        },
+        action_charges: ActionCharges([1.0, 2.0, 3.0, 4.0, 5.0]),
+        failed_action_effort: FailedActionEffort([0.0, 1.5, 2.5, 0.25, 4.5]),
         vm_compute: 7.0,
         priority_bid: 8.0,
         graph_compute: 9.0,
@@ -1114,10 +1103,10 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     assert_eq!(
         serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
         serde_json::json!({
-            "definition": "applied-energy-flows-v3",
+            "definition": "applied-energy-flows-v4",
             "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
             "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
-            "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
+            "failed_action_effort": {"noop": "0.000000", "move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
             "vm_compute": "7.000000", "priority_bid": "8.000000",
             "graph_compute": "9.000000", "mesh_ramp": "9.500000",
             "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
@@ -1183,7 +1172,7 @@ fn action_attempts_sum_every_eat_key_and_report_every_rejection_reason() {
 #[test]
 fn reports_stored_before_effort_pricing_read_the_new_blocks_as_absent() {
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
-    sim.stats.energy_flows.action_charges.r#move = 1.0;
+    sim.stats.energy_flows.action_charges[ActionType::Move] = 1.0;
     let mut stored =
         serde_json::to_value(WorldTracking::observe(&sim).with_transferred_counters(&sim)).unwrap();
     stored.as_object_mut().unwrap().remove("action_attempts");

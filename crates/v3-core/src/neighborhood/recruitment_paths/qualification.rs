@@ -7,6 +7,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
@@ -517,10 +518,10 @@ fn only_east_edge_appended(
 ) -> bool {
     a.compute_nodes() == b.compute_nodes()
         && a.output_sinks().len() == b.output_sinks().len()
-        && a.output_sinks()
-            .iter()
-            .zip(b.output_sinks())
-            .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y)
+        && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
+            x.kind == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, EAST))
+                || x == y
+        })
         && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
             .is_some_and(|edge| accept(&edge.source()) && edge.own_weight() > 0.0)
 }
@@ -596,10 +597,11 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
             only_scaffold_backend_changed(before, after)
                 && a.compute_nodes() == b.compute_nodes()
                 && move_sink(a, 0).inputs.is_empty()
-                && a.output_sinks()
-                    .iter()
-                    .zip(b.output_sinks())
-                    .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)) || x == y)
+                && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
+                    x.kind
+                        == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0))
+                        || x == y
+                })
         },
     );
     vec![ring_added(), north_removed, swap_activation()]
@@ -626,7 +628,7 @@ const VOTE_CUE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 0 };
 /// The reactive program's vote retargeted east: the comparison register into
 /// `Move(E)`.
 const VOTE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 2 };
-const _: () = assert!(VoteSink::Move(EAST).index() == 3);
+const _: () = assert!(VoteSink::Directed(DirectedVoteKind::Move, EAST).index() == 3);
 
 /// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
 /// `expected` and nothing else on the node changes but, on a Graph scaffold,
@@ -957,7 +959,10 @@ mod tests {
     /// The last edge of the `Move(EAST)` sink: the edge the step appended.
     fn born_edge(graph: &CgpGraphBackendDef) -> EdgeOccurrence {
         let east = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
+                DirectedVoteKind::Move,
+                EAST,
+            )))
             .expect("the fixed catalog holds every Move sink");
         let last = graph
             .surface_edges(east)
@@ -1000,7 +1005,10 @@ mod tests {
         let edge = *graph.edge_at(born);
         graph.remove_edge(born);
         let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
+                DirectedVoteKind::Move,
+                0,
+            )))
             .expect("the fixed catalog holds every Move sink");
         graph.push_edge(surface, edge);
 

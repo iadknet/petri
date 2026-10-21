@@ -13,7 +13,7 @@ import {
 describe("vote sink catalog", () => {
 	it("places the three drives between StealEnergy[7] and Terminate", () => {
 		expect(VOTE_SINK_COUNT).toBe(30);
-		expect(voteSinkFromIndex(24)).toEqual({ StealEnergy: 7 });
+		expect(voteSinkFromIndex(24)).toEqual({ Directed: ["StealEnergy", 7] });
 		expect(voteSinkFromIndex(25)).toEqual({ Drive: "Move" });
 		expect(voteSinkFromIndex(26)).toEqual({ Drive: "Reproduce" });
 		expect(voteSinkFromIndex(27)).toEqual({ Drive: "StealEnergy" });

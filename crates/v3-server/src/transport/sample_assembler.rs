@@ -224,6 +224,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
 #[cfg(test)]
 mod tests {
     use super::*;
+    use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::vote::{VoteSink, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphOutputSinkTrace, GraphTrace, MeshHopTrace,
@@ -400,9 +401,9 @@ mod tests {
                         votes: [1.0; VOTE_SINK_COUNT],
                         best: [
                             VoteSink::Eat,
-                            VoteSink::Move(2),
-                            VoteSink::Reproduce(0),
-                            VoteSink::StealEnergy(7),
+                            VoteSink::Directed(DirectedVoteKind::Move, 2),
+                            VoteSink::Directed(DirectedVoteKind::Reproduce, 0),
+                            VoteSink::Directed(DirectedVoteKind::StealEnergy, 7),
                         ],
                         bars: [0; VOTE_KIND_COUNT],
                         effective_votes: [1.0; VOTE_KIND_COUNT],
@@ -461,7 +462,7 @@ mod tests {
         assert_eq!(json["heading"], "SE");
         assert_eq!(
             json["passes"][0]["best"],
-            serde_json::json!(["Eat", {"Move": 2}, {"Reproduce": 0}, {"StealEnergy": 7}])
+            serde_json::json!(["Eat", {"Directed": ["Move", 2]}, {"Directed": ["Reproduce", 0]}, {"Directed": ["StealEnergy", 7]}])
         );
         assert_eq!(json["passes"][1]["bars"], serde_json::json!([1, 0, 0, 0]));
         assert_eq!(

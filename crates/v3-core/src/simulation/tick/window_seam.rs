@@ -129,13 +129,8 @@ pub(super) struct FlowMarks {
 
 impl FlowMarks {
     pub(super) fn of(flows: &EnergyFlows) -> Self {
-        let charges = &flows.action_charges;
         Self {
-            charge: charges.noop
-                + charges.eat
-                + charges.r#move
-                + charges.reproduce
-                + charges.steal_energy,
+            charge: flows.action_charges.total(),
             reward: flows.food_intake_by_type.iter().sum::<f64>()
                 + flows.predation_attacker_credit
                 + flows.predation_kill_bonus_credit,

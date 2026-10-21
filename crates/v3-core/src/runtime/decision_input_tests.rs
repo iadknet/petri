@@ -6,6 +6,7 @@
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, WorldAction};
 use crate::creature::genome::cgp::GraphSource;
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::VmInstruction;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
@@ -74,7 +75,7 @@ fn v1_lateral_inhibition(read: bool) -> crate::creature::genome::CreatureGenome 
             },
             VmInstruction::Sub { dst: 2, a: 1, b: 0 },
             VmInstruction::AddVote {
-                sink: VoteSink::Move(N).index() as u8,
+                sink: VoteSink::Directed(DirectedVoteKind::Move, N).index() as u8,
                 src: 2,
             },
             VmInstruction::Halt,
@@ -111,7 +112,10 @@ fn v1_action_votes_let_a_committed_vote_inhibit_a_later_node() {
         TerminationReason::NoDecision
     );
     // B read A's committed Eat vote: its Move N vote is 1 - 1 = 0.
-    assert_eq!(tick.passes[0].votes[VoteSink::Move(N).index()], 0.0);
+    assert_eq!(
+        tick.passes[0].votes[VoteSink::Directed(DirectedVoteKind::Move, N).index()],
+        0.0
+    );
 }
 
 /// V2: one graph node votes `Eat 1` and `Move N = PreviousPassVotes[Eat]`.
@@ -120,7 +124,10 @@ fn v2_decision_history(read: bool) -> crate::creature::genome::CreatureGenome {
     let one = graph.constant(1.0);
     let previous_eat = leaf_or_zero(&mut graph, read, eat_sub());
     graph.vote(VoteSink::Eat, &[(one, 1.0)]);
-    graph.vote(VoteSink::Move(N), &[(previous_eat, 1.0)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::Move, N),
+        &[(previous_eat, 1.0)],
+    );
     genome(vec![graph.build(
         0,
         vec![InputReference::PreviousPassVotes],
@@ -149,8 +156,14 @@ fn v2_previous_pass_votes_carry_the_last_pass_decision_into_the_next() {
     assert_eq!(tick.actions(), &[eat(), move_n()]);
     assert_eq!(tick.committed(), vec![Some(eat()), Some(move_n()), None]);
     // Pass one reads zeros; pass two reads pass one's Eat vote.
-    assert_eq!(tick.passes[0].votes[VoteSink::Move(N).index()], 0.0);
-    assert_eq!(tick.passes[1].votes[VoteSink::Move(N).index()], 1.0);
+    assert_eq!(
+        tick.passes[0].votes[VoteSink::Directed(DirectedVoteKind::Move, N).index()],
+        0.0
+    );
+    assert_eq!(
+        tick.passes[1].votes[VoteSink::Directed(DirectedVoteKind::Move, N).index()],
+        1.0
+    );
     assert_eq!(
         tick.output.termination_reason,
         TerminationReason::NoDecision
@@ -208,7 +221,7 @@ fn v4_deliberation_cost(read: bool) -> crate::creature::genome::CreatureGenome {
                 const_idx: 0,
             },
             VmInstruction::AddVote {
-                sink: VoteSink::Move(N).index() as u8,
+                sink: VoteSink::Directed(DirectedVoteKind::Move, N).index() as u8,
                 src: 0,
             },
             read_or_zero(read, 1, 0, 2),

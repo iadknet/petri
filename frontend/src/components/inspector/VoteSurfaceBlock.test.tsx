@@ -34,7 +34,12 @@ function zeroVotes(): number[] {
 }
 
 /** Each kind's best sink under heading `N` with no votes. */
-const NORTH_BEST: readonly VoteSink[] = ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }];
+const NORTH_BEST: readonly VoteSink[] = [
+	"Eat",
+	{ Directed: ["Move", 0] },
+	{ Directed: ["Reproduce", 0] },
+	{ Directed: ["StealEnergy", 0] },
+];
 
 function makePass(
 	fields: Partial<MeshPassTrace> & Pick<MeshPassTrace, "pass_index">,
@@ -103,7 +108,12 @@ describe("VoteSurfaceBlock", () => {
 						makePass({
 							pass_index: 0,
 							votes,
-							best: ["Eat", { Move: 3 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+							best: [
+								"Eat",
+								{ Directed: ["Move", 3] },
+								{ Directed: ["Reproduce", 0] },
+								{ Directed: ["StealEnergy", 0] },
+							],
 							bars: [0, 2, 0, 0],
 							// Deliberately not drive + best − bar: the view must show what was recorded.
 							effective_votes: [0, 0.125, 0, 0],
@@ -132,7 +142,12 @@ describe("VoteSurfaceBlock", () => {
 						makePass({
 							pass_index: 0,
 							votes,
-							best: ["Eat", { Move: 0 }, { Reproduce: 1 }, { StealEnergy: 0 }],
+							best: [
+								"Eat",
+								{ Directed: ["Move", 0] },
+								{ Directed: ["Reproduce", 1] },
+								{ Directed: ["StealEnergy", 0] },
+							],
 							effective_votes: [0, 0, 0.7, 0],
 							committed: { Reproduce: { direction: "NE", energy_transfer_fraction: 0 } },
 						}),
@@ -178,7 +193,12 @@ describe("VoteSurfaceBlock", () => {
 		const votes = zeroVotes();
 		votes[3] = 0.52; // Move[2]
 		votes[11] = 0.026; // Reproduce[2]
-		const best: VoteSink[] = ["Eat", { Move: 2 }, { Reproduce: 2 }, { StealEnergy: 0 }];
+		const best: VoteSink[] = [
+			"Eat",
+			{ Directed: ["Move", 2] },
+			{ Directed: ["Reproduce", 2] },
+			{ Directed: ["StealEnergy", 0] },
+		];
 		const pass = (
 			pass_index: number,
 			bars: number[],

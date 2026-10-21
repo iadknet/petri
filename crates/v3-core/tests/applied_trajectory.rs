@@ -167,6 +167,12 @@
 //! 449159b3... -> 95ef1cbb...; guard 15de1150... -> c7e77b62..., rate 0.0
 //! 919473fb... -> 7488a15f...). With `mutation.per_unit_rate` 0 the sampled
 //! run is byte-identical (bd8dca14..., gestation rate 0.0 d3b71fcd...).
+//! Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug` shape):
+//! a directed vote sink serializes as `{"Directed":["Move",3]}` where
+//! `{"Move":3}` stood, which moves the two sampled digests (a5a9f6e4... ->
+//! e73790b0..., gestation rate 0.0 95ef1cbb... -> 7ce96421...); the guard
+//! digests hold, and mapping the genome text back to the old shape restores
+//! both old sampled digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -178,11 +184,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "a5a9f6e4da13cace123302810025f8b3751be33b9ecf5657e5dd4920bf493fd1"
+        "e73790b01711f0f1cc8ad3ff5acc816d6fdcc5f3fcbfc5d99ade84c306a30971"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "95ef1cbb91fd84ffb9e8ab776c92bf4849039819efe0d2f6bf0bfc7e58d73398"
+        "7ce96421b0ed9d4bae1e28b97519548b174baec5a32c819ad17c40c3db52b96d"
     );
 }
 

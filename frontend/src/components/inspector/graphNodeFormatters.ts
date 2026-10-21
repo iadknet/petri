@@ -1,15 +1,14 @@
-import {
-	ACTION_PARAM_FIELDS,
-	type ActionParamField,
-	type ComputeNodeKind,
-	type GraphSource,
-	type InputReference,
-	type OutputSinkKind,
-	type VoteSink,
+import type {
+	ActionParamField,
+	ComputeNodeKind,
+	GraphSource,
+	InputReference,
+	OutputSinkKind,
+	VoteSink,
 } from "../../types/genome.ts";
 import { directionWord } from "./directions.ts";
 import { describeInputRef } from "./inputRefUtils.ts";
-import { formatVoteSink } from "./voteSinks.ts";
+import { ACTION_PARAM_FIELDS, formatVoteSink } from "./voteSinks.ts";
 
 export {
 	driveSinkIndex,

@@ -592,6 +592,7 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction, WorldInputKey};
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -955,9 +956,9 @@ mod tests {
         use crate::creature::genome::vote::VoteSink;
         let sink = match action_type {
             1 => Some(VoteSink::Eat),
-            2 => Some(VoteSink::Move(0)),
-            3 => Some(VoteSink::Reproduce(0)),
-            4 => Some(VoteSink::StealEnergy(0)),
+            2 => Some(VoteSink::Directed(DirectedVoteKind::Move, 0)),
+            3 => Some(VoteSink::Directed(DirectedVoteKind::Reproduce, 0)),
+            4 => Some(VoteSink::Directed(DirectedVoteKind::StealEnergy, 0)),
             _ => None,
         };
         let mut program = Vec::new();

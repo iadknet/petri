@@ -12,6 +12,7 @@ use crate::contracts::{
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
@@ -278,7 +279,7 @@ fn a_vote_or_parameter_edge_alone_enters_a_visit() {
     for (label, kind) in [
         (
             "vote edge only",
-            OutputSinkKind::ActionVote(VoteSink::Move(3)),
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 3)),
         ),
         (
             "parameter edge only",
@@ -309,7 +310,7 @@ fn wired_blank_detour_forwards_its_bus_and_executes_its_successor() {
     // 0.75 of the leaf: one commit.
     wire(
         &mut successor,
-        OutputSinkKind::ActionVote(VoteSink::Move(3)),
+        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 3)),
         leaf(0.25),
     );
 
@@ -517,7 +518,7 @@ fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendD
         3 => wire(&mut def, OutputSinkKind::ClearSlot(slot % 16), edge),
         4 => wire(
             &mut def,
-            OutputSinkKind::ActionVote(VoteSink::Move(slot % 8)),
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, slot % 8)),
             edge,
         ),
         5 => wire(

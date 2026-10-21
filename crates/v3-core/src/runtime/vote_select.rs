@@ -115,22 +115,31 @@ mod tests {
     fn founder_forage_pass_one_commits_eat_over_the_best_move() {
         let votes = votes_with(&[
             (VoteSink::Eat, 1.0),
-            (VoteSink::Move(0), 0.58),
-            (VoteSink::Move(2), 0.86),
-            (VoteSink::Move(4), 0.54),
-            (VoteSink::Move(6), 0.66),
+            (VoteSink::Directed(DirectedVoteKind::Move, 0), 0.58),
+            (VoteSink::Directed(DirectedVoteKind::Move, 2), 0.86),
+            (VoteSink::Directed(DirectedVoteKind::Move, 4), 0.54),
+            (VoteSink::Directed(DirectedVoteKind::Move, 6), 0.66),
         ]);
         let selection = select(&votes, &[0; 4], None, N);
         assert_eq!(selection.committed(), Some((VoteSink::Eat, 1.0)));
-        assert_eq!(selection.best[VoteKind::Move.index()], VoteSink::Move(2));
+        assert_eq!(
+            selection.best[VoteKind::Move.index()],
+            VoteSink::Directed(DirectedVoteKind::Move, 2)
+        );
         let second = select(&votes, &[1, 0, 0, 0], Some(VoteKind::Eat), N);
         assert_eq!(second.winner, Some(VoteKind::Move));
-        assert_eq!(second.best[VoteKind::Move.index()], VoteSink::Move(2));
+        assert_eq!(
+            second.best[VoteKind::Move.index()],
+            VoteSink::Directed(DirectedVoteKind::Move, 2)
+        );
     }
 
     #[test]
     fn a_kind_tie_goes_to_the_previous_kind_then_the_lowest_index() {
-        let votes = votes_with(&[(VoteSink::Eat, 1.0), (VoteSink::Move(2), 1.0)]);
+        let votes = votes_with(&[
+            (VoteSink::Eat, 1.0),
+            (VoteSink::Directed(DirectedVoteKind::Move, 2), 1.0),
+        ]);
         assert_eq!(select(&votes, &[0; 4], None, N).winner, Some(VoteKind::Eat));
         assert_eq!(
             select(&votes, &[0; 4], Some(VoteKind::Move), N).winner,
@@ -147,7 +156,7 @@ mod tests {
     fn nothing_positive_selects_nothing() {
         let votes = votes_with(&[(VoteSink::Terminate, 5.0), (VoteSink::Decide, 5.0)]);
         assert_eq!(select(&votes, &[0; 4], None, N).winner, None);
-        let votes = votes_with(&[(VoteSink::Move(1), 1.0)]);
+        let votes = votes_with(&[(VoteSink::Directed(DirectedVoteKind::Move, 1), 1.0)]);
         assert_eq!(select(&votes, &[0, 1, 0, 0], None, N).winner, None);
     }
 
@@ -166,34 +175,55 @@ mod tests {
     fn a_tie_goes_to_the_first_tied_sink_clockwise_from_the_heading() {
         // Tied at N (0) and SE (3): from NE the walk meets SE first; from SW
         // it wraps to N.
-        let votes = votes_with(&[(VoteSink::Move(0), 1.0), (VoteSink::Move(3), 1.0)]);
+        let votes = votes_with(&[
+            (VoteSink::Directed(DirectedVoteKind::Move, 0), 1.0),
+            (VoteSink::Directed(DirectedVoteKind::Move, 3), 1.0),
+        ]);
         let best = |heading| select(&votes, &[0; 4], None, heading).best[VoteKind::Move.index()];
-        assert_eq!(best(Direction::NE), VoteSink::Move(3));
-        assert_eq!(best(Direction::SE), VoteSink::Move(3));
-        assert_eq!(best(Direction::SW), VoteSink::Move(0));
-        assert_eq!(best(Direction::N), VoteSink::Move(0));
+        assert_eq!(
+            best(Direction::NE),
+            VoteSink::Directed(DirectedVoteKind::Move, 3)
+        );
+        assert_eq!(
+            best(Direction::SE),
+            VoteSink::Directed(DirectedVoteKind::Move, 3)
+        );
+        assert_eq!(
+            best(Direction::SW),
+            VoteSink::Directed(DirectedVoteKind::Move, 0)
+        );
+        assert_eq!(
+            best(Direction::N),
+            VoteSink::Directed(DirectedVoteKind::Move, 0)
+        );
         // A strict maximum wins whatever the heading.
-        let votes = votes_with(&[(VoteSink::Move(0), 1.0), (VoteSink::Move(3), 2.0)]);
+        let votes = votes_with(&[
+            (VoteSink::Directed(DirectedVoteKind::Move, 0), 1.0),
+            (VoteSink::Directed(DirectedVoteKind::Move, 3), 2.0),
+        ]);
         assert_eq!(
             select(&votes, &[0; 4], None, Direction::NW).best[VoteKind::Move.index()],
-            VoteSink::Move(3)
+            VoteSink::Directed(DirectedVoteKind::Move, 3)
         );
     }
 
     #[test]
     fn the_drive_adds_to_the_best_direction_and_is_never_best() {
         let votes = votes_with(&[
-            (VoteSink::Move(5), 0.4),
+            (VoteSink::Directed(DirectedVoteKind::Move, 5), 0.4),
             (VoteSink::Drive(DirectedVoteKind::Move), 0.7),
             (VoteSink::Eat, 1.0),
         ]);
         let selection = select(&votes, &[0; 4], None, N);
-        assert_eq!(selection.best[VoteKind::Move.index()], VoteSink::Move(5));
+        assert_eq!(
+            selection.best[VoteKind::Move.index()],
+            VoteSink::Directed(DirectedVoteKind::Move, 5)
+        );
         assert_eq!(selection.effective[VoteKind::Move.index()], 0.7 + 0.4);
         assert_eq!(selection.winner, Some(VoteKind::Move));
         // A negative drive suppresses the kind.
         let votes = votes_with(&[
-            (VoteSink::Reproduce(2), 1.0),
+            (VoteSink::Directed(DirectedVoteKind::Reproduce, 2), 1.0),
             (VoteSink::Drive(DirectedVoteKind::Reproduce), -1.5),
         ]);
         assert_eq!(select(&votes, &[0; 4], None, N).winner, None);
