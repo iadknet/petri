@@ -27,7 +27,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
 - [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
   - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
-- [ ] **T27.F03 — Giving Energy** — Depends on: T26.F01
+- [x] **T27.F03 — Giving Energy** — Depends on: T26.F01
   - Goal: Trophallaxis and parental feeding: a creature can pass a mouthful of energy to a neighbour, and stealing takes a mouthful the same way, so care and exploitation are both possible.
 
 ## Notes for AI Agents

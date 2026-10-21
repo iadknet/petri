@@ -1,6 +1,6 @@
 # T27.F03 — Giving Energy
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-21
 **Feature**: T27.F03
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
@@ -197,7 +197,7 @@ show the feature wrong.
 - [x] Commit 1 (catalog, behavior-preserving, tests first): invariants 1, 2 and 3; `PROTOCOL_VERSION` `v3alpha13` and its history line, `GENOME_FORMAT` 8 (6); the reference docs' `Directed` shape (9); the text fingerprints of invariant 8's first row re-pinned with the cause "sink serde and `Debug` shape"; the applied guard, every founder digest and every behavior reading unmoved (8). Verified by the catalog index tests, the fixture pin, the frontend parity tests, a creature-window assertion over the iterated charge sum, `tests/applied_trajectory.rs`'s applied guard and `cargo test -p v3-core`.
 - [x] Commit 2 (the bite and the zero-transfer fix; depends on commit 1): invariant 4; the steal column of the rules table with its ledger, `NaN` and sub-resolution tests (5); `GENOME_FORMAT` 9 and the history line (6); the reference-doc sentences, the post-action removal one included (9); every mutation-on pin re-pinned with the causes "field draws `0..3`, sink surface 97, steal transfers the bite", founder-only pins unmoved (8). Verified by the predation tests (`Transferred` only with a positive transfer, `RejectedNoVictim` on an exhausted victim, the flow pair), `tests/viability.rs` and `cargo test -p v3-core`.
 - [x] Commit 3 (giving; depends on commit 2): the give column of the rules table, `giving.rs`, death causes, action-log result (5); counting and versions (6); reach (7); the reference docs' sizes and steps (9); every mutation-on pin re-pinned with the causes "kind draws `0..4`, sink draws 39 / 106, sub-index widths", founder-only pins unmoved (8). Verified by the give fixture (a gift credited and capped, each side's applied booking, `NoRecipient`, `EnergyConstraints`, a giver exhausted by its gift and removed after its dispatch), the creature-window assertion over a give's charge, the telemetry family tests, `tests/viability.rs` and `cargo test -p v3-core`.
-- [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
+- [x] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
@@ -205,7 +205,8 @@ show the feature wrong.
 - [x] Three-world pressure: `exchange.bite` 8.0 in Orchards, Canyon and Confluence (no world file overrides it); per world the `giving` and `predation` blocks, the gift and predation flows, kills and the `gift` / `action_give_energy` / `action_steal_energy` deaths, zero included, in the readings file.
 - [x] Mutation gate: fresh `make rust-mutants-ci`, 16 survivors resolved (table below; runs in the readings file).
 - [x] Slow tier: `make rust-test-slow` -> 9 passed; Graph Drift pin 15 -> 16.
-- [ ] Gate and goal: measured (see Performance). Open: series entries, epoch re-pin on acceptance.
+- [x] Gate and goal: measured (see Performance); user accepted both severes, epochs re-pinned at 563cf5d3.
+- [x] `make check` exit 0 at b23dafc3.
 
 | Mutation gate | Record |
 | --- | --- |
@@ -283,10 +284,10 @@ Flow pairs match to rounding and no `Transferred` lacks a flow; no extinction; b
 
 ## Success Criteria
 
-- [ ] A brain can vote `GiveEnergy` toward a direction; a committed give moves `min(bite, giver energy)` to the creature there, booked as `gift_debit` / `gift_credit` with any excess over the cap as clamp loss, and a give with no recipient or nothing to give fails and pays the floor.
-- [ ] A committed steal moves `min(bite, victim energy)`; `StealEnergyAmount` is gone; no `Transferred` is counted without a positive transfer.
-- [ ] `VoteSink::Directed`, `vote-sinks.json` and the `ActionType`-indexed charge arrays are the one catalog; the frontend keeps no hand copy.
-- [ ] The three goal worlds report their `giving` and `predation` occurrences, zero included; viability, gate, goal, mutation gate and slow tier ran as declared.
+- [x] A brain can vote `GiveEnergy` toward a direction; a committed give moves `min(bite, giver energy)` to the creature there, booked as `gift_debit` / `gift_credit` with any excess over the cap as clamp loss, and a give with no recipient or nothing to give fails and pays the floor.
+- [x] A committed steal moves `min(bite, victim energy)`; `StealEnergyAmount` is gone; no `Transferred` is counted without a positive transfer.
+- [x] `VoteSink::Directed`, `vote-sinks.json` and the `ActionType`-indexed charge arrays are the one catalog; the frontend keeps no hand copy.
+- [x] The three goal worlds report their `giving` and `predation` occurrences, zero included; viability, gate, goal, mutation gate and slow tier ran as declared.
 
 ## Notes for AI Agents
 
