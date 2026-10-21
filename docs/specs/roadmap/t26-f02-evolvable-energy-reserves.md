@@ -206,31 +206,31 @@ cost flows read as negligible would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Config: `EnergyCapacityConfig`, `CapacityMutationConfig`, `max_energy`
+- [x] Config: `EnergyCapacityConfig`, `CapacityMutationConfig`, `max_energy`
       800, normalization and its tests.
-- [ ] Body: `capacity`, `founder(.., capacity)`, `inherit` with the
+- [x] Body: `capacity`, `founder(.., capacity)`, `inherit` with the
       capacity draws, `move_factor` and `upkeep`, property tests for the
       neutral point, the bounds, positivity and the draw order.
-- [ ] Cap and move rules read the body (invariants 3–4); characterization
+- [x] Cap and move rules read the body (invariants 3–4); characterization
       tests at the reference; the lab oracles re-derived.
-- [ ] Phase 0 `Phase0Charge`, `capacity_upkeep`, `DeathCause::CapacityUpkeep`
+- [x] Phase 0 `Phase0Charge`, `capacity_upkeep`, `DeathCause::CapacityUpkeep`
       and the booking and attribution tests (invariant 5).
-- [ ] Birth cap step, `offspring_capacity_overflow`, the required fixture and
+- [x] Birth cap step, `offspring_capacity_overflow`, the required fixture and
       the ledger identity test (invariant 7).
-- [ ] Sensor scale: the per-creature `energy_scale` under both
+- [x] Sensor scale: the per-creature `energy_scale` under both
       `sensor_scale` values at the read sites and their tests (invariant 6).
-- [ ] Lab, server detail doc, frontend bar scale, config types and panel
+- [x] Lab, server detail doc, frontend bar scale, config types and panel
       group (invariant 11).
-- [ ] Telemetry: the two flows, the cause, the three phase groups'
+- [x] Telemetry: the two flows, the cause, the three phase groups'
       attributes, the family and dashboards-check rows.
-- [ ] Bench: `CapacityDistribution` in `PopulationReadings` and
+- [x] Bench: `CapacityDistribution` in `PopulationReadings` and
       `PersistenceSample`; the two flows in `EnergyFlowTracking`'s mapping;
       schema and tests.
-- [ ] Reference docs: `v3-runtime-config-spec.md` §4, `v3-sensor-spec.md`,
+- [x] Reference docs: `v3-runtime-config-spec.md` §4, `v3-sensor-spec.md`,
       `v3-tick-orchestration-spec.md` §3, `v3-reproduction-spec.md` steps
       11–14, `v3-startup-seeding-spec.md` §5.1,
       `v3-server-api-protocol-spec.md`.
-- [ ] `cargo test -p v3-core --test viability` first; re-pin the trajectory
+- [x] `cargo test -p v3-core --test viability` first; re-pin the trajectory
       and reproducibility pins as predeclared.
 - [ ] Comparison, the `sensor_scale` ruling recorded in invariant 6, then
       the sweep (invariant 9); the chosen scale, β and u set as defaults.
@@ -238,9 +238,10 @@ cost flows read as negligible would show it wrong.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> `<result>`.
-- [ ] Focused tests (body rules, Phase 0 booking, birth fixture and ledger
-      identity, sensor scale, lab `validate`, bench block) -> `<results>`.
+- [x] `cargo test -p v3-core --test viability` -> 30 passed (re-pinned).
+- [x] Focused tests -> all touched crates pass but v3-cli
+      `gate_profile_has_no_severe_regression_against_series_references`
+      (awaits the gate epoch re-pin).
 - [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, summary
       line, output path, every survivor resolved as killed, equivalent, or

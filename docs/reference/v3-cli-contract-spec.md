@@ -195,6 +195,16 @@ initialized, drift_sum, at_bound}` for the keys `none` (retention exactly
 retention`); drift and at-bound read initialized entries, and both lists
 are empty in a block stored before T25.F09.
 
+From T26.F02 every persistence checkpoint sample carries `capacity`, the
+living population's heritable energy capacity: `min`, `p10`, `median`,
+`p90`, `max` (nearest-rank: the `q` percentile is the capacity at rank
+`ceil(q × n)`), `mean`, and `at_min_fraction` and `at_max_fraction`, the
+shares whose capacity equals `energy.capacity.min` and
+`energy.lifecycle.max_energy`. It is `null` at extinction and absent in
+samples stored before T26.F02. The case `energy_flows` block adds the
+signed `capacity_upkeep` and `offspring_capacity_overflow`, absent before
+T26.F02.
+
 Beside `goal_indicators.memory_sensitivity`, optional `structural_companions`
 carries `per_seed` rows with `seed`, `final_creature_count`,
 `reads_shared_memory`, `writes_shared_memory`, `has_stateful_compute_node`, and
