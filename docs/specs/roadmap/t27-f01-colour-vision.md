@@ -172,9 +172,8 @@ the F09 epoch 0.0026384 (+17.6%), inside the 25% flag band; one counter flag,
 `vm_steps` 0.040014 vs 0.031219 (+28.2%). Goal: v3-cli exit 3
 (`measurement_evidence.cli_exit`, successful artifact pair with a severe),
 outer `make` exit 2 (`Error 3`); `severe=true`, one severe: `decided_passes`
-0.003873 vs 0.002251 (+72.1%, severe at 50%), a trajectory reading under the
-changed draw stream with no predeclared direction, to be reported to the user
-and re-pinned at closure; two flags, `graph_relax_iters` +10.4% and
+0.003873 vs 0.002251 (+72.1%, severe at 50%), which the user accepted
+(2026-10-21) as a trajectory reading; both epochs re-pinned here; two flags, `graph_relax_iters` +10.4% and
 `actions_applied` +12.9%; goal wall clock 0.0125132 vs 0.0093403 (+34.0%,
 `flag`, not fatal). Colour-channel use rows (descriptive): the founder cohort
 declares none; at tick 2000 the selected cohorts show causal colour use only in
