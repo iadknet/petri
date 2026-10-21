@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::mem::size_of;
 
+use crate::config::{EnergyConfig, EnergyLifecycleConfig};
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::body::HeritableBody;
@@ -283,6 +284,22 @@ impl CreatureState {
             self.lifetime_eats_applied_by_type.resize(index + 1, 0);
         }
         self.lifetime_eats_applied_by_type[index] += 1;
+    }
+
+    /// The upper energy bound a credit is capped at (T26.F01 body rule):
+    /// `lifecycle.max_energy` for every creature today. Read only by the
+    /// action layer's cap step.
+    #[must_use]
+    pub fn energy_cap(&self, lifecycle: &EnergyLifecycleConfig) -> f32 {
+        lifecycle.max_energy
+    }
+
+    /// The effort one move charges this creature, successful or blocked
+    /// (T26.F01 body rule): the move base through
+    /// [`EnergyConfig::action_effort`] at this creature's complexity and age.
+    #[must_use]
+    pub fn move_effort(&self, energy: &EnergyConfig) -> f32 {
+        energy.action_effort(energy.costs.move_cost, self.cached_complexity, self.age)
     }
 
     /// Observe the already-applied arithmetic without changing the stored energy.

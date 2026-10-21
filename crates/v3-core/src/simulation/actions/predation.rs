@@ -107,14 +107,12 @@ pub fn apply_steal_energy(
     sim.stats.energy_flows.predation_attacker_credit -=
         attacker.observe_energy(before, DeathCause::Predation);
 
-    // Step 7: Cap attacker energy at max.
-    let max_energy = sim.config.energy.lifecycle.max_energy;
-    if sim.creatures[attacker_id].energy > max_energy {
-        let before = sim.creatures[attacker_id].energy;
-        sim.creatures[attacker_id].energy = max_energy;
-        sim.stats.energy_flows.maximum_energy_clamp_loss +=
-            crate::simulation::energy_accounting::applied_debit(before, max_energy);
-    }
+    // Step 7: Cap attacker energy at its body's cap.
+    super::cap_energy(
+        &mut sim.creatures[attacker_id],
+        &sim.config.energy.lifecycle,
+        &mut sim.stats.energy_flows,
+    );
 
     // Step 8: Check kill.
     if sim.creatures[victim_id].energy <= 0.0 {
@@ -130,12 +128,11 @@ pub fn apply_steal_energy(
         attacker.energy += bonus;
         sim.stats.energy_flows.predation_kill_bonus_credit -=
             attacker.observe_energy(before, DeathCause::Predation);
-        if sim.creatures[attacker_id].energy > max_energy {
-            let before = sim.creatures[attacker_id].energy;
-            sim.creatures[attacker_id].energy = max_energy;
-            sim.stats.energy_flows.maximum_energy_clamp_loss +=
-                crate::simulation::energy_accounting::applied_debit(before, max_energy);
-        }
+        super::cap_energy(
+            &mut sim.creatures[attacker_id],
+            &sim.config.energy.lifecycle,
+            &mut sim.stats.energy_flows,
+        );
 
         // Remove victim from world, slotmap, and action logs.
         sim.remove_creature(victim_id);
