@@ -180,6 +180,13 @@
 //! 7ce96421... -> c902c7b9...) and the default guard (c7e77b62... ->
 //! 9ad87b36...); the rate-0.0 guard holds (7488a15f...), and the
 //! founder-only viability digests hold.
+//! Re-pinned by T27.F03 commit 3 after two agreeing runs: `GiveEnergy`
+//! joins the catalog (kind draws `0..4`, `RetargetGroupKind` `0..3`, sink
+//! draws 39 / 106, the widened decision sub-index draws), which moves the
+//! sampled digests (aaf02e29... -> 08c117b1..., gestation rate 0.0
+//! c902c7b9... -> ac404138...) and the rate-0.0 guard (7488a15f... ->
+//! fbbd2128...); the default guard holds (9ad87b36...), and the
+//! founder-only viability digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -191,11 +198,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "aaf02e29e0d7e3bd1958777c3ecc474e0e225a68bd53daa1c4d274c8e4e259c6"
+        "08c117b15af2859478d44822cae8ca937dee35a90c6b13836b4785f1e50e9c42"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "c902c7b930dbe7e0873c65735a1adc9209ab8d8732185d07613467f4846808a8"
+        "ac40413841e591b06ed99bad806ab9ab3a0a4d155631fe8f5f9f72f1d58ded1e"
     );
 }
 
@@ -272,7 +279,7 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "7488a15fcd86a374eb979867a7c9e18d5787fc63d2fc49ea4ae39fc85a513ca0"
+        "fbbd2128664fe2781e5c328b21c0ef231cd63c7c8d6150084296b616674378f6"
     );
 }
 

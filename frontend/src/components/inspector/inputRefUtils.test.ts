@@ -198,7 +198,7 @@ describe("formatInputRefWithSubIndex", () => {
 	it("names decision-state and queue sub-values", () => {
 		expect(formatInputRefWithSubIndex("ActionVotes", 0)).toBe("Votes.Eat");
 		expect(formatInputRefWithSubIndex("ActionVotes", 22)).toBe("Votes.StealEnergy[SW]");
-		expect(formatInputRefWithSubIndex("PreviousPassVotes", 25)).toBe("PrevVotes.Drive Move");
+		expect(formatInputRefWithSubIndex("PreviousPassVotes", 33)).toBe("PrevVotes.Drive Move");
 		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("Commits.Reproduce");
 		expect(formatInputRefWithSubIndex("PreviousOutcome", 0)).toBe("PrevOutcome.energy");
 		expect(formatInputRefWithSubIndex("ActionQueue", 0)).toBe("Queue1.type");

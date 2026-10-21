@@ -243,10 +243,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// fixed steal bite remap the mutation-on run (default 7249815572780154446
 /// -> 4272505042310913195, rate 0.0 5416380403039395140 ->
 /// 1898874401650296998).
+/// Re-pinned by T27.F03 commit 3 after two agreeing runs: the four-kind
+/// group draws, the 39 / 106 sink draws and the widened decision sub-index
+/// draws remap the mutation-on run (default 4272505042310913195 ->
+/// 6792060840251457963, rate 0.0 1898874401650296998 ->
+/// 12748047497881745737).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 4272505042310913195);
-    assert_eq!(short_run_identity(Some(0.0)), 1898874401650296998);
+    assert_eq!(short_run_identity(None), 6792060840251457963);
+    assert_eq!(short_run_identity(Some(0.0)), 12748047497881745737);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

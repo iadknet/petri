@@ -164,6 +164,7 @@ export function MechanicsTab() {
 						eat={lastActions?.eat ?? 0}
 						reproduce={lastActions?.reproduce ?? 0}
 						steal={lastActions?.steal ?? 0}
+						give={lastActions?.give ?? 0}
 						noop={lastActions?.noop ?? 0}
 					/>
 				</div>

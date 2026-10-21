@@ -52,8 +52,8 @@ Compound inputs in v3alpha1:
 - `World(AreaBarrierSummary)` — 7 sub-values
 - `World(AreaOccupancySummary)` — 7 sub-values
 - `World(NearbyCreature)` — 40 sub-values
-- `ActionVotes`, `PreviousPassVotes` — 30 sub-values (Section 3.6)
-- `CommitCounts` — 4 sub-values (Section 3.6)
+- `ActionVotes`, `PreviousPassVotes` — 39 sub-values (Section 3.6)
+- `CommitCounts` — 5 sub-values (Section 3.6)
 - `PreviousOutcome` — 4 sub-values (Section 3.7)
 
 For scalar inputs, `sub_idx` is ignored (the scalar value is returned regardless).
@@ -219,9 +219,9 @@ starts from zeros.
 
 | Reference | Width | Sub-value `i` | Value |
 | --- | --- | --- | --- |
-| `ActionVotes` | 30 | `VoteSink::from_index(i)` | The current pass's vote vector: the sanitized sum of every contribution committed so far this pass. A dispatch sees its own earlier contribution this pass, never the one it is staging. |
-| `PreviousPassVotes` | 30 | same | The vote vector at the previous pass's end; zeros in the tick's first pass. |
-| `CommitCounts` | 4 | `VoteKind` index (Eat, Move, Reproduce, StealEnergy) | The per-kind bar as a raw count: commits of that kind this tick. |
+| `ActionVotes` | 39 | `VoteSink::from_index(i)` | The current pass's vote vector: the sanitized sum of every contribution committed so far this pass. A dispatch sees its own earlier contribution this pass, never the one it is staging. |
+| `PreviousPassVotes` | 39 | same | The vote vector at the previous pass's end; zeros in the tick's first pass. |
+| `CommitCounts` | 5 | `VoteKind` index (Eat, Move, Reproduce, StealEnergy, GiveEnergy) | The per-kind bar as a raw count: commits of that kind this tick. |
 
 ### 3.7 Previous Outcome (Compound, T19.F05)
 

@@ -322,14 +322,15 @@ pub(crate) fn genome_body(genome: &CreatureGenome) -> (String, String) {
 }
 
 /// An applied or selected action as a short string: `noop`, `eat:<type>`,
-/// `move:<dir>`, `reproduce:<dir>`, `steal:<dir>`.
+/// `move:<dir>`, `reproduce:<dir>`, `steal:<dir>`, `give:<dir>`.
 pub(crate) fn action_label(action: &WorldAction) -> String {
     match action {
         WorldAction::NoOp => "noop".to_owned(),
         WorldAction::Eat { type_idx, .. } => format!("eat:{}", type_idx.get()),
         WorldAction::Move(direction) => format!("move:{}", direction.to_index()),
         WorldAction::Reproduce { direction, .. } => format!("reproduce:{}", direction.to_index()),
-        WorldAction::StealEnergy { direction, .. } => format!("steal:{}", direction.to_index()),
+        WorldAction::StealEnergy { direction } => format!("steal:{}", direction.to_index()),
+        WorldAction::GiveEnergy { direction } => format!("give:{}", direction.to_index()),
     }
 }
 

@@ -708,7 +708,7 @@ mod tests {
         assert_eq!(&*state.cached_reachable_nodes, &[0, 2, 5]);
         assert_eq!(state.cached_complexity, 42);
         assert_eq!(state.cached_genome_size, 7);
-        assert_eq!(state.lifetime_actions_attempted_by_type, [0; 5]);
+        assert_eq!(state.lifetime_actions_attempted_by_type, [0; 6]);
         assert!(state.lifetime_eats_applied_by_type.is_empty());
         assert_eq!(state.lifetime_predation_kills_count, 0);
         assert_eq!(state.lifetime_predation_hits_taken_count, 0);
@@ -731,7 +731,7 @@ mod tests {
         state.record_action_attempt(ActionType::Eat);
         state.record_action_attempt(ActionType::Eat);
         assert_eq!(state.lifetime_action_attempted_count, 3);
-        assert_eq!(state.lifetime_actions_attempted_by_type, [0, 2, 0, 0, 1]);
+        assert_eq!(state.lifetime_actions_attempted_by_type, [0, 2, 0, 0, 1, 0]);
         state.record_applied_eat(OrdinaryFoodTypeId::new(2));
         state.record_applied_eat(OrdinaryFoodTypeId::new(0));
         state.record_applied_eat(OrdinaryFoodTypeId::new(2));

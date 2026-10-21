@@ -21,7 +21,8 @@ export const PREDATION_FIELDS: FieldDef[] = [
 		sliderMax: 50,
 		testId: "config-field-exchange-bite",
 		defaultValue: 8.0,
-		tooltip: "Energy one steal takes from the neighbour, at most what it holds",
+		tooltip:
+			"Energy one steal takes from the neighbour, or one give passes to it, at most what the giving side holds",
 	},
 	{
 		path: "predation.kill_complexity_bonus_multiplier",

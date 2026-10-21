@@ -1,13 +1,13 @@
 pub(crate) mod cgp_reproduction;
+mod giving;
 mod predation;
 mod reproduction;
 
 use crate::creature::action_log::ActionType;
+pub use giving::{apply_give_energy, GiveActionResult};
 #[cfg(test)]
 pub(crate) use predation::steal_with_bite;
-pub use predation::{
-    apply_steal_energy, PredationActionResult, PredationEventRecord, TransferOutcome,
-};
+pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
@@ -54,6 +54,16 @@ fn cap_energy(
         flows.maximum_energy_clamp_loss += applied_debit(creature.energy, cap);
         creature.energy = cap;
     }
+}
+
+/// What a transfer action moved: its result, the energy debited from the
+/// side that gives it up, and the counterpart creature, `None` when the target
+/// cell held none.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TransferOutcome<R> {
+    pub result: R,
+    pub amount: f32,
+    pub counterpart: Option<CreatureId>,
 }
 
 /// Classification for rejected move actions.

@@ -560,6 +560,9 @@ fn counters(f: &mut Families, s: &SimStats) {
         predation_actions_transferred_total,
         predation_actions_rejected_total,
         predation_kills_total,
+        give_actions_attempted_total,
+        give_actions_transferred_total,
+        give_actions_rejected_total,
     );
 
     f.scalar(
@@ -630,6 +633,8 @@ fn energy(f: &mut Families, s: &SimStats) {
             "predation_kill_bonus_credit".to_owned(),
             flows.predation_kill_bonus_credit,
         ),
+        ("gift_debit".to_owned(), flows.gift_debit),
+        ("gift_credit".to_owned(), flows.gift_credit),
         (
             "maximum_energy_clamp_loss".to_owned(),
             flows.maximum_energy_clamp_loss,
@@ -896,6 +901,12 @@ fn outcomes(f: &mut Families, s: &SimStats) {
         &s.predation_actions_by_result,
         |k| k.as_key().to_owned(),
     );
+    f.counts(
+        run_name("give_actions_by_result"),
+        "petri.result",
+        &s.give_actions_by_result,
+        |k| k.as_key().to_owned(),
+    );
 }
 
 /// The per-tick values and the census, sampled at the snapshot tick.
@@ -911,6 +922,7 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
             ("noop", s.last_tick_noop),
             ("reproduce", s.last_tick_reproduce),
             ("steal", s.last_tick_steal),
+            ("give", s.last_tick_give),
         ]
         .map(|(action, count)| (vec![("petri.action", action.to_owned())], count.into())),
     );
@@ -1152,6 +1164,7 @@ fn drive_kind_key(kind: DirectedVoteKind) -> &'static str {
         DirectedVoteKind::Move => "move",
         DirectedVoteKind::Reproduce => "reproduce",
         DirectedVoteKind::StealEnergy => "steal_energy",
+        DirectedVoteKind::GiveEnergy => "give_energy",
     }
 }
 

@@ -107,7 +107,7 @@ pub enum OutputSinkKind {
     WriteSlot(u8),
     /// Clear `shared_memory[slot]` to 0.0. 16 slots, indices 0-15.
     ClearSlot(u8),
-    /// Contribute to the pass vote `votes[sink.index()]` (T19.F03). 27 sinks;
+    /// Contribute to the pass vote `votes[sink.index()]` (T19.F03). 39 sinks;
     /// the pass end commits from them (T19.F04).
     ActionVote(VoteSink),
     /// Overwrite `action_params[field.index()]` (T11.F27), read when a pass
@@ -140,11 +140,11 @@ pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 Cus
     + SHARED_MEMORY_SLOTS as usize // 16 WriteSlot sinks
     + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
 const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
-/// Total fixed sink count: the sinks before the vote catalog + 30 ActionVote +
+/// Total fixed sink count: the sinks before the vote catalog + 39 ActionVote +
 /// 3 ActionParam (T11.F27, T02.F08, T27.F03).
 pub const FIXED_SINK_COUNT: usize =
     FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + ACTION_PARAM_FIELD_COUNT;
-const _: () = assert!(FIXED_SINK_COUNT == 97);
+const _: () = assert!(FIXED_SINK_COUNT == 106);
 
 #[cfg(test)]
 mod tests {
@@ -196,10 +196,10 @@ mod tests {
                 OutputSinkKind::ActionVote(sink)
             );
         }
-        // The three parameter sinks occupy 94..97 in `ActionParamField::ALL`
+        // The three parameter sinks occupy 103..106 in `ActionParamField::ALL`
         // order (T11.F27).
         let first_param = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
-        assert_eq!(first_param, 94);
+        assert_eq!(first_param, 103);
         let params: Vec<OutputSinkKind> = def.output_sinks()[first_param..]
             .iter()
             .map(|sink| sink.kind)
@@ -208,7 +208,7 @@ mod tests {
             params,
             ActionParamField::ALL.map(OutputSinkKind::ActionParam)
         );
-        assert_eq!(def.output_sinks().len(), 97);
+        assert_eq!(def.output_sinks().len(), 106);
 
         // All sinks start with empty edges
         for sink in def.output_sinks() {

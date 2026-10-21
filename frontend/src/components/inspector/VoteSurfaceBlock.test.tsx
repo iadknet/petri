@@ -39,6 +39,7 @@ const NORTH_BEST: readonly VoteSink[] = [
 	{ Directed: ["Move", 0] },
 	{ Directed: ["Reproduce", 0] },
 	{ Directed: ["StealEnergy", 0] },
+	{ Directed: ["GiveEnergy", 0] },
 ];
 
 function makePass(
@@ -48,8 +49,8 @@ function makePass(
 		end_reason: "NoTargets",
 		votes: zeroVotes(),
 		best: NORTH_BEST,
-		bars: [0, 0, 0, 0],
-		effective_votes: [0, 0, 0, 0],
+		bars: [0, 0, 0, 0, 0],
+		effective_votes: [0, 0, 0, 0, 0],
 		committed: null,
 		hops: 1,
 		...fields,
@@ -61,7 +62,7 @@ describe("VoteSurfaceBlock", () => {
 		const votes = zeroVotes();
 		votes[0] = 1.5;
 		votes[3] = -2.25;
-		votes[29] = 0.5;
+		votes[38] = 0.5;
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -70,13 +71,13 @@ describe("VoteSurfaceBlock", () => {
 							pass_index: 0,
 							end_reason: "Decided",
 							votes,
-							effective_votes: [1.5, 0, 0, 0],
+							effective_votes: [1.5, 0, 0, 0, 0],
 							committed: { Eat: { type_idx: 0, leave: 0 } },
 							hops: 2,
 						}),
-						makePass({ pass_index: 1, effective_votes: [-1, 0, 0, 0], bars: [1, 0, 0, 0] }),
+						makePass({ pass_index: 1, effective_votes: [-1, 0, 0, 0, 0], bars: [1, 0, 0, 0, 0] }),
 					],
-					[1, 0, 0, 0],
+					[1, 0, 0, 0, 0],
 				)}
 			/>,
 		);
@@ -100,7 +101,7 @@ describe("VoteSurfaceBlock", () => {
 		const votes = zeroVotes();
 		votes[1] = 0.9; // Move[0], tied with Move[3]
 		votes[4] = 0.9; // Move[3], the sink the heading tie recorded
-		votes[25] = 0.4; // Drive Move
+		votes[33] = 0.4; // Drive Move
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -114,12 +115,12 @@ describe("VoteSurfaceBlock", () => {
 								{ Directed: ["Reproduce", 0] },
 								{ Directed: ["StealEnergy", 0] },
 							],
-							bars: [0, 2, 0, 0],
+							bars: [0, 2, 0, 0, 0],
 							// Deliberately not drive + best − bar: the view must show what was recorded.
-							effective_votes: [0, 0.125, 0, 0],
+							effective_votes: [0, 0.125, 0, 0, 0],
 						}),
 					],
-					[0, 2, 0, 0],
+					[0, 2, 0, 0, 0],
 					"SE",
 				)}
 			/>,
@@ -134,7 +135,7 @@ describe("VoteSurfaceBlock", () => {
 
 	it("shows a kind whose only vote is its drive", () => {
 		const votes = zeroVotes();
-		votes[26] = 0.7; // Drive Reproduce
+		votes[34] = 0.7; // Drive Reproduce
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -148,11 +149,11 @@ describe("VoteSurfaceBlock", () => {
 								{ Directed: ["Reproduce", 1] },
 								{ Directed: ["StealEnergy", 0] },
 							],
-							effective_votes: [0, 0, 0.7, 0],
+							effective_votes: [0, 0, 0.7, 0, 0],
 							committed: { Reproduce: { direction: "NE", energy_transfer_fraction: 0 } },
 						}),
 					],
-					[0, 0, 1, 0],
+					[0, 0, 1, 0, 0],
 					"NE",
 				)}
 			/>,
@@ -168,18 +169,18 @@ describe("VoteSurfaceBlock", () => {
 	it("shows Terminate against the winning effective vote on the pass that ends a TerminateVoted tick", () => {
 		const votes = zeroVotes();
 		votes[0] = 0.4;
-		votes[28] = 0.75;
+		votes[37] = 0.75;
 		const tick = makeTick(
 			[
 				makePass({
 					pass_index: 0,
 					votes,
-					bars: [0, 1, 0, 0],
-					effective_votes: [0.4, -1, 0.2, 0],
+					bars: [0, 1, 0, 0, 0],
+					effective_votes: [0.4, -1, 0.2, 0, 0],
 					hops: 3,
 				}),
 			],
-			[0, 1, 0, 0],
+			[0, 1, 0, 0, 0],
 		);
 		tick.termination_reason = "TerminateVoted";
 		render(<VoteSurfaceBlock tick={tick} />);
@@ -210,13 +211,13 @@ describe("VoteSurfaceBlock", () => {
 			<VoteSurfaceBlock
 				tick={makeTick(
 					[
-						pass(0, [0, 0, 0, 0], [0, 0.52, 0.026, 0], { Move: "E" }),
-						pass(1, [0, 1, 0, 0], [0, -0.48, 0.026, 0], {
+						pass(0, [0, 0, 0, 0, 0], [0, 0.52, 0.026, 0, 0], { Move: "E" }),
+						pass(1, [0, 1, 0, 0, 0], [0, -0.48, 0.026, 0, 0], {
 							Reproduce: { direction: "E", energy_transfer_fraction: 0.5 },
 						}),
-						pass(2, [0, 1, 1, 0], [0, -0.48, -0.974, 0], null),
+						pass(2, [0, 1, 1, 0, 0], [0, -0.48, -0.974, 0, 0], null),
 					],
-					[0, 1, 1, 0],
+					[0, 1, 1, 0, 0],
 				)}
 			/>,
 		);
@@ -240,7 +241,7 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("says so when the tick ran no passes, and always shows the four bars", () => {
-		render(<VoteSurfaceBlock tick={makeTick([], [0, 1, 2, 3])} />);
+		render(<VoteSurfaceBlock tick={makeTick([], [0, 1, 2, 3, 0])} />);
 
 		expect(screen.getByText("no passes this tick")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 0")).toBeInTheDocument();

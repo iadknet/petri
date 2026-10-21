@@ -11,16 +11,19 @@ import {
 } from "./graphNodeFormatters.ts";
 
 describe("vote sink catalog", () => {
-	it("places the three drives between StealEnergy[7] and Terminate", () => {
-		expect(VOTE_SINK_COUNT).toBe(30);
+	it("places the four drives between GiveEnergy[7] and Terminate", () => {
+		expect(VOTE_SINK_COUNT).toBe(39);
 		expect(voteSinkFromIndex(24)).toEqual({ Directed: ["StealEnergy", 7] });
-		expect(voteSinkFromIndex(25)).toEqual({ Drive: "Move" });
-		expect(voteSinkFromIndex(26)).toEqual({ Drive: "Reproduce" });
-		expect(voteSinkFromIndex(27)).toEqual({ Drive: "StealEnergy" });
-		expect(voteSinkFromIndex(28)).toBe("Terminate");
-		expect(voteSinkFromIndex(29)).toBe("Decide");
-		expect(voteSinkFromIndex(30)).toBeNull();
-		expect(driveSinkIndex("Reproduce")).toBe(26);
+		expect(voteSinkFromIndex(25)).toEqual({ Directed: ["GiveEnergy", 0] });
+		expect(voteSinkFromIndex(32)).toEqual({ Directed: ["GiveEnergy", 7] });
+		expect(voteSinkFromIndex(33)).toEqual({ Drive: "Move" });
+		expect(voteSinkFromIndex(34)).toEqual({ Drive: "Reproduce" });
+		expect(voteSinkFromIndex(35)).toEqual({ Drive: "StealEnergy" });
+		expect(voteSinkFromIndex(36)).toEqual({ Drive: "GiveEnergy" });
+		expect(voteSinkFromIndex(37)).toBe("Terminate");
+		expect(voteSinkFromIndex(38)).toBe("Decide");
+		expect(voteSinkFromIndex(39)).toBeNull();
+		expect(driveSinkIndex("Reproduce")).toBe(34);
 	});
 
 	it("round-trips every index and names a drive by its kind", () => {
@@ -29,9 +32,10 @@ describe("vote sink catalog", () => {
 			expect(sink).not.toBeNull();
 			if (sink !== null) expect(voteSinkIndex(sink)).toBe(index);
 		}
-		expect(voteSinkLabel(25)).toBe("Drive Move");
-		expect(voteSinkLabel(27)).toBe("Drive StealEnergy");
-		expect(voteSinkLabel(30)).toBe("invalid(30)");
+		expect(voteSinkLabel(33)).toBe("Drive Move");
+		expect(voteSinkLabel(35)).toBe("Drive StealEnergy");
+		expect(voteSinkLabel(26)).toBe("GiveEnergy[NE]");
+		expect(voteSinkLabel(39)).toBe("invalid(39)");
 	});
 
 	it("names a directed sink by its compass direction", () => {

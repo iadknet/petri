@@ -209,7 +209,7 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
     );
     assert_eq!(output.votes.iter().filter(|v| **v != 0.0).count(), 1);
     // A vote of 3.0 commits three moves.
-    assert_eq!(output.commit_counts, [0, 3, 0, 0]);
+    assert_eq!(output.commit_counts, [0, 3, 0, 0, 0]);
 }
 
 #[test]
@@ -397,7 +397,7 @@ fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
     );
     // A vote of 2.0 commits two steals; the parameter surface is read at
     // each commit (asserted in `pass_loop_tests`).
-    assert_eq!(output.commit_counts, [0, 0, 0, 2]);
+    assert_eq!(output.commit_counts, [0, 0, 0, 2, 0]);
 }
 
 #[test]

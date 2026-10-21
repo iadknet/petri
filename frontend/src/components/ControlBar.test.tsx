@@ -301,7 +301,10 @@ describe("ControlBar", () => {
 		});
 		useStatsHistoryStore
 			.getState()
-			.recordStatus({ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 }, 0.5);
+			.recordStatus(
+				{ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, give: 0, predation_kills: 0 },
+				0.5,
+			);
 
 		vi.mocked(api.startup).mockResolvedValue({
 			protocol_version: "v3alpha1",

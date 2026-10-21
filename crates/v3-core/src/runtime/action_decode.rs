@@ -11,8 +11,8 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
 /// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
 /// an unwired field eats the whole cell) and `Reproduce`
-/// `ReproduceTransferFraction`; `Move` and `StealEnergy` read nothing (a
-/// steal moves the fixed exchange bite, T27.F03). A drive,
+/// `ReproduceTransferFraction`; `Move`, `StealEnergy` and `GiveEnergy` read
+/// nothing (a steal or a give moves the fixed exchange bite, T27.F03). A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
@@ -32,6 +32,7 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
                     ),
                 },
                 DirectedVoteKind::StealEnergy => WorldAction::StealEnergy { direction },
+                DirectedVoteKind::GiveEnergy => WorldAction::GiveEnergy { direction },
             }
         }
         VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
