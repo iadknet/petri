@@ -128,7 +128,7 @@ pub struct CognitionEnergyObservation {
 /// Energy charged per action type, indexed by [`ActionType`] (T16.F02,
 /// T27.F03).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct ActionCharges(pub [f64; ACTION_TYPE_COUNT as usize]);
+pub struct ActionCharges([f64; ACTION_TYPE_COUNT as usize]);
 
 /// The share of [`ActionCharges`] paid by attempts that failed (T16.F02): a
 /// blocked move, an eat that found no food, a rejected reproduce, a steal
@@ -136,7 +136,7 @@ pub struct ActionCharges(pub [f64; ACTION_TYPE_COUNT as usize]);
 /// nothing to give. A subset, not a sink (`failed_action_effort[k] <=
 /// action_charges[k]`); `NoOp` cannot fail, so its slot stays 0.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct FailedActionEffort(pub [f64; ACTION_TYPE_COUNT as usize]);
+pub struct FailedActionEffort([f64; ACTION_TYPE_COUNT as usize]);
 
 macro_rules! action_type_indexed {
     ($ledger:ty) => {

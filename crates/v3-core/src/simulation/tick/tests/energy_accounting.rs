@@ -667,10 +667,10 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
         // Assert
         let charges = sim.stats.energy_flows.action_charges;
         assert_eq!(charges[ActionType::NoOp], 0.0, "{action:?}");
-        assert_eq!(
-            sim.stats.energy_flows.failed_action_effort.0, charges.0,
-            "{action:?}"
-        );
+        let failed = sim.stats.energy_flows.failed_action_effort;
+        for kind in ActionType::ALL {
+            assert_eq!(failed[kind], charges[kind], "{action:?} {kind:?}");
+        }
         assert!(charges.total() > 0.0, "{action:?} must have paid an effort");
         assert!(sim.creatures.contains_key(id), "{action:?}");
     }
