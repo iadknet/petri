@@ -226,10 +226,17 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// carry cost, replication multiplier and gestation move, which moves the
 /// rate-0.0 identity (14067834609445145015 -> 17266400608968368299); the
 /// default identity holds, and the founder-only viability digests hold.
+/// Re-pinned by T27.F01 (rebase: T27.F01 combined with T26.F01 + T25.F10)
+/// after two agreeing runs: the 40-wide `NearbyCreature` family, the
+/// 20-edge slot recruitment and the 30-bucket key draw remap the
+/// mutation-on draws (default 2537487317403075458 -> 6408902103238049453,
+/// rate 0.0 17266400608968368299 -> 12885579396041597214); with mutation
+/// off the run is unchanged (8324246536663749152, rate 0.0
+/// 1561139812032769563).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 2537487317403075458);
-    assert_eq!(short_run_identity(Some(0.0)), 17266400608968368299);
+    assert_eq!(short_run_identity(None), 6408902103238049453);
+    assert_eq!(short_run_identity(Some(0.0)), 12885579396041597214);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

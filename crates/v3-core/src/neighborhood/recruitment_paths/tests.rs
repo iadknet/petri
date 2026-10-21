@@ -2700,8 +2700,8 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
     assert_eq!(lineage.classification, LineageClass::CensoredAt64);
 }
 
-/// S0 arm 12 (`graph_prepared` / Drift) batch 1 lineage 12 retains its F06
-/// discovery (module 2) at generation 6 and deletes that module at depth 229,
+/// S0 arm 12 (`graph_prepared` / Drift) batch 7 lineage 7 retains its F06
+/// discovery (module 2) at generation 2 and deletes that module at depth 144,
 /// so the T13.F06 retention reading at +256 is `Deleted` with no score loss
 /// even though the founder modules at the same creation depth are still
 /// present. Fixture re-pinned at T25.F02 commit 1 (draw count through
@@ -2731,15 +2731,20 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// commit 2 (a gene costs one unit and its members nothing, so the supply
 /// draw of every grouped genome moves; batch 1 lineage 3 no longer
 /// reads `Deleted`): batch 1 lineage 12 is the first `Deleted` lineage of
-/// the same search (generation 6, at 262, depth 229).
+/// the same search (generation 6, at 262, depth 229). Re-pinned at T27.F01
+/// (rebase: T27.F01 combined with T26.F01 + T25.F10; the 40-wide
+/// `NearbyCreature` family and the 30-bucket key draw remap every Graph
+/// draw; batch 1 lineage 12 now reads `NoLongerUseful`): batch 7 lineage 7
+/// is the first `Deleted` lineage of the same search (generation 2, at 258,
+/// depth 144).
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
-    // The pinned lineage is the default rate's; check it before the 263-
+    // The pinned lineage is the default rate's; check it before the 259-
     // generation walk, which a much larger rate makes unbounded in practice.
     assert_eq!(
         crate::config::MutationConfig::default().per_unit_rate,
         0.006_062_5,
-        "the batch 1 lineage 12 fixture is pinned at the default rate 0.0060625"
+        "the batch 7 lineage 7 fixture is pinned at the default rate 0.0060625"
     );
     let sizes = Sizes {
         batches: 4,
@@ -2754,12 +2759,12 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         ("graph_prepared", Policy::Drift)
     );
 
-    let lineage = assay.lineage(12, 1, 12);
+    let lineage = assay.lineage(12, 7, 7);
 
     let retention = lineage.retention.as_ref().unwrap();
-    assert_eq!(retention.discovery.generation, 6);
+    assert_eq!(retention.discovery.generation, 2);
     assert_eq!(retention.discovery.module.node, NodeId::new(2));
-    assert_eq!(retention.at_generation, 262);
+    assert_eq!(retention.at_generation, 258);
     assert_eq!(
         (retention.outcome, retention.score_loss),
         (RetentionOutcome::Deleted, None)
@@ -2770,7 +2775,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .iter()
         .find(|module| module.module.node == NodeId::new(2))
         .unwrap();
-    assert_eq!(module.module.deleted_depth, Some(229));
+    assert_eq!(module.module.deleted_depth, Some(144));
     assert!(!module.module.is_present());
     assert!(last
         .modules
