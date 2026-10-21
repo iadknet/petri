@@ -4,9 +4,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
-use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
-};
+use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
 use crate::creature::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
 use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
@@ -38,27 +36,11 @@ pub fn input_ref_kind(reference: &InputReference) -> InputRefKind {
 }
 
 /// Every `InputReference` a genome can carry in a world with
-/// `food_type_count` ordinary food types: the sampling pool of
-/// `sampling::random_input_reference_for_food_types`, enumerated.
+/// `food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
+/// expanded over the food types and every upstream slot, deduplicated in
+/// table order (T27.F01).
 pub(crate) fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
-    let capped = food_type_count.clamp(1, usize::from(u16::MAX) + 1);
-    let food_types = (0..capped).map(|idx| OrdinaryFoodTypeId::new(idx as u16));
-    WorldInputKey::universe(food_types)
-        .into_iter()
-        .map(InputReference::World)
-        .chain([
-            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-            InputReference::ActionQueue,
-            InputReference::ActionVotes,
-            InputReference::PreviousPassVotes,
-            InputReference::CommitCounts,
-            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
-            InputReference::PreviousOutcome,
-        ])
-        .chain((0..OUTPUT_SLOT_COUNT).map(InputReference::UpstreamSlot))
-        .collect()
+    sampling::bucket_references(food_type_count)
 }
 
 /// The members of `universe` that share `entry`'s kind, `entry` excluded.

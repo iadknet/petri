@@ -39,6 +39,7 @@ fn sensors() -> SensorSnapshot {
             neighbor_occupied: [0.0; 8],
             max_energy: 200.0,
             age_ticks: LEAF_VALUE,
+            own_colour: [0.0; 3],
             previous_outcome: [0.0; 4],
         },
         typed_local_food: TypedFoodLocalSnapshot::zeroed(1),

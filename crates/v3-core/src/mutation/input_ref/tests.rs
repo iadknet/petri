@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::{MutationConfig, OrdinaryFoodTypeId, RuntimeConfig};
-use crate::contracts::{NodeId, WorldInputKey};
+use crate::contracts::{DynamicIntrospectionKey, NodeId, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
@@ -128,11 +128,11 @@ fn swap_alternatives_follow_the_kind_table() {
             ))),
         ]
     );
-    // The four introspection scalars form one kind (T19.F05 adds
-    // `HopsThisTick`).
+    // The seven introspection scalars form one kind (T19.F05 adds
+    // `HopsThisTick`, T27.F01 the three own-colour keys).
     let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
     let others = swap_alternatives(&energy, 1);
-    assert_eq!(others.len(), 3);
+    assert_eq!(others.len(), 6);
     assert!(others.contains(&InputReference::DynamicIntrospection(
         DynamicIntrospectionKey::HopsThisTick
     )));
@@ -448,6 +448,9 @@ fn decision_state_kinds_follow_the_swap_table() {
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnBlue),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnGreen),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnRed),
         ]
     );
 }

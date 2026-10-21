@@ -48,6 +48,7 @@ fn sensors() -> SensorSnapshot {
             neighbor_occupied: ramp(0.25),
             max_energy: 200.0,
             age_ticks: 10.0,
+            own_colour: [0.8, 0.25, 0.375],
             previous_outcome: ramp(-0.5),
         },
         typed_local_food: TypedFoodLocalSnapshot {
@@ -168,6 +169,18 @@ fn reference_cases() -> Vec<(InputReference, Vec<f32>)> {
             vec![10.0],
         ),
         (
+            R::StaticIntrospection(StaticIntrospectionKey::OwnRed),
+            vec![0.8],
+        ),
+        (
+            R::StaticIntrospection(StaticIntrospectionKey::OwnGreen),
+            vec![0.25],
+        ),
+        (
+            R::StaticIntrospection(StaticIntrospectionKey::OwnBlue),
+            vec![0.375],
+        ),
+        (
             R::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             vec![0.5],
         ),
@@ -262,8 +275,8 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
     }
     assert_eq!(
         sources.len(),
-        245,
-        "213 declared channels and 32 memory slots"
+        248,
+        "216 declared channels and 32 memory slots"
     );
     let votes: Vec<_> = VoteSink::all().collect();
     assert_eq!(votes.len(), 30);

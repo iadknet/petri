@@ -186,6 +186,7 @@ impl Senses {
                 neighbor_occupied: self.occupied,
                 max_energy: 200.0,
                 age_ticks: self.age,
+                own_colour: [0.0; 3],
                 previous_outcome: [0.0; 4],
             },
             typed_local_food: TypedFoodLocalSnapshot {

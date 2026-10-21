@@ -63,6 +63,20 @@ describe("formatInputRef", () => {
 		expect(formatInputRef(ref)).toBe("Age");
 	});
 
+	it("labels and explains the three own-colour inputs", () => {
+		for (const [key, channel] of [
+			["OwnRed", "red"],
+			["OwnGreen", "green"],
+			["OwnBlue", "blue"],
+		] as const) {
+			const described = describeInputRef({ StaticIntrospection: key }, 0);
+			expect(described.label).toBe(key);
+			expect(described.description).toBe(
+				`Own ${channel}: this creature's own ${channel} channel (0 to 1).`,
+			);
+		}
+	});
+
 	it("formats UpstreamSlot variant", () => {
 		const ref: InputReference = { UpstreamSlot: 3 };
 		expect(formatInputRef(ref)).toBe("Bus[3]");

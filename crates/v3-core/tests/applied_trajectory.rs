@@ -116,6 +116,14 @@
 //! 53b0c507...) at the merge base and after the commit, and with
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical
 //! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
+//! Re-pinned by T27.F01 commit 2 after two agreeing runs: the key draw is
+//! `gen_range(0..30)` over the bucket table, the universe follows the table
+//! order, and the own-colour keys join the introspection `Swap`
+//! alternatives, which moves all four digests (sampled 4ed89bd0... ->
+//! 4eacb171..., gestation rate 0.0 0fdcb23c... -> 7bd3a06c...; guard
+//! cca5541d... -> e1a37a69..., rate 0.0 55e51cf0... -> 2cc6a72f...). With
+//! `mutation.per_unit_rate` 0 the sampled run is byte-identical
+//! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
 //! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned group
 //! creation, the scope coin and `SetScope` change every Graph draw, groups
 //! learn, and the learned row carries the initialized learned scales after

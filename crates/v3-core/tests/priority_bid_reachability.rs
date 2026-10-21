@@ -67,6 +67,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_occupied: [0.0; 8],
                     max_energy: 200.0,
                     age_ticks: 5.0,
+                    own_colour: [0.0; 3],
                     previous_outcome: [0.0; 4],
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -87,6 +88,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_occupied: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
                     max_energy: 200.0,
                     age_ticks: 40.0,
+                    own_colour: [0.0; 3],
                     previous_outcome: [0.0; 4],
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -107,6 +109,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_occupied: [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
                     max_energy: 200.0,
                     age_ticks: 120.0,
+                    own_colour: [0.0; 3],
                     previous_outcome: [0.0; 4],
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -127,6 +130,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_occupied: [0.0; 8],
                     max_energy: 200.0,
                     age_ticks: 0.0,
+                    own_colour: [0.0; 3],
                     previous_outcome: [0.0; 4],
                 },
                 typed_local_food: TypedFoodLocalSnapshot::zeroed(1),

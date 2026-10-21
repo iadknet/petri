@@ -350,6 +350,13 @@ impl WorldInputKey {
 pub enum StaticIntrospectionKey {
     /// Age as a saturating fraction of `age_reference_ticks`, in [0, 1].
     AgeTicks,
+    /// This creature's own colour, red channel over 255, in [0, 1]: what a
+    /// neighbour's `NearbyCreature` slot reads of it (T27.F01).
+    OwnRed,
+    /// Own colour, green channel over 255.
+    OwnGreen,
+    /// Own colour, blue channel over 255.
+    OwnBlue,
 }
 
 /// Dynamic introspection values resolved live at read time (not snapshot).
@@ -634,6 +641,9 @@ mod tests {
             InputReference::World(WorldInputKey::NeighborBarrierRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnRed),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnGreen),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::OwnBlue),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
             InputReference::UpstreamSlot(0),

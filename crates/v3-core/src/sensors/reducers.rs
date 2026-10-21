@@ -1001,6 +1001,61 @@ mod tests {
         }
     }
 
+    /// Symmetry (T27.F01 invariant 3): what a creature reads as its own
+    /// colour is what a neighbour's slot reads of it in the same tick, over
+    /// the real reducer and `assemble_static_inputs`.
+    #[test]
+    fn own_colour_equals_what_a_neighbour_sees() {
+        use crate::config::EnergyLifecycleConfig;
+        use crate::contracts::StaticIntrospectionKey;
+        use crate::sensors::static_inputs::assemble_static_inputs;
+
+        let mut world = make_world(20, 20);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let a_pos = crate::contracts::Position::new(10, 10);
+        let b_pos = crate::contracts::Position::new(12, 9);
+        let a_id = creatures.insert_with_key(|id| {
+            make_creature(id, a_pos, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        let b_id = creatures.insert_with_key(|id| {
+            make_creature(
+                id,
+                b_pos,
+                50.0,
+                CreatureIdentityState::default(),
+                [150, 0, 200, 200, 60, 60],
+            )
+        });
+        world.place_creature(a_pos, a_id);
+        world.place_creature(b_pos, b_id);
+
+        let visible = compute_visible_cells(a_pos, &world, get_visibility_table(5));
+        let seen = assemble_perception(
+            a_id,
+            &creatures[a_id],
+            visible.cells(),
+            &world,
+            &creatures,
+            &PerceptionConfig::default(),
+        );
+        let own =
+            assemble_static_inputs(&world, &creatures[b_id], &EnergyLifecycleConfig::default());
+
+        let slot0 = &seen.nearby[nearby_idx::RED..=nearby_idx::BLUE];
+        assert_eq!(own.own_colour.as_slice(), slot0);
+        assert_eq!(own.own_colour, [13.0 / 255.0, 89.0 / 255.0, 174.0 / 255.0]);
+        for (c, key) in [
+            StaticIntrospectionKey::OwnRed,
+            StaticIntrospectionKey::OwnGreen,
+            StaticIntrospectionKey::OwnBlue,
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(own.resolve_static(key).to_bits(), slot0[c].to_bits());
+        }
+    }
+
     #[test]
     fn nearby_reproduce_ready_requires_energy_and_age() {
         let mut world = make_world(20, 20);

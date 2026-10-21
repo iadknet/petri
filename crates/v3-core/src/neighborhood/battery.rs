@@ -87,6 +87,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             neighbor_barrier: [0.0; 8],
             neighbor_occupied,
             age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
+            own_colour: [0.0; 3],
             max_energy: lifecycle.max_energy,
             previous_outcome: [0.0; 4],
         },

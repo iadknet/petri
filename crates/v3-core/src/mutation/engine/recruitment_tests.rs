@@ -86,7 +86,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Re-pinned by T25.F09 commit 3: the six retention operators join the
     // Graph catalog (enabled weight 66 -> 78 on this path) and remap every
     // Graph draw (2113204031778778398 -> 5304583554271412245).
-    assert_eq!(hash, 5304583554271412245, "pin of the recruitment-Off path");
+    // Held by T27.F01 commit 1 (the 40-wide creature family). Re-pinned by
+    // T27.F01 commit 2 after two agreeing runs: the key draw is
+    // `gen_range(0..30)` over the bucket table and the three own-colour keys
+    // join the width-1 introspection `Swap` alternatives
+    // (5304583554271412245 -> 2059421590127301874).
+    assert_eq!(hash, 2059421590127301874, "pin of the recruitment-Off path");
 }
 
 #[test]
