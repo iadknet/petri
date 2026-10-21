@@ -1,7 +1,7 @@
 # T25.F10 — Group Genes Cost as Genes
 
 **Status**: In Progress
-**Last updated**: 2026-10-20
+**Last updated**: 2026-10-21
 **Feature**: T25.F10
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
 
@@ -109,13 +109,13 @@ baseline is edited to pass.
 
 ## Implementation Tasks
 
-- [ ] Commit 1 (fact members), tests first: the member site (audit R1), `pattern_at` 0 by role (R5), `check_local_invariants` and `validate_graph` by role (R2), `can_host_facts` (R4), the one-primitive gene build in recruitment (R3) and its direct callers, `relocate_group` and `RetargetGroupKind` applicability, the own-only detach of a fact member with its `-0.0` and seed-presence tests (R8), seeds, the invariant and seed-alignment property generators extended to both roles (invariant 1); `pair-groups-v2` with its fixture test, the summary keep-list and conversion fixture (R9) and the series entry; `graph_weights` and the inspector facts line; mutation-on pins re-pinned with the fact-member cause.
-- [ ] Commit 2 (size rule), tests first: `genome_size` (invariant 1) with unit tests for a `Ring` gene, a pair gene with facts, a hole and a detached member; `expected_delta` re-pinned; the founder test (invariant 5); every mutation-on pin re-pinned with the size cause; the `genome_size` series entry; reference specs and the tooltip.
+- [x] Commit 1 (fact members, `9d92ad1b`), tests first: the member site (audit R1), `pattern_at` 0 by role (R5), `check_local_invariants` and `validate_graph` by role (R2), `can_host_facts` (R4), the one-primitive gene build in recruitment (R3) and its direct callers, `relocate_group` and `RetargetGroupKind` applicability, the own-only detach of a fact member with its `-0.0` and seed-presence tests (R8), seeds, the invariant and seed-alignment property generators extended to both roles (invariant 1); `pair-groups-v2` with its fixture test, the summary keep-list and conversion fixture (R9) and the series entry; `graph_weights` and the inspector facts line; mutation-on pins re-pinned with the fact-member cause.
+- [x] Commit 2 (size rule, `61c5b8d1`), tests first: `genome_size` (invariant 1) with unit tests for a `Ring` gene, a pair gene with facts, a hole and a detached member; `expected_delta` re-pinned; the founder test (invariant 5); every mutation-on pin re-pinned with the size cause; the `genome_size` series entry; reference specs and the tooltip.
 - [ ] Verification Plan: viability first, then gate and goal through the benchmark specialist; mutation gate and slow tier through the mutation specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
-- [ ] Focused tests or checks: `cargo test -p v3-core` (container, validation, recruitment, genome-size and engine delta tests), `cargo test -p v3-cli --lib bench` (`pair_groups`), the inspector `vitest` run -> results recorded here.
+- [x] Focused tests or checks at `61c5b8d1`: `cargo check --workspace --all-targets` clean; `cargo test -p v3-core --no-fail-fast` all pass (lib 2,220, 9 ignored slow); `cargo test -p v3-cli -p v3-server -p v3-lab -p v3-telemetry --no-fail-fast` all pass; `npx vitest run src/components/inspector/ src/components/config-panel` 357 pass; `biome check` clean on the touched files. Re-pinned with their cause: `applied_trajectory` (commit 1 the sampled digest; commit 2 all four), `baseline_worlds` rate-0.0 identity (both commits), the `--lib` known-deleting lineage fixture (commit 2: arm 12 batch 1 lineage 12, the first `Deleted` lineage of batches 0-40, lineages 0-15), the inspector's `group.rs` fingerprint (commit 1); v3-cli trajectory and `bench_artifacts` digests held.
 - [ ] When the Verification Plan declares the mutation gate: fresh
       `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
@@ -126,7 +126,7 @@ baseline is edited to pass.
       `<id>-goal-long.json`, local raw hash/byte count and verification time
       checked, series entry points to the summary, and no new full report
       staged. Otherwise `Not run: Verification Plan`.
-- [ ] Viability first: `cargo test -p v3-core --test viability` -> founder-only digests unchanged.
+- [x] Viability first: `cargo test -p v3-core --test viability` before and after each commit -> 30 pass, founder-only digests unchanged.
 - [ ] Slow tier: `make rust-test-slow` -> recruitment-paths readings re-pinned with their cause.
 
 ## Performance and Goal Impact
