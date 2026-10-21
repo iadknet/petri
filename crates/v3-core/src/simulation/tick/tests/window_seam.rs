@@ -50,6 +50,7 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: old.body.identity,
+                capacity: 200.0,
             },
             old.shared_memory,
         );

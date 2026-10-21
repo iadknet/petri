@@ -28,22 +28,24 @@ pub fn v3alpha1_founder_genome() -> CreatureGenome {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FounderReproducePolicy {
     /// The founder attempts to reproduce only while `EnergyCurrent` — its
-    /// energy as a fraction of `max_energy` — is strictly above this (a
-    /// `Threshold` compute node in node 0). The founder gates on fullness:
-    /// the fraction is its own constant, not recomputed from `max_energy`.
+    /// energy as a fraction of its energy scale (the reference capacity
+    /// under the default `Reference` sensor scale, T26.F02) — is strictly
+    /// above this (a `Threshold` compute node in node 0). The founder gates
+    /// on fullness: the fraction is its own constant, not recomputed from the
+    /// scale.
     pub energy_threshold: f32,
     /// The fraction of the parent's post-cost energy the child starts with:
     /// node 1's constant on `ActionParam(ReproduceTransferFraction)` (T19.F04, T11.F27).
     pub transfer_fraction: f32,
 }
 
-/// At the default `max_energy` (200) each unit threshold is the T17.F01 raw
+/// At the default energy scale (the 200 reference capacity) each unit threshold is the T17.F01 raw
 /// gate (32/32/60/40/50) divided by 200, which sits at least 2.0 above
 /// `min_reproduce_energy` (30), and each fraction clears the `initial_energy`
 /// (20) litter floor at its own threshold after the age-1.0 attempt effort
 /// and reproduce cost, so before senescence (through age 130 at default
 /// economics) a founder attempt above its gate is never refused on energy
-/// (T17.F01 invariant 5); older founders may waste attempts. A lifecycle where `energy_threshold * max_energy -
+/// (T17.F01 invariant 5); older founders may waste attempts. A lifecycle where `energy_threshold * scale -
 /// 1.0 < min_reproduce_energy` pins the founder at its gate.
 #[must_use]
 pub const fn founder_reproduce_policy(profile: FounderProfile) -> FounderReproducePolicy {
@@ -261,8 +263,8 @@ mod tests {
     use proptest::prelude::*;
 
     /// The T17.F01 profile table on the unit scale (T17.F02): (profile,
-    /// strict energy threshold as a fraction of `max_energy`, the T17.F01 raw
-    /// threshold it re-expresses at the default `max_energy` (200), transfer
+    /// strict energy threshold as a fraction of the energy scale, the T17.F01
+    /// raw threshold it re-expresses at the default scale (200), transfer
     /// fraction). Pinned here independently of `founder_reproduce_policy`
     /// so a change in either shows up.
     const PROFILES: [(FounderProfile, f32, f32, f32); 5] = [
@@ -289,13 +291,13 @@ mod tests {
     /// 60.000004 (one ulp above 60; the quotient rounds down onto 0.30).
     #[test]
     fn founder_energy_gates_scan_identically_on_the_unit_scale() {
-        let max_energy = EnergyLifecycleConfig::default().max_energy;
+        let scale = crate::config::EnergyCapacityConfig::default().reference;
         for (profile, unit, raw, _) in PROFILES {
-            assert_eq!(unit, raw / max_energy, "{profile:?}");
+            assert_eq!(unit, raw / scale, "{profile:?}");
             let mut mismatches = Vec::new();
             let mut energy = raw - 1.0;
             while energy <= raw + 1.0 {
-                if (energy > raw) != (energy_fraction(energy, max_energy) > unit) {
+                if (energy > raw) != (energy_fraction(energy, scale) > unit) {
                     mismatches.push(energy);
                 }
                 energy = energy.next_up();
@@ -415,7 +417,7 @@ mod tests {
                 neighbor_occupied: [0.0; 8],
                 age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
                 own_colour: [0.0; 3],
-                max_energy: lifecycle.max_energy,
+                energy_scale: crate::config::EnergyCapacityConfig::default().reference,
                 previous_outcome: [0.0; 4],
             },
             typed_local_food: TypedFoodLocalSnapshot {

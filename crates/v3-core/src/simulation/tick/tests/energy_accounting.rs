@@ -194,7 +194,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
-    sim.config.energy.lifecycle.max_energy = 10.0;
+    sim.creatures[attacker].body.capacity = 10.0;
     sim.creatures[victim].cached_complexity = 4;
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     let flows = &sim.stats.energy_flows;
@@ -340,7 +340,7 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
     sim.config.energy.complexity_cost.enabled = false;
     sim.config.energy.costs.eat_cost = 1.0;
     sim.config.energy.costs.eat_reward_per_food = 10.0;
-    sim.config.energy.lifecycle.max_energy = 5.0;
+    sim.creatures[id].body.capacity = 5.0;
     sim.world.set_food_type(
         sim.creatures[id].position,
         OrdinaryFoodTypeId::default(),

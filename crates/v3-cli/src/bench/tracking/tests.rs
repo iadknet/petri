@@ -1054,6 +1054,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     };
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
     sim.stats.mortality.record(DeathCause::MeshRamp);
+    sim.stats.mortality.record(DeathCause::CapacityUpkeep);
     sim.stats.energy_flows = EnergyFlows {
         food_intake_by_type: vec![0.123456789, -2.0, 0.0],
         action_charges: ActionCharges {
@@ -1075,9 +1076,11 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         mesh_ramp: 9.5,
         lifecycle_decay: 12.0,
         genome_carrying: 13.0,
+        capacity_upkeep: -13.5,
         genome_size_creature_ticks: 14,
         parental_transfer_debit: 15.0,
         offspring_energy_credit: 16.0,
+        offspring_capacity_overflow: 16.5,
         predation_victim_debit: -17.0,
         predation_attacker_credit: -18.0,
         predation_kill_bonus_credit: 19.0,
@@ -1089,10 +1092,11 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let mortality = tracking.mortality.unwrap();
     assert_eq!(mortality.definition, "applied-mortality-v3");
-    assert_eq!(mortality.deaths_total, 1);
+    assert_eq!(mortality.deaths_total, 2);
     let expected_keys = [
         "lifecycle_decay",
         "genome_carrying",
+        "capacity_upkeep",
         "vm_compute",
         "graph_compute",
         "mesh_ramp",
@@ -1109,7 +1113,10 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     ];
     assert_eq!(mortality.by_cause.len(), expected_keys.len());
     for key in expected_keys {
-        assert_eq!(mortality.by_cause[key], u64::from(key == "mesh_ramp"));
+        assert_eq!(
+            mortality.by_cause[key],
+            u64::from(matches!(key, "mesh_ramp" | "capacity_upkeep"))
+        );
     }
     assert_eq!(
         serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
@@ -1120,8 +1127,8 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
             "vm_compute": "7.000000", "priority_bid": "8.000000",
             "graph_compute": "9.000000", "mesh_ramp": "9.500000",
-            "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
-            "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000",
+            "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "capacity_upkeep": "-13.500000", "genome_size_creature_ticks": 14,
+            "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000", "offspring_capacity_overflow": "16.500000",
             "predation_victim_debit": "-17.000000", "predation_attacker_credit": "-18.000000",
             "predation_kill_bonus_credit": "19.000000", "maximum_energy_clamp_loss": "20.000000",
             "zero_floor_credit": "21.000000", "external_removal_loss": "22.000000",

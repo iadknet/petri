@@ -42,7 +42,7 @@ fn compound_at(values: &[f32], sub_idx: u16) -> f32 {
 ///   `compound_width()`.
 /// - World and static introspection keys are read from the pre-assembled snapshot.
 /// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`
-///   as fractions of the snapshot's `max_energy`, clamped to [0, 1]; `HopsThisTick`
+///   as fractions of the snapshot's `energy_scale`, clamped to [0, 1]; `HopsThisTick`
 ///   is the raw hop count.
 /// - The decision-state compounds read `sub_idx` directly; at or past the
 ///   width they read 0.0.
@@ -84,10 +84,10 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
         InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => {
-                energy_fraction(ctx.energy, ctx.sensors.local.max_energy)
+                energy_fraction(ctx.energy, ctx.sensors.local.energy_scale)
             }
             DynamicIntrospectionKey::EnergyConsumedThisTick => {
-                energy_fraction(ctx.energy_consumed, ctx.sensors.local.max_energy)
+                energy_fraction(ctx.energy_consumed, ctx.sensors.local.energy_scale)
             }
             DynamicIntrospectionKey::HopsThisTick => ctx.mesh_hops as f32,
         },
@@ -121,7 +121,7 @@ mod tests {
                 neighbor_food: [0.5; 8],
                 neighbor_barrier: [0.0; 8],
                 neighbor_occupied: [0.0; 8],
-                max_energy: 200.0,
+                energy_scale: 200.0,
                 age_ticks: 0.02,
                 own_colour: [0.0; 3],
                 previous_outcome: [0.0; 4],

@@ -98,7 +98,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 pos,
                 energy,
                 0,
-                HeritableBody::founder(founder_index, seed),
+                HeritableBody::founder(founder_index, seed, config.energy.capacity.founder),
                 [0.0; crate::creature::state::SHARED_MEMORY_SLOTS],
             );
             founder.heading = heading;

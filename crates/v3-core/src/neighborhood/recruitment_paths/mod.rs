@@ -72,6 +72,7 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                 HeritableBody {
                     phenotype: Phenotype::FOUNDER,
                     identity: CreatureIdentityState::default(),
+                    capacity: config.energy.capacity.founder,
                 },
                 [0.0; 16],
             )

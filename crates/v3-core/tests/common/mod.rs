@@ -56,6 +56,7 @@ pub(crate) fn insert_creature(
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
+                capacity: 200.0,
             },
             [0.0; 16],
         )

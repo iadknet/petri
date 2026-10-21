@@ -383,8 +383,9 @@ fn fill_nearby_banks(
         };
 
         // Vitals
-        fields[nearby_idx::ENERGY_RATIO] = if config.max_energy > 0.0 {
-            (target.energy / config.max_energy).clamp(0.0, 1.0)
+        let energy_scale = target.body.energy_scale(&config.energy_capacity);
+        fields[nearby_idx::ENERGY_RATIO] = if energy_scale > 0.0 {
+            (target.energy / energy_scale).clamp(0.0, 1.0)
         } else {
             0.0
         };
@@ -446,6 +447,7 @@ mod tests {
                     polarity: [true; 6],
                 },
                 identity,
+                capacity: 200.0,
             },
             [0.0; 16],
         )
@@ -1006,7 +1008,7 @@ mod tests {
     /// the real reducer and `assemble_static_inputs`.
     #[test]
     fn own_colour_equals_what_a_neighbour_sees() {
-        use crate::config::EnergyLifecycleConfig;
+        use crate::config::EnergyConfig;
         use crate::contracts::StaticIntrospectionKey;
         use crate::sensors::static_inputs::assemble_static_inputs;
 
@@ -1038,8 +1040,7 @@ mod tests {
             &creatures,
             &PerceptionConfig::default(),
         );
-        let own =
-            assemble_static_inputs(&world, &creatures[b_id], &EnergyLifecycleConfig::default());
+        let own = assemble_static_inputs(&world, &creatures[b_id], &EnergyConfig::default());
 
         let slot0 = &seen.nearby[nearby_idx::RED..=nearby_idx::BLUE];
         assert_eq!(own.own_colour.as_slice(), slot0);
@@ -1141,10 +1142,8 @@ mod tests {
             euclidean_dist: 2.0f32.sqrt(),
             chebyshev_dist: 1,
         }];
-        let config = PerceptionConfig {
-            max_energy: 0.0,
-            ..PerceptionConfig::default()
-        };
+        let mut config = PerceptionConfig::default();
+        config.energy_capacity.reference = 0.0;
 
         let nearby = fill_nearby_banks(
             &candidates,
@@ -1163,6 +1162,49 @@ mod tests {
             nearby_idx::ENERGY_RATIO,
         ] {
             assert_eq!(nearby[field], 0.0, "field {field}");
+        }
+    }
+
+    /// The nearby energy read divides by the target's energy scale
+    /// (T26.F02): the reference under `Reference`, the target's own capacity
+    /// under `Own`.
+    #[test]
+    fn nearby_energy_ratio_divides_by_the_targets_energy_scale() {
+        use crate::config::SensorScale;
+        let origin = crate::contracts::Position::new(10, 10);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        let neighbor_id = creatures.insert_with_key(|id| {
+            make_creature(
+                id,
+                crate::contracts::Position::new(11, 11),
+                40.0,
+                CreatureIdentityState::default(),
+                [0; 6],
+            )
+        });
+        creatures[neighbor_id].body.capacity = 50.0;
+        let candidates = [NearbyCandidate {
+            creature_id: neighbor_id,
+            dx: 1,
+            dy: 1,
+            euclidean_dist: 2.0f32.sqrt(),
+            chebyshev_dist: 1,
+        }];
+        let mut config = PerceptionConfig::default();
+        for (scale, expected) in [(SensorScale::Reference, 0.2), (SensorScale::Own, 0.8)] {
+            config.energy_capacity.sensor_scale = scale;
+            let nearby = fill_nearby_banks(
+                &candidates,
+                &creatures[observer_id],
+                &creatures,
+                &config,
+                2.0,
+                2.0,
+            );
+            assert_eq!(nearby[nearby_idx::ENERGY_RATIO], expected, "{scale:?}");
         }
     }
 }

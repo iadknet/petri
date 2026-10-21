@@ -233,7 +233,9 @@ fn gestation_rate_zero_delivers_at_conception_and_the_queue_continues() {
 
 /// Count identities and the energy identity of the spec's "Energy identity"
 /// row over a run with births, losses on death and crowded deliveries.
-/// `lower_cap_at` lowers `max_energy` mid-run without re-clamping creatures.
+/// `lower_cap_at` lowers every living body's capacity and `max_energy` to
+/// [`LOWERED_CAP`] mid-run without re-clamping creatures, so later litters
+/// overflow the children's capacity (T26.F02 invariant 7).
 fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 32;
@@ -267,15 +269,21 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // commit 1 (2733 -> 3249): `AddDirectionPairGroup` joins the Graph
     // default arm and remaps every Graph draw; 3249 is the first seed from
     // 2733 that passes both the unlowered and the lowered-cap case; removing
-    // the catalog entry restores 2733.
-    let mut sim = seed_simulation(cfg, 3249);
+    // the catalog entry restores 2733. Re-seeded by T26.F02 (3249 -> 3282,
+    // lowered cap 60 -> 50): the capacity chance draw on every birth shifts
+    // every later draw, no seed in 3249..3600 met the precondition at 60, and
+    // 3282 is the first seed from 3249 that passes both cases at 50.
+    let mut sim = seed_simulation(cfg, 3282);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {
         if lower_cap_at == Some(tick) {
-            sim.config.energy.lifecycle.max_energy = 60.0;
+            sim.config.energy.lifecycle.max_energy = LOWERED_CAP;
+            for creature in sim.creatures.values_mut() {
+                creature.body.capacity = LOWERED_CAP;
+            }
             assert!(
-                sim.creatures.values().any(|c| c.energy > 60.0),
+                sim.creatures.values().any(|c| c.energy > LOWERED_CAP),
                 "creatures must hold energy above the lowered cap"
             );
             // B6: a held parent only loses energy, so one above the new cap
@@ -283,7 +291,7 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
             assert!(
                 sim.creatures
                     .values()
-                    .any(|c| c.pending_birth.is_some() && c.energy > 60.0),
+                    .any(|c| c.pending_birth.is_some() && c.energy > LOWERED_CAP),
                 "a gestating parent must hold energy above the lowered cap"
             );
         }
@@ -316,7 +324,10 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
         let flows = &s.energy_flows;
         let carried: f64 = pending.iter().copied().map(f64::from).sum();
         let residual = (flows.parental_transfer_debit
-            - (flows.offspring_energy_credit + flows.gestation_lost + carried))
+            - (flows.offspring_energy_credit
+                + flows.offspring_capacity_overflow
+                + flows.gestation_lost
+                + carried))
             .abs();
         let bound = s.gestations_started_total as f64
             * f64::from(e_max.max(c_max))
@@ -333,7 +344,16 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
         s.gestations_lost_no_cell_total + s.gestations_lost_population_cap_total > 0,
         "crowded deliveries must lose some litters"
     );
+    assert_eq!(
+        s.energy_flows.offspring_capacity_overflow > 0.0,
+        lower_cap_at.is_some(),
+        "only the lowered cap overflows a litter"
+    );
 }
+
+/// The capacity `assert_gestation_identities` lowers every body and
+/// `max_energy` to.
+const LOWERED_CAP: f32 = 50.0;
 
 #[test]
 fn gestation_energy_and_count_identities_hold_every_tick() {

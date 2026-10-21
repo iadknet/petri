@@ -104,16 +104,16 @@ fn an_eat_on_food_is_read_next_tick_as_its_scaled_outcome() {
     run_tick(&mut sim, &mut None);
 
     let creature = &sim.creatures[id];
-    let lifecycle = &sim.config.energy.lifecycle;
+    let energy = &sim.config.energy;
     let stored = creature.previous_outcome;
     assert!(
         stored[OutcomeChannel::EnergyDelta as usize] > 0.0,
         "{stored:?}"
     );
     assert_eq!(
-        assemble_static_inputs(&sim.world, creature, lifecycle).previous_outcome,
+        assemble_static_inputs(&sim.world, creature, energy).previous_outcome,
         [
-            stored[OutcomeChannel::EnergyDelta as usize] / lifecycle.max_energy,
+            stored[OutcomeChannel::EnergyDelta as usize] / energy.capacity.reference,
             1.0,
             0.0,
             0.0
@@ -160,9 +160,9 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
         .find(|(id, _)| *id != parent)
         .expect("the newborn");
     assert_eq!(child.previous_outcome, [0.0; 4]);
-    let lifecycle = &sim.config.energy.lifecycle;
+    let energy = &sim.config.energy;
     assert_eq!(
-        assemble_static_inputs(&sim.world, child, lifecycle).previous_outcome,
+        assemble_static_inputs(&sim.world, child, energy).previous_outcome,
         [0.0; 4]
     );
 }

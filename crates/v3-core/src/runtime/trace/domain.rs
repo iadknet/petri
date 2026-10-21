@@ -384,7 +384,7 @@ mod tests {
             neighbor_food: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
             neighbor_barrier: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
             neighbor_occupied: [0.0; 8],
-            max_energy: 200.0,
+            energy_scale: 200.0,
             age_ticks: 0.084,
             own_colour: [0.0; 3],
             previous_outcome: [0.25, 0.5, 0.0, 1.0],

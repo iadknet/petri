@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::EnergyLifecycleConfig;
+use crate::config::EnergyConfig;
 use crate::creature::body::HeritableBody;
 use crate::creature::genome::vote::{
     ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
@@ -541,11 +541,12 @@ fn vm_eats_when_food_here() {
                 polarity: [true; 6],
             },
             identity: CreatureIdentityState::default(),
+            capacity: 200.0,
         },
         [0.0; 16],
     );
 
-    let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+    let local = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
     // food_here should be > 0.0
     assert!(local.food_here > 0.0);
     let ss = SensorSnapshot {
@@ -638,10 +639,11 @@ fn vm_noop_when_no_food() {
                 polarity: [true; 6],
             },
             identity: CreatureIdentityState::default(),
+            capacity: 200.0,
         },
         [0.0; 16],
     );
-    let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+    let local = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
     assert_eq!(local.food_here, 0.0);
     let ss = SensorSnapshot {
         world_reads: Default::default(),

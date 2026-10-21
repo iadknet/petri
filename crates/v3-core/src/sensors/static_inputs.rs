@@ -1,4 +1,4 @@
-use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
+use crate::config::{EnergyConfig, OrdinaryFoodTypeId};
 use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::colour::unit_rgb;
 use crate::creature::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
@@ -8,8 +8,8 @@ use crate::kernel::WorldState;
 /// Snapshot of world and static-introspection sensor values for one creature's turn.
 ///
 /// Assembled once at turn start; dynamic introspection (energy, consumed) is
-/// resolved live during mesh evaluation as a fraction of `max_energy`, which
-/// the snapshot carries from the lifecycle config for that purpose.
+/// resolved live during mesh evaluation as a fraction of `energy_scale`, the
+/// creature's sensor denominator the snapshot carries for that purpose.
 ///
 /// All food values are normalized to [0.0, 1.0] by clamping raw food density;
 /// introspection is on the unit scale (T17.F02).
@@ -32,28 +32,31 @@ pub struct StaticInputs {
     /// The creature's own colour on the unit scale
     /// (`creature::colour::unit_rgb`): `OwnRed`, `OwnGreen`, `OwnBlue`.
     pub own_colour: [f32; 3],
-    /// `EnergyLifecycleConfig::max_energy`: the denominator for the live
-    /// energy introspection reads.
-    pub max_energy: f32,
+    /// The creature's energy sensor denominator
+    /// ([`HeritableBody::energy_scale`](crate::creature::body::HeritableBody::energy_scale),
+    /// T26.F02): the reference capacity or the creature's own, by
+    /// `energy.capacity.sensor_scale`. Divides the live energy introspection
+    /// reads and the `PreviousOutcome` energy channels.
+    pub energy_scale: f32,
     /// The previous tick's outcome channels (`PreviousOutcome`, T19.F05),
     /// indexed by `OutcomeChannel` discriminant: the energy channels as
-    /// fractions of `max_energy`, the other two as stored.
+    /// fractions of `energy_scale`, the other two as stored.
     pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
 }
 
 /// The `PreviousOutcome` read of a stored outcome bank: `EnergyDelta` over
-/// `max_energy` clamped to [-1, 1], `DamageDelta` over `max_energy` clamped
-/// to [-1, 0], `ActionSuccess` and `OffspringSuccess` as stored.
+/// `energy_scale` clamped to [-1, 1], `DamageDelta` over `energy_scale`
+/// clamped to [-1, 0], `ActionSuccess` and `OffspringSuccess` as stored.
 #[must_use]
 pub fn previous_outcome_read(
     stored: &[f32; OUTCOME_CHANNEL_COUNT],
-    max_energy: f32,
+    energy_scale: f32,
 ) -> [f32; OUTCOME_CHANNEL_COUNT] {
     let mut read = *stored;
     let energy = OutcomeChannel::EnergyDelta as usize;
     let damage = OutcomeChannel::DamageDelta as usize;
-    read[energy] = (stored[energy] / max_energy).clamp(-1.0, 1.0);
-    read[damage] = (stored[damage] / max_energy).clamp(-1.0, 0.0);
+    read[energy] = (stored[energy] / energy_scale).clamp(-1.0, 1.0);
+    read[damage] = (stored[damage] / energy_scale).clamp(-1.0, 0.0);
     read
 }
 
@@ -62,8 +65,8 @@ pub fn previous_outcome_read(
 /// mid-dispatch `effective` energy can be) reads 0.
 #[inline]
 #[must_use]
-pub fn energy_fraction(value: f32, max_energy: f32) -> f32 {
-    (value / max_energy).clamp(0.0, 1.0)
+pub fn energy_fraction(value: f32, energy_scale: f32) -> f32 {
+    (value / energy_scale).clamp(0.0, 1.0)
 }
 
 /// `min(age / reference, 1)` as f32 division: the unit-scale `AgeTicks` read.
@@ -111,10 +114,11 @@ impl StaticInputs {
 pub fn assemble_static_inputs(
     world: &WorldState,
     creature: &CreatureState,
-    lifecycle: &EnergyLifecycleConfig,
+    energy: &EnergyConfig,
 ) -> StaticInputs {
     let pos = creature.position;
     let food_here = world.food_at(pos).clamp(0.0, 1.0);
+    let energy_scale = creature.body.energy_scale(&energy.capacity);
 
     let mut neighbor_food = [0.0f32; 8];
     let mut neighbor_barrier = [0.0f32; 8];
@@ -143,10 +147,10 @@ pub fn assemble_static_inputs(
         neighbor_food,
         neighbor_barrier,
         neighbor_occupied,
-        age_ticks: age_fraction(creature.age, lifecycle.age_reference_ticks),
+        age_ticks: age_fraction(creature.age, energy.lifecycle.age_reference_ticks),
         own_colour: unit_rgb(creature.body.phenotype.channels),
-        max_energy: lifecycle.max_energy,
-        previous_outcome: previous_outcome_read(&creature.previous_outcome, lifecycle.max_energy),
+        energy_scale,
+        previous_outcome: previous_outcome_read(&creature.previous_outcome, energy_scale),
     }
 }
 
@@ -197,6 +201,7 @@ mod tests {
                     polarity: [true; 6],
                 },
                 identity: CreatureIdentityState::default(),
+                capacity: 200.0,
             },
             [0.0; 16],
         )
@@ -212,7 +217,7 @@ mod tests {
         let world = make_world(4, 4);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         assert_eq!(si.food_here, 0.0);
     }
 
@@ -229,7 +234,7 @@ mod tests {
         world.seed_food(&mut rng);
         let id = get_id();
         let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         assert!((si.food_here - 1.0).abs() < 1e-6);
     }
 
@@ -246,7 +251,7 @@ mod tests {
         world.seed_food(&mut rng);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         for i in 0..8 {
             assert!(
                 (si.neighbor_food[i] - 1.0).abs() < 1e-6,
@@ -261,7 +266,7 @@ mod tests {
         world.set_barrier(Position::new(2, 1), true);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         assert_eq!(si.neighbor_barrier[Direction::N.to_index()], 1.0);
         assert_eq!(si.neighbor_barrier[Direction::S.to_index()], 0.0);
     }
@@ -274,7 +279,7 @@ mod tests {
         let mut world = make_world(5, 5);
         world.place_creature(Position::new(3, 2), id2);
         let creature = make_creature(id1, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         assert_eq!(si.neighbor_occupied[Direction::E.to_index()], 1.0);
         assert_eq!(si.neighbor_occupied[Direction::W.to_index()], 0.0);
     }
@@ -310,18 +315,17 @@ mod tests {
                     polarity: [true; 6],
                 },
                 identity: CreatureIdentityState::default(),
+                capacity: 200.0,
             },
             [0.0; 16],
         );
         creature.age = 42;
-        let lifecycle = EnergyLifecycleConfig {
-            max_energy: 150.0,
-            age_reference_ticks: 400,
-            ..EnergyLifecycleConfig::default()
-        };
-        let si = assemble_static_inputs(&world, &creature, &lifecycle);
+        let mut energy = EnergyConfig::default();
+        energy.lifecycle.age_reference_ticks = 400;
+        energy.capacity.reference = 150.0;
+        let si = assemble_static_inputs(&world, &creature, &energy);
         assert!((si.age_ticks - 0.105).abs() < 1e-6);
-        assert_eq!(si.max_energy, 150.0);
+        assert_eq!(si.energy_scale, 150.0);
         assert_eq!(
             si.resolve_static(&StaticIntrospectionKey::AgeTicks),
             si.age_ticks
@@ -380,7 +384,7 @@ mod tests {
         let world = make_world(4, 4);
         let id = get_id();
         let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
+        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
         let result = si.resolve_world(&WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
         });
@@ -388,7 +392,7 @@ mod tests {
     }
 
     /// The `PreviousOutcome` read scales the two energy channels by
-    /// `max_energy` into their clamps and passes the other two through.
+    /// `energy_scale` into their clamps and passes the other two through.
     #[test]
     fn previous_outcome_read_scales_and_clamps_the_energy_channels() {
         assert_eq!(
@@ -410,15 +414,41 @@ mod tests {
         let world = make_world(8, 8);
         let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let mut creature = make_creature(ids.insert(()), Position::new(2, 2));
-        let lifecycle = SimulationConfig::default().energy.lifecycle;
+        let energy = SimulationConfig::default().energy;
         assert_eq!(
-            assemble_static_inputs(&world, &creature, &lifecycle).previous_outcome,
+            assemble_static_inputs(&world, &creature, &energy).previous_outcome,
             [0.0; OUTCOME_CHANNEL_COUNT]
         );
-        creature.previous_outcome = [lifecycle.max_energy / 4.0, 1.0, 0.0, 1.0];
+        creature.previous_outcome = [energy.capacity.reference / 4.0, 1.0, 0.0, 1.0];
         assert_eq!(
-            assemble_static_inputs(&world, &creature, &lifecycle).previous_outcome,
+            assemble_static_inputs(&world, &creature, &energy).previous_outcome,
             [0.25, 1.0, 0.0, 1.0]
         );
+    }
+
+    /// Under `Reference` every creature's energy reads divide by the
+    /// reference capacity; under `Own` by its own (T26.F02 invariant 6):
+    /// the same 32 energy and outcome reads 0.16 at every capacity, or
+    /// 0.64 at a capacity of 50.
+    #[test]
+    fn the_energy_scale_follows_the_sensor_scale() {
+        use crate::config::SensorScale;
+        let world = make_world(8, 8);
+        let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let mut energy = SimulationConfig::default().energy;
+        for capacity in [50.0, 200.0, 800.0] {
+            let mut creature = make_creature(ids.insert(()), Position::new(2, 2));
+            creature.body.capacity = capacity;
+            creature.previous_outcome = [32.0, 0.0, -32.0, 0.0];
+            energy.capacity.sensor_scale = SensorScale::Reference;
+            let si = assemble_static_inputs(&world, &creature, &energy);
+            assert_eq!(si.energy_scale, 200.0);
+            assert_eq!(energy_fraction(32.0, si.energy_scale), 0.16);
+            assert_eq!(si.previous_outcome, [0.16, 0.0, -0.16, 0.0]);
+            energy.capacity.sensor_scale = SensorScale::Own;
+            let si = assemble_static_inputs(&world, &creature, &energy);
+            assert_eq!(si.energy_scale, capacity);
+            assert_eq!(si.previous_outcome[0], (32.0 / capacity).min(1.0));
+        }
     }
 }

@@ -465,7 +465,7 @@ impl Default for EnergyLifecycleConfig {
     fn default() -> Self {
         Self {
             initial_energy: 20.0,
-            max_energy: 200.0,
+            max_energy: DEFAULT_MAX_ENERGY,
             energy_decay_per_tick: 0.5,
             min_reproduce_energy: 30.0,
             min_reproduce_age: default_min_reproduce_age(),
@@ -606,6 +606,95 @@ impl AgeEnergyCostConfig {
     }
 }
 
+/// The default upper bound of the capacity range (T26.F02).
+const DEFAULT_MAX_ENERGY: f32 = 800.0;
+const DEFAULT_CAPACITY_REFERENCE: f32 = 200.0;
+const DEFAULT_CAPACITY_MIN: f32 = 50.0;
+const DEFAULT_INITIAL_ENERGY: f32 = 20.0;
+/// β: the grid's smallest value, held until the T26.F02 sweep picks one.
+const DEFAULT_MOVE_COST_SLOPE: f32 = 0.5;
+/// u: the grid's smallest value, held until the T26.F02 sweep picks one.
+const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.0005;
+const DEFAULT_CAPACITY_MUTATION_CHANCE: f32 = 0.1;
+const DEFAULT_CAPACITY_LOG_STEP: f32 = 0.25;
+
+/// Which denominator the energy sensor reads divide by (T26.F02).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensorScale {
+    /// `energy.capacity.reference` for every creature: the trait changes
+    /// absolute storage only.
+    #[default]
+    Reference,
+    /// The creature's own capacity.
+    Own,
+}
+
+impl SensorScale {
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Reference => "reference",
+            Self::Own => "own",
+        }
+    }
+}
+
+/// The heritable energy capacity (T26.F02). Canonical owner:
+/// v3-runtime-config-spec.md Section 4. The range is
+/// `[min, lifecycle.max_energy]`; at `reference` the move factor is 1 and the
+/// upkeep 0, so a body at the reference pays today's costs.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EnergyCapacityConfig {
+    /// The neutral capacity, in `[1, max_energy]`.
+    pub reference: f32,
+    /// The lower bound of the range, in `[1, reference]`.
+    pub min: f32,
+    /// Every founder's capacity, in `[min, max_energy]`.
+    pub founder: f32,
+    /// β in `[0, 1]`: the move base is scaled by
+    /// `(1 − β) + β·(capacity / reference)`.
+    pub move_cost_slope: f32,
+    /// u `≥ 0`: the signed Phase 0 upkeep is `u·(capacity − reference)`.
+    pub upkeep_per_unit: f32,
+    /// The denominator of the energy sensor reads.
+    pub sensor_scale: SensorScale,
+}
+
+impl Default for EnergyCapacityConfig {
+    fn default() -> Self {
+        Self {
+            reference: DEFAULT_CAPACITY_REFERENCE,
+            min: DEFAULT_CAPACITY_MIN,
+            founder: DEFAULT_CAPACITY_REFERENCE,
+            move_cost_slope: DEFAULT_MOVE_COST_SLOPE,
+            upkeep_per_unit: DEFAULT_UPKEEP_PER_UNIT,
+            sensor_scale: SensorScale::default(),
+        }
+    }
+}
+
+/// The capacity mutation drawn on every birth (T26.F02). Canonical owner:
+/// v3-runtime-config-spec.md Section 3.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CapacityMutationConfig {
+    /// Chance per birth that the child's capacity mutates, in `[0, 1]`.
+    pub chance: f32,
+    /// Half-width of the uniform log-space step, `≥ 0`.
+    pub log_step: f32,
+}
+
+impl Default for CapacityMutationConfig {
+    fn default() -> Self {
+        Self {
+            chance: DEFAULT_CAPACITY_MUTATION_CHANCE,
+            log_step: DEFAULT_CAPACITY_LOG_STEP,
+        }
+    }
+}
+
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -616,6 +705,8 @@ pub struct EnergyConfig {
     pub complexity_cost: ComplexityEnergyCostConfig,
     #[serde(default)]
     pub age_cost: AgeEnergyCostConfig,
+    #[serde(default)]
+    pub capacity: EnergyCapacityConfig,
 }
 
 impl EnergyConfig {
@@ -855,6 +946,9 @@ pub struct MutationConfig {
     /// How many ticks back a dispatch still counts as "recently executed".
     #[serde(default = "default_executed_window_ticks")]
     pub executed_window_ticks: u64,
+    /// The heritable energy capacity's mutation (T26.F02).
+    #[serde(default)]
+    pub capacity: CapacityMutationConfig,
 }
 
 /// Per genome unit: `0.485 / 80`, so the 80-unit V3Alpha1 founder (T25.F02)
@@ -889,6 +983,7 @@ impl Default for MutationConfig {
             reachable_bias: ReachableBiasConfig::default(),
             executed_bias: default_executed_bias(),
             executed_window_ticks: default_executed_window_ticks(),
+            capacity: CapacityMutationConfig::default(),
         }
     }
 }
@@ -989,9 +1084,8 @@ impl SimulationConfig {
         }
         normalize_world_food(&mut self.world);
 
+        self.normalize_capacity();
         let el = &mut self.energy.lifecycle;
-        el.initial_energy = normalize_f32_finite_nonneg(el.initial_energy, 20.0);
-        el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 200.0);
         el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.5);
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 30.0);
         if el.age_reference_ticks == 0 {
@@ -1120,6 +1214,52 @@ impl SimulationConfig {
         if p.max_creatures < p.initial_creatures {
             p.max_creatures = 100000;
         }
+    }
+
+    /// The capacity range and its dependents, in the T26.F02 order: each
+    /// bound is checked against the ones normalized before it, so a founder
+    /// is never provisioned above its capacity nor a capacity outside
+    /// `[min, max_energy]`.
+    fn normalize_capacity(&mut self) {
+        let el = &mut self.energy.lifecycle;
+        let cap = &mut self.energy.capacity;
+        el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, DEFAULT_MAX_ENERGY);
+        let max_energy = el.max_energy;
+        cap.reference = normalize_f32_finite_in(
+            cap.reference,
+            1.0,
+            max_energy,
+            DEFAULT_CAPACITY_REFERENCE.min(max_energy),
+        );
+        cap.min = normalize_f32_finite_in(
+            cap.min,
+            1.0,
+            cap.reference,
+            DEFAULT_CAPACITY_MIN.min(cap.reference),
+        );
+        cap.founder = normalize_f32_finite_in(cap.founder, cap.min, max_energy, cap.reference);
+        el.initial_energy = normalize_f32_finite_in(
+            el.initial_energy,
+            0.0,
+            cap.founder,
+            DEFAULT_INITIAL_ENERGY.min(cap.founder),
+        );
+        cap.move_cost_slope =
+            normalize_f32_finite_in(cap.move_cost_slope, 0.0, 1.0, DEFAULT_MOVE_COST_SLOPE);
+        cap.upkeep_per_unit =
+            normalize_f32_finite_nonneg(cap.upkeep_per_unit, DEFAULT_UPKEEP_PER_UNIT);
+        let mc = &mut self.mutation.capacity;
+        mc.chance = normalize_f32_finite_in(mc.chance, 0.0, 1.0, DEFAULT_CAPACITY_MUTATION_CHANCE);
+        mc.log_step = normalize_f32_finite_nonneg(mc.log_step, DEFAULT_CAPACITY_LOG_STEP);
+    }
+}
+
+/// `v` when finite and in `[lo, hi]`, else `fallback`.
+fn normalize_f32_finite_in(v: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
+    if v.is_finite() && (lo..=hi).contains(&v) {
+        v
+    } else {
+        fallback
     }
 }
 
@@ -1405,7 +1545,7 @@ mod tests {
         }
         // Energy lifecycle
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
+        assert_eq!(cfg.energy.lifecycle.max_energy, 800.0);
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 30.0).abs() < 1e-6);
         assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 20);
@@ -1555,11 +1695,147 @@ mod tests {
     }
 
     #[test]
+    fn capacity_defaults_are_the_reference_body_and_the_grids_smallest_pair() {
+        let cfg = SimulationConfig::default();
+        let cap = &cfg.energy.capacity;
+        assert_eq!((cap.reference, cap.min, cap.founder), (200.0, 50.0, 200.0));
+        assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (0.5, 0.0005));
+        assert_eq!(cap.sensor_scale, SensorScale::Reference);
+        assert_eq!(
+            (cfg.mutation.capacity.chance, cfg.mutation.capacity.log_step),
+            (0.1, 0.25)
+        );
+    }
+
+    #[test]
+    fn capacity_overrides_deserialize_from_a_partial_overlay() {
+        let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+        value["energy"]["capacity"] = serde_json::json!({
+            "founder": 50.0, "sensor_scale": "own", "move_cost_slope": 0.0, "upkeep_per_unit": 0.0
+        });
+        value["mutation"]["capacity"] = serde_json::json!({"chance": 0.0});
+        value["mutation"]["per_unit_rate"] = serde_json::json!(0.0);
+        let cfg: SimulationConfig = serde_json::from_value(value).unwrap();
+        let cap = &cfg.energy.capacity;
+        assert_eq!(cap.founder, 50.0);
+        assert_eq!(cap.sensor_scale, SensorScale::Own);
+        assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (0.0, 0.0));
+        assert_eq!(cap.reference, 200.0, "an omitted field keeps its default");
+        assert_eq!(cfg.mutation.capacity.chance, 0.0);
+        assert_eq!(cfg.mutation.capacity.log_step, 0.25);
+        assert_eq!(cfg.mutation.per_unit_rate, 0.0);
+    }
+
+    #[test]
+    fn configs_without_capacity_keys_take_the_defaults() {
+        let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+        value["energy"].as_object_mut().unwrap().remove("capacity");
+        value["mutation"]
+            .as_object_mut()
+            .unwrap()
+            .remove("capacity");
+        let cfg: SimulationConfig = serde_json::from_value(value).unwrap();
+        assert_eq!(cfg.energy.capacity, EnergyCapacityConfig::default());
+        assert_eq!(cfg.mutation.capacity, CapacityMutationConfig::default());
+    }
+
+    #[test]
+    fn normalize_keeps_a_valid_capacity_range() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.max_energy = 1000.0;
+        cfg.energy.capacity.reference = 300.0;
+        cfg.energy.capacity.min = 10.0;
+        cfg.energy.capacity.founder = 900.0;
+        cfg.energy.lifecycle.initial_energy = 900.0;
+        cfg.normalize();
+        let cap = &cfg.energy.capacity;
+        assert_eq!((cap.reference, cap.min, cap.founder), (300.0, 10.0, 900.0));
+        assert_eq!(cfg.energy.lifecycle.initial_energy, 900.0);
+    }
+
+    #[test]
+    fn normalize_falls_the_capacity_bounds_back_in_order() {
+        // A maximum below the reference pulls the reference, then the min,
+        // the founder and the founder's provision down behind it.
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.max_energy = 40.0;
+        cfg.normalize();
+        let cap = &cfg.energy.capacity;
+        assert_eq!(cap.reference, 40.0);
+        assert_eq!(cap.min, 40.0);
+        assert_eq!(cap.founder, 40.0);
+        assert_eq!(cfg.energy.lifecycle.initial_energy, 20.0);
+
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.max_energy = 10.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.capacity.founder, 10.0);
+        assert_eq!(cfg.energy.lifecycle.initial_energy, 10.0);
+    }
+
+    #[test]
+    fn normalize_rejects_out_of_range_capacity_fields() {
+        for (reference, min, founder) in [
+            (f32::NAN, f32::NAN, f32::NAN),
+            (0.5, 0.5, 0.5),
+            (900.0, 300.0, 900.0),
+        ] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.capacity.reference = reference;
+            cfg.energy.capacity.min = min;
+            cfg.energy.capacity.founder = founder;
+            cfg.normalize();
+            let cap = &cfg.energy.capacity;
+            assert_eq!((cap.reference, cap.min, cap.founder), (200.0, 50.0, 200.0));
+        }
+        // A founder below the min falls back to the reference.
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.capacity.founder = 49.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.capacity.founder, 200.0);
+        // A provision above the founder's capacity falls back to 20.
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.initial_energy = 201.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.initial_energy, 20.0);
+    }
+
+    #[test]
+    fn normalize_rejects_out_of_range_capacity_coefficients() {
+        for (slope, upkeep, chance, log_step) in [
+            (f32::NAN, f32::NAN, f32::NAN, f32::NAN),
+            (1.5, -1.0, 1.5, -0.1),
+            (-0.1, f32::INFINITY, -0.1, f32::INFINITY),
+        ] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.capacity.move_cost_slope = slope;
+            cfg.energy.capacity.upkeep_per_unit = upkeep;
+            cfg.mutation.capacity.chance = chance;
+            cfg.mutation.capacity.log_step = log_step;
+            cfg.normalize();
+            assert_eq!(cfg.energy.capacity.move_cost_slope, 0.5);
+            assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0005);
+            assert_eq!(cfg.mutation.capacity.chance, 0.1);
+            assert_eq!(cfg.mutation.capacity.log_step, 0.25);
+        }
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.capacity.move_cost_slope = 1.0;
+        cfg.energy.capacity.upkeep_per_unit = 0.0;
+        cfg.mutation.capacity.chance = 0.0;
+        cfg.mutation.capacity.log_step = 0.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.capacity.move_cost_slope, 1.0);
+        assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0);
+        assert_eq!(cfg.mutation.capacity.chance, 0.0);
+        assert_eq!(cfg.mutation.capacity.log_step, 0.0);
+    }
+
+    #[test]
     fn normalize_negative_max_energy_falls_back() {
         let mut cfg = SimulationConfig::default();
         cfg.energy.lifecycle.max_energy = -1.0;
         cfg.normalize();
-        assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
+        assert_eq!(cfg.energy.lifecycle.max_energy, 800.0);
     }
 
     #[test]

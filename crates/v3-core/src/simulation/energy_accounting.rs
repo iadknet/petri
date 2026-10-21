@@ -5,6 +5,8 @@
 pub enum DeathCause {
     LifecycleDecay,
     GenomeCarrying,
+    /// The Phase 0 capacity upkeep of a body above the reference (T26.F02).
+    CapacityUpkeep,
     VmCompute,
     GraphCompute,
     MeshRamp,
@@ -21,9 +23,10 @@ pub enum DeathCause {
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
+        Self::CapacityUpkeep,
         Self::VmCompute,
         Self::GraphCompute,
         Self::MeshRamp,
@@ -44,6 +47,7 @@ impl DeathCause {
         match self {
             Self::LifecycleDecay => "lifecycle_decay",
             Self::GenomeCarrying => "genome_carrying",
+            Self::CapacityUpkeep => "capacity_upkeep",
             Self::VmCompute => "vm_compute",
             Self::GraphCompute => "graph_compute",
             Self::MeshRamp => "mesh_ramp",
@@ -151,9 +155,16 @@ pub struct EnergyFlows {
     pub mesh_ramp: f64,
     pub lifecycle_decay: f64,
     pub genome_carrying: f64,
+    /// The signed Phase 0 capacity upkeep (T26.F02): the applied charge less
+    /// its decay and carrying shares, negative for a body below the
+    /// reference; the zero floor's shortfall lands here.
+    pub capacity_upkeep: f64,
     pub genome_size_creature_ticks: u64,
     pub parental_transfer_debit: f64,
     pub offspring_energy_credit: f64,
+    /// The share of a delivered litter above the child's capacity, removed by
+    /// the birth cap step (T26.F02); `offspring_energy_credit` books the rest.
+    pub offspring_capacity_overflow: f64,
     pub predation_victim_debit: f64,
     pub predation_attacker_credit: f64,
     pub predation_kill_bonus_credit: f64,
@@ -244,7 +255,7 @@ mod tests {
         #[test]
         fn cause_keys_follow_the_stable_report_schema(index in 0usize..DeathCause::ALL.len()) {
             let expected = [
-                "lifecycle_decay", "genome_carrying", "vm_compute", "graph_compute",
+                "lifecycle_decay", "genome_carrying", "capacity_upkeep", "vm_compute", "graph_compute",
                 "mesh_ramp", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
                 "parental_transfer", "predation",
