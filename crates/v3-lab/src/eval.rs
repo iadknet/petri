@@ -9,7 +9,8 @@
 //!
 //! Scripted instruments run on a lab stepper over the production appliers
 //! (`apply_typed_eat`, `apply_move`, which charge the action effort) plus
-//! `energy_decay_per_tick`; they pay no brain compute or carrying charge.
+//! `energy_decay_per_tick`; they pay no brain compute, carrying charge or
+//! capacity upkeep (T26.F02; zero at the founder capacity the lab seeds).
 //!
 //! Every genome evaluation runs an expression-masked copy ([`expressed`]):
 //! lifetime learning is off, so improvement across generations is inherited
