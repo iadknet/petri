@@ -239,7 +239,7 @@ flows would show it wrong.
       aarch64 at the sweep defaults (re-pinned). GNU/Linux x86_64 digests:
       an x86_64 test binary under emulated Ubuntu 24.04 (glibc 2.39), which
       reproduced the `08b1584c` pins, measured the new ones; CI's
-      `ubuntu-24.04` run confirms them.
+      `ubuntu-24.04` confirmation is pending.
 - [x] `cargo test --workspace --no-fail-fast` -> all pass but v3-cli
       `gate_profile_has_no_severe_regression_against_series_references`
       (awaits the gate epoch re-pin); `cargo fmt --all --check`,
