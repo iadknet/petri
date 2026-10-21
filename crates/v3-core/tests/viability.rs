@@ -1119,15 +1119,18 @@ fn founder_only_trajectory_digest_is_pinned() {
     // draw): default 91 -> 90 births (old digest 63650331...), rate 0.0
     // 94 -> 94 (old digest 3a9d028b...), carrying cost off 89 -> 89 (old
     // digest 361f913d...); removing the capacity draw restores all three.
-    // Measured on macOS aarch64; the GNU/Linux x86_64 pins are not
-    // re-measured here.
+    // T26.F02 sweep defaults (beta 0.5 -> 1.0, u 0.0005 -> 0.002): default
+    // 90 -> 92 births (old digest 85a067f4...), rate 0.0 94 -> 95 (old
+    // digest 6384951f...), carrying cost off 89 -> 90 (old digest
+    // 4940c9c6...); restoring (0.5, 0.0005) restores all three. Measured on
+    // macOS aarch64.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            90,
+            92,
             0,
             platform_digest(
-                "85a067f43a6f9376588279f97ee95aaf3758f3fea5b2ebf9aee06ec669f06239",
+                "a16496cf5a6f064250317584351843f09239dc72e7e9b3729be7949268926167",
                 "c6d8c806f500d34c4648ecdbe7942adddc9a94ad0138551e343029f1cc741a88"
             )
         )
@@ -1141,10 +1144,10 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
     assert_eq!(
         founder_only_trajectory(Some(0.0)),
         (
-            94,
+            95,
             0,
             platform_digest(
-                "6384951ff2f009f8982a104be38895df81c39b983d205e3ce9f578a2bbe7a13e",
+                "58c474d109b1f35e6b1e8f52d10fdf4dcc4ae5d16fd30af1e44a12b07d726149",
                 "ed256c6b450e61a586720ab39bb6b3d678ad264cdee09b9692c4c84888af5062"
             )
         )
@@ -1179,10 +1182,10 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
     assert_eq!(
         founder_only_trajectory_with(None, Some(0.0)),
         (
-            89,
+            90,
             0,
             platform_digest(
-                "4940c9c658bca8529afaa12bc13ca7bcffd55ce1a71f4d0655247d635ec3ed56",
+                "b04233ae9cd239b1e11a7382f420766a664661904d6d9ae51211bf38bd186956",
                 "73f3ae652d91a994ac10470e6134353087df26173e1192aa6c9e16f5848fe604"
             )
         )

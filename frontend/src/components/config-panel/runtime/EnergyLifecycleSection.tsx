@@ -128,7 +128,7 @@ export const ENERGY_CAPACITY_NUMBER_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.01,
-		defaultValue: 0.5,
+		defaultValue: 1.0,
 		tooltip:
 			"How much a body's size scales its move cost: the base is multiplied by (1 \u2212 slope) + slope \u00d7 capacity / reference",
 	},
@@ -138,7 +138,7 @@ export const ENERGY_CAPACITY_NUMBER_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 0.01,
 		step: 0.0001,
-		defaultValue: 0.0005,
+		defaultValue: 0.002,
 		slider: false,
 		tooltip:
 			"Energy charged each tick per capacity unit above the reference, and refunded against the tick's other upkeep below it",

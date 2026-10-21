@@ -151,8 +151,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // 145 goes extinct at tick 149; of 0..=2000 seeds 52, 831, 1184 and 1871
     // survive the horizon, and 831 is the lowest that ends with more than
     // one creature, which the occupancy-grid test needs. Removing the
-    // capacity draw restores seed 145.
-    const SEED: u64 = 831;
+    // capacity draw restores seed 145. Moved from 831 to 14 by the T26.F02
+    // sweep defaults (beta 1.0, u 0.002): seed 831 goes extinct at tick 126;
+    // of 0..=2000 seeds 14, 15, 281, 295, 387, 865, 1296, 1300, 1570 and 1845
+    // survive the horizon, and 14, the lowest, ends with three creatures.
+    // Restoring (0.5, 0.0005) restores seed 831.
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -234,8 +238,9 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // 129 survives (see the post-tick-state test). T25.F09 commit 3: seed
     // 129 goes extinct and seed 14 survives (see the post-tick-state test).
     // T27.F01 commit 2: seed 14 goes extinct and seed 145 survives (see the
+    // post-tick-state test). T26.F02: 145 -> 831 -> 14 (see the
     // post-tick-state test).
-    const SEED: u64 = 831;
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -384,8 +389,9 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // 558), 14 is the lowest and ends over five cells. T27.F01 commit 2
     // moved it from 14 to 145: seed 14 goes extinct; of the seeds of 0..=600
     // that survive the horizon (145, 175, 268, 319, 513), 145 is the lowest
-    // and ends over four cells.
-    const SEED: u64 = 831;
+    // and ends over four cells. T26.F02 moved it 145 -> 831 -> 14 (see the
+    // post-tick-state test).
+    const SEED: u64 = 14;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

@@ -173,7 +173,11 @@
 //! rate 0.0 95ef1cbb... -> 5e94f066...; guard c7e77b62... -> fd13dc02...,
 //! rate 0.0 7488a15f... -> a0579f08...). With the capacity draw removed all
 //! four digests hold: every founder sits at the reference, so the cap, move
-//! and upkeep rules and the sensor scale are today's.
+//! and upkeep rules and the sensor scale are today's. Re-pinned by the
+//! T26.F02 sweep defaults (beta 0.5 -> 1.0, u 0.0005 -> 0.002) after two
+//! agreeing runs (sampled e145bf0f... -> 4d34eae0..., rate 0.0 5e94f066...
+//! -> bf1ce9a1...; guard fd13dc02... -> 5cbdceed..., rate 0.0 a0579f08...
+//! -> 5067bc4b...); restoring (0.5, 0.0005) restores all four.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -185,11 +189,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "e145bf0fe88a29c1d54ef82aab2f0b34e5438a9600d3ba71dd2b81244ecfed75"
+        "4d34eae0d58f28fd65f4e3fc34d041ef466fc4b822a0c48320b65d6e75273146"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "5e94f066efa78e0f757a8138e90d93a484c15dea27872dfb7b3d186a4081dd36"
+        "bf1ce9a1ae539a810ca3c47d5bcdcef1acfda578cb81bfa8e80cc1db0af5ee45"
     );
 }
 
@@ -262,11 +266,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "fd13dc023980a742495e8c78d6b6f56a3da6dfd292e3988ab6d498a6be8bdb44"
+        "5cbdceedcde92d10acf0e6e616570915df3d1f25b8dfc9f09e57ee4ed10ccdcd"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "a0579f084865db4438c4d29f69353e5cf8a406095a0509438e8eb12a506d8ae9"
+        "5067bc4bef2fbb7a29f1a5553419120fd33cd5a0bf17b0227ad23ede71085f8f"
     );
 }
 
