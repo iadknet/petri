@@ -229,21 +229,27 @@ flows would show it wrong.
       reproduction steps 11–14, startup-seeding §5.1, server-protocol.
 - [x] `cargo test -p v3-core --test viability` first; re-pin the trajectory
       and reproducibility pins as predeclared.
-- [ ] Comparison, the `sensor_scale` ruling recorded in invariant 6, then
+- [x] Comparison, the `sensor_scale` ruling recorded in invariant 6, then
       the sweep (invariant 9); the chosen scale, β and u set as defaults.
 - [ ] gate, goal and goal-long on the final defaults; mutation gate; slow tier.
 
 ## Verification
 
-- [x] `cargo test -p v3-core --test viability` -> 30 passed (re-pinned).
-- [x] Focused tests -> all touched crates pass but v3-cli
+- [x] `cargo test -p v3-core --test viability` -> 30 passed on macOS
+      aarch64 at the sweep defaults (re-pinned). GNU/Linux x86_64 digests:
+      an x86_64 test binary under emulated Ubuntu 24.04 (glibc 2.39), which
+      reproduced the `08b1584c` pins, measured the new ones; CI's
+      `ubuntu-24.04` run confirms them.
+- [x] `cargo test --workspace --no-fail-fast` -> all pass but v3-cli
       `gate_profile_has_no_severe_regression_against_series_references`
-      (awaits the gate epoch re-pin).
+      (awaits the gate epoch re-pin); `cargo fmt --all --check`,
+      `make rust-clippy`, `make frontend-build` and `npx vitest run`
+      (675 passed) clean.
 - [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
 - [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, summary
       line, output path, every survivor resolved as killed, equivalent, or
       deferred.
-- [ ] Comparison and sweep tables and local summary hashes in the readings
+- [x] Comparison and sweep tables and local summary hashes in the readings
       file.
 - [ ] gate, goal and goal-long summaries at
       `docs/progress/features/t26-f02-evolvable-energy-reserves{,-goal,-goal-long}.json`;
