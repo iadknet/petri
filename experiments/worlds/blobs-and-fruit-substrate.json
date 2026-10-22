@@ -61,9 +61,11 @@
     "initial_creatures": 10000,
     "max_creatures": 1000000
   },
+  "exchange": {
+    "effort_rate": 0.05000000074505806
+  },
   "predation": {
-    "kill_complexity_bonus_multiplier": 0.0,
-    "steal_cost_rate": 0.05000000074505806
+    "kill_complexity_bonus_multiplier": 0.0
   },
   "runtime": {
     "graph_node_base_cost": 9.999999747378752e-06,

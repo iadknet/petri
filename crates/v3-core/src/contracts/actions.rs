@@ -81,8 +81,10 @@ pub enum WorldAction {
         direction: Direction,
         energy_transfer_fraction: f32,
     },
-    /// Attempt to steal energy from a neighbor in the given direction.
-    StealEnergy { direction: Direction, amount: f32 },
+    /// Attempt to steal energy from the neighbour in the given direction;
+    /// `effort` is the decoded modifier in `[0.25, 4]` that scales the
+    /// attacker's `steal_share` (T27.F03).
+    StealEnergy { direction: Direction, effort: f32 },
 }
 
 impl WorldAction {
@@ -127,7 +129,7 @@ impl WorldAction {
 
     /// Read back a parameter slot for `ReadActionQueueParam`.
     /// Slot 0 = direction index (as f32), or the food type index (Eat);
-    /// slot 1 = amount (StealEnergy), energy_transfer_fraction (Reproduce) or
+    /// slot 1 = the effort modifier (StealEnergy), energy_transfer_fraction (Reproduce) or
     /// the leave share (Eat). Returns 0.0 for unknown slots or
     /// variants without that parameter.
     #[inline]
@@ -145,7 +147,7 @@ impl WorldAction {
                 1,
             ) => *energy_transfer_fraction,
             (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
-            (WorldAction::StealEnergy { amount, .. }, 1) => *amount,
+            (WorldAction::StealEnergy { effort, .. }, 1) => *effort,
             _ => 0.0,
         }
     }
@@ -172,7 +174,7 @@ mod tests {
         .is_noop());
         assert!(!WorldAction::StealEnergy {
             direction: Direction::E,
-            amount: 10.0
+            effort: 1.0
         }
         .is_noop());
     }
@@ -194,7 +196,7 @@ mod tests {
         assert_eq!(
             WorldAction::StealEnergy {
                 direction: Direction::W,
-                amount: 1.0
+                effort: 1.0
             }
             .direction(),
             Some(Direction::W)
@@ -248,11 +250,12 @@ mod tests {
     fn steal_energy_fields_accessible() {
         let action = WorldAction::StealEnergy {
             direction: Direction::NW,
-            amount: 7.5,
+            effort: 0.5,
         };
-        if let WorldAction::StealEnergy { direction, amount } = action {
+        assert_eq!(action.param(1), 0.5, "slot 1 reads the effort modifier");
+        if let WorldAction::StealEnergy { direction, effort } = action {
             assert_eq!(direction, Direction::NW);
-            assert!((amount - 7.5).abs() < f32::EPSILON);
+            assert_eq!(effort, 0.5);
         } else {
             panic!("expected StealEnergy variant");
         }
@@ -273,7 +276,7 @@ mod tests {
             },
             WorldAction::StealEnergy {
                 direction: Direction::S,
-                amount: 8.0,
+                effort: 4.0,
             },
         ];
         for action in actions {

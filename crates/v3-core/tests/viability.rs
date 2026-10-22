@@ -40,6 +40,8 @@ fn founder_body() -> HeritableBody {
         phenotype: Phenotype::FOUNDER,
         identity: CreatureIdentityState::default(),
         capacity: 200.0,
+        steal_share: 0.2,
+        give_share: 0.2,
     }
 }
 
@@ -805,6 +807,8 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
                 phenotype: Phenotype::FOUNDER,
                 identity: parent_identity,
                 capacity: 200.0,
+                steal_share: 0.2,
+                give_share: 0.2,
             },
             [0.0; 16],
         )
@@ -1127,14 +1131,24 @@ fn founder_only_trajectory_digest_is_pinned() {
     // 73f3ae65...) were re-measured at the same births with an x86_64 test
     // binary (cross-built for x86_64-unknown-linux-gnu) run under emulated
     // Ubuntu 24.04 (glibc 2.39), which reproduced all three 08b1584c pins.
+    // T27.F03 commit 3 (the steal and give share chances drawn on every
+    // birth, after the capacity draw; the founder never steals or gives, so
+    // only the shifted draws move the run): default 92 -> 87 births (old
+    // digest a16496cf...), rate 0.0 95 -> 94 (old digest 58c474d1...),
+    // carrying cost off 90 -> 95 (old digest b04233ae...); removing the two
+    // share draws restores all three. Measured on macOS aarch64; the
+    // GNU/Linux x86_64 pins (old b29898f6..., 7b621076..., 71543e36...) were
+    // re-measured at the same births the same way as T26.F02's, a binary
+    // cross-built for x86_64-unknown-linux-gnu run under emulated Ubuntu
+    // 24.04 (glibc 2.39), which reproduced the three T27.F03 commit-2 pins.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            92,
+            87,
             0,
             platform_digest(
-                "a16496cf5a6f064250317584351843f09239dc72e7e9b3729be7949268926167",
-                "b29898f6c0d6ceae897db21a4615e1d7f2b6f466ac2330222ac7f5ba93a21de7"
+                "53890c1d7aec0c27f5cfa7968d33ee51e3c1e3414c341cb3f35e27be64200ae8",
+                "787559b66c042542208c1602e16e74ec43836f738dd83ec0ad2db6728381ca1e"
             )
         )
     );
@@ -1147,11 +1161,11 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
     assert_eq!(
         founder_only_trajectory(Some(0.0)),
         (
-            95,
+            94,
             0,
             platform_digest(
-                "58c474d109b1f35e6b1e8f52d10fdf4dcc4ae5d16fd30af1e44a12b07d726149",
-                "7b6210766076b2c100ba7083cdee9c7e07f5a65fe23aa33f7b6b40f0c133efc5"
+                "e6616f37fe83d13fc7f4442738db77248cb06ac2f0892d879eb4310c91335a2b",
+                "23c5e4b0ce2e85544d89a0a551970e7cf4026251b8a80eb9d43676ae72b57bf5"
             )
         )
     );
@@ -1185,11 +1199,11 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
     assert_eq!(
         founder_only_trajectory_with(None, Some(0.0)),
         (
-            90,
+            95,
             0,
             platform_digest(
-                "b04233ae9cd239b1e11a7382f420766a664661904d6d9ae51211bf38bd186956",
-                "71543e36de7009177082f5cb75b36e549c0f45650352bc18e9f600064a13ed84"
+                "094c1347e4ca8d5604c170ebbbd2c583402de6820dd685706b39682265f7f168",
+                "32b19ad41f360bd43ec3876af1c427a889f5c7162576b7613a929d513e7f5771"
             )
         )
     );

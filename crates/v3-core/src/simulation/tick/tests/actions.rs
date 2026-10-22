@@ -500,7 +500,7 @@ fn last_tick_steal_resets_each_tick() {
 #[test]
 fn steal_energy_dispatch_transfers_and_removes_victim() {
     let (mut sim, attacker_id, victim_id) = make_sim_two_creatures(50.0, 5.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     let victim_pos = Position::new(5, 4);
 
     let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0).result;
@@ -528,7 +528,7 @@ fn steal_energy_dispatch_transfers_and_removes_victim() {
 #[test]
 fn killed_creature_steal_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
 
     let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(
@@ -545,7 +545,7 @@ fn killed_creature_steal_action_does_not_panic() {
 #[test]
 fn killed_creature_reproduce_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
 
     let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(

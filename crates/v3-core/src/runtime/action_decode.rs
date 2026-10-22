@@ -11,7 +11,8 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
 /// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
 /// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction` and
-/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. A drive,
+/// `StealEnergy` `StealEffort` as its effort modifier ([`effort_modifier`],
+/// T27.F03); `Move` reads nothing. A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
@@ -32,9 +33,7 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
                 },
                 DirectedVoteKind::StealEnergy => WorldAction::StealEnergy {
                     direction,
-                    amount: clamp_non_negative_finite(
-                        params[ActionParamField::StealEnergyAmount.index()],
-                    ),
+                    effort: effort_modifier(params[ActionParamField::StealEffort.index()]),
                 },
             }
         }
@@ -72,13 +71,16 @@ pub(crate) fn clamp_unit_interval(v: f32) -> f32 {
     }
 }
 
-/// Clamp to non-negative finite: NaN/Inf/negative → 0.0.
+/// An exchange act's effort modifier (T27.F03): `2^clamp(x, −2, 2)`, in
+/// `[0.25, 4]`; the unwired 0 and a non-finite `x` give exactly 1.0, so an
+/// act no field drives moves its actor's heritable share.
 #[inline]
-fn clamp_non_negative_finite(v: f32) -> f32 {
-    if v.is_finite() && v >= 0.0 {
-        v
+#[must_use]
+pub fn effort_modifier(x: f32) -> f32 {
+    if x.is_finite() {
+        x.clamp(-2.0, 2.0).exp2()
     } else {
-        0.0
+        1.0
     }
 }
 
@@ -86,9 +88,7 @@ fn clamp_non_negative_finite(v: f32) -> f32 {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use ActionParamField::{
-        EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount,
-    };
+    use ActionParamField::{EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEffort};
 
     /// A parameter surface holding `fields` and zero elsewhere.
     fn surface(fields: &[(ActionParamField, f32)]) -> ActionParams {
@@ -123,11 +123,11 @@ mod tests {
             assert_eq!(
                 decode_commit(
                     VoteSink::Directed(DirectedVoteKind::StealEnergy, d),
-                    &surface(&[(StealEnergyAmount, 3.0)])
+                    &surface(&[(StealEffort, 1.0)])
                 ),
                 WorldAction::StealEnergy {
                     direction,
-                    amount: 3.0,
+                    effort: 2.0,
                 }
             );
         }
@@ -157,7 +157,7 @@ mod tests {
                 &surface(&[
                     (EatFoodType, 3.0),
                     (ReproduceTransferFraction, 8.0),
-                    (StealEnergyAmount, 8.0)
+                    (StealEffort, 8.0)
                 ])
             ),
             WorldAction::eat(OrdinaryFoodTypeId::new(3))
@@ -211,19 +211,43 @@ mod tests {
         );
     }
 
+    /// T27.F03 invariant 5: the effort modifier is `2^clamp(x, −2, 2)`, and
+    /// the unwired 0 and a non-finite value give exactly 1.0.
     #[test]
-    fn steal_amount_is_non_negative_finite() {
-        for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
+    fn steal_effort_is_a_bounded_power_of_two_and_one_when_unwired() {
+        for (raw, expected) in [
+            (0.0_f32, 1.0_f32),
+            (-0.0, 1.0),
+            (f32::NAN, 1.0),
+            (f32::INFINITY, 1.0),
+            (f32::NEG_INFINITY, 1.0),
+            (1.0, 2.0),
+            (-1.0, 0.5),
+            (2.0, 4.0),
+            (-2.0, 0.25),
+            (9.0, 4.0),
+            (-9.0, 0.25),
+        ] {
             assert_eq!(
                 decode_commit(
                     VoteSink::Directed(DirectedVoteKind::StealEnergy, 0),
-                    &surface(&[(StealEnergyAmount, raw)])
+                    &surface(&[(StealEffort, raw)])
                 ),
                 WorldAction::StealEnergy {
                     direction: Direction::N,
-                    amount: 0.0,
-                }
+                    effort: expected,
+                },
+                "{raw}"
             );
+        }
+    }
+
+    proptest! {
+        /// Every field value decodes to a modifier in `[0.25, 4]`.
+        #[test]
+        fn the_effort_modifier_stays_in_its_bounds(bits in any::<u32>()) {
+            let effort = effort_modifier(f32::from_bits(bits));
+            prop_assert!((0.25..=4.0).contains(&effort));
         }
     }
 

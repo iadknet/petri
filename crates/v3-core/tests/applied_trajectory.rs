@@ -184,6 +184,12 @@
 //! sampled digests (4d34eae0... -> 3a4846f3..., gestation rate 0.0
 //! bf1ce9a1... -> 5a9ed31a...); the guard digests hold, and mapping the
 //! genome text back to the old shape restores both old sampled digests.
+//! Re-pinned by T27.F03 commit 3 (share draws per birth; `StealEffort`; the
+//! share rule) after two agreeing runs: every birth draws the steal and give
+//! share chances after the capacity draw, which shifts every later draw, and
+//! a committed steal takes `i × victim energy` (sampled 3a4846f3... ->
+//! 6f97de82..., gestation rate 0.0 5a9ed31a... -> 2a9c2834...; guard
+//! 5cbdceed... -> 9d4e5755..., rate 0.0 5067bc4b... -> 23ff7d5e...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -195,11 +201,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "3a4846f33b0a006e4a51f98c94cc699533b042114c5f3c64754d9aab3b28563c"
+        "6f97de82718beab35ed9cde0e30d2293087984eb84248c4a88173154157e7f49"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "5a9ed31a23f6c9d2387d75f426863dbfcbe6d479e06f56e6437721ba1a8203c7"
+        "2a9c28349ffb2febae1e50e919afba5902f3b10e2b8b9c84e49fd2e6aae9a465"
     );
 }
 
@@ -272,11 +278,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "5cbdceedcde92d10acf0e6e616570915df3d1f25b8dfc9f09e57ee4ed10ccdcd"
+        "9d4e5755d6c5c32e1e6c460fb6b4674d2cf4e6d6972e7551992304feeb93dba4"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "5067bc4bef2fbb7a29f1a5553419120fd33cd5a0bf17b0227ad23ede71085f8f"
+        "23ff7d5eb9db5a326d64ae5b2eab6961e12d57294b6dae3d1164591d918b52b2"
     );
 }
 

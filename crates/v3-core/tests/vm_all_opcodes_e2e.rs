@@ -298,6 +298,8 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
                 capacity: 200.0,
+                steal_share: 0.2,
+                give_share: 0.2,
             },
             [0.0; 16],
         )

@@ -76,8 +76,9 @@ pub enum ActionParamField {
     EatLeaveShare,
     /// The energy fraction a `Reproduce` commit transfers to the child.
     ReproduceTransferFraction,
-    /// The energy a `StealEnergy` commit takes.
-    StealEnergyAmount,
+    /// A `StealEnergy` commit's effort modifier (T27.F03): a field value
+    /// `x` scales the attacker's `steal_share` by `2^clamp(x, −2, 2)`.
+    StealEffort,
 }
 
 impl ActionParamField {
@@ -87,7 +88,7 @@ impl ActionParamField {
         Self::EatFoodType,
         Self::EatLeaveShare,
         Self::ReproduceTransferFraction,
-        Self::StealEnergyAmount,
+        Self::StealEffort,
     ];
 
     /// Position in [`Self::ALL`], in `0..ACTION_PARAM_FIELD_COUNT`.
@@ -97,7 +98,7 @@ impl ActionParamField {
             Self::EatFoodType => 0,
             Self::EatLeaveShare => 1,
             Self::ReproduceTransferFraction => 2,
-            Self::StealEnergyAmount => 3,
+            Self::StealEffort => 3,
         }
     }
 
@@ -107,7 +108,7 @@ impl ActionParamField {
         match self {
             Self::EatFoodType | Self::EatLeaveShare => VoteKind::Eat,
             Self::ReproduceTransferFraction => VoteKind::Reproduce,
-            Self::StealEnergyAmount => VoteKind::StealEnergy,
+            Self::StealEffort => VoteKind::StealEnergy,
         }
     }
 }
@@ -276,7 +277,7 @@ mod tests {
                 ActionParamField::EatFoodType,
                 ActionParamField::EatLeaveShare,
                 ActionParamField::ReproduceTransferFraction,
-                ActionParamField::StealEnergyAmount,
+                ActionParamField::StealEffort,
             ]
         );
         for (index, field) in ActionParamField::ALL.into_iter().enumerate() {

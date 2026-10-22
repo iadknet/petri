@@ -153,7 +153,8 @@ Rules:
   per-founder profile selection.
 - Every founder's body carries `energy.capacity.founder` as its capacity
   (T26.F02) and is provisioned `energy.lifecycle.initial_energy`, which
-  normalization keeps at or below that capacity.
+  normalization keeps at or below that capacity. Both its exchange shares,
+  `steal_share` and `give_share`, are `exchange.founder_share` (T27.F03).
 - Startup phenotype baseline is deterministic and uniform for seeded founders.
   Canonical founder phenotype baseline values (RGB, channel weights, polarity)
   are defined in `v3-phenotype-spec.md` Section 3.

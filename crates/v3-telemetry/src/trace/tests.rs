@@ -264,7 +264,9 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "energy.lifecycle.max_energy",
         "mutation.capacity.chance",
         "mutation.capacity.log_step",
-        "predation.steal_cost_rate",
+        "exchange.effort_rate",
+        "exchange.share_min",
+        "exchange.founder_share",
         "predation.kill_complexity_bonus_multiplier",
     ]);
     let reward_learning = config_keys(&[]);

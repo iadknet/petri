@@ -110,6 +110,8 @@ Type posture:
 | `mutation.executed_window_ticks` | `u64` | `100` | How many ticks back a node dispatch still counts as recently executed. `0` normalizes to `100`. |
 | `mutation.capacity.chance` | `f32` | `0.1` | Chance per birth that the child's energy capacity mutates (T26.F02). Must be finite and in `[0.0, 1.0]`; other values fall back to `0.1`. A missing block or field takes the default. |
 | `mutation.capacity.log_step` | `f32` | `0.25` | Half-width of the capacity mutation's uniform log-space step. Must be finite and in `[0.0, ln(energy.lifecycle.max_energy / energy.capacity.min)]` (one step spans at most the range), normalized after both bounds; other values fall back to `min(0.25, that bound)`. |
+| `mutation.share.chance` | `f32` | `0.1` | Chance per birth that each exchange share mutates (T27.F03). Must be finite and in `[0.0, 1.0]`; other values fall back to `0.1`. A missing block or field takes the default. |
+| `mutation.share.log_step` | `f32` | `0.25` | Half-width of a share mutation's uniform log-space step. Must be finite and in `[0.0, ln(1 / exchange.share_min)]` (the share range's log width, 4.6 at the default; 0 at `share_min` = 1, where both shares stay at 1), normalized after `exchange.share_min`; other values fall back to `min(0.25, that bound)`. |
 
 Capacity mutation (T26.F02) is not a mutation engine domain either: at
 reproduction step 11 every birth draws one `f32` against
@@ -119,6 +121,15 @@ capacity to `parent capacity × e^δ` clamped to
 `[energy.capacity.min, energy.lifecycle.max_energy]`. The draw is taken on
 every birth, mutated or not, and is outside the engine, so the engine's draws
 are unchanged.
+
+Share mutation (T27.F03) follows the capacity's rule with one
+`mutation.share` config: after the capacity draw, every birth inherits
+`steal_share` then `give_share`, each the parent's value clamped to
+`[exchange.share_min, 1]`, then one `f32` draw against
+`mutation.share.chance` and, on a hit, `δ` uniform in `[-log_step,
+log_step]` with the child `parent × e^δ` clamped to the same range. The
+capacity and the shares share one `inherit_scalar` step and one
+`LogStepMutationConfig { chance, log_step }` type.
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -325,8 +336,9 @@ Action effort (T16.F02):
 - Every committed action charges its effort on every attempt, whatever the
   outcome: `EnergyConfig::action_effort(base, complexity, age)` =
   `adjusted_action_cost(max(base, noop_cost), complexity, age)`, with base
-  `move_cost`, `eat_cost`, `noop_cost`, `reproduce_attempt_cost`, or
-  `predation.steal_cost_rate` times the sanitized requested amount.
+  `move_cost`, `eat_cost`, `noop_cost`, `reproduce_attempt_cost`, or a
+  steal's `exchange.effort_rate × intensity × max(attacker energy, 0)`
+  (T27.F03).
 - The actions share the multiplier, so no effort is below `NoOp`'s, and
   `NoOp`'s is above zero. A base at or above `noop_cost` is charged exactly
   `adjusted_action_cost(base, …)`.
@@ -372,6 +384,23 @@ Outcome mapping:
 
 Behavioral ownership remains in `v3-reproduction-spec.md`; this section owns
 field names/defaults and transfer-gate config semantics.
+
+Exchange fields (T27.F03, `SimulationConfig.exchange`):
+
+| Key | Type | Default | Normalization and role |
+| --- | --- | --- | --- |
+| `exchange.effort_rate` | `f32` | `0.05` | Finite values clamp to `[0, 1]`; non-finite fall back to `0.05`. The effort rate of the exchange acts: a steal's effort base is `effort_rate × intensity × max(attacker energy, 0)`. |
+| `exchange.share_min` | `f32` | `0.01` | Must be finite and in `(0, 1]`; other values fall back to `0.01`. The lower bound of both heritable shares. |
+| `exchange.founder_share` | `f32` | `0.2` | Must be finite and in `[share_min, 1]`; other values fall back to `0.2` clamped to that range. Every founder's `steal_share` and `give_share`. |
+
+Normalization runs `exchange.share_min`, then `exchange.founder_share`, then
+`mutation.share`. `PredationConfig` keeps only
+`kill_complexity_bonus_multiplier`; a config naming the retired
+`predation.steal_cost_rate` fails to resolve. A steal's intensity is
+`min(1, steal_share × effort)`, with the attacker's own share and the
+decoded effort modifier `2^clamp(x, −2, 2)` of its `StealEffort` field (1
+when unwired). A live patch of the share bounds reaches newborns through the
+clamp at birth; a living creature keeps its stored shares.
 
 ---
 

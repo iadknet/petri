@@ -569,6 +569,8 @@ mod pair {
                 },
                 identity: CreatureIdentityState::default(),
                 capacity: 200.0,
+                steal_share: 0.2,
+                give_share: 0.2,
             },
             [0.0; 16],
         )

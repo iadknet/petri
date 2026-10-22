@@ -247,11 +247,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// `Directed(Move, 3)` where `Move(3)` stood (default 12505458608371593438
 /// -> 3145154597724195549, rate 0.0 17623746894553768688 ->
 /// 9861678929341148521); mapping that text back to the old shape restores
-/// both old values.
+/// both old values. Re-pinned by T27.F03 commit 3 (share draws per birth;
+/// `StealEffort`; the share rule) after two agreeing runs (default
+/// 3145154597724195549 -> 5743177234346840164, rate 0.0
+/// 9861678929341148521 -> 4601283646038048810).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 3145154597724195549);
-    assert_eq!(short_run_identity(Some(0.0)), 9861678929341148521);
+    assert_eq!(short_run_identity(None), 5743177234346840164);
+    assert_eq!(short_run_identity(Some(0.0)), 4601283646038048810);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

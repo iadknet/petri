@@ -235,8 +235,9 @@ export interface ReachableBiasConfig {
 /** Native Graph input recruitment (T20.F04); `WholeFamily` is the default. */
 export type NeutralInputRecruitment = "Off" | "SingleChannel" | "WholeFamily";
 
-/** The capacity mutation drawn on every birth (T26.F02). */
-export interface CapacityMutationConfig {
+/** A heritable scalar trait's mutation drawn on every birth: the capacity
+ * (T26.F02) and the two exchange shares (T27.F03). */
+export interface LogStepMutationConfig {
 	chance: number;
 	log_step: number;
 }
@@ -252,7 +253,8 @@ export interface MutationConfig {
 	reachable_bias: ReachableBiasConfig;
 	executed_bias: number;
 	executed_window_ticks: number;
-	capacity: CapacityMutationConfig;
+	capacity: LogStepMutationConfig;
+	share: LogStepMutationConfig;
 }
 
 export interface PerceptionRuntimeConfig {
@@ -271,8 +273,14 @@ export interface RuntimeConfig {
 }
 
 export interface PredationConfig {
-	steal_cost_rate: number;
 	kill_complexity_bonus_multiplier: number;
+}
+
+/** The exchange acts' effort rate and heritable share range (T27.F03). */
+export interface ExchangeConfig {
+	effort_rate: number;
+	share_min: number;
+	founder_share: number;
 }
 
 export interface ActionLogConfig {
@@ -290,6 +298,7 @@ export interface SimulationConfig {
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;
 	predation: PredationConfig;
+	exchange: ExchangeConfig;
 	action_log: ActionLogConfig;
 	shared_memory: SharedMemoryConfig;
 }

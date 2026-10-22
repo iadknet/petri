@@ -924,7 +924,7 @@ mod tests {
                 r#"{"ActionParam":["Eat",0]}"#,
             ),
             (
-                r#"{"ActionParam":"StealEnergyAmount"}"#,
+                r#"{"ActionParam":"StealEffort"}"#,
                 r#"{"ActionParam":["StealEnergy",1]}"#,
             ),
             (

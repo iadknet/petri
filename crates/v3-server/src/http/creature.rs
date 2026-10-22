@@ -51,6 +51,10 @@ struct CreatureDetailResponse<'a> {
     /// The creature's own energy capacity (`body.capacity`, T26.F02): the
     /// cap every credit is clamped at, not the configured `max_energy`.
     max_energy: f32,
+    /// The stored heritable shares of a steal and a gift (T27.F03), in the
+    /// range in force at the creature's birth.
+    steal_share: f32,
+    give_share: f32,
     age: u64,
     generation: u64,
     /// The direction of the creature's last committed `Move` (T11.F30).
@@ -484,6 +488,8 @@ pub async fn get_creature(
         },
         energy: creature.energy,
         max_energy: creature.energy_cap(),
+        steal_share: creature.body.steal_share,
+        give_share: creature.body.give_share,
         age: creature.age,
         generation: creature.generation,
         heading: creature.heading,

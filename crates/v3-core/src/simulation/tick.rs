@@ -1148,13 +1148,13 @@ fn execute_steal_energy(
     sim: &mut Simulation,
     ctx: &ActionContext,
     direction: Direction,
-    amount: f32,
+    effort: f32,
     outcome_acc: &mut OutcomeAccumulator,
 ) -> ActionLogEntry {
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::StealEnergy);
     }
-    let outcome = apply_steal_energy(ctx.id, sim, direction, amount);
+    let outcome = apply_steal_energy(ctx.id, sim, direction, effort);
     let result = outcome.result;
     outcome_acc.record_action_result(ctx.id, result.transferred());
     // A surviving victim takes the damage; a killed one was removed.
@@ -1263,8 +1263,8 @@ fn run_phase_2(
                     reproduce_rng,
                     &mut successful_spawn_targets,
                 ),
-                WorldAction::StealEnergy { direction, amount } => {
-                    execute_steal_energy(sim, &ctx, direction, amount, outcome_acc)
+                WorldAction::StealEnergy { direction, effort } => {
+                    execute_steal_energy(sim, &ctx, direction, effort, outcome_acc)
                 }
             };
             // Floor energy at 0.0 — creatures cannot spend more than they have.

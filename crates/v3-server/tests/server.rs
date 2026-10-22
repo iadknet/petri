@@ -2117,6 +2117,10 @@ async fn get_creature_returns_full_detail() {
         Some(200.0),
         "the detail max_energy is the founder body's capacity, not lifecycle.max_energy"
     );
+    // T27.F03: the founder's stored shares, `exchange.founder_share`.
+    for share in ["steal_share", "give_share"] {
+        assert_eq!(body[share].as_f64(), Some(f64::from(0.2f32)), "{share}");
+    }
     assert!(body.get("reproductive_reserve").is_none());
     assert!(body.get("reproductive_reserve_capacity").is_none());
     assert!(body["age"].is_number(), "missing age");

@@ -145,7 +145,7 @@ fn reproductive_success_preserves_phase_zero_and_predation_removal_ages() {
     sim.creatures[victim].genome = genome_for(CognitiveClass::SharedMemory);
     sim.creatures[victim].age = 19;
     sim.creatures[victim].offspring_spawned_count = 5;
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);

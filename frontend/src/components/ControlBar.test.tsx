@@ -143,10 +143,15 @@ const MOCK_CONFIG: SimulationConfig = {
 		executed_bias: 0.9,
 		executed_window_ticks: 100,
 		capacity: { chance: 0.1, log_step: 0.25 },
+		share: { chance: 0.1, log_step: 0.25 },
 	},
 	predation: {
-		steal_cost_rate: 0.2,
 		kill_complexity_bonus_multiplier: 0.05,
+	},
+	exchange: {
+		effort_rate: 0.2,
+		share_min: 0.01,
+		founder_share: 0.2,
 	},
 	action_log: {
 		capacity: 500,

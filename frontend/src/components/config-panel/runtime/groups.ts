@@ -13,7 +13,7 @@ import {
 } from "./FoodParametersSection.tsx";
 import { MUTATION_ALL_FIELDS } from "./MutationSection.tsx";
 import { POPULATION_FIELDS } from "./PopulationSection.tsx";
-import { PREDATION_FIELDS } from "./PredationSection.tsx";
+import { EXCHANGE_FIELDS, PREDATION_FIELDS } from "./PredationSection.tsx";
 import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
 import { SHARED_MEMORY_FIELDS } from "./SharedMemorySection.tsx";
 
@@ -32,6 +32,7 @@ export const RUNTIME_PATCH_FIELDS: AnyFieldDef[] = [
 	...AGE_COST_ALL_FIELDS,
 	...RUNTIME_FIELDS,
 	...MUTATION_ALL_FIELDS,
+	...EXCHANGE_FIELDS,
 	...PREDATION_FIELDS,
 	...ACTION_LOG_FIELDS,
 	...SHARED_MEMORY_FIELDS,
@@ -252,6 +253,10 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 				fields: pick("mutation.capacity.chance", "mutation.capacity.log_step"),
 			},
 			{
+				title: "Share drift",
+				fields: pick("mutation.share.chance", "mutation.share.log_step"),
+			},
+			{
 				title: "Colour drift",
 				fields: pick(
 					"mutation.phenotype.channel_step",
@@ -268,7 +273,12 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 		subgroups: [
 			{
 				title: "Stealing and kills",
-				fields: pick("predation.steal_cost_rate", "predation.kill_complexity_bonus_multiplier"),
+				fields: pick(
+					"exchange.effort_rate",
+					"exchange.share_min",
+					"exchange.founder_share",
+					"predation.kill_complexity_bonus_multiplier",
+				),
 			},
 		],
 	},

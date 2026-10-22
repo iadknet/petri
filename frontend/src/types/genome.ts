@@ -96,7 +96,7 @@ export type ActionParamField =
 	| "EatFoodType"
 	| "EatLeaveShare"
 	| "ReproduceTransferFraction"
-	| "StealEnergyAmount";
+	| "StealEffort";
 
 export type OutputSinkKind =
 	| { CustomOutput: number }

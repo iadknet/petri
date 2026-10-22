@@ -250,7 +250,7 @@ the cause named in invariant 9.
 
 - [x] Commit 1 (catalog).
 - [x] Commit 2 (zero-transfer fix).
-- [ ] Commit 3 (shares and effort).
+- [x] Commit 3 (shares and effort).
 - [ ] Commit 4 (give).
 - [ ] Verification Plan: viability first, then gate and goal through the
       benchmark specialist; mutation gate and slow tier through the mutation

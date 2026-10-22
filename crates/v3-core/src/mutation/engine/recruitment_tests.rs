@@ -96,10 +96,11 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // `Directed(Move, 3)` where `{"Move":3}` and `Move(3)` stood
     // (2059421590127301874 -> 12995421853181291158); mapping that text back
     // to the old shape restores the old value.
-    assert_eq!(
-        hash, 12995421853181291158,
-        "pin of the recruitment-Off path"
-    );
+    // Re-pinned by T27.F03 commit 3 (text only): parameter field 3 is
+    // `StealEffort` where `StealEnergyAmount` stood
+    // (12995421853181291158 -> 1565583786713441820); mapping the name back
+    // restores the old value.
+    assert_eq!(hash, 1565583786713441820, "pin of the recruitment-Off path");
 }
 
 #[test]

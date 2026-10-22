@@ -542,6 +542,8 @@ fn vm_eats_when_food_here() {
             },
             identity: CreatureIdentityState::default(),
             capacity: 200.0,
+            steal_share: 0.2,
+            give_share: 0.2,
         },
         [0.0; 16],
     );
@@ -640,6 +642,8 @@ fn vm_noop_when_no_food() {
             },
             identity: CreatureIdentityState::default(),
             capacity: 200.0,
+            steal_share: 0.2,
+            give_share: 0.2,
         },
         [0.0; 16],
     );

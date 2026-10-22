@@ -209,7 +209,7 @@ serializes as `{"Drive":"Move"}`. `VoteKind` is
 order: `Eat`, `Move`, `Reproduce`, `StealEnergy`.
 `ActionParamField` holds exactly the fields the commit decoder reads, in the
 order `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
-`StealEnergyAmount` (T11.F27, T02.F08); `Move` has no parameter field.
+`StealEffort` (T11.F27, T02.F08, T27.F03); `Move` has no parameter field.
 
 A wired `ActionVote` sink writes its weighted sum into the visit's vote
 contribution, which replaces the node's earlier contribution in the pass; a
@@ -250,7 +250,8 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
 - Parameters are read at commit from the kind's fields: `Eat` reads
   `EatFoodType` and `EatLeaveShare` (the share of the cell's food it leaves,
   clamped to `[0, 1]`, T02.F08), `Reproduce` `ReproduceTransferFraction`,
-  `StealEnergy` `StealEnergyAmount`, and `Move` nothing
+  `StealEnergy` `StealEffort` as its effort modifier `2^clamp(x, −2, 2)`
+  (1 when unwired, T27.F03), and `Move` nothing
   (`runtime::action_decode::decode_commit`, shared with the VM's
   `WriteActionParam`).
 - `Terminate` ends a non-empty tick when its vote is at least the best

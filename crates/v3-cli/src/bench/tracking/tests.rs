@@ -188,6 +188,15 @@ fn empty_readings() -> PopulationReadings {
         pair_groups: None,
         plasticity_census: plasticity_for(0),
         capacity: None,
+        shares: None,
+    }
+}
+
+/// A shares block both of whose distributions read `value`.
+fn shares_block(value: f64) -> crate::bench::capacity::ShareDistributions {
+    crate::bench::capacity::ShareDistributions {
+        steal_share: capacity_block(value),
+        give_share: capacity_block(value),
     }
 }
 
@@ -227,6 +236,7 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         pair_groups: Some(pair_groups_for(tick)),
         plasticity_census: plasticity_for(population),
         capacity: Some(capacity_block(tick as f64)),
+        shares: Some(shares_block(tick as f64 / 1000.0)),
     }
 }
 
@@ -586,6 +596,7 @@ proptest! {
             pair_groups: None,
             plasticity_census: Some(plasticity_for(population)),
             capacity: (population > 0).then(|| capacity_block(population as f64)),
+            shares: (population > 0).then(|| shares_block(population as f64 / 1000.0)),
             tracking: WorldTracking::default(),
         };
 
@@ -626,6 +637,7 @@ proptest! {
             "occupancy_grid",
             "plasticity_census",
             "capacity",
+            "shares",
         ] {
             object.remove(key);
         }
@@ -642,6 +654,7 @@ proptest! {
         prop_assert_eq!(historical.sensor_census, None);
         prop_assert_eq!(historical.occupancy_grid, None);
         prop_assert_eq!(historical.capacity, None);
+        prop_assert_eq!(historical.shares, None);
     }
 }
 
@@ -1444,6 +1457,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         pair_groups: Some(pair_groups_for(100)),
         plasticity_census: Some(plasticity_for(5)),
         capacity: Some(capacity_block(200.0)),
+        shares: Some(shares_block(0.2)),
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],

@@ -87,7 +87,7 @@ drives (T11.F30) included.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
-| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's four-field parameter surface (`field_idx` in `0..4`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount`; an invalid field is ignored and still costs) |
+| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's four-field parameter surface (`field_idx` in `0..4`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEffort`; an invalid field is ignored and still costs) |
 | 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
 ### Action Queue Reads
@@ -96,7 +96,7 @@ drives (T11.F30) included.
 |---|---|---|---|
 | 27 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` (the actions committed by earlier passes this tick) |
 | 28 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
-| 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`; only slots `0` and `1` carry a value: slot 0 the direction index or, for `Eat`, the food type index; slot 1 the `Eat` leave share, the `Reproduce` transfer fraction or the `StealEnergy` amount) |
+| 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`; only slots `0` and `1` carry a value: slot 0 the direction index or, for `Eat`, the food type index; slot 1 the `Eat` leave share, the `Reproduce` transfer fraction or the `StealEnergy` effort modifier) |
 
 ### Halt, Shared Memory Slots, and Priority Bid
 
@@ -371,13 +371,13 @@ best sink. The committed action reads its kind's parameter fields:
 | `Eat` | 0 | `EatFoodType` (field 0) = food type index (rounded; non-finite or negative reads 0); `EatLeaveShare` (field 1) = share of the cell's food left in place, `clamp_unit_interval` (T02.F08) |
 | `Move` | 1 to 8 (`Direction::ALL` order `N, NE, E, SE, S, SW, W, NW`) | none |
 | `Reproduce` | 9 to 16 | `ReproduceTransferFraction` (field 2) = offspring transfer fraction, `clamp_unit_interval` |
-| `StealEnergy` | 17 to 24 | `StealEnergyAmount` (field 3) = amount, `clamp_non_negative_finite` |
+| `StealEnergy` | 17 to 24 | `StealEffort` (field 3) = effort modifier `2^clamp(x, −2, 2)`, 1 for a non-finite value (T27.F03) |
 | `Drive(Move)`, `Drive(Reproduce)`, `Drive(StealEnergy)` | 25 to 27 | never commits; adds to its kind's best direction vote at the pass end (T11.F30) |
 | `Terminate` | 28 | never commits; ends a non-empty tick when it holds the best effective vote |
 | `Decide` | 29 | never commits; ends the pass early when some kind's effective vote is positive, or the queue is non-empty and `Terminate` is positive |
 
 `WriteActionParam` field indexes (T11.F27, T02.F08): `0` `EatFoodType`, `1`
-`EatLeaveShare`, `2` `ReproduceTransferFraction`, `3` `StealEnergyAmount`. The surface holds only
+`EatLeaveShare`, `2` `ReproduceTransferFraction`, `3` `StealEffort`. The surface holds only
 the fields a commit reads. A serialized pre-T11.F27 genome whose program
 holds `WriteActionParam { slot_idx, .. }` fails to deserialize; no conversion
 path exists.

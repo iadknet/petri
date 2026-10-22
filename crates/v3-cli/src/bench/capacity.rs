@@ -1,6 +1,7 @@
 //! The per-sample `capacity` block (T26.F02): the distribution of the living
 //! population's heritable energy capacity and the mass at each bound of its
-//! range.
+//! range; and the `shares` block beside it (T27.F03), the same distribution
+//! of the two heritable exchange shares over `[exchange.share_min, 1]`.
 
 use serde::{Deserialize, Serialize};
 
@@ -69,6 +70,33 @@ impl CapacityDistribution {
     }
 }
 
+/// The living population's two exchange shares at one sampled tick
+/// (T27.F03), each over `[exchange.share_min, 1]`; the boundary fractions
+/// count equality with the bounds in force.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShareDistributions {
+    pub steal_share: CapacityDistribution,
+    pub give_share: CapacityDistribution,
+}
+
+impl ShareDistributions {
+    /// The two share distributions, `None` at extinction.
+    pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Option<Self> {
+        let share_min = sim.config.exchange.share_min;
+        let of = |share: fn(&v3_core::creature::body::HeritableBody) -> f32| {
+            CapacityDistribution::of(
+                sim.creatures.values().map(|creature| share(&creature.body)),
+                share_min,
+                1.0,
+            )
+        };
+        Some(Self {
+            steal_share: of(|body| body.steal_share)?,
+            give_share: of(|body| body.give_share)?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +120,27 @@ mod tests {
         assert_eq!(block.at_min_fraction, six(0.0));
         sim.creatures.clear();
         assert_eq!(CapacityDistribution::observe(&sim), None);
+    }
+
+    #[test]
+    fn a_seeded_population_reports_its_founder_shares_and_extinction_none() {
+        let mut config = v3_core::config::SimulationConfig::default();
+        config.population.initial_creatures = 3;
+        let mut sim = v3_core::simulation::seed_simulation(config, 3);
+        let block = ShareDistributions::observe(&sim).expect("a living population");
+        for share in [&block.steal_share, &block.give_share] {
+            assert_eq!(share.median, six(f64::from(0.2f32)));
+            assert_eq!(share.at_min_fraction, six(0.0));
+            assert_eq!(share.at_max_fraction, six(0.0));
+        }
+        let first = sim.creatures.keys().next().unwrap();
+        sim.creatures[first].body.steal_share = sim.config.exchange.share_min;
+        sim.creatures[first].body.give_share = 1.0;
+        let block = ShareDistributions::observe(&sim).unwrap();
+        assert_eq!(block.steal_share.at_min_fraction, six(1.0 / 3.0));
+        assert_eq!(block.give_share.at_max_fraction, six(1.0 / 3.0));
+        sim.creatures.clear();
+        assert_eq!(ShareDistributions::observe(&sim), None);
     }
 
     #[test]

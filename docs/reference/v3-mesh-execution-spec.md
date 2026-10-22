@@ -59,7 +59,7 @@ from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, the ei
 `Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
 four-field parameter surface `action_params` (indexed by `ActionParamField`:
 `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
-`StealEnergyAmount`); at the pass
+`StealEffort`); at the pass
 end at most one
 action commits. A node may be dispatched any number of times within a pass
 (T19.F02): cycles and self-targets are legal, every dispatch runs on the
@@ -107,8 +107,8 @@ food type from `EatFoodType` (rounded, non-finite or negative reads type 0)
 and its leave share from `EatLeaveShare` (clamped to `[0, 1]`, non-finite
 reads 0, T02.F08),
 `Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
-`[0, 1]`, non-finite reads 0), and `StealEnergy` its amount from
-`StealEnergyAmount` (non-negative finite, else 0). `Move` reads no field, and
+`[0, 1]`, non-finite reads 0), and `StealEnergy` its effort modifier from
+`StealEffort` (`2^clamp(x, −2, 2)`, 1 for a non-finite value, T27.F03). `Move` reads no field, and
 the drives, `Terminate` and `Decide`
 never commit and decode to `NoOp`. The parameter surface is zeroed
 at tick start, overwritten per visit, and read at commit.
