@@ -70,14 +70,25 @@ fn pay_exchange_effort(
 }
 
 /// The energy an exchange at `intensity` moves out of `store`: `intensity ×
-/// store` when the store is positive, else nothing. A comparison, so a `NaN`
-/// or exhausted store moves nothing.
-fn exchange_amount(intensity: f32, store: f32) -> f32 {
-    if store > 0.0 {
-        intensity * store
-    } else {
-        0.0
-    }
+/// store` when the store is positive and the debit lowers it, else `None`.
+/// Comparisons, so a `NaN` or exhausted store, or an amount `f32` rounding
+/// absorbs, moves nothing.
+fn exchange_amount(intensity: f32, store: f32) -> Option<f32> {
+    let amount = if store > 0.0 { intensity * store } else { 0.0 };
+    (store - amount < store).then_some(amount)
+}
+
+/// The creature on the neighbour cell of `actor` in `dir`, never `actor`
+/// itself (a degenerate world can wrap onto it).
+fn neighbour_creature(
+    sim: &crate::simulation::simulation::Simulation,
+    actor: CreatureId,
+    dir: Direction,
+) -> Option<CreatureId> {
+    sim.world
+        .resolve_neighbor(sim.creatures[actor].position, dir)
+        .and_then(|target_pos| sim.world.creature_at(target_pos))
+        .filter(|&id| id != actor)
 }
 
 /// Debit `creature` an already computed `effort` and return the applied

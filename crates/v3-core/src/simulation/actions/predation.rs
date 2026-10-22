@@ -94,29 +94,21 @@ pub fn apply_steal_energy(
     // Steps 3 and 4: resolve the target cell and its victim, guarding
     // against self-predation in degenerate worlds.
     let attacker_pos = sim.creatures[attacker_id].position;
-    let victim_id = sim
-        .world
-        .resolve_neighbor(attacker_pos, dir)
-        .and_then(|target_pos| sim.world.creature_at(target_pos))
-        .filter(|&id| id != attacker_id);
-    let Some(victim_id) = victim_id else {
+    let Some(victim_id) = super::neighbour_creature(sim, attacker_id, dir) else {
         return reject(sim, PredationActionResult::RejectedNoVictim, effort, None);
     };
 
-    // Step 5: The share of the victim's store the intensity takes.
+    // Step 5: The share of the victim's store the intensity takes; a steal
+    // transfers only when the victim's stored energy falls.
     let before = sim.creatures[victim_id].energy;
-    let actual = super::exchange_amount(intensity, before);
-    // A steal transfers only when the victim's stored energy fell, so an
-    // amount rounding absorbs, or a NaN store, moves nothing.
-    let store_fell = before - actual < before;
-    if !store_fell {
+    let Some(actual) = super::exchange_amount(intensity, before) else {
         return reject(
             sim,
             PredationActionResult::RejectedNothingToTake,
             effort,
             Some(victim_id),
         );
-    }
+    };
 
     // Step 6: Transfer energy.
     let victim = &mut sim.creatures[victim_id];
