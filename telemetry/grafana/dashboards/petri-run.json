@@ -74,7 +74,8 @@
         "sortOrder": "Ascending",
         "dedupStrategy": "none",
         "prettifyLogMessage": false
-      }
+      },
+      "description": "The run's start, state changes, configuration and end, from the run log."
     },
     {
       "id": 2,
@@ -157,7 +158,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Which simulation tick the run has reached, and how fast it is advancing.\n\n- **tick**: the latest tick.\n- **ticks/s**: ticks completed per second of wall time."
     },
     {
       "id": 4,
@@ -215,7 +217,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Living creatures.\n\nSampled at each snapshot."
     },
     {
       "id": 5,
@@ -273,7 +276,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Mean stored energy per living creature.\n\nSampled at each snapshot."
     },
     {
       "id": 6,
@@ -355,7 +359,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Population means of brain and genome size.\n\n- **genome size**: genome units per creature. Every unit costs energy to carry.\n- **mesh nodes**: brain nodes per creature.\n- **generation**: how many ancestors back to a founder, on average.\n\nSampled at each snapshot."
     },
     {
       "id": 7,
@@ -413,7 +418,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Deaths per second, by the cost that took the creature's energy to zero.\n\n- **lifecycle_decay**: the flat metabolic cost every creature pays each tick.\n- **genome_carrying**: the per-tick cost of carrying a large genome.\n- **capacity_upkeep**: the per-tick cost of a body that stores more energy than the reference body.\n- **vm_compute / graph_compute**: the cost of running the brain's VM or graph nodes.\n- **mesh_ramp**: the rising cost of brain hops beyond the free allowance in one tick.\n- **priority_bid**: energy bid to act earlier in the turn order.\n- **action_<kind>**: the effort cost of that action (eat, move, noop, reproduce, steal_energy, give_energy).\n- **parental_transfer**: energy handed to offspring at reproduction.\n- **predation**: drained by an attacker's StealEnergy.\n- **gift**: gave its own energy away.\n- **external_removal**: removed from outside while it still had energy.\n- **unattributed**: reached zero with no recorded cause.\n- **failed_action_penalty, hebbian_learning, reward_learning**: appear only in older runs. Current builds no longer use them."
     },
     {
       "id": 8,
@@ -471,7 +477,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Children delivered per second (after any gestation)."
     },
     {
       "id": 9,
@@ -553,7 +560,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Mutation events per second at birth.\n\n- **attempted**: an operator was drawn for the child's genome.\n- **applied**: it changed the genome.\n- **skipped**: it changed nothing (no target, or the result was invalid and rolled back)."
     },
     {
       "id": 10,
@@ -611,7 +619,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Every energy flow in the world over each minute, by flow. The Exchange and Reserves rows split out the newer flows.\n\nDebits leave creatures, credits enter them. The values are energy summed over the minute.\n\n- **lifecycle_decay, genome_carrying, vm_compute, graph_compute, mesh_ramp, priority_bid**: running costs (debits). See Deaths by cause for each.\n- **capacity_upkeep**: upkeep on stored-energy capacity. Negative when bodies are smaller than the reference.\n- **action_charge.<action>**: effort paid for each action kind (debit).\n- **failed_action_effort.<action>**: the part of action_charge spent on attempts that failed.\n- **food_intake.<N>**: energy eaten from food type N (credit).\n- **parental_transfer_debit / offspring_energy_credit**: energy a parent pays into a litter, and what the child receives.\n- **offspring_capacity_overflow**: litter energy above the child's capacity, lost at birth.\n- **gestation_lost**: litter energy lost when a birth fails (parent died, no free cell, population cap).\n- **predation_victim_debit / predation_attacker_credit / predation_kill_bonus_credit**: energy stolen, energy gained, and the bonus for a kill.\n- **gift_debit / gift_credit**: energy a giver pays out, and what recipients take in before their cap.\n- **maximum_energy_clamp_loss**: energy discarded because a creature was already full.\n- **zero_floor_credit**: energy added back when a creature overdrew below zero (it dies at zero).\n- **external_removal_loss**: energy held by creatures removed from outside."
     },
     {
       "id": 11,
@@ -669,7 +678,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Share of the simulation's wall time spent in each phase of a tick.\n\n- **food_growth**: food regrowth across the map.\n- **world_update**: ageing, decay, memory decay and removing the dead.\n- **sensor_assembly**: building every creature's sensor inputs.\n- **cognition**: running the brains (in parallel).\n- **actions**: carrying out the chosen actions, one creature at a time.\n- **reward_learning**: reward-modulated learning after actions."
     },
     {
       "id": 12,
@@ -727,7 +737,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Actions chosen in the latest tick, by kind.\n\n- **move**: step to a neighbouring cell.\n- **eat**: eat food on the creature's cell.\n- **noop**: do nothing (still costs the effort floor).\n- **reproduce**: start a litter.\n- **steal**: StealEnergy: take energy from a creature in a neighbouring cell.\n- **give**: GiveEnergy: pass energy to a creature in a neighbouring cell.\n\nSampled at each snapshot."
     },
     {
       "id": 13,
@@ -809,7 +820,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Mean brain running cost per creature in the latest tick, in energy units.\n\n- **total**: VM + graph + hop (mesh_ramp) cost, over creatures that ran their brain.\n- **vm**: VM node cost, over creatures that ran a VM node.\n- **graph**: graph node cost, over creatures that ran a graph node.\n\nSampled at each snapshot."
     },
     {
       "id": 14,
@@ -867,7 +879,8 @@
           "mode": "multi",
           "sort": "none"
         }
-      }
+      },
+      "description": "Total food on the map, by food type.\n\nSampled at each snapshot."
     },
     {
       "id": 25,
@@ -886,7 +899,7 @@
       "id": 26,
       "type": "timeseries",
       "title": "Barrier bumps next to a barrier, by barrier reader",
-      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement.",
+      "description": "Of the moves made while standing next to a barrier, the share that walked into it, over a 1m window.\n\n- **has_barrier_reader**: the creature's live brain contains a node that reads a barrier sensor. It has the sensor, whether or not it acts on it.\n- **no_barrier_reader**: it has no barrier sensor in its live brain.\n\nIf creatures with the sensor bump as often as creatures without it, the sensor is not shaping their movement.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -947,7 +960,7 @@
       "id": 27,
       "type": "bargauge",
       "title": "Barrier bumps next to a barrier, run so far",
-      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement. Totals since the run started.",
+      "description": "Of the moves made while standing next to a barrier, the share that walked into it. Totals since the run started.\n\n- **has_barrier_reader**: the creature's live brain contains a node that reads a barrier sensor. It has the sensor, whether or not it acts on it.\n- **no_barrier_reader**: it has no barrier sensor in its live brain.\n\nIf creatures with the sensor bump as often as creatures without it, the sensor is not shaping their movement.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1012,7 +1025,7 @@
       "type": "xychart",
       "pluginVersion": "13.2.2",
       "title": "Barrier bumps next to a barrier, by tick",
-      "description": "The run-so-far bars over time: of the moves a creature made while standing next to a barrier, the share that walked into the barrier (1m window), plotted against simulation tick. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). A gap opening with barrier readers below non-readers means the sensor is shaping movement; overlapping lines mean it is not.",
+      "description": "The barrier bump share over a 1m window.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.\n\n- **has_barrier_reader**: the creature's live brain contains a node that reads a barrier sensor. It has the sensor, whether or not it acts on it.\n- **no_barrier_reader**: it has no barrier sensor in its live brain.\n\nReaders dropping below non-readers means the sensor is shaping movement. Overlapping lines mean it is not.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1163,7 +1176,7 @@
       "id": 28,
       "type": "bargauge",
       "title": "Offspring per removed creature, by cognitive class",
-      "description": "Offspring spawned per creature, over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking.",
+      "description": "Offspring per creature, over creatures that have died or been removed so far. Living creatures are not counted.\n\nEach removed creature gets the first class it matches, in this order. The order is bookkeeping, not an ability ranking.\n\n- **plasticity**: carries a learning rule on a reachable graph node.\n- **stateful**: has a node that keeps state between ticks (integrator, momentum, oscillator or adaptive gain).\n- **shared_memory**: reads or writes shared memory slots.\n- **none**: none of the above. A purely reactive brain.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1227,7 +1240,7 @@
       "id": 29,
       "type": "bargauge",
       "title": "Lifespan of removed creatures, by cognitive class",
-      "description": "Age at removal in ticks, averaged over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking.",
+      "description": "Age at removal in ticks, averaged over creatures that have died or been removed so far. Living creatures are not counted.\n\nEach removed creature gets the first class it matches, in this order. The order is bookkeeping, not an ability ranking.\n\n- **plasticity**: carries a learning rule on a reachable graph node.\n- **stateful**: has a node that keeps state between ticks (integrator, momentum, oscillator or adaptive gain).\n- **shared_memory**: reads or writes shared memory slots.\n- **none**: none of the above. A purely reactive brain.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1291,7 +1304,7 @@
       "id": 30,
       "type": "timeseries",
       "title": "Eat hit rate, by food type",
-      "description": "Of the typed Eat actions naming a food type, the share that found food. A low hit rate means creatures eat without checking what is under them.",
+      "description": "Of the Eat actions that name a food type, the share that found that food on the cell. A low hit rate means creatures eat without checking what is under them.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1352,7 +1365,7 @@
       "id": 31,
       "type": "timeseries",
       "title": "Food eaten, by food type (rate)",
-      "description": "Eat actions that consumed food, per second, by the food type the action named. Shows what the population actually harvests.",
+      "description": "Eat actions that consumed food, per second, by the food type eaten. Shows what the population actually harvests.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1411,7 +1424,7 @@
       "id": 32,
       "type": "timeseries",
       "title": "Blocked moves, share of all moves, by cause",
-      "description": "Of the move actions executed, the share that did not move the creature, by what blocked it: a barrier, another creature, or the world edge.",
+      "description": "Of the moves executed, the share that left the creature where it was, by what blocked it.\n\n- **barrier**: a barrier was in the way.\n- **occupied**: another creature was on the cell.\n- **out_of_bounds**: the move would have left the world.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1472,7 +1485,7 @@
       "id": 33,
       "type": "timeseries",
       "title": "Predation attempts, by result (rate)",
-      "description": "StealEnergy actions per second, by what happened: energy transferred, or rejected (for example no victim in the target cell).",
+      "description": "StealEnergy (predation) actions per second, by outcome.\n\n- **Transferred**: energy was taken and the victim survived.\n- **TransferredAndKilled**: the victim was drained to zero and died.\n- **RejectedNoVictim**: the target cell was empty, a barrier or off the map.\n- **RejectedNothingToTake**: there was a victim, but no energy moved.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1620,13 +1633,13 @@
           "sort": "none"
         }
       },
-      "description": "Age of the parent, in ticks, when each child was delivered (after any gestation), over births in the last minute. Quantiles are interpolated within histogram buckets (bounds 20, 22, 25, 30, 40, 50, 75, 100, 150, 200, 300, 500, 1000, 2000, 5000 ticks); a quantile above 5000 reads as 5000. \"First birth\" is the parent's first delivered child: age at first reproduction."
+      "description": "The parent's age in ticks when each child was delivered, over births in the last minute.\n\n- **p10 / median / p90**: 10th, 50th and 90th percentile over all births.\n- **median, first births**: only each parent's first child: age at first reproduction.\n\nPercentiles are estimated within histogram buckets (bounds 20 to 5,000 ticks). Anything above 5,000 reads as 5,000."
     },
     {
       "id": 35,
       "type": "bargauge",
       "title": "Parent age at birth, run so far",
-      "description": "Births over the whole time range by the parent's age at delivery, in ticks; each bar is one bucket, labelled by its inclusive upper bound (+Inf holds ages above 5000).",
+      "description": "Births over the whole time range by the parent's age at delivery, in ticks. Each bar is one age bucket, labelled by its upper bound. +Inf holds ages above 5,000.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1690,7 +1703,7 @@
       "id": 36,
       "type": "bargauge",
       "title": "Mean parent age at birth, run so far, by birth order",
-      "description": "Mean age of the parent, in ticks, at delivery, over every birth in the time range: \"first\" is each parent's first delivered child (age at first reproduction), \"later\" every subsequent one.",
+      "description": "Mean parent age at delivery, in ticks, over every birth in the time range.\n\n- **first**: each parent's first child (age at first reproduction).\n- **later**: every child after that.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1767,7 +1780,7 @@
       "id": 39,
       "type": "timeseries",
       "title": "Drive carriers, share of population, by kind (sampled)",
-      "description": "Share of living creatures with at least one live path into a kind's drive sink (Drive Move, Drive Reproduce, Drive StealEnergy; T11.F30), from the drives-v1 census over reachable nodes at each snapshot. Founders start with no drive edges, so any rise is mutation-borne and kept by selection. Structure, not use: a carried drive may still lose to the bar.",
+      "description": "Share of living creatures whose live brain has at least one connection into an action's drive sink.\n\nA brain votes for a directed action in one of eight directions (**direction sinks**). A **drive sink** is a ninth vote, \"do this action at all\", added to whichever direction is winning.\n\n- **move / reproduce / steal_energy / give_energy**: the four directed action kinds.\n\nFounders have no drive connections, so any rise came from mutation and was kept by selection. Having a drive is structure, not use: the drive can still lose the vote.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1828,7 +1841,7 @@
       "id": 40,
       "type": "timeseries",
       "title": "Direction fan-outs, share of population, by kind (sampled)",
-      "description": "Share of living creatures that wire one source into two or more of a kind's eight direction sinks: the per-direction duplication a single drive edge replaces. Founders carry Move and Reproduce fan-outs. Drive carriers rising while fan-outs fall is the shift T11.F30 aims at.",
+      "description": "Share of living creatures that wire one source into two or more of an action's eight direction sinks. That duplication is what a single drive connection replaces.\n\nA brain votes for a directed action in one of eight directions (**direction sinks**). A **drive sink** is a ninth vote, \"do this action at all\", added to whichever direction is winning.\n\n- **move / reproduce / steal_energy / give_energy**: the four directed action kinds.\n\nFounders carry move and reproduce fan-outs. Drive carriers rising while fan-outs fall is the shift drives were added for.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1890,7 +1903,7 @@
       "type": "xychart",
       "pluginVersion": "13.2.2",
       "title": "Drive carriers by tick (sampled)",
-      "description": "The drive-carrier shares plotted against simulation tick, one series per kind, so runs at different speeds compare on the same axis.",
+      "description": "The drive-carrier shares.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.\n\nA brain votes for a directed action in one of eight directions (**direction sinks**). A **drive sink** is a ninth vote, \"do this action at all\", added to whichever direction is winning.\n\n- **move / reproduce / steal_energy / give_energy**: the four directed action kinds.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1946,6 +1959,18 @@
           },
           "expr": "max (petri_tick_drive_carriers{petri_run_id=\"$run_id\",petri_drive_kind=\"steal_energy\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
           "legendFormat": "steal_energy",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max (petri_tick_drive_carriers{petri_run_id=\"$run_id\",petri_drive_kind=\"give_energy\"}) / scalar(max(petri_tick_population{petri_run_id=\"$run_id\"}))",
+          "legendFormat": "give_energy",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -2056,6 +2081,26 @@
                 "options": "steal_energy"
               }
             }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "tick"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "give_energy"
+              }
+            }
           }
         ],
         "legend": {
@@ -2070,9 +2115,9 @@
       }
     },
     {
-      "id": 42,
+      "id": 60,
       "type": "row",
-      "title": "Learning",
+      "title": "Exchange",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -2083,10 +2128,10 @@
       "panels": []
     },
     {
-      "id": 43,
+      "id": 61,
       "type": "timeseries",
-      "title": "Weight changes per creature-tick, by kind",
-      "description": "Plasticity edge assignments whose stored weight differs from its prior value, per creature-tick over a 1m window: pure Hebbian (applied after every graph visit) and reward-modulated (three-factor, applied once per tick after actions). How much learning actually moves weights. Activity, not effect: every compute node of a visited mesh node learns whether or not it feeds a sink, and a moved weight need not change behaviour.",
+      "title": "Give attempts, by result (rate)",
+      "description": "GiveEnergy actions per second, by outcome.\n\n- **Transferred**: energy moved to the recipient.\n- **RejectedNoRecipient**: no creature was on the target cell.\n- **RejectedNothingToGive**: the giver had no energy left after paying the action's effort.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2094,6 +2139,466 @@
       "gridPos": {
         "x": 0,
         "y": 132,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_result) (rate(petri_run_give_actions_by_result_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_result}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 62,
+      "type": "bargauge",
+      "title": "Give attempts, by result, run so far",
+      "description": "Each outcome's share of the run's GiveEnergy attempts. Totals since the run started.\n\n- **Transferred**: energy moved to the recipient.\n- **RejectedNoRecipient**: no creature was on the target cell.\n- **RejectedNothingToGive**: the giver had no energy left after paying the action's effort.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 132,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_result) (last_over_time(petri_run_give_actions_by_result_total{petri_run_id=\"$run_id\"}[$__range])) / ignoring (petri_result) group_left () sum (last_over_time(petri_run_give_actions_attempted_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{petri_result}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 63,
+      "type": "timeseries",
+      "title": "Give success share",
+      "description": "Of the GiveEnergy attempts in each minute, the share that moved energy to a recipient.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 140,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_give_actions_transferred_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_give_actions_attempted_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "transferred / attempted",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 64,
+      "type": "timeseries",
+      "title": "Gift energy flows (delta over 1m)",
+      "description": "Energy moved by gifts over each minute.\n\n- **gift_debit**: energy the givers paid out.\n- **gift_credit**: energy the recipients took in, before their capacity cap.\n\nWhen the lines overlap, recipients had room for every gift. A gap is energy lost to full recipients.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 140,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_flow) (delta(petri_run_energy_flow{petri_run_id=\"$run_id\",petri_flow=~\"gift_debit|gift_credit\"}[1m]))",
+          "legendFormat": "{{petri_flow}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 65,
+      "type": "row",
+      "title": "Reserves",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 148,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 66,
+      "type": "timeseries",
+      "title": "Reserve energy flows (delta over 1m)",
+      "description": "Energy flows tied to how much energy a body can store, over each minute.\n\n- **capacity_upkeep**: the per-tick cost of a body's storage capacity, relative to the reference body. Negative means bodies smaller than the reference are being refunded.\n- **offspring_capacity_overflow**: litter energy above a newborn's capacity, lost at birth.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 149,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_flow) (delta(petri_run_energy_flow{petri_run_id=\"$run_id\",petri_flow=~\"capacity_upkeep|offspring_capacity_overflow\"}[1m]))",
+          "legendFormat": "{{petri_flow}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 67,
+      "type": "timeseries",
+      "title": "Capacity upkeep deaths, share of all deaths",
+      "description": "Of the deaths in each minute, the share caused by capacity upkeep: the creature paid for more storage than it could keep filled.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 149,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_deaths_by_cause_total{petri_run_id=\"$run_id\",petri_cause=\"capacity_upkeep\"}[1m])) / sum(rate(petri_run_deaths_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "capacity_upkeep",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 79,
+      "type": "timeseries",
+      "title": "Mean capacity and mean energy (sampled)",
+      "description": "Storage room against what is actually stored.\n\n- **mean capacity**: the most energy a creature can hold, averaged over the living. It is inherited and mutates.\n- **mean energy**: energy actually held, averaged over the living.\n\nThe gap is unused storage, which still costs upkeep.\n\nSampled at each snapshot.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 149,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(petri_tick_mean_capacity{petri_run_id=\"$run_id\"})",
+          "legendFormat": "mean capacity",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(petri_tick_mean_energy{petri_run_id=\"$run_id\"})",
+          "legendFormat": "mean energy",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 42,
+      "type": "row",
+      "title": "Learning",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 157,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "Weight changes per creature-tick, by kind",
+      "description": "Weight changes per creature-tick over a 1m window: how much learning actually moves weights.\n\n- **hebbian**: pure Hebbian. Updates from activity alone, after every graph visit.\n- **reward-modulated**: three-factor learning. Activity is held in a fading eligibility trace and becomes a weight change only when the edge's outcome signal (energy change, action success, damage or offspring) is nonzero. Applied once per tick, after actions.\n\nA change counts when the stored weight differs from before. This is activity, not benefit: a weight can move on an edge that feeds nothing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 158,
         "w": 12,
         "h": 8
       },
@@ -2157,14 +2662,14 @@
       "id": 44,
       "type": "timeseries",
       "title": "Plasticity updates per creature-tick, by kind",
-      "description": "Plasticity edge assignments per creature-tick, changed or not: one per plastic edge on either surface per committed graph visit (Hebbian, so multi-pass ticks count more than once) or per initialized edge per tick (reward-modulated, counted even when the outcome signal is 0). Mixes how many creatures carry plasticity with how active each one is.",
+      "description": "Learning updates per creature-tick, whether or not the weight changed. Rises with both how many creatures learn and how busy each one is.\n\n- **hebbian**: pure Hebbian. Updates from activity alone, after every graph visit.\n- **reward-modulated**: three-factor learning. Activity is held in a fading eligibility trace and becomes a weight change only when the edge's outcome signal (energy change, action success, damage or offspring) is nonzero. Applied once per tick, after actions.\n\nHebbian counts once per plastic edge per graph visit, so ticks with several brain passes count more than once. Reward-modulated counts once per initialized edge per tick, even when the outcome signal is 0.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 132,
+        "y": 158,
         "w": 12,
         "h": 8
       },
@@ -2228,14 +2733,14 @@
       "id": 45,
       "type": "timeseries",
       "title": "Share of plasticity updates that change a weight, by kind",
-      "description": "Weight changes over updates, per kind, over a 1m window. A low share means most updates write the same value back: zero pre or post activity, a zero outcome signal, or a weight held at its clamp. Exact f32 inequality, so a delta rounded or clamped away is not a change.",
+      "description": "Of the learning updates, the share that changed a weight, over a 1m window.\n\n- **hebbian**: pure Hebbian. Updates from activity alone, after every graph visit.\n- **reward-modulated**: three-factor learning. Activity is held in a fading eligibility trace and becomes a weight change only when the edge's outcome signal (energy change, action success, damage or offspring) is nonzero. Applied once per tick, after actions.\n\nA low share means most updates write the same value back: no activity, a zero outcome signal, or a weight already at its clamp (its maximum).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 140,
+        "y": 166,
         "w": 12,
         "h": 8
       },
@@ -2301,14 +2806,14 @@
       "id": 46,
       "type": "bargauge",
       "title": "Plasticity per creature-tick, run so far",
-      "description": "The Hebbian and reward-modulated update and change counters over all creature-ticks of the run so far. Learning is free (T25.F02), so it has no energy flow.",
+      "description": "Learning updates and weight changes per creature-tick, over the run so far.\n\n- **hebbian**: pure Hebbian. Updates from activity alone, after every graph visit.\n- **reward-modulated**: three-factor learning. Activity is held in a fading eligibility trace and becomes a weight change only when the edge's outcome signal (energy change, action success, damage or offspring) is nonzero. Applied once per tick, after actions.\n\nLearning costs no energy, so it has no energy flow.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 140,
+        "y": 166,
         "w": 12,
         "h": 8
       },
@@ -2402,14 +2907,14 @@
       "type": "xychart",
       "pluginVersion": "13.2.2",
       "title": "Weight changes per creature-tick by tick",
-      "description": "Weight changes per creature-tick plotted against simulation tick, one series per kind, so runs at different speeds compare on the same axis.",
+      "description": "Weight changes per creature-tick.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.\n\n- **hebbian**: pure Hebbian. Updates from activity alone, after every graph visit.\n- **reward-modulated**: three-factor learning. Activity is held in a fading eligibility trace and becomes a weight change only when the edge's outcome signal (energy change, action success, damage or offspring) is nonzero. Applied once per tick, after actions.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 148,
+        "y": 174,
         "w": 24,
         "h": 8
       },
@@ -2549,14 +3054,14 @@
       "id": 48,
       "type": "timeseries",
       "title": "Plasticity carriers, share of population (sampled)",
-      "description": "Share of living creatures with at least one plastic edge (compute input or sink) on a reachable Graph node, from the plasticity census at each snapshot. Founders carry none, so any rise is mutation-borne and kept by selection. Structure, not use: a carried edge learns only when its mesh node is visited.",
+      "description": "Share of living creatures with at least one plastic (learning) edge in their live brain.\n\nFounders carry none, so any rise came from mutation and was kept by selection. Carrying an edge is structure, not use: it learns only when its brain node runs.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 156,
+        "y": 182,
         "w": 12,
         "h": 8
       },
@@ -2610,14 +3115,14 @@
       "id": 49,
       "type": "timeseries",
       "title": "Mean drift per plastic edge, by surface (sampled)",
-      "description": "Mean |learned - genome weight| over reachable plastic edges, compute inputs and sink edges apart. An edge not yet initialized (its mesh node never visited, no inherited seed) adds 0. Darwinian drift is learning within one lifetime; a seeded Lamarckian edge starts from the parent's learned weight, so its drift also carries what ancestors learned.",
+      "description": "How far learning has moved weights: the mean of |learned − birth weight| per plastic edge, by where the edge points.\n\n- **compute**: an edge into a compute node, inside the brain graph.\n- **sink**: an edge into an output sink: an action vote, a memory write or a gate.\n\nAn edge that has not learned yet adds 0. Lamarckian edges start from the parent's learned weight, so their drift also carries what ancestors learned.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 156,
+        "y": 182,
         "w": 12,
         "h": 8
       },
@@ -2669,14 +3174,14 @@
       "id": 50,
       "type": "timeseries",
       "title": "Plastic edges at their clamp, share by surface (sampled)",
-      "description": "Share of reachable plastic edges whose initialized learned weight sits at plus or minus the edge's weight_clamp (in [0.01, 10]), compute inputs and sink edges apart. A high share means learning saturates instead of tracking its inputs; T17 found Covariance with large inputs reaching its clamp in one tick.",
+      "description": "Share of learned weights stuck at their clamp (the ± maximum each edge allows, between 0.01 and 10), by where the edge points.\n\n- **compute**: an edge into a compute node, inside the brain graph.\n- **sink**: an edge into an output sink: an action vote, a memory write or a gate.\n\nA high share means learning saturates instead of tracking its inputs. Covariance with large inputs can hit the clamp in one tick.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 164,
+        "y": 190,
         "w": 12,
         "h": 8
       },
@@ -2730,14 +3235,14 @@
       "id": 51,
       "type": "timeseries",
       "title": "Plastic edges by rule (sampled)",
-      "description": "Reachable plastic edges (compute inputs and sink edges) in the living population, per rule: the mix of rules selection keeps.",
+      "description": "Plastic edges in the living population, by learning rule: the mix of rules selection keeps.\n\n- **classic**: plain Hebbian learning. The weight grows when its input and the node are active together (Δw = rate × in × out).\n- **anti_hebb**: the reverse. Activity together weakens the weight (Δw = −rate × in × out).\n- **oja**: Hebbian with a brake. Growth slows as the weight gets large, so it settles instead of running away (Δw = rate × out × (in − w × out)).\n- **covariance**: learns from distance to the midpoint 0.5. Input and node both above or both below it strengthen the weight; one above and one below weakens it (Δw = rate × (in − 0.5) × (out − 0.5)).\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 164,
+        "y": 190,
         "w": 12,
         "h": 8
       },
@@ -2790,14 +3295,14 @@
       "type": "xychart",
       "pluginVersion": "13.2.2",
       "title": "Plasticity carriers by tick (sampled)",
-      "description": "The plasticity-carrier share plotted against simulation tick, so runs at different speeds compare on the same axis.",
+      "description": "The plasticity-carrier share.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 172,
+        "y": 198,
         "w": 24,
         "h": 8
       },
@@ -2909,14 +3414,14 @@
       "id": 57,
       "type": "timeseries",
       "title": "Plastic edges by scope (sampled)",
-      "description": "Reachable plastic edges in the living population by learning scope (T25.F07): ungrouped edges, group members that learn their own correction (edge scope), and members that learn for their group by moving its one shared scale (group scope).",
+      "description": "Plastic edges in the living population, by what they learn.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **ungrouped**: the edge is in no group and learns its own weight.\n- **edge**: a group member that learns its own correction on top of the shared scale.\n- **group**: a group member that learns the group's shared scale, moving all members together.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 180,
+        "y": 206,
         "w": 8,
         "h": 8
       },
@@ -2968,14 +3473,14 @@
       "id": 58,
       "type": "timeseries",
       "title": "Mean learned-scale drift, by inheritance (sampled)",
-      "description": "Mean |learned - genome scale| over the learned scales of groups with a group-scope learner, once per group; an uninitialized scale adds 0. Lamarckian groups (inherit_scale) start from the parent's learned scale, so their drift also carries what ancestors learned.",
+      "description": "How far learning has moved group scales: mean |learned − birth scale|, counted once per group.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **darwinian**: children start from the genome's birth value. What the parent learned dies with it.\n- **lamarckian**: children start from the parent's learned value, so learning is passed down.\n\nA scale that has not learned yet adds 0.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 8,
-        "y": 180,
+        "y": 206,
         "w": 8,
         "h": 8
       },
@@ -3027,14 +3532,14 @@
       "id": 59,
       "type": "timeseries",
       "title": "Learned scales at their bound, share by inheritance (sampled)",
-      "description": "Share of learned scales whose initialized value sits at plus or minus the group's bound (the smallest weight_clamp among its group-scope learners). A genomic scale outside the bound starts at it (T25.F09).",
+      "description": "Share of learned group scales stuck at their bound (the smallest clamp among the group's learners).\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **darwinian**: children start from the genome's birth value. What the parent learned dies with it.\n- **lamarckian**: children start from the parent's learned value, so learning is passed down.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 16,
-        "y": 180,
+        "y": 206,
         "w": 8,
         "h": 8
       },
@@ -3085,12 +3590,638 @@
       }
     },
     {
+      "id": 68,
+      "type": "timeseries",
+      "title": "Plastic edges, share by retention (sampled)",
+      "description": "Plastic edges, split by how fast they forget, as a share of all plastic edges.\n\nEvery tick a learned value slides back toward its birth value. The label is how much of the learned change it loses per tick:\n\n- **none**: loses nothing. Learning lasts the whole life.\n- **1e-3**: loses under 0.1% per tick (slow forgetting).\n- **1e-2**: 0.1% to 1% per tick.\n- **1e-1**: 1% to 10% per tick.\n- **1**: 10% to 100% per tick (forgets within a few ticks).\n\nSampled at each snapshot.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 214,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_plasticity_retention) (petri_tick_plastic_edges_by_retention{petri_run_id=\"$run_id\"}) / ignoring (petri_plasticity_retention) group_left () sum(petri_tick_plastic_edges_by_retention{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_plasticity_retention}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 30,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 69,
+      "type": "timeseries",
+      "title": "Learned scales, share by retention (sampled)",
+      "description": "Learned group scales, split by how fast they forget, as a share of all learned scales.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\nEvery tick a learned value slides back toward its birth value. The label is how much of the learned change it loses per tick:\n\n- **none**: loses nothing. Learning lasts the whole life.\n- **1e-3**: loses under 0.1% per tick (slow forgetting).\n- **1e-2**: 0.1% to 1% per tick.\n- **1e-1**: 1% to 10% per tick.\n- **1**: 10% to 100% per tick (forgets within a few ticks).\n\nSampled at each snapshot.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 214,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_plasticity_retention) (petri_tick_learned_scales_by_retention{petri_run_id=\"$run_id\"}) / ignoring (petri_plasticity_retention) group_left () sum(petri_tick_learned_scales_by_retention{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_plasticity_retention}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 30,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 70,
+      "type": "timeseries",
+      "title": "Plastic edges by inheritance (sampled)",
+      "description": "Plastic edges in the living population, by whether children inherit what was learned.\n\n- **darwinian**: children start from the genome's birth value. What the parent learned dies with it.\n- **lamarckian**: children start from the parent's learned value, so learning is passed down.\n\nSampled at each snapshot.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 214,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_plasticity_inheritance) (petri_tick_plastic_edges_by_inheritance{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_plasticity_inheritance}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 71,
+      "type": "row",
+      "title": "Mutation",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 222,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 72,
+      "type": "timeseries",
+      "title": "Mutations applied, top 8 operators (rate)",
+      "description": "Applied mutation events per second for the eight busiest operators at each moment. The legend lists every operator that was in the top eight at some point.\n\nOperator names read `Family.Operator`. The family says which part of the genome the operator changes:\n\n- **Topology**: the brain's node network: which node runs next (routes), the entry node, gate biases.\n- **Graph**: inside a graph node: compute nodes, edges and weights, groups and learning settings.\n- **Vm**: inside a VM node: its instruction program, constants, registers and memory addresses.\n- **InputRef**: which sensors a node reads (add, prune, swap, retune).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 223,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk(8, sum by (petri_operator) (rate(petri_run_mutation_events_applied_by_operator_total{petri_run_id=\"$run_id\"}[1m])))",
+          "legendFormat": "{{petri_operator}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 73,
+      "type": "bargauge",
+      "title": "Mutations applied, top 12 operators, run so far",
+      "description": "Each operator's share of the run's applied mutation events, the twelve largest. Totals since the run started.\n\nOperator names read `Family.Operator`. The family says which part of the genome the operator changes:\n\n- **Topology**: the brain's node network: which node runs next (routes), the entry node, gate biases.\n- **Graph**: inside a graph node: compute nodes, edges and weights, groups and learning settings.\n- **Vm**: inside a VM node: its instruction program, constants, registers and memory addresses.\n- **InputRef**: which sensors a node reads (add, prune, swap, retune).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 223,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk(12, sum by (petri_operator) (last_over_time(petri_run_mutation_events_applied_by_operator_total{petri_run_id=\"$run_id\"}[$__range])) / ignoring (petri_operator) group_left () sum(last_over_time(petri_run_mutation_events_applied_by_operator_total{petri_run_id=\"$run_id\"}[$__range])))",
+          "legendFormat": "{{petri_operator}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 74,
+      "type": "timeseries",
+      "title": "Mutations skipped, by reason (rate)",
+      "description": "Mutation events per second that drew an operator but changed nothing, by reason.\n\n- **NoApplicableTarget**: the genome had nothing that operator can act on.\n- **ParseabilityViolation**: the result would not be a valid genome.\n- **NumericProposalRejected**: the proposed number was out of range.\n- **GraphInvariantViolation**: the change broke a brain-graph rule and was rolled back.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 231,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_skip_reason) (rate(petri_run_mutation_events_skipped_by_reason_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_skip_reason}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 75,
+      "type": "timeseries",
+      "title": "Attribute changes, by scope (rate)",
+      "description": "Mutations to learning settings (rule, rate, retention, inheritance, scope and so on) per second, by how the edited edge learns.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **Edge**: the edge learns its own weight or correction.\n- **Group**: the edge learns its group's shared scale.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 231,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_scope) (rate(petri_run_mutation_attribute_changes_by_scope_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_scope}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 76,
+      "type": "timeseries",
+      "title": "Edges detached and groups removed (rate)",
+      "description": "Mutations that take groups apart, per second.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **edges detached**: an edge left its group and now carries its own weight.\n- **groups removed**: a whole group was dissolved.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 239,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_graph_edges_detached_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "edges detached",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_groups_removed_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "groups removed",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 77,
+      "type": "timeseries",
+      "title": "Births inheriting a pair-group scale",
+      "description": "Of the births in each minute, the share whose genome holds a nonzero direction-pair group scale that no mutation at that birth could have made. The scale was inherited from the parent.\n\nA direction-pair group turns a sensed x/y offset (such as nearest food) into votes for the eight directions.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 239,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_pair_group_inherited_nonzero_births_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_reproduction_actions_spawned_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "inherited nonzero",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 78,
+      "type": "timeseries",
+      "title": "Genome size per creature-tick",
+      "description": "Mean genome size, weighted by how long each creature lived: genome units carried per creature-tick. This is the size the population actually paid carrying cost on.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 239,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(petri_run_genome_size_creature_ticks_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_creature_ticks_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "genome size",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 15,
       "type": "row",
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 188,
+        "y": 247,
         "w": 24,
         "h": 1
       },
@@ -3107,7 +4238,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 189,
+        "y": 248,
         "w": 12,
         "h": 8
       },
@@ -3172,7 +4303,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "description": "Living creatures.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up."
     },
     {
       "id": 17,
@@ -3184,7 +4316,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 189,
+        "y": 248,
         "w": 12,
         "h": 8
       },
@@ -3249,7 +4381,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "description": "Mean stored energy per living creature.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up."
     },
     {
       "id": 18,
@@ -3261,7 +4394,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 197,
+        "y": 256,
         "w": 12,
         "h": 8
       },
@@ -3326,7 +4459,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "description": "Mean genome units per creature.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up."
     },
     {
       "id": 19,
@@ -3338,7 +4472,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 197,
+        "y": 256,
         "w": 12,
         "h": 8
       },
@@ -3403,7 +4537,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "description": "Deaths so far.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up."
     },
     {
       "id": 20,
@@ -3415,7 +4550,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 205,
+        "y": 264,
         "w": 12,
         "h": 8
       },
@@ -3480,7 +4615,8 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "description": "Applied mutation events so far.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up."
     },
     {
       "id": 21,
@@ -3488,7 +4624,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 213,
+        "y": 272,
         "w": 24,
         "h": 1
       },
@@ -3499,14 +4635,14 @@
       "id": 22,
       "type": "table",
       "title": "Tick traces",
-      "description": "One row per tick trace of the run: its start, duration, tick and sample policy. The span ID opens the trace.",
+      "description": "One row per tick trace of the run: its start, duration, tick and sample policy. Click the span ID to open the trace.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
       },
       "gridPos": {
         "x": 0,
-        "y": 214,
+        "y": 273,
         "w": 24,
         "h": 10
       },
@@ -3533,7 +4669,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 224,
+        "y": 283,
         "w": 24,
         "h": 1
       },
@@ -3544,14 +4680,14 @@
       "id": 24,
       "type": "table",
       "title": "Creature windows",
-      "description": "One row per creature window or manual sample of the run: its sample index, creature, policy, ticks recorded, end reason and truncation. The span ID opens the trace, whose tick spans carry the hop, pass and action events.",
+      "description": "One row per creature window (a creature recorded tick by tick for a short stretch) or manual sample. Click the span ID to open the trace. Its tick spans carry the brain hops, passes and actions.",
       "datasource": {
         "type": "tempo",
         "uid": "tempo"
       },
       "gridPos": {
         "x": 0,
-        "y": 225,
+        "y": 284,
         "w": 24,
         "h": 10
       },
@@ -3579,7 +4715,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 235,
+        "y": 294,
         "w": 24,
         "h": 1
       },
@@ -3589,14 +4725,14 @@
       "id": 54,
       "type": "timeseries",
       "title": "Sensors declared, share of population, by world input (sampled)",
-      "description": "Share of living creatures whose reachable nodes list each world input key in their input references, wired or not. Cached at birth. Carried, not necessarily used.",
+      "description": "Share of living creatures whose live brain lists each sensor in its inputs, wired or not. Fixed at birth. Carried, not necessarily used.\n\n`:N` names a food type.\n\n- **FoodHere:N**: food density on the creature's own cell.\n- **NeighborFoodRing:N**: food in each of the 8 neighbouring cells.\n- **NeighborBarrierRing**: barriers in the 8 neighbouring cells.\n- **NeighborOccupiedRing**: creatures in the 8 neighbouring cells.\n- **AreaFoodSummary:N / AreaBarrierSummary / AreaOccupancySummary**: a 7-number summary of food, barriers or crowding in the wider area.\n- **NearbyCreature**: up to 4 nearby creatures, 10 numbers describing each.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 236,
+        "y": 295,
         "w": 8,
         "h": 9
       },
@@ -3650,14 +4786,14 @@
       "id": 55,
       "type": "timeseries",
       "title": "Sensors wired, share of population, by world input (sampled)",
-      "description": "Share of living creatures whose sensor census reaches each key: a live VM read, a wired graph edge or a ring projection on the live walk. Cached at birth. Structural: a zero-weight or never-routed wire still counts.",
+      "description": "Share of living creatures whose live brain has each sensor connected to something: a VM read, a graph edge or a ring projection. Fixed at birth. A zero-weight connection still counts.\n\n`:N` names a food type.\n\n- **FoodHere:N**: food density on the creature's own cell.\n- **NeighborFoodRing:N**: food in each of the 8 neighbouring cells.\n- **NeighborBarrierRing**: barriers in the 8 neighbouring cells.\n- **NeighborOccupiedRing**: creatures in the 8 neighbouring cells.\n- **AreaFoodSummary:N / AreaBarrierSummary / AreaOccupancySummary**: a 7-number summary of food, barriers or crowding in the wider area.\n- **NearbyCreature**: up to 4 nearby creatures, 10 numbers describing each.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 8,
-        "y": 236,
+        "y": 295,
         "w": 8,
         "h": 9
       },
@@ -3711,14 +4847,14 @@
       "id": 56,
       "type": "timeseries",
       "title": "Sensors read, share of population, by world input (sampled)",
-      "description": "Share of living creatures whose most recent mesh run resolved each key: an executed VM read, or a graph leaf or ring projection evaluated on a visited node. Can exceed wired: a VM read whose result is unused still executes, and a graph node evaluates its dead compute nodes. Read is not influence.",
+      "description": "Share of living creatures whose latest brain run actually evaluated each sensor. Can exceed wired, because a VM read whose result is unused still runs. Read is not influence.\n\n`:N` names a food type.\n\n- **FoodHere:N**: food density on the creature's own cell.\n- **NeighborFoodRing:N**: food in each of the 8 neighbouring cells.\n- **NeighborBarrierRing**: barriers in the 8 neighbouring cells.\n- **NeighborOccupiedRing**: creatures in the 8 neighbouring cells.\n- **AreaFoodSummary:N / AreaBarrierSummary / AreaOccupancySummary**: a 7-number summary of food, barriers or crowding in the wider area.\n- **NearbyCreature**: up to 4 nearby creatures, 10 numbers describing each.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "x": 16,
-        "y": 236,
+        "y": 295,
         "w": 8,
         "h": 9
       },

@@ -8,7 +8,7 @@
       "id": 1,
       "type": "table",
       "title": "Selected runs",
-      "description": "Identity of each selected run from its run.started record: when it started, which binary, seed, world, preset, build revision and full-config digest. Runs with the same build and config digest differ only by seed.",
+      "description": "The selected runs' start lines: seed, world, recipe and build.",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -116,7 +116,7 @@
       "id": 3,
       "type": "trend",
       "title": "Population by tick (sampled)",
-      "description": "Living creatures at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Living creatures, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -238,7 +238,7 @@
       "id": 4,
       "type": "trend",
       "title": "Mean energy by tick (sampled)",
-      "description": "Mean creature energy at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Mean stored energy per living creature, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -360,7 +360,7 @@
       "id": 5,
       "type": "trend",
       "title": "Mean genome size by tick (sampled)",
-      "description": "Mean genome size at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Mean genome units per creature, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -482,7 +482,7 @@
       "id": 6,
       "type": "trend",
       "title": "Mean mesh nodes by tick (sampled)",
-      "description": "Mean mesh node count at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Mean brain nodes per creature, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -604,7 +604,7 @@
       "id": 7,
       "type": "trend",
       "title": "Births so far by tick",
-      "description": "Offspring spawned since the run started. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Children delivered so far, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -726,7 +726,7 @@
       "id": 8,
       "type": "trend",
       "title": "Deaths so far by tick",
-      "description": "Creatures that died since the run started. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "description": "Deaths so far, one line per run.\n\nPlotted against simulation tick instead of wall time, so runs at different speeds line up.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -861,7 +861,7 @@
       "id": 10,
       "type": "barchart",
       "title": "Barrier bumps next to a barrier, by barrier reader",
-      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Of the moves made next to a barrier, the share that walked into it.\n\n- **has_barrier_reader**: the creature's live brain contains a node that reads a barrier sensor. It has the sensor, whether or not it acts on it.\n- **no_barrier_reader**: it has no barrier sensor in its live brain.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -939,7 +939,7 @@
       "id": 11,
       "type": "barchart",
       "title": "Eat hit rate, by food type",
-      "description": "Of the typed Eat actions naming a food type, the share that found food. A low hit rate means creatures eat without checking what is under them. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Of the Eat actions that name a food type, the share that found that food.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1017,7 +1017,7 @@
       "id": 12,
       "type": "barchart",
       "title": "Offspring per removed creature, by cognitive class",
-      "description": "Offspring spawned per creature, over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Offspring per creature, over creatures removed so far.\n\nEach removed creature gets the first class it matches, in this order. The order is bookkeeping, not an ability ranking.\n\n- **plasticity**: carries a learning rule on a reachable graph node.\n- **stateful**: has a node that keeps state between ticks (integrator, momentum, oscillator or adaptive gain).\n- **shared_memory**: reads or writes shared memory slots.\n- **none**: none of the above. A purely reactive brain.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1094,7 +1094,7 @@
       "id": 13,
       "type": "barchart",
       "title": "Lifespan of removed creatures, by cognitive class",
-      "description": "Age at removal in ticks, averaged over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Age at removal in ticks, over creatures removed so far.\n\nEach removed creature gets the first class it matches, in this order. The order is bookkeeping, not an ability ranking.\n\n- **plasticity**: carries a learning rule on a reachable graph node.\n- **stateful**: has a node that keeps state between ticks (integrator, momentum, oscillator or adaptive gain).\n- **shared_memory**: reads or writes shared memory slots.\n- **none**: none of the above. A purely reactive brain.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1171,7 +1171,7 @@
       "id": 14,
       "type": "barchart",
       "title": "Deaths, share by cause",
-      "description": "Each cause's share of the run's deaths, where the cause is the energy debit that took the creature to zero. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Each cause's share of the run's deaths.\n\n- **lifecycle_decay**: the flat metabolic cost every creature pays each tick.\n- **genome_carrying**: the per-tick cost of carrying a large genome.\n- **capacity_upkeep**: the per-tick cost of a body that stores more energy than the reference body.\n- **vm_compute / graph_compute**: the cost of running the brain's VM or graph nodes.\n- **mesh_ramp**: the rising cost of brain hops beyond the free allowance in one tick.\n- **priority_bid**: energy bid to act earlier in the turn order.\n- **action_<kind>**: the effort cost of that action (eat, move, noop, reproduce, steal_energy, give_energy).\n- **parental_transfer**: energy handed to offspring at reproduction.\n- **predation**: drained by an attacker's StealEnergy.\n- **gift**: gave its own energy away.\n- **external_removal**: removed from outside while it still had energy.\n- **unattributed**: reached zero with no recorded cause.\n- **failed_action_penalty, hebbian_learning, reward_learning**: appear only in older runs. Current builds no longer use them.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1249,7 +1249,7 @@
       "id": 15,
       "type": "barchart",
       "title": "Action mix (sampled)",
-      "description": "Each action's share of the actions taken at sampled ticks, averaged over the time range. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Each action's share of the actions chosen, averaged over the sampled ticks.\n\n- **move**: step to a neighbouring cell.\n- **eat**: eat food on the creature's cell.\n- **noop**: do nothing (still costs the effort floor).\n- **reproduce**: start a litter.\n- **steal**: StealEnergy: take energy from a creature in a neighbouring cell.\n- **give**: GiveEnergy: pass energy to a creature in a neighbouring cell.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1327,7 +1327,7 @@
       "id": 16,
       "type": "barchart",
       "title": "Mean parent age at birth, by birth order",
-      "description": "Mean age of the parent, in ticks, at delivery: \"first\" is each parent's first delivered child (age at first reproduction), \"later\" every subsequent one. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "description": "Mean parent age at delivery, in ticks.\n\n- **first**: each parent's first child (age at first reproduction).\n- **later**: every child after that.\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1389,6 +1389,84 @@
         "groupWidth": 0.8,
         "barWidth": 0.9,
         "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "barchart",
+      "title": "Mutation operator mix, top 8 per run",
+      "description": "Each operator's share of the run's applied mutation events, the eight largest per run.\n\nOperator names read `Family.Operator`. The family says which part of the genome the operator changes:\n\n- **Topology**: the brain's node network: which node runs next (routes), the entry node, gate biases.\n- **Graph**: inside a graph node: compute nodes, edges and weights, groups and learning settings.\n- **Vm**: inside a VM node: its instruction program, constants, registers and memory addresses.\n- **InputRef**: which sensors a node reads (add, prune, swap, retune).\n\nOne bar per selected run, labelled by the first eight characters of its run ID. Totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk by (run) (8, sum by (run, petri_operator) (label_replace(last_over_time(petri_run_mutation_events_applied_by_operator_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) / ignoring (petri_operator) group_left () sum by (run) (label_replace(last_over_time(petri_run_mutation_events_applied_by_operator_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_operator",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_operator": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "normal",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "never",
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
