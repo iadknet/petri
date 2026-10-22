@@ -2,12 +2,17 @@
 //! `min(1, give_share × effort) × giver energy` from the giver to the
 //! creature on the target cell through the ledger.
 
+use super::super::run_tick;
 use super::support::*;
 use crate::contracts::{ActionType, CreatureId, Direction, WorldAction};
 use crate::creature::action_log::{ActionLog, ActionLogEntry, ActionResult};
+use crate::creature::genome::vote::DirectedVoteKind;
+use crate::creature::genome::{CreatureGenome, OutcomeChannel, VmInstruction};
 use crate::simulation::actions::{apply_give_energy, GiveActionResult};
 use crate::simulation::energy_accounting::{applied_debit, DeathCause};
+use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::Simulation;
+use rand::SeedableRng;
 
 /// A give north at effort modifier `effort`.
 const fn give_north(effort: f32) -> WorldAction {
@@ -244,5 +249,90 @@ proptest::proptest! {
                 proptest::prop_assert!(false, "the recipient is adjacent");
             }
         }
+    }
+}
+
+#[test]
+fn each_give_result_has_its_stable_key() {
+    let expected = [
+        (GiveActionResult::Transferred, "Transferred"),
+        (GiveActionResult::RejectedNoRecipient, "RejectedNoRecipient"),
+        (
+            GiveActionResult::RejectedNothingToGive,
+            "RejectedNothingToGive",
+        ),
+    ];
+    assert_eq!(
+        GiveActionResult::ALL.to_vec(),
+        expected.map(|(result, _)| result).to_vec()
+    );
+    for (result, key) in expected {
+        assert_eq!(result.as_key(), key);
+    }
+}
+
+/// The `ActionSuccess` outcome signal creature `id` reads after committing
+/// `action` alone.
+fn action_success(sim: &mut Simulation, id: CreatureId, action: WorldAction) -> f32 {
+    let mut outcomes = OutcomeAccumulator::default();
+    outcomes.snapshot_energy(id, sim.creatures[id].energy);
+    super::super::run_phase_2(
+        sim,
+        vec![(id, decision(vec![action]))],
+        &mut outcomes,
+        &mut rand::rngs::SmallRng::seed_from_u64(11),
+    );
+    let energy = sim.creatures[id].energy;
+    outcomes
+        .compute_signal_bank(id, energy)
+        .expect("the actor has an outcome record")
+        .signals[OutcomeChannel::ActionSuccess as usize]
+}
+
+/// A genome committing one unit to the `kind` sink in direction `dir`.
+fn exchange_genome(kind: DirectedVoteKind, dir: Direction) -> CreatureGenome {
+    let sink = kind.sink(dir.to_index() as u8).index() as u8;
+    vm_program_genome(vec![
+        VmInstruction::AddVote { sink, src: 0 },
+        VmInstruction::Halt,
+    ])
+}
+
+#[test]
+fn a_tick_counts_its_gives_and_steals_among_the_applied_actions() {
+    // The giver sits south of the attacker: it gives north, the attacker
+    // steals back south.
+    let (mut sim, giver, attacker) = make_sim_two_creatures(50.0, 50.0);
+    sim.creatures[giver].genome = exchange_genome(DirectedVoteKind::GiveEnergy, Direction::N);
+    sim.creatures[attacker].genome = exchange_genome(DirectedVoteKind::StealEnergy, Direction::S);
+
+    run_tick(&mut sim, &mut None);
+
+    assert_eq!(sim.stats.last_tick_give, 1);
+    assert_eq!(sim.stats.last_tick_steal, 1);
+    assert_eq!(sim.stats.actions_applied_total, 2);
+}
+
+#[test]
+fn only_a_transferring_exchange_counts_as_a_successful_action() {
+    let directions = [(Direction::N, 1.0), (Direction::S, 0.0)];
+    for (direction, success) in directions {
+        let give = WorldAction::GiveEnergy {
+            direction,
+            effort: 1.0,
+        };
+        let (mut sim, giver, _) = make_sim_two_creatures(50.0, 30.0);
+        assert_eq!(action_success(&mut sim, giver, give), success, "{give:?}");
+
+        let steal = WorldAction::StealEnergy {
+            direction,
+            effort: 1.0,
+        };
+        let (mut sim, attacker, _) = make_sim_two_creatures(50.0, 30.0);
+        assert_eq!(
+            action_success(&mut sim, attacker, steal),
+            success,
+            "{steal:?}"
+        );
     }
 }

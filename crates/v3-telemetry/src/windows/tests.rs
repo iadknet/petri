@@ -957,3 +957,39 @@ fn run_started_records_the_three_settings() {
         .unwrap();
     assert_eq!(ended.attribute("petri.samples_skipped"), Some("0"));
 }
+
+#[test]
+fn action_label_names_each_action_kind_with_its_argument() {
+    use v3_core::config::OrdinaryFoodTypeId;
+    use v3_core::contracts::{Direction, WorldAction};
+
+    let cases = [
+        (WorldAction::NoOp, "noop"),
+        (WorldAction::eat(OrdinaryFoodTypeId::new(1)), "eat:1"),
+        (WorldAction::Move(Direction::S), "move:4"),
+        (
+            WorldAction::Reproduce {
+                direction: Direction::E,
+                energy_transfer_fraction: 0.5,
+            },
+            "reproduce:2",
+        ),
+        (
+            WorldAction::StealEnergy {
+                direction: Direction::W,
+                effort: 2.0,
+            },
+            "steal:6",
+        ),
+        (
+            WorldAction::GiveEnergy {
+                direction: Direction::N,
+                effort: 0.5,
+            },
+            "give:0",
+        ),
+    ];
+    for (action, label) in cases {
+        assert_eq!(action_label(&action), label, "{action:?}");
+    }
+}
