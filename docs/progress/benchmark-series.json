@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t27-f01-colour-vision.json",
+    "epoch_baseline": "docs/progress/features/t26-f02-evolvable-energy-reserves.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -83,7 +83,8 @@
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog.json",
       "docs/progress/features/t25-f09-learned-weight-decay.json",
       "docs/progress/features/t25-f10.json",
-      "docs/progress/features/t27-f01-colour-vision.json"
+      "docs/progress/features/t27-f01-colour-vision.json",
+      "docs/progress/features/t26-f02-evolvable-energy-reserves.json"
     ]
   },
   "goal": {
@@ -184,7 +185,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t27-f01-colour-vision-goal.json",
+    "epoch_baseline": "docs/progress/features/t26-f02-evolvable-energy-reserves-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -242,15 +243,17 @@
       "docs/progress/features/t25-f08-creation-forms-detach-and-the-catalog-goal.json",
       "docs/progress/features/t25-f09-learned-weight-decay-goal.json",
       "docs/progress/features/t25-f10-goal.json",
-      "docs/progress/features/t27-f01-colour-vision-goal.json"
+      "docs/progress/features/t27-f01-colour-vision-goal.json",
+      "docs/progress/features/t26-f02-evolvable-energy-reserves-goal.json"
     ]
   },
   "goal_worlds_long": {
     "series": "goal-worlds-long-v1",
-    "epoch_baseline": "docs/progress/features/t25-f02-uniform-genome-size-base-goal-long.json",
+    "epoch_baseline": "docs/progress/features/t26-f02-evolvable-energy-reserves-goal-long.json",
     "closed": [
       "docs/progress/features/t25-f02-uniform-genome-size-goal-long.json",
-      "docs/progress/features/t25-f04-direction-pair-groups-goal-long.json"
+      "docs/progress/features/t25-f04-direction-pair-groups-goal-long.json",
+      "docs/progress/features/t26-f02-evolvable-energy-reserves-goal-long.json"
     ]
   }
 }
