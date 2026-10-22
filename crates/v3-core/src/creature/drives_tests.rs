@@ -80,7 +80,7 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
                         src: 0,
                     },
                     VmInstruction::AddVote {
-                        sink: VoteSink::StealEnergy(3).index() as u8,
+                        sink: VoteSink::Directed(DirectedVoteKind::StealEnergy, 3).index() as u8,
                         src: 0,
                     },
                 ],
@@ -117,16 +117,51 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
 fn a_fanout_needs_one_source_and_sign_into_two_direction_sinks_on_one_node() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // Fan-out: memory(0) positive into Move(0) twice and Move(2): 3 edges.
-    wire(&mut def, VoteSink::Move(0), memory(0), 0.5);
-    wire(&mut def, VoteSink::Move(0), memory(0), 0.7);
-    wire(&mut def, VoteSink::Move(2), memory(0), 0.5);
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 0),
+        memory(0),
+        0.5,
+    );
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 0),
+        memory(0),
+        0.7,
+    );
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 2),
+        memory(0),
+        0.5,
+    );
     // Not one: the opposite sign into a third direction, a lone edge, the
     // drive, another kind, and a floored weight.
-    wire(&mut def, VoteSink::Move(4), memory(0), -0.5);
-    wire(&mut def, VoteSink::Move(5), memory(1), 0.5);
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 4),
+        memory(0),
+        -0.5,
+    );
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 5),
+        memory(1),
+        0.5,
+    );
     wire(&mut def, DirectedVoteKind::Move.drive(), memory(1), 0.5);
-    wire(&mut def, VoteSink::Reproduce(5), memory(1), 0.5);
-    wire(&mut def, VoteSink::Move(6), memory(1), 1e-4);
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Reproduce, 5),
+        memory(1),
+        0.5,
+    );
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 6),
+        memory(1),
+        1e-4,
+    );
     let census = census_of(&[graph_genome(def)]);
     let moves = census.kinds[DirectedVoteKind::Move.index()];
     assert_eq!(
@@ -152,8 +187,18 @@ fn a_weight_exactly_at_the_floor_carries_no_path() {
     let drive = DirectedVoteKind::Move.drive();
     wire(&mut def, drive, memory(0), PATH_WEIGHT_FLOOR);
     wire(&mut def, drive, memory(1), -PATH_WEIGHT_FLOOR);
-    wire(&mut def, VoteSink::Move(0), memory(2), PATH_WEIGHT_FLOOR);
-    wire(&mut def, VoteSink::Move(1), memory(2), PATH_WEIGHT_FLOOR);
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 0),
+        memory(2),
+        PATH_WEIGHT_FLOOR,
+    );
+    wire(
+        &mut def,
+        VoteSink::Directed(DirectedVoteKind::Move, 1),
+        memory(2),
+        PATH_WEIGHT_FLOOR,
+    );
     let census = census_of(&[graph_genome(def)]);
     assert_eq!(
         census.kinds[DirectedVoteKind::Move.index()],
@@ -179,7 +224,7 @@ fn a_group_is_not_a_fanout() {
         for channel in 0..8u8 {
             wire(
                 &mut independent,
-                VoteSink::Move((channel + offset) % 8),
+                VoteSink::Directed(DirectedVoteKind::Move, (channel + offset) % 8),
                 GraphSource::InputLeaf {
                     ref_idx: 0,
                     sub_idx: u16::from(channel),

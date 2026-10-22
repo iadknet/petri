@@ -1,6 +1,66 @@
 use crate::contracts::Direction;
 use crate::contracts::OrdinaryFoodTypeId;
 
+/// Action type discriminant: the action-queue code `ReadActionQueueType`
+/// reads, the action-log type, and the index of the per-type charge ledger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[non_exhaustive]
+#[repr(u8)]
+pub enum ActionType {
+    NoOp = 0,
+    Eat = 1,
+    Move = 2,
+    Reproduce = 3,
+    StealEnergy = 4,
+}
+
+/// Number of meaningful action type discriminants (NoOp..StealEnergy).
+pub const ACTION_TYPE_COUNT: u8 = 5;
+const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
+
+impl ActionType {
+    /// Every action type in discriminant order, for fixed-order reports.
+    pub const ALL: [Self; ACTION_TYPE_COUNT as usize] = [
+        Self::NoOp,
+        Self::Eat,
+        Self::Move,
+        Self::Reproduce,
+        Self::StealEnergy,
+    ];
+
+    /// Stable diagnostics key for this action type.
+    ///
+    /// Matches the variant name emitted by the derived `Serialize` impl.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::NoOp => "NoOp",
+            Self::Eat => "Eat",
+            Self::Move => "Move",
+            Self::Reproduce => "Reproduce",
+            Self::StealEnergy => "StealEnergy",
+        }
+    }
+
+    /// The energy-ledger key of this type's charge and failed-effort rows.
+    #[must_use]
+    pub const fn flow_key(self) -> &'static str {
+        match self {
+            Self::NoOp => "noop",
+            Self::Eat => "eat",
+            Self::Move => "move",
+            Self::Reproduce => "reproduce",
+            Self::StealEnergy => "steal_energy",
+        }
+    }
+
+    /// Position in [`Self::ALL`]: the discriminant as an index.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+}
+
 /// The action a creature emits at the end of mesh execution for one tick.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WorldAction {
@@ -40,16 +100,16 @@ impl WorldAction {
         matches!(self, WorldAction::NoOp)
     }
 
-    /// Return the action type discriminant `ReadActionQueueType` reads.
-    /// 0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy.
+    /// The action's type; `as u8` is the code `ReadActionQueueType` reads.
     #[inline]
-    pub fn action_type(&self) -> u8 {
+    #[must_use]
+    pub const fn action_type(&self) -> ActionType {
         match self {
-            WorldAction::NoOp => 0,
-            WorldAction::Eat { .. } => 1,
-            WorldAction::Move(_) => 2,
-            WorldAction::Reproduce { .. } => 3,
-            WorldAction::StealEnergy { .. } => 4,
+            WorldAction::NoOp => ActionType::NoOp,
+            WorldAction::Eat { .. } => ActionType::Eat,
+            WorldAction::Move(_) => ActionType::Move,
+            WorldAction::Reproduce { .. } => ActionType::Reproduce,
+            WorldAction::StealEnergy { .. } => ActionType::StealEnergy,
         }
     }
 

@@ -55,6 +55,34 @@ pub(super) fn take_decided() -> Vec<Decided> {
     DECIDED.take()
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Every action-log entry logged on this thread since the last
+    /// [`take_logged`], kept even when its creature dies and its log goes;
+    /// `None` until a test starts the capture.
+    static LOGGED: std::cell::RefCell<Option<Vec<(CreatureId, ActionLogEntry)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Records `entry` for [`take_logged`] once a test has started the capture:
+/// the traced/untraced equivalence oracle, which outlives a creature removed
+/// with its action log.
+#[cfg(test)]
+pub(super) fn capture_logged(id: CreatureId, entry: ActionLogEntry) {
+    LOGGED.with_borrow_mut(|logged| {
+        if let Some(logged) = logged {
+            logged.push((id, entry));
+        }
+    });
+}
+
+/// The action-log entries logged on this thread since the last call, which
+/// starts the capture on its first call.
+#[cfg(test)]
+pub(super) fn take_logged() -> Vec<(CreatureId, ActionLogEntry)> {
+    LOGGED.with_borrow_mut(|logged| logged.replace(Vec::new()).unwrap_or_default())
+}
+
 /// The creature `trace` records this tick, when it records one.
 pub(super) fn observed(trace: &Option<ActiveTrace>) -> Option<CreatureId> {
     trace
@@ -129,13 +157,8 @@ pub(super) struct FlowMarks {
 
 impl FlowMarks {
     pub(super) fn of(flows: &EnergyFlows) -> Self {
-        let charges = &flows.action_charges;
         Self {
-            charge: charges.noop
-                + charges.eat
-                + charges.r#move
-                + charges.reproduce
-                + charges.steal_energy,
+            charge: flows.action_charges.total(),
             reward: flows.food_intake_by_type.iter().sum::<f64>()
                 + flows.predation_attacker_credit
                 + flows.predation_kill_bonus_credit,

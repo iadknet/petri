@@ -6,6 +6,7 @@ use super::super::run_tick;
 use super::support::*;
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, InputReference, NodeId};
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, VmBackendDef, VmInstruction,
@@ -47,7 +48,7 @@ fn v5_genome(read: bool) -> CreatureGenome {
     outcome_genome(vec![
         load,
         VmInstruction::AddVote {
-            sink: VoteSink::Move(0).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, 0).index() as u8,
             src: 0,
         },
         VmInstruction::Halt,
@@ -136,7 +137,7 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
             src: 0,
         },
         VmInstruction::AddVote {
-            sink: VoteSink::Reproduce(0).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Reproduce, 0).index() as u8,
             src: 0,
         },
         VmInstruction::Halt,

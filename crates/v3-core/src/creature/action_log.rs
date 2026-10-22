@@ -3,49 +3,10 @@ use std::mem::size_of;
 
 use crate::config::OrdinaryFoodTypeId;
 
-/// Action type discriminant for log entries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[non_exhaustive]
-#[repr(u8)]
-pub enum ActionType {
-    NoOp = 0,
-    Eat = 1,
-    Move = 2,
-    Reproduce = 3,
-    StealEnergy = 4,
-}
-
-impl ActionType {
-    /// Every action type in discriminant order, for fixed-order reports.
-    pub const ALL: [Self; ACTION_TYPE_COUNT as usize] = [
-        Self::NoOp,
-        Self::Eat,
-        Self::Move,
-        Self::Reproduce,
-        Self::StealEnergy,
-    ];
-
-    /// Stable diagnostics key for this action type.
-    ///
-    /// Matches the variant name emitted by the derived `Serialize` impl.
-    #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        match self {
-            Self::NoOp => "NoOp",
-            Self::Eat => "Eat",
-            Self::Move => "Move",
-            Self::Reproduce => "Reproduce",
-            Self::StealEnergy => "StealEnergy",
-        }
-    }
-}
+pub use crate::contracts::{ActionType, ACTION_TYPE_COUNT};
 
 /// Direction byte recorded for actions that carry no direction parameter.
 pub const NO_DIRECTION: u8 = 255;
-
-/// Number of meaningful action type discriminants (NoOp..StealEnergy).
-pub const ACTION_TYPE_COUNT: u8 = 5;
-const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
 
 /// Outcome of an action for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]

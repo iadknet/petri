@@ -2,6 +2,7 @@ pub(crate) mod cgp_reproduction;
 mod predation;
 mod reproduction;
 
+use crate::creature::action_log::ActionType;
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
@@ -96,7 +97,7 @@ pub fn apply_noop(
     config: &SimulationConfig,
     flows: &mut EnergyFlows,
 ) {
-    flows.action_charges.noop += pay_effort(
+    flows.action_charges[ActionType::NoOp] += pay_effort(
         creature,
         &config.energy,
         config.energy.costs.noop_cost,
@@ -146,9 +147,9 @@ pub fn apply_typed_eat(
         config.energy.costs.eat_cost,
         DeathCause::ActionEat,
     );
-    flows.action_charges.eat += effort;
+    flows.action_charges[ActionType::Eat] += effort;
     if eaten <= 0.0 {
-        flows.failed_action_effort.eat += effort;
+        flows.failed_action_effort[ActionType::Eat] += effort;
     }
     eaten
 }
@@ -182,9 +183,9 @@ pub fn apply_move(
 
     let move_effort = creature.move_effort(&config.energy);
     let effort = charge_effort(creature, move_effort, DeathCause::ActionMove);
-    flows.action_charges.r#move += effort;
+    flows.action_charges[ActionType::Move] += effort;
     if !succeeded {
-        flows.failed_action_effort.r#move += effort;
+        flows.failed_action_effort[ActionType::Move] += effort;
     }
     succeeded
 }
@@ -197,6 +198,7 @@ mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
     use crate::contracts::Position;
+    use crate::creature::action_log::ActionType;
     use crate::creature::body::HeritableBody;
     use crate::creature::founder::{
         founder_genome, founder_reproduce_policy, v3alpha1_founder_genome,
@@ -740,7 +742,7 @@ mod tests {
         let energy_before = sim.creatures[parent_id].energy;
         let after_effort = post_effort(&sim, parent_id);
         let death_cause_before = sim.creatures[parent_id].pending_death_cause;
-        let charges_before = sim.stats.energy_flows.action_charges.reproduce;
+        let charges_before = sim.stats.energy_flows.action_charges[ActionType::Reproduce];
         let transfer_before = sim.stats.energy_flows.parental_transfer_debit;
         let rejected_before = sim.stats.reproduction_actions_rejected_total;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
@@ -762,12 +764,12 @@ mod tests {
         // "the effort, bit for bit", and nothing else was added to them.
         let effort = applied_debit(energy_before, after_effort);
         assert_eq!(
-            sim.stats.energy_flows.action_charges.reproduce,
+            sim.stats.energy_flows.action_charges[ActionType::Reproduce],
             charges_before + effort,
             "only the effort lands in action_charges.reproduce"
         );
         assert_eq!(
-            sim.stats.energy_flows.failed_action_effort.reproduce,
+            sim.stats.energy_flows.failed_action_effort[ActionType::Reproduce],
             effort
         );
         assert_eq!(
@@ -853,7 +855,7 @@ mod tests {
             "parent must pay effort, cost then transfer as three f32 subtractions"
         );
         assert_eq!(
-            sim.stats.energy_flows.action_charges.reproduce,
+            sim.stats.energy_flows.action_charges[ActionType::Reproduce],
             applied_debit(energy_before, after_effort) + applied_debit(after_effort, after_cost),
             "action_charges.reproduce must carry exactly the effort and the charge"
         );
@@ -1969,7 +1971,7 @@ mod tests {
             );
             assert_eq!(sim.creatures[id].energy.to_bits(), after_effort.to_bits());
             assert_eq!(
-                sim.stats.energy_flows.action_charges.reproduce,
+                sim.stats.energy_flows.action_charges[ActionType::Reproduce],
                 applied_debit(1.0, after_effort)
             );
             assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
@@ -2003,7 +2005,7 @@ mod tests {
             // rejected attempt pays only its T16.F02 effort (bit-exact).
             assert_eq!(sim.creatures[id].energy.to_bits(), after_effort.to_bits());
             assert_eq!(
-                sim.stats.energy_flows.action_charges.reproduce,
+                sim.stats.energy_flows.action_charges[ActionType::Reproduce],
                 applied_debit(energy, after_effort)
             );
             assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);

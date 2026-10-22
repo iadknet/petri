@@ -53,8 +53,9 @@ Boundary intent:
 ## 2. Pass Loop and Action Selection
 
 A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
-from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, 8
-`Move`, 8 `Reproduce`, 8 `StealEnergy`, the drives `Drive(Move)`,
+from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, the eight
+`Directed(K, d)` sinks of each directed kind `K` in `Move`, `Reproduce`,
+`StealEnergy` order, the drives `Drive(Move)`,
 `Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
 four-field parameter surface `action_params` (indexed by `ActionParamField`:
 `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
@@ -94,7 +95,7 @@ pass:
     if E[K*] <= 0: end the tick (NoDecision)
     if queue non-empty and V[Terminate] >= E[K*]: end the tick (TerminateVoted)
     commit best[K*] decoded with the parameter surface of K*; C[K*] += 1
-    if the commit is Move(d): h = d (for later passes and the stored state)
+    if the commit is Directed(Move, d): h = d (for later passes and the stored state)
     if queue full: end the tick (ActionCapReached)
     next pass
 exit: settle the bid once; actions = queue, or NoOp when empty

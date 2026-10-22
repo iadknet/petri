@@ -147,7 +147,7 @@ fn node1_graph_decision(forage_first: bool, reproduce_transfer_fraction: f32) ->
 /// 5, votes, and a parameter write).
 #[cfg(test)]
 pub(crate) fn vm_decision_founder_genome() -> CreatureGenome {
-    use crate::creature::genome::vote::{ActionParamField, VoteSink};
+    use crate::creature::genome::vote::{ActionParamField, DirectedVoteKind, VoteSink};
     use crate::creature::genome::{VmBackendDef, VmInstruction};
     let fraction = founder_reproduce_policy(FounderProfile::V3Alpha1).transfer_fraction;
     let mut program: Vec<VmInstruction> = (0..7u8)
@@ -223,13 +223,13 @@ pub(crate) fn vm_decision_founder_genome() -> CreatureGenome {
                 a: 15,
                 b: 12,
             },
-            vote(VoteSink::Move(d), 17),
+            vote(VoteSink::Directed(DirectedVoteKind::Move, d), 17),
             VmInstruction::Mul {
                 dst: 18,
                 a: 15,
                 b: 1,
             },
-            vote(VoteSink::Reproduce(d), 18),
+            vote(VoteSink::Directed(DirectedVoteKind::Reproduce, d), 18),
         ]);
     }
     program.extend([

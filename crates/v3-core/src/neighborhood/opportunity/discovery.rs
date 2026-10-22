@@ -4,6 +4,7 @@
 //! parameter sink, the Graph cost of the authored controller, and the VM
 //! instructions a hand translation would take (counted, not run).
 
+use crate::creature::genome::vote::DirectedVoteKind;
 use std::collections::BTreeSet;
 
 use rand::rngs::SmallRng;
@@ -395,7 +396,10 @@ pub fn vm_translation(family: Family) -> Vec<VmInstruction> {
                         a: register,
                         b: 24,
                     },
-                    vote(VoteSink::Move(direction), register),
+                    vote(
+                        VoteSink::Directed(DirectedVoteKind::Move, direction),
+                        register,
+                    ),
                 ]);
             }
             program
@@ -443,12 +447,12 @@ pub fn vm_translation(family: Family) -> Vec<VmInstruction> {
                 a: 22,
                 b: 25,
             },
-            vote(VoteSink::Move(2), 21),
-            vote(VoteSink::Move(4), 22),
+            vote(VoteSink::Directed(DirectedVoteKind::Move, 2), 21),
+            vote(VoteSink::Directed(DirectedVoteKind::Move, 4), 22),
             Neg { dst: 21, src: 21 },
             Neg { dst: 22, src: 22 },
-            vote(VoteSink::Move(6), 21),
-            vote(VoteSink::Move(0), 22),
+            vote(VoteSink::Directed(DirectedVoteKind::Move, 6), 21),
+            vote(VoteSink::Directed(DirectedVoteKind::Move, 0), 22),
         ],
         // Constant pool entry 0 holds 0.0 and entry 9 the 0.5 threshold:
         // `fruit` in register 22, `fruit_only` in register 23.

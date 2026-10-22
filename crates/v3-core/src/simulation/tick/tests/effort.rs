@@ -4,6 +4,7 @@
 use super::support::*;
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldAction};
 use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
+use crate::simulation::tick::ActionType;
 use crate::simulation::Simulation;
 
 const REPRODUCE: WorldAction = WorldAction::Reproduce {
@@ -35,20 +36,20 @@ impl Bucket {
     fn add_failed(self, flows: &mut EnergyFlows, debit: f64) {
         let (charge, failed) = match self {
             Self::Move => (
-                &mut flows.action_charges.r#move,
-                &mut flows.failed_action_effort.r#move,
+                &mut flows.action_charges[ActionType::Move],
+                &mut flows.failed_action_effort[ActionType::Move],
             ),
             Self::Eat => (
-                &mut flows.action_charges.eat,
-                &mut flows.failed_action_effort.eat,
+                &mut flows.action_charges[ActionType::Eat],
+                &mut flows.failed_action_effort[ActionType::Eat],
             ),
             Self::Reproduce => (
-                &mut flows.action_charges.reproduce,
-                &mut flows.failed_action_effort.reproduce,
+                &mut flows.action_charges[ActionType::Reproduce],
+                &mut flows.failed_action_effort[ActionType::Reproduce],
             ),
             Self::Steal => (
-                &mut flows.action_charges.steal_energy,
-                &mut flows.failed_action_effort.steal_energy,
+                &mut flows.action_charges[ActionType::StealEnergy],
+                &mut flows.failed_action_effort[ActionType::StealEnergy],
             ),
         };
         *charge += debit;
@@ -249,10 +250,10 @@ fn reproduce_below_cost_pays_only_the_attempt_effort() {
     execute(&mut sim, id, REPRODUCE);
     assert_eq!(sim.creatures[id].energy, 1.5 - 1.0);
     let flows = &sim.stats.energy_flows;
-    assert!(flows.action_charges.reproduce > 0.0);
+    assert!(flows.action_charges[ActionType::Reproduce] > 0.0);
     assert_eq!(
-        flows.action_charges.reproduce,
-        flows.failed_action_effort.reproduce
+        flows.action_charges[ActionType::Reproduce],
+        flows.failed_action_effort[ActionType::Reproduce]
     );
     assert_eq!(flows.parental_transfer_debit, 0.0);
     assert_eq!(sim.stats.mortality.deaths_total, 0);
@@ -285,13 +286,16 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
         assert_eq!(sim.stats.mortality.deaths_total, 1, "{cause:?}");
         let flows = &sim.stats.energy_flows;
         assert_eq!(flows.zero_floor_credit, 0.0, "{cause:?}");
-        let charges = flows.action_charges;
         assert_eq!(
-            charges.eat + charges.r#move + charges.reproduce + charges.steal_energy,
+            flows.action_charges.total(),
             applied_debit(0.03, 0.0),
             "{cause:?}"
         );
-        assert_eq!(sim.stats.energy_flows.action_charges.noop, 0.0, "{cause:?}");
+        assert_eq!(
+            sim.stats.energy_flows.action_charges[ActionType::NoOp],
+            0.0,
+            "{cause:?}"
+        );
         assert_eq!(sim.stats.last_tick_noop, 0, "{cause:?}");
     }
 }
@@ -334,8 +338,8 @@ fn an_overdrawn_steal_into_an_empty_cell_charges_only_the_energy_it_had() {
     assert!(!sim.creatures.contains_key(id));
     assert_eq!(sim.stats.mortality.count(DeathCause::ActionStealEnergy), 1);
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges.steal_energy, 46.0);
-    assert_eq!(flows.failed_action_effort.steal_energy, 46.0);
+    assert_eq!(flows.action_charges[ActionType::StealEnergy], 46.0);
+    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 46.0);
     assert_eq!(flows.zero_floor_credit, 0.0);
 }
 
@@ -357,8 +361,8 @@ fn an_overdrawn_steal_with_a_victim_charges_its_energy_plus_the_loot() {
     assert!(!sim.creatures.contains_key(victim));
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.predation_attacker_credit, 300.0);
-    assert_eq!(flows.action_charges.steal_energy, 346.0);
-    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
+    assert_eq!(flows.action_charges[ActionType::StealEnergy], 346.0);
+    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 0.0);
     assert_eq!(flows.zero_floor_credit, 0.0);
 }
 
@@ -378,8 +382,8 @@ fn an_inherited_deficit_stays_a_floor_credit_and_the_unpaid_effort_charges_nothi
     );
     assert!(!sim.creatures.contains_key(id));
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges.steal_energy, 0.0);
-    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
+    assert_eq!(flows.action_charges[ActionType::StealEnergy], 0.0);
+    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 0.0);
     assert!(
         (flows.zero_floor_credit - 10.0).abs() < 1e-6,
         "floor credit {}",
@@ -404,7 +408,10 @@ fn a_gestating_parent_and_its_discarded_actions_are_never_charged() {
     );
     assert!(sim.creatures[id].pending_birth.is_some());
     let charged = sim.stats.energy_flows.action_charges;
-    assert_eq!((charged.eat, charged.r#move), (0.0, 0.0));
+    assert_eq!(
+        (charged[ActionType::Eat], charged[ActionType::Move]),
+        (0.0, 0.0)
+    );
     let held = sim.creatures[id].energy;
 
     execute(&mut sim, id, eat);
@@ -451,8 +458,11 @@ fn a_successful_eat_credits_then_pays_its_effort() {
     let max = sim.creatures[id].energy_cap();
     assert_eq!(sim.creatures[id].energy.to_bits(), (max - effort).to_bits());
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges.eat, applied_debit(max, max - effort));
-    assert_eq!(flows.failed_action_effort.eat, 0.0);
+    assert_eq!(
+        flows.action_charges[ActionType::Eat],
+        applied_debit(max, max - effort)
+    );
+    assert_eq!(flows.failed_action_effort[ActionType::Eat], 0.0);
 }
 
 /// Success: a conception pays the attempt effort, then the replication cost,
@@ -479,10 +489,10 @@ fn a_conception_pays_effort_then_cost_then_litter() {
     );
     let flows = &sim.stats.energy_flows;
     assert_eq!(
-        flows.action_charges.reproduce,
+        flows.action_charges[ActionType::Reproduce],
         applied_debit(100.0, after_effort) + applied_debit(after_effort, after_cost)
     );
-    assert_eq!(flows.failed_action_effort.reproduce, 0.0);
+    assert_eq!(flows.failed_action_effort[ActionType::Reproduce], 0.0);
     assert_eq!(flows.offspring_energy_credit, f64::from(litter));
 }
 

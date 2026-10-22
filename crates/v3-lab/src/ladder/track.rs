@@ -4,6 +4,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
+use v3_core::creature::genome::vote::DirectedVoteKind;
 
 use rayon::prelude::*;
 use serde::Serialize;
@@ -54,7 +55,10 @@ pub fn relevant_family_labels(assay: Assay) -> Vec<String> {
 
 /// A sink the capability acts through: `Eat` or `Move(_)`.
 fn motor_sink(sink: VoteSink) -> bool {
-    matches!(sink, VoteSink::Eat | VoteSink::Move(_))
+    matches!(
+        sink,
+        VoteSink::Eat | VoteSink::Directed(DirectedVoteKind::Move, _)
+    )
 }
 
 /// Whether `node` votes `Eat` or `Move(_)`: a graph `ActionVote` sink with

@@ -190,14 +190,23 @@ RouterGate + 16 WriteSlot + 16 ClearSlot + 30 ActionVote + 4 ActionParam = 98
 sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
 kinds.
 
-`VoteSink` is the fixed vote catalog: `Eat` (index 0), `Move(d)` (`1 + d`),
-`Reproduce(d)` (`9 + d`), `StealEnergy(d)` (`17 + d`) for `d` in the eight
-`Direction::ALL` slots, `Drive(Move)` (25), `Drive(Reproduce)` (26),
-`Drive(StealEnergy)` (27), `Terminate` (28), and `Decide` (29). A drive
+`VoteSink` is the fixed vote catalog: `Eat`, `Directed(K, d)`, `Drive(K)`,
+`Terminate` and `Decide`, for `K` a `DirectedVoteKind` (`Move`, `Reproduce`,
+`StealEnergy`, in `DirectedVoteKind::ALL` order) and `d` in the eight
+`Direction::ALL` slots. With `N` directed kinds the index rule is `Eat` 0,
+`Directed(K, d)` `1 + 8·K.index() + d`, `Drive(K)` `1 + 8·N + K.index()`,
+`Terminate` `VOTE_SINK_COUNT − 2` and `Decide` `VOTE_SINK_COUNT − 1`, with
+`VOTE_SINK_COUNT = 3 + 9·N`: `Directed(Move, d)` (`1 + d`),
+`Directed(Reproduce, d)` (`9 + d`), `Directed(StealEnergy, d)` (`17 + d`),
+`Drive(Move)` (25), `Drive(Reproduce)` (26), `Drive(StealEnergy)` (27),
+`Terminate` (28), and `Decide` (29). A new directed kind is appended to
+`DirectedVoteKind::ALL` and the rule places its sinks. A directed sink
+serializes as `{"Directed":["Move",3]}`. A drive
 (T11.F30) votes for its kind without naming a direction: the pass end adds it
 to the kind's best direction vote, and it is never committed itself; it
 serializes as `{"Drive":"Move"}`. `VoteKind` is
-`Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
+`Eat` followed by the directed kinds' vote kinds in `DirectedVoteKind::ALL`
+order: `Eat`, `Move`, `Reproduce`, `StealEnergy`.
 `ActionParamField` holds exactly the fields the commit decoder reads, in the
 order `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
 `StealEnergyAmount` (T11.F27, T02.F08); `Move` has no parameter field.

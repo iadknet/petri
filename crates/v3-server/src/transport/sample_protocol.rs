@@ -13,7 +13,7 @@ pub type WorldActionPayload = serde_json::Value;
 pub type VmInstructionPayload = serde_json::Value;
 /// Serialized direction shape (`"N"`, `"NE"`, ...) owned by transport wire DTOs.
 pub type DirectionPayload = serde_json::Value;
-/// Serialized vote-sink shape (`"Eat"`, `{"Move":3}`, `{"Drive":"Move"}`).
+/// Serialized vote-sink shape (`"Eat"`, `{"Directed":["Move",3]}`, `{"Drive":"Move"}`).
 pub type VoteSinkPayload = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize)]

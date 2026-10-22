@@ -256,6 +256,7 @@ mod tests {
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
+    use crate::creature::genome::vote::DirectedVoteKind;
     use crate::creature::genome::{
         HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction,
     };
@@ -608,7 +609,10 @@ mod tests {
         let mut graph = empty_graph();
         push_sink(
             &mut graph,
-            OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Move(0)), vec![leaf(0)]),
+            OutputSink::new(
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
+                vec![leaf(0)],
+            ),
         );
         push_sink(
             &mut graph,

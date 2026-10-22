@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SamplerPosition } from "../../stores/samplePlayback.ts";
 import type { ExecutionSample, TickTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../types/trace.ts";
 import { SamplerBar } from "./SamplerBar.tsx";
 
 vi.mock("./TickTimeline.tsx", () => ({
@@ -93,7 +93,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 		termination_reason: "NoDecision" as const,
 		debug_perception: null,
 		priority_bid: 0,
-		commit_counts: [0, 0, 0, 0],
+		commit_counts: ZERO_KIND_COUNTS,
 	}));
 
 	return { creature_id: 1, ticks };
@@ -252,9 +252,14 @@ describe("SamplerBar", () => {
 			pass_index,
 			end_reason: "NoTargets" as const,
 			votes: ZERO_VOTES,
-			best: ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }],
-			bars: [0, 0, 0, 0],
-			effective_votes: [0, 0, 0, 0],
+			best: [
+				"Eat",
+				{ Directed: ["Move", 0] },
+				{ Directed: ["Reproduce", 0] },
+				{ Directed: ["StealEnergy", 0] },
+			],
+			bars: ZERO_KIND_COUNTS,
+			effective_votes: ZERO_KIND_COUNTS,
 			committed: null,
 			hops: 1,
 		}));

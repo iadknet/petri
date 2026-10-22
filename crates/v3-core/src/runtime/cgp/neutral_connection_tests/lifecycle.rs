@@ -2,6 +2,7 @@
 use super::*;
 use crate::config::MutationConfig;
 use crate::creature::genome::cgp::test_support::{edit_sinks, reweighted};
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;
@@ -14,7 +15,7 @@ fn duplicate_node() -> NodeGenome {
     for weight in [0.0, 0.0, 0.0] {
         wire(
             &mut def,
-            OutputSinkKind::ActionVote(VoteSink::Move(5)),
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 5)),
             edge(leaf(0, 6), weight),
         );
     }
@@ -37,7 +38,10 @@ fn existing_weight_mutation_refines_one_zero_duplicate_without_touching_the_orig
         .side
         .dispatch_effects()
         .0;
-    assert_ne!(votes[VoteSink::Move(5).index()], 0.0);
+    assert_ne!(
+        votes[VoteSink::Directed(DirectedVoteKind::Move, 5).index()],
+        0.0
+    );
     assert_eq!(votes.iter().filter(|v| **v != 0.0).count(), 1);
     remove_edge(graph_mut(&mut copy), &mut SmallRng::seed_from_u64(5)).unwrap();
     assert_eq!(graph(&copy).edges().count(), 2);
@@ -87,7 +91,7 @@ proptest! {
         refs.push(source_ref.clone());
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         for weight in [0.0, 0.5] {
-            wire(&mut def, OutputSinkKind::ActionVote(VoteSink::Reproduce(7)), edge(leaf(unused as u16, channel), weight));
+            wire(&mut def, OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 7)), edge(leaf(unused as u16, channel), weight));
         }
         let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, refs)] };
         let before = effects(graph(&genome.nodes[0]), &genome.nodes[0].input_refs, 0.25).side.dispatch_effects();

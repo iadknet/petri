@@ -1,10 +1,10 @@
 import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
-import { VOTE_KINDS } from "../../types/trace.ts";
+import { VOTE_KINDS, voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import directionPairsFixture from "./directionPairs.json";
 import { directionName, directionWord } from "./directions.ts";
 import nearbyFields from "./nearbyFields.json";
-import { formatVoteSink, voteSinkFromIndex } from "./voteSinks.ts";
+import { actionCodeLegend, formatVoteSink } from "./voteSinks.ts";
 
 export { directionName } from "./directions.ts";
 
@@ -148,7 +148,7 @@ const OUTCOME_FIELDS: readonly SubField[] = [
 ];
 
 const QUEUE_FIELDS: readonly SubField[] = [
-	{ name: "type", description: "Action code: 0 none, 1 Eat, 2 Move, 3 Reproduce, 4 StealEnergy." },
+	{ name: "type", description: `Action code: ${actionCodeLegend()}.` },
 	{ name: "param0", description: "Direction index (N=0 … NW=7); for Eat, the food type." },
 	{ name: "param1", description: "Reproduce: energy share given; StealEnergy: amount requested." },
 ];

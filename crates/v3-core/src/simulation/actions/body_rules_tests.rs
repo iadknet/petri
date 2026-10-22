@@ -3,6 +3,7 @@
 //! body inheritance draws. Each assertion pins main's behavior before the
 //! refactor, so a moved booking or draw is a defect.
 
+use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
@@ -210,7 +211,7 @@ fn steal(victim_energy: f32) -> (Simulation, CreatureId, PredationActionResult, 
         .config
         .energy
         .action_effort(0.0, attacker.cached_complexity, attacker.age);
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0);
+    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0).result;
     (sim, ids[0], result, 195.0 - effort)
 }
 
@@ -261,7 +262,7 @@ fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
 fn predation_under_the_cap_books_no_clamp_loss() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0), (Position::new(5, 4), 50.0)]);
     sim.config.predation.steal_cost_rate = 0.0;
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0);
+    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0).result;
     assert_eq!(result, PredationActionResult::Transferred);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
 }
@@ -480,8 +481,11 @@ fn a_successful_move_charges_the_move_effort() {
     assert!(moved);
     assert_eq!(sim.creatures[id].energy, 50.0 - effort);
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges.r#move, debit(50.0, 50.0 - effort));
-    assert_eq!(flows.failed_action_effort.r#move, 0.0);
+    assert_eq!(
+        flows.action_charges[ActionType::Move],
+        debit(50.0, 50.0 - effort)
+    );
+    assert_eq!(flows.failed_action_effort[ActionType::Move], 0.0);
 }
 
 #[test]
@@ -490,9 +494,12 @@ fn a_blocked_move_charges_the_move_effort_as_failed() {
     assert!(!moved);
     assert_eq!(sim.creatures[id].energy, 50.0 - effort);
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges.r#move, debit(50.0, 50.0 - effort));
     assert_eq!(
-        flows.failed_action_effort.r#move,
+        flows.action_charges[ActionType::Move],
+        debit(50.0, 50.0 - effort)
+    );
+    assert_eq!(
+        flows.failed_action_effort[ActionType::Move],
         debit(50.0, 50.0 - effort)
     );
 }

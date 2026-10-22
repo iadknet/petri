@@ -11,6 +11,7 @@ use crate::contracts::{
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
@@ -394,7 +395,7 @@ fn active_graph() -> CgpGraphBackendDef {
             1.0,
         ),
         (
-            OutputSinkKind::ActionVote(VoteSink::StealEnergy(7)),
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 7)),
             memory(0, false),
             8.0,
         ),

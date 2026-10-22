@@ -7,6 +7,7 @@ use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey,
 };
 use crate::creature::genome::cgp::{ComputeNodeKind, GraphSource};
+use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteKind, VoteSink};
 use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
@@ -67,7 +68,7 @@ fn forage_graph(extra_refs: Vec<InputReference>) -> (GraphBuilder, Vec<InputRefe
     graph.vote(VoteSink::Eat, &[(food, 1.0)]);
     for d in [0u8, 2, 4, 6] {
         graph.vote(
-            VoteSink::Move(d),
+            VoteSink::Directed(DirectedVoteKind::Move, d),
             &[(bias, 0.5), (leaf(1, u16::from(d)), 0.4)],
         );
     }
@@ -141,7 +142,10 @@ fn w3_founder_reproduce_tick_commits_once_whatever_the_live_gate_reads() {
 #[test]
 fn w4_one_edge_into_an_unused_kind_adds_exactly_one_action() {
     let (mut graph, refs) = forage_graph(vec![occupied_ring()]);
-    graph.vote(VoteSink::StealEnergy(E), &[(leaf(2, u16::from(E)), 1.0)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::StealEnergy, E),
+        &[(leaf(2, u16::from(E)), 1.0)],
+    );
     let g = genome(vec![graph.build(0, refs, &[])]);
     let mut senses = w1_senses(0.0);
     senses.occupied[usize::from(E)] = 1.0;
@@ -164,8 +168,11 @@ fn static_eat_and_west_plus_food_edge(edge_d: u8) -> Vec<WorldAction> {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     graph.vote(VoteSink::Eat, &[(one, 1.0)]);
-    graph.vote(VoteSink::Move(W), &[(one, 0.9)]);
-    graph.vote(VoteSink::Move(edge_d), &[(leaf(0, u16::from(edge_d)), 1.0)]);
+    graph.vote(VoteSink::Directed(DirectedVoteKind::Move, W), &[(one, 0.9)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::Move, edge_d),
+        &[(leaf(0, u16::from(edge_d)), 1.0)],
+    );
     let g = genome(vec![graph.build(0, vec![food_ring()], &[])]);
     let mut senses = Senses::default();
     senses.food[usize::from(edge_d)] = 1.0;
@@ -192,7 +199,7 @@ fn w7_a_burst_commits_the_ceiling_of_the_vote() {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     graph.vote(
-        VoteSink::Move(W),
+        VoteSink::Directed(DirectedVoteKind::Move, W),
         &[(one, 0.9), (leaf(0, u16::from(E)), 3.0)],
     );
     let g = genome(vec![graph.build(0, vec![occupied_ring()], &[])]);
@@ -213,7 +220,10 @@ fn w8_a_plan_reads_its_own_queue_move_then_eat() {
         ComputeNodeKind::Multiply,
         &[(moved, 1.0), (west, 1.0), (leaf(0, u16::from(W)), 1.0)],
     );
-    graph.vote(VoteSink::Move(W), &[(leaf(0, u16::from(W)), 0.9)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::Move, W),
+        &[(leaf(0, u16::from(W)), 0.9)],
+    );
     graph.vote(VoteSink::Eat, &[(after, 1.0)]);
     let g = genome(vec![graph.build(
         0,
@@ -247,7 +257,7 @@ fn w9_a_route_with_a_turn_west_west_north() {
         },
         VmInstruction::Mul { dst: 4, a: 4, b: 2 },
         VmInstruction::AddVote {
-            sink: VoteSink::Move(W).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, W).index() as u8,
             src: 4,
         },
         VmInstruction::LoadConst {
@@ -256,7 +266,7 @@ fn w9_a_route_with_a_turn_west_west_north() {
         },
         VmInstruction::Mul { dst: 4, a: 4, b: 3 },
         VmInstruction::AddVote {
-            sink: VoteSink::Move(N).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, N).index() as u8,
             src: 4,
         },
         VmInstruction::Halt,
@@ -280,7 +290,7 @@ fn w10_a_clock_ends_a_fixed_length_plan_with_terminate() {
     let one = graph.constant(1.0);
     let clock = graph.node(ComputeNodeKind::DecayIntegrator(0.5), &[(one, 1.0)]);
     let done = graph.node(ComputeNodeKind::Threshold(0.8), &[(clock, 1.0)]);
-    graph.vote(VoteSink::Move(W), &[(one, 3.0)]);
+    graph.vote(VoteSink::Directed(DirectedVoteKind::Move, W), &[(one, 3.0)]);
     graph.vote(VoteSink::Terminate, &[(done, 1.0)]);
     let g = genome(vec![graph.build(0, vec![], &[])]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
@@ -309,13 +319,20 @@ fn w11_a_voteless_self_loop_runs_one_capped_pass_to_noop() {
 
 #[test]
 fn w12_a_static_self_loop_commits_once_over_two_capped_passes() {
-    let g = genome(vec![vm_voter(0, &[(VoteSink::Move(W), 1.0)], &[0])]);
+    let g = genome(vec![vm_voter(
+        0,
+        &[(VoteSink::Directed(DirectedVoteKind::Move, W), 1.0)],
+        &[0],
+    )]);
     let tick = run_tick(&g, Senses::default(), &config(), 10.0, [0.0; 16]);
     assert_eq!(tick.actions(), &[mv(W)]);
     assert_eq!(tick.output.work_counters.pass_cap_hits, 2);
     assert_eq!(tick.output.work_counters.passes, 2);
     // A revisited node replaces its contribution: the vote stays 1.0.
-    assert_eq!(tick.passes[0].votes[VoteSink::Move(W).index()], 1.0);
+    assert_eq!(
+        tick.passes[0].votes[VoteSink::Directed(DirectedVoteKind::Move, W).index()],
+        1.0
+    );
 }
 
 /// A self-loop that counts visits on bus slot 0 (carried across passes).
@@ -344,7 +361,7 @@ fn counting_program(extra: Vec<VmInstruction>) -> Vec<VmInstruction> {
 #[test]
 fn w13_a_bus_counter_voted_into_move_fills_the_action_cap_and_pays_the_ramp() {
     let program = counting_program(vec![VmInstruction::AddVote {
-        sink: VoteSink::Move(W).index() as u8,
+        sink: VoteSink::Directed(DirectedVoteKind::Move, W).index() as u8,
         src: 0,
     }]);
     let g = genome(vec![vm_node(
@@ -367,7 +384,10 @@ fn w13_a_bus_counter_voted_into_move_fills_the_action_cap_and_pays_the_ramp() {
     // 640 hops at allowance 32 and cost 1e-4: 1e-4 · 608 · 609 / 2.
     assert!((tick.output.cost_report.mesh_ramp_cost - 18.5136).abs() < 1e-2);
     // The count is visits, not passes: the last pass voted 640.
-    assert_eq!(tick.passes[9].votes[VoteSink::Move(W).index()], 640.0);
+    assert_eq!(
+        tick.passes[9].votes[VoteSink::Directed(DirectedVoteKind::Move, W).index()],
+        640.0
+    );
 }
 
 #[test]
@@ -394,7 +414,11 @@ fn w14_a_cycle_with_a_route_exit_leaves_after_its_counted_visits() {
         vec![InputReference::UpstreamSlot(0)],
         &[0, 1],
     );
-    let exit = vm_voter(1, &[(VoteSink::Move(W), 1.0)], &[]);
+    let exit = vm_voter(
+        1,
+        &[(VoteSink::Directed(DirectedVoteKind::Move, W), 1.0)],
+        &[],
+    );
     let g = genome(vec![entry, exit]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
     assert_eq!(tick.actions(), &[mv(W)]);
@@ -427,9 +451,9 @@ fn w16_every_kind_inhibited_is_noop_without_a_stall() {
         0,
         &[
             (VoteSink::Eat, -1.0),
-            (VoteSink::Move(W), -0.5),
-            (VoteSink::Reproduce(E), 0.0),
-            (VoteSink::StealEnergy(N), -2.0),
+            (VoteSink::Directed(DirectedVoteKind::Move, W), -0.5),
+            (VoteSink::Directed(DirectedVoteKind::Reproduce, E), 0.0),
+            (VoteSink::Directed(DirectedVoteKind::StealEnergy, N), -2.0),
             (VoteSink::Terminate, 3.0),
         ],
         &[],
@@ -453,7 +477,7 @@ fn w17_genome(prefix: Vec<VmInstruction>) -> CreatureGenome {
             const_idx: 1,
         },
         VmInstruction::AddVote {
-            sink: VoteSink::Move(W).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, W).index() as u8,
             src: 1,
         },
         VmInstruction::LoadConst {
@@ -562,11 +586,11 @@ fn w19_queue(slot: f32) -> Vec<WorldAction> {
     );
     let mut sure = GraphBuilder::new();
     let one = sure.constant(1.0);
-    sure.vote(VoteSink::Move(W), &[(one, 1.0)]);
+    sure.vote(VoteSink::Directed(DirectedVoteKind::Move, W), &[(one, 1.0)]);
     sure.vote(VoteSink::Decide, &[(one, 0.7)]);
     let mut later = GraphBuilder::new();
     let two = later.constant(2.0);
-    later.vote(VoteSink::Move(E), &[(two, 1.0)]);
+    later.vote(VoteSink::Directed(DirectedVoteKind::Move, E), &[(two, 1.0)]);
     let g = genome(vec![
         threshold.build(0, vec![], &[1]),
         sure.build(1, vec![], &[2]),
@@ -594,7 +618,10 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     let fraction = graph.constant(0.25);
-    graph.vote(VoteSink::Reproduce(W), &[(one, 1.0)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::Reproduce, W),
+        &[(one, 1.0)],
+    );
     graph.param(
         ActionParamField::ReproduceTransferFraction,
         &[(fraction, 1.0)],
@@ -620,7 +647,7 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
                 const_idx: 1,
             },
             VmInstruction::AddVote {
-                sink: VoteSink::StealEnergy(N).index() as u8,
+                sink: VoteSink::Directed(DirectedVoteKind::StealEnergy, N).index() as u8,
                 src: 0,
             },
             VmInstruction::AddVote {
@@ -670,8 +697,8 @@ const FIELD_VALUES: [(ActionParamField, f32); 4] = [
 ];
 const FIELD_VOTES: [VoteSink; 3] = [
     VoteSink::Eat,
-    VoteSink::Reproduce(W),
-    VoteSink::StealEnergy(N),
+    VoteSink::Directed(DirectedVoteKind::Reproduce, W),
+    VoteSink::Directed(DirectedVoteKind::StealEnergy, N),
 ];
 
 /// A graph node wiring every `(field, value)` to a constant sink and voting
@@ -821,7 +848,7 @@ fn the_param_surface_persists_across_passes() {
             const_idx: 1,
         },
         VmInstruction::AddVote {
-            sink: VoteSink::Move(E).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, E).index() as u8,
             src: 1,
         },
         VmInstruction::Halt,
@@ -1008,7 +1035,7 @@ fn the_bus_is_zero_at_tick_start_and_carries_between_passes() {
         },
         VmInstruction::Add { dst: 1, a: 0, b: 1 },
         VmInstruction::AddVote {
-            sink: VoteSink::Move(W).index() as u8,
+            sink: VoteSink::Directed(DirectedVoteKind::Move, W).index() as u8,
             src: 1,
         },
         VmInstruction::LoadConst {
@@ -1030,8 +1057,14 @@ fn the_bus_is_zero_at_tick_start_and_carries_between_passes() {
         &[],
     )]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-    assert_eq!(tick.passes[0].votes[VoteSink::Move(W).index()], 1.0);
-    assert_eq!(tick.passes[1].votes[VoteSink::Move(W).index()], 6.0);
+    assert_eq!(
+        tick.passes[0].votes[VoteSink::Directed(DirectedVoteKind::Move, W).index()],
+        1.0
+    );
+    assert_eq!(
+        tick.passes[1].votes[VoteSink::Directed(DirectedVoteKind::Move, W).index()],
+        6.0
+    );
     assert_eq!(tick.actions(), &[mv(W); 6]);
 }
 
