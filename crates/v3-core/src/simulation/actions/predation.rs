@@ -788,4 +788,34 @@ mod tests {
         assert!(sim.stats.last_tick_predation_events.is_empty());
         assert_eq!(sim.stats.last_tick_predation_kills, 0);
     }
+
+    #[test]
+    fn each_result_has_its_stable_key_and_transfer_flag() {
+        let expected = [
+            (PredationActionResult::Transferred, "Transferred", true),
+            (
+                PredationActionResult::TransferredAndKilled,
+                "TransferredAndKilled",
+                true,
+            ),
+            (
+                PredationActionResult::RejectedNoVictim,
+                "RejectedNoVictim",
+                false,
+            ),
+            (
+                PredationActionResult::RejectedNothingToTake,
+                "RejectedNothingToTake",
+                false,
+            ),
+        ];
+        assert_eq!(
+            PredationActionResult::ALL.to_vec(),
+            expected.map(|(result, _, _)| result).to_vec()
+        );
+        for (result, key, transferred) in expected {
+            assert_eq!(result.as_key(), key);
+            assert_eq!(result.transferred(), transferred, "{result:?}");
+        }
+    }
 }

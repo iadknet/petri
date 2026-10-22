@@ -336,6 +336,35 @@ mod tests {
         }
 
         #[test]
+        fn netting_an_overdraft_takes_only_this_actions_charge(
+            row in 0usize..ActionType::ALL.len(),
+            prior in 0.0f64..1.0e8,
+            charged in 0.0f64..1.0e8,
+            overshoot in 0.0f64..1.0e8,
+        ) {
+            let action = ActionType::ALL[row];
+            let mut flows = EnergyFlows::default();
+            for k in ActionType::ALL {
+                flows.action_charges[k] = prior;
+            }
+            let before = (flows.action_charges, flows.failed_action_effort);
+            flows.action_charges[action] += charged;
+            let remainder = flows.net_action_overdraft(before, overshoot);
+            let netted = (prior + charged) - flows.action_charges[action];
+            // The earlier charges were the creature's own energy: only the
+            // action's charge is netted, the rest of the overshoot remains.
+            let tolerance = 1e-6 * (prior + charged).max(1.0);
+            prop_assert!(flows.action_charges[action] >= prior - tolerance);
+            prop_assert!(netted <= charged + tolerance);
+            prop_assert!((netted + remainder - overshoot).abs() <= 1e-6 * overshoot.max(1.0));
+            for k in ActionType::ALL {
+                if k != action {
+                    prop_assert_eq!(flows.action_charges[k], prior);
+                }
+            }
+        }
+
+        #[test]
         fn pending_cause_retains_first_crossing_until_positive_recovery(
             positive in 0.001f64..1.0e6,
             overshoot in -1.0e6f64..=0.0,
