@@ -1,6 +1,6 @@
 # T27.F03 — Giving Energy
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-22
 **Feature**: T27.F03
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
@@ -252,21 +252,17 @@ the cause named in invariant 9.
 - [x] Commit 2 (zero-transfer fix).
 - [x] Commit 3 (shares and effort).
 - [x] Commit 4 (give).
-- [ ] Verification Plan: viability first, then gate and goal through the
+- [x] Verification Plan: viability first, then gate and goal through the
       benchmark specialist; mutation gate and slow tier through the mutation
       specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core --test viability` -> 30
+- [x] Focused tests: `cargo test -p v3-core --test viability` -> 30
       passed (run first); `cargo test -p v3-core` -> pass, and
       `--features telemetry-seams --lib` -> 2,329 passed; `-p v3-server
-      -p v3-lab -p v3-telemetry` -> 458 passed; `-p v3-cli` -> fails only
-      `gate_profile_has_no_severe_regression_against_series_references`
-      (`decided_passes` 0.000355 against the zero T26.F02 reference) until
-      the closure re-pin; `cargo check --workspace --all-targets`,
-      `cargo fmt --all --check` and `make rust-clippy` clean; x86_64
-      digests via emulated Ubuntu 24.04. `make rust-test-slow` -> 3 + 6 passed
+      -p v3-lab -p v3-telemetry` -> 458 passed; `-p v3-cli` passes after the
+      re-pin; `make check` -> exit 0 at 7d70a1f6. `make rust-test-slow` -> 3 + 6 passed
       once cadaaeeb re-pinned Graph Drift `[16, 10, 9, 2]`.
 - [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
       `src/types/vote-sinks.test.ts` (union witnesses) and `vote.rs`'s fixture pin.
@@ -287,8 +283,8 @@ the cause named in invariant 9.
       | `actions/mod.rs:51` `>` -> `>=` in `exchange_intensity` | equivalent: at a ±0 product both branches return a zero the `NoOp`-floored effort and the amount comparison treat alike |
       | `actions/mod.rs:77` `>` -> `>=` in `exchange_amount` | equivalent: at a zero store `store - intensity × 0 < store` is false either way, so both return `None` |
       | `window_seam.rs:160` `FlowMarks::of` -> `Default::default()` | equivalent: compiled only under `telemetry-seams`, off in the gate's v3-core build; a feature-on `cargo mutants -p v3-core --features telemetry-seams -F FlowMarks::of` run finds it unviable (no `Default`) |
-- [ ] Gate and goal: viability 30 passed; gate exit 3 (severe on
-      `decided_passes`), goal exit 0; summaries and readings linked below.
+- [x] Gate and goal: gate exit 3 (`decided_passes` severe, user-accepted
+      2026-10-22), goal exit 0; epochs re-pinned at 28735891.
 - [x] Telemetry: the families in the Telemetry table present in
       `crates/v3-telemetry/src/metrics/tests.rs` and
       `scripts/telemetry-dashboards-check` (its workload keys the give
@@ -322,7 +318,7 @@ readings file; its conclusions, with the expected readings:
 
 **Measured verdict.** Gate severe on `decided_passes`, flag on `vm_steps`
 (+48.7%); goal not severe, flag on `pass_cap_hits` (+12.2%). All three worlds
-persist; kills 0; gives and steals occur; shares sit near 0.2. Epochs not re-pinned.
+persist; kills 0; gives and steals occur; shares sit near 0.2. Severe accepted, epochs re-pinned.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f03-giving-energy.json),
   [goal](../../progress/features/t27-f03-giving-energy-goal.json).
@@ -330,10 +326,10 @@ persist; kills 0; gives and steals occur; shares sit near 0.2. Epochs not re-pin
 
 ## Success Criteria
 
-- [ ] A committed give moves `min(1, give_share × effort) × giver.energy` to the neighbour through `gift_debit` / `gift_credit` with the recipient capped; a committed steal takes `min(1, steal_share × effort) × victim.energy` through the predation flows; both charge `action_effort(exchange.effort_rate × intensity × actor.energy)` with the floor; a zero transfer is a rejection with no kill credit.
-- [ ] `steal_share` and `give_share` are inherited with the capacity's rule from the founder's `exchange.founder_share`, stay in `[share_min, 1]`, and are visible in the creature detail and the goal summary's `shares` block.
-- [ ] `VoteSink::Directed` with four kinds, 39 vote sinks, five parameter fields, `vote-sinks.json` pinned and consumed by the frontend; `StealEnergyAmount` and `predation.steal_cost_rate` are gone.
-- [ ] Viability passes first; gate and goal summaries stored and epochs re-pinned; the goal readings report steals, gives, kills and shares per world, zero included; mutation gate and slow tier run with every survivor resolved.
+- [x] A committed give moves `min(1, give_share × effort) × giver.energy` to the neighbour through `gift_debit` / `gift_credit` with the recipient capped; a committed steal takes `min(1, steal_share × effort) × victim.energy` through the predation flows; both charge `action_effort(exchange.effort_rate × intensity × actor.energy)` with the floor; a zero transfer is a rejection with no kill credit.
+- [x] `steal_share` and `give_share` are inherited with the capacity's rule from the founder's `exchange.founder_share`, stay in `[share_min, 1]`, and are visible in the creature detail and the goal summary's `shares` block.
+- [x] `VoteSink::Directed` with four kinds, 39 vote sinks, five parameter fields, `vote-sinks.json` pinned and consumed by the frontend; `StealEnergyAmount` and `predation.steal_cost_rate` are gone.
+- [x] Viability passes first; gate and goal summaries stored and epochs re-pinned; the goal readings report steals, gives, kills and shares per world, zero included; mutation gate and slow tier run with every survivor resolved.
 
 ## Notes for AI Agents
 
@@ -352,3 +348,7 @@ persist; kills 0; gives and steals occur; shares sit near 0.2. Epochs not re-pin
 - Deferred: the long-run reading of giving, stealing and the share
   distributions runs on T27.F02's goal-long, the track's one carrier; this
   feature's 2,000-tick reading reports them, zero included.
+- Decision: the user kept R10 (round-1 `step-back:`, 2026-10-22).
+- Deferred: the capacity bound `(max_energy / cap.min).ln()` overflows for a
+  subnormal `cap.min`; feature-on mutant `window_seam.rs:165` is uncaught.
+- Cost: see the readings file.
