@@ -249,7 +249,7 @@ the cause named in invariant 9.
 | 4 give | the four-kind catalog (39 / 108, five fields, six action types) and the give column, `giving.rs`, `GiveEffort`, death causes, action-log result (1, 5, 6); counting and versions with `GENOME_FORMAT` 10 (7); reach (8); reference-doc sizes and steps (10); invariant 9 row 4 re-pinned, cause "kind draws `0..4`, sink draws 39 / 108, field draws `0..5`, sub-index widths"; founder-only digests unmoved from commit 3 | the give fixture (a gift credited and capped, each side's applied booking, `NoRecipient`, `EnergyConstraints`, a giver exhausted by its gift and removed after its dispatch); the creature-window assertion over a give's charge; telemetry family tests; dashboards check names; `tests/viability.rs`; `cargo test -p v3-core` |
 
 - [x] Commit 1 (catalog).
-- [ ] Commit 2 (zero-transfer fix).
+- [x] Commit 2 (zero-transfer fix).
 - [ ] Commit 3 (shares and effort).
 - [ ] Commit 4 (give).
 - [ ] Verification Plan: viability first, then gate and goal through the

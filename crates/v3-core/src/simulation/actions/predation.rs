@@ -22,9 +22,26 @@ pub enum PredationActionResult {
     TransferredAndKilled,
     /// No victim at target (empty cell, barrier, or off-world).
     RejectedNoVictim,
+    /// A victim, but the steal moved nothing: no positive amount, an
+    /// exhausted victim, or an amount `f32` rounding absorbs.
+    RejectedNothingToTake,
 }
 
 impl PredationActionResult {
+    /// Every result, in declaration order.
+    pub const ALL: [Self; 4] = [
+        Self::Transferred,
+        Self::TransferredAndKilled,
+        Self::RejectedNoVictim,
+        Self::RejectedNothingToTake,
+    ];
+
+    /// Whether the steal moved energy.
+    #[must_use]
+    pub const fn transferred(self) -> bool {
+        matches!(self, Self::Transferred | Self::TransferredAndKilled)
+    }
+
     /// Stable string key used by transport/API boundaries.
     #[must_use]
     pub const fn as_key(self) -> &'static str {
@@ -32,6 +49,7 @@ impl PredationActionResult {
             Self::Transferred => "Transferred",
             Self::TransferredAndKilled => "TransferredAndKilled",
             Self::RejectedNoVictim => "RejectedNoVictim",
+            Self::RejectedNothingToTake => "RejectedNothingToTake",
         }
     }
 }
@@ -50,7 +68,10 @@ pub struct TransferOutcome<R> {
 ///
 /// The attacker always pays the effort of `steal_cost_rate * requested_amount`,
 /// floored at `NoOp`'s (T16.F02), regardless of outcome, and nothing more.
-/// If a victim exists, the actual transfer is `min(requested_amount, victim.energy)`.
+/// If a victim exists, the actual transfer is `min(requested_amount, victim.energy)`
+/// when the victim's energy is positive, else nothing; a steal that leaves the
+/// victim's stored energy unchanged fails as `RejectedNothingToTake` and kills
+/// nothing.
 /// If the victim's energy drops to zero or below, the victim is killed and removed,
 /// and the attacker receives a complexity bonus.
 pub fn apply_steal_energy(
@@ -90,25 +111,31 @@ pub fn apply_steal_energy(
         .and_then(|target_pos| sim.world.creature_at(target_pos))
         .filter(|&id| id != attacker_id);
     let Some(victim_id) = victim_id else {
-        sim.stats.predation_actions_rejected_total += 1;
-        *sim.stats
-            .predation_actions_by_result
-            .entry(PredationActionResult::RejectedNoVictim)
-            .or_insert(0) += 1;
-        sim.stats.energy_flows.failed_action_effort[ActionType::StealEnergy] += effort;
-        return TransferOutcome {
-            result: PredationActionResult::RejectedNoVictim,
-            amount: 0.0,
-            counterpart: None,
-        };
+        return reject(sim, PredationActionResult::RejectedNoVictim, effort, None);
     };
 
-    // Step 5: Compute actual steal (capped at victim's current energy).
-    let actual = requested_amount.min(sim.creatures[victim_id].energy);
+    // Step 5: Compute actual steal (capped at victim's current energy); a
+    // comparison, so a NaN or exhausted store yields nothing.
+    let before = sim.creatures[victim_id].energy;
+    let actual = if before > 0.0 {
+        requested_amount.min(before)
+    } else {
+        0.0
+    };
+    // A steal transfers only when the victim's stored energy fell, so an
+    // amount rounding absorbs, or a NaN store, moves nothing.
+    let store_fell = before - actual < before;
+    if !store_fell {
+        return reject(
+            sim,
+            PredationActionResult::RejectedNothingToTake,
+            effort,
+            Some(victim_id),
+        );
+    }
 
     // Step 6: Transfer energy.
     let victim = &mut sim.creatures[victim_id];
-    let before = victim.energy;
     victim.energy -= actual;
     sim.stats.energy_flows.predation_victim_debit +=
         victim.observe_energy(before, DeathCause::Predation);
@@ -193,6 +220,27 @@ pub fn apply_steal_energy(
         result: PredationActionResult::Transferred,
         amount: actual,
         counterpart: Some(victim_id),
+    }
+}
+
+/// Books a steal that moved nothing: one rejection by `result`, its effort as
+/// failed.
+fn reject(
+    sim: &mut Simulation,
+    result: PredationActionResult,
+    effort: f64,
+    counterpart: Option<CreatureId>,
+) -> TransferOutcome<PredationActionResult> {
+    sim.stats.predation_actions_rejected_total += 1;
+    *sim.stats
+        .predation_actions_by_result
+        .entry(result)
+        .or_insert(0) += 1;
+    sim.stats.energy_flows.failed_action_effort[ActionType::StealEnergy] += effort;
+    TransferOutcome {
+        result,
+        amount: 0.0,
+        counterpart,
     }
 }
 
@@ -557,23 +605,127 @@ mod tests {
     }
 
     #[test]
-    fn steal_zero_amount_pays_the_noop_floor() {
+    fn steal_zero_amount_pays_the_noop_floor_and_takes_nothing() {
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.predation.steal_cost_rate = 0.2;
 
-        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 0.0).result;
+        let outcome = apply_steal_energy(attacker_id, &mut sim, Direction::N, 0.0);
 
-        assert_eq!(result, PredationActionResult::Transferred);
-        // cost = max(0.2 * 0, noop_cost) = 0.4 (T16.F02; effort-cost defaults, 2026-10-10), transfer = 0
+        assert_eq!(outcome.result, PredationActionResult::RejectedNothingToTake);
+        assert_eq!(outcome.amount, 0.0);
+        assert_eq!(outcome.counterpart, Some(victim_id));
+        // cost = max(0.2 * 0, noop_cost) = 0.4 (T16.F02; effort-cost defaults, 2026-10-10)
         assert!(
             (sim.creatures[attacker_id].energy - (50.0 - 0.4)).abs() < 1e-6,
             "a zero steal pays the NoOp floor"
         );
-        assert!(
-            (sim.creatures[victim_id].energy - 30.0).abs() < 1e-6,
-            "victim unchanged"
+        assert_eq!(sim.creatures[victim_id].energy, 30.0, "victim unchanged");
+        assert_nothing_taken(&sim, attacker_id, victim_id);
+    }
+
+    /// A steal that moved nothing: rejected once, its effort booked as failed,
+    /// no kill, no hit, no `Predation` death and no event record.
+    fn assert_nothing_taken(sim: &Simulation, attacker_id: CreatureId, victim_id: CreatureId) {
+        assert!(sim.creatures.contains_key(victim_id), "no kill");
+        assert_eq!(sim.stats.predation_actions_rejected_total, 1);
+        assert_eq!(sim.stats.predation_actions_transferred_total, 0);
+        assert_eq!(
+            sim.stats
+                .predation_actions_by_result
+                .get(&PredationActionResult::RejectedNothingToTake),
+            Some(&1)
         );
+        assert_eq!(sim.stats.predation_kills_total, 0);
+        assert!(sim.stats.last_tick_predation_events.is_empty());
+        assert_eq!(sim.creatures[victim_id].pending_death_cause, None);
+        assert_eq!(
+            sim.creatures[victim_id].lifetime_predation_hits_taken_count,
+            0
+        );
+        assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 0);
+        let flows = &sim.stats.energy_flows;
+        assert_eq!(flows.predation_victim_debit, 0.0);
+        assert_eq!(flows.predation_attacker_credit, 0.0);
+        assert!(flows.failed_action_effort[ActionType::StealEnergy] > 0.0);
+        assert_eq!(
+            flows.failed_action_effort[ActionType::StealEnergy],
+            flows.action_charges[ActionType::StealEnergy]
+        );
+    }
+
+    #[test]
+    fn an_exhausted_victim_yields_nothing_to_take_and_no_kill() {
+        for store in [0.0, -0.0, -3.0, f32::NAN, f32::NEG_INFINITY] {
+            let (mut sim, attacker_id, victim_id) =
+                make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
+            sim.creatures[victim_id].energy = store;
+
+            let outcome = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+            assert_eq!(
+                outcome.result,
+                PredationActionResult::RejectedNothingToTake,
+                "store {store}"
+            );
+            assert_eq!(outcome.amount, 0.0);
+            assert_eq!(sim.creatures[victim_id].energy.to_bits(), store.to_bits());
+            assert_nothing_taken(&sim, attacker_id, victim_id);
+        }
+    }
+
+    #[test]
+    fn an_amount_rounding_absorbs_is_nothing_to_take() {
+        // At 1e7 the f32 spacing is 1.0, so 1e7 - 0.25 rounds back to 1e7.
+        let (mut sim, attacker_id, victim_id) =
+            make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 1.0e7);
+
+        let outcome = apply_steal_energy(attacker_id, &mut sim, Direction::N, 0.25);
+
+        assert_eq!(outcome.result, PredationActionResult::RejectedNothingToTake);
+        assert_eq!(outcome.amount, 0.0);
+        assert_eq!(sim.creatures[victim_id].energy, 1.0e7);
+        assert_nothing_taken(&sim, attacker_id, victim_id);
+    }
+
+    proptest::proptest! {
+        /// A steal is `Transferred` or `TransferredAndKilled` only when it
+        /// moved a positive amount that lowered the victim's stored energy,
+        /// for any `f32` bit pattern of the victim's store and the request.
+        #[test]
+        fn a_transfer_always_lowers_the_victim_store(
+            store_bits in proptest::num::u32::ANY,
+            request_bits in proptest::num::u32::ANY,
+        ) {
+            let store = f32::from_bits(store_bits);
+            let (mut sim, attacker_id, victim_id) =
+                make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
+            sim.creatures[victim_id].energy = store;
+
+            let outcome =
+                apply_steal_energy(attacker_id, &mut sim, Direction::N, f32::from_bits(request_bits));
+
+            match outcome.result {
+                PredationActionResult::Transferred => {
+                    proptest::prop_assert!(outcome.amount > 0.0);
+                    proptest::prop_assert!(sim.creatures[victim_id].energy < store);
+                }
+                PredationActionResult::TransferredAndKilled => {
+                    proptest::prop_assert!(outcome.amount > 0.0);
+                    proptest::prop_assert!(!sim.creatures.contains_key(victim_id));
+                }
+                PredationActionResult::RejectedNothingToTake => {
+                    proptest::prop_assert_eq!(outcome.amount, 0.0);
+                    proptest::prop_assert_eq!(
+                        sim.creatures[victim_id].energy.to_bits(),
+                        store.to_bits()
+                    );
+                }
+                PredationActionResult::RejectedNoVictim => {
+                    proptest::prop_assert!(false, "the victim is adjacent");
+                }
+            }
+        }
     }
 
     #[test]

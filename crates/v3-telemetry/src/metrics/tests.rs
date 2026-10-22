@@ -211,11 +211,7 @@ fn populated() -> SimStats {
     ] {
         s.move_actions_blocked_total_by_cause.insert(cause, 1);
     }
-    for result in [
-        PredationActionResult::Transferred,
-        PredationActionResult::TransferredAndKilled,
-        PredationActionResult::RejectedNoVictim,
-    ] {
+    for result in PredationActionResult::ALL {
         s.predation_actions_by_result.insert(result, 1);
     }
     s.last_tick_food_total_density_by_type = vec![0.5, 0.25];
@@ -616,7 +612,12 @@ fn outcome_families(families: &mut Vec<Family>) {
         vec![(
             "petri.result",
             strings(
-                ["Transferred", "TransferredAndKilled", "RejectedNoVictim"],
+                [
+                    "Transferred",
+                    "TransferredAndKilled",
+                    "RejectedNoVictim",
+                    "RejectedNothingToTake",
+                ],
                 str::to_owned,
             ),
         )],

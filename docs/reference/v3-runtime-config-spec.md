@@ -331,7 +331,7 @@ Action effort (T16.F02):
   `NoOp`'s is above zero. A base at or above `noop_cost` is charged exactly
   `adjusted_action_cost(base, …)`.
 - A failure (a blocked move, an eat finding no food, a rejected reproduce, a
-  steal with no victim) pays its effort and nothing more; there is no
+  steal with no victim or nothing to take) pays its effort and nothing more; there is no
   failed-action penalty and no startup ramp. A config naming the retired
   `energy.costs.failed_action_penalty` or `startup` section fails to resolve.
 
