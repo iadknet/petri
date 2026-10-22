@@ -1715,6 +1715,18 @@ mod tests {
         );
     }
 
+    /// `SensorScale::as_key` is the serialized config key of each scale.
+    #[test]
+    fn sensor_scale_keys_match_their_serialized_names() {
+        for scale in [SensorScale::Reference, SensorScale::Own] {
+            assert_eq!(serde_json::to_value(scale).unwrap(), scale.as_key());
+        }
+        assert_eq!(
+            [SensorScale::Reference.as_key(), SensorScale::Own.as_key()],
+            ["reference", "own"]
+        );
+    }
+
     #[test]
     fn capacity_overrides_deserialize_from_a_partial_overlay() {
         let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();

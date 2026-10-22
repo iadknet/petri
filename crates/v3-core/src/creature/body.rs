@@ -198,6 +198,44 @@ mod tests {
         assert_eq!(body.energy_scale(&config), 50.0);
     }
 
+    /// An RNG whose every word is zero, so `gen::<f32>()` draws exactly 0.0.
+    struct ZeroRng;
+
+    impl rand::RngCore for ZeroRng {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            dest.fill(0);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            dest.fill(0);
+            Ok(())
+        }
+    }
+
+    /// A zero capacity chance never fires, even on the smallest draw (0.0),
+    /// and a chance just above it does.
+    #[test]
+    fn a_zero_capacity_chance_never_fires_on_a_zero_draw() {
+        let parent = HeritableBody::founder(0, 0, 200.0);
+        let energy = EnergyConfig::default();
+        let child =
+            HeritableBody::inherit(&parent, false, &mutation(0.0, 0.25), &energy, &mut ZeroRng);
+        assert_eq!(child, parent);
+        let fired = HeritableBody::inherit(
+            &parent,
+            false,
+            &mutation(f32::MIN_POSITIVE, 0.25),
+            &energy,
+            &mut ZeroRng,
+        );
+        assert_eq!(fired.capacity, 200.0 * (-0.25f32).exp());
+    }
+
     /// A `log_step` at its normalized bound, `ln(max_energy / min)` over the
     /// widest range, samples without panic.
     #[test]
