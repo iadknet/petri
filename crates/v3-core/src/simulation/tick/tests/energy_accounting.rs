@@ -178,7 +178,9 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         );
         assert_eq!(sim.stats.mortality.count(DeathCause::VmCompute), 1);
         assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 0);
-        assert_eq!(sim.stats.predation_kills_total, 1);
+        // An exhausted victim yields nothing to take: no kill (T27.F03).
+        assert_eq!(sim.stats.predation_kills_total, 0);
+        assert_eq!(sim.stats.predation_actions_rejected_total, 1);
         assert_eq!(
             sim.stats.energy_flows.vm_compute.to_bits(),
             observed.to_bits()
@@ -202,17 +204,20 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     assert_eq!(flows.maximum_energy_clamp_loss, 3.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
 
+    // An exhausted victim yields nothing: no kill, no bonus, no flow.
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
     sim.creatures[victim].cached_complexity = 3;
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
-    assert_eq!(sim.creatures[attacker].energy, 2.0);
-    assert_eq!(
-        sim.creatures[attacker].pending_death_cause, None,
-        "bonus restores positive energy"
-    );
+    assert_eq!(sim.creatures[attacker].energy, 1.0);
+    assert_eq!(sim.creatures[victim].energy, -2.0);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.predation_victim_debit, 0.0);
+    assert_eq!(flows.predation_attacker_credit, 0.0);
+    assert_eq!(flows.predation_kill_bonus_credit, 0.0);
+    assert_eq!(sim.stats.predation_kills_total, 0);
 }
 
 #[test]
@@ -557,23 +562,20 @@ fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() 
 }
 
 #[test]
-fn predation_retains_exhausted_victim_cause_and_signed_reverse_transfer() {
+fn predation_leaves_an_exhausted_victim_its_own_cause_and_takes_nothing() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     sim.creatures[victim].pending_death_cause = Some(DeathCause::VmCompute);
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    assert_eq!(sim.stats.predation_kills_total, 0);
+    assert_eq!(sim.stats.energy_flows.predation_victim_debit, 0.0);
+    assert_eq!(sim.stats.energy_flows.predation_attacker_credit, 0.0);
+    assert_eq!(sim.creatures[attacker].pending_death_cause, None);
+    sim.remove_creature(victim);
     assert_eq!(sim.stats.mortality.count(DeathCause::VmCompute), 1);
-    assert_eq!(sim.stats.predation_kills_total, 1);
-    assert_eq!(sim.stats.energy_flows.predation_victim_debit, -2.0);
-    assert_eq!(sim.stats.energy_flows.predation_attacker_credit, -2.0);
-    assert_eq!(
-        sim.creatures[attacker].pending_death_cause,
-        Some(DeathCause::Predation)
-    );
-    sim.remove_creature(attacker);
-    assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
+    assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 0);
 }
 
 /// The per-creature compute total is the plain sum of all three cognition

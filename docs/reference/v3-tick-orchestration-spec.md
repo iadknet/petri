@@ -221,8 +221,8 @@ complexity, age)` (`EnergyConfig::action_effort`). The actions share the
 multiplier, so no action's effort is below `NoOp`'s, and `NoOp`'s is above
 zero (`noop_cost > 0`); a base at or above `noop_cost` is charged exactly
 `adjusted_action_cost(base, …)`. A failed attempt (a blocked move, an eat
-finding no food, a rejected reproduce, a steal with no victim) pays its effort
-and nothing more: there is no failed-action penalty. The debit lands in
+finding no food, a rejected reproduce, a steal with no victim or nothing to
+take) pays its effort and nothing more: there is no failed-action penalty. The debit lands in
 `energy_flows.action_charges.<action>`, and on a failed attempt also in its
 subset `energy_flows.failed_action_effort.<action>`.
 
@@ -266,6 +266,12 @@ subset `energy_flows.failed_action_effort.<action>`.
   requested amount before the target resolves; a zero or invalid amount pays
   `NoOp`'s effort. Transfer, kill and bonus rules are owned by the predation
   action.
+- The amount is `min(requested, victim.energy)` when the victim's energy is
+  positive, else 0. A steal transfers only when the victim's stored energy
+  falls; one that moves nothing (a zero amount, an exhausted or `NaN` store,
+  an amount `f32` rounding absorbs) fails as `RejectedNothingToTake`: its
+  effort is booked as failed, and it kills nothing, credits no bonus and
+  records no predation event.
 
 ### Energy after action
 

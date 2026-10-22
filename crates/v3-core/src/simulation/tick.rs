@@ -1156,7 +1156,7 @@ fn execute_steal_energy(
     }
     let outcome = apply_steal_energy(ctx.id, sim, direction, amount);
     let result = outcome.result;
-    outcome_acc.record_action_result(ctx.id, result != PredationActionResult::RejectedNoVictim);
+    outcome_acc.record_action_result(ctx.id, result.transferred());
     // A surviving victim takes the damage; a killed one was removed.
     if let (PredationActionResult::Transferred, Some(victim_id)) = (result, outcome.counterpart) {
         outcome_acc.record_damage(victim_id, outcome.amount);
@@ -1164,7 +1164,9 @@ fn execute_steal_energy(
     let action_result = match result {
         PredationActionResult::Transferred => ActionResult::Success,
         PredationActionResult::TransferredAndKilled => ActionResult::TransferredAndKilled,
-        PredationActionResult::RejectedNoVictim => ActionResult::NoVictim,
+        PredationActionResult::RejectedNoVictim | PredationActionResult::RejectedNothingToTake => {
+            ActionResult::NoVictim
+        }
     };
     push_action_log(
         sim,
