@@ -18,7 +18,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 - [x] Each NearbyCreature slot carries the seen creature's red, green and blue, and the creature senses its own; the lineage oracle `LINEAGE_MATCH` and the genotype comparison `PHENOTYPE_SIMILARITY` are retired, and `KIN_AFFINITY` stays as the one self-referent matching sense.
 - [ ] A creature holds eight signal values it writes like memory, held until rewritten, and its neighbours read them per slot one tick later; no channel carries an assigned meaning.
-- [ ] Giving and stealing each move one fixed bite per action through named ledger flows; a zero transfer is a failure, and the steal amount parameter is gone.
+- [ ] Giving and stealing each move a share of the source's energy, set by a heritable per-kind share and an effort field that is neutral when unwired, through named ledger flows; a zero transfer is a failure with no kill credit, and the steal amount parameter is gone.
 - [ ] Signals and giving run in all three goal worlds, and their goal readings report occurrences and use, including zero.
 
 ## Executable Features
@@ -28,7 +28,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 - [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
   - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
 - [ ] **T27.F03 — Giving Energy** — Depends on: T26.F01
-  - Goal: Trophallaxis and parental feeding: a creature can pass a mouthful of energy to a neighbour, and stealing takes a mouthful the same way, so care and exploitation are both possible.
+  - Goal: Trophallaxis and parental feeding: a creature can pass part of its store to a neighbour, and stealing takes part of the victim's the same way; how much is inherited and pushed by effort, so care and exploitation are both possible.
 
 ## Notes for AI Agents
 
@@ -77,22 +77,71 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   gene rather than 28 silent edges, so F02 waits for it. F02's goal-long run
   also carries T25.F10's deferred reading: group, materialized-member and
   corrected-member counts beside genome size, compute and energy.
+- F03 amount (user decisions, 2026-10-21): the user rejected the fixed
+  `exchange.bite` of the first implementation (closed at d36f7be6, reverted
+  at 58121149) as a global amount no creature shapes. This row supersedes the
+  design note's §3 C and takes up the share form of archived T17.F03. The
+  amount comes from three creature factors:
+  - physiology: one heritable share per kind, `steal_share` and
+    `give_share`, in T26.F01's `HeritableBody`. Every genome carries both
+    from the founder (start near 0.2), mutated at birth by relative steps and
+    cryptic until a give or steal sink is wired. The spec sets the range
+    within (0, 1], the start, the bounded-share mutation and its boundary
+    handling (T11.F23's `max(|c|, 1)` floor makes steps absolute across this
+    range, so it is background, not the rule), and predeclares the moved
+    inheritance draws. Direction only picks the
+    target: one share per kind, not per direction sink;
+  - effort: `StealEffort` replaces `StealEnergyAmount` and `GiveEffort` is
+    new, both decoded action-parameter fields reachable through T11.F25's
+    decoded-field draws. An unwired field reads 0 and means ×1, as an
+    unwired `EatLeaveShare` eats the whole cell; the old amount reads 0
+    when unwired, so wiring a steal sink alone requests nothing. The
+    modifier is multiplicative and never negative; the spec chooses its
+    shape and bounds;
+  - state: the amount is share × modifier of the source's current energy,
+    the victim's for a steal and the giver's own for a give (Polyworld's give
+    is energy × give activation × a configured fraction,
+    `TSimulation::GetGiveStatus` in its `src/library/sim/Simulation.cc`).
+
+  The only constant is the existing effort rate. Give and steal share one
+  effort rule: the charge grows with the attempted intensity, with the 0.4
+  floor on every attempt (user decision: give is graded like steal). A
+  no-victim attempt has no absolute amount, so the spec states the charge
+  base. Give is lossless: the recipient is credited through T26.F01's cap
+  function, the excess booked as clamp loss, and the gift as paired transfer
+  flows. Payoff (design review finding 4): at neutral effort, share 0.2,
+  population mean energy 24–33 and the recorded 4–9% blind victim-hit
+  rates give illustrative gross returns of about 0.2–0.6 per attempt
+  against the 0.4 floor. Profitability is unestablished; the spec
+  predeclares the payoff calculation under its charge base, the
+  complexity and age multiplier and the applied-transfer limits. Expect parental care first (Taylor-Davies et
+  al. 2024); do not target it.
+- F03 lands the zero-transfer fix as its own commit with a predeclared
+  re-pin: a give or steal that moves nothing is a failed action, never
+  `Transferred`. A steal on a victim already at or below zero energy
+  (exhausted in Phase 1, not yet removed) moves nothing, so it credits no
+  kill and no `Predation` death cause. Live telemetry shows these kills
+  outnumbering real ones: one run logged 3,824 kills against 2,730 energy
+  taken.
 - F03 folds in the directed-kind catalog refactor (`VoteSink::Directed`,
   a `voteSinks.json` fixture covering `VoteKind`, `ActionParamField` and
-  `OutputSinkKind`, charge arrays indexed by action type). It lands the
-  zero-transfer fix as its own commit with a predeclared re-pin. Give is
-  lossless: the recipient is credited through T26.F01's cap function, the
-  excess booked as clamp loss, and the gift as paired transfer flows. A
-  successful give and a failed one each pay the effort floor. Before
-  implementing, the spec predeclares a bite-size payoff calculation from the
-  recorded victim-hit rates (F09 goal: about 4–9% of steal attempts find a
-  victim), so the bite is chosen against the targeting economics rather than
-  the amount alone. Expect
-  parental care first (Taylor-Davies et al. 2024); do not target it.
+  `OutputSinkKind`, charge arrays indexed by action type). The reverted
+  implementation (586605fd..d36f7be6) holds a reusable version of it and of
+  the zero-transfer fix. T26.F02 also extends `HeritableBody`; whichever
+  lands second adds its field beside the other's.
+- Steal under the old decoder evolved late (live telemetry, 2026-10-21):
+  21 of 247 runs moved real energy, every one at least 2,566 ticks long and
+  most beyond 20,000, with takeoff bursts between ticks about 13,000 and
+  48,000 in the runs examined. These observations concern the old amount
+  decoder and do not establish onset under F03. The graded steal effort has
+  been live since predation landed; T16.F02 retired only the separate
+  failed-action penalty.
 - F02 depends on F03 (review round 5 finding 8), so the track's goal-long
-  run on F02 includes giving. It reads colour, giving and slot-fact
-  discovery together. A 2,000-tick goal reading is an early integration
-  reading for every T27 row; zero use there is inconclusive.
+  run on F02 includes giving. It reads colour, giving, stealing and
+  slot-fact discovery together. A 2,000-tick goal reading is an early
+  integration reading for every T27 row: it reports giving and stealing,
+  including zero, and the goal-long run supplies the longer-horizon
+  reading.
 - F02's signal writes and next-tick NearbyCreature reads operate in all
   three goal worlds, with a focused write-to-read fixture; the reading
   reports per-channel wiring and value variance, including zero, with no
