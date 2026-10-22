@@ -380,6 +380,37 @@ mod tests {
         }
     }
 
+    /// A subnormal `share_min`, whose reciprocal overflows `f32`, still
+    /// bounds the share step by `ln(1 / share_min)`, so a birth with the
+    /// share mutation always firing samples a finite step without panic.
+    #[test]
+    fn a_subnormal_share_min_bounds_the_share_step_and_a_birth_samples() {
+        let mut cfg = crate::config::SimulationConfig::default();
+        cfg.exchange.share_min = 1.0e-40;
+        cfg.mutation.share.chance = 1.0;
+        cfg.mutation.share.log_step = 3.0e38;
+        cfg.normalize();
+        let step = cfg.mutation.share.log_step;
+        assert!(
+            step.is_finite() && step <= cfg.exchange.share_min.ln().abs(),
+            "{step}"
+        );
+        let parent = HeritableBody::founder(0, 0, 200.0, 0.2);
+        let mut rng = SmallRng::seed_from_u64(7);
+        for _ in 0..64 {
+            let child = HeritableBody::inherit(
+                &parent,
+                false,
+                &cfg.mutation,
+                &cfg.energy,
+                &cfg.exchange,
+                &mut rng,
+            );
+            assert!((1.0e-40..=1.0).contains(&child.steal_share));
+            assert!((1.0e-40..=1.0).contains(&child.give_share));
+        }
+    }
+
     proptest! {
         /// An inheritance draws, in order: the phenotype mutation and the
         /// kin-tag mutation when `mutated`; then the capacity, `steal_share`
@@ -472,7 +503,7 @@ mod tests {
         ) {
             let parent = HeritableBody { steal_share, give_share, ..parent };
             let exchange = ExchangeConfig { share_min, ..EXCHANGE };
-            let log_step = log_step.min((1.0 / share_min).ln());
+            let log_step = log_step.min(share_min.ln().abs());
             let mut rng = SmallRng::seed_from_u64(seed);
             let child = HeritableBody::inherit(
                 &parent, false, &mutation(chance, log_step), &EnergyConfig::default(), &exchange, &mut rng,

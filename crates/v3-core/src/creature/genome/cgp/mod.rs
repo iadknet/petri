@@ -373,7 +373,7 @@ mod tests {
             GraphSource::ComputeNode(0)
         );
 
-        // Last sink (ActionParam(StealEffort)) edge to Relu: was CN(2), now CN(1)
+        // Last sink (the final parameter sink) edge to Relu: was CN(2), now CN(1)
         assert_eq!(
             def.output_sinks()[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(1)
@@ -467,7 +467,7 @@ mod tests {
             def.output_sinks()[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::ComputeNode(0)
         );
-        // Last sink (ActionParam(StealEffort)) edge to Relu: was CN(1), now CN(2).
+        // Last sink (the final parameter sink) edge to Relu: was CN(1), now CN(2).
         assert_eq!(
             def.output_sinks()[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(2)

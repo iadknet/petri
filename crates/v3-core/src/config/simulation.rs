@@ -1323,7 +1323,10 @@ impl SimulationConfig {
             1.0,
             DEFAULT_FOUNDER_SHARE.clamp(share_min, 1.0),
         );
-        self.mutation.share.normalize((1.0 / share_min).ln());
+        // `ln(1 / share_min)` as `|ln share_min|`: the reciprocal of a
+        // subnormal `share_min` overflows to infinity, and the absolute value
+        // keeps the bound `+0.0` at `share_min = 1`.
+        self.mutation.share.normalize(share_min.ln().abs());
     }
 }
 
@@ -2333,7 +2336,15 @@ mod tests {
         cfg.exchange.share_min = 1.0;
         cfg.normalize();
         assert_eq!(cfg.mutation.share.log_step, 0.0);
+        assert!(cfg.mutation.share.log_step.is_sign_positive());
         assert_eq!(cfg.exchange.founder_share, 1.0);
+        // A subnormal share_min, whose reciprocal overflows, still bounds
+        // the step by ln(1 / share_min) ≈ 92.1.
+        let mut cfg = SimulationConfig::default();
+        cfg.exchange.share_min = 1.0e-40;
+        cfg.mutation.share.log_step = 3.0e38;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.share.log_step, 0.25);
         for bad in [1.5, -0.1, f32::NAN] {
             let mut cfg = SimulationConfig::default();
             cfg.mutation.share.chance = bad;

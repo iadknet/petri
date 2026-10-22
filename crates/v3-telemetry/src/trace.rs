@@ -435,12 +435,15 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
     ] {
         a.double(config_key(key), value);
     }
-    // The exchange acts' effort rate and share range (T27.F03).
+    // The exchange acts' effort rate, the share range and the birth's share
+    // draw (T27.F03).
     let exchange = &config.exchange;
     for (key, value) in [
         ("exchange.effort_rate", exchange.effort_rate),
         ("exchange.share_min", exchange.share_min),
         ("exchange.founder_share", exchange.founder_share),
+        ("mutation.share.chance", mutation.share.chance),
+        ("mutation.share.log_step", mutation.share.log_step),
     ] {
         a.double(config_key(key), value);
     }

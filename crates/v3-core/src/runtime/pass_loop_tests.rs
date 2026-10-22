@@ -8,7 +8,9 @@ use crate::contracts::{
 };
 use crate::creature::genome::cgp::{ComputeNodeKind, GraphSource};
 use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{ActionParamField, VoteKind, VoteSink};
+use crate::creature::genome::vote::{
+    ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
+};
 use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
@@ -628,6 +630,11 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     );
     graph.param(ActionParamField::StealEffort, &[(fraction, 8.0)]);
     graph.param(ActionParamField::EatLeaveShare, &[(fraction, 2.0)]);
+    graph.param(ActionParamField::GiveEffort, &[(fraction, -4.0)]);
+    graph.vote(
+        VoteSink::Directed(DirectedVoteKind::GiveEnergy, E),
+        &[(one, 1.0)],
+    );
     let steal = vm_node(
         1,
         1,
@@ -656,7 +663,7 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
             },
             // An invalid field is ignored.
             VmInstruction::WriteActionParam {
-                field_idx: crate::creature::genome::vote::ACTION_PARAM_FIELD_COUNT as u8,
+                field_idx: ACTION_PARAM_FIELD_COUNT as u8,
                 src: 0,
             },
             VmInstruction::Halt,
@@ -666,12 +673,18 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     );
     let g = genome(vec![graph.build(0, vec![], &[1]), steal]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-    assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25, 4.0));
+    assert_eq!(tick.actions(), &param_commits(3, 0.5, 0.25, 4.0, 0.5));
 }
 
-/// The commits of a tick that votes `Eat`, `Reproduce(W)` and
-/// `StealEnergy(N)` once each with the given parameter surface.
-fn three_param_commits(food: u16, leave: f32, fraction: f32, effort: f32) -> [WorldAction; 3] {
+/// The commits of a tick that votes `Eat`, `Reproduce(W)`, `StealEnergy(N)`
+/// and `GiveEnergy(E)` once each with the given parameter surface.
+fn param_commits(
+    food: u16,
+    leave: f32,
+    fraction: f32,
+    steal_effort: f32,
+    give_effort: f32,
+) -> [WorldAction; 4] {
     [
         WorldAction::Eat {
             type_idx: OrdinaryFoodTypeId::new(food),
@@ -683,22 +696,28 @@ fn three_param_commits(food: u16, leave: f32, fraction: f32, effort: f32) -> [Wo
         },
         WorldAction::StealEnergy {
             direction: Direction::N,
-            effort,
+            effort: steal_effort,
+        },
+        WorldAction::GiveEnergy {
+            direction: Direction::E,
+            effort: give_effort,
         },
     ]
 }
 
 /// The surface values and the vote each end-to-end fixture writes.
-const FIELD_VALUES: [(ActionParamField, f32); 4] = [
+const FIELD_VALUES: [(ActionParamField, f32); ACTION_PARAM_FIELD_COUNT] = [
     (ActionParamField::EatFoodType, 3.0),
     (ActionParamField::EatLeaveShare, 0.5),
     (ActionParamField::ReproduceTransferFraction, 0.25),
     (ActionParamField::StealEffort, 2.0),
+    (ActionParamField::GiveEffort, -1.0),
 ];
-const FIELD_VOTES: [VoteSink; 3] = [
+const FIELD_VOTES: [VoteSink; 4] = [
     VoteSink::Eat,
     VoteSink::Directed(DirectedVoteKind::Reproduce, W),
     VoteSink::Directed(DirectedVoteKind::StealEnergy, N),
+    VoteSink::Directed(DirectedVoteKind::GiveEnergy, E),
 ];
 
 /// A graph node wiring every `(field, value)` to a constant sink and voting
@@ -756,14 +775,16 @@ fn vm_param_writer(
     vm_node(id, 1, constants, program, vec![], target_ids)
 }
 
-/// T11.F27, T02.F08: each of the four fields, written by a Graph sink and by
-/// a VM write, reaches the committed `WorldAction` of its kind.
+/// T11.F27, T02.F08, T27.F03: each field of `ActionParamField::ALL`, written
+/// by a Graph sink and by a VM write, reaches the committed `WorldAction` of
+/// its kind.
 #[test]
 fn every_param_field_reaches_its_commit_from_either_backend() {
+    assert_eq!(FIELD_VALUES.map(|(field, _)| field), ActionParamField::ALL);
     for writer in [graph_param_writer, vm_param_writer] {
         let g = genome(vec![writer(0, &FIELD_VALUES, &FIELD_VOTES, &[])]);
         let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-        assert_eq!(tick.actions(), &three_param_commits(3, 0.5, 0.25, 4.0));
+        assert_eq!(tick.actions(), &param_commits(3, 0.5, 0.25, 4.0, 0.5));
     }
 }
 
@@ -790,13 +811,13 @@ fn the_last_param_write_wins_across_graph_and_vm_nodes() {
 
 /// T11.F27: a commit reading a field no node wrote in its mesh run decodes
 /// it as zero, since the surface is local to one run. Each writer sets only
-/// `EatFoodType` and votes all three parameterized kinds.
+/// `EatFoodType` and votes all four parameterized kinds.
 #[test]
 fn a_field_unwritten_in_the_mesh_run_decodes_as_zero() {
     for writer in [graph_param_writer, vm_param_writer] {
         let g = genome(vec![writer(0, &FIELD_VALUES[..1], &FIELD_VOTES, &[])]);
         let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
-        assert_eq!(tick.actions(), &three_param_commits(3, 0.0, 0.0, 1.0));
+        assert_eq!(tick.actions(), &param_commits(3, 0.0, 0.0, 1.0, 1.0));
     }
 }
 
