@@ -1,7 +1,7 @@
 # T26 — Body Traits
 
-**Status**: In Progress
-**Last updated**: 2026-10-20
+**Status**: Complete
+**Last updated**: 2026-10-21
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -15,15 +15,15 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Track Success Criteria
 
-- [ ] Phenotype, kin identity and every later heritable body trait are one record passed as one constructor argument and inherited by one call; the upper energy cap and movement effort each come from one function, with every caller's floor, ordering and signed flows unchanged.
-- [ ] Energy capacity is a heritable per-creature trait bounded to a fixed range; movement effort and upkeep are linear in capacity and both neutral at 200, so the founder's economy is unchanged; a newborn provisioned above its own capacity is handled and booked by a stated rule.
-- [ ] The goal-long run reports the capacity distribution, boundary mass and its trend per world, and the readings distinguish selection toward a bound from a tradeoff that is broken or effectively free.
+- [x] Phenotype, kin identity and every later heritable body trait are one record passed as one constructor argument and inherited by one call; the upper energy cap and movement effort each come from one function, with every caller's floor, ordering and signed flows unchanged.
+- [x] Energy capacity is a heritable per-creature trait bounded to a fixed range; movement effort and upkeep are linear in capacity and both neutral at 200, so the founder's economy is unchanged; a newborn provisioned above its own capacity is handled and booked by a stated rule.
+- [x] The goal-long run reports the capacity distribution, boundary mass and its trend per world, and the readings distinguish selection toward a bound from a tradeoff that is broken or effectively free.
 
 ## Executable Features
 
 - [x] **T26.F01 — One Body Record and Body Rules** — Depends on: None
   - Goal: Heredity builds a body as well as a brain, as an egg carries its pigment and markings beside its nervous system: colour and kin identity travel in one inherited body record, and the energy cap and the cost of moving are each one body rule, with no behavior change.
-- [ ] **T26.F02 — Evolvable Energy Reserves** — Depends on: T26.F01
+- [x] **T26.F02 — Evolvable Energy Reserves** — Depends on: T26.F01
   - Goal: Fat: a creature inherits how much energy it can store; a larger store survives lean times but costs more to move and keep, a smaller one is cheaper, and today's capacity is the neutral point.
 
 ## Notes for AI Agents
