@@ -21,6 +21,26 @@ use crate::testing::{decode_metrics, MetricKind, PointValue, ReceivedSnapshot};
 const MS: Duration = Duration::from_millis(1);
 
 #[test]
+fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction() {
+    let mut config = v3_core::config::SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    config.population.initial_creatures = 3;
+    let mut sim = v3_core::simulation::seed_simulation(config, 5);
+    for (creature, capacity) in sim.creatures.values_mut().zip([40.0, 60.0, 110.0]) {
+        creature.body.capacity = capacity;
+    }
+
+    let census = Census::of(&sim);
+    sim.creatures.clear();
+    let extinct = Census::of(&sim);
+
+    assert_eq!(census.population, 3);
+    assert!((census.mean_capacity - 70.0).abs() < 1e-9);
+    assert_eq!(extinct.mean_capacity, 0.0);
+}
+
+#[test]
 fn an_interval_snapshot_waits_for_the_interval_since_the_last_one_or_the_start() {
     let start = Instant::now();
     let interval = 100 * MS;
@@ -674,6 +694,7 @@ fn tick_families(families: &mut Vec<Family>) {
         "food_growth_suppressed_by_type_inhibition",
         "population",
         "mean_energy",
+        "mean_capacity",
         "mean_genome_size",
         "mean_mesh_nodes",
         "mean_generation",
