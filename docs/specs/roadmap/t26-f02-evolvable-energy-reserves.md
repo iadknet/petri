@@ -240,9 +240,10 @@ flows would show it wrong.
       deferred.
 - [x] Comparison and sweep tables and local summary hashes in the readings
       file.
-- [ ] gate, goal and goal-long summaries at
+- [x] gate, goal and goal-long summaries at
       `docs/progress/features/t26-f02-evolvable-energy-reserves{,-goal,-goal-long}.json`;
-      raw hash and byte count checked; no full report staged.
+      raw hash and byte count checked (gate raw replaced; its hash is in the
+      summary); no full report staged.
 
 ## Performance and Goal Impact
 
@@ -264,7 +265,17 @@ and u, set before the final runs: `Reference`, 1.0, 0.002 (invariant 9).
 | The same under `Own` | mean capacity may rise: a larger store is filled before the gate opens | — |
 | Distribution still centered at 200 with negligible `capacity_upkeep` and move flows | not expected | the tradeoff is effectively free |
 
-**Measured verdict.** `<one line per profile>`
+**Measured verdict** (2026-10-21, defaults, code `3e23ea84`; CLI exit 3, make
+exit 2, `severe` true in all three; details in the readings file, "Final
+profiles"):
+
+- gate: severe `plasticity_updates` +77.6%; wall -21.8% ok. Not predeclared.
+- goal: severe `decided_passes` +132.8%; wall -24.1% ok; all worlds persist.
+  Orchards plateau -21.6% and births -36.4% against T27.F01 are outside the
+  predeclaration; mean capacity at 2,000 is 88, 161, 110.
+- goal-long: severe `plasticity_updates` +422.5% (epoch), +294.4% (last);
+  all persist to 40,000; mean capacity 53-59, mass at 50 30-60%, none at 800,
+  as predeclared; cost flows not negligible.
 
 - Summaries of the declared profiles:
   [gate](../../progress/features/t26-f02-evolvable-energy-reserves.json),
