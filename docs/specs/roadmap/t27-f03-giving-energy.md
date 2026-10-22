@@ -262,7 +262,7 @@ the cause named in invariant 9.
       passed (run first); `cargo test -p v3-core` -> pass, and
       `--features telemetry-seams --lib` -> 2,329 passed; `-p v3-server
       -p v3-lab -p v3-telemetry` -> 458 passed; `-p v3-cli` passes after the
-      re-pin; `make check` -> exit 0 at 7d70a1f6. `make rust-test-slow` -> 3 + 6 passed
+      re-pin; `make check` -> exit 0 at 7de9aaa9 (rebased). `make rust-test-slow` -> 3 + 6 passed
       once cadaaeeb re-pinned Graph Drift `[16, 10, 9, 2]`.
 - [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
       `src/types/vote-sinks.test.ts` (union witnesses) and `vote.rs`'s fixture pin.
