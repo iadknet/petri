@@ -87,7 +87,7 @@ drives (T11.F30) included.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
-| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's four-field parameter surface (`field_idx` in `0..4`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEffort`; an invalid field is ignored and still costs) |
+| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's five-field parameter surface (`field_idx` in `0..5`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEffort, GiveEffort`; an invalid field is ignored and still costs) |
 | 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
 ### Action Queue Reads
@@ -183,7 +183,7 @@ All genome-derived indexes are handled without panic:
 - **Register index**: normalized by modulo `register_count`.
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload slot index**: valid when `< 12`; otherwise write ignored.
-- **Action parameter field index**: valid when `< 3`; otherwise write ignored.
+- **Action parameter field index**: valid when `< 5`; otherwise write ignored.
 - **Vote sink index**: valid when `< 39`; otherwise the vote is dropped.
 
 If `register_count == 0`, VM halts immediately (no votes).
