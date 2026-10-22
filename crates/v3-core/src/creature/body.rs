@@ -124,7 +124,7 @@ impl HeritableBody {
 /// then one `f32` draw against `config.chance` and, when it fires, a uniform
 /// log-space step `δ ∈ [-log_step, log_step]` with the child
 /// `(parent × e^δ)` clamped to the same range.
-pub fn inherit_scalar(
+fn inherit_scalar(
     parent: f32,
     config: &LogStepMutationConfig,
     min: f32,

@@ -615,10 +615,8 @@ const DEFAULT_INITIAL_ENERGY: f32 = 20.0;
 const DEFAULT_MOVE_COST_SLOPE: f32 = 1.0;
 /// u: the T26.F02 sweep's pick (`docs/progress/readings/t26-f02.md`).
 const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.002;
-const DEFAULT_CAPACITY_MUTATION_CHANCE: f32 = 0.1;
-const DEFAULT_CAPACITY_LOG_STEP: f32 = 0.25;
-const DEFAULT_SHARE_MUTATION_CHANCE: f32 = 0.1;
-const DEFAULT_SHARE_LOG_STEP: f32 = 0.25;
+const DEFAULT_LOG_STEP_MUTATION_CHANCE: f32 = 0.1;
+const DEFAULT_LOG_STEP: f32 = 0.25;
 const DEFAULT_EFFORT_RATE: f32 = 0.05;
 const DEFAULT_SHARE_MIN: f32 = 0.01;
 const DEFAULT_FOUNDER_SHARE: f32 = 0.2;
@@ -696,16 +694,27 @@ pub struct LogStepMutationConfig {
 impl Default for LogStepMutationConfig {
     fn default() -> Self {
         Self {
-            chance: DEFAULT_CAPACITY_MUTATION_CHANCE,
-            log_step: DEFAULT_CAPACITY_LOG_STEP,
+            chance: DEFAULT_LOG_STEP_MUTATION_CHANCE,
+            log_step: DEFAULT_LOG_STEP,
         }
     }
 }
 
-const _: () = assert!(
-    DEFAULT_SHARE_MUTATION_CHANCE == DEFAULT_CAPACITY_MUTATION_CHANCE
-        && DEFAULT_SHARE_LOG_STEP == DEFAULT_CAPACITY_LOG_STEP
-);
+impl LogStepMutationConfig {
+    /// The chance into `[0, 1]` and the step into `[0, log_step_bound]`,
+    /// the trait range's log width, so the sampler's `-step..=step` width
+    /// stays finite; each out-of-range value falls back to its default.
+    fn normalize(&mut self, log_step_bound: f32) {
+        self.chance =
+            normalize_f32_finite_in(self.chance, 0.0, 1.0, DEFAULT_LOG_STEP_MUTATION_CHANCE);
+        self.log_step = normalize_f32_finite_in(
+            self.log_step,
+            0.0,
+            log_step_bound,
+            DEFAULT_LOG_STEP.min(log_step_bound),
+        );
+    }
+}
 
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -1290,17 +1299,8 @@ impl SimulationConfig {
             normalize_f32_finite_in(cap.move_cost_slope, 0.0, 1.0, DEFAULT_MOVE_COST_SLOPE);
         cap.upkeep_per_unit =
             normalize_f32_finite_nonneg(cap.upkeep_per_unit, DEFAULT_UPKEEP_PER_UNIT);
-        // One step spans at most the range, so the sampler's
-        // `-step..=step` width stays finite.
         let log_step_bound = (max_energy / cap.min).ln();
-        let mc = &mut self.mutation.capacity;
-        mc.chance = normalize_f32_finite_in(mc.chance, 0.0, 1.0, DEFAULT_CAPACITY_MUTATION_CHANCE);
-        mc.log_step = normalize_f32_finite_in(
-            mc.log_step,
-            0.0,
-            log_step_bound,
-            DEFAULT_CAPACITY_LOG_STEP.min(log_step_bound),
-        );
+        self.mutation.capacity.normalize(log_step_bound);
     }
 }
 
@@ -1323,15 +1323,7 @@ impl SimulationConfig {
             1.0,
             DEFAULT_FOUNDER_SHARE.clamp(share_min, 1.0),
         );
-        let log_step_bound = (1.0 / share_min).ln();
-        let ms = &mut self.mutation.share;
-        ms.chance = normalize_f32_finite_in(ms.chance, 0.0, 1.0, DEFAULT_SHARE_MUTATION_CHANCE);
-        ms.log_step = normalize_f32_finite_in(
-            ms.log_step,
-            0.0,
-            log_step_bound,
-            DEFAULT_SHARE_LOG_STEP.min(log_step_bound),
-        );
+        self.mutation.share.normalize((1.0 / share_min).ln());
     }
 }
 

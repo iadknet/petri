@@ -67,29 +67,20 @@ pub fn apply_give_energy(
         super::pay_exchange_effort(giver, &sim.config, intensity, DeathCause::ActionGiveEnergy);
     sim.stats.energy_flows.action_charges[ActionType::GiveEnergy] += effort;
 
-    let giver_pos = sim.creatures[giver_id].position;
-    let recipient_id = sim
-        .world
-        .resolve_neighbor(giver_pos, dir)
-        .and_then(|target_pos| sim.world.creature_at(target_pos))
-        .filter(|&id| id != giver_id);
-    let Some(recipient_id) = recipient_id else {
-        return reject(sim, effort, GiveActionResult::RejectedNoRecipient, None);
+    let Some(recipient_id) = super::neighbour_creature(sim, giver_id, dir) else {
+        return reject(sim, GiveActionResult::RejectedNoRecipient, effort, None);
     };
 
+    // A gift moves only when the giver's stored energy falls.
     let before = sim.creatures[giver_id].energy;
-    let amount = super::exchange_amount(intensity, before);
-    // A gift moves only when the giver's stored energy fell, so an amount
-    // rounding absorbs moves nothing.
-    let store_fell = before - amount < before;
-    if !store_fell {
+    let Some(amount) = super::exchange_amount(intensity, before) else {
         return reject(
             sim,
-            effort,
             GiveActionResult::RejectedNothingToGive,
+            effort,
             Some(recipient_id),
         );
-    }
+    };
 
     let giver = &mut sim.creatures[giver_id];
     giver.energy -= amount;
@@ -118,8 +109,8 @@ pub fn apply_give_energy(
 /// failed.
 fn reject(
     sim: &mut Simulation,
-    effort: f64,
     result: GiveActionResult,
+    effort: f64,
     counterpart: Option<CreatureId>,
 ) -> TransferOutcome<GiveActionResult> {
     sim.stats.give_actions_rejected_total += 1;
