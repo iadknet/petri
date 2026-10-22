@@ -123,6 +123,8 @@ pub(crate) fn stamp(now_ns: u64, previous_ns: Option<u64>) -> u64 {
 pub struct Census {
     pub population: usize,
     pub mean_energy: f32,
+    /// Mean heritable energy capacity, `body.capacity` (T26.F02).
+    pub mean_capacity: f64,
     pub mean_genome_size: f64,
     pub mean_mesh_nodes: f64,
     pub mean_generation: f64,
@@ -184,6 +186,12 @@ impl Census {
             drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
             mean_energy: sim.mean_energy(),
+            mean_capacity: sim
+                .creatures
+                .values()
+                .map(|c| f64::from(c.body.capacity))
+                .sum::<f64>()
+                / population as f64,
             mean_genome_size: mean(
                 sim.creatures
                     .values()
@@ -981,6 +989,11 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
         "petri.tick.mean_energy".to_owned(),
         sampled,
         census.mean_energy,
+    );
+    f.scalar(
+        "petri.tick.mean_capacity".to_owned(),
+        sampled,
+        census.mean_capacity,
     );
     f.scalar(
         "petri.tick.mean_genome_size".to_owned(),

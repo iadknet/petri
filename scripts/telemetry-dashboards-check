@@ -204,6 +204,7 @@ petri_tick_food_grazing_modifier_mean
 petri_tick_food_grazed_cell_share
 petri_tick_population
 petri_tick_mean_energy
+petri_tick_mean_capacity
 petri_tick_mean_genome_size
 petri_tick_mean_mesh_nodes
 petri_tick_mean_generation
