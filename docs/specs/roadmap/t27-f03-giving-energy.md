@@ -272,13 +272,8 @@ the cause named in invariant 9.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback),
       its summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred, listed here.
-- [ ] Gate and goal: summaries at
-      `docs/progress/features/t27-f03-giving-energy.json` and
-      `t27-f03-giving-energy-goal.json`, local raw hash/byte count and
-      verification time checked, series entry points to the summary, no new
-      full report staged. Per-world `predation`, `giving` and `shares`
-      readings, zero included, in
-      [`docs/progress/readings/t27-f03.md`](../../progress/readings/t27-f03.md).
+- [ ] Gate and goal: viability 30 passed; gate exit 3 (severe on
+      `decided_passes`), goal exit 0; summaries and readings linked below.
 - [x] Telemetry: the families in the Telemetry table present in
       `crates/v3-telemetry/src/metrics/tests.rs` and
       `scripts/telemetry-dashboards-check` (its workload keys the give
@@ -310,7 +305,9 @@ readings file; its conclusions, with the expected readings:
 | `shares` block | min, p10, median, p90, max, mean near 0.2 with no predeclared direction: the shares are cryptic until wired, so they walk under the mutation alone | a mass at `share_min` or 1 within 2,000 ticks: check the step and the clamp before accepting; the clamped walk permits boundary mass over long runs, and a founder that wires neither sink feels no selection on it |
 | Gate per-creature-tick counters | `actions_applied`, `passes`, `decided_passes`, `births` within the ordinary thresholds; `mesh_hops`, `vm_steps` may move by the widened draws | a severe level: attribute before accepting; a compute change beyond the catalog widening and the draws is a defect |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate severe on `decided_passes`, flag on `vm_steps`
+(+48.7%); goal not severe, flag on `pass_cap_hits` (+12.2%). All three worlds
+persist; kills 0; gives and steals occur; shares sit near 0.2. Epochs not re-pinned.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t27-f03-giving-energy.json),
   [goal](../../progress/features/t27-f03-giving-energy-goal.json).
