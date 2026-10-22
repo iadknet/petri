@@ -18,14 +18,17 @@ pub enum DeathCause {
     ActionMove,
     ActionReproduce,
     ActionStealEnergy,
+    ActionGiveEnergy,
     ParentalTransfer,
     Predation,
+    /// A giver exhausted by its own gift (T27.F03).
+    Gift,
     ExternalRemoval,
     Unattributed,
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 18] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
         Self::CapacityUpkeep,
@@ -38,8 +41,10 @@ impl DeathCause {
         Self::ActionMove,
         Self::ActionReproduce,
         Self::ActionStealEnergy,
+        Self::ActionGiveEnergy,
         Self::ParentalTransfer,
         Self::Predation,
+        Self::Gift,
         Self::ExternalRemoval,
         Self::Unattributed,
     ];
@@ -59,8 +64,10 @@ impl DeathCause {
             Self::ActionMove => "action_move",
             Self::ActionReproduce => "action_reproduce",
             Self::ActionStealEnergy => "action_steal_energy",
+            Self::ActionGiveEnergy => "action_give_energy",
             Self::ParentalTransfer => "parental_transfer",
             Self::Predation => "predation",
+            Self::Gift => "gift",
             Self::ExternalRemoval => "external_removal",
             Self::Unattributed => "unattributed",
         }
@@ -188,6 +195,10 @@ pub struct EnergyFlows {
     pub predation_victim_debit: f64,
     pub predation_attacker_credit: f64,
     pub predation_kill_bonus_credit: f64,
+    /// A giver's applied debit for its gifts (T27.F03).
+    pub gift_debit: f64,
+    /// A recipient's applied credit for gifts, before its cap.
+    pub gift_credit: f64,
     pub maximum_energy_clamp_loss: f64,
     pub zero_floor_credit: f64,
     pub external_removal_loss: f64,
@@ -252,7 +263,7 @@ mod tests {
                 "lifecycle_decay", "genome_carrying", "capacity_upkeep", "vm_compute", "graph_compute",
                 "mesh_ramp", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
-                "parental_transfer", "predation",
+                "action_give_energy", "parental_transfer", "predation", "gift",
                 "external_removal", "unattributed",
             ];
             prop_assert_eq!(DeathCause::ALL[index].as_key(), expected[index]);

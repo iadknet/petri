@@ -606,7 +606,7 @@ proptest! {
 
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
-        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 30]);
+        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; crate::creature::genome::vote::VOTE_SINK_COUNT]);
         prop_assert_eq!(visited.side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);

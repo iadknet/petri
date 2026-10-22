@@ -1,4 +1,4 @@
-//! The per-world `drives` block (T11.F30, `drives-v1`): the drive census of
+//! The per-world `drives` block (T11.F30, `drives-v2`): the drive census of
 //! the terminal population, projected from `v3_core::creature::drives`, with
 //! the canonical founder's fan-outs read by the same code.
 
@@ -103,11 +103,11 @@ mod tests {
         config.population.initial_creatures = 3;
         let sim = seed_simulation(config, 1);
         let block = observe_world(&sim);
-        assert_eq!(block.version, "drives-v1");
+        assert_eq!(block.version, "drives-v2");
         assert_eq!(block.creatures, sim.creatures.len() as u64);
         assert_eq!((block.founder_fanouts, block.founder_fanout_edges), (4, 16));
         let kinds: Vec<_> = block.kinds.iter().map(|row| row.kind.as_str()).collect();
-        assert_eq!(kinds, ["Move", "Reproduce", "StealEnergy"]);
+        assert_eq!(kinds, ["Move", "Reproduce", "StealEnergy", "GiveEnergy"]);
         assert!(block.kinds.iter().all(|row| row.drive_carriers == 0));
         assert_eq!(block.kinds[0].fanout_creatures, block.creatures);
         assert_eq!(block.kinds[0].fanouts, 3 * block.creatures);

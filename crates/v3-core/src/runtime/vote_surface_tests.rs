@@ -208,7 +208,7 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
     );
     assert_eq!(output.votes.iter().filter(|v| **v != 0.0).count(), 1);
     // A vote of 3.0 commits three moves.
-    assert_eq!(output.commit_counts, [0, 3, 0, 0]);
+    assert_eq!(output.commit_counts, [0, 3, 0, 0, 0]);
 }
 
 #[test]
@@ -396,13 +396,16 @@ fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
     );
     // A vote of 2.0 commits two steals; the parameter surface is read at
     // each commit (asserted in `pass_loop_tests`).
-    assert_eq!(output.commit_counts, [0, 0, 0, 2]);
+    assert_eq!(output.commit_counts, [0, 0, 0, 2, 0]);
 }
 
 #[test]
 fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves_it() {
     let mut side_outputs = crate::runtime::types::MeshSideOutputs::new(4);
-    assert_eq!(side_outputs.action_params, [0.0; 4]);
+    assert_eq!(
+        side_outputs.action_params,
+        [0.0; crate::creature::genome::vote::ACTION_PARAM_FIELD_COUNT]
+    );
 
     let param_sink = OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction);
     let mut visit = |value: f32, sinks: &[OutputSinkKind], node_idx: usize| {
@@ -433,7 +436,7 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
     // A visit with no parameter sink leaves the last written value standing.
     visit(9.0, &[OutputSinkKind::ActionVote(VoteSink::Eat)], 2);
 
-    let mut expected = [0.0; 4];
+    let mut expected = [0.0; crate::creature::genome::vote::ACTION_PARAM_FIELD_COUNT];
     expected[ActionParamField::ReproduceTransferFraction.index()] = -1.0;
     assert_eq!(side_outputs.action_params, expected);
 }

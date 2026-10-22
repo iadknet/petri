@@ -26,6 +26,7 @@ const ACTION_TYPE_WITNESS: Record<ActionType, true> = {
 	Move: true,
 	Reproduce: true,
 	StealEnergy: true,
+	GiveEnergy: true,
 };
 
 /** The frontend reads the catalog only through the Rust-pinned fixture

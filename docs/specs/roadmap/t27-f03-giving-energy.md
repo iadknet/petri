@@ -1,7 +1,7 @@
 # T27.F03 — Giving Energy
 
 **Status**: In Progress
-**Last updated**: 2026-10-21
+**Last updated**: 2026-10-22
 **Feature**: T27.F03
 **Track**: [T27 — Social Signals and Exchange](../../roadmaps/t27-social-signals-and-exchange.md)
 
@@ -251,19 +251,22 @@ the cause named in invariant 9.
 - [x] Commit 1 (catalog).
 - [x] Commit 2 (zero-transfer fix).
 - [x] Commit 3 (shares and effort).
-- [ ] Commit 4 (give).
+- [x] Commit 4 (give).
 - [ ] Verification Plan: viability first, then gate and goal through the
       benchmark specialist; mutation gate and slow tier through the mutation
       specialist; epochs re-pinned in the closing commit.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core` -> result; `cargo test -p v3-core
-      --test viability` -> result (run first, per the track note);
-      `make rust-test-slow` -> result (recruitment-paths readings re-pinned
-      to the 39-sink catalog).
-- [ ] Frontend: `npm run lint && npm run test && npm run build` in
-      `frontend/` -> result; the fixture parity tests listed.
+- [ ] Focused tests: `cargo test -p v3-core --test viability` -> 30
+      passed (first, commits 3 and 4); `cargo test -p v3-core` (and
+      `--features telemetry-seams --lib`), `-p v3-server`, `-p v3-lab`,
+      `-p v3-telemetry` -> pass; `-p v3-cli` -> the gate severe test fails
+      (`decided_passes` 0.000355 vs 0.0) until the closure re-pin; fmt and
+      `make rust-clippy` clean; x86_64 digests via emulated Ubuntu 24.04.
+      `make rust-test-slow` -> not run.
+- [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
+      `src/types/vote-sinks.test.ts` and `vote.rs`'s fixture pin.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback),
       its summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred, listed here.
@@ -274,7 +277,7 @@ the cause named in invariant 9.
       full report staged. Per-world `predation`, `giving` and `shares`
       readings, zero included, in
       [`docs/progress/readings/t27-f03.md`](../../progress/readings/t27-f03.md).
-- [ ] Telemetry: the families in the Telemetry table present in
+- [x] Telemetry: the families in the Telemetry table present in
       `crates/v3-telemetry/src/metrics/tests.rs` and
       `scripts/telemetry-dashboards-check`.
 

@@ -21,6 +21,7 @@ export function formatAction(action: WorldAction | null | undefined): string {
 	if ("Move" in action) return `Move(${action.Move})`;
 	if ("Reproduce" in action) return `Reproduce(${action.Reproduce.direction})`;
 	if ("StealEnergy" in action) return `Steal(${action.StealEnergy.direction})`;
+	if ("GiveEnergy" in action) return `Give(${action.GiveEnergy.direction})`;
 	return "?";
 }
 

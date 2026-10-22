@@ -22,6 +22,8 @@ pub enum ActionResult {
     TransferredAndKilled = 6,
     NoVictim = 7,
     AgeConstraints = 8,
+    /// A give found no creature on its target cell (T27.F03).
+    NoRecipient = 9,
 }
 
 impl ActionResult {
@@ -40,6 +42,7 @@ impl ActionResult {
             Self::TransferredAndKilled => "TransferredAndKilled",
             Self::NoVictim => "NoVictim",
             Self::AgeConstraints => "AgeConstraints",
+            Self::NoRecipient => "NoRecipient",
         }
     }
 }

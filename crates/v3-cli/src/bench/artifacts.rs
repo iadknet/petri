@@ -636,15 +636,16 @@ const KEPT_PAIR_GROUP_FIELDS: [&str; 11] = [
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
 /// `action_attempts` (T16.F02), `ring_rules` (T11.F31), and `drives` and
-/// `mutation_value_totals_by_birth_edge_class` (T11.F30), which the page does
-/// not read but the readings do.
-const KEPT_CASE_BLOCKS: [&str; 25] = [
+/// `mutation_value_totals_by_birth_edge_class` (T11.F30) and `giving`
+/// (T27.F03), which the page does not read but the readings do.
+const KEPT_CASE_BLOCKS: [&str; 26] = [
     "case",
     "cognition",
     "energy_flows",
     "gestation",
     "mortality",
     "predation",
+    "giving",
     "reproductive_success_by_cognitive_class",
     "surviving_clade_profiles",
     "mutation_supply",

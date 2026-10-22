@@ -1032,6 +1032,9 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// the three drive sinks remap the sink, surface and `AddVote` draws.
 /// T02.F08 moved the copy and split `GraphAddGraphEdge` seeds (713 -> 417,
 /// 653 -> 4890): the `EatLeaveShare` sink widens the edge-surface draw.
+/// T27.F03 commit 4 moves every Graph seed and the VM vote seeds:
+/// `GiveEnergy`'s nine sinks and `GiveEffort` widen the vote catalog to 39
+/// and the edge surface to `c + 108`.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1052,15 +1055,15 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         record,
         [
-            ("graph_blank", vec![(InputRefAdd, 4251), swap], None),
-            ("graph_copy", vec![(GraphAddGraphEdge, 417), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 4890), swap], None),
+            ("graph_blank", vec![(InputRefAdd, 5649), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 732), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 2221), swap], None),
             (
                 "vm_blank",
                 vec![
                     (InputRefAdd, 201),
                     (VmInstructionMutation, 1279),
-                    (VmInstructionMutation, 2189),
+                    (VmInstructionMutation, 39_910),
                     swap,
                 ],
                 None,
@@ -1068,7 +1071,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
                 "graph_unprepared",
-                vec![(InputRefAdd, 82_914), (GraphRemoveGraphEdge, 0), swap],
+                vec![(InputRefAdd, 12_947), (GraphRemoveGraphEdge, 0), swap],
                 None,
             ),
             (
@@ -1078,18 +1081,18 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (VmInstructionRawFieldMutation, 18),
                     (VmInstructionRawFieldMutation, 25),
                     (VmInstructionRawFieldMutation, 25),
-                    (VmInstructionMutation, 79_414),
+                    (VmInstructionMutation, 33_754),
                     swap,
                 ],
                 None,
             ),
-            ("graph_detour", vec![(InputRefAdd, 4251)], None),
+            ("graph_detour", vec![(InputRefAdd, 5649)], None),
             (
                 "vm_detour",
                 vec![
                     (InputRefAdd, 201),
                     (VmInstructionMutation, 1279),
-                    (VmInstructionMutation, 2189),
+                    (VmInstructionMutation, 39_910),
                 ],
                 None,
             ),

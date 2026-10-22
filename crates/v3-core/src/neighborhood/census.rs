@@ -158,19 +158,24 @@ mod tests {
         );
     }
 
-    /// A unit edge into the founder's unused `StealEnergy` kind never makes
-    /// it dead: the edge only adds votes to a kind the founder never commits
-    /// (W4's row), so the founder's own commits survive.
+    /// A unit edge into one of the founder's unused kinds, `StealEnergy` or
+    /// `GiveEnergy`, never makes it dead: the edge only adds votes to a kind
+    /// the founder never commits (W4's row), so the founder's own commits
+    /// survive.
     #[test]
     fn a_unit_edge_into_an_unused_kind_never_kills_the_founder() {
         let census = founder_census();
-        for row in census.rows.iter().filter(|row| {
-            matches!(
-                row.sink,
-                VoteSink::Directed(DirectedVoteKind::StealEnergy, _)
-            )
-        }) {
-            assert_eq!(row.tally.dead, 0, "{:?}", row.sink);
+        let unused = |kind| {
+            census
+                .rows
+                .iter()
+                .filter(move |row| matches!(row.sink, VoteSink::Directed(k, _) if k == kind))
+        };
+        for kind in [DirectedVoteKind::StealEnergy, DirectedVoteKind::GiveEnergy] {
+            assert!(unused(kind).count() > 0, "{kind:?} has census rows");
+            for row in unused(kind) {
+                assert_eq!(row.tally.dead, 0, "{:?}", row.sink);
+            }
         }
     }
 

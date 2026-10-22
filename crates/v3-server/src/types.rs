@@ -56,7 +56,9 @@ mod tests {
     }
 
     /// T27.F03 serializes a directed vote sink as `{"Directed":[kind,d]}`,
-    /// a breaking payload change.
+    /// retires the steal amount, adds the body shares to the creature
+    /// detail and adds the `GiveEnergy` action and its counters: breaking
+    /// payload changes.
     #[test]
     fn protocol_version_is_v3alpha13() {
         assert_eq!(PROTOCOL_VERSION, "v3alpha13");

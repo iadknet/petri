@@ -23,7 +23,7 @@ fn slot(action: ActionType) -> [u64; ACTION_TYPE_COUNT as usize] {
 fn every_creature_starts_with_zeroed_profile_counters() {
     let (sim, id) = make_sim_with_one_creature(8.0);
     let creature = &sim.creatures[id];
-    assert_eq!(creature.lifetime_actions_attempted_by_type, [0; 5]);
+    assert_eq!(creature.lifetime_actions_attempted_by_type, [0; 6]);
     assert!(creature.lifetime_eats_applied_by_type.is_empty());
     assert_eq!(creature.lifetime_predation_kills_count, 0);
     assert_eq!(creature.lifetime_predation_hits_taken_count, 0);
@@ -136,7 +136,10 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
         ],
     );
     let creature = &sim.creatures[id];
-    assert_eq!(creature.lifetime_actions_attempted_by_type, [2, 2, 2, 1, 1]);
+    assert_eq!(
+        creature.lifetime_actions_attempted_by_type,
+        [2, 2, 2, 1, 1, 0]
+    );
     assert_eq!(
         creature
             .lifetime_actions_attempted_by_type
@@ -169,7 +172,7 @@ fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
     assert_eq!(result, ReproductionActionResult::Conceived);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
 
-    assert_eq!(child.lifetime_actions_attempted_by_type, [0; 5]);
+    assert_eq!(child.lifetime_actions_attempted_by_type, [0; 6]);
     assert!(child.lifetime_eats_applied_by_type.is_empty());
     assert_eq!(child.lifetime_predation_kills_count, 0);
     assert_eq!(child.lifetime_predation_hits_taken_count, 0);

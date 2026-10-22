@@ -2252,15 +2252,20 @@ mod tests {
 
     #[test]
     fn normalize_keeps_a_valid_exchange_section() {
-        let mut cfg = SimulationConfig::default();
-        cfg.exchange = ExchangeConfig {
-            effort_rate: 0.5,
-            share_min: 0.1,
-            founder_share: 0.1,
-        };
-        cfg.mutation.share = LogStepMutationConfig {
-            chance: 0.0,
-            log_step: 0.0,
+        let mut cfg = SimulationConfig {
+            exchange: ExchangeConfig {
+                effort_rate: 0.5,
+                share_min: 0.1,
+                founder_share: 0.1,
+            },
+            mutation: MutationConfig {
+                share: LogStepMutationConfig {
+                    chance: 0.0,
+                    log_step: 0.0,
+                },
+                ..MutationConfig::default()
+            },
+            ..SimulationConfig::default()
         };
         cfg.normalize();
         assert_eq!(

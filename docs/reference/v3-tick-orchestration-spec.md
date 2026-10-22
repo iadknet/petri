@@ -222,7 +222,8 @@ multiplier, so no action's effort is below `NoOp`'s, and `NoOp`'s is above
 zero (`noop_cost > 0`); a base at or above `noop_cost` is charged exactly
 `adjusted_action_cost(base, …)`. A failed attempt (a blocked move, an eat
 finding no food, a rejected reproduce, a steal with no victim or nothing to
-take) pays its effort and nothing more: there is no failed-action penalty. The debit lands in
+take, a give with no recipient or nothing to give) pays its effort and
+nothing more: there is no failed-action penalty. The debit lands in
 `energy_flows.action_charges.<action>`, and on a failed attempt also in its
 subset `energy_flows.failed_action_effort.<action>`.
 
@@ -274,10 +275,32 @@ subset `energy_flows.failed_action_effort.<action>`.
   effort is booked as failed, and it kills nothing, credits no bonus and
   records no predation event.
 
+### GiveEnergy
+
+- The intensity is `i = min(1, give_share × effort)`: the giver's own
+  heritable share times the decoded `GiveEffort` modifier (T27.F03).
+- Deduct the effort of base `exchange.effort_rate × i × max(giver energy,
+  0)`, floored at `NoOp`'s effort, before the target resolves.
+- The recipient is the creature on the neighbour cell in the give's
+  direction, never the giver; none is `RejectedNoRecipient` (logged
+  `NoRecipient`). The gift is `i × giver.energy` after the effort when the
+  giver's energy is positive, else nothing; a gift is `Transferred` only
+  when the giver's stored energy fell, else `RejectedNothingToGive` (logged
+  `EnergyConstraints`), booked as failed effort. The giver books `gift_debit` (pending cause `Gift`), the
+  recipient `gift_credit`, then the recipient is capped, the excess booked as
+  `maximum_energy_clamp_loss`; a recipient at its cap still receives a
+  `Transferred` gift. A giver left at or below zero is removed right after
+  this dispatch (below).
+
 ### Energy after action
 
-Energy may become zero or negative after action application. The creature is
-not removed until the next tick's Phase 0 death removal step (Section 3).
+Energy may become zero or negative while an action applies. After each
+dispatch the creature's energy is floored at zero (an inherited deficit is a
+`zero_floor_credit`), and a creature left at or below zero is removed right
+then by the shared post-action removal, with its pending cause: its
+remaining queue is dropped and its cell freed this tick. A creature
+exhausted outside its own dispatch waits for the next tick's Phase 0 death
+removal step (Section 3).
 
 Config key defaults for all action costs are canonical in
 `v3-runtime-config-spec.md`.

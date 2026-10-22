@@ -140,11 +140,11 @@ pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 Cus
     + SHARED_MEMORY_SLOTS as usize // 16 WriteSlot sinks
     + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
 const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
-/// Total fixed sink count: the sinks before the vote catalog + 30 ActionVote +
-/// 4 ActionParam (T11.F27, T02.F08).
+/// Total fixed sink count: the sinks before the vote catalog + 39 ActionVote +
+/// 5 ActionParam (T11.F27, T02.F08, T27.F03).
 pub const FIXED_SINK_COUNT: usize =
     FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + ACTION_PARAM_FIELD_COUNT;
-const _: () = assert!(FIXED_SINK_COUNT == 98);
+const _: () = assert!(FIXED_SINK_COUNT == 108);
 
 #[cfg(test)]
 mod tests {
@@ -188,7 +188,7 @@ mod tests {
                 OutputSinkKind::ClearSlot(i)
             );
         }
-        // The vote sinks occupy 64..94 in `VoteSink` index order (T19.F03, T11.F30).
+        // The vote sinks occupy 64..103 in `VoteSink` index order (T19.F03, T11.F30).
         assert_eq!(FIRST_ACTION_VOTE_SINK, 64);
         for (offset, sink) in VoteSink::all().enumerate() {
             assert_eq!(
@@ -196,10 +196,10 @@ mod tests {
                 OutputSinkKind::ActionVote(sink)
             );
         }
-        // The four parameter sinks occupy 94..98 in `ActionParamField::ALL`
+        // The five parameter sinks occupy 103..108 in `ActionParamField::ALL`
         // order (T11.F27).
         let first_param = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
-        assert_eq!(first_param, 94);
+        assert_eq!(first_param, 103);
         let params: Vec<OutputSinkKind> = def.output_sinks()[first_param..]
             .iter()
             .map(|sink| sink.kind)
@@ -208,7 +208,7 @@ mod tests {
             params,
             ActionParamField::ALL.map(OutputSinkKind::ActionParam)
         );
-        assert_eq!(def.output_sinks().len(), 98);
+        assert_eq!(def.output_sinks().len(), 108);
 
         // All sinks start with empty edges
         for sink in def.output_sinks() {

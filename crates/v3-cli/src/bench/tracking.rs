@@ -79,6 +79,17 @@ pub struct PredationTracking {
     pub actions_by_result: BTreeMap<String, u64>,
 }
 
+/// What the population's give attempts did (T27.F03), with the per-result
+/// breakdown keyed by `GiveActionResult::as_key`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GivingTracking {
+    pub actions_attempted_total: u64,
+    pub actions_transferred_total: u64,
+    pub actions_rejected_total: u64,
+    pub actions_by_result: BTreeMap<String, u64>,
+}
+
 /// What the population's conceptions became (T03.F12): `started` equals
 /// `delivered` plus the three losses plus `pending_births`, the litters
 /// still carried at the end of the run.
@@ -243,6 +254,11 @@ pub struct EnergyFlowTracking {
     pub predation_victim_debit: String,
     pub predation_attacker_credit: String,
     pub predation_kill_bonus_credit: String,
+    /// A giver's and a recipient's applied gift changes (T27.F03).
+    #[serde(default)]
+    pub gift_debit: String,
+    #[serde(default)]
+    pub gift_credit: String,
     pub maximum_energy_clamp_loss: String,
     pub zero_floor_credit: String,
     pub external_removal_loss: String,
@@ -273,6 +289,8 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             predation_victim_debit: six(flows.predation_victim_debit),
             predation_attacker_credit: six(flows.predation_attacker_credit),
             predation_kill_bonus_credit: six(flows.predation_kill_bonus_credit),
+            gift_debit: six(flows.gift_debit),
+            gift_credit: six(flows.gift_credit),
             maximum_energy_clamp_loss: six(flows.maximum_energy_clamp_loss),
             zero_floor_credit: six(flows.zero_floor_credit),
             external_removal_loss: six(flows.external_removal_loss),
@@ -363,6 +381,9 @@ pub struct WorldTracking {
     /// What the population's predation attempts did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
+    /// What the population's give attempts did (T27.F03).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub giving: Option<GivingTracking>,
     /// How eat and reproduce attempts ended (T16.F02).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action_attempts: Option<ActionAttemptsTracking>,
@@ -608,6 +629,7 @@ impl WorldTracking {
             mutation_value_totals_by_operator: None,
             mutation_value_totals_by_birth_edge_class: None,
             predation: None,
+            giving: None,
             action_attempts: None,
             mortality: None,
             reproductive_success_by_cognitive_class: None,
@@ -709,6 +731,16 @@ impl WorldTracking {
                 kills_total: stats.predation_kills_total,
                 actions_by_result: stats
                     .predation_actions_by_result
+                    .iter()
+                    .map(|(result, count)| (result.as_key().to_string(), *count))
+                    .collect(),
+            }),
+            giving: Some(GivingTracking {
+                actions_attempted_total: stats.give_actions_attempted_total,
+                actions_transferred_total: stats.give_actions_transferred_total,
+                actions_rejected_total: stats.give_actions_rejected_total,
+                actions_by_result: stats
+                    .give_actions_by_result
                     .iter()
                     .map(|(result, count)| (result.as_key().to_string(), *count))
                     .collect(),

@@ -146,7 +146,8 @@ export type WorldAction =
 	| { Eat: { type_idx: number; leave: number } }
 	| { Move: string }
 	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
-	| { StealEnergy: { direction: string; amount: number } };
+	| { StealEnergy: { direction: string; effort: number } }
+	| { GiveEnergy: { direction: string; effort: number } };
 
 export { VOTE_KINDS, VOTE_SINK_COUNT } from "./vote-sinks.ts";
 /** `PreviousOutcome` channels, in `previous_outcome` order. */

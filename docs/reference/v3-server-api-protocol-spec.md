@@ -58,7 +58,11 @@ Version contract:
   drive keeps `{"Drive":"Move"}`; the `StealEnergyAmount` parameter field
   is retired for `StealEffort` (`WorldAction::StealEnergy { direction,
   effort }`), and the creature detail carries the body's `steal_share` and
-  `give_share`. `v3alpha12`
+  `give_share`; the `GiveEnergy` action joins the catalog (`{"Directed":
+  ["GiveEnergy",d]}` sinks, `WorldAction::GiveEnergy { direction, effort }`,
+  action type `GiveEnergy`, action-log result `NoRecipient`), and the stats,
+  health and WebSocket status payloads carry `give` beside `steal`, the
+  three give totals and `give_actions_by_result`. `v3alpha12`
   (T27.F01) widened the `debug_perception` `nearby` array to 40: each
   slot's fields 7 to 9 are the seen colour where `lineage_match` and
   `phenotype_similarity` stood, and added the static input keys `OwnRed`,
@@ -687,11 +691,11 @@ Execution-sampler rules:
     `applied`, `applied_value`
 - each tick carries `passes[]`, one record per pass (T19.F04): `pass_index`,
   `end_reason` (`Decided`, `PassCapReached`, `NoTargets`, `MissingNode`,
-  `EnergyExhausted`), `votes` (30 floats in `VoteSink` catalog order, the
+  `EnergyExhausted`), `votes` (39 floats in `VoteSink` catalog order, the
   pass's final vote vector), `best` (each kind's chosen sink in kind order
-  `Eat`, `Move`, `Reproduce`, `StealEnergy`, a `VoteSink` such as `"Eat"` or
-  `{"Directed":["Move",3]}`; the heading tie's choice for a directed kind), `bars` (four
-  integers, the bars the pass started with), `effective_votes` (four floats,
+  `Eat`, `Move`, `Reproduce`, `StealEnergy`, `GiveEnergy`, a `VoteSink` such as `"Eat"` or
+  `{"Directed":["Move",3]}`; the heading tie's choice for a directed kind), `bars` (five
+  integers, the bars the pass started with), `effective_votes` (five floats,
   kind order, `drive + best − bar` for a directed kind), `committed` (the action the pass committed, or `null`), and
   `hops`
 - each tick carries `heading`, the direction string (`"N"` to `"NW"`) the
@@ -700,12 +704,12 @@ Execution-sampler rules:
   `ActionCapReached`, `EnergyExhausted`) and `commit_counts`, the final
   per-kind bars (commits of each kind this tick)
 - each hop carries `pass_index` beside the tick-wide `hop_index`, and
-  `vote_contribution`, the 30 floats that hop committed; zeros when the
+  `vote_contribution`, the 39 floats that hop committed; zeros when the
   dispatch ended exhausted and committed nothing
 - each hop carries `decision_inputs` (T19.F06), the decision-state values
   the dispatch's inputs resolved against, each as the input read returns
-  it: `action_votes` (30, `ActionVotes`), `previous_pass_votes` (30,
-  `PreviousPassVotes`), `commit_counts` (4 floats, `CommitCounts`), and
+  it: `action_votes` (39, `ActionVotes`), `previous_pass_votes` (39,
+  `PreviousPassVotes`), `commit_counts` (5 floats, `CommitCounts`), and
   `hops_this_tick` (`HopsThisTick`); they are what the node could read, not
   proof of a read
 - `static_inputs.previous_outcome` holds the four scaled `PreviousOutcome`
@@ -803,12 +807,12 @@ Field definitions:
 | Field | Type | Description |
 |-------|------|-------------|
 | `tick` | u64 | Simulation tick when the action was executed. |
-| `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`. |
-| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
+| `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`, `GiveEnergy`. |
+| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`, `NoRecipient`. A steal with no victim or nothing to take is `NoVictim`; a give with no recipient is `NoRecipient` and one with nothing to give `EnergyConstraints`. |
 | `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
 | `energy_before` | f32 | Creature energy before the action. |
 | `energy_after` | f32 | Creature energy after the action (includes costs). |
-| `amount` | f32 | Action-specific amount (food consumed, energy stolen, transfer fraction in [0, 1] for Reproduce, 0 otherwise). |
+| `amount` | f32 | Action-specific amount (food consumed, energy stolen, energy given, transfer fraction in [0, 1] for Reproduce, 0 otherwise). |
 | `food_type` | u16 or null | Selected ordinary-food type for Eat; `null` for non-Eat actions. |
 | `priority_bid` | f32 | Priority bid value for that tick. |
 
