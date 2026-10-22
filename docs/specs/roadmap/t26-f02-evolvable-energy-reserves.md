@@ -1,6 +1,6 @@
 # T26.F02 — Evolvable Energy Reserves
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-21
 **Feature**: T26.F02
 **Track**: [T26 — Body Traits](../../roadmaps/t26-body-traits.md)
@@ -220,21 +220,16 @@ flows would show it wrong.
       (invariants 6, 9).
 - [x] Review remediation: newborn clamp and `log_step` bound with their
       tests, the `WORKAROUND(T26.F02)` marker, decay kept in `Phase0Charge`.
-- [ ] The two Reference comparison arms on the goal path.
-- [ ] gate, goal and goal-long on the final defaults; mutation gate; slow tier.
+- [x] The two Reference comparison arms on the goal path.
+- [x] gate, goal and goal-long on the final defaults; mutation gate; slow tier.
 
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> 30 passed (macOS aarch64,
       re-pinned); x86_64 digests measured under emulated Ubuntu 24.04, CI
       confirmation pending (readings file).
-- [x] `cargo test --workspace --no-fail-fast` -> all pass but the v3-cli
-      gate severe test (awaits the gate re-pin); fmt, clippy, frontend build
-      and vitest (675) clean.
-- [x] After the review remediation: viability 30 passed, no pin moved;
-      `cargo test -p v3-core --no-fail-fast` and its `telemetry-seams` lib
-      tests pass; check, fmt and `make rust-clippy` clean.
-- [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
+- [x] `make check` -> exit 0; `make rust-test-slow` -> exit 0 (tested
+      commit ee0ecf95).
 - [x] Mutation gate -> 167 tested: 5 missed, 146 caught, 16 unviable, 0
       timeouts (user-approved: shard 0 local, 1–3 Offload 39704631831);
       path, 4 killed, 1 equivalent in the readings file.
@@ -285,16 +280,16 @@ profiles"):
 
 ## Success Criteria
 
-- [ ] Capacity is heritable and bounded to [50, 800]; move effort and upkeep
+- [x] Capacity is heritable and bounded to [50, 800]; move effort and upkeep
       are linear in it and neutral at 200 (property test, byte-identical
       booking test).
-- [ ] A newborn above its capacity starts at it, the excess booked to
+- [x] A newborn above its capacity starts at it, the excess booked to
       `offspring_capacity_overflow`; the ledger identity holds.
-- [ ] Every energy read divides by the ruled `sensor_scale`; the server and
+- [x] Every energy read divides by the ruled `sensor_scale`; the server and
       inspector report the creature's own capacity.
-- [ ] The comparison and sweep tables exist; the defaults are the sweep's pick
+- [x] The comparison and sweep tables exist; the defaults are the sweep's pick
       under the predeclared rule.
-- [ ] The goal and goal-long summaries report the capacity distribution,
+- [x] The goal and goal-long summaries report the capacity distribution,
       boundary mass and trend per world; the readings file names each
       world's predeclared outcome.
 
@@ -318,3 +313,6 @@ profiles"):
   capacity the lab seeds); a lab feature seeding other capacities adds it.
   The root `world-recipe-*.json` presets keep their explicit `max_energy`,
   which bounds their range by invariant 1; they are not goal recipes.
+- Exception: user, 2026-10-21: accepted the gate, goal and goal-long
+  severes and the Orchards goal deviation; all three epochs re-pinned; mutation
+  shard 0 ran locally beside Offload shards 1–3.

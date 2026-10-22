@@ -20,7 +20,7 @@ attributed to the feature whose closure moved it.
 ## Track Roadmaps
 
 - [ ] **T25 — Edge Groups and Per-Edge Learning** — [Roadmap](roadmaps/t25-edge-groups-and-learning.md) — Depends on: None
-- [ ] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
+- [x] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
 - [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
 - [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
 
