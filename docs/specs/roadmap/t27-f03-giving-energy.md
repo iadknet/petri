@@ -266,12 +266,27 @@ the cause named in invariant 9.
       (`decided_passes` 0.000355 against the zero T26.F02 reference) until
       the closure re-pin; `cargo check --workspace --all-targets`,
       `cargo fmt --all --check` and `make rust-clippy` clean; x86_64
-      digests via emulated Ubuntu 24.04. `make rust-test-slow` -> not run.
+      digests via emulated Ubuntu 24.04. `make rust-test-slow` -> 3 + 6 passed
+      once cadaaeeb re-pinned Graph Drift `[16, 10, 9, 2]`.
 - [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
       `src/types/vote-sinks.test.ts` (union witnesses) and `vote.rs`'s fixture pin.
-- [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback),
-      its summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred, listed here.
+- [x] Mutation gate: fresh `make rust-mutants-ci` on 28735891 ->
+      `4 shards, 321 mutants tested: 18 missed, 229 caught, 74 unviable, 0 timeouts`
+      in `~/.local/share/petri-tools/mutants/t27-f03/mutants.out.old`.
+
+      | Survivor | Resolution |
+      | --- | --- |
+      | `giving.rs:32` `GiveActionResult::as_key` -> `""`, `"xyzzy"` | killed: `each_give_result_has_its_stable_key` |
+      | `predation.rs:49` `as_key` -> `""`, `"xyzzy"`; `:43` `transferred` -> `false` | killed: `each_result_has_its_stable_key_and_transfer_flag` |
+      | `tick.rs:1195` `==` -> `!=` in `execute_give_energy` | killed: `only_a_transferring_exchange_counts_as_a_successful_action` (`ActionSuccess`) |
+      | `tick.rs:839`, `:840` `+` -> `*`, `-` in `TickComputeStats::commit` | killed: `a_tick_counts_its_gives_and_steals_among_the_applied_actions` |
+      | `energy_accounting.rs:233` `-` -> `+` in `net_action_overdraft` | killed: `netting_an_overdraft_takes_only_this_actions_charge` |
+      | `v3-telemetry` `windows.rs:327` `action_label` -> `"xyzzy".into()`, `String::new()` | killed: `action_label_names_each_action_kind_with_its_argument` |
+      | `body.rs:76` delete `identity` in `HeritableBody::inherit` | equivalent: `CreatureIdentityState::inherit` is `*parent`, the value `..*parent` copies |
+      | `recruitment_paths/mod.rs:72` delete `identity` | equivalent: the scene runs one lone creature, so no kin affinity or clade count reads its identity |
+      | `actions/mod.rs:51` `>` -> `>=` in `exchange_intensity` | equivalent: at a ±0 product both branches return a zero the `NoOp`-floored effort and the amount comparison treat alike |
+      | `actions/mod.rs:77` `>` -> `>=` in `exchange_amount` | equivalent: at a zero store `store - intensity × 0 < store` is false either way, so both return `None` |
+      | `window_seam.rs:160` `FlowMarks::of` -> `Default::default()` | equivalent: compiled only under `telemetry-seams`, off in the gate's v3-core build; a feature-on `cargo mutants -p v3-core --features telemetry-seams -F FlowMarks::of` run finds it unviable (no `Default`) |
 - [ ] Gate and goal: viability 30 passed; gate exit 3 (severe on
       `decided_passes`), goal exit 0; summaries and readings linked below.
 - [x] Telemetry: the families in the Telemetry table present in
