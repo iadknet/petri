@@ -853,11 +853,11 @@ impl Default for RuntimeConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PhenotypeConfig {
-    /// RGB channel step magnitude (wrapping u8). Default: 1. Falls back to 1 if 0.
+    /// Internal HSL channel step magnitude (wrapping u8). Default: 1. Falls back to 1 if 0.
     pub channel_step: u8,
-    /// Probability of switching active channel per reproduction. Default: 0.001. Clamped [0.0, 1.0].
+    /// Probability of switching active channel per mutated birth. Default: 0.001. Clamped [0.0, 1.0].
     pub channel_change_chance: f32,
-    /// Probability of flipping the selected channel's polarity. Default: 0.0002. Clamped [0.0, 1.0].
+    /// Probability of flipping the selected channel's polarity per mutated birth. Default: 0.0002. Clamped [0.0, 1.0].
     pub polarity_flip_chance: f32,
 }
 
