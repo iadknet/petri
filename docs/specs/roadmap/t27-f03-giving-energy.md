@@ -259,12 +259,14 @@ the cause named in invariant 9.
 ## Verification
 
 - [ ] Focused tests: `cargo test -p v3-core --test viability` -> 30
-      passed (first, commits 3 and 4); `cargo test -p v3-core` (and
-      `--features telemetry-seams --lib`), `-p v3-server`, `-p v3-lab`,
-      `-p v3-telemetry` -> pass; `-p v3-cli` -> the gate severe test fails
-      (`decided_passes` 0.000355 vs 0.0) until the closure re-pin; fmt and
-      `make rust-clippy` clean; x86_64 digests via emulated Ubuntu 24.04.
-      `make rust-test-slow` -> not run.
+      passed (run first); `cargo test -p v3-core` -> pass, and
+      `--features telemetry-seams --lib` -> 2,328 passed; `-p v3-server
+      -p v3-lab -p v3-telemetry` -> 458 passed; `-p v3-cli` -> fails only
+      `gate_profile_has_no_severe_regression_against_series_references`
+      (`decided_passes` 0.000355 against the zero T26.F02 reference) until
+      the closure re-pin; `cargo check --workspace --all-targets`,
+      `cargo fmt --all --check` and `make rust-clippy` clean; x86_64
+      digests via emulated Ubuntu 24.04. `make rust-test-slow` -> not run.
 - [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
       `src/types/vote-sinks.test.ts` and `vote.rs`'s fixture pin.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback),
