@@ -28,6 +28,46 @@ pub(super) fn pay_effort(
     charge_effort(creature, effort, cause)
 }
 
+/// The intensity of an exchange attempt (T27.F03): `min(1, share ×
+/// effort)`, the actor's heritable share of the act scaled by the decoded
+/// effort modifier. A comparison, so a `NaN` product is no intensity rather
+/// than `f32::min`'s 1.
+fn exchange_intensity(share: f32, effort: f32) -> f32 {
+    let intensity = share * effort;
+    if intensity >= 1.0 {
+        1.0
+    } else if intensity > 0.0 {
+        intensity
+    } else {
+        0.0
+    }
+}
+
+/// Debit an exchange act's effort (T27.F03), base `effort_rate × intensity
+/// × max(actor energy, 0)` floored at `NoOp`'s like every action's, and
+/// return the applied debit, observed against `cause`. The base reads only
+/// the actor, so a steal's effort is known before its target resolves.
+fn pay_exchange_effort(
+    creature: &mut CreatureState,
+    config: &SimulationConfig,
+    intensity: f32,
+    cause: DeathCause,
+) -> f64 {
+    let base = config.exchange.effort_rate * intensity * creature.energy.max(0.0);
+    pay_effort(creature, &config.energy, base, cause)
+}
+
+/// The energy an exchange at `intensity` moves out of `store`: `intensity ×
+/// store` when the store is positive, else nothing. A comparison, so a `NaN`
+/// or exhausted store moves nothing.
+fn exchange_amount(intensity: f32, store: f32) -> f32 {
+    if store > 0.0 {
+        intensity * store
+    } else {
+        0.0
+    }
+}
+
 /// Debit `creature` an already computed `effort` and return the applied
 /// debit, observed against `cause`.
 fn charge_effort(creature: &mut CreatureState, effort: f32, cause: DeathCause) -> f64 {
@@ -217,6 +257,8 @@ mod tests {
             phenotype: Phenotype::FOUNDER,
             identity: CreatureIdentityState::default(),
             capacity: 200.0,
+            steal_share: 0.2,
+            give_share: 0.2,
         }
     }
 
@@ -1651,9 +1693,9 @@ mod tests {
         let _ = apply_steal_energy(attacker_high, &mut sim_high, Direction::N, 10.0);
         let cost_high = energy_before_high - sim_high.creatures[attacker_high].energy;
 
-        // Both steal 10.0 from victim and get 10.0 back, but the cost (steal_cost_rate * amount)
-        // should be higher for complex creatures. Net cost = steal_cost - stolen_energy.
-        // Since stolen amounts are equal, the difference is in the steal_cost.
+        // Both take the same share of equal victims, but the effort (the
+        // floor at the default rate) should be higher for complex creatures.
+        // Since stolen amounts are equal, the difference is in the effort.
         assert!(
             cost_high > cost_low,
             "high-complexity attacker should pay more steal cost: low={cost_low}, high={cost_high}"

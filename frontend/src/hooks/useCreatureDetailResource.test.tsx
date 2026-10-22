@@ -37,6 +37,8 @@ function buildCreatureDetail() {
 		position: { x: 10, y: 12 },
 		energy: 42,
 		max_energy: 100,
+		steal_share: 0.2,
+		give_share: 0.2,
 		age: 8,
 		generation: 2,
 		heading: "N",

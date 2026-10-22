@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
-import { PREDATION_FIELDS } from "./PredationSection.tsx";
+import { EXCHANGE_FIELDS, PREDATION_FIELDS } from "./PredationSection.tsx";
 
-const FIELDS = [...ENERGY_COSTS_FIELDS, ...PREDATION_FIELDS];
+const FIELDS = [...ENERGY_COSTS_FIELDS, ...EXCHANGE_FIELDS, ...PREDATION_FIELDS];
 
 function fieldFor(path: string) {
 	const field = FIELDS.find((candidate) => candidate.path === path);
@@ -42,7 +42,7 @@ describe("effort-priced action costs (T16.F02)", () => {
 		"energy.costs.eat_cost",
 		"energy.costs.noop_cost",
 		"energy.costs.reproduce_attempt_cost",
-		"predation.steal_cost_rate",
+		"exchange.effort_rate",
 	])("%s says it is charged on every attempt and never below Noop Cost", (path) => {
 		const tooltip = fieldFor(path).tooltip ?? "";
 		expect(tooltip).toMatch(/every attempt/i);

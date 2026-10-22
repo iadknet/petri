@@ -51,7 +51,7 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         (
             WorldAction::StealEnergy {
                 direction: Direction::N,
-                amount: 1.0,
+                effort: 1.0,
             },
             DeathCause::ActionStealEnergy,
         ),
@@ -63,7 +63,7 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         sim.config.energy.costs.move_cost = 2.0;
         sim.config.energy.costs.reproduce_attempt_cost = 2.0;
         sim.config.energy.lifecycle.min_reproduce_age = 0;
-        sim.config.predation.steal_cost_rate = 2.0;
+        sim.config.exchange.effort_rate = 2.0;
         execute(&mut sim, id, action);
         assert_eq!(sim.stats.mortality.count(cause), 1, "{cause:?}");
         // The 1.0 overdraft nets out of the charge, not into the floor.
@@ -148,7 +148,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         sim.creatures[victim].genome = vm_raw_program_genome(vec![VmInstruction::Noop]);
         sim.config.runtime.vm.opcode_cost_multiplier = 1.0;
         sim.config.runtime.vm.step_ramp_cost = 0.0;
-        sim.config.predation.steal_cost_rate = 0.0;
+        sim.config.exchange.effort_rate = 0.0;
         sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
         sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
         let queue = [attacker, victim];
@@ -168,7 +168,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         assert!(observed > 0.0);
         decisions[0].1.actions = vec![WorldAction::StealEnergy {
             direction: Direction::N,
-            amount: 1.0,
+            effort: 1.0,
         }];
         super::super::run_phase_2(
             &mut sim,
@@ -191,7 +191,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
 #[test]
 fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(9.0, 2.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
     sim.creatures[attacker].body.capacity = 10.0;
@@ -206,7 +206,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
 
     // An exhausted victim yields nothing: no kill, no bonus, no flow.
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
     sim.creatures[victim].cached_complexity = 3;
@@ -564,7 +564,7 @@ fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() 
 #[test]
 fn predation_leaves_an_exhausted_victim_its_own_cause_and_takes_nothing() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     sim.creatures[victim].pending_death_cause = Some(DeathCause::VmCompute);
@@ -644,7 +644,7 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
         },
         WorldAction::StealEnergy {
             direction: Direction::N,
-            amount: 1.0,
+            effort: 1.0,
         },
     ];
     for action in failing {
@@ -654,7 +654,7 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
             .set_barrier(crate::contracts::Position::new(5, 4), true);
         sim.config.energy.costs.eat_cost = 0.5;
         sim.config.energy.lifecycle.min_reproduce_age = 0;
-        sim.config.predation.steal_cost_rate = 0.5;
+        sim.config.exchange.effort_rate = 0.5;
 
         // Act
         execute(&mut sim, id, action);
@@ -695,13 +695,13 @@ fn successful_attempts_add_no_failed_action_effort() {
     );
 
     let (mut sim, attacker, _victim) = make_sim_two_creatures(100.0, 50.0);
-    sim.config.predation.steal_cost_rate = 0.5;
+    sim.config.exchange.effort_rate = 0.5;
     execute(
         &mut sim,
         attacker,
         WorldAction::StealEnergy {
             direction: Direction::N,
-            amount: 1.0,
+            effort: 1.0,
         },
     );
     assert!(sim.stats.energy_flows.action_charges[ActionType::StealEnergy] > 0.0);

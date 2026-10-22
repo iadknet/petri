@@ -164,7 +164,8 @@ const ACTION_PARAM_DESCRIPTIONS: Readonly<Record<ActionParamField, string>> = {
 	EatLeaveShare:
 		"Share of the cell's food Eat leaves behind (0 to 1). 0 eats everything; 1 eats nothing, a failed eat.",
 	ReproduceTransferFraction: "Share of the parent's energy given to the child (0 to 1).",
-	StealEnergyAmount: "Energy to steal; the effort cost grows with the amount asked.",
+	StealEffort:
+		"Steal effort: scales the steal share by 2^x (x clamped to ±2); unwired steals at the share itself.",
 };
 
 /** Describe an output sink: its label, subtitle and tooltip. */
@@ -219,7 +220,7 @@ const ACTION_PARAM_FIELD_LABELS: Readonly<Record<ActionParamField, string>> = {
 	EatFoodType: "Eat.food",
 	EatLeaveShare: "Eat.leave",
 	ReproduceTransferFraction: "Reproduce.frac",
-	StealEnergyAmount: "StealEnergy.amt",
+	StealEffort: "StealEnergy.effort",
 };
 
 /** Target of a VM `WriteActionParam` at `field_idx`: `param <field>`, or

@@ -285,14 +285,16 @@ runtime config contract: `v3-runtime-config-spec.md`.
       see v3-mutation-spec.md Section 4.1)
  10. inherit the child's body in one call, HeritableBody::inherit
      (creature/body.rs), copying the parent's phenotype, identity
-     (lineage_id unchanged) and capacity; only if
+     (lineage_id unchanged), capacity and exchange shares; only if
      MutationSummary.applied_events > 0:
  11.   mutate the phenotype per v3-phenotype-spec.md, then
        mutate kin_tag per v3-creature-identity-spec.md (this draw order;
        no draw when no event applied); then, on every birth, draw one f32
        against mutation.capacity.chance and, on a hit, the log-space step
        (v3-runtime-config-spec.md Section 3): the capacity draws come after
-       the kin-tag draw and are the only draws T26.F02 adds
+       the kin-tag draw and are the only draws T26.F02 adds; then, on every
+       birth, steal_share then give_share by the same rule under
+       mutation.share over [exchange.share_min, 1] (T27.F03)
  12. spawn child immediately with the whole litter; occupy cell now
  13. cap the child's energy at its own capacity; the excess is booked to
      energy_flows.offspring_capacity_overflow (the cap is not observed as

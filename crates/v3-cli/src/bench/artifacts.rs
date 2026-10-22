@@ -277,6 +277,7 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                                 "pair_groups",
                                 "plasticity_census",
                                 "capacity",
+                                "shares",
                             ],
                         )
                         .as_object()
@@ -593,10 +594,10 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
 /// Persistence checkpoint fields the page reads, each kept whole, and
 /// `mean_wired_sinks` (T25.F02), `mean_ring_groups` and
 /// `mean_ring_group_members` (T25.F03), `pair_groups` (T25.F04) and
-/// `plasticity_census` (T25.F06) and `capacity` (T26.F02), which the page
+/// `plasticity_census` (T25.F06), `capacity` (T26.F02) and `shares` (T27.F03), which the page
 /// does not read but the readings do; `keep_sample` projects `pair_groups`
 /// further.
-const KEPT_SAMPLE_FIELDS: [&str; 18] = [
+const KEPT_SAMPLE_FIELDS: [&str; 19] = [
     "tick",
     "population",
     "mean_energy",
@@ -615,6 +616,7 @@ const KEPT_SAMPLE_FIELDS: [&str; 18] = [
     "pair_groups",
     "plasticity_census",
     "capacity",
+    "shares",
 ];
 /// `pair_groups` aggregates every checkpoint keeps; `rows` is kept only on
 /// each world's last checkpoint (T25.F04). `facts` and `own_nonzero`

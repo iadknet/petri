@@ -100,7 +100,7 @@ fn a_rejected_steal_counts_the_attempt_and_no_kill_or_hit() {
         id,
         vec![WorldAction::StealEnergy {
             direction: Direction::N,
-            amount: 1.0,
+            effort: 1.0,
         }],
     );
     assert_eq!(by_type(&sim, id), slot(ActionType::StealEnergy));
@@ -130,7 +130,7 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
             },
             WorldAction::StealEnergy {
                 direction: Direction::E,
-                amount: 1.0,
+                effort: 1.0,
             },
             WorldAction::NoOp,
         ],

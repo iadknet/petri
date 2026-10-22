@@ -617,6 +617,11 @@ const DEFAULT_MOVE_COST_SLOPE: f32 = 1.0;
 const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.002;
 const DEFAULT_CAPACITY_MUTATION_CHANCE: f32 = 0.1;
 const DEFAULT_CAPACITY_LOG_STEP: f32 = 0.25;
+const DEFAULT_SHARE_MUTATION_CHANCE: f32 = 0.1;
+const DEFAULT_SHARE_LOG_STEP: f32 = 0.25;
+const DEFAULT_EFFORT_RATE: f32 = 0.05;
+const DEFAULT_SHARE_MIN: f32 = 0.01;
+const DEFAULT_FOUNDER_SHARE: f32 = 0.2;
 
 /// Which denominator the energy sensor reads divide by (T26.F02).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -675,18 +680,20 @@ impl Default for EnergyCapacityConfig {
     }
 }
 
-/// The capacity mutation drawn on every birth (T26.F02). Canonical owner:
-/// v3-runtime-config-spec.md Section 3.
+/// A heritable scalar trait's mutation, drawn on every birth: the capacity
+/// (T26.F02) and the two exchange shares (T27.F03). Canonical owner:
+/// v3-runtime-config-spec.md Section 3. The capacity and the shares share
+/// the default `(0.1, 0.25)`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct CapacityMutationConfig {
-    /// Chance per birth that the child's capacity mutates, in `[0, 1]`.
+pub struct LogStepMutationConfig {
+    /// Chance per birth that the child's trait mutates, in `[0, 1]`.
     pub chance: f32,
     /// Half-width of the uniform log-space step, `≥ 0`.
     pub log_step: f32,
 }
 
-impl Default for CapacityMutationConfig {
+impl Default for LogStepMutationConfig {
     fn default() -> Self {
         Self {
             chance: DEFAULT_CAPACITY_MUTATION_CHANCE,
@@ -694,6 +701,11 @@ impl Default for CapacityMutationConfig {
         }
     }
 }
+
+const _: () = assert!(
+    DEFAULT_SHARE_MUTATION_CHANCE == DEFAULT_CAPACITY_MUTATION_CHANCE
+        && DEFAULT_SHARE_LOG_STEP == DEFAULT_CAPACITY_LOG_STEP
+);
 
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -948,7 +960,11 @@ pub struct MutationConfig {
     pub executed_window_ticks: u64,
     /// The heritable energy capacity's mutation (T26.F02).
     #[serde(default)]
-    pub capacity: CapacityMutationConfig,
+    pub capacity: LogStepMutationConfig,
+    /// The two heritable exchange shares' mutation (T27.F03), each drawn on
+    /// every birth after the capacity.
+    #[serde(default)]
+    pub share: LogStepMutationConfig,
 }
 
 /// Per genome unit: `0.485 / 80`, so the 80-unit V3Alpha1 founder (T25.F02)
@@ -983,7 +999,8 @@ impl Default for MutationConfig {
             reachable_bias: ReachableBiasConfig::default(),
             executed_bias: default_executed_bias(),
             executed_window_ticks: default_executed_window_ticks(),
-            capacity: CapacityMutationConfig::default(),
+            capacity: LogStepMutationConfig::default(),
+            share: LogStepMutationConfig::default(),
         }
     }
 }
@@ -1002,12 +1019,10 @@ impl Default for ActionLogConfig {
     }
 }
 
-/// Predation config for the StealEnergy action.
+/// Predation config for the StealEnergy action's kill.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PredationConfig {
-    /// Fraction of attempted steal amount paid as attacker cost.
-    pub steal_cost_rate: f32,
     /// Energy bonus per unit of victim genome complexity on kill.
     pub kill_complexity_bonus_multiplier: f32,
 }
@@ -1015,8 +1030,33 @@ pub struct PredationConfig {
 impl Default for PredationConfig {
     fn default() -> Self {
         Self {
-            steal_cost_rate: 0.05,
             kill_complexity_bonus_multiplier: 0.0,
+        }
+    }
+}
+
+/// The energy exchange between neighbours (T27.F03): the effort rate both
+/// `StealEnergy` and `GiveEnergy` pay and the range of the heritable shares
+/// that size them. Canonical owner: v3-runtime-config-spec.md.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ExchangeConfig {
+    /// The effort base's rate: an attempt's base is `effort_rate ×
+    /// intensity × max(actor energy, 0)`. In `[0, 1]`; default 0.05.
+    pub effort_rate: f32,
+    /// The lower bound of both shares, in `(0, 1]`; default 0.01.
+    pub share_min: f32,
+    /// Every founder's `steal_share` and `give_share`, in `[share_min, 1]`;
+    /// default 0.2.
+    pub founder_share: f32,
+}
+
+impl Default for ExchangeConfig {
+    fn default() -> Self {
+        Self {
+            effort_rate: DEFAULT_EFFORT_RATE,
+            share_min: DEFAULT_SHARE_MIN,
+            founder_share: DEFAULT_FOUNDER_SHARE,
         }
     }
 }
@@ -1070,6 +1110,8 @@ pub struct SimulationConfig {
     pub population: PopulationConfig,
     #[serde(default)]
     pub predation: PredationConfig,
+    #[serde(default)]
+    pub exchange: ExchangeConfig,
     #[serde(default)]
     pub action_log: ActionLogConfig,
     #[serde(default)]
@@ -1200,9 +1242,9 @@ impl SimulationConfig {
         }
 
         let pred = &mut self.predation;
-        pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.05);
         pred.kill_complexity_bonus_multiplier =
             normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.0);
+        self.normalize_exchange();
 
         self.shared_memory.decay_rate =
             normalize_f32_clamp(self.shared_memory.decay_rate, 0.0, 1.0, 0.0);
@@ -1258,6 +1300,37 @@ impl SimulationConfig {
             0.0,
             log_step_bound,
             DEFAULT_CAPACITY_LOG_STEP.min(log_step_bound),
+        );
+    }
+}
+
+impl SimulationConfig {
+    /// The exchange section and `mutation.share`, in the T27.F03 order:
+    /// `share_min`, then `founder_share` against it, then the share step
+    /// bounded by the range's log width `ln(1 / share_min)`.
+    fn normalize_exchange(&mut self) {
+        let ex = &mut self.exchange;
+        ex.effort_rate = normalize_f32_clamp(ex.effort_rate, 0.0, 1.0, DEFAULT_EFFORT_RATE);
+        ex.share_min = if ex.share_min.is_finite() && ex.share_min > 0.0 && ex.share_min <= 1.0 {
+            ex.share_min
+        } else {
+            DEFAULT_SHARE_MIN
+        };
+        let share_min = ex.share_min;
+        ex.founder_share = normalize_f32_finite_in(
+            ex.founder_share,
+            share_min,
+            1.0,
+            DEFAULT_FOUNDER_SHARE.clamp(share_min, 1.0),
+        );
+        let log_step_bound = (1.0 / share_min).ln();
+        let ms = &mut self.mutation.share;
+        ms.chance = normalize_f32_finite_in(ms.chance, 0.0, 1.0, DEFAULT_SHARE_MUTATION_CHANCE);
+        ms.log_step = normalize_f32_finite_in(
+            ms.log_step,
+            0.0,
+            log_step_bound,
+            DEFAULT_SHARE_LOG_STEP.min(log_step_bound),
         );
     }
 }
@@ -1603,7 +1676,7 @@ mod tests {
         // Shared memory
         assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
         // Predation
-        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.exchange.effort_rate - 0.05).abs() < 1e-6);
         assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
         // Population
         assert_eq!(cfg.population.initial_creatures, 10000);
@@ -1756,7 +1829,7 @@ mod tests {
             .remove("capacity");
         let cfg: SimulationConfig = serde_json::from_value(value).unwrap();
         assert_eq!(cfg.energy.capacity, EnergyCapacityConfig::default());
-        assert_eq!(cfg.mutation.capacity, CapacityMutationConfig::default());
+        assert_eq!(cfg.mutation.capacity, LogStepMutationConfig::default());
     }
 
     #[test]
@@ -2098,7 +2171,7 @@ mod tests {
         assert_eq!(cfg.world.width, cfg2.world.width);
         assert_eq!(cfg.runtime.max_mesh_hops, cfg2.runtime.max_mesh_hops);
         assert!((cfg.mutation.per_unit_rate - cfg2.mutation.per_unit_rate).abs() < 1e-12);
-        assert!((cfg.predation.steal_cost_rate - cfg2.predation.steal_cost_rate).abs() < 1e-6);
+        assert_eq!(cfg.exchange, cfg2.exchange);
     }
 
     /// T16.F02: the penalty and its startup ramp are retired with no alias;
@@ -2129,39 +2202,147 @@ mod tests {
     #[test]
     fn predation_config_default_values() {
         let cfg = PredationConfig::default();
-        assert!((cfg.steal_cost_rate - 0.05).abs() < 1e-6);
         assert!((cfg.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
+    // ── ExchangeConfig tests (T27.F03) ─────────────────────────────────────
+
     #[test]
-    fn simulation_config_has_predation_field() {
+    fn exchange_and_share_mutation_defaults() {
         let cfg = SimulationConfig::default();
-        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
+        assert_eq!(
+            cfg.exchange,
+            ExchangeConfig {
+                effort_rate: 0.05,
+                share_min: 0.01,
+                founder_share: 0.2,
+            }
+        );
+        assert_eq!(
+            (cfg.mutation.share.chance, cfg.mutation.share.log_step),
+            (0.1, 0.25)
+        );
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(
+            json["exchange"],
+            serde_json::json!({"effort_rate": 0.05f32, "share_min": 0.01f32, "founder_share": 0.2f32})
+        );
+        assert_eq!(
+            json["mutation"]["share"],
+            serde_json::json!({"chance": 0.1f32, "log_step": 0.25f32})
+        );
     }
 
     #[test]
-    fn normalize_predation_steal_cost_rate_clamped_above_one() {
-        let mut cfg = SimulationConfig::default();
-        cfg.predation.steal_cost_rate = 1.5;
-        cfg.normalize();
-        assert!((cfg.predation.steal_cost_rate - 1.0).abs() < 1e-6);
+    fn the_retired_steal_cost_rate_is_rejected() {
+        let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+        value["predation"]["steal_cost_rate"] = serde_json::json!(0.05);
+        assert!(serde_json::from_value::<SimulationConfig>(value).is_err());
     }
 
     #[test]
-    fn normalize_predation_steal_cost_rate_clamped_negative() {
-        let mut cfg = SimulationConfig::default();
-        cfg.predation.steal_cost_rate = -0.5;
-        cfg.normalize();
-        assert!((cfg.predation.steal_cost_rate - 0.0).abs() < 1e-6);
+    fn configs_without_exchange_keys_take_the_defaults() {
+        let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("exchange");
+        value["mutation"].as_object_mut().unwrap().remove("share");
+        let cfg: SimulationConfig = serde_json::from_value(value).unwrap();
+        assert_eq!(cfg.exchange, ExchangeConfig::default());
+        assert_eq!(cfg.mutation.share, LogStepMutationConfig::default());
     }
 
     #[test]
-    fn normalize_predation_steal_cost_rate_nan_falls_back() {
+    fn normalize_keeps_a_valid_exchange_section() {
         let mut cfg = SimulationConfig::default();
-        cfg.predation.steal_cost_rate = f32::NAN;
+        cfg.exchange = ExchangeConfig {
+            effort_rate: 0.5,
+            share_min: 0.1,
+            founder_share: 0.1,
+        };
+        cfg.mutation.share = LogStepMutationConfig {
+            chance: 0.0,
+            log_step: 0.0,
+        };
         cfg.normalize();
-        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
+        assert_eq!(
+            cfg.exchange,
+            ExchangeConfig {
+                effort_rate: 0.5,
+                share_min: 0.1,
+                founder_share: 0.1,
+            }
+        );
+        assert_eq!(
+            (cfg.mutation.share.chance, cfg.mutation.share.log_step),
+            (0.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn normalize_clamps_a_finite_effort_rate_and_falls_back_otherwise() {
+        for (rate, expected) in [
+            (1.5, 1.0),
+            (-0.5, 0.0),
+            (f32::NAN, 0.05),
+            (f32::INFINITY, 0.05),
+        ] {
+            let mut cfg = SimulationConfig::default();
+            cfg.exchange.effort_rate = rate;
+            cfg.normalize();
+            assert_eq!(cfg.exchange.effort_rate, expected, "{rate}");
+        }
+    }
+
+    #[test]
+    fn normalize_falls_the_share_bounds_back_in_order() {
+        for bad in [0.0, -0.1, 1.5, f32::NAN, f32::INFINITY] {
+            let mut cfg = SimulationConfig::default();
+            cfg.exchange.share_min = bad;
+            cfg.normalize();
+            assert_eq!(cfg.exchange.share_min, 0.01, "{bad}");
+        }
+        // A founder share outside the range falls back to 0.2 clamped to it.
+        for (share_min, founder_share, expected) in [
+            (0.01, 0.005, 0.2),
+            (0.01, 1.5, 0.2),
+            (0.01, f32::NAN, 0.2),
+            (0.5, 0.2, 0.5),
+            (1.0, 0.2, 1.0),
+        ] {
+            let mut cfg = SimulationConfig::default();
+            cfg.exchange.share_min = share_min;
+            cfg.exchange.founder_share = founder_share;
+            cfg.normalize();
+            assert_eq!(
+                cfg.exchange.founder_share, expected,
+                "{share_min} {founder_share}"
+            );
+        }
+    }
+
+    #[test]
+    fn normalize_bounds_the_share_step_by_the_range_log_width() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.share.log_step = 4.6;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.share.log_step, 4.6, "within ln(100) = 4.605");
+        for bad in [4.7, -0.1, f32::NAN, f32::INFINITY] {
+            let mut cfg = SimulationConfig::default();
+            cfg.mutation.share.log_step = bad;
+            cfg.normalize();
+            assert_eq!(cfg.mutation.share.log_step, 0.25, "{bad}");
+        }
+        // At share_min = 1 the range has no width: the step pins to 0.
+        let mut cfg = SimulationConfig::default();
+        cfg.exchange.share_min = 1.0;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.share.log_step, 0.0);
+        assert_eq!(cfg.exchange.founder_share, 1.0);
+        for bad in [1.5, -0.1, f32::NAN] {
+            let mut cfg = SimulationConfig::default();
+            cfg.mutation.share.chance = bad;
+            cfg.normalize();
+            assert_eq!(cfg.mutation.share.chance, 0.1, "{bad}");
+        }
     }
 
     #[test]

@@ -195,8 +195,32 @@ export const MUTATION_CAPACITY_FIELDS: FieldDef[] = [
 	},
 ];
 
+/** The exchange-share mutation drawn on every birth (T27.F03). */
+export const MUTATION_SHARE_FIELDS: FieldDef[] = [
+	{
+		path: "mutation.share.chance",
+		label: "Share Mutation Chance",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.1,
+		tooltip: "Chance per birth that each of the child's exchange shares changes",
+	},
+	{
+		path: "mutation.share.log_step",
+		label: "Share Log Step",
+		min: 0,
+		max: 4.6,
+		step: 0.01,
+		defaultValue: 0.25,
+		tooltip:
+			"Largest change of a share mutation, in log space: the share is multiplied by e^\u03b4 with \u03b4 drawn evenly in \u00b1 this step",
+	},
+];
+
 export const MUTATION_ALL_FIELDS: AnyFieldDef[] = [
 	...MUTATION_CAPACITY_FIELDS,
+	...MUTATION_SHARE_FIELDS,
 	...MUTATION_FIELDS,
 	...MUTATION_TOGGLES,
 	...MUTATION_ENUMS,

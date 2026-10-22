@@ -51,6 +51,8 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
                 phenotype: Phenotype::FOUNDER,
                 identity: old.body.identity,
                 capacity: 200.0,
+                steal_share: 0.2,
+                give_share: 0.2,
             },
             old.shared_memory,
         );
@@ -198,24 +200,36 @@ fn assert_equivalent(
     died_in_window
 }
 
+/// The seeds both equivalence runs cover: equivalence must hold on each,
+/// and across them some traced target dies inside its window, so the
+/// oracle's death-tick record is exercised whichever seed a trajectory
+/// change moves the deaths to.
+const EQUIVALENCE_SEEDS: std::ops::RangeInclusive<u64> = 7..=12;
+
 #[test]
 fn traced_and_untraced_runs_are_identical_for_graph_founders() {
-    for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = seed_simulation(equivalence_config(), 7);
-        let plain = seed_simulation(equivalence_config(), 7);
-        let died = assert_equivalent(traced, plain, budget);
-        assert!(died > 0, "a traced target dies inside its window");
+    let mut died = 0;
+    for seed in EQUIVALENCE_SEEDS {
+        for budget in [Some(WINDOW_BUDGET), None] {
+            let traced = seed_simulation(equivalence_config(), seed);
+            let plain = seed_simulation(equivalence_config(), seed);
+            died += assert_equivalent(traced, plain, budget);
+        }
     }
+    assert!(died > 0, "a traced target dies inside its window");
 }
 
 #[test]
 fn traced_and_untraced_runs_are_identical_for_vm_founders() {
-    for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 9));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 9));
-        let died = assert_equivalent(traced, plain, budget);
-        assert!(died > 0, "a traced target dies inside its window");
+    let mut died = 0;
+    for seed in EQUIVALENCE_SEEDS {
+        for budget in [Some(WINDOW_BUDGET), None] {
+            let traced = with_vm_founders(seed_simulation(equivalence_config(), seed));
+            let plain = with_vm_founders(seed_simulation(equivalence_config(), seed));
+            died += assert_equivalent(traced, plain, budget);
+        }
     }
+    assert!(died > 0, "a traced target dies inside its window");
 }
 
 #[test]
@@ -562,9 +576,8 @@ fn steal_north_genome() -> CreatureGenome {
                         const_idx: 1,
                     },
                     VmInstruction::WriteActionParam {
-                        field_idx:
-                            crate::creature::genome::vote::ActionParamField::StealEnergyAmount
-                                .index() as u8,
+                        field_idx: crate::creature::genome::vote::ActionParamField::StealEffort
+                            .index() as u8,
                         src: 1,
                     },
                     VmInstruction::AddVote { sink: 17, src: 0 },
@@ -613,7 +626,9 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
     for victim_first in [false, true] {
         let (mut sim, attacker, victim) = make_sim_two_creatures(150.0, 3.0);
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-        sim.config.predation.steal_cost_rate = 0.0;
+        sim.config.exchange.effort_rate = 0.0;
+        // Share 1 at modifier 4: intensity 1, a steal that kills (T27.F03).
+        sim.creatures[attacker].body.steal_share = 1.0;
         sim.creatures[attacker].genome = steal_north_genome();
         sim.creatures[victim].genome = vm_program_genome(vec![
             VmInstruction::AddVote {
@@ -646,7 +661,7 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
 
     // Untraced, nothing is observed.
     let (mut sim, attacker, _) = make_sim_two_creatures(150.0, 3.0);
-    sim.config.predation.steal_cost_rate = 0.0;
+    sim.config.exchange.effort_rate = 0.0;
     sim.creatures[attacker].genome = steal_north_genome();
     run_tick(&mut sim, &mut None);
     assert!(sim.stats.observed_creature.is_none());
@@ -699,7 +714,8 @@ fn decisions_discarded_by_a_death_match_the_untraced_run() {
     fn preyed() -> (Simulation, CreatureId) {
         let (mut sim, attacker, victim) = make_sim_two_creatures(150.0, 3.0);
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-        sim.config.predation.steal_cost_rate = 0.0;
+        sim.config.exchange.effort_rate = 0.0;
+        sim.creatures[attacker].body.steal_share = 1.0;
         sim.creatures[attacker].genome = bidding(steal_north_genome());
         sim.creatures[victim].genome = eat_then_move_genome();
         (sim, victim)

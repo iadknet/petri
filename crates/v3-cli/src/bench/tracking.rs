@@ -831,6 +831,10 @@ pub struct PersistenceSample {
     /// at extinction and absent in reports stored before T26.F02.
     #[serde(default)]
     pub capacity: Option<super::capacity::CapacityDistribution>,
+    /// The living population's two heritable exchange shares (T27.F03).
+    /// `null` at extinction and absent in reports stored before T27.F03.
+    #[serde(default)]
+    pub shares: Option<super::capacity::ShareDistributions>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
 }
@@ -1139,6 +1143,7 @@ pub(super) struct PopulationReadings {
     pair_groups: Option<super::pair_groups::PairGroups>,
     plasticity_census: PlasticityCensusBlock,
     capacity: Option<super::capacity::CapacityDistribution>,
+    shares: Option<super::capacity::ShareDistributions>,
 }
 
 impl PopulationReadings {
@@ -1160,6 +1165,7 @@ impl PopulationReadings {
             pair_groups: super::pair_groups::PairGroups::observe(sim),
             plasticity_census: PlasticityCensusBlock::observe(sim),
             capacity: super::capacity::CapacityDistribution::observe(sim),
+            shares: super::capacity::ShareDistributions::observe(sim),
         }
     }
 }
@@ -1261,6 +1267,7 @@ impl PersistenceAccumulator {
                 pair_groups: readings.pair_groups.filter(|_| alive),
                 plasticity_census: Some(readings.plasticity_census),
                 capacity: readings.capacity.filter(|_| alive),
+                shares: readings.shares.filter(|_| alive),
                 tracking: tracking(),
             });
         }

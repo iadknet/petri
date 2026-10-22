@@ -37,7 +37,7 @@
 		{ "field": "EatFoodType", "kind": "Eat" },
 		{ "field": "EatLeaveShare", "kind": "Eat" },
 		{ "field": "ReproduceTransferFraction", "kind": "Reproduce" },
-		{ "field": "StealEnergyAmount", "kind": "StealEnergy" }
+		{ "field": "StealEffort", "kind": "StealEnergy" }
 	],
 	"actionTypes": [
 		{ "name": "NoOp", "code": 0 },

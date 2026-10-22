@@ -120,7 +120,12 @@ impl Setup {
             position,
             self.start_energy,
             0,
-            HeritableBody::founder(0, seed, self.config.energy.capacity.founder),
+            HeritableBody::founder(
+                0,
+                seed,
+                self.config.energy.capacity.founder,
+                self.config.exchange.founder_share,
+            ),
             [0.0; SHARED_MEMORY_SLOTS],
         )
     }

@@ -18,7 +18,6 @@ use crate::contracts::{Direction, Position, WorldAction};
 use crate::creature::body::HeritableBody;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
-use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::runtime::trace::recording::ActiveTrace;
@@ -70,9 +69,13 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                 50.0,
                 0,
                 HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
                     identity: CreatureIdentityState::default(),
-                    capacity: config.energy.capacity.founder,
+                    ..HeritableBody::founder(
+                        0,
+                        0,
+                        config.energy.capacity.founder,
+                        config.exchange.founder_share,
+                    )
                 },
                 [0.0; 16],
             )

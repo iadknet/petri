@@ -55,7 +55,10 @@ Version contract:
   (T27.F03) serializes a directed vote sink as `{"Directed":[kind,d]}`
   (`{"Directed":["Move",3]}` where `{"Move":3}` stood) in genome
   `ActionVote` sinks, `AddVote` instructions and trace `best` entries; a
-  drive keeps `{"Drive":"Move"}`. `v3alpha12`
+  drive keeps `{"Drive":"Move"}`; the `StealEnergyAmount` parameter field
+  is retired for `StealEffort` (`WorldAction::StealEnergy { direction,
+  effort }`), and the creature detail carries the body's `steal_share` and
+  `give_share`. `v3alpha12`
   (T27.F01) widened the `debug_perception` `nearby` array to 40: each
   slot's fields 7 to 9 are the seen colour where `lineage_match` and
   `phenotype_similarity` stood, and added the static input keys `OwnRed`,
@@ -742,6 +745,8 @@ Response (full, no query parameters):
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
   "max_energy": 200.0,
+  "steal_share": 0.2,
+  "give_share": 0.2,
   "age": 84,
   "generation": 3,
   "heading": "NE",
@@ -780,6 +785,7 @@ Field definitions:
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
 | `max_energy` | f32 | The creature's own energy capacity (`body.capacity`, T26.F02): the cap its credits are clamped at, in `[energy.capacity.min, energy.lifecycle.max_energy]`. |
+| `steal_share`, `give_share` | f32 | The body's stored heritable exchange shares (T27.F03), in the `[exchange.share_min, 1]` in force at the creature's birth: the share of a victim's store a steal at effort modifier 1 takes, and of its own store a gift passes. |
 | `age` | u64 | Ticks alive. |
 | `generation` | u64 | Reproduction generation (0 = founder). |
 | `heading` | string | Direction of the creature's last committed `Move` (`"N"` to `"NW"`); at birth the step from its parent, at seeding a drawn direction (T11.F30). |

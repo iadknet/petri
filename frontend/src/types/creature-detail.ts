@@ -99,6 +99,11 @@ export interface CreatureDetail {
 	position: { x: number; y: number };
 	energy: number;
 	max_energy: number;
+	/** The heritable share of a victim's store a steal takes at modifier 1
+	 * (T27.F03). */
+	steal_share: number;
+	/** The heritable share of its own store a gift passes at modifier 1. */
+	give_share: number;
 	age: number;
 	generation: number;
 	/** The direction of the creature's last committed `Move`, e.g. `"NE"`. */

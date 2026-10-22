@@ -71,7 +71,7 @@ fn side() -> MeshSideOutputs {
     for _ in 0..5 {
         side.action_queue.push(WorldAction::StealEnergy {
             direction: Direction::NW,
-            amount: 0.75,
+            effort: 0.75,
         });
     }
     side.votes = ramp(0.0);
@@ -390,7 +390,7 @@ fn active_graph() -> CgpGraphBackendDef {
         ),
         (OutputSinkKind::RouterGate(0), memory(0, false), 1.0),
         (
-            OutputSinkKind::ActionParam(ActionParamField::StealEnergyAmount),
+            OutputSinkKind::ActionParam(ActionParamField::StealEffort),
             memory(0, false),
             1.0,
         ),

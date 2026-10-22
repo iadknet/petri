@@ -434,10 +434,15 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
     ] {
         a.double(config_key(key), value);
     }
-    a.double(
-        config_key("predation.steal_cost_rate"),
-        config.predation.steal_cost_rate,
-    );
+    // The exchange acts' effort rate and share range (T27.F03).
+    let exchange = &config.exchange;
+    for (key, value) in [
+        ("exchange.effort_rate", exchange.effort_rate),
+        ("exchange.share_min", exchange.share_min),
+        ("exchange.founder_share", exchange.founder_share),
+    ] {
+        a.double(config_key(key), value);
+    }
     a.double(
         config_key("predation.kill_complexity_bonus_multiplier"),
         config.predation.kill_complexity_bonus_multiplier,

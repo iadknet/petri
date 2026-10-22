@@ -155,8 +155,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // sweep defaults (beta 1.0, u 0.002): seed 831 goes extinct at tick 126;
     // of 0..=2000 seeds 14, 15, 281, 295, 387, 865, 1296, 1300, 1570 and 1845
     // survive the horizon, and 14, the lowest, ends with three creatures.
-    // Restoring (0.5, 0.0005) restores seed 831.
-    const SEED: u64 = 14;
+    // Restoring (0.5, 0.0005) restores seed 831. Moved from 14 to 41 by
+    // T27.F03 commit 3: the two share draws on every birth shift every later
+    // draw and seed 14 goes extinct at tick 125; of 0..=2000 seeds 41, 199,
+    // 272, 321, 351, 451, 509 and 519 are the first to survive the horizon
+    // with more than one creature, and 41, the lowest, ends with two.
+    const SEED: u64 = 41;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -239,8 +243,9 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // 129 goes extinct and seed 14 survives (see the post-tick-state test).
     // T27.F01 commit 2: seed 14 goes extinct and seed 145 survives (see the
     // post-tick-state test). T26.F02: 145 -> 831 -> 14 (see the
+    // post-tick-state test). T27.F03 commit 3: 14 -> 41 (see the
     // post-tick-state test).
-    const SEED: u64 = 14;
+    const SEED: u64 = 41;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -390,8 +395,9 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // moved it from 14 to 145: seed 14 goes extinct; of the seeds of 0..=600
     // that survive the horizon (145, 175, 268, 319, 513), 145 is the lowest
     // and ends over four cells. T26.F02 moved it 145 -> 831 -> 14 (see the
+    // post-tick-state test). T27.F03 commit 3 moved it 14 -> 41 (see the
     // post-tick-state test).
-    const SEED: u64 = 14;
+    const SEED: u64 = 41;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

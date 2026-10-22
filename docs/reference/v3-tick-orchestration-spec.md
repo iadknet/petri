@@ -262,12 +262,13 @@ subset `energy_flows.failed_action_effort.<action>`.
 
 ### StealEnergy
 
-- Deduct the effort of base `predation.steal_cost_rate` times the sanitized
-  requested amount before the target resolves; a zero or invalid amount pays
-  `NoOp`'s effort. Transfer, kill and bonus rules are owned by the predation
-  action.
-- The amount is `min(requested, victim.energy)` when the victim's energy is
-  positive, else 0. A steal transfers only when the victim's stored energy
+- The intensity is `i = min(1, steal_share × effort)`: the attacker's own
+  heritable share times the decoded effort modifier (T27.F03).
+- Deduct the effort of base `exchange.effort_rate × i × max(attacker
+  energy, 0)` before the target resolves, floored at `NoOp`'s effort.
+  Transfer, kill and bonus rules are owned by the predation action.
+- The amount is `i × victim.energy` when the victim's energy is positive,
+  else 0; a kill happens only at `i = 1` or by rounding. A steal transfers only when the victim's stored energy
   falls; one that moves nothing (a zero amount, an exhausted or `NaN` store,
   an amount `f32` rounding absorbs) fails as `RejectedNothingToTake`: its
   effort is booked as failed, and it kills nothing, credits no bonus and

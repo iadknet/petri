@@ -290,7 +290,11 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // lowered cap 60 -> 50): the capacity chance draw on every birth shifts
     // every later draw, no seed in 3249..3600 met the precondition at 60, and
     // 3282 is the first seed from 3249 that passes both cases at 50.
-    let mut sim = seed_simulation(cfg, 3282);
+    // Re-seeded by T27.F03 commit 3 (3282 -> 3485): the two share draws on
+    // every birth shift every later draw, at 3282 no creature holds energy
+    // above the lowered cap at tick 50, and 3485 is the first seed from 3282
+    // that passes both cases.
+    let mut sim = seed_simulation(cfg, 3485);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {

@@ -512,13 +512,14 @@ fn spawn_child(
     let child_birth_edge_class = summary.birth_edge_class();
 
     // Step 11: Body inheritance — phenotype then kin-tag mutation, drawn only
-    // when at least one genome event was applied, then the capacity draws
-    // drawn on every birth.
+    // when at least one genome event was applied, then the capacity, the
+    // steal share and the give share draws on every birth.
     let child_body = HeritableBody::inherit(
         &sim.creatures[parent_id].body,
         summary.applied_events > 0,
         &sim.config.mutation,
         &sim.config.energy,
+        &sim.config.exchange,
         rng,
     );
 

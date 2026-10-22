@@ -16,7 +16,9 @@ pub const SUMMARY_KIND: &str = "petri-lab-summary";
 pub const SUMMARY_VERSION: u32 = 4;
 /// The oldest summary version `report` still renders.
 pub const SUMMARY_VERSION_MIN: u32 = 2;
-/// Genome-file format: 8 since T27.F03 (a directed vote sink serializes as
+/// Genome-file format: 9 since T27.F03 commit 3 (parameter field 3 is
+/// `StealEffort`, an effort modifier, where `StealEnergyAmount` stood); 8
+/// since T27.F03 commit 1 (a directed vote sink serializes as
 /// `{"Directed":[kind,d]}`); 7 since T27.F01 (colour vision); 6 since T25.F09 (every plastic edge and every group
 /// carries a `retention`); 5 since T25.F07 (every member carries a `scope`,
 /// every group an `inherit_scale`); 4 since T25.F06 (per-edge plasticity);
@@ -24,7 +26,7 @@ pub const SUMMARY_VERSION_MIN: u32 = 2;
 /// the three creature families); 2 since T25.F03
 /// (`own_weight`, edge membership and groups replace `weight` and ring
 /// projections).
-pub const GENOME_FORMAT: u32 = 8;
+pub const GENOME_FORMAT: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Summary {

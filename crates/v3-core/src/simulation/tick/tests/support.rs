@@ -22,6 +22,8 @@ fn founder_body() -> HeritableBody {
         phenotype: Phenotype::FOUNDER,
         identity: CreatureIdentityState::default(),
         capacity: 200.0,
+        steal_share: 0.2,
+        give_share: 0.2,
     }
 }
 

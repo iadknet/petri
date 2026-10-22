@@ -713,7 +713,12 @@ fn eval_rule(
             scene.start,
             rule.start(),
             0,
-            HeritableBody::founder(0, scene.seed, config.energy.capacity.founder),
+            HeritableBody::founder(
+                0,
+                scene.seed,
+                config.energy.capacity.founder,
+                config.exchange.founder_share,
+            ),
             [0.0; SHARED_MEMORY_SLOTS],
         )
     });

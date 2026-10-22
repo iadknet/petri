@@ -1130,7 +1130,7 @@ mod tests {
         use crate::contracts::InputReference;
         let mut producer = node(0, &[1], false);
         if let BackendDef::Vm(vm) = &mut producer.backend_def {
-            vm.constants = vec![3.0];
+            vm.constants = vec![1.0];
             vm.program = vec![
                 VmInstruction::LoadConst {
                     dst: 0,
@@ -1147,10 +1147,10 @@ mod tests {
         middle.node_id = NodeId::new(1);
         middle.targets[0].target_id = NodeId::new(2);
         if let BackendDef::Vm(vm) = &mut middle.backend_def {
-            vm.constants[0] = 5.0;
+            vm.constants[0] = -1.0;
         }
         // The consumer steals the bus value: it writes upstream slot 0 into
-        // the `StealEnergyAmount` field and votes one steal.
+        // the `StealEffort` field and votes one steal.
         let mut consumer = node(2, &[], false);
         consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
         if let BackendDef::Vm(vm) = &mut consumer.backend_def {
@@ -1161,8 +1161,8 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    field_idx: crate::creature::genome::vote::ActionParamField::StealEnergyAmount
-                        .index() as u8,
+                    field_idx: crate::creature::genome::vote::ActionParamField::StealEffort.index()
+                        as u8,
                     src: 0,
                 },
                 VmInstruction::LoadConst {
@@ -1191,14 +1191,14 @@ mod tests {
             actual.snapshots[0],
             vec![crate::contracts::WorldAction::StealEnergy {
                 direction: crate::contracts::Direction::N,
-                amount: 3.0,
+                effort: 2.0,
             }]
         );
         assert_eq!(
             baseline.snapshots[0],
             vec![crate::contracts::WorldAction::StealEnergy {
                 direction: crate::contracts::Direction::N,
-                amount: 5.0,
+                effort: 0.5,
             }]
         );
         assert_eq!(reading(&g).knockout_count, 1); // overwritten producer is silent
