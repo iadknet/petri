@@ -242,10 +242,16 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 14059995974793206223 -> 12505458608371593438, rate 0.0
 /// 7853259137754474046 -> 17623746894553768688); restoring (0.5, 0.0005)
 /// restores both.
+/// Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug` shape)
+/// after two agreeing runs: a directed vote sink's `Debug` text is
+/// `Directed(Move, 3)` where `Move(3)` stood (default 12505458608371593438
+/// -> 3145154597724195549, rate 0.0 17623746894553768688 ->
+/// 9861678929341148521); mapping that text back to the old shape restores
+/// both old values.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 12505458608371593438);
-    assert_eq!(short_run_identity(Some(0.0)), 17623746894553768688);
+    assert_eq!(short_run_identity(None), 3145154597724195549);
+    assert_eq!(short_run_identity(Some(0.0)), 9861678929341148521);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

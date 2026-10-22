@@ -282,7 +282,7 @@ fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
     let edge_weight = 0.3;
     wire(
         &mut def,
-        OutputSinkKind::ActionVote(VoteSink::Move(2)),
+        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
         edge(memory(1, false), edge_weight),
     );
     let (w1, k1, w2, k2) = (0.7f32, 3u8, -1.9f32, 3u8);
@@ -301,7 +301,7 @@ fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
             members.to_vec()
         };
         assert_eq!(
-            votes[VoteSink::Move(d).index()].to_bits(),
+            votes[VoteSink::Directed(DirectedVoteKind::Move, d).index()].to_bits(),
             sanitize_f32(terms.iter().copied().sum::<f32>()).to_bits(),
             "d={d}"
         );
@@ -395,7 +395,9 @@ fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
     let votes = votes(&def, &sensors);
     for (index, &vote) in votes.iter().enumerate() {
         let expected = match VoteSink::from_index(index) {
-            Some(VoteSink::Move(d)) if food[usize::from(d)] != 0.0 => scale,
+            Some(VoteSink::Directed(DirectedVoteKind::Move, d)) if food[usize::from(d)] != 0.0 => {
+                scale
+            }
             _ => 0.0,
         };
         assert_eq!(vote, expected, "{index}");
@@ -487,7 +489,9 @@ fn production_and_traced_visits_agree_and_the_trace_carries_member_terms() {
     assert_eq!(energy_a, energy_b);
     let votes = production.dispatch_effects().0;
     assert_eq!(applied, votes.to_vec());
-    assert!((0..8).all(|d| votes[VoteSink::StealEnergy(d).index()] != 0.0));
+    assert!(
+        (0..8).all(|d| votes[VoteSink::Directed(DirectedVoteKind::StealEnergy, d).index()] != 0.0)
+    );
 }
 
 #[test]

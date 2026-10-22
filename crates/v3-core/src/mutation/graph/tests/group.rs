@@ -282,7 +282,10 @@ fn applicability_follows_rings_groups_and_hosting() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     partial.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::StealEnergy(3)));
+        sinks.retain(|sink| {
+            sink.kind
+                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 3))
+        });
     });
     assert!(!partial.can_host_group());
     let unhosted = genome(refs(), partial);
@@ -523,7 +526,10 @@ fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
 fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Reproduce(0)));
+        sinks.retain(|sink| {
+            sink.kind
+                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 0))
+        });
     });
     let mut node = graph_node(vec![barrier()], partial);
     let before = node.clone();
@@ -588,7 +594,9 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
 fn add_pair_skips_without_a_draw_without_a_site() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Move(5)));
+        sinks.retain(|sink| {
+            sink.kind != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 5))
+        });
     });
     for mut node in [
         graph_node(vec![area_barrier()], partial),

@@ -872,6 +872,8 @@ fn push_action_log(
         food_type,
         priority_bid: ctx.priority_bid,
     };
+    #[cfg(all(test, feature = "telemetry-seams"))]
+    window_seam::capture_logged(ctx.id, entry);
     if let Some(log) = sim.action_logs.get_mut(ctx.id) {
         log.push(entry);
     }
@@ -1149,29 +1151,16 @@ fn execute_steal_energy(
     amount: f32,
     outcome_acc: &mut OutcomeAccumulator,
 ) -> ActionLogEntry {
-    // Snapshot predation events length to extract damage info.
-    let pred_events_before = sim.stats.last_tick_predation_events.len();
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::StealEnergy);
     }
-    let result = apply_steal_energy(ctx.id, sim, direction, amount);
-    let succeeded = result != PredationActionResult::RejectedNoVictim;
-    outcome_acc.record_action_result(ctx.id, succeeded);
-    // Record damage to victim from predation event (if any).
-    if succeeded {
-        if let Some(event) = sim.stats.last_tick_predation_events.get(pred_events_before) {
-            let victim_pos = Position::new(event.victim_x, event.victim_y);
-            if let Some(victim_id) = sim.world.creature_at(victim_pos) {
-                outcome_acc.record_damage(victim_id, event.energy_stolen);
-            }
-        }
+    let outcome = apply_steal_energy(ctx.id, sim, direction, amount);
+    let result = outcome.result;
+    outcome_acc.record_action_result(ctx.id, result != PredationActionResult::RejectedNoVictim);
+    // A surviving victim takes the damage; a killed one was removed.
+    if let (PredationActionResult::Transferred, Some(victim_id)) = (result, outcome.counterpart) {
+        outcome_acc.record_damage(victim_id, outcome.amount);
     }
-    // Extract stolen amount from predation event (if any).
-    let actual_stolen = sim
-        .stats
-        .last_tick_predation_events
-        .get(pred_events_before)
-        .map_or(0.0, |e| e.energy_stolen);
     let action_result = match result {
         PredationActionResult::Transferred => ActionResult::Success,
         PredationActionResult::TransferredAndKilled => ActionResult::TransferredAndKilled,
@@ -1183,7 +1172,7 @@ fn execute_steal_energy(
         ActionType::StealEnergy,
         action_result,
         direction.to_index() as u8,
-        actual_stolen,
+        outcome.amount,
         None,
     )
 }

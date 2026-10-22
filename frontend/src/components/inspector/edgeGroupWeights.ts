@@ -35,9 +35,7 @@ export function sinkDirection(kind: OutputSinkKind | undefined): number | undefi
 	if (kind === undefined || !("ActionVote" in kind)) return undefined;
 	const vote = kind.ActionVote;
 	if (typeof vote !== "object") return undefined;
-	if ("Move" in vote) return vote.Move;
-	if ("Reproduce" in vote) return vote.Reproduce;
-	if ("StealEnergy" in vote) return vote.StealEnergy;
+	if ("Directed" in vote) return vote.Directed[1];
 	return undefined;
 }
 

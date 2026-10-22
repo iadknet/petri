@@ -8,6 +8,7 @@ use rand::SeedableRng;
 use v3_core::contracts::{InputReference, Position, WorldInputKey};
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
+use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::genome::VmBackendDef;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::{
@@ -107,8 +108,14 @@ fn unconnected_vote_sinks_are_not_motor_sites_and_a_bare_start_has_no_site() {
     assert_eq!((sites.sites.len(), sites.reachable), (0, 1));
     for (kind, motor) in [
         (OutputSinkKind::ActionVote(VoteSink::Eat), true),
-        (OutputSinkKind::ActionVote(VoteSink::Move(3)), true),
-        (OutputSinkKind::ActionVote(VoteSink::Reproduce(0)), false),
+        (
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 3)),
+            true,
+        ),
+        (
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 0)),
+            false,
+        ),
         (OutputSinkKind::ActionVote(VoteSink::Decide), false),
         (OutputSinkKind::CustomOutput(0), false),
     ] {

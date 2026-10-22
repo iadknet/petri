@@ -1,23 +1,17 @@
-import {
-	ACTION_PARAM_FIELDS,
-	type ActionParamField,
-	type ComputeNodeKind,
-	type GraphSource,
-	type InputReference,
-	type OutputSinkKind,
-	type VoteSink,
+import type {
+	ActionParamField,
+	ComputeNodeKind,
+	GraphSource,
+	InputReference,
+	OutputSinkKind,
+	VoteSink,
 } from "../../types/genome.ts";
+import { ACTION_PARAM_FIELDS } from "../../types/vote-sinks.ts";
 import { directionWord } from "./directions.ts";
 import { describeInputRef } from "./inputRefUtils.ts";
 import { formatVoteSink } from "./voteSinks.ts";
 
-export {
-	driveSinkIndex,
-	formatVoteSink,
-	voteSinkFromIndex,
-	voteSinkIndex,
-	voteSinkLabel,
-} from "./voteSinks.ts";
+export { formatVoteSink, voteSinkLabel } from "./voteSinks.ts";
 
 export function getKindName(kind: ComputeNodeKind): string {
 	if (typeof kind === "string") return kind;

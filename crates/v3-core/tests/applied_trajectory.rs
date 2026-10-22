@@ -178,6 +178,12 @@
 //! agreeing runs (sampled e145bf0f... -> 4d34eae0..., rate 0.0 5e94f066...
 //! -> bf1ce9a1...; guard fd13dc02... -> 5cbdceed..., rate 0.0 a0579f08...
 //! -> 5067bc4b...); restoring (0.5, 0.0005) restores all four.
+//! Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug` shape)
+//! after two agreeing runs: a directed vote sink serializes as
+//! `{"Directed":["Move",3]}` where `{"Move":3}` stood, which moves the two
+//! sampled digests (4d34eae0... -> 3a4846f3..., gestation rate 0.0
+//! bf1ce9a1... -> 5a9ed31a...); the guard digests hold, and mapping the
+//! genome text back to the old shape restores both old sampled digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -189,11 +195,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "4d34eae0d58f28fd65f4e3fc34d041ef466fc4b822a0c48320b65d6e75273146"
+        "3a4846f33b0a006e4a51f98c94cc699533b042114c5f3c64754d9aab3b28563c"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "bf1ce9a1ae539a810ca3c47d5bcdcef1acfda578cb81bfa8e80cc1db0af5ee45"
+        "5a9ed31a23f6c9d2387d75f426863dbfcbe6d479e06f56e6437721ba1a8203c7"
     );
 }
 

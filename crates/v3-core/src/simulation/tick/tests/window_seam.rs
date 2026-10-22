@@ -4,7 +4,7 @@
 use std::fmt::Write as _;
 
 use super::super::run_tick;
-use super::super::window_seam::{take_decided, Decided};
+use super::super::window_seam::{take_decided, take_logged, Decided};
 use super::support::*;
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
@@ -96,20 +96,6 @@ fn fingerprint(sim: &Simulation) -> String {
     out
 }
 
-/// The untraced action log entries of `id` at `tick`.
-fn logged_at(sim: &Simulation, id: CreatureId, tick: u64) -> Vec<String> {
-    sim.action_logs
-        .get(id)
-        .map(|log| {
-            log.entries()
-                .iter()
-                .filter(|entry| entry.tick == tick)
-                .map(|entry| format!("{entry:?}"))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 /// A recording of `ticks` ticks of `id` under `budget`, or unbudgeted.
 fn recording(id: CreatureId, ticks: u32, budget: Option<TraceBudget>) -> ActiveTrace {
     budget.map_or_else(
@@ -118,19 +104,35 @@ fn recording(id: CreatureId, ticks: u32, budget: Option<TraceBudget>) -> ActiveT
     )
 }
 
+/// One tick of the untraced run: its sorted decision queue and the traced
+/// target's action-log entries, captured as they were logged so a target
+/// removed with its log keeps them.
+struct PlainTick {
+    queue: Vec<Decided>,
+    target_logged: Vec<String>,
+}
+
 /// Runs one tick of each simulation and asserts both handed the action phase
 /// the same sorted decision queue, and that a tick recorded this tick holds
-/// the traced creature's queued actions; returns the untraced queue.
+/// the traced creature's queued actions; returns the untraced tick.
 fn tick_both(
     traced: &mut Simulation,
     plain: &mut Simulation,
     trace: &mut Option<ActiveTrace>,
     tick: u64,
-) -> Vec<Decided> {
+) -> PlainTick {
+    let target = trace.as_ref().map(|active| active.creature_id);
+    take_logged();
     run_tick(traced, trace);
     let traced_queue = take_decided();
+    take_logged();
     run_tick(plain, &mut None);
     let plain_queue = take_decided();
+    let target_logged = take_logged()
+        .into_iter()
+        .filter(|(id, _)| Some(*id) == target)
+        .map(|(_, entry)| format!("{entry:?}"))
+        .collect();
     assert_eq!(traced_queue, plain_queue, "decision queue at tick {tick}");
     if let Some(active) = trace.as_ref() {
         if let Some(record) = active.ticks.last().filter(|r| r.tick_number == tick) {
@@ -141,16 +143,25 @@ fn tick_both(
             assert_eq!(record.final_actions, decided.actions, "tick {tick}");
         }
     }
-    plain_queue
+    PlainTick {
+        queue: plain_queue,
+        target_logged,
+    }
 }
 
 /// Runs `traced` and `plain` side by side for 50 ticks, `traced` with a trace
 /// whose target moves to a new creature every 8 ticks; asserts every tick's
 /// decision queue, each recorded tick's applied actions and the state after
-/// every tick equal the untraced run's.
-fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Option<TraceBudget>) {
+/// every tick equal the untraced run's. Returns how many traced targets died
+/// inside their window.
+fn assert_equivalent(
+    mut traced: Simulation,
+    mut plain: Simulation,
+    budget: Option<TraceBudget>,
+) -> usize {
     let mut trace: Option<ActiveTrace> = None;
     let mut recorded = 0;
+    let mut died_in_window = 0;
     for tick in 0..50_u64 {
         if tick % 8 == 0 {
             let population: Vec<CreatureId> = traced.creatures.keys().collect();
@@ -162,10 +173,14 @@ fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Opti
             next.include_perception_debug = true;
             trace = Some(next);
         }
-        let target = trace.as_ref().map(|t| t.creature_id);
+        let target = trace.as_ref().map(|t| t.creature_id).unwrap();
+        let alive = plain.creatures.contains_key(target);
         let before = trace.as_ref().map_or(0, |t| t.ticks.len());
-        tick_both(&mut traced, &mut plain, &mut trace, tick);
+        let plain_tick = tick_both(&mut traced, &mut plain, &mut trace, tick);
         assert_eq!(fingerprint(&traced), fingerprint(&plain), "tick {tick}");
+        if alive && !plain.creatures.contains_key(target) {
+            died_in_window += 1;
+        }
         let active = trace.as_ref().unwrap();
         if active.ticks.len() > before {
             recorded += 1;
@@ -176,57 +191,30 @@ fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Opti
                 .iter()
                 .map(|action| format!("{:?}", action.entry))
                 .collect();
-            assert_eq!(
-                applied,
-                logged_at(&plain, target.unwrap(), tick),
-                "tick {tick}"
-            );
+            assert_eq!(applied, plain_tick.target_logged, "tick {tick}");
         }
     }
     assert!(recorded > 0, "the run recorded ticks");
+    died_in_window
 }
 
 #[test]
 fn traced_and_untraced_runs_are_identical_for_graph_founders() {
-    // Kind drives (T11.F30), 2026-10-12: seed 7 to 12. At seed 7 a traced
-    // target dies of a move at tick 31, inside its window, and a dead
-    // creature's action log, the oracle, is removed with it; seeds 8 to 11
-    // also lose a target inside its window. T25.F08 commit 2 (the
-    // randomized creation operators and `DetachGraphEdge` remap every Graph
-    // draw): seed 12 to 14. At seed 12 a traced target dies of a move at tick
-    // 40, inside its window; seed 13 also fails the check.
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = seed_simulation(equivalence_config(), 14);
-        let plain = seed_simulation(equivalence_config(), 14);
-        assert_equivalent(traced, plain, budget);
+        let traced = seed_simulation(equivalence_config(), 7);
+        let plain = seed_simulation(equivalence_config(), 7);
+        let died = assert_equivalent(traced, plain, budget);
+        assert!(died > 0, "a traced target dies inside its window");
     }
 }
 
 #[test]
 fn traced_and_untraced_runs_are_identical_for_vm_founders() {
-    // Effort-cost defaults, 2026-10-10: seed 9 to 14. At seeds 9, 10, 12 and
-    // 13 a traced target dies of a move inside its window, and a dead
-    // creature's action log, the oracle, is removed with it. Kind drives
-    // (T11.F30), 2026-10-12: seed 14 to 16. At seed 14 a traced target dies
-    // of a move at tick 32, inside its window; seed 15 also loses one.
-    // Uniform genome size (T25.F02), 2026-10-14: seed 16 to 21. At seed 16 a
-    // traced target dies of a move at tick 49, inside its window; seeds 17 to
-    // 20 also lose a target inside its window. The old size rule and anchor
-    // 97 restore seed 16. `AddDirectionPairGroup` (T25.F04 commit 1): seed 21
-    // to 24. At seed 21 a traced target dies of a move at tick 46, inside its
-    // window; seeds 22 and 23 also fail the check. Removing the catalog entry
-    // restores seed 21. T25.F08 commit 2 (the randomized creation operators
-    // and `DetachGraphEdge` remap every Graph draw): seed 24 to 25. At seed
-    // 24 a traced target dies of a move at tick 49, inside its window. Seed
-    // 25 to 29 in T26.F02: at seed 25 a traced target dies of a move at tick
-    // 47, inside its window, already on main at 08b1584c on macOS aarch64
-    // (the same tick-47 failure, before any T26.F02 change); seeds 26 to 28 also lose a target
-    // inside its window.
-    // WORKAROUND(T26.F02): an equivalence oracle that retains death-tick actions
     for budget in [Some(WINDOW_BUDGET), None] {
-        let traced = with_vm_founders(seed_simulation(equivalence_config(), 29));
-        let plain = with_vm_founders(seed_simulation(equivalence_config(), 29));
-        assert_equivalent(traced, plain, budget);
+        let traced = with_vm_founders(seed_simulation(equivalence_config(), 9));
+        let plain = with_vm_founders(seed_simulation(equivalence_config(), 9));
+        let died = assert_equivalent(traced, plain, budget);
+        assert!(died > 0, "a traced target dies inside its window");
     }
 }
 
@@ -601,6 +589,11 @@ fn a_steal_credits_its_reward_and_the_victim_records_damage() {
     assert!(steal.reward > 0.0);
     assert!(steal.charge > 0.0);
 
+    // The window's charge sums every `ActionType` row, so the one steal of
+    // the tick reads as exactly its own row's ledger delta.
+    let ledger = sim.stats.energy_flows.action_charges;
+    assert!((steal.charge - ledger[ActionType::StealEnergy]).abs() < 1e-9);
+
     let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);
     sim.creatures[attacker].genome = steal_north_genome();
     sim.creatures[victim].genome = vm_program_genome(vec![VmInstruction::Halt]);
@@ -716,7 +709,7 @@ fn decisions_discarded_by_a_death_match_the_untraced_run() {
             let (mut traced, id) = fixture();
             let (mut plain, _) = fixture();
             let mut trace = Some(recording(id, 3, budget));
-            let queue = tick_both(&mut traced, &mut plain, &mut trace, 0);
+            let queue = tick_both(&mut traced, &mut plain, &mut trace, 0).queue;
             let decided = queue.iter().find(|entry| entry.id == id).unwrap();
             assert!(decided.actions.len() > 1, "the queue outlives the creature");
             assert!(!plain.creatures.contains_key(id), "the creature died");

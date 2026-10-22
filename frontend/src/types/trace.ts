@@ -1,4 +1,5 @@
-import type { InputReference, VmInstruction, VoteKind, VoteSink } from "./genome.ts";
+import type { InputReference, VmInstruction, VoteSink } from "./genome.ts";
+import { VOTE_KINDS, VOTE_SINK_COUNT } from "./vote-sinks.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -147,16 +148,7 @@ export type WorldAction =
 	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
 	| { StealEnergy: { direction: string; amount: number } };
 
-/** Vote sinks in the catalog: Eat, 8 each of Move/Reproduce/StealEnergy, a
- * drive per directed kind, Terminate, Decide. */
-export const VOTE_SINK_COUNT = 30;
-/** Action kinds carrying a vote commit counter, in `commit_counts` order. */
-export const VOTE_KINDS: readonly VoteKind[] = Object.freeze([
-	"Eat",
-	"Move",
-	"Reproduce",
-	"StealEnergy",
-]);
+export { VOTE_KINDS, VOTE_SINK_COUNT } from "./vote-sinks.ts";
 /** `PreviousOutcome` channels, in `previous_outcome` order. */
 export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
 	"EnergyDelta",
@@ -168,12 +160,15 @@ export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
 export const ZERO_VOTES: readonly number[] = Object.freeze(
 	Array.from({ length: VOTE_SINK_COUNT }, () => 0),
 );
+/** A per-kind vector (commit counts, bars) with every kind at zero, in
+ * `VOTE_KINDS` order. */
+export const ZERO_KIND_COUNTS: readonly number[] = Object.freeze(VOTE_KINDS.map(() => 0));
 
 /** Decision-state inputs of a dispatch before any vote, commit, or hop. */
 export const ZERO_DECISION_INPUTS: DecisionInputs = Object.freeze({
 	action_votes: ZERO_VOTES,
 	previous_pass_votes: ZERO_VOTES,
-	commit_counts: Object.freeze([0, 0, 0, 0]),
+	commit_counts: ZERO_KIND_COUNTS,
 	hops_this_tick: 0,
 });
 

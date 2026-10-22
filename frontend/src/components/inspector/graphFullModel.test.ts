@@ -25,7 +25,7 @@ describe("buildFullGraphModel edge-group members", () => {
 		return makeGraphDef({
 			output_sinks: [
 				{
-					kind: { ActionVote: { Move: 0 } },
+					kind: { ActionVote: { Directed: ["Move", 0] } },
 					inputs: [
 						inputEdge(1, 3, 0.25),
 						{ ...inputEdge(0, 0, 0), membership: { group: 0, scope: "Edge" } },
@@ -91,7 +91,7 @@ describe("buildFullGraphModel edge-group members", () => {
 			makeGraphDef({
 				output_sinks: [
 					{
-						kind: { ActionVote: { Move: 6 } },
+						kind: { ActionVote: { Directed: ["Move", 6] } },
 						inputs: [{ ...inputEdge(0, 1, 0.25), membership: { group: 0, scope: "Edge" } }],
 					},
 				],
@@ -184,7 +184,10 @@ describe("buildFullGraphModel", () => {
 	});
 
 	it("draws wired vote and parameter sinks as action outputs and skips unwired ones", () => {
-		const vote: OutputSink = { kind: { ActionVote: { Move: 2 } }, inputs: [computeEdge(0)] };
+		const vote: OutputSink = {
+			kind: { ActionVote: { Directed: ["Move", 2] } },
+			inputs: [computeEdge(0)],
+		};
 		const param: OutputSink = {
 			kind: { ActionParam: "ReproduceTransferFraction" },
 			inputs: [computeEdge(0)],

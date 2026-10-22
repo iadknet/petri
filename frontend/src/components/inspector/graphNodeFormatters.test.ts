@@ -1,19 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { VOTE_SINK_COUNT } from "../../types/trace.ts";
+import {
+	VOTE_SINK_COUNT,
+	driveSinkIndex,
+	voteSinkFromIndex,
+	voteSinkIndex,
+} from "../../types/vote-sinks.ts";
 import {
 	describeComputeKind,
 	describeGraphSource,
 	describeOutputSink,
-	driveSinkIndex,
-	voteSinkFromIndex,
-	voteSinkIndex,
 	voteSinkLabel,
 } from "./graphNodeFormatters.ts";
 
 describe("vote sink catalog", () => {
 	it("places the three drives between StealEnergy[7] and Terminate", () => {
 		expect(VOTE_SINK_COUNT).toBe(30);
-		expect(voteSinkFromIndex(24)).toEqual({ StealEnergy: 7 });
+		expect(voteSinkFromIndex(24)).toEqual({ Directed: ["StealEnergy", 7] });
 		expect(voteSinkFromIndex(25)).toEqual({ Drive: "Move" });
 		expect(voteSinkFromIndex(26)).toEqual({ Drive: "Reproduce" });
 		expect(voteSinkFromIndex(27)).toEqual({ Drive: "StealEnergy" });

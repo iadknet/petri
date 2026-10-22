@@ -152,22 +152,20 @@ impl From<v3_core::simulation::reproductive_success::ReproductiveSuccessTotals>
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ActionChargeTracking {
-    pub noop: String,
-    pub eat: String,
-    pub r#move: String,
-    pub reproduce: String,
-    pub steal_energy: String,
-}
+/// Energy charged per action type, keyed by `ActionType::flow_key`
+/// (T27.F03, `applied-energy-flows-v4`).
+pub type ActionChargeTracking = BTreeMap<String, String>;
 
-/// The share of [`ActionChargeTracking`] paid by failed attempts (T16.F02).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FailedActionEffortTracking {
-    pub r#move: String,
-    pub eat: String,
-    pub reproduce: String,
-    pub steal_energy: String,
+/// The share of [`ActionChargeTracking`] paid by failed attempts (T16.F02),
+/// keyed like it; the `noop` row is exported and stays zero.
+pub type FailedActionEffortTracking = BTreeMap<String, String>;
+
+/// One row per `ActionType`, keyed by its flow key.
+fn by_action_type(ledger: impl Fn(ActionType) -> f64) -> BTreeMap<String, String> {
+    ActionType::ALL
+        .iter()
+        .map(|&action| (action.flow_key().to_owned(), six(ledger(action))))
+        .collect()
 }
 
 /// How the population's eat and reproduce attempts ended (T16.F02). Moves
@@ -257,21 +255,10 @@ pub struct EnergyFlowTracking {
 impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
     fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
         Self {
-            definition: "applied-energy-flows-v3".into(),
+            definition: "applied-energy-flows-v4".into(),
             food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
-            action_charges: ActionChargeTracking {
-                noop: six(flows.action_charges.noop),
-                eat: six(flows.action_charges.eat),
-                r#move: six(flows.action_charges.r#move),
-                reproduce: six(flows.action_charges.reproduce),
-                steal_energy: six(flows.action_charges.steal_energy),
-            },
-            failed_action_effort: Some(FailedActionEffortTracking {
-                r#move: six(flows.failed_action_effort.r#move),
-                eat: six(flows.failed_action_effort.eat),
-                reproduce: six(flows.failed_action_effort.reproduce),
-                steal_energy: six(flows.failed_action_effort.steal_energy),
-            }),
+            action_charges: by_action_type(|action| flows.action_charges[action]),
+            failed_action_effort: Some(by_action_type(|action| flows.failed_action_effort[action])),
             vm_compute: six(flows.vm_compute),
             priority_bid: six(flows.priority_bid),
             graph_compute: six(flows.graph_compute),

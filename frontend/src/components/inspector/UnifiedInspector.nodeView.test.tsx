@@ -4,7 +4,7 @@ import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
 import { useSamplePlaybackStore } from "../../stores/samplePlayback.ts";
 import type { CreatureGenome } from "../../types/genome.ts";
 import type { ExecutionSample, MeshHopTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../types/trace.ts";
 import { UnifiedInspector } from "./UnifiedInspector.tsx";
 
 vi.mock("./mesh/useMeshLayout.ts", () => ({
@@ -82,16 +82,21 @@ const sample: ExecutionSample = {
 				pass_index,
 				end_reason: "PassCapReached" as const,
 				votes: ZERO_VOTES,
-				best: ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }],
-				bars: [0, 0, 0, 0],
-				effective_votes: [0, 0, 0, 0],
+				best: [
+					"Eat",
+					{ Directed: ["Move", 0] },
+					{ Directed: ["Reproduce", 0] },
+					{ Directed: ["StealEnergy", 0] },
+				],
+				bars: ZERO_KIND_COUNTS,
+				effective_votes: ZERO_KIND_COUNTS,
 				committed: null,
 				hops: 2,
 			})),
 			final_actions: [],
 			termination_reason: "NoDecision",
 			priority_bid: 0,
-			commit_counts: [0, 0, 0, 0],
+			commit_counts: ZERO_KIND_COUNTS,
 		},
 	],
 };

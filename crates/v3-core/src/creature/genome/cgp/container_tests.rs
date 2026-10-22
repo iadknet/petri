@@ -687,7 +687,10 @@ fn can_host_group_needs_every_direction_sink_and_capacity() {
     assert!(!def.can_host_group());
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     crate::creature::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::StealEnergy(7)));
+        sinks.retain(|sink| {
+            sink.kind
+                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 7))
+        });
     });
     assert!(!partial.can_host_group());
 }

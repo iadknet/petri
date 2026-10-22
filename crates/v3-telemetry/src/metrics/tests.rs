@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use v3_core::creature::action_log::ActionType;
 
 use proptest::prelude::*;
 use prost::Message as _;
@@ -134,7 +135,7 @@ fn populated() -> SimStats {
     s.birth_parent_age.record(BirthOrder::Later, 120);
     s.birth_parent_age.record(BirthOrder::Later, 20_000);
     s.energy_flows.food_intake_by_type = vec![1.5, 2.5];
-    s.energy_flows.action_charges.r#move = -3.25;
+    s.energy_flows.action_charges[ActionType::Move] = -3.25;
     s.phase_wall_clock.cognition = Duration::from_millis(1_500);
     for domain in MutationDomain::all() {
         s.mutation_events_attempted_total_by_domain
@@ -374,6 +375,7 @@ fn run_families(families: &mut Vec<Family>) {
             "action_charge.move",
             "action_charge.reproduce",
             "action_charge.steal_energy",
+            "failed_action_effort.noop",
             "failed_action_effort.move",
             "failed_action_effort.eat",
             "failed_action_effort.reproduce",

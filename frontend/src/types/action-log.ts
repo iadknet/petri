@@ -1,15 +1,14 @@
-/**
- * Action types — serialized as string variant names from Rust's `ActionType` enum.
- */
-export const ActionType = {
-	NoOp: "NoOp",
-	Eat: "Eat",
-	Move: "Move",
-	Reproduce: "Reproduce",
-	StealEnergy: "StealEnergy",
-} as const;
+import catalog from "./vote-sinks.json";
 
-export type ActionType = (typeof ActionType)[keyof typeof ActionType];
+/**
+ * Action types — serialized as string variant names from Rust's `ActionType`
+ * enum; the values come from the Rust-pinned `vote-sinks.json` catalog.
+ */
+export type ActionType = "NoOp" | "Eat" | "Move" | "Reproduce" | "StealEnergy";
+
+export const ActionType = Object.freeze(
+	Object.fromEntries(catalog.actionTypes.map(({ name }) => [name, name])),
+) as { readonly [K in ActionType]: K };
 
 /**
  * Action results — serialized as string variant names from Rust's `ActionResult` enum.
