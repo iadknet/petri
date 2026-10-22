@@ -5,7 +5,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction,
 };
 use crate::mutation::MutationOperator;
-use crate::simulation::actions::{apply_reproduce, steal_with_bite, ReproductionActionResult};
+use crate::simulation::actions::{apply_reproduce, apply_steal_energy, ReproductionActionResult};
 use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::reproductive_success::{
     CognitiveClass, ReproductiveSuccessByCognitiveClass, ReproductiveSuccessTotals,
@@ -147,7 +147,7 @@ fn reproductive_success_preserves_phase_zero_and_predation_removal_ages() {
     sim.creatures[victim].offspring_spawned_count = 5;
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
-    steal_with_bite(attacker, &mut sim, Direction::N, 10.0);
+    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
     assert!(sim.creatures.contains_key(attacker));
     assert_eq!(

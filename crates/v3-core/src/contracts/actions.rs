@@ -1,70 +1,6 @@
 use crate::contracts::Direction;
 use crate::contracts::OrdinaryFoodTypeId;
 
-/// Action type discriminant: the action-queue code `ReadActionQueueType`
-/// reads, the action-log type, and the index of the per-type charge ledger.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
-#[non_exhaustive]
-#[repr(u8)]
-pub enum ActionType {
-    NoOp = 0,
-    Eat = 1,
-    Move = 2,
-    Reproduce = 3,
-    StealEnergy = 4,
-    GiveEnergy = 5,
-}
-
-/// Number of meaningful action type discriminants (NoOp..GiveEnergy).
-pub const ACTION_TYPE_COUNT: u8 = 6;
-const _: () = assert!(ActionType::GiveEnergy as u8 + 1 == ACTION_TYPE_COUNT);
-
-impl ActionType {
-    /// Every action type in discriminant order, for fixed-order reports.
-    pub const ALL: [Self; ACTION_TYPE_COUNT as usize] = [
-        Self::NoOp,
-        Self::Eat,
-        Self::Move,
-        Self::Reproduce,
-        Self::StealEnergy,
-        Self::GiveEnergy,
-    ];
-
-    /// Stable diagnostics key for this action type.
-    ///
-    /// Matches the variant name emitted by the derived `Serialize` impl.
-    #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        match self {
-            Self::NoOp => "NoOp",
-            Self::Eat => "Eat",
-            Self::Move => "Move",
-            Self::Reproduce => "Reproduce",
-            Self::StealEnergy => "StealEnergy",
-            Self::GiveEnergy => "GiveEnergy",
-        }
-    }
-
-    /// The energy-ledger key of this type's charge and failed-effort rows.
-    #[must_use]
-    pub const fn flow_key(self) -> &'static str {
-        match self {
-            Self::NoOp => "noop",
-            Self::Eat => "eat",
-            Self::Move => "move",
-            Self::Reproduce => "reproduce",
-            Self::StealEnergy => "steal_energy",
-            Self::GiveEnergy => "give_energy",
-        }
-    }
-
-    /// Position in [`Self::ALL`]: the discriminant as an index.
-    #[must_use]
-    pub const fn index(self) -> usize {
-        self as usize
-    }
-}
-
 /// The action a creature emits at the end of mesh execution for one tick.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WorldAction {
@@ -85,12 +21,8 @@ pub enum WorldAction {
         direction: Direction,
         energy_transfer_fraction: f32,
     },
-    /// Attempt to take one exchange bite of energy from the neighbour in the
-    /// given direction (T27.F03).
-    StealEnergy { direction: Direction },
-    /// Pass one exchange bite of energy to the neighbour in the given
-    /// direction (T27.F03).
-    GiveEnergy { direction: Direction },
+    /// Attempt to steal energy from a neighbor in the given direction.
+    StealEnergy { direction: Direction, amount: f32 },
 }
 
 impl WorldAction {
@@ -108,17 +40,16 @@ impl WorldAction {
         matches!(self, WorldAction::NoOp)
     }
 
-    /// The action's type; `as u8` is the code `ReadActionQueueType` reads.
+    /// Return the action type discriminant `ReadActionQueueType` reads.
+    /// 0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy.
     #[inline]
-    #[must_use]
-    pub const fn action_type(&self) -> ActionType {
+    pub fn action_type(&self) -> u8 {
         match self {
-            WorldAction::NoOp => ActionType::NoOp,
-            WorldAction::Eat { .. } => ActionType::Eat,
-            WorldAction::Move(_) => ActionType::Move,
-            WorldAction::Reproduce { .. } => ActionType::Reproduce,
-            WorldAction::StealEnergy { .. } => ActionType::StealEnergy,
-            WorldAction::GiveEnergy { .. } => ActionType::GiveEnergy,
+            WorldAction::NoOp => 0,
+            WorldAction::Eat { .. } => 1,
+            WorldAction::Move(_) => 2,
+            WorldAction::Reproduce { .. } => 3,
+            WorldAction::StealEnergy { .. } => 4,
         }
     }
 
@@ -129,17 +60,16 @@ impl WorldAction {
         match self {
             WorldAction::Move(direction)
             | WorldAction::Reproduce { direction, .. }
-            | WorldAction::StealEnergy { direction, .. }
-            | WorldAction::GiveEnergy { direction } => Some(*direction),
+            | WorldAction::StealEnergy { direction, .. } => Some(*direction),
             WorldAction::NoOp | WorldAction::Eat { .. } => None,
         }
     }
 
     /// Read back a parameter slot for `ReadActionQueueParam`.
     /// Slot 0 = direction index (as f32), or the food type index (Eat);
-    /// slot 1 = energy_transfer_fraction (Reproduce) or the leave share
-    /// (Eat). Returns 0.0 for unknown slots or variants without that
-    /// parameter, a steal's slot 1 included.
+    /// slot 1 = amount (StealEnergy), energy_transfer_fraction (Reproduce) or
+    /// the leave share (Eat). Returns 0.0 for unknown slots or
+    /// variants without that parameter.
     #[inline]
     pub fn param(&self, slot: usize) -> f32 {
         match (self, slot) {
@@ -154,8 +84,8 @@ impl WorldAction {
                 },
                 1,
             ) => *energy_transfer_fraction,
-            (WorldAction::StealEnergy { direction }, 0)
-            | (WorldAction::GiveEnergy { direction }, 0) => direction.to_index() as f32,
+            (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
+            (WorldAction::StealEnergy { amount, .. }, 1) => *amount,
             _ => 0.0,
         }
     }
@@ -181,7 +111,8 @@ mod tests {
         }
         .is_noop());
         assert!(!WorldAction::StealEnergy {
-            direction: Direction::E
+            direction: Direction::E,
+            amount: 10.0
         }
         .is_noop());
     }
@@ -202,7 +133,8 @@ mod tests {
         );
         assert_eq!(
             WorldAction::StealEnergy {
-                direction: Direction::W
+                direction: Direction::W,
+                amount: 1.0
             }
             .direction(),
             Some(Direction::W)
@@ -253,25 +185,17 @@ mod tests {
     }
 
     #[test]
-    fn a_give_is_type_five_and_reads_its_direction_in_slot_zero() {
-        let action = WorldAction::GiveEnergy {
-            direction: Direction::SE,
-        };
-        assert_eq!(action.action_type(), ActionType::GiveEnergy);
-        assert_eq!(action.action_type() as u8, 5);
-        assert_eq!(action.direction(), Some(Direction::SE));
-        assert_eq!(action.param(0), Direction::SE.to_index() as f32);
-        assert_eq!(action.param(1).to_bits(), 0.0f32.to_bits());
-        assert_eq!(ActionType::GiveEnergy.flow_key(), "give_energy");
-    }
-
-    #[test]
-    fn a_steal_carries_only_its_direction_and_reads_no_slot_one() {
+    fn steal_energy_fields_accessible() {
         let action = WorldAction::StealEnergy {
             direction: Direction::NW,
+            amount: 7.5,
         };
-        assert_eq!(action.param(0), Direction::NW.to_index() as f32);
-        assert_eq!(action.param(1).to_bits(), 0.0f32.to_bits());
+        if let WorldAction::StealEnergy { direction, amount } = action {
+            assert_eq!(direction, Direction::NW);
+            assert!((amount - 7.5).abs() < f32::EPSILON);
+        } else {
+            panic!("expected StealEnergy variant");
+        }
     }
 
     #[test]
@@ -289,9 +213,7 @@ mod tests {
             },
             WorldAction::StealEnergy {
                 direction: Direction::S,
-            },
-            WorldAction::GiveEnergy {
-                direction: Direction::SW,
+                amount: 8.0,
             },
         ];
         for action in actions {

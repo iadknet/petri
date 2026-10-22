@@ -182,7 +182,6 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "petri.actions.noop",
         "petri.actions.reproduce",
         "petri.actions.steal",
-        "petri.actions.give",
         "petri.predation_kills",
         "petri.compute_total_mean",
         "petri.compute_total_min",
@@ -254,7 +253,6 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "mutation.executed_bias",
         "predation.steal_cost_rate",
         "predation.kill_complexity_bonus_multiplier",
-        "exchange.bite",
     ]);
     let reward_learning = config_keys(&[]);
     [

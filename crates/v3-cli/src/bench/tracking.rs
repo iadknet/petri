@@ -79,17 +79,6 @@ pub struct PredationTracking {
     pub actions_by_result: BTreeMap<String, u64>,
 }
 
-/// What the population's give attempts did (T27.F03), with the per-result
-/// breakdown keyed by `GiveActionResult::as_key`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct GivingTracking {
-    pub actions_attempted_total: u64,
-    pub actions_transferred_total: u64,
-    pub actions_rejected_total: u64,
-    pub actions_by_result: BTreeMap<String, u64>,
-}
-
 /// What the population's conceptions became (T03.F12): `started` equals
 /// `delivered` plus the three losses plus `pending_births`, the litters
 /// still carried at the end of the run.
@@ -163,20 +152,22 @@ impl From<v3_core::simulation::reproductive_success::ReproductiveSuccessTotals>
     }
 }
 
-/// Energy charged per action type, keyed by `ActionType::flow_key`
-/// (T27.F03, `applied-energy-flows-v4`).
-pub type ActionChargeTracking = BTreeMap<String, String>;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionChargeTracking {
+    pub noop: String,
+    pub eat: String,
+    pub r#move: String,
+    pub reproduce: String,
+    pub steal_energy: String,
+}
 
-/// The share of [`ActionChargeTracking`] paid by failed attempts (T16.F02),
-/// keyed like it; the `noop` row is exported and stays zero.
-pub type FailedActionEffortTracking = BTreeMap<String, String>;
-
-/// One row per `ActionType`, keyed by its flow key.
-fn by_action_type(ledger: impl Fn(ActionType) -> f64) -> BTreeMap<String, String> {
-    ActionType::ALL
-        .iter()
-        .map(|&action| (action.flow_key().to_owned(), six(ledger(action))))
-        .collect()
+/// The share of [`ActionChargeTracking`] paid by failed attempts (T16.F02).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FailedActionEffortTracking {
+    pub r#move: String,
+    pub eat: String,
+    pub reproduce: String,
+    pub steal_energy: String,
 }
 
 /// How the population's eat and reproduce attempts ended (T16.F02). Moves
@@ -246,11 +237,6 @@ pub struct EnergyFlowTracking {
     pub predation_victim_debit: String,
     pub predation_attacker_credit: String,
     pub predation_kill_bonus_credit: String,
-    /// A giver's and a recipient's applied gift changes (T27.F03).
-    #[serde(default)]
-    pub gift_debit: String,
-    #[serde(default)]
-    pub gift_credit: String,
     pub maximum_energy_clamp_loss: String,
     pub zero_floor_credit: String,
     pub external_removal_loss: String,
@@ -263,10 +249,21 @@ pub struct EnergyFlowTracking {
 impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
     fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
         Self {
-            definition: "applied-energy-flows-v4".into(),
+            definition: "applied-energy-flows-v3".into(),
             food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
-            action_charges: by_action_type(|action| flows.action_charges[action]),
-            failed_action_effort: Some(by_action_type(|action| flows.failed_action_effort[action])),
+            action_charges: ActionChargeTracking {
+                noop: six(flows.action_charges.noop),
+                eat: six(flows.action_charges.eat),
+                r#move: six(flows.action_charges.r#move),
+                reproduce: six(flows.action_charges.reproduce),
+                steal_energy: six(flows.action_charges.steal_energy),
+            },
+            failed_action_effort: Some(FailedActionEffortTracking {
+                r#move: six(flows.failed_action_effort.r#move),
+                eat: six(flows.failed_action_effort.eat),
+                reproduce: six(flows.failed_action_effort.reproduce),
+                steal_energy: six(flows.failed_action_effort.steal_energy),
+            }),
             vm_compute: six(flows.vm_compute),
             priority_bid: six(flows.priority_bid),
             graph_compute: six(flows.graph_compute),
@@ -279,8 +276,6 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             predation_victim_debit: six(flows.predation_victim_debit),
             predation_attacker_credit: six(flows.predation_attacker_credit),
             predation_kill_bonus_credit: six(flows.predation_kill_bonus_credit),
-            gift_debit: six(flows.gift_debit),
-            gift_credit: six(flows.gift_credit),
             maximum_energy_clamp_loss: six(flows.maximum_energy_clamp_loss),
             zero_floor_credit: six(flows.zero_floor_credit),
             external_removal_loss: six(flows.external_removal_loss),
@@ -371,9 +366,6 @@ pub struct WorldTracking {
     /// What the population's predation attempts did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
-    /// What the population's give attempts did (T27.F03).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub giving: Option<GivingTracking>,
     /// How eat and reproduce attempts ended (T16.F02).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action_attempts: Option<ActionAttemptsTracking>,
@@ -619,7 +611,6 @@ impl WorldTracking {
             mutation_value_totals_by_operator: None,
             mutation_value_totals_by_birth_edge_class: None,
             predation: None,
-            giving: None,
             action_attempts: None,
             mortality: None,
             reproductive_success_by_cognitive_class: None,
@@ -721,16 +712,6 @@ impl WorldTracking {
                 kills_total: stats.predation_kills_total,
                 actions_by_result: stats
                     .predation_actions_by_result
-                    .iter()
-                    .map(|(result, count)| (result.as_key().to_string(), *count))
-                    .collect(),
-            }),
-            giving: Some(GivingTracking {
-                actions_attempted_total: stats.give_actions_attempted_total,
-                actions_transferred_total: stats.give_actions_transferred_total,
-                actions_rejected_total: stats.give_actions_rejected_total,
-                actions_by_result: stats
-                    .give_actions_by_result
                     .iter()
                     .map(|(result, count)| (result.as_key().to_string(), *count))
                     .collect(),

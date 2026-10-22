@@ -15,7 +15,6 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 
 /// The founder's age gate on the unit scale the brain reads `AgeTicks` on:
@@ -221,7 +220,7 @@ pub(crate) fn build_cgp_founder_decision_graph(
     for ((slot, direction), product) in CARDINALS.into_iter().zip(gated_ring) {
         wire(
             &mut def,
-            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, direction)),
+            OutputSinkKind::ActionVote(VoteSink::Move(direction)),
             vec![
                 edge(bias, 0.5),
                 edge(leaf(slot, 0), 0.4),
@@ -231,7 +230,7 @@ pub(crate) fn build_cgp_founder_decision_graph(
         );
         wire(
             &mut def,
-            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, direction)),
+            OutputSinkKind::ActionVote(VoteSink::Reproduce(direction)),
             vec![edge(gate, 0.5), edge(product, 0.4)],
         );
     }

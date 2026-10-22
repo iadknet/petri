@@ -75,13 +75,13 @@ fn direct_edges_cover_a_rule_per_direction_and_ignore_tiny_weights() {
     for d in 0..6u8 {
         wire(
             &mut def,
-            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, d)),
+            OutputSinkKind::ActionVote(VoteSink::Move(d)),
             leaf(0, u16::from((d + 4) % 8), -0.5),
         );
     }
     wire(
         &mut def,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 6)),
+        OutputSinkKind::ActionVote(VoteSink::Move(6)),
         leaf(0, 2, 1e-4),
     );
     let census = census_of(&[single(def, vec![barrier()])]);
@@ -108,7 +108,7 @@ fn bus_hop(sender_channel: u16) -> CreatureGenome {
     let mut receiver = CgpGraphBackendDef::new_with_fixed_outputs();
     wire(
         &mut receiver,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 5)),
+        OutputSinkKind::ActionVote(VoteSink::StealEnergy(5)),
         leaf(0, 0, 0.5),
     );
     let mut entry = node(0, vec![food], sender);
@@ -158,17 +158,17 @@ fn only_ring_references_above_the_weight_floor_carry_a_path() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     wire(
         &mut def,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
+        OutputSinkKind::ActionVote(VoteSink::Move(0)),
         leaf(0, 0, 1.0),
     );
     wire(
         &mut def,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 1)),
+        OutputSinkKind::ActionVote(VoteSink::Move(1)),
         leaf(1, 0, PATH_WEIGHT_FLOOR),
     );
     wire(
         &mut def,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
+        OutputSinkKind::ActionVote(VoteSink::Move(2)),
         leaf(1, 0, -PATH_WEIGHT_FLOOR),
     );
     let id = def.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Reproduce, 0);
@@ -248,7 +248,7 @@ fn a_ring_group_covers_every_direction_once_it_carries_weight() {
     // An incumbent edge path for the same rule in one direction.
     wire(
         &mut weighted,
-        OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 3)),
+        OutputSinkKind::ActionVote(VoteSink::Reproduce(3)),
         leaf(0, 0, 1.0),
     );
     group(&mut weighted, DirectedVoteKind::Reproduce, 3, 0.25);

@@ -6,25 +6,18 @@
 //! traces all read their positions from here. Nothing in this module carries
 //! runtime state; the pass end commits from the surface (T19.F04).
 
-/// The world-action kinds a creature can vote for: `Eat` and the directed
-/// kinds.
-pub const VOTE_KIND_COUNT: usize = 1 + DIRECTED_VOTE_KIND_COUNT;
-/// Directed kinds: the kinds with eight direction sinks and a drive.
-pub const DIRECTED_VOTE_KIND_COUNT: usize = DirectedVoteKind::ALL.len();
-/// Vote sinks in the catalog: one `Eat`, eight per directed kind, one drive
-/// per directed kind (T11.F30), `Terminate`, and `Decide`.
-pub const VOTE_SINK_COUNT: usize =
-    3 + (VOTE_DIRECTION_COUNT as usize + 1) * DIRECTED_VOTE_KIND_COUNT;
+/// The four world-action kinds a creature can vote for.
+pub const VOTE_KIND_COUNT: usize = 4;
+/// Vote sinks in the catalog: one `Eat`, eight each for the three directed
+/// kinds, one drive per directed kind (T11.F30), `Terminate`, and `Decide`.
+pub const VOTE_SINK_COUNT: usize = 30;
 /// Directions a directed vote sink covers — the `Direction::ALL` index range.
 pub const VOTE_DIRECTION_COUNT: u8 = 8;
 /// Action-parameter fields: the fields `decode_commit` reads (T11.F27).
-pub const ACTION_PARAM_FIELD_COUNT: usize = 3;
-
-/// Catalog index of the first drive sink: the direction sinks end here.
-const FIRST_DRIVE_SINK: usize = 1 + VOTE_DIRECTION_COUNT as usize * DIRECTED_VOTE_KIND_COUNT;
+pub const ACTION_PARAM_FIELD_COUNT: usize = 4;
 
 const _: () = assert!(VOTE_DIRECTION_COUNT as usize == crate::contracts::Direction::ALL.len());
-const _: () = assert!(FIRST_DRIVE_SINK + DIRECTED_VOTE_KIND_COUNT == VOTE_SINK_COUNT - 2);
+const _: () = assert!(VOTE_SINK_COUNT == 2 + 1 + 3 * (VOTE_DIRECTION_COUNT as usize + 1));
 
 /// One node's contribution, or the mesh's accumulated vote, over the catalog.
 pub type VoteVector = [f32; VOTE_SINK_COUNT];
@@ -36,19 +29,12 @@ pub enum VoteKind {
     Move,
     Reproduce,
     StealEnergy,
-    GiveEnergy,
 }
 
 impl VoteKind {
-    /// Catalog order, which is also the per-kind counter order: `Eat`, then
-    /// the directed kinds' vote kinds in [`DirectedVoteKind::ALL`] order.
-    pub const ALL: [Self; VOTE_KIND_COUNT] = [
-        Self::Eat,
-        Self::Move,
-        Self::Reproduce,
-        Self::StealEnergy,
-        Self::GiveEnergy,
-    ];
+    /// Catalog order, which is also the per-kind counter order.
+    pub const ALL: [Self; VOTE_KIND_COUNT] =
+        [Self::Eat, Self::Move, Self::Reproduce, Self::StealEnergy];
 
     /// Index in `0..VOTE_KIND_COUNT`, the position in the per-kind counters.
     #[must_use]
@@ -58,7 +44,6 @@ impl VoteKind {
             Self::Move => 1,
             Self::Reproduce => 2,
             Self::StealEnergy => 3,
-            Self::GiveEnergy => 4,
         }
     }
 
@@ -83,6 +68,8 @@ pub enum ActionParamField {
     EatLeaveShare,
     /// The energy fraction a `Reproduce` commit transfers to the child.
     ReproduceTransferFraction,
+    /// The energy a `StealEnergy` commit takes.
+    StealEnergyAmount,
 }
 
 impl ActionParamField {
@@ -92,6 +79,7 @@ impl ActionParamField {
         Self::EatFoodType,
         Self::EatLeaveShare,
         Self::ReproduceTransferFraction,
+        Self::StealEnergyAmount,
     ];
 
     /// Position in [`Self::ALL`], in `0..ACTION_PARAM_FIELD_COUNT`.
@@ -101,6 +89,7 @@ impl ActionParamField {
             Self::EatFoodType => 0,
             Self::EatLeaveShare => 1,
             Self::ReproduceTransferFraction => 2,
+            Self::StealEnergyAmount => 3,
         }
     }
 
@@ -110,6 +99,7 @@ impl ActionParamField {
         match self {
             Self::EatFoodType | Self::EatLeaveShare => VoteKind::Eat,
             Self::ReproduceTransferFraction => VoteKind::Reproduce,
+            Self::StealEnergyAmount => VoteKind::StealEnergy,
         }
     }
 }
@@ -121,8 +111,12 @@ impl ActionParamField {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum VoteSink {
     Eat,
-    /// A directed kind's sink; `u8` is a `Direction::ALL` index in `0..8`.
-    Directed(DirectedVoteKind, u8),
+    /// Directed sink; `u8` is a `Direction::ALL` index in `0..8`.
+    Move(u8),
+    /// Directed sink; `u8` is a `Direction::ALL` index in `0..8`.
+    Reproduce(u8),
+    /// Directed sink; `u8` is a `Direction::ALL` index in `0..8`.
+    StealEnergy(u8),
     /// The kind's drive: whether to act, apart from where (T11.F30).
     Drive(DirectedVoteKind),
     Terminate,
@@ -130,19 +124,20 @@ pub enum VoteSink {
 }
 
 impl VoteSink {
-    /// Catalog index: `Eat` 0, `Directed(K, d)` `1 + 8·K.index() + d`,
-    /// `Drive(K)` `1 + 8·N + K.index()` for `N` directed kinds, `Terminate`
-    /// `VOTE_SINK_COUNT − 2`, `Decide` `VOTE_SINK_COUNT − 1`. A directed sink
-    /// built with an out-of-range direction indexes past its kind and is
-    /// never constructed by the catalog itself.
+    /// Catalog index: `Eat` 0, `Move(d)` `1 + d`, `Reproduce(d)` `9 + d`,
+    /// `StealEnergy(d)` `17 + d`, `Drive(K)` `25 + K.index()`, `Terminate` 28,
+    /// `Decide` 29. A directed sink built with an out-of-range direction
+    /// indexes past the catalog and is never constructed by the catalog
+    /// itself.
     #[must_use]
     pub const fn index(self) -> usize {
+        let directions = VOTE_DIRECTION_COUNT as usize;
         match self {
             Self::Eat => 0,
-            Self::Directed(kind, d) => {
-                1 + VOTE_DIRECTION_COUNT as usize * kind.index() + d as usize
-            }
-            Self::Drive(kind) => FIRST_DRIVE_SINK + kind.index(),
+            Self::Move(d) => 1 + d as usize,
+            Self::Reproduce(d) => 1 + directions + d as usize,
+            Self::StealEnergy(d) => 1 + 2 * directions + d as usize,
+            Self::Drive(kind) => 1 + 3 * directions + kind.index(),
             Self::Terminate => VOTE_SINK_COUNT - 2,
             Self::Decide => VOTE_SINK_COUNT - 1,
         }
@@ -155,13 +150,16 @@ impl VoteSink {
         let directions = VOTE_DIRECTION_COUNT as usize;
         match index {
             0 => Some(Self::Eat),
-            _ if index < FIRST_DRIVE_SINK => Some(Self::Directed(
-                DirectedVoteKind::ALL[(index - 1) / directions],
-                ((index - 1) % directions) as u8,
-            )),
-            _ if index < FIRST_DRIVE_SINK + DIRECTED_VOTE_KIND_COUNT => {
-                Some(Self::Drive(DirectedVoteKind::ALL[index - FIRST_DRIVE_SINK]))
+            _ if index < 1 + directions => Some(Self::Move((index - 1) as u8)),
+            _ if index < 1 + 2 * directions => {
+                Some(Self::Reproduce((index - 1 - directions) as u8))
             }
+            _ if index < 1 + 3 * directions => {
+                Some(Self::StealEnergy((index - 1 - 2 * directions) as u8))
+            }
+            _ if index < 1 + 3 * directions + DirectedVoteKind::ALL.len() => Some(Self::Drive(
+                DirectedVoteKind::ALL[index - 1 - 3 * directions],
+            )),
             _ if index == VOTE_SINK_COUNT - 2 => Some(Self::Terminate),
             _ if index == VOTE_SINK_COUNT - 1 => Some(Self::Decide),
             _ => None,
@@ -179,16 +177,17 @@ impl VoteSink {
     pub fn kind(self) -> Option<VoteKind> {
         match self {
             Self::Eat => Some(VoteKind::Eat),
-            Self::Directed(kind, _) | Self::Drive(kind) => Some(kind.vote_kind()),
+            Self::Move(_) => Some(VoteKind::Move),
+            Self::Reproduce(_) => Some(VoteKind::Reproduce),
+            Self::StealEnergy(_) => Some(VoteKind::StealEnergy),
+            Self::Drive(kind) => Some(kind.vote_kind()),
             Self::Terminate | Self::Decide => None,
         }
     }
 }
 
-/// A directed world-action kind: the kinds with eight direction sinks and a
-/// drive, which a `Ring` edge group (T25.F03) votes for. A new kind is
-/// appended to [`Self::ALL`], and the index rule of [`VoteSink::index`]
-/// places its sinks.
+/// A directed world-action kind: the kinds with eight direction sinks, which a
+/// `Ring` edge group (T25.F03) votes for.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -196,19 +195,12 @@ pub enum DirectedVoteKind {
     Move,
     Reproduce,
     StealEnergy,
-    /// Pass one exchange bite to the neighbour (T27.F03).
-    GiveEnergy,
 }
 
 impl DirectedVoteKind {
     /// Catalog order, the order `AddRingGroup` and `RetargetGroupKind` draw
     /// over.
-    pub const ALL: [Self; 4] = [
-        Self::Move,
-        Self::Reproduce,
-        Self::StealEnergy,
-        Self::GiveEnergy,
-    ];
+    pub const ALL: [Self; 3] = [Self::Move, Self::Reproduce, Self::StealEnergy];
 
     /// Position in [`Self::ALL`].
     #[must_use]
@@ -217,14 +209,17 @@ impl DirectedVoteKind {
             Self::Move => 0,
             Self::Reproduce => 1,
             Self::StealEnergy => 2,
-            Self::GiveEnergy => 3,
         }
     }
 
     /// The direction-`d` sink of this kind; `d` is a `Direction::ALL` index.
     #[must_use]
     pub const fn sink(self, d: u8) -> VoteSink {
-        VoteSink::Directed(self, d)
+        match self {
+            Self::Move => VoteSink::Move(d),
+            Self::Reproduce => VoteSink::Reproduce(d),
+            Self::StealEnergy => VoteSink::StealEnergy(d),
+        }
     }
 
     /// The kind and direction of a directed sink; `None` for any other sink,
@@ -232,7 +227,9 @@ impl DirectedVoteKind {
     #[must_use]
     pub const fn of_sink(sink: VoteSink) -> Option<(Self, u8)> {
         match sink {
-            VoteSink::Directed(kind, d) => Some((kind, d)),
+            VoteSink::Move(d) => Some((Self::Move, d)),
+            VoteSink::Reproduce(d) => Some((Self::Reproduce, d)),
+            VoteSink::StealEnergy(d) => Some((Self::StealEnergy, d)),
             VoteSink::Eat | VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => None,
         }
     }
@@ -250,7 +247,6 @@ impl DirectedVoteKind {
             Self::Move => VoteKind::Move,
             Self::Reproduce => VoteKind::Reproduce,
             Self::StealEnergy => VoteKind::StealEnergy,
-            Self::GiveEnergy => VoteKind::GiveEnergy,
         }
     }
 }
@@ -287,13 +283,22 @@ mod tests {
                 ActionParamField::EatFoodType,
                 ActionParamField::EatLeaveShare,
                 ActionParamField::ReproduceTransferFraction,
+                ActionParamField::StealEnergyAmount,
             ]
         );
         for (index, field) in ActionParamField::ALL.into_iter().enumerate() {
             assert_eq!(field.index(), index);
         }
         let kinds = ActionParamField::ALL.map(ActionParamField::kind);
-        assert_eq!(kinds, [VoteKind::Eat, VoteKind::Eat, VoteKind::Reproduce]);
+        assert_eq!(
+            kinds,
+            [
+                VoteKind::Eat,
+                VoteKind::Eat,
+                VoteKind::Reproduce,
+                VoteKind::StealEnergy
+            ]
+        );
         for field in ActionParamField::ALL {
             let json = serde_json::to_string(&field).unwrap();
             assert_eq!(json, format!("\"{field:?}\""));
@@ -308,31 +313,16 @@ mod tests {
     fn catalog_indices_are_the_pinned_order() {
         assert_eq!(VoteSink::Eat.index(), 0);
         for d in 0..VOTE_DIRECTION_COUNT {
-            assert_eq!(
-                VoteSink::Directed(DirectedVoteKind::Move, d).index(),
-                1 + d as usize
-            );
-            assert_eq!(
-                VoteSink::Directed(DirectedVoteKind::Reproduce, d).index(),
-                9 + d as usize
-            );
-            assert_eq!(
-                VoteSink::Directed(DirectedVoteKind::StealEnergy, d).index(),
-                17 + d as usize
-            );
-            assert_eq!(
-                VoteSink::Directed(DirectedVoteKind::GiveEnergy, d).index(),
-                25 + d as usize
-            );
+            assert_eq!(VoteSink::Move(d).index(), 1 + d as usize);
+            assert_eq!(VoteSink::Reproduce(d).index(), 9 + d as usize);
+            assert_eq!(VoteSink::StealEnergy(d).index(), 17 + d as usize);
         }
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::Move).index(), 33);
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::Reproduce).index(), 34);
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::StealEnergy).index(), 35);
-        assert_eq!(VoteSink::Drive(DirectedVoteKind::GiveEnergy).index(), 36);
-        assert_eq!(VoteSink::Terminate.index(), 37);
-        assert_eq!(VoteSink::Decide.index(), 38);
-        assert_eq!(VOTE_SINK_COUNT, 39);
-        assert_eq!(VOTE_KIND_COUNT, 5);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Move).index(), 25);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::Reproduce).index(), 26);
+        assert_eq!(VoteSink::Drive(DirectedVoteKind::StealEnergy).index(), 27);
+        assert_eq!(VoteSink::Terminate.index(), 28);
+        assert_eq!(VoteSink::Decide.index(), 29);
+        assert_eq!(VOTE_SINK_COUNT, 30);
     }
 
     #[test]
@@ -354,18 +344,9 @@ mod tests {
             .collect();
         assert_eq!(without_kind, vec![VoteSink::Terminate, VoteSink::Decide]);
         assert_eq!(VoteSink::Eat.kind(), Some(VoteKind::Eat));
-        assert_eq!(
-            VoteSink::Directed(DirectedVoteKind::Move, 7).kind(),
-            Some(VoteKind::Move)
-        );
-        assert_eq!(
-            VoteSink::Directed(DirectedVoteKind::Reproduce, 0).kind(),
-            Some(VoteKind::Reproduce)
-        );
-        assert_eq!(
-            VoteSink::Directed(DirectedVoteKind::StealEnergy, 3).kind(),
-            Some(VoteKind::StealEnergy)
-        );
+        assert_eq!(VoteSink::Move(7).kind(), Some(VoteKind::Move));
+        assert_eq!(VoteSink::Reproduce(0).kind(), Some(VoteKind::Reproduce));
+        assert_eq!(VoteSink::StealEnergy(3).kind(), Some(VoteKind::StealEnergy));
     }
 
     #[test]
@@ -378,59 +359,6 @@ mod tests {
     }
 
     #[test]
-    fn vote_kinds_are_eat_then_the_directed_kinds_in_catalog_order() {
-        let mut expected = vec![VoteKind::Eat];
-        expected.extend(DirectedVoteKind::ALL.map(DirectedVoteKind::vote_kind));
-        assert_eq!(VoteKind::ALL.to_vec(), expected);
-        for kind in DirectedVoteKind::ALL {
-            assert_eq!(kind.vote_kind().index(), 1 + kind.index());
-        }
-    }
-
-    /// The index rule of invariant 1 holds for every directed kind, so a new
-    /// kind appended to `DirectedVoteKind::ALL` needs no index arithmetic.
-    #[test]
-    fn the_catalog_follows_the_directed_index_rule() {
-        let n = DirectedVoteKind::ALL.len();
-        assert_eq!(VOTE_SINK_COUNT, 3 + 9 * n);
-        for kind in DirectedVoteKind::ALL {
-            for d in 0..VOTE_DIRECTION_COUNT {
-                assert_eq!(kind.sink(d).index(), 1 + 8 * kind.index() + usize::from(d));
-            }
-            assert_eq!(kind.drive().index(), 1 + 8 * n + kind.index());
-        }
-        assert_eq!(VoteSink::Terminate.index(), VOTE_SINK_COUNT - 2);
-        assert_eq!(VoteSink::Decide.index(), VOTE_SINK_COUNT - 1);
-    }
-
-    /// The frontend's `vote-sinks.json` is the declared catalog (T27.F03
-    /// invariant 2), as `nearbyFields.json` is the nearby fields.
-    #[test]
-    fn the_frontend_fixture_equals_the_declared_catalog() {
-        use crate::contracts::ActionType;
-        let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../../frontend/src/types/vote-sinks.json"
-        ))
-        .expect("fixture parses");
-        let action_types: Vec<_> = ActionType::ALL
-            .iter()
-            .map(|&t| serde_json::json!({ "name": t.as_key(), "code": t as u8 }))
-            .collect();
-        let fields: Vec<_> = ActionParamField::ALL
-            .iter()
-            .map(|&f| serde_json::json!({ "field": f, "kind": f.kind() }))
-            .collect();
-        let declared = serde_json::json!({
-            "voteKinds": VoteKind::ALL,
-            "directedKinds": DirectedVoteKind::ALL,
-            "voteSinks": VoteSink::all().collect::<Vec<_>>(),
-            "actionParamFields": fields,
-            "actionTypes": action_types,
-        });
-        assert_eq!(fixture, declared);
-    }
-
-    #[test]
     fn serde_round_trips_every_sink_and_kind() {
         for sink in VoteSink::all() {
             let json = serde_json::to_string(&sink).unwrap();
@@ -438,8 +366,8 @@ mod tests {
         }
         assert_eq!(serde_json::to_string(&VoteSink::Eat).unwrap(), "\"Eat\"");
         assert_eq!(
-            serde_json::to_string(&VoteSink::Directed(DirectedVoteKind::Move, 3)).unwrap(),
-            "{\"Directed\":[\"Move\",3]}"
+            serde_json::to_string(&VoteSink::Move(3)).unwrap(),
+            "{\"Move\":3}"
         );
         assert_eq!(
             serde_json::to_string(&VoteSink::Drive(DirectedVoteKind::Move)).unwrap(),

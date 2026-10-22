@@ -2,11 +2,10 @@ use super::support::*;
 use crate::contracts::Direction;
 use crate::contracts::{OrdinaryFoodTypeId, WorldAction};
 use crate::runtime::types::ComputeCostReport;
-use crate::simulation::actions::steal_with_bite;
+use crate::simulation::actions::apply_steal_energy;
 use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::run_phase_0;
-use crate::simulation::tick::ActionType;
 use rand::{rngs::SmallRng, SeedableRng};
 
 #[test]
@@ -23,7 +22,7 @@ fn noop_counts_each_applied_attempt() {
         );
         assert_eq!(sim.stats.last_tick_noop, attempts);
         assert_eq!(
-            sim.stats.energy_flows.action_charges[ActionType::NoOp],
+            sim.stats.energy_flows.action_charges.noop,
             f64::from(attempts)
         );
     }
@@ -51,6 +50,7 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         (
             WorldAction::StealEnergy {
                 direction: Direction::N,
+                amount: 1.0,
             },
             DeathCause::ActionStealEnergy,
         ),
@@ -69,15 +69,18 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
         assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
         let charges = sim.stats.energy_flows.action_charges;
         let charged_bucket = match cause {
-            DeathCause::ActionNoop => charges[ActionType::NoOp],
-            DeathCause::ActionEat => charges[ActionType::Eat],
-            DeathCause::ActionMove => charges[ActionType::Move],
-            DeathCause::ActionReproduce => charges[ActionType::Reproduce],
-            DeathCause::ActionStealEnergy => charges[ActionType::StealEnergy],
+            DeathCause::ActionNoop => charges.noop,
+            DeathCause::ActionEat => charges.eat,
+            DeathCause::ActionMove => charges.r#move,
+            DeathCause::ActionReproduce => charges.reproduce,
+            DeathCause::ActionStealEnergy => charges.steal_energy,
             _ => unreachable!(),
         };
         assert_eq!(charged_bucket, 1.0);
-        assert_eq!(charges.total(), 1.0);
+        assert_eq!(
+            charges.noop + charges.eat + charges.r#move + charges.reproduce + charges.steal_energy,
+            1.0
+        );
     }
 }
 
@@ -106,7 +109,7 @@ fn parental_transfer_counts_only_a_successful_birth_and_newborn_starts_clear() {
         );
         // T16.F01: the charge lands only on a birth; a rejected attempt is free.
         assert_eq!(
-            sim.stats.energy_flows.action_charges[ActionType::Reproduce],
+            sim.stats.energy_flows.action_charges.reproduce,
             if spawned { 1.0 } else { 0.0 }
         );
         assert_eq!(
@@ -133,7 +136,7 @@ fn a_charge_rounded_away_records_no_debit() {
     let (mut sim, id) = make_sim_with_one_creature(100.0);
     sim.config.energy.costs.noop_cost = f32::EPSILON;
     execute(&mut sim, id, WorldAction::NoOp);
-    assert_eq!(sim.stats.energy_flows.action_charges[ActionType::NoOp], 0.0);
+    assert_eq!(sim.stats.energy_flows.action_charges.noop, 0.0);
     assert_eq!(sim.creatures[id].energy, 100.0);
 }
 
@@ -167,6 +170,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         assert!(observed > 0.0);
         decisions[0].1.actions = vec![WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0,
         }];
         super::super::run_phase_2(
             &mut sim,
@@ -176,10 +180,7 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
         );
         assert_eq!(sim.stats.mortality.count(DeathCause::VmCompute), 1);
         assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 0);
-        // T27.F03: the exhausted victim holds nothing to take, so the steal
-        // is a zero-transfer failure, not a kill.
-        assert_eq!(sim.stats.predation_kills_total, 0);
-        assert_eq!(sim.stats.predation_actions_rejected_total, 1);
+        assert_eq!(sim.stats.predation_kills_total, 1);
         assert_eq!(
             sim.stats.energy_flows.vm_compute.to_bits(),
             observed.to_bits()
@@ -195,7 +196,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
     sim.config.energy.lifecycle.max_energy = 10.0;
     sim.creatures[victim].cached_complexity = 4;
-    steal_with_bite(attacker, &mut sim, Direction::N, 10.0);
+    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.predation_victim_debit, 2.0);
     assert_eq!(flows.predation_attacker_credit, 2.0);
@@ -203,18 +204,16 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     assert_eq!(flows.maximum_energy_clamp_loss, 3.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
 
-    let (mut sim, attacker, victim) = make_sim_two_creatures(9.0, 2.0);
+    let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
     sim.creatures[victim].cached_complexity = 3;
-    sim.creatures[attacker].energy = -1.0;
-    sim.creatures[attacker].pending_death_cause = Some(DeathCause::VmCompute);
-    steal_with_bite(attacker, &mut sim, Direction::N, 10.0);
-    assert_eq!(sim.creatures[attacker].energy, 4.0);
+    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    assert_eq!(sim.creatures[attacker].energy, 2.0);
     assert_eq!(
         sim.creatures[attacker].pending_death_cause, None,
-        "loot and bonus restore positive energy"
+        "bonus restores positive energy"
     );
 }
 
@@ -354,7 +353,7 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
     );
     assert_eq!(sim.stats.energy_flows.food_intake_by_type, vec![10.0]);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 3.0);
-    assert_eq!(sim.stats.energy_flows.action_charges[ActionType::Eat], 1.0);
+    assert_eq!(sim.stats.energy_flows.action_charges.eat, 1.0);
     assert_eq!(sim.creatures[id].energy, 4.0);
     assert_eq!(sim.creatures[id].pending_death_cause, None);
 }
@@ -559,29 +558,24 @@ fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() 
     assert_eq!(sim.stats.energy_flows.genome_size_creature_ticks, 8);
 }
 
-/// T27.F03: a victim already at or below zero holds nothing to take, so the
-/// steal transfers nothing (no reverse transfer), kills nothing, and the
-/// victim keeps its pending cause.
 #[test]
-fn predation_of_an_exhausted_victim_transfers_nothing_and_keeps_its_cause() {
+fn predation_retains_exhausted_victim_cause_and_signed_reverse_transfer() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
     sim.config.predation.steal_cost_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     sim.creatures[victim].pending_death_cause = Some(DeathCause::VmCompute);
-    steal_with_bite(attacker, &mut sim, Direction::N, 10.0);
-    assert_eq!(sim.stats.predation_kills_total, 0);
-    assert_eq!(sim.stats.predation_actions_rejected_total, 1);
-    assert_eq!(sim.stats.energy_flows.predation_victim_debit, 0.0);
-    assert_eq!(sim.stats.energy_flows.predation_attacker_credit, 0.0);
-    assert_eq!(sim.creatures[victim].energy, -2.0);
-    assert_eq!(sim.creatures[attacker].energy, 1.0);
-    assert_eq!(
-        sim.creatures[victim].pending_death_cause,
-        Some(DeathCause::VmCompute)
-    );
-    sim.remove_creature(victim);
+    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::VmCompute), 1);
+    assert_eq!(sim.stats.predation_kills_total, 1);
+    assert_eq!(sim.stats.energy_flows.predation_victim_debit, -2.0);
+    assert_eq!(sim.stats.energy_flows.predation_attacker_credit, -2.0);
+    assert_eq!(
+        sim.creatures[attacker].pending_death_cause,
+        Some(DeathCause::Predation)
+    );
+    sim.remove_creature(attacker);
+    assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
 }
 
 /// The per-creature compute total is the plain sum of all three cognition
@@ -636,32 +630,11 @@ fn tick_compute_passes_and_decided_passes_accumulate_across_creatures_and_ticks(
     assert_eq!(stats.decided_passes_total, 6);
 }
 
-/// `actions_applied_total` adds every kind's per-tick applied count, the
-/// steal and give columns included.
-#[test]
-fn tick_compute_commit_sums_every_kind_into_actions_applied() {
-    // Arrange
-    let mut stats = crate::simulation::stats::SimStats {
-        last_tick_move: 1,
-        last_tick_eat: 2,
-        last_tick_noop: 3,
-        last_tick_reproduce: 4,
-        last_tick_steal: 5,
-        last_tick_give: 6,
-        ..Default::default()
-    };
-
-    // Act
-    super::super::TickComputeStats::default().commit(&mut stats);
-
-    // Assert
-    assert_eq!(stats.actions_applied_total, 21);
-}
-
 /// T16.F02 invariant 5: `failed_action_effort.k` adds the very debit
 /// `action_charges.k` records whenever the attempt failed.
 #[test]
 fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
+    use crate::simulation::energy_accounting::{ActionCharges, FailedActionEffort};
     let failing = [
         WorldAction::Move(Direction::N),
         WorldAction::eat(OrdinaryFoodTypeId::default()),
@@ -672,6 +645,7 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
         },
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0,
         },
     ];
     for action in failing {
@@ -687,13 +661,28 @@ fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
         execute(&mut sim, id, action);
 
         // Assert
-        let charges = sim.stats.energy_flows.action_charges;
-        assert_eq!(charges[ActionType::NoOp], 0.0, "{action:?}");
-        let failed = sim.stats.energy_flows.failed_action_effort;
-        for kind in ActionType::ALL {
-            assert_eq!(failed[kind], charges[kind], "{action:?} {kind:?}");
-        }
-        assert!(charges.total() > 0.0, "{action:?} must have paid an effort");
+        let ActionCharges {
+            noop,
+            eat,
+            r#move,
+            reproduce,
+            steal_energy,
+        } = sim.stats.energy_flows.action_charges;
+        assert_eq!(noop, 0.0, "{action:?}");
+        assert_eq!(
+            sim.stats.energy_flows.failed_action_effort,
+            FailedActionEffort {
+                r#move,
+                eat,
+                reproduce,
+                steal_energy,
+            },
+            "{action:?}"
+        );
+        assert!(
+            r#move + eat + reproduce + steal_energy > 0.0,
+            "{action:?} must have paid an effort"
+        );
         assert!(sim.creatures.contains_key(id), "{action:?}");
     }
 }
@@ -714,8 +703,8 @@ fn successful_attempts_add_no_failed_action_effort() {
     );
     execute(&mut sim, id, WorldAction::NoOp);
     execute(&mut sim, id, WorldAction::Move(Direction::S));
-    assert!(sim.stats.energy_flows.action_charges[ActionType::Eat] > 0.0);
-    assert!(sim.stats.energy_flows.action_charges[ActionType::Move] > 0.0);
+    assert!(sim.stats.energy_flows.action_charges.eat > 0.0);
+    assert!(sim.stats.energy_flows.action_charges.r#move > 0.0);
     assert_eq!(
         sim.stats.energy_flows.failed_action_effort,
         Default::default()
@@ -728,9 +717,10 @@ fn successful_attempts_add_no_failed_action_effort() {
         attacker,
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0,
         },
     );
-    assert!(sim.stats.energy_flows.action_charges[ActionType::StealEnergy] > 0.0);
+    assert!(sim.stats.energy_flows.action_charges.steal_energy > 0.0);
     assert_eq!(
         sim.stats.energy_flows.failed_action_effort,
         Default::default()

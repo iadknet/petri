@@ -116,7 +116,7 @@ describe("graph edge tooltips", () => {
 			compute_nodes: [],
 			output_sinks: [
 				{
-					kind: { ActionVote: { Directed: ["Move", 1] } },
+					kind: { ActionVote: { Move: 1 } },
 					inputs: [
 						{
 							source: { InputLeaf: { ref_idx: 1, sub_idx: 0 } },

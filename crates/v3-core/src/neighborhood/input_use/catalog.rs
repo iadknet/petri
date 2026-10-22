@@ -1,4 +1,4 @@
-//! The `input-use-v4` catalog: the 20 named input families the mutation
+//! The `input-use-v3` catalog: the 20 named input families the mutation
 //! engine draws, `UpstreamSlot` (one channel per slot), and the separate
 //! shared-memory inventory, with the channel each read actually addresses
 //! under `runtime::inputs::resolve_input`.

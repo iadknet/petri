@@ -1333,17 +1333,13 @@ mod tests {
     /// facts, family width 36 -> 40, 20 slot-recruitment edges) remaps the
     /// mutation-on draws (Graph Selection `[15; 4]` -> `[16; 4]`); Graph
     /// Drift `[15, 10, 9, 2]`, both VM rows and the discard counts (zero)
-    /// are unchanged. Re-pinned by T27.F03 (giving energy): the `GiveEnergy`
-    /// directed vote kind widens the `DirectedVoteKind::ALL` group-operator
-    /// draws and remaps the Graph Drift lineages
-    /// (`[15, 10, 9, 2]` -> `[16, 10, 9, 2]`); Graph Selection `[16; 4]`,
-    /// both VM rows and the discard counts (zero) are unchanged.
+    /// are unchanged.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [16, 10, 9, 2], [0, 0]),
+            ("graph_prepared", Policy::Drift, [15, 10, 9, 2], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,

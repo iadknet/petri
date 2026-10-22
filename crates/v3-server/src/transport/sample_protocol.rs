@@ -13,7 +13,7 @@ pub type WorldActionPayload = serde_json::Value;
 pub type VmInstructionPayload = serde_json::Value;
 /// Serialized direction shape (`"N"`, `"NE"`, ...) owned by transport wire DTOs.
 pub type DirectionPayload = serde_json::Value;
-/// Serialized vote-sink shape (`"Eat"`, `{"Directed":["Move",3]}`, `{"Drive":"Move"}`).
+/// Serialized vote-sink shape (`"Eat"`, `{"Move":3}`, `{"Drive":"Move"}`).
 pub type VoteSinkPayload = serde_json::Value;
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,7 +66,6 @@ pub struct MeshPassTracePayload {
     pub pass_index: u32,
     pub end_reason: PassEndReasonPayload,
     /// The pass's final vote vector, in `VoteSink` index order.
-    #[serde(serialize_with = "v3_core::runtime::trace::domain::serialize_array")]
     pub votes: [f32; VOTE_SINK_COUNT],
     /// Each kind's best sink at the pass end, in `VoteKind` index order: the
     /// direction the heading tie chose for a directed kind (T11.F30).
@@ -113,7 +112,6 @@ pub struct MeshHopTracePayload {
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     pub route: Option<RouteDecisionPayload>,
     /// The vote contribution this hop committed (T19.F03).
-    #[serde(serialize_with = "v3_core::runtime::trace::domain::serialize_array")]
     pub vote_contribution: [f32; VOTE_SINK_COUNT],
     /// The decision-state values this dispatch's inputs resolved against (T19.F06).
     pub decision_inputs: DecisionInputsPayload,
@@ -123,9 +121,7 @@ pub struct MeshHopTracePayload {
 /// The decision-state input values available to one dispatch (T19.F06).
 #[derive(Debug, Clone, Serialize)]
 pub struct DecisionInputsPayload {
-    #[serde(serialize_with = "v3_core::runtime::trace::domain::serialize_array")]
     pub action_votes: [f32; VOTE_SINK_COUNT],
-    #[serde(serialize_with = "v3_core::runtime::trace::domain::serialize_array")]
     pub previous_pass_votes: [f32; VOTE_SINK_COUNT],
     pub commit_counts: [f32; VOTE_KIND_COUNT],
     pub hops_this_tick: f32,

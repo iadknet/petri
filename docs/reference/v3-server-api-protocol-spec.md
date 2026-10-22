@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha13 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha12 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha13 protocol-version posture;
+- v3alpha12 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,19 +50,8 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha13"`.
-- Breaking payload changes require protocol-version bump. `v3alpha13`
-  (T27.F03) serializes a directed vote sink as `{"Directed":[kind,d]}`
-  (`{"Directed":["Move",3]}` where `{"Move":3}` stood) in genome
-  `ActionVote` sinks, `AddVote` instructions and trace `best` entries; a
-  drive keeps `{"Drive":"Move"}`; the `StealEnergyAmount` parameter field is
-  retired (an `ActionParam` sink or `WorldAction::StealEnergy` names no
-  amount, `{"StealEnergy":{"direction":"N"}}`); the `GiveEnergy` action
-  (`{"GiveEnergy":{"direction":"N"}}`, action type `GiveEnergy`, result
-  `NoRecipient`) and its four directed sinks and drive widen every vote
-  vector to 39 and every per-kind array (`best`, `bars`,
-  `effective_votes`, `commit_counts`) to five; the status and health
-  payloads gain `give` and the `give_actions_*` fields. `v3alpha12`
+- Canonical value: `"v3alpha12"`.
+- Breaking payload changes require protocol-version bump. `v3alpha12`
   (T27.F01) widened the `debug_perception` `nearby` array to 40: each
   slot's fields 7 to 9 are the seen colour where `lineage_match` and
   `phenotype_similarity` stood, and added the static input keys `OwnRed`,
@@ -132,7 +121,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha13 shape):
+Request (conceptual v3alpha12 shape):
 
 ```json
 {
@@ -267,7 +256,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -288,7 +277,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "running",
   "tick": 123
 }
@@ -303,7 +292,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "paused",
   "tick": 123
 }
@@ -332,7 +321,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -345,7 +334,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -399,7 +388,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -448,7 +437,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "paused",
   "config": {
     "population": {
@@ -591,7 +580,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -622,7 +611,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -635,7 +624,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -646,7 +635,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -691,11 +680,11 @@ Execution-sampler rules:
     `applied`, `applied_value`
 - each tick carries `passes[]`, one record per pass (T19.F04): `pass_index`,
   `end_reason` (`Decided`, `PassCapReached`, `NoTargets`, `MissingNode`,
-  `EnergyExhausted`), `votes` (39 floats in `VoteSink` catalog order, the
+  `EnergyExhausted`), `votes` (30 floats in `VoteSink` catalog order, the
   pass's final vote vector), `best` (each kind's chosen sink in kind order
-  `Eat`, `Move`, `Reproduce`, `StealEnergy`, `GiveEnergy`, a `VoteSink` such as `"Eat"` or
-  `{"Directed":["Move",3]}`; the heading tie's choice for a directed kind), `bars` (five
-  integers, the bars the pass started with), `effective_votes` (five floats,
+  `Eat`, `Move`, `Reproduce`, `StealEnergy`, a `VoteSink` such as `"Eat"` or
+  `{"Move":3}`; the heading tie's choice for a directed kind), `bars` (four
+  integers, the bars the pass started with), `effective_votes` (four floats,
   kind order, `drive + best − bar` for a directed kind), `committed` (the action the pass committed, or `null`), and
   `hops`
 - each tick carries `heading`, the direction string (`"N"` to `"NW"`) the
@@ -704,12 +693,12 @@ Execution-sampler rules:
   `ActionCapReached`, `EnergyExhausted`) and `commit_counts`, the final
   per-kind bars (commits of each kind this tick)
 - each hop carries `pass_index` beside the tick-wide `hop_index`, and
-  `vote_contribution`, the 39 floats that hop committed; zeros when the
+  `vote_contribution`, the 30 floats that hop committed; zeros when the
   dispatch ended exhausted and committed nothing
 - each hop carries `decision_inputs` (T19.F06), the decision-state values
   the dispatch's inputs resolved against, each as the input read returns
-  it: `action_votes` (39, `ActionVotes`), `previous_pass_votes` (39,
-  `PreviousPassVotes`), `commit_counts` (5 floats, `CommitCounts`), and
+  it: `action_votes` (30, `ActionVotes`), `previous_pass_votes` (30,
+  `PreviousPassVotes`), `commit_counts` (4 floats, `CommitCounts`), and
   `hops_this_tick` (`HopsThisTick`); they are what the node could read, not
   proof of a read
 - `static_inputs.previous_outcome` holds the four scaled `PreviousOutcome`
@@ -744,7 +733,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -782,7 +771,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha13"`. |
+| `protocol_version` | string | Always `"v3alpha12"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -804,12 +793,12 @@ Field definitions:
 | Field | Type | Description |
 |-------|------|-------------|
 | `tick` | u64 | Simulation tick when the action was executed. |
-| `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`, `GiveEnergy`. |
-| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`, `NoRecipient`. |
+| `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`. |
+| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
 | `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
 | `energy_before` | f32 | Creature energy before the action. |
 | `energy_after` | f32 | Creature energy after the action (includes costs). |
-| `amount` | f32 | Action-specific amount (food consumed, energy stolen, energy given for a successful GiveEnergy, transfer fraction in [0, 1] for Reproduce, 0 otherwise). |
+| `amount` | f32 | Action-specific amount (food consumed, energy stolen, transfer fraction in [0, 1] for Reproduce, 0 otherwise). |
 | `food_type` | u16 or null | Selected ordinary-food type for Eat; `null` for non-Eat actions. |
 | `priority_bid` | f32 | Priority bid value for that tick. |
 
@@ -838,7 +827,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -946,7 +935,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha13
+  performance, but must document the throttle policy. The default v3alpha12
   behavior is per-tick emission.
 
 Ordering rules:
@@ -963,7 +952,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha12",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -989,7 +978,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha13)
+## 7. Out-of-Scope API Surfaces (v3alpha12)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -1011,7 +1000,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha13 server transport/API semantics.
+This file remains canonical for v3alpha12 server transport/API semantics.
 
 ---
 

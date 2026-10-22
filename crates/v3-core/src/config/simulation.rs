@@ -907,27 +907,11 @@ impl Default for ActionLogConfig {
     }
 }
 
-/// The energy exchange between neighbours (T27.F03): one fixed bite a
-/// `StealEnergy` takes and a `GiveEnergy` gives.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ExchangeConfig {
-    /// Energy one transfer moves, at most what the debited side holds.
-    /// Finite and positive (fallback 8.0). Default: 8.0.
-    pub bite: f32,
-}
-
-impl Default for ExchangeConfig {
-    fn default() -> Self {
-        Self { bite: 8.0 }
-    }
-}
-
 /// Predation config for the StealEnergy action.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PredationConfig {
-    /// Fraction of the exchange bite paid as the attacker's effort base.
+    /// Fraction of attempted steal amount paid as attacker cost.
     pub steal_cost_rate: f32,
     /// Energy bonus per unit of victim genome complexity on kill.
     pub kill_complexity_bonus_multiplier: f32,
@@ -991,8 +975,6 @@ pub struct SimulationConfig {
     pub population: PopulationConfig,
     #[serde(default)]
     pub predation: PredationConfig,
-    #[serde(default)]
-    pub exchange: ExchangeConfig,
     #[serde(default)]
     pub action_log: ActionLogConfig,
     #[serde(default)]
@@ -1127,7 +1109,6 @@ impl SimulationConfig {
         pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.05);
         pred.kill_complexity_bonus_multiplier =
             normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.0);
-        self.exchange.bite = normalize_f32_finite_positive(self.exchange.bite, 8.0);
 
         self.shared_memory.decay_rate =
             normalize_f32_clamp(self.shared_memory.decay_rate, 0.0, 1.0, 0.0);
@@ -1828,22 +1809,6 @@ mod tests {
     }
 
     // ── PredationConfig tests ──────────────────────────────────────────────
-
-    #[test]
-    fn exchange_bite_defaults_to_eight_and_normalizes_to_finite_positive() {
-        let mut cfg = SimulationConfig::default();
-        assert_eq!(cfg.exchange.bite, 8.0);
-        for bad in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-            cfg.exchange.bite = bad;
-            cfg.normalize();
-            assert_eq!(cfg.exchange.bite, 8.0, "{bad}");
-        }
-        cfg.exchange.bite = 0.25;
-        cfg.normalize();
-        assert_eq!(cfg.exchange.bite, 0.25);
-        let json = serde_json::to_value(&cfg).unwrap();
-        assert_eq!(json["exchange"], serde_json::json!({ "bite": 0.25 }));
-    }
 
     #[test]
     fn predation_config_default_values() {

@@ -1,4 +1,3 @@
-use crate::creature::action_log::ActionType;
 use rand::Rng;
 
 use super::cgp_reproduction;
@@ -165,11 +164,11 @@ pub fn apply_reproduce(
         sim.config.energy.costs.reproduce_attempt_cost,
         DeathCause::ActionReproduce,
     );
-    sim.stats.energy_flows.action_charges[ActionType::Reproduce] += effort;
+    sim.stats.energy_flows.action_charges.reproduce += effort;
 
     let result = conceive(parent_id, sim, dir, energy_transfer_fraction, rng);
     if result != ReproductionActionResult::Conceived {
-        sim.stats.energy_flows.failed_action_effort[ActionType::Reproduce] += effort;
+        sim.stats.energy_flows.failed_action_effort.reproduce += effort;
     }
     result
 }
@@ -276,7 +275,7 @@ fn conceive(
     // successive f32 subtractions so the parent lands on the same value the
     // charge-first order produced.
     sim.creatures[parent_id].energy = after_cost;
-    sim.stats.energy_flows.action_charges[ActionType::Reproduce] +=
+    sim.stats.energy_flows.action_charges.reproduce +=
         sim.creatures[parent_id].observe_energy(energy_before_cost, DeathCause::ActionReproduce);
     sim.creatures[parent_id].energy = after_cost - transfer;
     sim.stats.energy_flows.parental_transfer_debit +=
@@ -578,7 +577,6 @@ fn spawn_child(
 mod tests {
     use super::*;
     use crate::config::MutationConfig;
-    use crate::creature::action_log::ActionType;
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
     };
@@ -826,11 +824,10 @@ mod tests {
         );
         assert_eq!(sim.stats.reproduction_actions_spawned_total, 0);
         let flows = &sim.stats.energy_flows;
-        assert!(flows.action_charges[ActionType::Reproduce] > 0.0);
+        assert!(flows.action_charges.reproduce > 0.0);
         // Exact equality is the claim: nothing but failed attempt effort.
         assert_eq!(
-            flows.action_charges[ActionType::Reproduce],
-            flows.failed_action_effort[ActionType::Reproduce],
+            flows.action_charges.reproduce, flows.failed_action_effort.reproduce,
             "rejected attempts contribute only their effort to action_charges.reproduce"
         );
     }

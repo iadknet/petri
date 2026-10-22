@@ -52,7 +52,7 @@ impl ActionQueue {
     pub fn action_type_at(&self, index: usize) -> f32 {
         self.actions
             .get(index)
-            .map_or(0.0, |a| f32::from(a.action_type() as u8))
+            .map_or(0.0, |a| a.action_type() as f32)
     }
 
     /// Return the action parameter at `index` and `slot`, or 0.0 if OOB.

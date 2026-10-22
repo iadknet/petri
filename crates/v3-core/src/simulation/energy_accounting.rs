@@ -1,7 +1,5 @@
 //! Bounded observations of applied energy arithmetic. These never drive execution.
 
-use crate::contracts::{ActionType, ACTION_TYPE_COUNT};
-
 /// The sink that first exhausted a creature since its last positive recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeathCause {
@@ -16,16 +14,14 @@ pub enum DeathCause {
     ActionMove,
     ActionReproduce,
     ActionStealEnergy,
-    ActionGiveEnergy,
     ParentalTransfer,
     Predation,
-    Gift,
     ExternalRemoval,
     Unattributed,
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 15] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
         Self::VmCompute,
@@ -37,10 +33,8 @@ impl DeathCause {
         Self::ActionMove,
         Self::ActionReproduce,
         Self::ActionStealEnergy,
-        Self::ActionGiveEnergy,
         Self::ParentalTransfer,
         Self::Predation,
-        Self::Gift,
         Self::ExternalRemoval,
         Self::Unattributed,
     ];
@@ -59,10 +53,8 @@ impl DeathCause {
             Self::ActionMove => "action_move",
             Self::ActionReproduce => "action_reproduce",
             Self::ActionStealEnergy => "action_steal_energy",
-            Self::ActionGiveEnergy => "action_give_energy",
             Self::ParentalTransfer => "parental_transfer",
             Self::Predation => "predation",
-            Self::Gift => "gift",
             Self::ExternalRemoval => "external_removal",
             Self::Unattributed => "unattributed",
         }
@@ -125,44 +117,25 @@ pub struct CognitionEnergyObservation {
     pub pending_cause: Option<DeathCause>,
 }
 
-/// Energy charged per action type, indexed by [`ActionType`] (T16.F02,
-/// T27.F03).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct ActionCharges([f64; ACTION_TYPE_COUNT as usize]);
+pub struct ActionCharges {
+    pub noop: f64,
+    pub eat: f64,
+    pub r#move: f64,
+    pub reproduce: f64,
+    pub steal_energy: f64,
+}
 
 /// The share of [`ActionCharges`] paid by attempts that failed (T16.F02): a
-/// blocked move, an eat that found no food, a rejected reproduce, a steal
-/// with no victim or nothing to take, and a give with no recipient or
-/// nothing to give. A subset, not a sink (`failed_action_effort[k] <=
-/// action_charges[k]`); `NoOp` cannot fail, so its slot stays 0.
+/// blocked move, an eat that found no food, a rejected reproduce and a steal
+/// with no victim. A subset, not a sink (`failed_action_effort.k <=
+/// action_charges.k`); `NoOp` cannot fail.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct FailedActionEffort([f64; ACTION_TYPE_COUNT as usize]);
-
-macro_rules! action_type_indexed {
-    ($ledger:ty) => {
-        impl std::ops::Index<ActionType> for $ledger {
-            type Output = f64;
-            fn index(&self, action: ActionType) -> &f64 {
-                &self.0[action.index()]
-            }
-        }
-
-        impl std::ops::IndexMut<ActionType> for $ledger {
-            fn index_mut(&mut self, action: ActionType) -> &mut f64 {
-                &mut self.0[action.index()]
-            }
-        }
-    };
-}
-action_type_indexed!(ActionCharges);
-action_type_indexed!(FailedActionEffort);
-
-impl ActionCharges {
-    /// The sum over every action type, in [`ActionType::ALL`] order.
-    #[must_use]
-    pub fn total(&self) -> f64 {
-        ActionType::ALL.iter().map(|&action| self[action]).sum()
-    }
+pub struct FailedActionEffort {
+    pub r#move: f64,
+    pub eat: f64,
+    pub reproduce: f64,
+    pub steal_energy: f64,
 }
 
 /// Cumulative signed f64 changes of the stored f32 energy at each applied site.
@@ -184,10 +157,6 @@ pub struct EnergyFlows {
     pub predation_victim_debit: f64,
     pub predation_attacker_credit: f64,
     pub predation_kill_bonus_credit: f64,
-    /// A giver's applied debit for its gifts (T27.F03).
-    pub gift_debit: f64,
-    /// A recipient's applied credit for gifts, before its cap.
-    pub gift_credit: f64,
     pub maximum_energy_clamp_loss: f64,
     pub zero_floor_credit: f64,
     pub external_removal_loss: f64,
@@ -216,16 +185,42 @@ impl EnergyFlows {
         overshoot: f64,
     ) -> f64 {
         let (charges, failed) = before;
+        let rows = [
+            (&mut self.action_charges.noop, charges.noop, None),
+            (
+                &mut self.action_charges.eat,
+                charges.eat,
+                Some((&mut self.failed_action_effort.eat, failed.eat)),
+            ),
+            (
+                &mut self.action_charges.r#move,
+                charges.r#move,
+                Some((&mut self.failed_action_effort.r#move, failed.r#move)),
+            ),
+            (
+                &mut self.action_charges.reproduce,
+                charges.reproduce,
+                Some((&mut self.failed_action_effort.reproduce, failed.reproduce)),
+            ),
+            (
+                &mut self.action_charges.steal_energy,
+                charges.steal_energy,
+                Some((
+                    &mut self.failed_action_effort.steal_energy,
+                    failed.steal_energy,
+                )),
+            ),
+        ];
         let mut remainder = overshoot;
-        for action in ActionType::ALL {
-            let charge = &mut self.action_charges[action];
-            let share = overdrawn_share(remainder, *charge - charges[action]);
+        for (charge, charge_before, failed_row) in rows {
+            let share = overdrawn_share(remainder, *charge - charge_before);
             *charge -= share;
             // A failed attempt's effort is also its failed effort; keep the
-            // subset `failed_action_effort[k] <= action_charges[k]`.
-            let failed_now = &mut self.failed_action_effort[action];
-            if *failed_now > failed[action] {
-                *failed_now -= share;
+            // subset `failed_action_effort.k <= action_charges.k`.
+            if let Some((failed, failed_before)) = failed_row {
+                if *failed > failed_before {
+                    *failed -= share;
+                }
             }
             remainder -= share;
         }
@@ -252,7 +247,7 @@ mod tests {
                 "lifecycle_decay", "genome_carrying", "vm_compute", "graph_compute",
                 "mesh_ramp", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
-                "action_give_energy", "parental_transfer", "predation", "gift",
+                "parental_transfer", "predation",
                 "external_removal", "unattributed",
             ];
             prop_assert_eq!(DeathCause::ALL[index].as_key(), expected[index]);
@@ -298,61 +293,35 @@ mod tests {
 
         #[test]
         fn netting_an_overdraft_conserves_it_and_keeps_failed_within_charge(
-            row in 0usize..ActionType::ALL.len(),
+            row in 0usize..5,
             failed_attempt in any::<bool>(),
             charged in 0.0f64..1.0e8,
             overshoot in 0.0f64..1.0e8,
         ) {
-            let action = ActionType::ALL[row];
             let mut flows = EnergyFlows::default();
             let before = (flows.action_charges, flows.failed_action_effort);
-            flows.action_charges[action] += charged;
-            // NoOp cannot fail: its failed slot is never written.
-            if failed_attempt && action != ActionType::NoOp {
-                flows.failed_action_effort[action] += charged;
+            let charges = &mut flows.action_charges;
+            let failed = &mut flows.failed_action_effort;
+            let (charge, failed_row) = match row {
+                0 => (&mut charges.noop, None),
+                1 => (&mut charges.eat, Some(&mut failed.eat)),
+                2 => (&mut charges.r#move, Some(&mut failed.r#move)),
+                3 => (&mut charges.reproduce, Some(&mut failed.reproduce)),
+                _ => (&mut charges.steal_energy, Some(&mut failed.steal_energy)),
+            };
+            *charge += charged;
+            if let (true, Some(failed_row)) = (failed_attempt, failed_row) {
+                *failed_row += charged;
             }
             let remainder = flows.net_action_overdraft(before, overshoot);
             let c = flows.action_charges;
             let f = flows.failed_action_effort;
-            let total = c.total();
+            let total = c.noop + c.eat + c.r#move + c.reproduce + c.steal_energy;
             prop_assert!(total >= 0.0);
             prop_assert!(remainder >= 0.0);
             prop_assert!(((charged - total) + remainder - overshoot).abs() <= 1e-6 * overshoot.max(1.0));
-            for action in ActionType::ALL {
-                prop_assert!(f[action] <= c[action]);
-            }
-            prop_assert_eq!(f[ActionType::NoOp], 0.0);
-        }
-
-        /// Netting reaches only what this action charged: every row's charge
-        /// from earlier actions survives, the overdraft taken from this
-        /// action's increment alone, the rest returned as the remainder.
-        #[test]
-        fn netting_an_overdraft_leaves_earlier_charges_untouched(
-            row in 0usize..ActionType::ALL.len(),
-            prior in 1.0f64..1.0e6,
-            charged in 0.0f64..1.0e6,
-            overshoot in 0.0f64..1.0e6,
-        ) {
-            let action = ActionType::ALL[row];
-            let mut flows = EnergyFlows::default();
-            for k in ActionType::ALL {
-                flows.action_charges[k] = prior;
-            }
-            let before = (flows.action_charges, flows.failed_action_effort);
-            flows.action_charges[action] += charged;
-            let gross = flows.action_charges[action];
-            let increment = gross - prior;
-            let remainder = flows.net_action_overdraft(before, overshoot);
-            let c = flows.action_charges;
-            for k in ActionType::ALL {
-                if k != action {
-                    prop_assert_eq!(c[k], prior);
-                }
-            }
-            let share = overshoot.min(increment);
-            prop_assert_eq!(c[action], gross - share);
-            prop_assert_eq!(remainder, overshoot - share);
+            prop_assert!(f.eat <= c.eat && f.r#move <= c.r#move);
+            prop_assert!(f.reproduce <= c.reproduce && f.steal_energy <= c.steal_energy);
         }
 
         #[test]

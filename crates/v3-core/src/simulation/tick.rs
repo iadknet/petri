@@ -32,10 +32,9 @@ use crate::sensors::visibility::{
     compute_visible_cells_into, get_visibility_table, VisibilityScratch,
 };
 use crate::simulation::actions::{
-    apply_give_energy, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
-    apply_typed_eat, deliver_pending_birth, BarrierReaderState, BirthDelivery, GiveActionResult,
-    MoveBlockedCause, PredationActionResult, ReproductionActionResult,
-    ReproductionInvalidTargetCause,
+    apply_move, apply_noop, apply_reproduce, apply_steal_energy, apply_typed_eat,
+    deliver_pending_birth, BarrierReaderState, BirthDelivery, MoveBlockedCause,
+    PredationActionResult, ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::simulation::Simulation;
@@ -784,8 +783,7 @@ impl TickComputeStats {
                 + stats.last_tick_eat
                 + stats.last_tick_noop
                 + stats.last_tick_reproduce
-                + stats.last_tick_steal
-                + stats.last_tick_give,
+                + stats.last_tick_steal,
         );
     }
 }
@@ -1096,18 +1094,32 @@ fn execute_steal_energy(
     sim: &mut Simulation,
     ctx: &ActionContext,
     direction: Direction,
+    amount: f32,
     outcome_acc: &mut OutcomeAccumulator,
 ) -> ActionLogEntry {
+    // Snapshot predation events length to extract damage info.
+    let pred_events_before = sim.stats.last_tick_predation_events.len();
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::StealEnergy);
     }
-    let outcome = apply_steal_energy(ctx.id, sim, direction);
-    let result = outcome.result;
-    outcome_acc.record_action_result(ctx.id, result != PredationActionResult::RejectedNoVictim);
-    // A surviving victim takes the damage; a killed one was removed.
-    if let (PredationActionResult::Transferred, Some(victim_id)) = (result, outcome.counterpart) {
-        outcome_acc.record_damage(victim_id, outcome.amount);
+    let result = apply_steal_energy(ctx.id, sim, direction, amount);
+    let succeeded = result != PredationActionResult::RejectedNoVictim;
+    outcome_acc.record_action_result(ctx.id, succeeded);
+    // Record damage to victim from predation event (if any).
+    if succeeded {
+        if let Some(event) = sim.stats.last_tick_predation_events.get(pred_events_before) {
+            let victim_pos = Position::new(event.victim_x, event.victim_y);
+            if let Some(victim_id) = sim.world.creature_at(victim_pos) {
+                outcome_acc.record_damage(victim_id, event.energy_stolen);
+            }
+        }
     }
+    // Extract stolen amount from predation event (if any).
+    let actual_stolen = sim
+        .stats
+        .last_tick_predation_events
+        .get(pred_events_before)
+        .map_or(0.0, |e| e.energy_stolen);
     let action_result = match result {
         PredationActionResult::Transferred => ActionResult::Success,
         PredationActionResult::TransferredAndKilled => ActionResult::TransferredAndKilled,
@@ -1119,34 +1131,7 @@ fn execute_steal_energy(
         ActionType::StealEnergy,
         action_result,
         direction.to_index() as u8,
-        outcome.amount,
-        None,
-    )
-}
-
-fn execute_give_energy(
-    sim: &mut Simulation,
-    ctx: &ActionContext,
-    direction: Direction,
-    outcome_acc: &mut OutcomeAccumulator,
-) -> ActionLogEntry {
-    if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.record_action_attempt(ActionType::GiveEnergy);
-    }
-    let outcome = apply_give_energy(ctx.id, sim, direction);
-    outcome_acc.record_action_result(ctx.id, outcome.result == GiveActionResult::Transferred);
-    let action_result = match outcome.result {
-        GiveActionResult::Transferred => ActionResult::Success,
-        GiveActionResult::RejectedNoRecipient => ActionResult::NoRecipient,
-        GiveActionResult::RejectedNothingToGive => ActionResult::EnergyConstraints,
-    };
-    push_action_log(
-        sim,
-        ctx,
-        ActionType::GiveEnergy,
-        action_result,
-        direction.to_index() as u8,
-        outcome.amount,
+        actual_stolen,
         None,
     )
 }
@@ -1235,11 +1220,8 @@ fn run_phase_2(
                     reproduce_rng,
                     &mut successful_spawn_targets,
                 ),
-                WorldAction::StealEnergy { direction } => {
-                    execute_steal_energy(sim, &ctx, direction, outcome_acc)
-                }
-                WorldAction::GiveEnergy { direction } => {
-                    execute_give_energy(sim, &ctx, direction, outcome_acc)
+                WorldAction::StealEnergy { direction, amount } => {
+                    execute_steal_energy(sim, &ctx, direction, amount, outcome_acc)
                 }
             };
             // Floor energy at 0.0 — creatures cannot spend more than they have.

@@ -5,7 +5,7 @@ use crate::creature::genome::cgp::test_support::{edit_sinks, push_sink};
 use crate::creature::genome::cgp::{
     EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
 use proptest::prelude::*;
@@ -186,17 +186,14 @@ fn every_valid_vote_occurrence_and_only_valid_votes_are_destinations() {
     let graph = graph_mut(&mut fixture);
     push_sink(
         graph,
-        OutputSink::new(
-            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 8)),
-            vec![],
-        ),
+        OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Move(8)), vec![]),
     );
     push_sink(
         graph,
         OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Eat), vec![]),
     );
     let sites = destinations(graph);
-    assert_eq!(sites.len(), VOTE_SINK_COUNT + 1);
+    assert_eq!(sites.len(), 31);
     for vote in VoteSink::all() {
         assert!(sites
             .iter()
@@ -241,7 +238,7 @@ proptest! {
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
         if grouped == 0 {
             prop_assert_eq!(changed, 1);
-            prop_assert!((1..=VOTE_SINK_COUNT).contains(&added));
+            prop_assert!((1..=30).contains(&added));
             if !whole { prop_assert_eq!(added, 1); }
             prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {
@@ -420,7 +417,7 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
         &family,
         Arm::SingleChannel,
         5,
-        VoteSink::Directed(DirectedVoteKind::Move, 3),
+        VoteSink::Move(3),
     )
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
@@ -440,7 +437,7 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
         &family,
         Arm::WholeFamily,
         0,
-        VoteSink::Directed(DirectedVoteKind::StealEnergy, 7),
+        VoteSink::StealEnergy(7),
     )
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
@@ -460,7 +457,7 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
         &SourceFamily::Input(InputReference::ActionVotes),
         Arm::SingleChannel,
         1,
-        VoteSink::Directed(DirectedVoteKind::Move, 0),
+        VoteSink::Move(0),
     )
     .unwrap();
     assert!(graph(&other).groups().is_empty());
@@ -497,13 +494,7 @@ fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
         assert!(graph(&full).can_host_group());
         let mut partial = node();
         edit_sinks(graph_mut(&mut partial), |sinks| {
-            sinks.retain(|sink| {
-                sink.kind
-                    != OutputSinkKind::ActionVote(VoteSink::Directed(
-                        DirectedVoteKind::Reproduce,
-                        4,
-                    ))
-            });
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Reproduce(4)));
         });
         assert!(!graph(&partial).can_host_group());
         let without = Admission::new(&partial.input_refs, graph(&partial)).families(arm, 2);
@@ -560,7 +551,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
             &mut fixture,
             &SourceFamily::Input(reference.clone()),
             Arm::WholeFamily,
-            VoteSink::Directed(DirectedVoteKind::StealEnergy, 3),
+            VoteSink::StealEnergy(3),
             pair,
         )
         .unwrap();
@@ -622,7 +613,7 @@ fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family
         &SourceFamily::Input(area_food()),
         Arm::SingleChannel,
         4,
-        VoteSink::Directed(DirectedVoteKind::Move, 2),
+        VoteSink::Move(2),
     )
     .unwrap();
     assert!(graph(&single).groups().is_empty());
@@ -787,10 +778,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
     let no_direction = {
         let mut partial = node();
         edit_sinks(graph_mut(&mut partial), |sinks| {
-            sinks.retain(|sink| {
-                sink.kind
-                    != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 6))
-            });
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Move(6)));
         });
         partial
     };

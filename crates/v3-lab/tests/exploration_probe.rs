@@ -734,7 +734,7 @@ fn eval_rule(
                 .move_actions_blocked_total_by_cause
                 .values()
                 .sum::<u64>(),
-            sim.stats.energy_flows.failed_action_effort[ActionType::Reproduce],
+            sim.stats.energy_flows.failed_action_effort.reproduce,
         )
     };
     let mut progress = Progress::new(

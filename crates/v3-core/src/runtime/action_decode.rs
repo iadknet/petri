@@ -1,8 +1,6 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
-use crate::creature::genome::vote::{
-    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
-};
+use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 
 /// The parameter surface a commit reads, indexed by `ActionParamField::index`.
 pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
@@ -10,9 +8,8 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// Decode the action a pass commits (T19.F04): the direction is the winning
 /// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
 /// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
-/// an unwired field eats the whole cell) and `Reproduce`
-/// `ReproduceTransferFraction`; `Move`, `StealEnergy` and `GiveEnergy` read
-/// nothing (a steal or a give moves the fixed exchange bite, T27.F03). A drive,
+/// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction` and
+/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
@@ -21,20 +18,17 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
             type_idx: decode_food_type_idx(params[ActionParamField::EatFoodType.index()]),
             leave: clamp_unit_interval(params[ActionParamField::EatLeaveShare.index()]),
         },
-        VoteSink::Directed(kind, d) => {
-            let direction = sink_direction(d);
-            match kind {
-                DirectedVoteKind::Move => WorldAction::Move(direction),
-                DirectedVoteKind::Reproduce => WorldAction::Reproduce {
-                    direction,
-                    energy_transfer_fraction: clamp_unit_interval(
-                        params[ActionParamField::ReproduceTransferFraction.index()],
-                    ),
-                },
-                DirectedVoteKind::StealEnergy => WorldAction::StealEnergy { direction },
-                DirectedVoteKind::GiveEnergy => WorldAction::GiveEnergy { direction },
-            }
-        }
+        VoteSink::Move(d) => WorldAction::Move(sink_direction(d)),
+        VoteSink::Reproduce(d) => WorldAction::Reproduce {
+            direction: sink_direction(d),
+            energy_transfer_fraction: clamp_unit_interval(
+                params[ActionParamField::ReproduceTransferFraction.index()],
+            ),
+        },
+        VoteSink::StealEnergy(d) => WorldAction::StealEnergy {
+            direction: sink_direction(d),
+            amount: clamp_non_negative_finite(params[ActionParamField::StealEnergyAmount.index()]),
+        },
         VoteSink::Drive(_) | VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
     }
 }
@@ -69,11 +63,23 @@ pub(crate) fn clamp_unit_interval(v: f32) -> f32 {
     }
 }
 
+/// Clamp to non-negative finite: NaN/Inf/negative → 0.0.
+#[inline]
+fn clamp_non_negative_finite(v: f32) -> f32 {
+    if v.is_finite() && v >= 0.0 {
+        v
+    } else {
+        0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use ActionParamField::{EatFoodType, EatLeaveShare, ReproduceTransferFraction};
+    use ActionParamField::{
+        EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount,
+    };
 
     /// A parameter surface holding `fields` and zero elsewhere.
     fn surface(fields: &[(ActionParamField, f32)]) -> ActionParams {
@@ -89,15 +95,12 @@ mod tests {
         for (d, direction) in Direction::ALL.into_iter().enumerate() {
             let d = d as u8;
             assert_eq!(
-                decode_commit(
-                    VoteSink::Directed(DirectedVoteKind::Move, d),
-                    &[9.0; ACTION_PARAM_FIELD_COUNT]
-                ),
+                decode_commit(VoteSink::Move(d), &[9.0; ACTION_PARAM_FIELD_COUNT]),
                 WorldAction::Move(direction)
             );
             assert_eq!(
                 decode_commit(
-                    VoteSink::Directed(DirectedVoteKind::Reproduce, d),
+                    VoteSink::Reproduce(d),
                     &surface(&[(ReproduceTransferFraction, 0.25)])
                 ),
                 WorldAction::Reproduce {
@@ -107,10 +110,13 @@ mod tests {
             );
             assert_eq!(
                 decode_commit(
-                    VoteSink::Directed(DirectedVoteKind::StealEnergy, d),
-                    &[9.0; ACTION_PARAM_FIELD_COUNT]
+                    VoteSink::StealEnergy(d),
+                    &surface(&[(StealEnergyAmount, 3.0)])
                 ),
-                WorldAction::StealEnergy { direction }
+                WorldAction::StealEnergy {
+                    direction,
+                    amount: 3.0,
+                }
             );
         }
     }
@@ -122,10 +128,7 @@ mod tests {
         let last = Direction::ALL[Direction::ALL.len() - 1];
         for d in [8, 9, u8::MAX] {
             assert_eq!(
-                decode_commit(
-                    VoteSink::Directed(DirectedVoteKind::Move, d),
-                    &[0.0; ACTION_PARAM_FIELD_COUNT]
-                ),
+                decode_commit(VoteSink::Move(d), &[0.0; ACTION_PARAM_FIELD_COUNT]),
                 WorldAction::Move(last)
             );
         }
@@ -136,7 +139,11 @@ mod tests {
         assert_eq!(
             decode_commit(
                 VoteSink::Eat,
-                &surface(&[(EatFoodType, 3.0), (ReproduceTransferFraction, 8.0),])
+                &surface(&[
+                    (EatFoodType, 3.0),
+                    (ReproduceTransferFraction, 8.0),
+                    (StealEnergyAmount, 8.0)
+                ])
             ),
             WorldAction::eat(OrdinaryFoodTypeId::new(3))
         );
@@ -189,6 +196,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn steal_amount_is_non_negative_finite() {
+        for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
+            assert_eq!(
+                decode_commit(
+                    VoteSink::StealEnergy(0),
+                    &surface(&[(StealEnergyAmount, raw)])
+                ),
+                WorldAction::StealEnergy {
+                    direction: Direction::N,
+                    amount: 0.0,
+                }
+            );
+        }
+    }
+
     /// T17.F01 invariant 1: the reproduce parameter leaves decode as a
     /// fraction in [0, 1].
     #[test]
@@ -207,7 +230,7 @@ mod tests {
                 energy_transfer_fraction,
                 ..
             } = decode_commit(
-                VoteSink::Directed(DirectedVoteKind::Reproduce, 0),
+                VoteSink::Reproduce(0),
                 &surface(&[(ReproduceTransferFraction, raw)]),
             )
             else {
@@ -255,7 +278,7 @@ mod tests {
         #[test]
         fn a_field_never_changes_another_kinds_commit(
             field_index in 0..ActionParamField::ALL.len(),
-            base in prop::array::uniform3(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
+            base in prop::array::uniform4(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
             value in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
         ) {
             let field = ActionParamField::ALL[field_index];
@@ -271,7 +294,7 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Directed(DirectedVoteKind::Reproduce, 2), &surface(&[(ReproduceTransferFraction, raw)]))
+            } = decode_commit(VoteSink::Reproduce(2), &surface(&[(ReproduceTransferFraction, raw)]))
             else {
                 panic!("expected Reproduce");
             };

@@ -30,8 +30,8 @@ contract are defined in `v3-mutation-spec.md`.
 
 The VM defines **39 opcodes** (T19.F04). The `#` column is the index of the
 fresh-instruction draw (`mutation/vm/operators.rs`), which covers all 39;
-`AddVote` draws its sink uniformly over the 39-sink catalog, the four kind
-drives (T11.F30, T27.F03) included.
+`AddVote` draws its sink uniformly over the 30-sink catalog, the three kind
+drives (T11.F30) included.
 
 ### Arithmetic and Data Movement
 
@@ -87,7 +87,7 @@ drives (T11.F30, T27.F03) included.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
-| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's three-field parameter surface (`field_idx` in `0..3`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction`; an invalid field is ignored and still costs) |
+| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's four-field parameter surface (`field_idx` in `0..4`, the `ActionParamField` order `EatFoodType, EatLeaveShare, ReproduceTransferFraction, StealEnergyAmount`; an invalid field is ignored and still costs) |
 | 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
 ### Action Queue Reads
@@ -95,7 +95,7 @@ drives (T11.F30, T27.F03) included.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 27 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` (the actions committed by earlier passes this tick) |
-| 28 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type() as u8` (codes `0` NoOp, `1` Eat, `2` Move, `3` Reproduce, `4` StealEnergy, `5` GiveEnergy; OOB yields `0.0`) |
+| 28 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
 | 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`; only slots `0` and `1` carry a value: slot 0 the direction index or, for `Eat`, the food type index; slot 1 the `Eat` leave share, the `Reproduce` transfer fraction or the `StealEnergy` amount) |
 
 ### Halt, Shared Memory Slots, and Priority Bid
@@ -115,7 +115,7 @@ drives (T11.F30, T27.F03) included.
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 38 | `AddVote` | sink, src | `contribution[sink] += regs[src]` on the dispatch-local vote vector (`sink` in `0..39`, the `VoteSink` catalog order; an invalid sink writes nothing and still costs). The dispatch's contribution replaces this node's earlier one in the pass at every exit but energy exhaustion; the pass end reads the summed votes (`v3-mesh-execution-spec.md` Section 2). |
+| 38 | `AddVote` | sink, src | `contribution[sink] += regs[src]` on the dispatch-local vote vector (`sink` in `0..30`, the `VoteSink` catalog order; an invalid sink writes nothing and still costs). The dispatch's contribution replaces this node's earlier one in the pass at every exit but energy exhaustion; the pass end reads the summed votes (`v3-mesh-execution-spec.md` Section 2). |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
@@ -184,7 +184,7 @@ All genome-derived indexes are handled without panic:
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload slot index**: valid when `< 12`; otherwise write ignored.
 - **Action parameter field index**: valid when `< 3`; otherwise write ignored.
-- **Vote sink index**: valid when `< 39`; otherwise the vote is dropped.
+- **Vote sink index**: valid when `< 30`; otherwise the vote is dropped.
 
 If `register_count == 0`, VM halts immediately (no votes).
 
@@ -340,7 +340,7 @@ Canonical owner for `runtime.vm.opcode_cost_multiplier`,
 
 VM node evaluation maintains:
 - internal payload buffer (12 slots)
-- a dispatch-local vote contribution (39 entries, `VoteSink` order)
+- a dispatch-local vote contribution (30 entries, `VoteSink` order)
 - eight route gate scores
 
 and writes the tick's parameter surface (`action_params`, one entry per
@@ -371,14 +371,13 @@ best sink. The committed action reads its kind's parameter fields:
 | `Eat` | 0 | `EatFoodType` (field 0) = food type index (rounded; non-finite or negative reads 0); `EatLeaveShare` (field 1) = share of the cell's food left in place, `clamp_unit_interval` (T02.F08) |
 | `Move` | 1 to 8 (`Direction::ALL` order `N, NE, E, SE, S, SW, W, NW`) | none |
 | `Reproduce` | 9 to 16 | `ReproduceTransferFraction` (field 2) = offspring transfer fraction, `clamp_unit_interval` |
-| `StealEnergy` | 17 to 24 | none; the steal moves the fixed `exchange.bite` (T27.F03) |
-| `GiveEnergy` | 25 to 32 | none; the give moves the fixed `exchange.bite` (T27.F03) |
-| `Drive(Move)`, `Drive(Reproduce)`, `Drive(StealEnergy)`, `Drive(GiveEnergy)` | 33 to 36 | never commits; adds to its kind's best direction vote at the pass end (T11.F30) |
-| `Terminate` | 37 | never commits; ends a non-empty tick when it holds the best effective vote |
-| `Decide` | 38 | never commits; ends the pass early when some kind's effective vote is positive, or the queue is non-empty and `Terminate` is positive |
+| `StealEnergy` | 17 to 24 | `StealEnergyAmount` (field 3) = amount, `clamp_non_negative_finite` |
+| `Drive(Move)`, `Drive(Reproduce)`, `Drive(StealEnergy)` | 25 to 27 | never commits; adds to its kind's best direction vote at the pass end (T11.F30) |
+| `Terminate` | 28 | never commits; ends a non-empty tick when it holds the best effective vote |
+| `Decide` | 29 | never commits; ends the pass early when some kind's effective vote is positive, or the queue is non-empty and `Terminate` is positive |
 
 `WriteActionParam` field indexes (T11.F27, T02.F08): `0` `EatFoodType`, `1`
-`EatLeaveShare`, `2` `ReproduceTransferFraction` (T27.F03 retired the steal amount). The surface holds only
+`EatLeaveShare`, `2` `ReproduceTransferFraction`, `3` `StealEnergyAmount`. The surface holds only
 the fields a commit reads. A serialized pre-T11.F27 genome whose program
 holds `WriteActionParam { slot_idx, .. }` fails to deserialize; no conversion
 path exists.

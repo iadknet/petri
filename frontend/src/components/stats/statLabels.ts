@@ -68,10 +68,8 @@ const DEATH_CAUSES: Record<string, string> = {
 	action_move: "Moving",
 	action_reproduce: "Reproducing",
 	action_steal_energy: "Stealing",
-	action_give_energy: "Giving",
 	parental_transfer: "Litter handed over",
 	predation: "Killed by a predator",
-	gift: "Gave its last energy away",
 	external_removal: "Removed by hand",
 	unattributed: "Unattributed",
 };

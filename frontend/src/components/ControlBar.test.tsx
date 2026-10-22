@@ -139,9 +139,6 @@ const MOCK_CONFIG: SimulationConfig = {
 		steal_cost_rate: 0.2,
 		kill_complexity_bonus_multiplier: 0.05,
 	},
-	exchange: {
-		bite: 8,
-	},
 	action_log: {
 		capacity: 500,
 	},
@@ -301,10 +298,7 @@ describe("ControlBar", () => {
 		});
 		useStatsHistoryStore
 			.getState()
-			.recordStatus(
-				{ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, give: 0, predation_kills: 0 },
-				0.5,
-			);
+			.recordStatus({ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 }, 0.5);
 
 		vi.mocked(api.startup).mockResolvedValue({
 			protocol_version: "v3alpha1",

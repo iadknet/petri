@@ -224,7 +224,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
 #[cfg(test)]
 mod tests {
     use super::*;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::vote::{VoteSink, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphOutputSinkTrace, GraphTrace, MeshHopTrace,
@@ -367,7 +366,7 @@ mod tests {
                     decision_inputs: core_trace::DecisionInputs {
                         action_votes: [0.5; VOTE_SINK_COUNT],
                         previous_pass_votes: [0.25; VOTE_SINK_COUNT],
-                        commit_counts: [1.0, 0.0, 0.0, 2.0, 0.0],
+                        commit_counts: [1.0, 0.0, 0.0, 2.0],
                         hops_this_tick: 3.0,
                     },
                     route: Some(TraceRouteDecision {
@@ -401,10 +400,9 @@ mod tests {
                         votes: [1.0; VOTE_SINK_COUNT],
                         best: [
                             VoteSink::Eat,
-                            VoteSink::Directed(DirectedVoteKind::Move, 2),
-                            VoteSink::Directed(DirectedVoteKind::Reproduce, 0),
-                            VoteSink::Directed(DirectedVoteKind::StealEnergy, 7),
-                            VoteSink::Directed(DirectedVoteKind::GiveEnergy, 1),
+                            VoteSink::Move(2),
+                            VoteSink::Reproduce(0),
+                            VoteSink::StealEnergy(7),
                         ],
                         bars: [0; VOTE_KIND_COUNT],
                         effective_votes: [1.0; VOTE_KIND_COUNT],
@@ -418,8 +416,8 @@ mod tests {
                         end_reason: PassEndReason::PassCapReached,
                         votes: [0.0; VOTE_SINK_COUNT],
                         best: [VoteSink::Eat; VOTE_KIND_COUNT],
-                        bars: [1, 0, 0, 0, 0],
-                        effective_votes: [-1.0, 0.0, 0.0, 0.0, 0.0],
+                        bars: [1, 0, 0, 0],
+                        effective_votes: [-1.0, 0.0, 0.0, 0.0],
                         committed: None,
                         hops: 64,
                     },
@@ -429,7 +427,7 @@ mod tests {
                 )],
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
-                commit_counts: [1, 0, 0, 0, 0],
+                commit_counts: [1, 0, 0, 0],
                 heading: v3_core::contracts::Direction::SE,
                 ..recorded_tick()
             }],
@@ -457,21 +455,18 @@ mod tests {
             PassEndReasonPayload::PassCapReached
         ));
         assert!(tick.passes[1].committed.is_none());
-        assert_eq!(tick.commit_counts, [1, 0, 0, 0, 0]);
+        assert_eq!(tick.commit_counts, [1, 0, 0, 0]);
         let json = serde_json::to_value(tick).expect("pass records serialize");
         assert_eq!(json["passes"][0]["end_reason"], "Decided");
         assert_eq!(json["heading"], "SE");
         assert_eq!(
             json["passes"][0]["best"],
-            serde_json::json!(["Eat", {"Directed": ["Move", 2]}, {"Directed": ["Reproduce", 0]}, {"Directed": ["StealEnergy", 7]}, {"Directed": ["GiveEnergy", 1]}])
+            serde_json::json!(["Eat", {"Move": 2}, {"Reproduce": 0}, {"StealEnergy": 7}])
         );
-        assert_eq!(
-            json["passes"][1]["bars"],
-            serde_json::json!([1, 0, 0, 0, 0])
-        );
+        assert_eq!(json["passes"][1]["bars"], serde_json::json!([1, 0, 0, 0]));
         assert_eq!(
             json["passes"][0]["votes"].as_array().map(Vec::len),
-            Some(39)
+            Some(30)
         );
         assert_eq!(json["termination_reason"], "NoDecision");
         assert_eq!(
@@ -483,7 +478,7 @@ mod tests {
         assert_eq!(hop["decision_inputs"]["previous_pass_votes"][0], 0.25);
         assert_eq!(
             hop["decision_inputs"]["commit_counts"],
-            serde_json::json!([1.0, 0.0, 0.0, 2.0, 0.0])
+            serde_json::json!([1.0, 0.0, 0.0, 2.0])
         );
         assert_eq!(hop["decision_inputs"]["hops_this_tick"], 3.0);
         let graph_json = &hop["backend_trace"]["Graph"];

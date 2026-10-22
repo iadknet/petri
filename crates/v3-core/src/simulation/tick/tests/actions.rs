@@ -7,7 +7,7 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::simulation::actions::{
-    apply_reproduce, steal_with_bite, BarrierReaderState, MoveBlockedCause,
+    apply_reproduce, apply_steal_energy, BarrierReaderState, MoveBlockedCause,
     ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
@@ -503,7 +503,7 @@ fn steal_energy_dispatch_transfers_and_removes_victim() {
     sim.config.predation.steal_cost_rate = 0.0;
     let victim_pos = Position::new(5, 4);
 
-    let result = steal_with_bite(attacker_id, &mut sim, Direction::N, 20.0).result;
+    let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 
     assert_eq!(
         result,
@@ -530,7 +530,7 @@ fn killed_creature_steal_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.predation.steal_cost_rate = 0.0;
 
-    let result = steal_with_bite(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0);
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,
@@ -538,7 +538,7 @@ fn killed_creature_steal_action_does_not_panic() {
     assert!(!sim.creatures.contains_key(b_id), "B should be dead");
 
     if sim.creatures.contains_key(b_id) {
-        let _result = steal_with_bite(b_id, &mut sim, Direction::S, 10.0).result;
+        let _result = apply_steal_energy(b_id, &mut sim, Direction::S, 10.0);
     }
 }
 
@@ -547,7 +547,7 @@ fn killed_creature_reproduce_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.predation.steal_cost_rate = 0.0;
 
-    let result = steal_with_bite(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0);
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,
@@ -706,7 +706,7 @@ const CAPPED_TRANSFER: f32 = 100.0;
 /// One direct `apply_reproduce` on a fresh 1000-energy parent at reproduce
 /// age, at a transfer fraction of 1.0 (so the child gets `CAPPED_TRANSFER`);
 /// returns the parent's energy after the birth, the child's energy, and the
-/// recorded `action_charges[ActionType::Reproduce]`.
+/// recorded `action_charges.reproduce`.
 fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
     let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
     sim.config.energy.lifecycle.genome_replication_cost_per_unit = rate;
@@ -726,7 +726,7 @@ fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
     (
         sim.creatures[parent].energy,
         child.energy,
-        sim.stats.energy_flows.action_charges[ActionType::Reproduce] as f32,
+        sim.stats.energy_flows.action_charges.reproduce as f32,
     )
 }
 

@@ -192,34 +192,12 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
-/// Undoes T27.F03 commit 2 on the resolved goal recipes: removing the
-/// `exchange` key recovers the T25.F08 commit-1 digests, whose values it
-/// returns.
-fn undo_t27_f03(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
-    let values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
-        assert_eq!(
-            value.as_object_mut().unwrap().remove("exchange"),
-            Some(json!({ "bite": 8.0 }))
-        );
-        value
-    });
-    assert_eq!(
-        values.each_ref().map(value_digest),
-        [
-            "sha256:62fcf74bafeb6ab75f0e1c882eeafce73720c892441d65872706cc6d14159f24",
-            "sha256:3d595bef955f186a5ef59278bae6e741a233cc4bd7c4b989bfa77558a52d54b8",
-            "sha256:e4d5bef9de074f0d1d1376c2f312c85c64c489fe6b484451948727a7bcbc5454",
-        ]
-    );
-    values
-}
-
-/// Undoes T25.F08 commit 1 on the T25.F08 commit-1 values: re-inserting
+/// Undoes T25.F08 commit 1 on the resolved goal recipes: re-inserting
 /// `mutation.structured_heritable_refinement: true` recovers the T25.F02
 /// commit-3 digests, whose values it returns.
-fn undo_t25_f08(values: [Value; 3]) -> [Value; 3] {
-    let values = values.map(|mut value| {
+fn undo_t25_f08(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
+    let values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
         assert_eq!(
             value["mutation"]
                 .as_object_mut()
@@ -304,9 +282,6 @@ fn undo_t25_f02(values: [Value; 3]) -> [Value; 3] {
 /// digests. T25.F08 commit 1 re-pinned all three after two agreeing runs:
 /// the resolved `MutationConfig` drops `structured_heritable_refinement`;
 /// re-inserting it at `true` recovers the T25.F02 commit-3 digests.
-/// T27.F03 commit 2 re-pinned all three after two agreeing runs: the
-/// resolved config gains `exchange.bite: 8.0`; removing only the `exchange`
-/// key recovers the T25.F08 commit-1 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -322,13 +297,13 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:5ca216c574ef6a6f1b9d84e000bf119219f311e28fd188ac01837cd1e6ffc652",
-            "sha256:91a95ad30ab5606cb1dd6cfd112f3f81c69e2eafbc10d326d21de72d5199ffdb",
-            "sha256:3a0a4ac3f6f5bdbe7084be388b3aed5c41a3962dc5cdd944bf03d20ff362fc33",
+            "sha256:62fcf74bafeb6ab75f0e1c882eeafce73720c892441d65872706cc6d14159f24",
+            "sha256:3d595bef955f186a5ef59278bae6e741a233cc4bd7c4b989bfa77558a52d54b8",
+            "sha256:e4d5bef9de074f0d1d1376c2f312c85c64c489fe6b484451948727a7bcbc5454",
         ]
     );
 
-    let input_values = undo_t25_f02(undo_t25_f08(undo_t27_f03(configs)));
+    let input_values = undo_t25_f02(undo_t25_f08(configs));
     assert_eq!(
         input_values.each_ref().map(value_digest),
         [

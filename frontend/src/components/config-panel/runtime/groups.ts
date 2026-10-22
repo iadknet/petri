@@ -252,11 +252,7 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 		subgroups: [
 			{
 				title: "Stealing and kills",
-				fields: pick(
-					"predation.steal_cost_rate",
-					"exchange.bite",
-					"predation.kill_complexity_bonus_multiplier",
-				),
+				fields: pick("predation.steal_cost_rate", "predation.kill_complexity_bonus_multiplier"),
 			},
 		],
 	},

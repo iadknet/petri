@@ -282,10 +282,7 @@ fn applicability_follows_rings_groups_and_hosting() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     partial.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| {
-            sink.kind
-                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 3))
-        });
+        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::StealEnergy(3)));
     });
     assert!(!partial.can_host_group());
     let unhosted = genome(refs(), partial);
@@ -328,7 +325,7 @@ fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
         group::add_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
         let rings = [1u16, 2, 3];
         let ring_ref = rings[expected.gen_range(0..rings.len())];
-        let kind = DirectedVoteKind::ALL[expected.gen_range(0..DirectedVoteKind::ALL.len())];
+        let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
         let offset = expected.gen_range(0..8u8);
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
         let group = want.add_group(Shape::Ring { ring_ref }, kind, offset);
@@ -382,11 +379,7 @@ fn unit_operators_draw_the_group_first_and_change_its_record() {
             .filter(|&k| k != record.kind())
             .collect();
         let mut want = before.clone();
-        want.relocate_group(
-            id(idx),
-            others[expected.gen_range(0..others.len())],
-            record.offset(),
-        );
+        want.relocate_group(id(idx), others[expected.gen_range(0..2)], record.offset());
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
         assert!(validate_graph(&node).is_ok());
@@ -530,10 +523,7 @@ fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
 fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| {
-            sink.kind
-                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 0))
-        });
+        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Reproduce(0)));
     });
     let mut node = graph_node(vec![barrier()], partial);
     let before = node.clone();
@@ -577,7 +567,7 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let mut expected = SmallRng::seed_from_u64(seed);
         group::add_pair_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
         let (ref_idx, pair) = flat[expected.gen_range(0..flat.len())];
-        let kind = DirectedVoteKind::ALL[expected.gen_range(0..DirectedVoteKind::ALL.len())];
+        let kind = DirectedVoteKind::ALL[expected.gen_range(0..3)];
         let offset = expected.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -598,9 +588,7 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
 fn add_pair_skips_without_a_draw_without_a_site() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| {
-            sink.kind != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 5))
-        });
+        sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(VoteSink::Move(5)));
     });
     for mut node in [
         graph_node(vec![area_barrier()], partial),
@@ -792,14 +780,14 @@ fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, GroupId)
             .chain((0..2).map(|p| (5, p)))
             .collect();
         let (ref_idx, pair) = flat[rng.gen_range(0..flat.len())];
-        let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
+        let kind = DirectedVoteKind::ALL[rng.gen_range(0..3)];
         let offset = rng.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
         want.add_pair_group(ref_idx, pair, layout, kind, offset, &[])
     } else {
         let rings = [1u16, 2, 3];
         let ring_ref = rings[rng.gen_range(0..rings.len())];
-        let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
+        let kind = DirectedVoteKind::ALL[rng.gen_range(0..3)];
         let offset = rng.gen_range(0..8u8);
         want.add_group(Shape::Ring { ring_ref }, kind, offset)
     };
@@ -1065,11 +1053,7 @@ fn retarget_kind_moves_fact_members_only_to_a_kind_that_can_host_them() {
         let target = {
             let mut expected = SmallRng::seed_from_u64(seed);
             expected.gen_range(0..1);
-            [
-                DirectedVoteKind::Reproduce,
-                DirectedVoteKind::StealEnergy,
-                DirectedVoteKind::GiveEnergy,
-            ][expected.gen_range(0..3)]
+            [DirectedVoteKind::Reproduce, DirectedVoteKind::StealEnergy][expected.gen_range(0..2)]
         };
         let mut factless = gene(&[]);
         assert_eq!(

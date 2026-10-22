@@ -1,12 +1,7 @@
 pub(crate) mod cgp_reproduction;
-mod giving;
 mod predation;
 mod reproduction;
 
-use crate::creature::action_log::ActionType;
-pub use giving::{apply_give_energy, GiveActionResult};
-#[cfg(test)]
-pub(crate) use predation::steal_with_bite;
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
@@ -56,27 +51,6 @@ fn cap_energy(
     }
 }
 
-/// One exchange bite taken from a holder of `before` energy (T27.F03):
-/// `min(bite, before)` when `before` is positive, else nothing (a comparison,
-/// so a `NaN` energy yields nothing). Returns `(amount, after)` only when a
-/// positive amount lowers the stored energy; a bite the holder's `f32`
-/// resolution absorbs is `None`.
-fn exchange_bite(before: f32, bite: f32) -> Option<(f32, f32)> {
-    let amount = if before > 0.0 { bite.min(before) } else { 0.0 };
-    let after = before - amount;
-    (amount > 0.0 && after < before).then_some((amount, after))
-}
-
-/// What a transfer action moved: its result, the energy debited from the
-/// side that gives it up, and the counterpart creature, `None` when the target
-/// cell held none.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TransferOutcome<R> {
-    pub result: R,
-    pub amount: f32,
-    pub counterpart: Option<CreatureId>,
-}
-
 /// Classification for rejected move actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MoveBlockedCause {
@@ -122,7 +96,7 @@ pub fn apply_noop(
     config: &SimulationConfig,
     flows: &mut EnergyFlows,
 ) {
-    flows.action_charges[ActionType::NoOp] += pay_effort(
+    flows.action_charges.noop += pay_effort(
         creature,
         &config.energy,
         config.energy.costs.noop_cost,
@@ -172,9 +146,9 @@ pub fn apply_typed_eat(
         config.energy.costs.eat_cost,
         DeathCause::ActionEat,
     );
-    flows.action_charges[ActionType::Eat] += effort;
+    flows.action_charges.eat += effort;
     if eaten <= 0.0 {
-        flows.failed_action_effort[ActionType::Eat] += effort;
+        flows.failed_action_effort.eat += effort;
     }
     eaten
 }
@@ -208,9 +182,9 @@ pub fn apply_move(
 
     let move_effort = creature.move_effort(&config.energy);
     let effort = charge_effort(creature, move_effort, DeathCause::ActionMove);
-    flows.action_charges[ActionType::Move] += effort;
+    flows.action_charges.r#move += effort;
     if !succeeded {
-        flows.failed_action_effort[ActionType::Move] += effort;
+        flows.failed_action_effort.r#move += effort;
     }
     succeeded
 }
@@ -223,7 +197,6 @@ mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
     use crate::contracts::Position;
-    use crate::creature::action_log::ActionType;
     use crate::creature::body::HeritableBody;
     use crate::creature::founder::{
         founder_genome, founder_reproduce_policy, v3alpha1_founder_genome,
@@ -233,7 +206,6 @@ mod tests {
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;
-    use proptest::strategy::Strategy as _;
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
@@ -767,7 +739,7 @@ mod tests {
         let energy_before = sim.creatures[parent_id].energy;
         let after_effort = post_effort(&sim, parent_id);
         let death_cause_before = sim.creatures[parent_id].pending_death_cause;
-        let charges_before = sim.stats.energy_flows.action_charges[ActionType::Reproduce];
+        let charges_before = sim.stats.energy_flows.action_charges.reproduce;
         let transfer_before = sim.stats.energy_flows.parental_transfer_debit;
         let rejected_before = sim.stats.reproduction_actions_rejected_total;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
@@ -789,12 +761,12 @@ mod tests {
         // "the effort, bit for bit", and nothing else was added to them.
         let effort = applied_debit(energy_before, after_effort);
         assert_eq!(
-            sim.stats.energy_flows.action_charges[ActionType::Reproduce],
+            sim.stats.energy_flows.action_charges.reproduce,
             charges_before + effort,
             "only the effort lands in action_charges.reproduce"
         );
         assert_eq!(
-            sim.stats.energy_flows.failed_action_effort[ActionType::Reproduce],
+            sim.stats.energy_flows.failed_action_effort.reproduce,
             effort
         );
         assert_eq!(
@@ -880,7 +852,7 @@ mod tests {
             "parent must pay effort, cost then transfer as three f32 subtractions"
         );
         assert_eq!(
-            sim.stats.energy_flows.action_charges[ActionType::Reproduce],
+            sim.stats.energy_flows.action_charges.reproduce,
             applied_debit(energy_before, after_effort) + applied_debit(after_effort, after_cost),
             "action_charges.reproduce must carry exactly the effort and the charge"
         );
@@ -1654,7 +1626,7 @@ mod tests {
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
         let energy_before_low = sim_low.creatures[attacker_low].energy;
-        let _ = steal_with_bite(attacker_low, &mut sim_low, Direction::N, 10.0);
+        let _ = apply_steal_energy(attacker_low, &mut sim_low, Direction::N, 10.0);
         let cost_low = energy_before_low - sim_low.creatures[attacker_low].energy;
 
         // Set up high-complexity attacker with victim
@@ -1673,7 +1645,7 @@ mod tests {
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
         let energy_before_high = sim_high.creatures[attacker_high].energy;
-        let _ = steal_with_bite(attacker_high, &mut sim_high, Direction::N, 10.0);
+        let _ = apply_steal_energy(attacker_high, &mut sim_high, Direction::N, 10.0);
         let cost_high = energy_before_high - sim_high.creatures[attacker_high].energy;
 
         // Both steal 10.0 from victim and get 10.0 back, but the cost (steal_cost_rate * amount)
@@ -1848,7 +1820,7 @@ mod tests {
         });
         sim_young.world.place_creature(victim_pos, victim_young);
         let energy_before_young = sim_young.creatures[attacker_young].energy;
-        let _ = steal_with_bite(attacker_young, &mut sim_young, Direction::N, 10.0);
+        let _ = apply_steal_energy(attacker_young, &mut sim_young, Direction::N, 10.0);
         let cost_young = energy_before_young - sim_young.creatures[attacker_young].energy;
 
         // Old attacker
@@ -1867,7 +1839,7 @@ mod tests {
         });
         sim_old.world.place_creature(victim_pos, victim_old);
         let energy_before_old = sim_old.creatures[attacker_old].energy;
-        let _ = steal_with_bite(attacker_old, &mut sim_old, Direction::N, 10.0);
+        let _ = apply_steal_energy(attacker_old, &mut sim_old, Direction::N, 10.0);
         let cost_old = energy_before_old - sim_old.creatures[attacker_old].energy;
 
         // Both steal from victim, but old attacker's cost portion is higher.
@@ -1994,7 +1966,7 @@ mod tests {
             );
             assert_eq!(sim.creatures[id].energy.to_bits(), after_effort.to_bits());
             assert_eq!(
-                sim.stats.energy_flows.action_charges[ActionType::Reproduce],
+                sim.stats.energy_flows.action_charges.reproduce,
                 applied_debit(1.0, after_effort)
             );
             assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
@@ -2028,7 +2000,7 @@ mod tests {
             // rejected attempt pays only its T16.F02 effort (bit-exact).
             assert_eq!(sim.creatures[id].energy.to_bits(), after_effort.to_bits());
             assert_eq!(
-                sim.stats.energy_flows.action_charges[ActionType::Reproduce],
+                sim.stats.energy_flows.action_charges.reproduce,
                 applied_debit(energy, after_effort)
             );
             assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
@@ -2093,37 +2065,5 @@ mod tests {
         ])) {
             proptest::prop_assert_eq!(result.as_key(), key);
         }
-
-        /// The give breakdown's transport keys (`give_actions_by_result` in
-        /// the server and bench reports) are the stable variant names.
-        #[test]
-        fn give_result_keys_match_public_contract((result, key) in proptest::sample::select(vec![
-            (GiveActionResult::Transferred, "Transferred"),
-            (GiveActionResult::RejectedNoRecipient, "RejectedNoRecipient"),
-            (GiveActionResult::RejectedNothingToGive, "RejectedNothingToGive"),
-        ])) {
-            proptest::prop_assert_eq!(result.as_key(), key);
-        }
-
-        /// Every bite `exchange_bite` reports moves a positive amount that
-        /// lowers the holder's energy by exactly that amount, for any `f32`
-        /// bit pattern of `before`, NaN payloads included.
-        #[test]
-        fn exchange_bite_reports_only_a_positive_exact_debit(
-            before in proptest::num::u32::ANY.prop_map(f32::from_bits),
-            bite in proptest::num::f32::POSITIVE | proptest::num::f32::NORMAL,
-        ) {
-            if let Some((amount, after)) = exchange_bite(before, bite) {
-                proptest::prop_assert!(amount > 0.0);
-                proptest::prop_assert!(after < before);
-                proptest::prop_assert_eq!(after, before - amount);
-            }
-        }
-    }
-
-    #[test]
-    fn exchange_bite_from_a_signaling_nan_moves_nothing() {
-        assert_eq!(exchange_bite(f32::from_bits(0x7F80_0001), 8.0), None);
-        assert_eq!(exchange_bite(f32::INFINITY, 8.0), None);
     }
 }

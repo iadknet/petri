@@ -25,10 +25,6 @@ function health(overrides: Partial<HealthPayload> = {}): HealthPayload {
 		predation_actions_rejected_total: 0,
 		predation_kills_total: 0,
 		predation_actions_by_result: {},
-		give_actions_attempted_total: 0,
-		give_actions_transferred_total: 0,
-		give_actions_rejected_total: 0,
-		give_actions_by_result: {},
 		genome_complexity_mean: 0,
 		genome_complexity_min: 0,
 		genome_complexity_max: 0,
@@ -104,7 +100,7 @@ describe("StatsHistoryStore", () => {
 	it("records a sample per health message, stamped with the latest status compute cost", () => {
 		const store = useStatsHistoryStore.getState();
 		store.recordStatus(
-			{ move: 1, eat: 2, reproduce: 0, noop: 0, steal: 0, give: 0, predation_kills: 0 },
+			{ move: 1, eat: 2, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 },
 			0.5,
 		);
 		store.recordHealth(1, health());
@@ -175,10 +171,7 @@ describe("StatsHistoryStore", () => {
 
 	it("resets all state", () => {
 		const store = useStatsHistoryStore.getState();
-		store.recordStatus(
-			{ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, give: 0, predation_kills: 0 },
-			1,
-		);
+		store.recordStatus({ move: 1, eat: 0, reproduce: 0, noop: 0, steal: 0, predation_kills: 0 }, 1);
 		store.recordHealth(1, health({ mutation_events_attempted_total: 100 }));
 		store.reset();
 		const state = useStatsHistoryStore.getState();

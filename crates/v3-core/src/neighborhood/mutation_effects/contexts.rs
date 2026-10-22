@@ -1,4 +1,4 @@
-//! The `neighborhood-coverage-v4` contexts (T11.F26): recorded terminal-world
+//! The `neighborhood-coverage-v3` contexts (T11.F26): recorded terminal-world
 //! snapshots, authored contexts that set one channel group `neighborhood-v2`
 //! leaves at zero, and long sequences over them. Any change to these rules
 //! bumps [`super::COVERAGE_VERSION`].

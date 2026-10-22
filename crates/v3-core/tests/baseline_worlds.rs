@@ -233,25 +233,10 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// rate 0.0 17266400608968368299 -> 12885579396041597214); with mutation
 /// off the run is unchanged (8324246536663749152, rate 0.0
 /// 1561139812032769563).
-/// Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug` shape):
-/// a directed vote sink's `Debug` text is `Directed(Move, 3)` where
-/// `Move(3)` stood (default 6408902103238049453 -> 7249815572780154446, rate
-/// 0.0 12885579396041597214 -> 5416380403039395140); mapping that text back
-/// to the old shape restores both old values.
-/// Re-pinned by T27.F03 commit 2 after two agreeing runs: the
-/// `WriteActionParam` field draw `0..3`, the 97-sink Graph surface and the
-/// fixed steal bite remap the mutation-on run (default 7249815572780154446
-/// -> 4272505042310913195, rate 0.0 5416380403039395140 ->
-/// 1898874401650296998).
-/// Re-pinned by T27.F03 commit 3 after two agreeing runs: the four-kind
-/// group draws, the 39 / 106 sink draws and the widened decision sub-index
-/// draws remap the mutation-on run (default 4272505042310913195 ->
-/// 6792060840251457963, rate 0.0 1898874401650296998 ->
-/// 12748047497881745737).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 6792060840251457963);
-    assert_eq!(short_run_identity(Some(0.0)), 12748047497881745737);
+    assert_eq!(short_run_identity(None), 6408902103238049453);
+    assert_eq!(short_run_identity(Some(0.0)), 12885579396041597214);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

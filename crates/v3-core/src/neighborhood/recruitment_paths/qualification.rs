@@ -7,7 +7,6 @@ use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
@@ -518,10 +517,10 @@ fn only_east_edge_appended(
 ) -> bool {
     a.compute_nodes() == b.compute_nodes()
         && a.output_sinks().len() == b.output_sinks().len()
-        && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
-            x.kind == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, EAST))
-                || x == y
-        })
+        && a.output_sinks()
+            .iter()
+            .zip(b.output_sinks())
+            .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y)
         && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
             .is_some_and(|edge| accept(&edge.source()) && edge.own_weight() > 0.0)
 }
@@ -597,11 +596,10 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
             only_scaffold_backend_changed(before, after)
                 && a.compute_nodes() == b.compute_nodes()
                 && move_sink(a, 0).inputs.is_empty()
-                && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
-                    x.kind
-                        == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0))
-                        || x == y
-                })
+                && a.output_sinks()
+                    .iter()
+                    .zip(b.output_sinks())
+                    .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)) || x == y)
         },
     );
     vec![ring_added(), north_removed, swap_activation()]
@@ -628,7 +626,7 @@ const VOTE_CUE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 0 };
 /// The reactive program's vote retargeted east: the comparison register into
 /// `Move(E)`.
 const VOTE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 2 };
-const _: () = assert!(VoteSink::Directed(DirectedVoteKind::Move, EAST).index() == 3);
+const _: () = assert!(VoteSink::Move(EAST).index() == 3);
 
 /// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
 /// `expected` and nothing else on the node changes but, on a Graph scaffold,
@@ -813,30 +811,21 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // Re-pinned by T02.F08: the `EatLeaveShare` parameter sink widens the
 // edge-surface draw to `c + 98`, which moves the copy and split
 // `vote_edge_added` seeds (copy 713 -> 417, split 653 -> 4890).
-// Re-pinned by T27.F03 commit 2: retiring `StealEnergyAmount` narrows the
-// edge-surface draw to `c + 97`, which moves the copy and split
-// `vote_edge_added` seeds back (copy 417 -> 713, split 4890 -> 653).
-// Re-pinned by T27.F03 commit 3: `GiveEnergy`'s nine sinks widen the vote
-// catalog to 39 and the edge-surface draw to `c + 106`, and the `AddVote`
-// sink draw covers 39, which moves every Graph seed and the VM vote seeds
-// (`cue_added` 4251 -> 5649, copy 713 -> 268, split 653 -> 268,
-// `ring_added` 82914 -> 12947, `vote_east` 2189 -> 39910, `vote_to_east`
-// 79414 -> 33754).
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[5649, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[5649];
-const GRAPH_COPY_SEEDS: &[u64] = &[268, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[268, SWAP];
+const GRAPH_BLANK_SEEDS: &[u64] = &[4251, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[4251];
+const GRAPH_COPY_SEEDS: &[u64] = &[417, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[4890, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 /// Ring born into `Move(E)`, remove north, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[12_947, 0, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[82_914, 0, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
-const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 33_754, SWAP];
+const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 79_414, SWAP];
 /// Cue, read, vote, swap.
-const VM_BLANK_SEEDS: &[u64] = &[201, 1279, 39_910, SWAP];
+const VM_BLANK_SEEDS: &[u64] = &[201, 1279, 2189, SWAP];
 /// Cue, read, vote.
-const VM_DETOUR_SEEDS: &[u64] = &[201, 1279, 39_910];
+const VM_DETOUR_SEEDS: &[u64] = &[201, 1279, 2189];
 
 /// Every starting form's plan with its pinned seeds, in the fixed family
 /// order.
@@ -968,10 +957,7 @@ mod tests {
     /// The last edge of the `Move(EAST)` sink: the edge the step appended.
     fn born_edge(graph: &CgpGraphBackendDef) -> EdgeOccurrence {
         let east = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
-                DirectedVoteKind::Move,
-                EAST,
-            )))
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
             .expect("the fixed catalog holds every Move sink");
         let last = graph
             .surface_edges(east)
@@ -1014,10 +1000,7 @@ mod tests {
         let edge = *graph.edge_at(born);
         graph.remove_edge(born);
         let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
-                DirectedVoteKind::Move,
-                0,
-            )))
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(0)))
             .expect("the fixed catalog holds every Move sink");
         graph.push_edge(surface, edge);
 
