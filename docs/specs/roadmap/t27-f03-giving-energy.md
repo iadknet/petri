@@ -214,7 +214,7 @@ each commit's intermediate counts.
 | `petri.run.deaths_by_cause` keys `action_give_energy`, `gift` | existing family | `DeathCause::ALL` | `petri.cause` |
 | `petri.tick.actions` with `petri.action = "give"` | sampled gauge | `last_tick_give` | existing family |
 | goal summary `giving`, `shares`, `energy_flows.gift_*`, `action_charges.give_energy`, `mortality.by_cause.gift`, `drives` four kinds; `predation` block | per-world blocks | the same counters and the sampled body pass | reported per world in the readings file, zero included |
-| `petri.config.exchange.effort_rate`, `exchange.share_min`, `exchange.founder_share` on the `actions` phase span and `creature_window` root (replacing `predation.steal_cost_rate`); `run.started` body `exchange.*`, `mutation.share.*` | recorded configuration | `SimulationConfig` | beside `petri.config.predation.kill_complexity_bonus_multiplier` |
+| `petri.config.exchange.effort_rate`, `exchange.share_min`, `exchange.founder_share`, `mutation.share.chance`, `mutation.share.log_step` on the `actions` phase span and `creature_window` root (replacing `predation.steal_cost_rate`); `run.started` body `exchange.*`, `mutation.share.*` | recorded configuration | `SimulationConfig` | beside `petri.config.predation.kill_complexity_bonus_multiplier` |
 | creature detail `steal_share`, `give_share`; creature window / trace payloads | existing records and spans | the body record; `WorldAction::GiveEnergy`, `Directed` sinks in `best` | protocol `v3alpha13` |
 
 ## Verification Plan
@@ -260,7 +260,7 @@ the cause named in invariant 9.
 
 - [ ] Focused tests: `cargo test -p v3-core --test viability` -> 30
       passed (run first); `cargo test -p v3-core` -> pass, and
-      `--features telemetry-seams --lib` -> 2,328 passed; `-p v3-server
+      `--features telemetry-seams --lib` -> 2,329 passed; `-p v3-server
       -p v3-lab -p v3-telemetry` -> 458 passed; `-p v3-cli` -> fails only
       `gate_profile_has_no_severe_regression_against_series_references`
       (`decided_passes` 0.000355 against the zero T26.F02 reference) until
@@ -268,7 +268,7 @@ the cause named in invariant 9.
       `cargo fmt --all --check` and `make rust-clippy` clean; x86_64
       digests via emulated Ubuntu 24.04. `make rust-test-slow` -> not run.
 - [x] Frontend: lint/test/build -> 0 errors, 681 passed, built; parity in
-      `src/types/vote-sinks.test.ts` and `vote.rs`'s fixture pin.
+      `src/types/vote-sinks.test.ts` (union witnesses) and `vote.rs`'s fixture pin.
 - [ ] Mutation gate: fresh `make rust-mutants-ci` (or the local fallback),
       its summary line, output path, and every survivor resolved as killed,
       equivalent, or deferred, listed here.
@@ -281,7 +281,8 @@ the cause named in invariant 9.
       [`docs/progress/readings/t27-f03.md`](../../progress/readings/t27-f03.md).
 - [x] Telemetry: the families in the Telemetry table present in
       `crates/v3-telemetry/src/metrics/tests.rs` and
-      `scripts/telemetry-dashboards-check`.
+      `scripts/telemetry-dashboards-check` (its workload keys the give
+      map; script not run).
 
 ## Performance and Goal Impact
 
