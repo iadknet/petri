@@ -83,6 +83,18 @@ mod tests {
     }
 
     #[test]
+    fn a_seeded_population_reports_its_founders_and_extinction_none() {
+        let mut config = v3_core::config::SimulationConfig::default();
+        config.population.initial_creatures = 3;
+        let mut sim = v3_core::simulation::seed_simulation(config, 3);
+        let block = CapacityDistribution::observe(&sim).expect("a living population");
+        assert_eq!(block.median, six(200.0));
+        assert_eq!(block.at_min_fraction, six(0.0));
+        sim.creatures.clear();
+        assert_eq!(CapacityDistribution::observe(&sim), None);
+    }
+
+    #[test]
     fn the_distribution_reads_nearest_rank_percentiles_and_bound_shares() {
         // Ten creatures: two at the min, one at the max.
         let capacities = [
