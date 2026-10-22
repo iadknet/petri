@@ -253,43 +253,15 @@ subset `energy_flows.failed_action_effort.<action>`.
 
 ### StealEnergy
 
-- Deduct the effort of base `predation.steal_cost_rate` times
-  `exchange.bite` before the target resolves (T27.F03; the `NoOp` floor at
-  the defaults).
-- The victim is the creature on the neighbour cell in the steal's direction,
-  never the attacker; the transfer is `min(bite, victim.energy)` when the
-  victim's energy is positive, else nothing. The steal is `Transferred` only
-  when the victim's stored energy changed: no victim, an exhausted or `NaN`
-  victim, or a bite the victim's `f32` resolution absorbs is
-  `RejectedNoVictim`, booked as failed effort. Each side books its own
-  applied change (`predation_victim_debit`, `predation_attacker_credit`);
-  the attacker's credit is capped. Kill and bonus rules are owned by the
-  predation action.
-
-### GiveEnergy
-
-- Deduct the effort of base `energy.costs.noop_cost` (the floor) before the
-  target resolves (T27.F03).
-- The recipient is the creature on the neighbour cell in the give's
-  direction, never the giver; none is `RejectedNoRecipient` (logged
-  `NoRecipient`). The gift is `min(exchange.bite, giver.energy)` after the
-  effort when the giver's energy is positive, else nothing; a gift is
-  `Transferred` only when the giver's stored energy changed, else
-  `RejectedNothingToGive` (logged `EnergyConstraints`), booked as failed
-  effort. The giver books `gift_debit` (pending cause `Gift`), the
-  recipient `gift_credit`, then the recipient is capped, the excess booked as
-  `maximum_energy_clamp_loss`. A giver left at or below zero is removed
-  right after this dispatch (below).
+- Deduct the effort of base `predation.steal_cost_rate` times the sanitized
+  requested amount before the target resolves; a zero or invalid amount pays
+  `NoOp`'s effort. Transfer, kill and bonus rules are owned by the predation
+  action.
 
 ### Energy after action
 
-Energy may become zero or negative after action application. The acting
-creature is removed right after the dispatch that left it at or below zero
-(`remove_creature_if_dead` in `simulation/tick/helpers.rs`): its remaining
-queue is dropped and its cell freed this tick. A steal's victim drained to
-zero or below is killed by the predation action; any other creature left at
-or below zero is removed at the latest by the next tick's Phase 0 death removal step
-(Section 3).
+Energy may become zero or negative after action application. The creature is
+not removed until the next tick's Phase 0 death removal step (Section 3).
 
 Config key defaults for all action costs are canonical in
 `v3-runtime-config-spec.md`.

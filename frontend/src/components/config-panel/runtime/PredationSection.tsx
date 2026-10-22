@@ -10,19 +10,7 @@ export const PREDATION_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-predation-steal-cost-rate",
 		defaultValue: 0.05,
-		tooltip: `Fraction of the exchange bite the attacker pays as effort, before the target resolves. ${EFFORT_RULE}; a steal with no victim, or one with nothing to take, pays it and nothing more`,
-	},
-	{
-		path: "exchange.bite",
-		label: "Exchange Bite",
-		min: 0.01,
-		max: 1000,
-		step: 0.1,
-		sliderMax: 50,
-		testId: "config-field-exchange-bite",
-		defaultValue: 8.0,
-		tooltip:
-			"Energy one steal takes from the neighbour, or one give passes to it, at most what the giving side holds",
+		tooltip: `Fraction of the requested steal amount the attacker pays, before the target resolves. ${EFFORT_RULE}; a steal with no victim pays it and nothing more`,
 	},
 	{
 		path: "predation.kill_complexity_bonus_multiplier",

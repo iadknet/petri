@@ -6,4 +6,3 @@
 # everyone who runs the test benefits from these saved cases.
 cc a98615aed0d0e1a6b24c6c3f57d9b1af60c78b59f8fa605963b6767cae51909f # shrinks to seed = 13249636895434719317, whole = true, declarations = 0, weight = 0.0
 cc 2c9435acd3ba52a5f133fe812f32ff2c53a21ee794c50505c99399d5a288954c # shrinks to seed = 4841398915694828412, whole = true, declarations = 0, weight = 0.0
-cc 726e71b696539ec41f49579b010a84c4d1e8086f6b932390be48dc68d3d34c4a # shrinks to seed = 15665898841628788396, whole = true, declarations = 0, weight = 0.0

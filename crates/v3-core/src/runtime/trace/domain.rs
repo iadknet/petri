@@ -143,7 +143,6 @@ pub struct MeshPassTrace {
     pub pass_index: u32,
     pub end_reason: PassEndReason,
     /// The pass's final vote vector, in `VoteSink` index order.
-    #[serde(serialize_with = "serialize_array")]
     pub votes: VoteVector,
     /// Each kind's best sink at the pass end, in `VoteKind` index order: the
     /// direction the heading tie chose for a directed kind (T11.F30).
@@ -247,7 +246,6 @@ pub struct MeshHopTrace {
     pub route: Option<TraceRouteDecision>,
     /// The vote contribution this hop committed (T19.F03); zeros when the
     /// dispatch ended exhausted and committed nothing.
-    #[serde(serialize_with = "serialize_array")]
     pub vote_contribution: VoteVector,
     /// The decision state this dispatch's inputs resolved against (T19.F06).
     pub decision_inputs: DecisionInputs,
@@ -260,10 +258,8 @@ pub struct MeshHopTrace {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DecisionInputs {
     /// `ActionVotes`: the pass's committed votes, in `VoteSink` order.
-    #[serde(serialize_with = "serialize_array")]
     pub action_votes: VoteVector,
     /// `PreviousPassVotes`: the vote vector at the previous pass's end.
-    #[serde(serialize_with = "serialize_array")]
     pub previous_pass_votes: VoteVector,
     /// `CommitCounts`: the per-kind bars, in `VoteKind` order.
     pub commit_counts: [f32; VOTE_KIND_COUNT],

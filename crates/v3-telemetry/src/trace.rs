@@ -192,7 +192,6 @@ fn tick_attributes(
         ("noop", stats.last_tick_noop),
         ("reproduce", stats.last_tick_reproduce),
         ("steal", stats.last_tick_steal),
-        ("give", stats.last_tick_give),
     ] {
         a.int(format!("petri.actions.{action}"), count);
     }
@@ -417,7 +416,6 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         config_key("predation.kill_complexity_bonus_multiplier"),
         config.predation.kill_complexity_bonus_multiplier,
     );
-    a.double(config_key("exchange.bite"), config.exchange.bite);
 }
 
 /// What one tick trace is made of, read on the simulation thread.

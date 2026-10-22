@@ -146,7 +146,9 @@ fn the_class_of_every_sink_is_drive_direction_or_none() {
     for sink in VoteSink::all() {
         let expected = match sink {
             VoteSink::Drive(_) => Some(BirthEdgeClass::Drive),
-            VoteSink::Directed(..) => Some(BirthEdgeClass::Direction),
+            VoteSink::Move(_) | VoteSink::Reproduce(_) | VoteSink::StealEnergy(_) => {
+                Some(BirthEdgeClass::Direction)
+            }
             VoteSink::Eat | VoteSink::Terminate | VoteSink::Decide => None,
         };
         assert_eq!(BirthEdgeClass::of_sink(sink), expected, "{sink:?}");

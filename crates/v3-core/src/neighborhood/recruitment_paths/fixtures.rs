@@ -6,7 +6,6 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::graph::operators::split_existing_edge;
@@ -144,7 +143,7 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
                 },
                 VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                 VmInstruction::AddVote {
-                    sink: VoteSink::Directed(DirectedVoteKind::Move, EAST).index() as u8,
+                    sink: VoteSink::Move(EAST).index() as u8,
                     src: 2,
                 },
             ];
@@ -187,19 +186,13 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
 /// The catalog's `ActionVote(Move(d))` sink.
 pub(super) fn move_sink(graph: &CgpGraphBackendDef, d: u8) -> &OutputSink {
     graph
-        .sink(OutputSinkKind::ActionVote(VoteSink::Directed(
-            DirectedVoteKind::Move,
-            d,
-        )))
+        .sink(OutputSinkKind::ActionVote(VoteSink::Move(d)))
         .expect("the fixed catalog holds every Move sink")
 }
 
 fn move_surface(graph: &CgpGraphBackendDef, d: u8) -> EdgeSurface {
     graph
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
-            DirectedVoteKind::Move,
-            d,
-        )))
+        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Move(d)))
         .expect("the fixed catalog holds every Move sink")
 }
 
@@ -499,7 +492,7 @@ pub(super) fn starts_from_paths(paths: &[ConstructedPath]) -> Vec<Start> {
 /// Point the module's `Move` vote at direction `d`: the VM's `AddVote` sink,
 /// or the Graph's vote edges moved onto `Move(d)`.
 fn direction(node: &mut NodeGenome, d: u8) {
-    let target = VoteSink::Directed(DirectedVoteKind::Move, d);
+    let target = VoteSink::Move(d);
     match &mut node.backend_def {
         BackendDef::Vm(vm) => {
             for instruction in &mut vm.program {
@@ -511,10 +504,7 @@ fn direction(node: &mut NodeGenome, d: u8) {
         BackendDef::Graph(graph) => {
             // Every Move edge, in catalog order, lands on the `Move(d)` sink.
             let is_move = |sink: &OutputSink| {
-                matches!(
-                    sink.kind,
-                    OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, _))
-                )
+                matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
             };
             let mut edges: Vec<GraphEdge> = graph
                 .output_sinks()

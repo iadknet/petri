@@ -98,7 +98,6 @@ pub struct LastTickActions {
     pub reproduce: u32,
     pub noop: u32,
     pub steal: u32,
-    pub give: u32,
     pub predation_kills: u32,
 }
 
@@ -125,9 +124,6 @@ pub struct StatusPayload {
     pub predation_actions_transferred_total: u64,
     pub predation_actions_rejected_total: u64,
     pub predation_kills_total: u64,
-    pub give_actions_attempted_total: u64,
-    pub give_actions_transferred_total: u64,
-    pub give_actions_rejected_total: u64,
     pub last_tick_compute_total_mean: f32,
     pub last_tick_compute_total_min: f32,
     pub last_tick_compute_total_max: f32,
@@ -228,10 +224,6 @@ pub struct HealthPayload {
     pub predation_actions_rejected_total: u64,
     pub predation_kills_total: u64,
     pub predation_actions_by_result: HashMap<String, u64>,
-    pub give_actions_attempted_total: u64,
-    pub give_actions_transferred_total: u64,
-    pub give_actions_rejected_total: u64,
-    pub give_actions_by_result: HashMap<String, u64>,
     pub genome_complexity_mean: f32,
     pub genome_complexity_min: u32,
     pub genome_complexity_max: u32,
@@ -394,7 +386,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             reproduce: stats.last_tick_reproduce,
             noop: stats.last_tick_noop,
             steal: stats.last_tick_steal,
-            give: stats.last_tick_give,
             predation_kills: stats.last_tick_predation_kills,
         },
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
@@ -404,9 +395,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         predation_actions_transferred_total: stats.predation_actions_transferred_total,
         predation_actions_rejected_total: stats.predation_actions_rejected_total,
         predation_kills_total: stats.predation_kills_total,
-        give_actions_attempted_total: stats.give_actions_attempted_total,
-        give_actions_transferred_total: stats.give_actions_transferred_total,
-        give_actions_rejected_total: stats.give_actions_rejected_total,
         last_tick_compute_total_mean: stats.last_tick_compute_total_mean,
         last_tick_compute_total_min: stats.last_tick_compute_total_min,
         last_tick_compute_total_max: stats.last_tick_compute_total_max,
@@ -702,14 +690,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         predation_kills_total: stats.predation_kills_total,
         predation_actions_by_result: stats
             .predation_actions_by_result
-            .iter()
-            .map(|(result, count)| (result.as_key().to_string(), *count))
-            .collect(),
-        give_actions_attempted_total: stats.give_actions_attempted_total,
-        give_actions_transferred_total: stats.give_actions_transferred_total,
-        give_actions_rejected_total: stats.give_actions_rejected_total,
-        give_actions_by_result: stats
-            .give_actions_by_result
             .iter()
             .map(|(result, count)| (result.as_key().to_string(), *count))
             .collect(),

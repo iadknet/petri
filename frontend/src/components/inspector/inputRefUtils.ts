@@ -1,10 +1,10 @@
 import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
-import { VOTE_KINDS, voteSinkFromIndex } from "../../types/vote-sinks.ts";
+import { VOTE_KINDS } from "../../types/trace.ts";
 import directionPairsFixture from "./directionPairs.json";
 import { directionName, directionWord } from "./directions.ts";
 import nearbyFields from "./nearbyFields.json";
-import { actionCodeLegend, formatVoteSink } from "./voteSinks.ts";
+import { formatVoteSink, voteSinkFromIndex } from "./voteSinks.ts";
 
 export { directionName } from "./directions.ts";
 
@@ -21,7 +21,6 @@ export function formatAction(action: WorldAction | null | undefined): string {
 	if ("Move" in action) return `Move(${action.Move})`;
 	if ("Reproduce" in action) return `Reproduce(${action.Reproduce.direction})`;
 	if ("StealEnergy" in action) return `Steal(${action.StealEnergy.direction})`;
-	if ("GiveEnergy" in action) return `Give(${action.GiveEnergy.direction})`;
 	return "?";
 }
 
@@ -149,9 +148,9 @@ const OUTCOME_FIELDS: readonly SubField[] = [
 ];
 
 const QUEUE_FIELDS: readonly SubField[] = [
-	{ name: "type", description: `Action code: ${actionCodeLegend()}.` },
+	{ name: "type", description: "Action code: 0 none, 1 Eat, 2 Move, 3 Reproduce, 4 StealEnergy." },
 	{ name: "param0", description: "Direction index (N=0 … NW=7); for Eat, the food type." },
-	{ name: "param1", description: "Reproduce: energy share given; Eat: the share left." },
+	{ name: "param1", description: "Reproduce: energy share given; StealEnergy: amount requested." },
 ];
 
 const SCALAR_LABELS: Record<string, { label: string; description: string }> = {

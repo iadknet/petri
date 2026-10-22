@@ -89,13 +89,16 @@ impl BirthEdgeClass {
         }
     }
 
-    /// The class of `sink`: `Drive` for a drive, `Direction` for a directed
-    /// kind's direction sink, `None` for `Eat`, `Terminate` and `Decide`.
+    /// The class of `sink`: `Drive` for a drive, `Direction` for a `Move`,
+    /// `Reproduce` or `StealEnergy` direction sink, `None` for `Eat`,
+    /// `Terminate` and `Decide`.
     #[must_use]
     pub const fn of_sink(sink: VoteSink) -> Option<Self> {
         match sink {
             VoteSink::Drive(_) => Some(Self::Drive),
-            VoteSink::Directed(..) => Some(Self::Direction),
+            VoteSink::Move(_) | VoteSink::Reproduce(_) | VoteSink::StealEnergy(_) => {
+                Some(Self::Direction)
+            }
             VoteSink::Eat | VoteSink::Terminate | VoteSink::Decide => None,
         }
     }

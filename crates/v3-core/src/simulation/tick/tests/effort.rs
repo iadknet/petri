@@ -4,7 +4,6 @@
 use super::support::*;
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldAction};
 use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
-use crate::simulation::tick::ActionType;
 use crate::simulation::Simulation;
 
 const REPRODUCE: WorldAction = WorldAction::Reproduce {
@@ -22,34 +21,34 @@ enum Bucket {
 }
 
 impl Bucket {
-    /// The effort base for this attempt; a steal's scales the exchange bite.
-    fn base(self, sim: &Simulation) -> f32 {
+    /// The effort base for this attempt, with `requested` the steal amount.
+    fn base(self, sim: &Simulation, requested: f32) -> f32 {
         let costs = &sim.config.energy.costs;
         match self {
             Self::Move => costs.move_cost,
             Self::Eat => costs.eat_cost,
             Self::Reproduce => costs.reproduce_attempt_cost,
-            Self::Steal => sim.config.predation.steal_cost_rate * sim.config.exchange.bite,
+            Self::Steal => sim.config.predation.steal_cost_rate * requested,
         }
     }
 
     fn add_failed(self, flows: &mut EnergyFlows, debit: f64) {
         let (charge, failed) = match self {
             Self::Move => (
-                &mut flows.action_charges[ActionType::Move],
-                &mut flows.failed_action_effort[ActionType::Move],
+                &mut flows.action_charges.r#move,
+                &mut flows.failed_action_effort.r#move,
             ),
             Self::Eat => (
-                &mut flows.action_charges[ActionType::Eat],
-                &mut flows.failed_action_effort[ActionType::Eat],
+                &mut flows.action_charges.eat,
+                &mut flows.failed_action_effort.eat,
             ),
             Self::Reproduce => (
-                &mut flows.action_charges[ActionType::Reproduce],
-                &mut flows.failed_action_effort[ActionType::Reproduce],
+                &mut flows.action_charges.reproduce,
+                &mut flows.failed_action_effort.reproduce,
             ),
             Self::Steal => (
-                &mut flows.action_charges[ActionType::StealEnergy],
-                &mut flows.failed_action_effort[ActionType::StealEnergy],
+                &mut flows.action_charges.steal_energy,
+                &mut flows.failed_action_effort.steal_energy,
             ),
         };
         *charge += debit;
@@ -123,6 +122,7 @@ fn poor_parent(energy: f32) -> (Simulation, CreatureId) {
 fn a_failed_attempt_pays_its_effort_and_nothing_else() {
     let steal = WorldAction::StealEnergy {
         direction: Direction::N,
+        amount: 1.0,
     };
     let litter_reproduce = WorldAction::Reproduce {
         direction: Direction::N,
@@ -213,7 +213,7 @@ fn a_failed_attempt_pays_its_effort_and_nothing_else() {
         // Arrange
         let (mut sim, id) = setup(100.0);
         let before = sim.creatures[id].energy;
-        let effort = effort(&sim, id, bucket.base(&sim));
+        let effort = effort(&sim, id, bucket.base(&sim, 1.0));
         let mut expected = sim.stats.energy_flows.clone();
         if matches!(bucket, Bucket::Eat) {
             // An eat sizes the per-type intake slots before it reads food.
@@ -249,10 +249,10 @@ fn reproduce_below_cost_pays_only_the_attempt_effort() {
     execute(&mut sim, id, REPRODUCE);
     assert_eq!(sim.creatures[id].energy, 1.5 - 1.0);
     let flows = &sim.stats.energy_flows;
-    assert!(flows.action_charges[ActionType::Reproduce] > 0.0);
+    assert!(flows.action_charges.reproduce > 0.0);
     assert_eq!(
-        flows.action_charges[ActionType::Reproduce],
-        flows.failed_action_effort[ActionType::Reproduce]
+        flows.action_charges.reproduce,
+        flows.failed_action_effort.reproduce
     );
     assert_eq!(flows.parental_transfer_debit, 0.0);
     assert_eq!(sim.stats.mortality.deaths_total, 0);
@@ -273,6 +273,7 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
         (
             WorldAction::StealEnergy {
                 direction: Direction::N,
+                amount: 0.0,
             },
             DeathCause::ActionStealEnergy,
         ),
@@ -284,16 +285,13 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
         assert_eq!(sim.stats.mortality.deaths_total, 1, "{cause:?}");
         let flows = &sim.stats.energy_flows;
         assert_eq!(flows.zero_floor_credit, 0.0, "{cause:?}");
+        let charges = flows.action_charges;
         assert_eq!(
-            flows.action_charges.total(),
+            charges.eat + charges.r#move + charges.reproduce + charges.steal_energy,
             applied_debit(0.03, 0.0),
             "{cause:?}"
         );
-        assert_eq!(
-            sim.stats.energy_flows.action_charges[ActionType::NoOp],
-            0.0,
-            "{cause:?}"
-        );
+        assert_eq!(sim.stats.energy_flows.action_charges.noop, 0.0, "{cause:?}");
         assert_eq!(sim.stats.last_tick_noop, 0, "{cause:?}");
     }
 }
@@ -304,12 +302,12 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
 fn a_steal_whose_effort_exhausts_the_attacker_still_transfers() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(0.03, 50.0);
     sim.config.energy.complexity_cost.enabled = false;
-    sim.config.exchange.bite = 1.0;
     execute(
         &mut sim,
         attacker,
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0,
         },
     );
     assert_eq!(sim.creatures[victim].energy, 49.0);
@@ -318,26 +316,26 @@ fn a_steal_whose_effort_exhausts_the_attacker_still_transfers() {
     assert_eq!(sim.stats.mortality.deaths_total, 0);
 }
 
-/// Telemetry: a steal whose bite prices its effort far beyond the
-/// attacker's energy, into an empty cell, charges only the energy the
-/// attacker had; the overdraft is neither a charge nor a floor credit.
+/// Telemetry: a steal request far beyond the attacker's energy, into an
+/// empty cell, charges only the energy the attacker had; the overdraft is
+/// neither a charge nor a floor credit.
 #[test]
 fn an_overdrawn_steal_into_an_empty_cell_charges_only_the_energy_it_had() {
     let (mut sim, id) = make_sim_with_one_creature(46.0);
     sim.config.energy.complexity_cost.enabled = false;
-    sim.config.exchange.bite = 1.0e9;
     execute(
         &mut sim,
         id,
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0e9,
         },
     );
     assert!(!sim.creatures.contains_key(id));
     assert_eq!(sim.stats.mortality.count(DeathCause::ActionStealEnergy), 1);
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges[ActionType::StealEnergy], 46.0);
-    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 46.0);
+    assert_eq!(flows.action_charges.steal_energy, 46.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 46.0);
     assert_eq!(flows.zero_floor_credit, 0.0);
 }
 
@@ -347,20 +345,20 @@ fn an_overdrawn_steal_into_an_empty_cell_charges_only_the_energy_it_had() {
 fn an_overdrawn_steal_with_a_victim_charges_its_energy_plus_the_loot() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(46.0, 300.0);
     sim.config.energy.complexity_cost.enabled = false;
-    sim.config.exchange.bite = 1.0e9;
     execute(
         &mut sim,
         attacker,
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 1.0e9,
         },
     );
     assert!(!sim.creatures.contains_key(attacker));
     assert!(!sim.creatures.contains_key(victim));
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.predation_attacker_credit, 300.0);
-    assert_eq!(flows.action_charges[ActionType::StealEnergy], 346.0);
-    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 0.0);
+    assert_eq!(flows.action_charges.steal_energy, 346.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
     assert_eq!(flows.zero_floor_credit, 0.0);
 }
 
@@ -375,12 +373,13 @@ fn an_inherited_deficit_stays_a_floor_credit_and_the_unpaid_effort_charges_nothi
         id,
         WorldAction::StealEnergy {
             direction: Direction::N,
+            amount: 0.0,
         },
     );
     assert!(!sim.creatures.contains_key(id));
     let flows = &sim.stats.energy_flows;
-    assert_eq!(flows.action_charges[ActionType::StealEnergy], 0.0);
-    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 0.0);
+    assert_eq!(flows.action_charges.steal_energy, 0.0);
+    assert_eq!(flows.failed_action_effort.steal_energy, 0.0);
     assert!(
         (flows.zero_floor_credit - 10.0).abs() < 1e-6,
         "floor credit {}",
@@ -405,10 +404,7 @@ fn a_gestating_parent_and_its_discarded_actions_are_never_charged() {
     );
     assert!(sim.creatures[id].pending_birth.is_some());
     let charged = sim.stats.energy_flows.action_charges;
-    assert_eq!(
-        (charged[ActionType::Eat], charged[ActionType::Move]),
-        (0.0, 0.0)
-    );
+    assert_eq!((charged.eat, charged.r#move), (0.0, 0.0));
     let held = sim.creatures[id].energy;
 
     execute(&mut sim, id, eat);
@@ -455,11 +451,8 @@ fn a_successful_eat_credits_then_pays_its_effort() {
     let max = sim.config.energy.lifecycle.max_energy;
     assert_eq!(sim.creatures[id].energy.to_bits(), (max - effort).to_bits());
     let flows = &sim.stats.energy_flows;
-    assert_eq!(
-        flows.action_charges[ActionType::Eat],
-        applied_debit(max, max - effort)
-    );
-    assert_eq!(flows.failed_action_effort[ActionType::Eat], 0.0);
+    assert_eq!(flows.action_charges.eat, applied_debit(max, max - effort));
+    assert_eq!(flows.failed_action_effort.eat, 0.0);
 }
 
 /// Success: a conception pays the attempt effort, then the replication cost,
@@ -486,22 +479,20 @@ fn a_conception_pays_effort_then_cost_then_litter() {
     );
     let flows = &sim.stats.energy_flows;
     assert_eq!(
-        flows.action_charges[ActionType::Reproduce],
+        flows.action_charges.reproduce,
         applied_debit(100.0, after_effort) + applied_debit(after_effort, after_cost)
     );
-    assert_eq!(flows.failed_action_effort[ActionType::Reproduce], 0.0);
+    assert_eq!(flows.failed_action_effort.reproduce, 0.0);
     assert_eq!(flows.offspring_energy_credit, f64::from(litter));
 }
 
-/// Invariant 4: a steal whose effort base `steal_cost_rate × bite` is at or
-/// below the `NoOp` floor pays the floor (T27.F03: at the defaults the base
-/// is the floor) and takes one bite.
+/// Invariant 4: a steal requesting nothing, or priced at rate 0, pays the
+/// `NoOp` floor.
 #[test]
-fn a_steal_priced_at_or_below_the_floor_pays_the_noop_floor() {
-    for (rate, bite) in [(0.05, 8.0), (0.05, 1.0), (0.0, 8.0)] {
+fn a_steal_requesting_nothing_pays_the_noop_floor() {
+    for (rate, amount) in [(0.05, 0.0), (0.05, f32::NAN), (0.0, 10.0)] {
         let (mut sim, attacker, _victim) = make_sim_two_creatures(100.0, 50.0);
         sim.config.predation.steal_cost_rate = rate;
-        sim.config.exchange.bite = bite;
         let creature = &sim.creatures[attacker];
         let floor = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.noop_cost,
@@ -513,12 +504,14 @@ fn a_steal_priced_at_or_below_the_floor_pays_the_noop_floor() {
             attacker,
             WorldAction::StealEnergy {
                 direction: Direction::N,
+                amount,
             },
         );
+        let stolen = if amount.is_finite() { amount } else { 0.0 };
         assert_eq!(
             sim.creatures[attacker].energy.to_bits(),
-            ((100.0f32 - floor) + bite).to_bits(),
-            "rate {rate} bite {bite}"
+            ((100.0f32 - floor) + stolen).to_bits(),
+            "rate {rate} amount {amount}"
         );
     }
 }

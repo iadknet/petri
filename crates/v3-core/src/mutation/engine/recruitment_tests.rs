@@ -91,18 +91,7 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // `gen_range(0..30)` over the bucket table and the three own-colour keys
     // join the width-1 introspection `Swap` alternatives
     // (5304583554271412245 -> 2059421590127301874).
-    // Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug`
-    // shape): a directed vote sink reads `{"Directed":["Move",3]}` and
-    // `Directed(Move, 3)` where `{"Move":3}` and `Move(3)` stood
-    // (2059421590127301874 -> 12995421853181291158); mapping that text back
-    // to the old shape restores the old value. Re-pinned by T27.F03 commit
-    // 2: retiring `StealEnergyAmount` narrows the `WriteActionParam` field
-    // draw to `0..3` and the Graph sink surface to 97, and a steal moves the
-    // bite (12995421853181291158 -> 2846634796153140363). Re-pinned by
-    // T27.F03 commit 3 after two agreeing runs: kind draws `0..4`,
-    // `RetargetGroupKind` `0..3`, sink draws 39 / 106 and the widened
-    // decision sub-index draws (2846634796153140363 -> 7677103501026316003).
-    assert_eq!(hash, 7677103501026316003, "pin of the recruitment-Off path");
+    assert_eq!(hash, 2059421590127301874, "pin of the recruitment-Off path");
 }
 
 #[test]

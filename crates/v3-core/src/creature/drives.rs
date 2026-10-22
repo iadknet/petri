@@ -18,7 +18,7 @@ use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// The census version the goal summary records.
-pub const DRIVES_VERSION: &str = "drives-v2";
+pub const DRIVES_VERSION: &str = "drives-v1";
 
 /// The weight magnitude above which an edge carries a path.
 pub const PATH_WEIGHT_FLOOR: f32 = 1e-3;

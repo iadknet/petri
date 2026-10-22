@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SamplerPosition } from "../../../stores/samplePlayback.ts";
 import type { CreatureGenome } from "../../../types/genome.ts";
 import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../../types/trace.ts";
 import { deriveTraceFocus } from "./traceFocus.ts";
 
 const genome: CreatureGenome = {
@@ -103,7 +103,7 @@ const sample: ExecutionSample = {
 			termination_reason: "NoDecision",
 			debug_perception: null,
 			priority_bid: 0,
-			commit_counts: ZERO_KIND_COUNTS,
+			commit_counts: [0, 0, 0, 0],
 		},
 	],
 };

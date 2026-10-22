@@ -3,11 +3,10 @@
 //! body inheritance draws. Each assertion pins main's behavior before the
 //! refactor, so a moved booking or draw is a defect.
 
-use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
-use super::{apply_move, apply_reproduce, apply_typed_eat, steal_with_bite};
+use super::{apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, Position};
@@ -211,7 +210,7 @@ fn steal(victim_energy: f32) -> (Simulation, CreatureId, PredationActionResult, 
         .config
         .energy
         .action_effort(0.0, attacker.cached_complexity, attacker.age);
-    let result = steal_with_bite(ids[0], &mut sim, Direction::N, 20.0).result;
+    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0);
     (sim, ids[0], result, 195.0 - effort)
 }
 
@@ -262,7 +261,7 @@ fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
 fn predation_under_the_cap_books_no_clamp_loss() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0), (Position::new(5, 4), 50.0)]);
     sim.config.predation.steal_cost_rate = 0.0;
-    let result = steal_with_bite(ids[0], &mut sim, Direction::N, 20.0).result;
+    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 20.0);
     assert_eq!(result, PredationActionResult::Transferred);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
 }
@@ -325,11 +324,8 @@ fn a_successful_move_charges_the_move_effort() {
     assert!(moved);
     assert_eq!(sim.creatures[id].energy, 50.0 - effort);
     let flows = &sim.stats.energy_flows;
-    assert_eq!(
-        flows.action_charges[ActionType::Move],
-        debit(50.0, 50.0 - effort)
-    );
-    assert_eq!(flows.failed_action_effort[ActionType::Move], 0.0);
+    assert_eq!(flows.action_charges.r#move, debit(50.0, 50.0 - effort));
+    assert_eq!(flows.failed_action_effort.r#move, 0.0);
 }
 
 #[test]
@@ -338,12 +334,9 @@ fn a_blocked_move_charges_the_move_effort_as_failed() {
     assert!(!moved);
     assert_eq!(sim.creatures[id].energy, 50.0 - effort);
     let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.action_charges.r#move, debit(50.0, 50.0 - effort));
     assert_eq!(
-        flows.action_charges[ActionType::Move],
-        debit(50.0, 50.0 - effort)
-    );
-    assert_eq!(
-        flows.failed_action_effort[ActionType::Move],
+        flows.failed_action_effort.r#move,
         debit(50.0, 50.0 - effort)
     );
 }
@@ -381,11 +374,7 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 /// `NearbyCreature` family and the 30-bucket key draw change the genome
 /// mutation's draws before the phenotype step (channels
 /// `[0, 0, 92, 91, 138, 138]`, active 3 -> `[0, 0, 93, 92, 138, 138]`,
-/// active 2, polarity all adding); the kin tag holds. Re-pinned by T27.F03
-/// commit 3: the four-kind group draws, the 39 / 106 sink draws and the
-/// widened decision sub-index draws change the genome mutation's draws
-/// (channels `[0, 0, 93, 92, 138, 138]` -> `[0, 0, 91, 92, 138, 138]`, the
-/// third polarity subtracting, kin tag 3_756_156_572 -> 3_756_156_052).
+/// active 2, polarity all adding); the kin tag holds.
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
     let parent = parent_body();
@@ -399,13 +388,13 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
         child,
         HeritableBody {
             phenotype: Phenotype {
-                channels: [0, 0, 91, 92, 138, 138],
+                channels: [0, 0, 93, 92, 138, 138],
                 active_channel: 2,
-                polarity: [true, true, false, true, true, true],
+                polarity: [true; 6],
             },
             identity: CreatureIdentityState {
                 lineage_id: 3,
-                kin_tag: 3_756_156_052,
+                kin_tag: 3_756_156_572,
             },
         }
     );

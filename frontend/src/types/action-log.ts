@@ -1,14 +1,15 @@
-import catalog from "./vote-sinks.json";
-
 /**
- * Action types — serialized as string variant names from Rust's `ActionType`
- * enum; the values come from the Rust-pinned `vote-sinks.json` catalog.
+ * Action types — serialized as string variant names from Rust's `ActionType` enum.
  */
-export type ActionType = "NoOp" | "Eat" | "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
+export const ActionType = {
+	NoOp: "NoOp",
+	Eat: "Eat",
+	Move: "Move",
+	Reproduce: "Reproduce",
+	StealEnergy: "StealEnergy",
+} as const;
 
-export const ActionType = Object.freeze(
-	Object.fromEntries(catalog.actionTypes.map(({ name }) => [name, name])),
-) as { readonly [K in ActionType]: K };
+export type ActionType = (typeof ActionType)[keyof typeof ActionType];
 
 /**
  * Action results — serialized as string variant names from Rust's `ActionResult` enum.
@@ -22,7 +23,6 @@ export const ActionResult = {
 	PopulationCap: "PopulationCap",
 	TransferredAndKilled: "TransferredAndKilled",
 	NoVictim: "NoVictim",
-	NoRecipient: "NoRecipient",
 } as const;
 
 export type ActionResult = (typeof ActionResult)[keyof typeof ActionResult];

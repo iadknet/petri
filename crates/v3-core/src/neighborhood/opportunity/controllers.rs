@@ -13,7 +13,6 @@ use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 
@@ -165,7 +164,7 @@ impl Author<'_> {
 }
 
 fn move_sink(direction: u8) -> OutputSinkKind {
-    OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, direction))
+    OutputSinkKind::ActionVote(VoteSink::Move(direction))
 }
 
 /// The count of authored structure a controller adds.

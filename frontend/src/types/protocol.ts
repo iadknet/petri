@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "v3alpha13" as const;
+export const PROTOCOL_VERSION = "v3alpha12" as const;
 
 export type SimState = "idle" | "running" | "paused";
 export type ZoomTier = "overview" | "detail" | "inspect";
@@ -60,7 +60,6 @@ export interface LastTickActions {
 	reproduce: number;
 	noop: number;
 	steal: number;
-	give: number;
 	predation_kills: number;
 }
 
@@ -99,10 +98,6 @@ export interface StatusPayload {
 	predation_actions_rejected_total: number;
 	predation_kills_total: number;
 	predation_actions_by_result: Record<string, number>;
-	give_actions_attempted_total: number;
-	give_actions_transferred_total: number;
-	give_actions_rejected_total: number;
-	give_actions_by_result: Record<string, number>;
 	mutation_events_attempted_total: number;
 	mutation_events_applied_total: number;
 	mutation_events_skipped_total: number;
@@ -152,10 +147,6 @@ export interface HealthPayload {
 	predation_actions_rejected_total: number;
 	predation_kills_total: number;
 	predation_actions_by_result: Record<string, number>;
-	give_actions_attempted_total: number;
-	give_actions_transferred_total: number;
-	give_actions_rejected_total: number;
-	give_actions_by_result: Record<string, number>;
 	genome_complexity_mean: number;
 	genome_complexity_min: number;
 	genome_complexity_max: number;

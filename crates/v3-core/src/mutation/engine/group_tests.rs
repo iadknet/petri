@@ -64,9 +64,7 @@ fn the_gate_rolls_back_a_graph_event_that_breaks_an_invariant() {
     gate_rejects(|genome, idx, _| {
         edit_sinks(graph_mut(&mut genome.nodes[idx]), |sinks| {
             for sink in sinks.iter_mut() {
-                if sink.kind
-                    == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2))
-                {
+                if sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(2)) {
                     sink.kind = OutputSinkKind::ActionVote(VoteSink::Eat);
                 }
             }

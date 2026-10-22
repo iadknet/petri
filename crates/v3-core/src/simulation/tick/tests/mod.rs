@@ -5,7 +5,6 @@ mod effort;
 mod energy_accounting;
 mod full_sensor_inputs;
 mod gestation;
-mod giving;
 mod logging;
 mod ordering;
 mod phase0;

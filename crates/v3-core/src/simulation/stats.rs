@@ -9,8 +9,8 @@ use crate::mutation::{
     MutationOperatorFunnel, MutationSkipReason,
 };
 use crate::simulation::actions::{
-    BarrierReaderState, GiveActionResult, MoveBlockedCause, PredationActionResult,
-    PredationEventRecord, ReproductionActionResult, ReproductionInvalidTargetCause,
+    BarrierReaderState, MoveBlockedCause, PredationActionResult, PredationEventRecord,
+    ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -442,20 +442,12 @@ pub struct SimStats {
     /// Per-result predation outcome breakdown (cumulative).
     pub predation_actions_by_result: HashMap<PredationActionResult, u64>,
 
-    // ── Giving cumulative (T27.F03) ──────────────────────────────────────────
-    pub give_actions_attempted_total: u64,
-    pub give_actions_transferred_total: u64,
-    pub give_actions_rejected_total: u64,
-    /// Per-result give outcome breakdown (cumulative).
-    pub give_actions_by_result: HashMap<GiveActionResult, u64>,
-
     // ── Per-tick (reset at start of each tick) ───────────────────────────────
     pub last_tick_move: u32,
     pub last_tick_eat: u32,
     pub last_tick_noop: u32,
     pub last_tick_reproduce: u32,
     pub last_tick_steal: u32,
-    pub last_tick_give: u32,
     /// Per-tick predation event buffer for frontend visualization.
     pub last_tick_predation_events: Vec<PredationEventRecord>,
     /// Per-tick kill count for time-series charting.
@@ -518,7 +510,6 @@ impl SimStats {
         self.last_tick_noop = 0;
         self.last_tick_reproduce = 0;
         self.last_tick_steal = 0;
-        self.last_tick_give = 0;
         self.last_tick_predation_events.clear();
         self.last_tick_predation_kills = 0;
         self.last_tick_compute_total_mean = 0.0;

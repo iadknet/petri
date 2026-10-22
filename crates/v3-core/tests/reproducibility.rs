@@ -24,7 +24,6 @@
 
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{NodeId, Position, RouteTarget};
-use v3_core::creature::action_log::ActionType;
 use v3_core::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -185,15 +184,15 @@ fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
     bits.extend(f.food_intake_by_type.iter().map(|value| value.to_bits()));
     bits.extend(
         [
-            f.action_charges[ActionType::NoOp],
-            f.action_charges[ActionType::Eat],
-            f.action_charges[ActionType::Move],
-            f.action_charges[ActionType::Reproduce],
-            f.action_charges[ActionType::StealEnergy],
-            f.failed_action_effort[ActionType::Move],
-            f.failed_action_effort[ActionType::Eat],
-            f.failed_action_effort[ActionType::Reproduce],
-            f.failed_action_effort[ActionType::StealEnergy],
+            f.action_charges.noop,
+            f.action_charges.eat,
+            f.action_charges.r#move,
+            f.action_charges.reproduce,
+            f.action_charges.steal_energy,
+            f.failed_action_effort.r#move,
+            f.failed_action_effort.eat,
+            f.failed_action_effort.reproduce,
+            f.failed_action_effort.steal_energy,
             f.vm_compute,
             f.priority_bid,
             f.graph_compute,

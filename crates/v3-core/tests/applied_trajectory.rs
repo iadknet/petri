@@ -167,26 +167,6 @@
 //! 449159b3... -> 95ef1cbb...; guard 15de1150... -> c7e77b62..., rate 0.0
 //! 919473fb... -> 7488a15f...). With `mutation.per_unit_rate` 0 the sampled
 //! run is byte-identical (bd8dca14..., gestation rate 0.0 d3b71fcd...).
-//! Re-pinned by T27.F03 commit 1 (text only, sink serde and `Debug` shape):
-//! a directed vote sink serializes as `{"Directed":["Move",3]}` where
-//! `{"Move":3}` stood, which moves the two sampled digests (a5a9f6e4... ->
-//! e73790b0..., gestation rate 0.0 95ef1cbb... -> 7ce96421...); the guard
-//! digests hold, and mapping the genome text back to the old shape restores
-//! both old sampled digests.
-//! Re-pinned by T27.F03 commit 2 after two agreeing runs: retiring
-//! `StealEnergyAmount` narrows the `WriteActionParam` field draw to `0..3`
-//! and the Graph sink surface to 97, and a steal moves the fixed bite, which
-//! moves the sampled digests (e73790b0... -> aaf02e29..., gestation rate 0.0
-//! 7ce96421... -> c902c7b9...) and the default guard (c7e77b62... ->
-//! 9ad87b36...); the rate-0.0 guard holds (7488a15f...), and the
-//! founder-only viability digests hold.
-//! Re-pinned by T27.F03 commit 3 after two agreeing runs: `GiveEnergy`
-//! joins the catalog (kind draws `0..4`, `RetargetGroupKind` `0..3`, sink
-//! draws 39 / 106, the widened decision sub-index draws), which moves the
-//! sampled digests (aaf02e29... -> 08c117b1..., gestation rate 0.0
-//! c902c7b9... -> ac404138...) and the rate-0.0 guard (7488a15f... ->
-//! fbbd2128...); the default guard holds (9ad87b36...), and the
-//! founder-only viability digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -198,11 +178,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "08c117b15af2859478d44822cae8ca937dee35a90c6b13836b4785f1e50e9c42"
+        "a5a9f6e4da13cace123302810025f8b3751be33b9ecf5657e5dd4920bf493fd1"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "ac40413841e591b06ed99bad806ab9ab3a0a4d155631fe8f5f9f72f1d58ded1e"
+        "95ef1cbb91fd84ffb9e8ab776c92bf4849039819efe0d2f6bf0bfc7e58d73398"
     );
 }
 
@@ -275,11 +255,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "9ad87b3603ae2d60b0d70cfa7f7baf1ca7b913f760eee4530b01de22fc597e98"
+        "c7e77b620d6a887b9183cfb301818ea7c99aa06462f8f6f6716960ed674c9150"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "fbbd2128664fe2781e5c328b21c0ef231cd63c7c8d6150084296b616674378f6"
+        "7488a15fcd86a374eb979867a7c9e18d5787fc63d2fc49ea4ae39fc85a513ca0"
     );
 }
 

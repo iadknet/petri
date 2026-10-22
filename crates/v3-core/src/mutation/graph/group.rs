@@ -221,7 +221,7 @@ pub(crate) fn shift_offset(
     Ok(())
 }
 
-/// `RetargetGroupKind`: `gen_range(0..3)` over the other three kinds in
+/// `RetargetGroupKind`: `gen_range(0..2)` over the other two kinds in
 /// catalog order; every member moves to its new sink, a fact member to the
 /// new kind's drive. A gene with a fact member is not retargeted to a kind
 /// that cannot host facts ([`CgpGraphBackendDef::can_host_facts`],
@@ -237,7 +237,7 @@ pub(crate) fn retarget_kind(
         .into_iter()
         .filter(|&kind| kind != group.kind())
         .nth(pick)
-        .expect("another kind");
+        .expect("two other kinds");
     let has_facts = def.members(id).any(|member| def.is_fact_member(member));
     if has_facts && !def.can_host_facts(kind) {
         return Err(MutationSkipReason::NoApplicableTarget);

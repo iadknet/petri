@@ -1,9 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { DirectedVoteKind, VoteKind, VoteSink } from "../../types/genome.ts";
+import type { VoteSink } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace } from "../../types/trace.ts";
-import { ZERO_VOTES } from "../../types/trace.ts";
-import { VOTE_KINDS, driveSinkIndex, voteSinkIndex } from "../../types/vote-sinks.ts";
+import { VOTE_SINK_COUNT } from "../../types/trace.ts";
 import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
 
 function makeTick(passes: MeshPassTrace[], commitCounts: number[], heading = "N"): TickTrace {
@@ -30,38 +29,22 @@ function makeTick(passes: MeshPassTrace[], commitCounts: number[], heading = "N"
 	};
 }
 
-/** A vote vector, zero except at the given sinks. */
-function votesAt(entries: readonly [number, number][] = []): number[] {
-	const votes = [...ZERO_VOTES];
-	for (const [index, value] of entries) votes[index] = value;
-	return votes;
+function zeroVotes(): number[] {
+	return Array.from({ length: VOTE_SINK_COUNT }, () => 0);
 }
 
-/** A per-kind row in `VOTE_KINDS` order, zero for every kind not given. */
-function perKind(values: Partial<Record<VoteKind, number>> = {}): number[] {
-	return VOTE_KINDS.map((kind) => values[kind] ?? 0);
-}
-
-/** Each kind's best sink: Eat, and each directed kind at the given
- * direction, else 0. */
-function bestAt(directions: Partial<Record<DirectedVoteKind, number>> = {}): VoteSink[] {
-	return VOTE_KINDS.map((kind) =>
-		kind === "Eat" ? "Eat" : { Directed: [kind, directions[kind] ?? 0] },
-	);
-}
-
-const moveAt = (d: number) => voteSinkIndex({ Directed: ["Move", d] });
-const reproduceAt = (d: number) => voteSinkIndex({ Directed: ["Reproduce", d] });
+/** Each kind's best sink under heading `N` with no votes. */
+const NORTH_BEST: readonly VoteSink[] = ["Eat", { Move: 0 }, { Reproduce: 0 }, { StealEnergy: 0 }];
 
 function makePass(
 	fields: Partial<MeshPassTrace> & Pick<MeshPassTrace, "pass_index">,
 ): MeshPassTrace {
 	return {
 		end_reason: "NoTargets",
-		votes: votesAt(),
-		best: bestAt(),
-		bars: perKind(),
-		effective_votes: perKind(),
+		votes: zeroVotes(),
+		best: NORTH_BEST,
+		bars: [0, 0, 0, 0],
+		effective_votes: [0, 0, 0, 0],
 		committed: null,
 		hops: 1,
 		...fields,
@@ -70,11 +53,10 @@ function makePass(
 
 describe("VoteSurfaceBlock", () => {
 	it("shows each pass's reason, commit, kind votes, and Terminate and Decide as their own fields", () => {
-		const votes = votesAt([
-			[voteSinkIndex("Eat"), 1.5],
-			[moveAt(2), -2.25],
-			[voteSinkIndex("Decide"), 0.5],
-		]);
+		const votes = zeroVotes();
+		votes[0] = 1.5;
+		votes[3] = -2.25;
+		votes[29] = 0.5;
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -83,17 +65,13 @@ describe("VoteSurfaceBlock", () => {
 							pass_index: 0,
 							end_reason: "Decided",
 							votes,
-							effective_votes: perKind({ Eat: 1.5 }),
+							effective_votes: [1.5, 0, 0, 0],
 							committed: { Eat: { type_idx: 0, leave: 0 } },
 							hops: 2,
 						}),
-						makePass({
-							pass_index: 1,
-							effective_votes: perKind({ Eat: -1 }),
-							bars: perKind({ Eat: 1 }),
-						}),
+						makePass({ pass_index: 1, effective_votes: [-1, 0, 0, 0], bars: [1, 0, 0, 0] }),
 					],
-					perKind({ Eat: 1 }),
+					[1, 0, 0, 0],
 				)}
 			/>,
 		);
@@ -114,11 +92,10 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("shows the recorded best sink, drive, bar and effective vote, not a recomputation", () => {
-		const votes = votesAt([
-			[moveAt(0), 0.9], // tied with Move[3]
-			[moveAt(3), 0.9], // the sink the heading tie recorded
-			[driveSinkIndex("Move"), 0.4],
-		]);
+		const votes = zeroVotes();
+		votes[1] = 0.9; // Move[0], tied with Move[3]
+		votes[4] = 0.9; // Move[3], the sink the heading tie recorded
+		votes[25] = 0.4; // Drive Move
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -126,13 +103,13 @@ describe("VoteSurfaceBlock", () => {
 						makePass({
 							pass_index: 0,
 							votes,
-							best: bestAt({ Move: 3 }),
-							bars: perKind({ Move: 2 }),
+							best: ["Eat", { Move: 3 }, { Reproduce: 0 }, { StealEnergy: 0 }],
+							bars: [0, 2, 0, 0],
 							// Deliberately not drive + best − bar: the view must show what was recorded.
-							effective_votes: perKind({ Move: 0.125 }),
+							effective_votes: [0, 0.125, 0, 0],
 						}),
 					],
-					perKind({ Move: 2 }),
+					[0, 2, 0, 0],
 					"SE",
 				)}
 			/>,
@@ -146,7 +123,8 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("shows a kind whose only vote is its drive", () => {
-		const votes = votesAt([[driveSinkIndex("Reproduce"), 0.7]]);
+		const votes = zeroVotes();
+		votes[26] = 0.7; // Drive Reproduce
 		render(
 			<VoteSurfaceBlock
 				tick={makeTick(
@@ -154,12 +132,12 @@ describe("VoteSurfaceBlock", () => {
 						makePass({
 							pass_index: 0,
 							votes,
-							best: bestAt({ Reproduce: 1 }),
-							effective_votes: perKind({ Reproduce: 0.7 }),
+							best: ["Eat", { Move: 0 }, { Reproduce: 1 }, { StealEnergy: 0 }],
+							effective_votes: [0, 0, 0.7, 0],
 							committed: { Reproduce: { direction: "NE", energy_transfer_fraction: 0 } },
 						}),
 					],
-					perKind({ Reproduce: 1 }),
+					[0, 0, 1, 0],
 					"NE",
 				)}
 			/>,
@@ -173,21 +151,20 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("shows Terminate against the winning effective vote on the pass that ends a TerminateVoted tick", () => {
-		const votes = votesAt([
-			[voteSinkIndex("Eat"), 0.4],
-			[voteSinkIndex("Terminate"), 0.75],
-		]);
+		const votes = zeroVotes();
+		votes[0] = 0.4;
+		votes[28] = 0.75;
 		const tick = makeTick(
 			[
 				makePass({
 					pass_index: 0,
 					votes,
-					bars: perKind({ Move: 1 }),
-					effective_votes: perKind({ Eat: 0.4, Move: -1, Reproduce: 0.2 }),
+					bars: [0, 1, 0, 0],
+					effective_votes: [0.4, -1, 0.2, 0],
 					hops: 3,
 				}),
 			],
-			perKind({ Move: 1 }),
+			[0, 1, 0, 0],
 		);
 		tick.termination_reason = "TerminateVoted";
 		render(<VoteSurfaceBlock tick={tick} />);
@@ -198,11 +175,10 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("shows each pass's effective vote per kind against its recorded bar so the commits line up", () => {
-		const votes = votesAt([
-			[moveAt(2), 0.52],
-			[reproduceAt(2), 0.026],
-		]);
-		const best = bestAt({ Move: 2, Reproduce: 2 });
+		const votes = zeroVotes();
+		votes[3] = 0.52; // Move[2]
+		votes[11] = 0.026; // Reproduce[2]
+		const best: VoteSink[] = ["Eat", { Move: 2 }, { Reproduce: 2 }, { StealEnergy: 0 }];
 		const pass = (
 			pass_index: number,
 			bars: number[],
@@ -214,18 +190,13 @@ describe("VoteSurfaceBlock", () => {
 			<VoteSurfaceBlock
 				tick={makeTick(
 					[
-						pass(0, perKind(), perKind({ Move: 0.52, Reproduce: 0.026 }), { Move: "E" }),
-						pass(1, perKind({ Move: 1 }), perKind({ Move: -0.48, Reproduce: 0.026 }), {
+						pass(0, [0, 0, 0, 0], [0, 0.52, 0.026, 0], { Move: "E" }),
+						pass(1, [0, 1, 0, 0], [0, -0.48, 0.026, 0], {
 							Reproduce: { direction: "E", energy_transfer_fraction: 0.5 },
 						}),
-						pass(
-							2,
-							perKind({ Move: 1, Reproduce: 1 }),
-							perKind({ Move: -0.48, Reproduce: -0.974 }),
-							null,
-						),
+						pass(2, [0, 1, 1, 0], [0, -0.48, -0.974, 0], null),
 					],
-					perKind({ Move: 1, Reproduce: 1 }),
+					[0, 1, 1, 0],
 				)}
 			/>,
 		);
@@ -249,9 +220,7 @@ describe("VoteSurfaceBlock", () => {
 	});
 
 	it("says so when the tick ran no passes, and always shows the four bars", () => {
-		render(
-			<VoteSurfaceBlock tick={makeTick([], perKind({ Move: 1, Reproduce: 2, StealEnergy: 3 }))} />,
-		);
+		render(<VoteSurfaceBlock tick={makeTick([], [0, 1, 2, 3])} />);
 
 		expect(screen.getByText("no passes this tick")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 0")).toBeInTheDocument();

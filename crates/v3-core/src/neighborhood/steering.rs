@@ -442,7 +442,7 @@ mod tests {
         graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()));
         wire(
             &mut graph,
-            VoteSink::Directed(DirectedVoteKind::Move, scalar),
+            VoteSink::Move(scalar),
             vote_edge(GraphSource::ComputeNode(0), 0.5),
         );
         CreatureGenome {
@@ -471,7 +471,7 @@ mod tests {
         };
         wire(
             graph,
-            VoteSink::Directed(DirectedVoteKind::Move, d),
+            VoteSink::Move(d),
             vote_edge(
                 GraphSource::InputLeaf {
                     ref_idx: ring,
@@ -495,7 +495,7 @@ mod tests {
         };
         wire(
             graph,
-            VoteSink::Directed(DirectedVoteKind::Move, d),
+            VoteSink::Move(d),
             vote_edge(
                 GraphSource::InputLeaf {
                     ref_idx,
@@ -587,7 +587,7 @@ mod tests {
         let BackendDef::Graph(graph) = &mut eater.nodes[0].backend_def else {
             unreachable!()
         };
-        let mover = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2));
+        let mover = OutputSinkKind::ActionVote(VoteSink::Move(2));
         let edges = graph.sink(mover).unwrap().inputs.to_vec();
         crate::creature::genome::cgp::test_support::set_sink_inputs(graph, mover, Vec::new());
         wire(graph, VoteSink::Eat, edges[0]);
@@ -607,10 +607,7 @@ mod tests {
                 targets: vec![],
             }],
         };
-        assert!(votes_move(
-            &vm(VoteSink::Directed(DirectedVoteKind::Move, 7).index() as u8),
-            &node0
-        ));
+        assert!(votes_move(&vm(VoteSink::Move(7).index() as u8), &node0));
         assert!(!votes_move(&vm(VoteSink::Eat.index() as u8), &node0));
         assert!(!votes_move(&vm(200), &node0));
     }

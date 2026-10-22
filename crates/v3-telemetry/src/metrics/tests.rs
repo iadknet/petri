@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet};
-use v3_core::creature::action_log::ActionType;
 
 use proptest::prelude::*;
 use prost::Message as _;
@@ -135,7 +134,7 @@ fn populated() -> SimStats {
     s.birth_parent_age.record(BirthOrder::Later, 120);
     s.birth_parent_age.record(BirthOrder::Later, 20_000);
     s.energy_flows.food_intake_by_type = vec![1.5, 2.5];
-    s.energy_flows.action_charges[ActionType::Move] = -3.25;
+    s.energy_flows.action_charges.r#move = -3.25;
     s.phase_wall_clock.cognition = Duration::from_millis(1_500);
     for domain in MutationDomain::all() {
         s.mutation_events_attempted_total_by_domain
@@ -217,9 +216,6 @@ fn populated() -> SimStats {
         PredationActionResult::RejectedNoVictim,
     ] {
         s.predation_actions_by_result.insert(result, 1);
-    }
-    for result in v3_core::simulation::actions::GiveActionResult::ALL {
-        s.give_actions_by_result.insert(result, 1);
     }
     s.last_tick_food_total_density_by_type = vec![0.5, 0.25];
     s.last_tick_food_grazing_modifier_mean_by_type = vec![1.0, 1.0];
@@ -331,9 +327,6 @@ fn run_families(families: &mut Vec<Family>) {
         "predation_actions_transferred",
         "predation_actions_rejected",
         "predation_kills",
-        "give_actions_attempted",
-        "give_actions_transferred",
-        "give_actions_rejected",
         "deaths",
         "genome_size_creature_ticks",
     ] {
@@ -370,8 +363,6 @@ fn run_families(families: &mut Vec<Family>) {
             "predation_victim_debit",
             "predation_attacker_credit",
             "predation_kill_bonus_credit",
-            "gift_debit",
-            "gift_credit",
             "maximum_energy_clamp_loss",
             "zero_floor_credit",
             "external_removal_loss",
@@ -381,13 +372,10 @@ fn run_families(families: &mut Vec<Family>) {
             "action_charge.move",
             "action_charge.reproduce",
             "action_charge.steal_energy",
-            "action_charge.give_energy",
-            "failed_action_effort.noop",
             "failed_action_effort.move",
             "failed_action_effort.eat",
             "failed_action_effort.reproduce",
             "failed_action_effort.steal_energy",
-            "failed_action_effort.give_energy",
             "food_intake.0",
             "food_intake.1",
         ],
@@ -630,25 +618,11 @@ fn outcome_families(families: &mut Vec<Family>) {
         )],
     ));
     families.push((
-        "petri.run.give_actions_by_result".to_owned(),
-        MonotonicSum,
-        vec![(
-            "petri.result",
-            strings(
-                v3_core::simulation::actions::GiveActionResult::ALL,
-                |result| result.as_key().to_owned(),
-            ),
-        )],
-    ));
-    families.push((
         "petri.tick.actions".to_owned(),
         Gauge,
         vec![(
             "petri.action",
-            strings(
-                ["move", "eat", "noop", "reproduce", "steal", "give"],
-                str::to_owned,
-            ),
+            strings(["move", "eat", "noop", "reproduce", "steal"], str::to_owned),
         )],
     ));
 }
@@ -691,10 +665,7 @@ fn tick_families(families: &mut Vec<Family>) {
             Gauge,
             vec![(
                 "petri.drive_kind",
-                strings(
-                    ["move", "reproduce", "steal_energy", "give_energy"],
-                    str::to_owned,
-                ),
+                strings(["move", "reproduce", "steal_energy"], str::to_owned),
             )],
         ));
     }

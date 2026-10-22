@@ -192,7 +192,7 @@ fn zero_edges_can_clear_overwrite_and_change_nonadditive_compute_outputs() {
         OutputSinkKind::ClearSlot(3),
         OutputSinkKind::WriteSlot(3),
         OutputSinkKind::CustomOutput(3),
-        OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+        OutputSinkKind::ActionParam(ActionParamField::StealEnergyAmount),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let before = effects(&def, &[], 0.75);

@@ -83,17 +83,30 @@ export interface ComputeNode {
  * `Drive` votes for its directed kind without naming a direction (T11.F30). */
 export type VoteSink =
 	| "Eat"
-	| { Directed: [DirectedVoteKind, number] }
+	| { Move: number }
+	| { Reproduce: number }
+	| { StealEnergy: number }
 	| { Drive: DirectedVoteKind }
 	| "Terminate"
 	| "Decide";
 
 /** An action kind carrying votes and a bar. */
-export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
+export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
 
-/** One action-parameter field the commit decoder reads (T11.F27, T02.F08,
- * T27.F03). */
-export type ActionParamField = "EatFoodType" | "EatLeaveShare" | "ReproduceTransferFraction";
+/** One action-parameter field the commit decoder reads (T11.F27, T02.F08). */
+export type ActionParamField =
+	| "EatFoodType"
+	| "EatLeaveShare"
+	| "ReproduceTransferFraction"
+	| "StealEnergyAmount";
+
+/** Catalog order: the Graph sink order and the VM `field_idx` addressing. */
+export const ACTION_PARAM_FIELDS: readonly ActionParamField[] = Object.freeze([
+	"EatFoodType",
+	"EatLeaveShare",
+	"ReproduceTransferFraction",
+	"StealEnergyAmount",
+]);
 
 export type OutputSinkKind =
 	| { CustomOutput: number }
@@ -109,7 +122,7 @@ export interface OutputSink {
 }
 
 /** A directed vote kind an edge group votes for (T25.F03). */
-export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
+export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy";
 
 /** The geometry an edge group's members fit (T25.F03, T25.F04). */
 export type GroupShape =

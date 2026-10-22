@@ -27,7 +27,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
 - [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
   - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
-- [x] **T27.F03 — Giving Energy** — Depends on: T26.F01
+- [ ] **T27.F03 — Giving Energy** — Depends on: T26.F01
   - Goal: Trophallaxis and parental feeding: a creature can pass a mouthful of energy to a neighbour, and stealing takes a mouthful the same way, so care and exploitation are both possible.
 
 ## Notes for AI Agents
@@ -78,7 +78,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   also carries T25.F10's deferred reading: group, materialized-member and
   corrected-member counts beside genome size, compute and energy.
 - F03 folds in the directed-kind catalog refactor (`VoteSink::Directed`,
-  a `vote-sinks.json` fixture covering `VoteKind`, `ActionParamField` and
+  a `voteSinks.json` fixture covering `VoteKind`, `ActionParamField` and
   `OutputSinkKind`, charge arrays indexed by action type). It lands the
   zero-transfer fix as its own commit with a predeclared re-pin. Give is
   lossless: the recipient is credited through T26.F01's cap function, the
