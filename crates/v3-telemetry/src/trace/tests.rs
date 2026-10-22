@@ -268,6 +268,8 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "exchange.effort_rate",
         "exchange.share_min",
         "exchange.founder_share",
+        "mutation.share.chance",
+        "mutation.share.log_step",
         "predation.kill_complexity_bonus_multiplier",
     ]);
     let reward_learning = config_keys(&[]);

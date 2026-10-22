@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ActionType } from "./action-log.ts";
+import type { ActionParamField, DirectedVoteKind, VoteKind } from "./genome.ts";
 import {
 	VOTE_KINDS as TRACE_VOTE_KINDS,
 	VOTE_SINK_COUNT as TRACE_VOTE_SINK_COUNT,
@@ -29,6 +30,33 @@ const ACTION_TYPE_WITNESS: Record<ActionType, true> = {
 	GiveEnergy: true,
 };
 
+/** Every member of the handwritten `VoteKind`, `DirectedVoteKind` and
+ * `ActionParamField` unions, checked exhaustive by the compiler, so the
+ * catalog casts in `vote-sinks.ts` cannot drift from the fixture. */
+const VOTE_KIND_WITNESS: Record<VoteKind, true> = {
+	Eat: true,
+	Move: true,
+	Reproduce: true,
+	StealEnergy: true,
+	GiveEnergy: true,
+};
+const DIRECTED_VOTE_KIND_WITNESS: Record<DirectedVoteKind, true> = {
+	Move: true,
+	Reproduce: true,
+	StealEnergy: true,
+	GiveEnergy: true,
+};
+const ACTION_PARAM_FIELD_WITNESS: Record<ActionParamField, true> = {
+	EatFoodType: true,
+	EatLeaveShare: true,
+	ReproduceTransferFraction: true,
+	StealEffort: true,
+	GiveEffort: true,
+};
+
+/** The sorted keys of a union witness. */
+const witnessKeys = (witness: Record<string, true>) => Object.keys(witness).sort();
+
 /** The frontend reads the catalog only through the Rust-pinned fixture
  * (`vote.rs` pins `vote-sinks.json`; T27.F03 invariant 2). */
 describe("vote-sinks.json parity", () => {
@@ -44,7 +72,14 @@ describe("vote-sinks.json parity", () => {
 		expect(ACTION_PARAM_FIELDS).toEqual(catalogFixture.actionParamFields.map(({ field }) => field));
 		expect(ACTION_TYPES).toEqual(catalogFixture.actionTypes);
 		expect(Object.values(ActionType)).toEqual(fixtureNames);
-		expect(Object.keys(ACTION_TYPE_WITNESS).sort()).toEqual([...fixtureNames].sort());
+		expect(witnessKeys(ACTION_TYPE_WITNESS)).toEqual([...fixtureNames].sort());
+		expect(witnessKeys(VOTE_KIND_WITNESS)).toEqual([...catalogFixture.voteKinds].sort());
+		expect(witnessKeys(DIRECTED_VOTE_KIND_WITNESS)).toEqual(
+			[...catalogFixture.directedKinds].sort(),
+		);
+		expect(witnessKeys(ACTION_PARAM_FIELD_WITNESS)).toEqual(
+			catalogFixture.actionParamFields.map(({ field }) => field).sort(),
+		);
 	});
 
 	it("indexes every fixture sink at its position", () => {

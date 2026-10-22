@@ -288,6 +288,7 @@ petri_run_eat_actions_applied_by_type_total
 petri_run_eat_actions_failed_by_type_total
 petri_run_move_actions_blocked_by_cause_total
 petri_run_predation_actions_by_result_total
+petri_run_give_actions_by_result_total
 '
 
 get() {
