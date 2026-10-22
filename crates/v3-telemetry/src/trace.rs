@@ -192,6 +192,7 @@ fn tick_attributes(
         ("noop", stats.last_tick_noop),
         ("reproduce", stats.last_tick_reproduce),
         ("steal", stats.last_tick_steal),
+        ("give", stats.last_tick_give),
     ] {
         a.int(format!("petri.actions.{action}"), count);
     }

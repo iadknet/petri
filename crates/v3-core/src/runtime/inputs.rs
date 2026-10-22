@@ -545,12 +545,14 @@ mod tests {
         /// its width and `0.0` at or past it, never wrapping.
         #[test]
         fn decision_compounds_read_their_vector_and_zero_past_the_width(
-            votes in prop::array::uniform30(-1e6f32..1e6),
-            previous in prop::array::uniform30(-1e6f32..1e6),
-            counts in prop::array::uniform4(0u32..100),
+            votes in prop::collection::vec(-1e6f32..1e6, crate::creature::genome::vote::VOTE_SINK_COUNT),
+            previous in prop::collection::vec(-1e6f32..1e6, crate::creature::genome::vote::VOTE_SINK_COUNT),
+            counts in prop::array::uniform5(0u32..100),
             outcome in prop::array::uniform4(-1f32..1.0),
             sub in any::<u16>(),
         ) {
+            let votes: crate::creature::genome::vote::VoteVector = votes.try_into().unwrap();
+            let previous: crate::creature::genome::vote::VoteVector = previous.try_into().unwrap();
             let mut ss = make_sensor_snapshot(0.0);
             ss.local.previous_outcome = outcome;
             let upstream = [0.0f32; OUTPUT_SLOT_COUNT];

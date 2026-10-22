@@ -5,7 +5,7 @@ use crate::creature::genome::cgp::test_support::{edit_sinks, push_sink};
 use crate::creature::genome::cgp::{
     EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::VoteSink;
+use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
 use proptest::prelude::*;
@@ -196,7 +196,7 @@ fn every_valid_vote_occurrence_and_only_valid_votes_are_destinations() {
         OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Eat), vec![]),
     );
     let sites = destinations(graph);
-    assert_eq!(sites.len(), 31);
+    assert_eq!(sites.len(), VOTE_SINK_COUNT + 1);
     for vote in VoteSink::all() {
         assert!(sites
             .iter()
@@ -241,7 +241,7 @@ proptest! {
         prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
         if grouped == 0 {
             prop_assert_eq!(changed, 1);
-            prop_assert!((1..=30).contains(&added));
+            prop_assert!((1..=VOTE_SINK_COUNT).contains(&added));
             if !whole { prop_assert_eq!(added, 1); }
             prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {

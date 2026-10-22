@@ -180,41 +180,43 @@ pub enum OutputSinkKind {
     RouterGate(u8),          // eight routing gate scores, indices 0-7
     WriteSlot(u8),           // 16 slots, indices 0-15: shared memory write
     ClearSlot(u8),           // 16 slots, indices 0-15: shared memory clear
-    ActionVote(VoteSink),    // 30 vote sinks
-    ActionParam(ActionParamField), // 3 decoded parameter fields
+    ActionVote(VoteSink),    // 39 vote sinks
+    ActionParam(ActionParamField), // 5 decoded parameter fields
 }
 ```
 
 The full sink catalog is fixed at genome construction: 24 CustomOutput + 8
-RouterGate + 16 WriteSlot + 16 ClearSlot + 30 ActionVote + 4 ActionParam = 98
+RouterGate + 16 WriteSlot + 16 ClearSlot + 39 ActionVote + 5 ActionParam = 108
 sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
 kinds.
 
 `VoteSink` is the fixed vote catalog: `Eat`, `Directed(K, d)`, `Drive(K)`,
 `Terminate` and `Decide`, for `K` a `DirectedVoteKind` (`Move`, `Reproduce`,
-`StealEnergy`, in `DirectedVoteKind::ALL` order) and `d` in the eight
+`StealEnergy`, `GiveEnergy`, in `DirectedVoteKind::ALL` order) and `d` in the eight
 `Direction::ALL` slots. With `N` directed kinds the index rule is `Eat` 0,
 `Directed(K, d)` `1 + 8·K.index() + d`, `Drive(K)` `1 + 8·N + K.index()`,
 `Terminate` `VOTE_SINK_COUNT − 2` and `Decide` `VOTE_SINK_COUNT − 1`, with
 `VOTE_SINK_COUNT = 3 + 9·N`: `Directed(Move, d)` (`1 + d`),
 `Directed(Reproduce, d)` (`9 + d`), `Directed(StealEnergy, d)` (`17 + d`),
-`Drive(Move)` (25), `Drive(Reproduce)` (26), `Drive(StealEnergy)` (27),
-`Terminate` (28), and `Decide` (29). A new directed kind is appended to
+`Directed(GiveEnergy, d)` (`25 + d`), `Drive(Move)` (33), `Drive(Reproduce)`
+(34), `Drive(StealEnergy)` (35), `Drive(GiveEnergy)` (36), `Terminate` (37),
+and `Decide` (38): `N` = 4 and 39 vote sinks. A new directed kind is appended to
 `DirectedVoteKind::ALL` and the rule places its sinks. A directed sink
 serializes as `{"Directed":["Move",3]}`. A drive
 (T11.F30) votes for its kind without naming a direction: the pass end adds it
 to the kind's best direction vote, and it is never committed itself; it
 serializes as `{"Drive":"Move"}`. `VoteKind` is
 `Eat` followed by the directed kinds' vote kinds in `DirectedVoteKind::ALL`
-order: `Eat`, `Move`, `Reproduce`, `StealEnergy`.
+order: `Eat`, `Move`, `Reproduce`, `StealEnergy`, `GiveEnergy`.
 `ActionParamField` holds exactly the fields the commit decoder reads, in the
 order `EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
-`StealEffort` (T11.F27, T02.F08, T27.F03); `Move` has no parameter field.
+`StealEffort`, `GiveEffort` (T11.F27, T02.F08, T27.F03); `Move` has no
+parameter field.
 
 A wired `ActionVote` sink writes its weighted sum into the visit's vote
 contribution, which replaces the node's earlier contribution in the pass; a
 wired `ActionParam(field)` sink overwrites `action_params[field.index()]`
-on the tick's four-field parameter surface. The pass end reads both
+on the tick's five-field parameter surface. The pass end reads both
 (`v3-mesh-execution-spec.md` Section 2); votes are how the graph acts, so a
 graph with no wired vote sink never commits an action. `pick_random_surface`
 makes one uniform draw over the compute nodes and then every sink in vector
@@ -262,9 +264,9 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
 ### Qualified zero vote connections (T20.F02)
 
 F04 may append an ordinary `GraphEdge { source, weight: 0.0 }` to a
-**present** `ActionVote` sink. All 30 identities qualify: Eat, the eight
-Move, Reproduce and StealEnergy directions, the three drives, Terminate and
-Decide. Both empty
+**present** `ActionVote` sink. All 39 identities qualify: Eat, the eight
+Move, Reproduce, StealEnergy and GiveEnergy directions, the four drives,
+Terminate and Decide. Both empty
 and wired vote sinks qualify; their position in `output_sinks` is irrelevant.
 Preserve the incumbent edge order and coefficients, compute nodes, input
 references and sink identities.
@@ -753,8 +755,8 @@ from imposing a constant complexity tax.
 - 8 `RouterGate(0..7)` sinks (24..32)
 - 16 `WriteSlot(0..15)` sinks (32..48)
 - 16 `ClearSlot(0..15)` sinks (48..64)
-- 30 `ActionVote` sinks in `VoteSink` index order (64..94)
-- 4 `ActionParam` sinks in `ActionParamField::ALL` order (94..98)
+- 39 `ActionVote` sinks in `VoteSink` index order (64..103)
+- 5 `ActionParam` sinks in `ActionParamField::ALL` order (103..108)
 
 All sinks start with empty edge Vecs (inert until evolution wires them).
 

@@ -542,7 +542,11 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 /// `NearbyCreature` family and the 30-bucket key draw change the genome
 /// mutation's draws before the phenotype step (channels
 /// `[0, 0, 92, 91, 138, 138]`, active 3 -> `[0, 0, 93, 92, 138, 138]`,
-/// active 2, polarity all adding); the kin tag holds.
+/// active 2, polarity all adding); the kin tag holds. Re-pinned by T27.F03
+/// commit 3: the four-kind group draws, the 39 / 106 sink draws and the
+/// widened decision sub-index draws change the genome mutation's draws
+/// (channels `[0, 0, 93, 92, 138, 138]` -> `[0, 0, 91, 92, 138, 138]`, the
+/// third polarity subtracting, kin tag 3_756_156_572 -> 3_756_156_052).
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
     let parent = parent_body();
@@ -556,13 +560,13 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
         child,
         HeritableBody {
             phenotype: Phenotype {
-                channels: [0, 0, 93, 92, 138, 138],
+                channels: [0, 0, 91, 92, 138, 138],
                 active_channel: 2,
-                polarity: [true; 6],
+                polarity: [true, true, false, true, true, true],
             },
             identity: CreatureIdentityState {
                 lineage_id: 3,
-                kin_tag: 3_756_156_572,
+                kin_tag: 3_756_156_052,
             },
             capacity: 200.0,
             steal_share: 0.2,

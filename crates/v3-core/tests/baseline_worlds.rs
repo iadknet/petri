@@ -250,11 +250,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// both old values. Re-pinned by T27.F03 commit 3 (share draws per birth;
 /// `StealEffort`; the share rule) after two agreeing runs (default
 /// 3145154597724195549 -> 5743177234346840164, rate 0.0
-/// 9861678929341148521 -> 4601283646038048810).
+/// 9861678929341148521 -> 4601283646038048810). Re-pinned by T27.F03
+/// commit 4 (kind draws `0..4`, sink draws 39 / 108, field draws `0..5`,
+/// sub-index widths) after two agreeing runs (default 5743177234346840164
+/// -> 8393772808589926382, rate 0.0 4601283646038048810 ->
+/// 15622211672400239421).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 5743177234346840164);
-    assert_eq!(short_run_identity(Some(0.0)), 4601283646038048810);
+    assert_eq!(short_run_identity(None), 8393772808589926382);
+    assert_eq!(short_run_identity(Some(0.0)), 15622211672400239421);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

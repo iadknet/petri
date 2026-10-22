@@ -190,6 +190,10 @@
 //! a committed steal takes `i × victim energy` (sampled 3a4846f3... ->
 //! 6f97de82..., gestation rate 0.0 5a9ed31a... -> 2a9c2834...; guard
 //! 5cbdceed... -> 9d4e5755..., rate 0.0 5067bc4b... -> 23ff7d5e...).
+//! Re-pinned by T27.F03 commit 4 (kind draws `0..4`, sink draws 39 / 108,
+//! field draws `0..5`, sub-index widths) after two agreeing runs: the
+//! sampled digests move (6f97de82... -> cc976227..., gestation rate 0.0
+//! 2a9c2834... -> 82d14a4e...); both guard digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -201,11 +205,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "6f97de82718beab35ed9cde0e30d2293087984eb84248c4a88173154157e7f49"
+        "cc9762271e53d4d465d488e85a2f9e8ddc800088e0762ed31bb80cf57b76e02d"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "2a9c28349ffb2febae1e50e919afba5902f3b10e2b8b9c84e49fd2e6aae9a465"
+        "82d14a4e59065bf2165785e7be76e41ff0aaf3fbd081f1ac277ea84b493d514a"
     );
 }
 

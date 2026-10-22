@@ -89,14 +89,15 @@ export type VoteSink =
 	| "Decide";
 
 /** An action kind carrying votes and a bar. */
-export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
+export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
 
 /** One action-parameter field the commit decoder reads (T11.F27, T02.F08). */
 export type ActionParamField =
 	| "EatFoodType"
 	| "EatLeaveShare"
 	| "ReproduceTransferFraction"
-	| "StealEffort";
+	| "StealEffort"
+	| "GiveEffort";
 
 export type OutputSinkKind =
 	| { CustomOutput: number }
@@ -112,7 +113,7 @@ export interface OutputSink {
 }
 
 /** A directed vote kind an edge group votes for (T25.F03). */
-export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy";
+export type DirectedVoteKind = "Move" | "Reproduce" | "StealEnergy" | "GiveEnergy";
 
 /** The geometry an edge group's members fit (T25.F03, T25.F04). */
 export type GroupShape =

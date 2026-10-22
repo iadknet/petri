@@ -12,11 +12,12 @@ pub enum ActionType {
     Move = 2,
     Reproduce = 3,
     StealEnergy = 4,
+    GiveEnergy = 5,
 }
 
-/// Number of meaningful action type discriminants (NoOp..StealEnergy).
-pub const ACTION_TYPE_COUNT: u8 = 5;
-const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
+/// Number of meaningful action type discriminants (NoOp..GiveEnergy).
+pub const ACTION_TYPE_COUNT: u8 = 6;
+const _: () = assert!(ActionType::GiveEnergy as u8 + 1 == ACTION_TYPE_COUNT);
 
 impl ActionType {
     /// Every action type in discriminant order, for fixed-order reports.
@@ -26,6 +27,7 @@ impl ActionType {
         Self::Move,
         Self::Reproduce,
         Self::StealEnergy,
+        Self::GiveEnergy,
     ];
 
     /// Stable diagnostics key for this action type.
@@ -39,6 +41,7 @@ impl ActionType {
             Self::Move => "Move",
             Self::Reproduce => "Reproduce",
             Self::StealEnergy => "StealEnergy",
+            Self::GiveEnergy => "GiveEnergy",
         }
     }
 
@@ -51,6 +54,7 @@ impl ActionType {
             Self::Move => "move",
             Self::Reproduce => "reproduce",
             Self::StealEnergy => "steal_energy",
+            Self::GiveEnergy => "give_energy",
         }
     }
 
@@ -85,6 +89,10 @@ pub enum WorldAction {
     /// `effort` is the decoded modifier in `[0.25, 4]` that scales the
     /// attacker's `steal_share` (T27.F03).
     StealEnergy { direction: Direction, effort: f32 },
+    /// Pass part of the giver's own store to the neighbour in the given
+    /// direction; `effort` is the decoded modifier in `[0.25, 4]` that
+    /// scales the giver's `give_share` (T27.F03).
+    GiveEnergy { direction: Direction, effort: f32 },
 }
 
 impl WorldAction {
@@ -112,6 +120,7 @@ impl WorldAction {
             WorldAction::Move(_) => ActionType::Move,
             WorldAction::Reproduce { .. } => ActionType::Reproduce,
             WorldAction::StealEnergy { .. } => ActionType::StealEnergy,
+            WorldAction::GiveEnergy { .. } => ActionType::GiveEnergy,
         }
     }
 
@@ -122,14 +131,15 @@ impl WorldAction {
         match self {
             WorldAction::Move(direction)
             | WorldAction::Reproduce { direction, .. }
-            | WorldAction::StealEnergy { direction, .. } => Some(*direction),
+            | WorldAction::StealEnergy { direction, .. }
+            | WorldAction::GiveEnergy { direction, .. } => Some(*direction),
             WorldAction::NoOp | WorldAction::Eat { .. } => None,
         }
     }
 
     /// Read back a parameter slot for `ReadActionQueueParam`.
     /// Slot 0 = direction index (as f32), or the food type index (Eat);
-    /// slot 1 = the effort modifier (StealEnergy), energy_transfer_fraction (Reproduce) or
+    /// slot 1 = the effort modifier (StealEnergy, GiveEnergy), energy_transfer_fraction (Reproduce) or
     /// the leave share (Eat). Returns 0.0 for unknown slots or
     /// variants without that parameter.
     #[inline]
@@ -146,8 +156,10 @@ impl WorldAction {
                 },
                 1,
             ) => *energy_transfer_fraction,
-            (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
-            (WorldAction::StealEnergy { effort, .. }, 1) => *effort,
+            (WorldAction::StealEnergy { direction, .. }, 0)
+            | (WorldAction::GiveEnergy { direction, .. }, 0) => direction.to_index() as f32,
+            (WorldAction::StealEnergy { effort, .. }, 1)
+            | (WorldAction::GiveEnergy { effort, .. }, 1) => *effort,
             _ => 0.0,
         }
     }
@@ -247,6 +259,20 @@ mod tests {
     }
 
     #[test]
+    fn a_give_is_type_five_and_reads_its_direction_and_effort() {
+        let action = WorldAction::GiveEnergy {
+            direction: Direction::SE,
+            effort: 2.0,
+        };
+        assert_eq!(action.action_type(), ActionType::GiveEnergy);
+        assert_eq!(action.action_type() as u8, 5);
+        assert_eq!(action.direction(), Some(Direction::SE));
+        assert_eq!(action.param(0), Direction::SE.to_index() as f32);
+        assert_eq!(action.param(1), 2.0);
+        assert_eq!(ActionType::GiveEnergy.flow_key(), "give_energy");
+    }
+
+    #[test]
     fn steal_energy_fields_accessible() {
         let action = WorldAction::StealEnergy {
             direction: Direction::NW,
@@ -277,6 +303,10 @@ mod tests {
             WorldAction::StealEnergy {
                 direction: Direction::S,
                 effort: 4.0,
+            },
+            WorldAction::GiveEnergy {
+                direction: Direction::SW,
+                effort: 0.25,
             },
         ];
         for action in actions {

@@ -989,6 +989,7 @@ fn checkpoint_tracking_omits_every_transferred_block() {
         "mutation_value_totals_by_operator",
         "mutation_value_totals_by_birth_edge_class",
         "predation",
+        "giving",
         "action_attempts",
         "mortality",
         "energy_flows",
@@ -1092,8 +1093,8 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     let mut failed_action_effort = FailedActionEffort::default();
     for ((action, charge), failed) in ActionType::ALL
         .into_iter()
-        .zip([1.0, 2.0, 3.0, 4.0, 5.0])
-        .zip([0.0, 1.5, 2.5, 0.25, 4.5])
+        .zip([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+        .zip([0.0, 1.5, 2.5, 0.25, 4.5, 5.5])
     {
         action_charges[action] = charge;
         failed_action_effort[action] = failed;
@@ -1116,6 +1117,8 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         predation_victim_debit: -17.0,
         predation_attacker_credit: -18.0,
         predation_kill_bonus_credit: 19.0,
+        gift_debit: 19.25,
+        gift_credit: 19.5,
         maximum_energy_clamp_loss: 20.0,
         zero_floor_credit: 21.0,
         external_removal_loss: 22.0,
@@ -1138,8 +1141,10 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         "action_move",
         "action_reproduce",
         "action_steal_energy",
+        "action_give_energy",
         "parental_transfer",
         "predation",
+        "gift",
         "external_removal",
         "unattributed",
     ];
@@ -1155,14 +1160,16 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         serde_json::json!({
             "definition": "applied-energy-flows-v4",
             "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
-            "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
-            "failed_action_effort": {"noop": "0.000000", "move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
+            "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000", "give_energy": "6.000000"},
+            "failed_action_effort": {"noop": "0.000000", "move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000", "give_energy": "5.500000"},
             "vm_compute": "7.000000", "priority_bid": "8.000000",
             "graph_compute": "9.000000", "mesh_ramp": "9.500000",
             "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "capacity_upkeep": "-13.500000", "genome_size_creature_ticks": 14,
             "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000", "offspring_capacity_overflow": "16.500000",
             "predation_victim_debit": "-17.000000", "predation_attacker_credit": "-18.000000",
-            "predation_kill_bonus_credit": "19.000000", "maximum_energy_clamp_loss": "20.000000",
+            "predation_kill_bonus_credit": "19.000000",
+            "gift_debit": "19.250000", "gift_credit": "19.500000",
+            "maximum_energy_clamp_loss": "20.000000",
             "zero_floor_credit": "21.000000", "external_removal_loss": "22.000000",
             "gestation_lost": "23.000000",
         })
@@ -1418,10 +1425,9 @@ fn observe_reads_each_barrier_counter_from_its_own_stats_map() {
     );
 }
 
-/// Historical reports predate every tracking field, and a round trip of a
-/// current report keeps them flat on the wire.
+/// Historical reports predate every tracking field.
 #[test]
-fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
+fn tracking_fields_default_when_absent() {
     let legacy: PersistenceSample = serde_json::from_value(serde_json::json!({
         "tick": 100, "population": 5, "mean_energy": "1.000000", "births_total": 2
     }))
@@ -1438,7 +1444,13 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
     assert_eq!(legacy.sensor_census, None);
     assert_eq!(legacy.occupancy_grid, None);
     assert_eq!(legacy.capacity, None);
+    assert_eq!(legacy.shares, None);
+}
 
+/// A round trip of a current report keeps every tracking field flat on the
+/// wire.
+#[test]
+fn tracking_fields_survive_a_round_trip() {
     let sample = PersistenceSample {
         tick: 100,
         population: 5,
@@ -1532,6 +1544,11 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 kills_total: 1,
                 actions_by_result: BTreeMap::from([("Transferred".to_string(), 3)]),
             }),
+            giving: Some(GivingTracking {
+                actions_attempted_total: 4,
+                actions_by_result: BTreeMap::from([("RejectedNoRecipient".to_string(), 4)]),
+                ..GivingTracking::default()
+            }),
             action_attempts: None,
             mortality: None,
             reproductive_success_by_cognitive_class: None,
@@ -1623,7 +1640,7 @@ fn transferred_tracking_blocks_are_absent_not_zero_in_a_historical_report() {
 
 // ── T14.F07 surviving-clade profiles ─────────────────────────────────────────
 
-fn member(lineage_id: u32, energy: f32, eats: Vec<u64>, actions: [u64; 5]) -> CladeMemberReading {
+fn member(lineage_id: u32, energy: f32, eats: Vec<u64>, actions: [u64; 6]) -> CladeMemberReading {
     CladeMemberReading {
         lineage_id,
         energy,
@@ -1642,9 +1659,9 @@ fn surviving_clade_rows_are_sorted_by_lineage_and_padded_to_the_food_type_count(
     let rows = bucket_surviving_clades(
         3,
         vec![
-            member(7, 4.0, vec![1], [1, 1, 0, 0, 0]),
-            member(2, 1.0, vec![0, 2, 5, 9], [0, 2, 3, 0, 1]),
-            member(7, 2.0, vec![], [0, 0, 0, 1, 0]),
+            member(7, 4.0, vec![1], [1, 1, 0, 0, 0, 0]),
+            member(2, 1.0, vec![0, 2, 5, 9], [0, 2, 3, 0, 1, 1]),
+            member(7, 2.0, vec![], [0, 0, 0, 1, 0, 2]),
         ],
     );
     assert_eq!(rows.len(), 2);
@@ -1673,6 +1690,7 @@ fn surviving_clade_rows_are_sorted_by_lineage_and_padded_to_the_food_type_count(
             ("Move".to_string(), 0),
             ("Reproduce".to_string(), 1),
             ("StealEnergy".to_string(), 0),
+            ("GiveEnergy".to_string(), 2),
         ])
     );
 }
@@ -1692,7 +1710,7 @@ proptest! {
                 0u64..50,
                 1u32..500,
                 proptest::collection::vec(0u64..20, 0..4),
-                proptest::array::uniform5(0u64..20),
+                proptest::array::uniform6(0u64..20),
                 0u64..5,
                 0u64..5,
             ),
@@ -1734,7 +1752,7 @@ proptest! {
                 row.predation_hits_taken,
                 mine.iter().map(|m| m.predation_hits_taken).sum::<u64>()
             );
-            prop_assert_eq!(row.actions_by_type.len(), 5);
+            prop_assert_eq!(row.actions_by_type.len(), 6);
             for (slot, action) in ActionType::ALL.iter().enumerate() {
                 prop_assert_eq!(
                     row.actions_by_type[action.as_key()],
@@ -1768,7 +1786,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
         creature.body.identity.lineage_id = if index == 3 { 3 } else { 1 };
         creature.energy = index as f32;
         creature.lifetime_action_attempted_count = 1;
-        creature.lifetime_actions_attempted_by_type = [0, 0, 1, 0, 0];
+        creature.lifetime_actions_attempted_by_type = [0, 0, 1, 0, 0, 0];
         if index == 3 {
             creature.lifetime_eats_applied_by_type = vec![1];
             creature.lifetime_predation_kills_count = 2;
@@ -1827,7 +1845,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
             .as_object()
             .unwrap()
             .len(),
-        5
+        6
     );
     assert!(
         serde_json::to_value(WorldTracking::observe(&sim))

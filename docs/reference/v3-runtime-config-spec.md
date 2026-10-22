@@ -337,13 +337,16 @@ Action effort (T16.F02):
   outcome: `EnergyConfig::action_effort(base, complexity, age)` =
   `adjusted_action_cost(max(base, noop_cost), complexity, age)`, with base
   `move_cost`, `eat_cost`, `noop_cost`, `reproduce_attempt_cost`, or a
-  steal's `exchange.effort_rate × intensity × max(attacker energy, 0)`
-  (T27.F03).
+  steal's or a give's `exchange.effort_rate × intensity × max(actor energy,
+  0)` (T27.F03). The charge lands in `energy_flows.action_charges.<action>`
+  with `<action>` one of `noop`, `eat`, `move`, `reproduce`,
+  `steal_energy`, `give_energy`.
 - The actions share the multiplier, so no effort is below `NoOp`'s, and
   `NoOp`'s is above zero. A base at or above `noop_cost` is charged exactly
   `adjusted_action_cost(base, …)`.
 - A failure (a blocked move, an eat finding no food, a rejected reproduce, a
-  steal with no victim or nothing to take) pays its effort and nothing more; there is no
+  steal with no victim or nothing to take, a give with no recipient or
+  nothing to give) pays its effort and nothing more; there is no
   failed-action penalty and no startup ramp. A config naming the retired
   `energy.costs.failed_action_penalty` or `startup` section fails to resolve.
 
@@ -389,7 +392,7 @@ Exchange fields (T27.F03, `SimulationConfig.exchange`):
 
 | Key | Type | Default | Normalization and role |
 | --- | --- | --- | --- |
-| `exchange.effort_rate` | `f32` | `0.05` | Finite values clamp to `[0, 1]`; non-finite fall back to `0.05`. The effort rate of the exchange acts: a steal's effort base is `effort_rate × intensity × max(attacker energy, 0)`. |
+| `exchange.effort_rate` | `f32` | `0.05` | Finite values clamp to `[0, 1]`; non-finite fall back to `0.05`. The effort rate of both exchange acts: a steal's or a give's effort base is `effort_rate × intensity × max(actor energy, 0)`. |
 | `exchange.share_min` | `f32` | `0.01` | Must be finite and in `(0, 1]`; other values fall back to `0.01`. The lower bound of both heritable shares. |
 | `exchange.founder_share` | `f32` | `0.2` | Must be finite and in `[share_min, 1]`; other values fall back to `0.2` clamped to that range. Every founder's `steal_share` and `give_share`. |
 
@@ -397,9 +400,9 @@ Normalization runs `exchange.share_min`, then `exchange.founder_share`, then
 `mutation.share`. `PredationConfig` keeps only
 `kill_complexity_bonus_multiplier`; a config naming the retired
 `predation.steal_cost_rate` fails to resolve. A steal's intensity is
-`min(1, steal_share × effort)`, with the attacker's own share and the
-decoded effort modifier `2^clamp(x, −2, 2)` of its `StealEffort` field (1
-when unwired). A live patch of the share bounds reaches newborns through the
+`min(1, steal_share × effort)` and a give's `min(1, give_share × effort)`,
+with the actor's own share and the decoded effort modifier `2^clamp(x, −2,
+2)` of its `StealEffort` or `GiveEffort` field (1 when unwired). A live patch of the share bounds reaches newborns through the
 clamp at birth; a living creature keeps its stored shares.
 
 ---

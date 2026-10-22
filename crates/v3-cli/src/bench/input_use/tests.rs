@@ -107,7 +107,7 @@ fn world_set_cases_carry_the_input_use_block_and_the_gate_does_not() {
     assert_eq!(timings.input_use_wall_clock_ms_per_seed.len(), 3);
     for case in &report.goal_indicators.cases {
         let block = case.input_use.defined().expect("defined on the world set");
-        assert_eq!(block.version, "input-use-v3");
+        assert_eq!(block.version, "input-use-v4");
         assert_eq!(block.row_format, ROW_FORMAT);
         assert_eq!(block.family_row_format, FAMILY_ROW_FORMAT);
         assert_eq!(block.scenes.original_executions, 80);

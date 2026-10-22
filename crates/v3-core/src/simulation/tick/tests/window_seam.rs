@@ -589,6 +589,72 @@ fn steal_north_genome() -> CreatureGenome {
     }
 }
 
+/// Gives to the north neighbour at the unwired effort modifier 1 (T27.F03).
+fn give_north_genome() -> CreatureGenome {
+    let sink = crate::creature::genome::vote::DirectedVoteKind::GiveEnergy
+        .sink(0)
+        .index() as u8;
+    vm_program_genome(vec![
+        VmInstruction::AddVote { sink, src: 0 },
+        VmInstruction::Halt,
+    ])
+}
+
+/// The window's charge for a give is its own ledger row; the gift's credit
+/// is the recipient's, so the giver's applied action carries no reward.
+#[test]
+fn a_give_charges_its_effort_and_credits_no_reward_to_the_giver() {
+    let (mut sim, giver, recipient) = make_sim_two_creatures(100.0, 80.0);
+    sim.creatures[giver].genome = give_north_genome();
+    sim.creatures[recipient].genome = vm_program_genome(vec![VmInstruction::Halt]);
+    let mut trace = Some(ActiveTrace::new(giver, 1));
+    run_tick(&mut sim, &mut trace);
+    let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
+    let give = &outcome.applied[0];
+    assert_eq!(give.entry.action_type, ActionType::GiveEnergy);
+    assert_eq!(give.entry.result, ActionResult::Success);
+    assert!(give.charge > 0.0);
+    let ledger = sim.stats.energy_flows.action_charges;
+    assert!((give.charge - ledger[ActionType::GiveEnergy]).abs() < 1e-9);
+    assert_eq!(give.reward, 0.0);
+    assert!(sim.stats.energy_flows.gift_credit > 0.0);
+}
+
+/// A traced giver exhausted by its gift dies inside its window: the window
+/// records the gift and the `Gift` removal, and the applied action equals
+/// the untraced run's logged entry, which the oracle keeps past the
+/// giver's removal with its action log.
+#[test]
+fn a_giver_exhausted_by_its_gift_inside_its_window_matches_the_untraced_run() {
+    let fixture = || {
+        let (mut sim, giver, recipient) = make_sim_two_creatures(5.0, 30.0);
+        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+        sim.creatures[giver].body.give_share = 1.0;
+        sim.creatures[giver].genome = give_north_genome();
+        sim.creatures[recipient].genome = vm_program_genome(vec![VmInstruction::Halt]);
+        (sim, giver)
+    };
+    for budget in [Some(WINDOW_BUDGET), None] {
+        let (mut traced, giver) = fixture();
+        let (mut plain, _) = fixture();
+        let mut trace = Some(recording(giver, 3, budget));
+        let plain_tick = tick_both(&mut traced, &mut plain, &mut trace, 0);
+        assert!(!plain.creatures.contains_key(giver), "the giver died");
+        let outcome = trace.as_ref().unwrap().ticks[0].outcome.as_ref().unwrap();
+        assert_eq!(outcome.died, Some(DeathCause::Gift));
+        assert!(outcome.after.is_none());
+        let applied: Vec<String> = outcome
+            .applied
+            .iter()
+            .map(|action| format!("{:?}", action.entry))
+            .collect();
+        assert_eq!(applied.len(), 1);
+        assert_eq!(outcome.applied[0].entry.action_type, ActionType::GiveEnergy);
+        assert_eq!(applied, plain_tick.target_logged);
+        assert_eq!(fingerprint(&traced), fingerprint(&plain));
+    }
+}
+
 #[test]
 fn a_steal_credits_its_reward_and_the_victim_records_damage() {
     let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);

@@ -1,8 +1,10 @@
 pub(crate) mod cgp_reproduction;
+mod giving;
 mod predation;
 mod reproduction;
 
 use crate::creature::action_log::ActionType;
+pub use giving::{apply_give_energy, GiveActionResult};
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
@@ -26,6 +28,16 @@ pub(super) fn pay_effort(
 ) -> f64 {
     let effort = energy.action_effort(base, creature.cached_complexity, creature.age);
     charge_effort(creature, effort, cause)
+}
+
+/// What an exchange act moved: its result, the energy debited from the side
+/// that gives it up, and the counterpart creature, `None` when the target cell
+/// held none (T27.F03).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TransferOutcome<R> {
+    pub result: R,
+    pub amount: f32,
+    pub counterpart: Option<CreatureId>,
 }
 
 /// The intensity of an exchange attempt (T27.F03): `min(1, share ×

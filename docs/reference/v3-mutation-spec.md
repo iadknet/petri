@@ -177,9 +177,9 @@ Topology connection semantics (T11.F15, T11.F18):
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
   the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
-  include `AddVote { sink in 0..30, src }` (the sink drawn uniformly over the
-  vote catalog, the three kind drives included, T11.F30), `WriteActionParam { field_idx, src }`, whose `field_idx` is
-  one uniform draw over `ActionParamField::ALL` (`0..4`, T11.F27, T02.F08), and
+  include `AddVote { sink in 0..39, src }` (the sink drawn uniformly over the
+  vote catalog, the four kind drives included, T11.F30), `WriteActionParam { field_idx, src }`, whose `field_idx` is
+  one uniform draw over `ActionParamField::ALL` (`0..5`, T11.F27, T02.F08, T27.F03), and
   `ReadActionQueueParam`, whose `param_slot` is drawn from `0..2`, the queue
   parameter slots that carry a value (T11.F27); the operand nudge moves an
   `AddVote`'s `sink` or `src`, and the raw-field move can still step a
@@ -357,7 +357,7 @@ and native storage/work costs. Existing weight mutation and edge deletion apply
 to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
-(the 98 output sinks, vote and parameter sinks included) are never
+(the 108 output sinks, vote and parameter sinks included) are never
 added/removed/retyped — only their edges are evolvable.
 
 - `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
@@ -420,7 +420,7 @@ added/removed/retyped — only their edges are evolvable.
   fewer events for the same targets (the intended supply-and-target law).
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
   uniform draw over one surface per compute node and one per sink in vector
-  order: all 98 sinks, the 30 vote sinks and the four parameter sinks
+  order: all 108 sinks, the 39 vote sinks and the five parameter sinks
   included (T11.F27, T11.F30, T02.F08);
   source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
@@ -550,7 +550,7 @@ added/removed/retyped — only their edges are evolvable.
   samples ActionQueue across all `u16` channels; WholeFamily excludes it because
   it has no small complete fixed-width family. WholeFamily groups upstream into
   24 channels/declarations and each memory bank into 16 channels with no
-  declaration. The event appends at most 30 edges and 24 declarations, to one
+  declaration. The event appends at most 39 edges and 24 declarations, to one
   sink, and counts as one mutation event. Typed families name one food type.
 
   Source admission reuses the first representable matching declaration, or
@@ -656,11 +656,11 @@ added/removed/retyped — only their edges are evolvable.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
-  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..3)` over `[Move, Reproduce, StealEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
-  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..3)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 and no fact members (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
+  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..4)` over `[Move, Reproduce, StealEnergy, GiveEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
+  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..4)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 and no fact members (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
   | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
   | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
-  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..2)` over the other two kinds in catalog order; every member moves to its new sink, a fact member to the new kind's drive; a gene with a fact member skips after its draws when that drive is absent | Neutral |
+  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..3)` over the other three kinds in catalog order; every member moves to its new sink, a fact member to the new kind's drive; a gene with a fact member skips after its draws when that drive is absent | Neutral |
   | `RemoveGroup` | 2 | same | the group; removes the record and every member of either role, renumbering higher `GroupId`s; `Δgenome_size` −1 | Decreasing |
   | `AddRandomizedRingGroup` | 2 | as `AddRingGroup` | `AddRingGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
   | `AddRandomizedDirectionPairGroup` | 2 | as `AddDirectionPairGroup` | `AddDirectionPairGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
@@ -680,7 +680,7 @@ added/removed/retyped — only their edges are evolvable.
   operators that construct `ReadInput`. On a Graph node it is a connection
   operator (T20.F16, born-connected input declaration): after the reference
   draw it draws `sub_idx = gen_range(0..width)` (`width` the reference's
-  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..30))` and a
+  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..39))` and a
   weight `gen_range(-1.0f32..=1.0)` (`AddGraphEdge`'s new-edge law), in that
   order, and appends one `GraphEdge { source: InputLeaf { ref_idx, sub_idx },
   weight }` to that `ActionVote` sink's inputs, `ref_idx` the appended index.

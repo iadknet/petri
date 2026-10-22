@@ -100,7 +100,10 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // `StealEffort` where `StealEnergyAmount` stood
     // (12995421853181291158 -> 1565583786713441820); mapping the name back
     // restores the old value.
-    assert_eq!(hash, 1565583786713441820, "pin of the recruitment-Off path");
+    // Re-pinned by T27.F03 commit 4 after two agreeing runs: the
+    // `GiveEnergy` kind and `GiveEffort` widen the kind, sink and field
+    // draws (1565583786713441820 -> 6751617150376296849).
+    assert_eq!(hash, 6751617150376296849, "pin of the recruitment-Off path");
 }
 
 #[test]

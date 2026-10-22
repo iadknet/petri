@@ -42,7 +42,8 @@ use contexts::{recorded_contexts, Extension};
 use records::{run_panel_executions, PanelExecution, TracedBattery};
 
 pub const VERSION: &str = "mutation-effects-v5";
-pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v3";
+/// `neighborhood-coverage-v4` since T27.F03: 39 vote-sink rows.
+pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v4";
 /// Proposal seed: `PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER * cohort +
 /// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`, where
 /// `parent_index` is the parent's zero-based ordinal within its cohort, not

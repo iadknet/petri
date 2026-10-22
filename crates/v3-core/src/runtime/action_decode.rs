@@ -10,9 +10,9 @@ pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 /// Decode the action a pass commits (T19.F04): the direction is the winning
 /// sink's, and the kind's parameter fields supply the rest (T11.F27): `Eat`
 /// reads `EatFoodType` and `EatLeaveShare` (T02.F08, clamped to `[0, 1]`, so
-/// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction` and
-/// `StealEnergy` `StealEffort` as its effort modifier ([`effort_modifier`],
-/// T27.F03); `Move` reads nothing. A drive,
+/// an unwired field eats the whole cell), `Reproduce` `ReproduceTransferFraction`,
+/// and `StealEnergy` and `GiveEnergy` `StealEffort` and `GiveEffort` as their
+/// effort modifiers ([`effort_modifier`], T27.F03); `Move` reads nothing. A drive,
 /// `Terminate` and `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
@@ -34,6 +34,10 @@ pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
                 DirectedVoteKind::StealEnergy => WorldAction::StealEnergy {
                     direction,
                     effort: effort_modifier(params[ActionParamField::StealEffort.index()]),
+                },
+                DirectedVoteKind::GiveEnergy => WorldAction::GiveEnergy {
+                    direction,
+                    effort: effort_modifier(params[ActionParamField::GiveEffort.index()]),
                 },
             }
         }
@@ -317,7 +321,7 @@ mod tests {
         #[test]
         fn a_field_never_changes_another_kinds_commit(
             field_index in 0..ActionParamField::ALL.len(),
-            base in prop::array::uniform4(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
+            base in prop::array::uniform5(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
             value in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
         ) {
             let field = ActionParamField::ALL[field_index];

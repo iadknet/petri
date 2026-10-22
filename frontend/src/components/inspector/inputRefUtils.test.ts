@@ -20,11 +20,13 @@ describe("formatAction", () => {
 	it("formats current server world action variants", () => {
 		const move: WorldAction = { Move: "E" };
 		const reproduce: WorldAction = { Reproduce: { direction: "N", energy_transfer_fraction: 0.5 } };
-		const steal: WorldAction = { StealEnergy: { direction: "W", amount: 3 } };
+		const steal: WorldAction = { StealEnergy: { direction: "W", effort: 2 } };
+		const give: WorldAction = { GiveEnergy: { direction: "S", effort: 1 } };
 
 		expect(formatAction(move)).toBe("Move(E)");
 		expect(formatAction(reproduce)).toBe("Reproduce(N)");
 		expect(formatAction(steal)).toBe("Steal(W)");
+		expect(formatAction(give)).toBe("Give(S)");
 	});
 
 	it("summarizes action arrays without crashing on empty entries", () => {
@@ -198,7 +200,7 @@ describe("formatInputRefWithSubIndex", () => {
 	it("names decision-state and queue sub-values", () => {
 		expect(formatInputRefWithSubIndex("ActionVotes", 0)).toBe("Votes.Eat");
 		expect(formatInputRefWithSubIndex("ActionVotes", 22)).toBe("Votes.StealEnergy[SW]");
-		expect(formatInputRefWithSubIndex("PreviousPassVotes", 25)).toBe("PrevVotes.Drive Move");
+		expect(formatInputRefWithSubIndex("PreviousPassVotes", 33)).toBe("PrevVotes.Drive Move");
 		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("Commits.Reproduce");
 		expect(formatInputRefWithSubIndex("PreviousOutcome", 0)).toBe("PrevOutcome.energy");
 		expect(formatInputRefWithSubIndex("ActionQueue", 0)).toBe("Queue1.type");

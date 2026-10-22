@@ -53,13 +53,13 @@ Boundary intent:
 ## 2. Pass Loop and Action Selection
 
 A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
-from `entry_node_id`; nodes vote into the 30-sink vote vector `V` (`Eat`, the eight
+from `entry_node_id`; nodes vote into the 39-sink vote vector `V` (`Eat`, the eight
 `Directed(K, d)` sinks of each directed kind `K` in `Move`, `Reproduce`,
-`StealEnergy` order, the drives `Drive(Move)`,
-`Drive(Reproduce)`, `Drive(StealEnergy)`, `Terminate`, `Decide`) and write the
-four-field parameter surface `action_params` (indexed by `ActionParamField`:
-`EatFoodType`, `EatLeaveShare`, `ReproduceTransferFraction`,
-`StealEffort`); at the pass
+`StealEnergy`, `GiveEnergy` order, the drives `Drive(Move)`,
+`Drive(Reproduce)`, `Drive(StealEnergy)`, `Drive(GiveEnergy)`, `Terminate`,
+`Decide`) and write the five-field parameter surface `action_params` (indexed
+by `ActionParamField`: `EatFoodType`, `EatLeaveShare`,
+`ReproduceTransferFraction`, `StealEffort`, `GiveEffort`); at the pass
 end at most one
 action commits. A node may be dispatched any number of times within a pass
 (T19.F02): cycles and self-targets are legal, every dispatch runs on the
@@ -108,7 +108,8 @@ and its leave share from `EatLeaveShare` (clamped to `[0, 1]`, non-finite
 reads 0, T02.F08),
 `Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
 `[0, 1]`, non-finite reads 0), and `StealEnergy` its effort modifier from
-`StealEffort` (`2^clamp(x, −2, 2)`, 1 for a non-finite value, T27.F03). `Move` reads no field, and
+`StealEffort` (`2^clamp(x, −2, 2)`, 1 for a non-finite value, T27.F03), and
+`GiveEnergy` its effort modifier from `GiveEffort` by the same rule. `Move` reads no field, and
 the drives, `Terminate` and `Decide`
 never commit and decode to `NoOp`. The parameter surface is zeroed
 at tick start, overwritten per visit, and read at commit.

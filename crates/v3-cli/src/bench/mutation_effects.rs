@@ -1,6 +1,6 @@
 //! The per-world `mutation_effects` block (T11.F26): exposure strata beside
 //! the drift and selected readings, single-event attribution cohorts, and the
-//! `neighborhood-coverage-v3` extension, projected from
+//! `neighborhood-coverage-v4` extension, projected from
 //! `v3_core::neighborhood::mutation_effects`.
 //!
 //! Count rows are fixed-order integer arrays named once by `count_fields`,

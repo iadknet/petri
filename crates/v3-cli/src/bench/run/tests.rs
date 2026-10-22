@@ -601,8 +601,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // 42 are the first six). Removing the capacity draw restores seed 2.
     // T27.F03 commit 3 (the two share draws on every birth shift every later
     // draw): seed 4 goes extinct at tick 84; seed 1 is the lowest of 0..=200
-    // that survives (1, 9, 37, 43, 75 and 110 are the first six).
-    params.seeds = vec![1];
+    // that survives (1, 9, 37, 43, 75 and 110 are the first six). T27.F03
+    // commit 4 (the `GiveEnergy` kind widens the kind, sink and field
+    // draws): seed 1 goes extinct; seed 9 is the lowest of 0..=200 that
+    // survives (9, 37, 43, 53, 60 and 75 are the first six).
+    params.seeds = vec![9];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

@@ -205,7 +205,7 @@ fn v3_commit_counts_let_a_plan_stop_after_one_commit() {
     // Pass two reads the bar 1: Eat votes 1, effective 0.
     assert_eq!(tick.passes[1].votes[VoteSink::Eat.index()], 1.0);
     assert_eq!(tick.passes[1].effective_votes[VoteKind::Eat.index()], 0.0);
-    assert_eq!(tick.output.commit_counts, [1, 0, 0, 0]);
+    assert_eq!(tick.output.commit_counts, [1, 0, 0, 0, 0]);
 }
 
 /// V4: a self-routing VM node, no `Decide`, votes `Move N 2` and
