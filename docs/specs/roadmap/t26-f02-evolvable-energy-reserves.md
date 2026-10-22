@@ -235,9 +235,9 @@ flows would show it wrong.
       `cargo test -p v3-core --no-fail-fast` and its `telemetry-seams` lib
       tests pass; check, fmt and `make rust-clippy` clean.
 - [ ] `make check` -> `<result>`; `make rust-test-slow` -> `<result>`.
-- [ ] Mutation gate: fresh `MUTANTS_ITERATE=0 make rust-mutants`, summary
-      line, output path, every survivor resolved as killed, equivalent, or
-      deferred.
+- [x] Mutation gate -> 167 tested: 5 missed, 146 caught, 16 unviable, 0
+      timeouts (user-approved: shard 0 local, 1–3 Offload 39704631831);
+      path, 4 killed, 1 equivalent in the readings file.
 - [x] Comparison and sweep tables and local summary hashes in the readings
       file.
 - [x] gate, goal and goal-long summaries at
