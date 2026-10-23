@@ -9,6 +9,7 @@ Before editing this file, follow `.agents/skills/agents-md/SKILL.md`.
   `v3-lab` (capability assay lab, T22), `v3-telemetry` (run telemetry, T21).
 - `frontend/`: web UI, with its own `frontend/AGENTS.md`. `scripts/`: POSIX checks and tooling.
   `telemetry/`: local observability stack. `experiments/worlds/`: world files.
+- `docs/architecture.md`: the desired architecture (domains, owners, dependency graph) and its gaps.
 - `docs/README.md` indexes the documentation: roadmap tracks in `docs/roadmaps/`, feature specs in
   `docs/specs/roadmap/`, research notes in `docs/strategy/`, progress records in `docs/progress/`.
 - `CONTRIBUTING.md` covers roadmap editing and commits; `SECURITY.md` covers dependencies and reporting.

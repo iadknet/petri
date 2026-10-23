@@ -19,5 +19,8 @@ Describe this track's independently observable outcome.
 
 ## Notes for AI Agents
 
+- Architecture: the [`docs/architecture.md`](../architecture.md) sections this
+  track serves, and the A8 gaps each row closes (`G<n>`: `T01.F01`).
+
 Record track context and constraints. Keep execution policy in
 `docs/workflow.md`.

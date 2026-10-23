@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -11,7 +11,12 @@ function root() {
   return mkdtempSync(join(tmpdir(), 'petri-roadmap-check.'));
 }
 
-function run(repository) {
+const ARCHITECTURE = '# Architecture\n\n## A1 Rules\n\nRules.\n\n## A8 Gaps\n\nNone.\n';
+
+// Every live repository carries docs/architecture.md unless a test removes it.
+function run(repository, { architecture = true } = {}) {
+  const file = join(repository, 'docs', 'architecture.md');
+  if (architecture && !existsSync(file)) write(repository, 'docs/architecture.md', ARCHITECTURE);
   return spawnSync(process.execPath, [checker, '--root', repository], { encoding: 'utf8' });
 }
 
@@ -25,13 +30,14 @@ function master(rows, { status = 'Active', criteria = '- [ ] Program complete.' 
   return `# Program\n\n**Status**: ${status}\n\n## Track Roadmaps\n\n${rows.join('\n')}\n\n## Final Success Criteria\n\n${criteria}\n`;
 }
 
-function track(id, features, { status = 'Planned', criteria = '- [ ] Track complete.' } = {}) {
-  return `# ${id} — Track\n\n**Status**: ${status}\n\n## Track Success Criteria\n\n${criteria}\n\n## Executable Features\n\n${features.join('\n')}\n`;
+function track(id, features, { status = 'Planned', criteria = '- [ ] Track complete.', notes = '- Architecture: serves A1.' } = {}) {
+  return `# ${id} — Track\n\n**Status**: ${status}\n\n## Track Success Criteria\n\n${criteria}\n\n## Executable Features\n\n${features.join('\n')}\n\n## Notes for AI Agents\n\n${notes}\n`;
 }
 
-function spec(id, { status = 'Planned', checked = false } = {}) {
+function spec(id, { status = 'Planned', checked = false, architecture = '| A1 | works within |' } = {}) {
   const mark = checked ? 'x' : ' ';
-  return `# ${id} — Feature\n\n**Status**: ${status}\n**Feature**: ${id}\n**Last updated**: whenever useful\n\n## Goal\n\nGoal. Mentioning readiness review or any retired workflow term is ordinary prose.\n\n## Implementation Tasks\n\n- [${mark}] Implement.\n\n## Verification\n\n- [${mark}] Verify.\n\n## Success Criteria\n\n- [${mark}] Succeed.\n`;
+  const cited = architecture === null ? '' : `## Architecture\n\n| Section or gap | Role |\n| --- | --- |\n${architecture}\n\n`;
+  return `# ${id} — Feature\n\n**Status**: ${status}\n**Feature**: ${id}\n**Last updated**: whenever useful\n\n## Goal\n\nGoal. Mentioning readiness review or any retired workflow term is ordinary prose.\n\n${cited}## Implementation Tasks\n\n- [${mark}] Implement.\n\n## Verification\n\n- [${mark}] Verify.\n\n## Success Criteria\n\n- [${mark}] Succeed.\n`;
 }
 
 function base(repository, options = {}) {
@@ -223,4 +229,57 @@ test('Notes for AI Agents accepts only labelled bullets', () => {
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }
+});
+
+test('live roadmaps require docs/architecture.md', () => {
+  const repository = root();
+  try {
+    base(repository);
+    const result = run(repository, { architecture: false });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /docs\/architecture\.md: live tracks or specs require/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('a spec must cite docs/architecture.md sections that exist', () => {
+  const repository = root();
+  try {
+    base(repository);
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md', spec('T01.F01', { architecture: null }));
+    let result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /missing ## Architecture section/);
+
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md', spec('T01.F01', { architecture: '| none | nothing |' }));
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /cites no docs\/architecture\.md section/);
+
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md', spec('T01.F01', { architecture: '| A9 | works within |' }));
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /cites A9, which docs\/architecture\.md does not define/);
+
+    // A gap alone is a citation; gaps are not checked against A8, which closure empties.
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md', spec('T01.F01', { architecture: '| G3 | closes |' }));
+    assert.equal(run(repository).status, 0);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('a track must carry an Architecture note citing docs/architecture.md', () => {
+  const repository = root();
+  try {
+    base(repository);
+    write(repository, 'docs/roadmaps/t01-core.md', track('T01', [
+      '- [ ] **T01.F01 — Foundation** — Depends on: None',
+    ], { notes: '- Some other note.' }));
+    let result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /t01-core\.md: Notes for AI Agents needs an "- Architecture:" bullet/);
+
+    write(repository, 'docs/roadmaps/t01-core.md', track('T01', [
+      '- [ ] **T01.F01 — Foundation** — Depends on: None',
+    ], { notes: '- Some other note.\n- Architecture: serves A1 and\n  A8; closes G2.' }));
+    assert.equal(run(repository).status, 0);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });

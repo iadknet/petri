@@ -17,8 +17,15 @@ its natural analog first; the master roadmap's natural-analog rule is what the
 reviewer checks it against. Anything longer than a sentence belongs in the
 feature spec, written just in time.
 
+Tracks and rows serve [`docs/architecture.md`](../architecture.md), the
+desired architecture. A track's Notes name the sections it serves and the A8
+gaps each row closes. Rows that change the desired state edit that file in the
+same commit. A gap no row closes is proposed to the user, not added silently.
+
 Run `make roadmap-check` while editing. It checks ownership, links, dependency
-existence and cycles, feature/spec completion agreement, and completion rollups.
+existence and cycles, feature/spec completion agreement, completion rollups, and
+that every track's Notes and every spec's Architecture section cite sections
+`docs/architecture.md` defines.
 It intentionally does not police prose, review procedure, dates, or agent
 orchestration.
 

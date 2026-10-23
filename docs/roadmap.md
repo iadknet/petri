@@ -24,6 +24,7 @@ attributed to the feature whose closure moved it.
 - [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
 - [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
 - [ ] **T29 — Heredity** — [Roadmap](roadmaps/t29-heredity.md) — Depends on: T25
+- [ ] **T30 — Core Boundaries** — [Roadmap](roadmaps/t30-core-boundaries.md) — Depends on: T25, T29
 
 ## Final Success Criteria
 
@@ -44,6 +45,11 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   kin-tag affinity). Ordinary condition readings of another body (its
   energy, its readiness) are facts, not comparisons. Its roadmap goal line names
   the analog first. Measurement features are exempt.
+- Every track, row and spec serves [`docs/architecture.md`](architecture.md),
+  the desired architecture: one owner per concept, the domain dependency
+  graph, composition over inheritance, and as few built-in assumptions as
+  clean layers allow. A track's Notes name the sections it serves and the
+  gaps its rows close.
 - Brain and sensorimotor features improve what evolution can find on its
   own; they never target a specific behavior. Specific sensors and scenes are
   yardsticks only.
@@ -73,7 +79,18 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   steals (2026-10-12 probe) are owned by T27.F03.
 
 Priority order for new starts: T26.F01, T25.F10, T27.F01, T26.F02, T27.F03,
-T25.F11, T25.F12, T27.F02, T28.F01, T28.F02.
+T30.F01, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03, T30.F02,
+T30.F03, T30.F04, T30.F05, T30.F06, T30.F07, T28.F01, T28.F02.
+
+- T30 (core boundaries) was placed on 2026-10-22 at the user's direction
+  from the gaps [`docs/architecture.md`](architecture.md) found without an
+  owning row; the same change made T27.F02 depend on T25.F11 (user) and
+  entered T29's rows, missing from this order since that track was added.
+  T30.F01 is ordered before T25.F11 so the genome refactors change a server
+  projection rather than the frontend's copy of genome types; the other
+  rows follow T29 and precede T28, whose ledger buckets would build on
+  T30.F02. Both are scheduling preferences, not prerequisites (assistant
+  proposal; [design review](progress/readings/t30-design-review.md)).
 
 - T26–T28 were placed on 2026-10-20 at the user's direction from the
   [interaction features design note](strategy/interaction-features-design-2026-10-20.md),

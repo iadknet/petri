@@ -41,7 +41,9 @@ After worktree setup, delegate the shared Plan step to `roadmap_spec_owner`
 with `model: gpt-6-astra`, `reasoning_effort: xhigh`, and `fork_turns: none`.
 Give it the original user requirements, absolute repository/worktree paths,
 feature ID, and instructions to read `AGENTS.md`, the roadmap contract and
-template, and the sections it needs rather than whole files: from
+template, `docs/architecture.md` (the shared Plan step's "Architecture"
+paragraph applies, and its plan-design-review runs checks 3 and 5 against
+that file), and the sections it needs rather than whole files: from
 `docs/workflow.md`, "Plan", "Review", and "Environmental pressures in the
 standard baseline"; from this adapter, "Planning and spec ownership". From the
 owning track it reads the feature's row, its dependency rows, and the "Notes for

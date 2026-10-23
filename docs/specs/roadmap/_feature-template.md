@@ -34,6 +34,18 @@ List source-of-truth inputs, decision-relevant research evidence, exact
 dependency outputs, and invariants. The owning roadmap row is the source of
 truth for feature dependencies.
 
+## Architecture
+
+Cite [`docs/architecture.md`](../../architecture.md), the desired state: the
+sections this feature works within, the A8 gaps it closes or preserves, and
+any change to the desired contract (A1–A7), which the plan commit makes in
+that file with an A8 line naming this feature. Closure deletes what it closed.
+
+| Section or gap | Role |
+| --- | --- |
+| `A5 <concept>` | works within, or changes (edited in `docs/architecture.md`) |
+| `G<n>` | closes; or closes part (name the part); or preserves (owning row; any new use and why) |
+
 ## Telemetry
 
 State what a person looking at a run of this feature can see, or

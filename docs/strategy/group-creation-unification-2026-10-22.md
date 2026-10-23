@@ -173,7 +173,7 @@ non-direction members.
   `InputRefAdd` (replaced by the two `AddSensor*`).
 - **Recruitment's whole-family capabilities are kept through the common
   layers** (assistant proposal, by the maximum-flexibility rule; round 5
-  of the review found no user intent to drop them): the 8-slot upstream
+  of the review found no user intent to drop them): the 24-slot upstream
   bus and each 16-slot shared-memory bank (current and previous) become
   sensor families in the descriptor, so `AddSensor*` and `AddBundle*` can
   wire one as a `Plain` bundle in one event, live or silent, like any

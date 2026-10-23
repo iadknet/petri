@@ -8,6 +8,10 @@ needed, track roadmaps under `docs/roadmaps/`, and feature specs under
 Roadmap features are implemented through the workflow in `docs/workflow.md`:
 one goal per feature, in its own worktree, merged into `main`.
 
+New tracks, rows and specs cite `docs/architecture.md`, the desired
+architecture, and update it when they change a boundary; its Gaps section
+names the rows that close each difference from today's code.
+
 Run `make roadmap-check` while editing roadmap documents and record focused
 verification in the owning feature spec. Keep dependencies, checkboxes, links,
 statuses, and completion rollups truthful. Run `make check` before declaring a
