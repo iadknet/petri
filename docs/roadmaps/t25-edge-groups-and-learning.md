@@ -1,7 +1,7 @@
 # T25 — Edge Groups and Per-Edge Learning
 
 **Status**: In Progress
-**Last updated**: 2026-10-20
+**Last updated**: 2026-10-22
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -24,9 +24,11 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 - [ ] A direction-pair group born silent on a creature, food, barrier or crowd offset is retained and its scale moves off zero in a 40,000-tick goal-long run on at least one standard goal world.
 - [ ] The three creature families are one `NearbyCreature` family declared once in `contracts::inputs`.
 - [ ] Learning mode, reward source, trace decay and the Lamarckian flag are per-edge heritable attributes on both surfaces; vote edges can learn; no cost knob or lazy initializer remains.
-- [ ] Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
+- [ ] (Superseded by T25.F12 for the representation: `Scope` and `inherit_scale` give way to bundle `Learning`, member overrides and `credits`; the behavior this criterion asked for is kept.) Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
 - [ ] Group creation is uniform or randomized, a member can be detached, and the catalog is one consistent set of edge and group operators with a bijection test.
 - [ ] A group costs one genome unit however many members it has and however they have changed; a pair recruitment's direction members and drive facts belong to one group, so a recruitment costs one unit, not its silent edges; runtime learning never changes the size.
+- [ ] Sensor wiring is a set of orthogonal mutations over one concept, the bundle (T25's group, renamed): every bundle has the same parts, cost, birth law, learning draw, member law (composition, learning, decay, seeds, detach) and edit operators, and differs only in its wiring (`Plain` into one sink, `Ring` and `DirectionPair` geometry-aware into a kind); `AddSensorLive`/`AddSensorSilent` wire every new sensor whole, one bundle per field set (a single-field sensor is a bundle of one), `AddBundleLive`/`AddBundleSilent` add a bundle to a declared sensor, through one birth policy; `RecruitNeutralInput`, its config and the four add-group operators are gone; the goal run counts creations by operator and wiring.
+- [ ] Learning is one type: edges and bundles carry the same `Learning` (one `lamarckian` flag, one retention); every member's weight is `scale × pattern + modifier`; a bundle's `Learning` can target its scale ("learn as a group"), its members ("learn per edge"), or both (assistant proposal); a member's policy is inherit (static modifier under scale-only learning, the bundle's settings under member learning), static, or its own `Learning`, which always overrides; a member may also credit the scale; a learned scale's state survives without contributors; and the runtime updates every learnable number through one path with no scope branches.
 - [ ] A learned edge weight and a learned group scale relax toward their birth values at a heritable per-edge or per-group retention, the founder stays at no decay, and the goal run reads the retention distribution beside the plasticity census.
 
 ## Executable Features
@@ -52,12 +54,18 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 - [x] **T25.F10 — Group Genes Cost as Genes** — Depends on: T25.F09
   - Goal: The genomic bottleneck: one developmental gene wires many synapses, so a creature pays to carry and copy the gene, not every synapse it built.
+- [ ] **T25.F11 — Sensor Wiring as Orthogonal Mutations** — Depends on: T25.F10
+  - Goal: One developmental program wires a sensory map however the gene that calls it was reached, and a new synapse may transmit from the start or wait silent until activity unsilences it: a sensor arrives whole, one bundle per field set, a bundle can wrap a sensor already there, and every bundle is built and edited one way, live or silent, with geometry-aware wiring as the only difference.
+- [ ] **T25.F12 — Learning as One Type on Edges and Bundles** — Depends on: T25.F11
+  - Goal: Synapses and the developmental programs that build them learn by one machinery, as one family of plasticity rules serves every synapse type: a bundle owns its learning and whether it learns as a group or per edge, each member inherits it, stays static, or overrides it with its own, may credit the group as well, and one learner serves every learnable number.
 
 ## Notes for AI Agents
 
 - Decisions (user, 2026-10-13): only geometry is built in (the compass
   pattern and the `(x, y)` pairs declared in `contracts::inputs`), never a
-  computation; the bundle gene was rejected. Reward source and trace decay
+  computation; the "bundle gene" was rejected (a gene multiplying who a
+  creature is by where it is; it does not prohibit T25.F11's bundles, which
+  build in no computation). Reward source and trace decay
   are evolvable per edge or group; shared credit is one pattern-weighted
   change to the shared scale; the plasticity update cost is 0 and its
   machinery is deleted; group creation randomizes learning attributes, never
@@ -108,8 +116,11 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
     second member role of the same gene: one edge per fact field into
     `Drive K`, born at weight 0, no shared scale. F10 owns their
     validation, relocation, deletion, detach and seed handling inside the
-    graph container, so a recruitment's 12 + 16 edges cost one unit.
+    graph container, so a recruitment's 12 + 16 edges cost one unit
+    (historical: a `NearbyCreature` slot now has eight facts, 12 + 8).
     Ordinary slot-fact wiring outside a recruitment is unchanged.
+    Superseded by T25.F11: facts become ordinary bundle members with
+    pattern 1 under the shared scale, and recruitment is removed.
   - **Intended consequence.** Supply is drawn from size before targets, and
     weight mutation picks one materialized edge, so a genome dominated by
     intact n-member genes draws about n+1 times fewer events for the same
@@ -127,6 +138,41 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
     between.
   - **Verification.** Viability first, gate + goal. T25's goal-long
     allowance is spent by F02 and F04.
+- Decided (user, 2026-10-22): F11 is a refactor of sensor wiring, after
+  the [intent audit](../progress/readings/t25-intent-audit-2026-10-22.md)
+  found three composite routes answering the group-creation questions
+  differently and the most frequent route making no group, the gap T25's
+  own problem statement was about. User requirements: live and silent are
+  separate mutation types; groups are treated the same everywhere; "a set
+  of mutations that can happen, what they can happen to, and a randomized
+  draw"; a multi-field input without geometry wires all its fields into one
+  vote, as one gene like any group; bundles are the parent concept, Ring
+  and DirectionPair are bundles with geometry-aware wiring, and that is the
+  only difference. The proposed model (bundles, four new operators, one
+  birth policy, recruitment and its config deleted), its assistant-proposed parts
+  and the Codex review's changes are in the
+  [sensor wiring note](../strategy/group-creation-unification-2026-10-22.md).
+  Verification: viability first, gate + goal; mutation gate and slow tests
+  run; no goal-long (T25's allowance is spent).
+- Decided (user, 2026-10-22): F12 follows F11, after the user asked whether
+  sensors, sinks, edges and bundles keep clean layers around learning. The
+  [bundle learning note](../strategy/bundle-learning-ownership-2026-10-22.md)
+  found learning owned only by edges, a bundle scale borrowing its rule and
+  clamp from members, paired flags (`lamarckian` / `inherit_scale`, two
+  retentions) and scope branches across runtime, census and mutation. The
+  user's model (2026-10-22): every member's weight is the bundle's weight
+  plus its own evolvable modifier; a bundle learns as a group (its scale)
+  or per edge (members without their own learning learn their modifier
+  with the bundle's settings); an edge's own learning always overrides; a
+  member may credit the bundle and learn itself at once; and, as a general
+  rule, "bake in as few assumptions and constraints as possible and allow
+  evolution maximum flexibility, while also maintaining clean abstraction
+  layers". Both targets at once, an explicit static member policy and
+  scale state surviving without contributors are assistant proposals under
+  that rule. F12 supersedes member-owned scale-learning configuration, not
+  only the names `Scope` and `inherit_scale`. Details, update law, detach
+  table, commit shape and acceptance cases are in the note. Verification:
+  viability first, gate + goal; mutation gate and slow tests run.
 - Decided (F08, 2026-10-19): `Slots` deleted on nine empty post-F05
   refinement-by-key readings (F05, F06, F07 goal); `RefineHeritableStructure`,
   `mutation.structured_heritable_refinement` and the inferred-set code are

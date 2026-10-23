@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-10-20
+**Last updated**: 2026-10-22
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
 closed, what made evolution start working and the findings it carried
@@ -72,7 +72,7 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   steals (2026-10-12 probe) are owned by T27.F03.
 
 Priority order for new starts: T26.F01, T25.F10, T27.F01, T26.F02, T27.F03,
-T27.F02, T28.F01, T28.F02.
+T25.F11, T25.F12, T27.F02, T28.F01, T28.F02.
 
 - T26–T28 were placed on 2026-10-20 at the user's direction from the
   [interaction features design note](strategy/interaction-features-design-2026-10-20.md),
@@ -84,6 +84,18 @@ T27.F02, T28.F01, T28.F02.
   because it revises T25.F02's size rule. The
   [T26–T28 design review](progress/readings/t26-t28-design-review.md) records
   the Codex plan-design-review and its dispositions.
+
+- T25.F11 (sensor wiring as orthogonal mutations) was added to T25 on 2026-10-22 at the
+  user's direction, from the
+  [sensor wiring note](strategy/group-creation-unification-2026-10-22.md)
+  and the [T25 intent audit](progress/readings/t25-intent-audit-2026-10-22.md):
+  three mutation routes built groups by three rule sets, and the most
+  frequent one built none, the gap T25 set out to close. Placed before
+  T27.F02 (assistant proposal), whose goal-long run reads group counts.
+  T25.F12 (learning as one type on edges and bundles) was added the same
+  day from the
+  [bundle learning note](strategy/bundle-learning-ownership-2026-10-22.md)
+  and follows F11.
 
 - T25 was placed on 2026-10-13 at the user's direction from the
   [edge groups and learning design note](strategy/edge-groups-and-learning-design-2026-10-13.md),
