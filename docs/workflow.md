@@ -734,7 +734,7 @@ In the worktree: run `make check` once on the final feature code, plus
 `make rust-test-slow` when the Verification Plan declares it, and record
 that commit as the tested commit. Then set the spec to `Complete`, check the
 feature row, delete the `docs/architecture.md` known debts the feature
-paid, update the track and master rollups only if
+paid and their lines in `scripts/architecture-debts.txt`, update the track and master rollups only if
 their own criteria are now satisfied, run `make check-docs` (the closure edits are documentation, and
 the full suite was just run on the same code), and commit. Then:
 

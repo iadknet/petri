@@ -1,0 +1,39 @@
+# Imports crates/v3-core still owes against docs/architecture.md section 3.
+# One line per file and imported module: "<debt> <file under src/> <module>".
+# scripts/architecture-check.mjs fails on any other violation, on an entry the
+# code no longer needs, and on a debt ID section 5 no longer lists. Paying a
+# debt deletes its lines here and its row there.
+
+G2 mutation/sampling.rs runtime::OUTPUT_SLOT_COUNT
+G2 mutation/graph/recruitment.rs runtime::OUTPUT_SLOT_COUNT
+G2 mutation/input_ref/mod.rs runtime::OUTPUT_SLOT_COUNT
+G2 mutation/topology/routing.rs runtime::routing
+G2 mutation/vm/operators.rs runtime::vm
+G2 sensors/static_inputs.rs creature::genome
+G5 mutation/phenotype.rs creature::phenotype
+G7 creature/state.rs simulation::energy_accounting
+G7 runtime/cgp/execute.rs simulation::energy_accounting
+G7 runtime/mesh.rs simulation::energy_accounting
+G7 runtime/trace/domain.rs simulation::energy_accounting
+G7 runtime/trace/recording.rs simulation::energy_accounting
+G7 runtime/types.rs simulation::energy_accounting
+G7 runtime/vm.rs simulation::energy_accounting
+G8 mutation/reachability.rs creature::state
+G8 runtime/cgp/execute.rs creature::state
+G8 runtime/cgp/traced.rs creature::state
+G8 runtime/mesh.rs creature::state
+G8 runtime/traced_mesh.rs creature::state
+G9 sensors/reducers.rs creature::colour
+G9 sensors/reducers.rs creature::state
+G9 sensors/static_inputs.rs creature::colour
+G9 sensors/static_inputs.rs creature::state
+G10 config/simulation.rs patterns::PatternParams
+G10 config/simulation.rs patterns::PatternBounds
+G11 kernel/ordinary_food/stream.rs creature::identity
+G12 mutation/engine/mod.rs creature::parseability
+G14 creature/state.rs creature::sensor_census
+G14 simulation/actions/reproduction.rs creature::drives
+G16 runtime/trace/domain.rs creature::action_log
+G16 runtime/trace/domain.rs simulation::stats
+G20 sensors/perception.rs creature::genome
+G20 sensors/typed_food.rs creature::genome

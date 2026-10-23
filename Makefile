@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-slow rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants rust-mutants-ci frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-slow rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants rust-mutants-ci frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test architecture-check architecture-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -137,6 +137,12 @@ roadmap-check: ## Validate the live roadmap contract (set ROADMAP_ROOT for a fix
 roadmap-check-test: ## Run the roadmap checker regression suite through Aqua's Node runtime.
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/roadmap-check.test.mjs
 
+architecture-check: ## Check v3-core imports against docs/architecture.md and its listed debts.
+	@scripts/architecture-check.mjs
+
+architecture-check-test: ## Run the architecture checker regression suite through Aqua's Node runtime.
+	@$(AQUA_ROOT_DIR)/bin/node --test scripts/architecture-check.test.mjs
+
 implementer-gate-test: ## Run the roadmap-implementer SubagentStop gate regression suite.
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/implementer-gate.test.mjs
 
@@ -150,7 +156,7 @@ tracked-size-check-test: ## Run tracked-file size limit regression tests.
 	@scripts/tracked-size-check-test
 
 policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
-	@$(MAKE) roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test
+	@$(MAKE) roadmap-check roadmap-check-test architecture-check architecture-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.

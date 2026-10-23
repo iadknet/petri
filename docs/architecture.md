@@ -135,7 +135,10 @@ flowchart TD
 ## 5 Known debts
 
 Where today's code differs from sections 1–4, with the row that pays it.
-Delete a line when the code matches. Design notes:
+Delete a line when the code matches. `scripts/architecture-check.mjs` (in
+`make check-docs` and `make check`) fails any `v3-core` import against
+section 3 except those `scripts/architecture-debts.txt` lists under a debt
+here, and fails a listed import the code no longer needs. Design notes:
 [sensor wiring](strategy/group-creation-unification-2026-10-22.md),
 [bundle learning](strategy/bundle-learning-ownership-2026-10-22.md),
 [heredity](strategy/heredity-architecture-2026-10-22.md).
@@ -143,14 +146,14 @@ Delete a line when the code matches. Design notes:
 | Debt | Today | Paid by |
 | --- | --- | --- |
 | G1 | Three routes wire a sensor with three rule sets (`mutation/input_ref/mod.rs:310`, `mutation/graph/recruitment.rs:125`, `mutation/graph/group.rs:121,159`); fact-only branches in `creature/genome/cgp/container.rs:695,1304`; hosting split across `:1105,1117`; non-world sensor widths in `mutation/compound.rs:21-24` | T25.F11 |
-| G2 | Brain I/O vocabulary outside `contracts` (`creature/genome/vote.rs`; `OUTPUT_SLOT_COUNT` in `runtime/types.rs`, imported by `mutation/sampling.rs:7`); route resolution and jump targets imported from runtime (`mutation/topology/routing.rs:12`, `mutation/vm/operators.rs:728`) | vocabulary: T25.F11; routes and jumps: T30.F05 |
+| G2 | Brain I/O vocabulary outside `contracts` (`creature/genome/vote.rs`, outcome channels read by `sensors/static_inputs.rs:4`; `OUTPUT_SLOT_COUNT` in `runtime/types.rs`, imported by `mutation/sampling.rs:7`); route resolution and jump targets imported from runtime (`mutation/topology/routing.rs:12`, `mutation/vm/operators.rs:728`) | vocabulary: T25.F11; routes and jumps: T30.F05 |
 | G3 | Learning configured on edges only (`creature/genome/mod.rs:180`), group flags beside it (`cgp/group.rs:122`), `Scope::Group` branches (`runtime/plasticity/learned.rs:166-278`), learners found from plastic edges (`creature/genome/companions.rs:57`) | T25.F12 |
 | G4 | No birth constructor: `spawn_child` (`simulation/actions/reproduction.rs:376`) and seeding (`simulation/seeding.rs:95`) build creatures separately; learned seeds ride in the genome (`cgp/container.rs:245-246`); `cap_energy` runs after construction (`reproduction.rs:568`); traits draw their own RNG (`creature/identity.rs:43`, `creature/body.rs:80`) | T29.F01 |
 | G5 | Body outside the genome (`creature/body.rs:26`), per-birth trait chances (`body.rs:127`), colour and kin tag gated on brain mutation (`reproduction.rs:519`), `lineage_id` in the body (`creature/identity.rs:7`), mutation importing creature's `Phenotype` (`mutation/phenotype.rs:4`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`reproduction.rs:386`) | T29.F03 |
-| G7 | Energy primitives in `simulation/energy_accounting.rs`, imported by runtime (`runtime/mesh.rs:25`, `runtime/vm.rs:11`, `runtime/cgp/execute.rs:14`, `runtime/types.rs:76`) and creature (`creature/state.rs:171,315-317`) | T30.F02 |
-| G8 | Runtime state types in the creature record (`creature/state.rs:33,77`), imported by runtime (`runtime/mesh.rs:16`, `runtime/cgp/execute.rs:4`) and mutation (`mutation/reachability.rs:21`) | T30.F02 |
-| G9 | Sensors read the whole creature (`sensors/reducers.rs:9`, `sensors/static_inputs.rs:5`) while the creature record imports `sensors::reads` (`creature/state.rs:19`) | T30.F03 |
+| G7 | Energy primitives in `simulation/energy_accounting.rs`, imported by runtime (`runtime/mesh.rs:25`, `runtime/vm.rs:11`, `runtime/cgp/execute.rs:14`, `runtime/types.rs:76`, `runtime/trace/recording.rs:61`) and creature (`creature/state.rs:171,315-317`) | T30.F02 |
+| G8 | Runtime state types in the creature record (`creature/state.rs:33,77`), imported by runtime (`runtime/mesh.rs:16`, `runtime/cgp/execute.rs:4`, `runtime/cgp/traced.rs:4`, `runtime/traced_mesh.rs:7`) and mutation (`mutation/reachability.rs:21`) | T30.F02 |
+| G9 | Sensors read the whole creature and its colour helper (`sensors/reducers.rs:8-9`, `sensors/static_inputs.rs:3,5`) while the creature record imports `sensors::reads` (`creature/state.rs:19`) | T30.F03 |
 | G10 | A config→patterns→kernel cycle (`config/simulation.rs:360-361`, `patterns/mod.rs:18`, `kernel/fertility/mod.rs`) | T30.F04 |
 | G11 | The kernel imports a creature hash helper (`kernel/ordinary_food/stream.rs:10`) | T30.F04 |
 | G12 | The genome validity gate lives in `creature/parseability.rs`, imported by `mutation/engine/mod.rs:9` | T30.F05 |
