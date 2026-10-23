@@ -208,27 +208,57 @@ The **sensor descriptor** in the input contract (`contracts/inputs.rs`)
 owns every sensor's fields, field sets and geometry, including the widths
 of the non-world references that live in `mutation/compound.rs` today
 (`ActionQueue`, `ActionVotes`, `PreviousPassVotes`, `CommitCounts`,
-`PreviousOutcome`), which move there. Mutation selects from it, the wiring
-maps it to destinations and patterns, the container materializes and
-validates it; no other layer rediscovers a sensor's layout.
+`PreviousOutcome`), which move there. The descriptor owns field identity,
+field sets and geometry only; it never knows which action receives a
+field. Mutation selects from it, the wiring maps it to destinations and
+patterns, the container materializes and validates it; no other layer
+rediscovers a sensor's layout. The upstream-bus and shared-memory
+families define their descriptor-to-source addressing once, in the
+descriptor: a memory-bank member reads through the existing
+`GraphSource::SharedMemory` source, so no second memory-read model
+appears.
+
+The vote vocabulary (the 39 vote sinks: four directed kinds of nine, plus
+`Eat`, `Terminate`, `Decide`, and the action parameters) lives in
+`creature/genome/vote.rs` today. It is a brain I/O contract that the VM,
+the Graph, decoding and readers share; the spec owner decides whether F11
+moves it beside the sensor descriptor or a later row does. Graph-only
+output surfaces (the bus, memory writes) stay in the graph domain.
 
 F11 keeps today's learning representation (per-member `PlasticityConfig`
 and `Scope`, group `inherit_scale` and `retention`), applied the same way
 to every wiring; T25.F12 replaces that representation
 ([bundle learning note](bundle-learning-ownership-2026-10-22.md)).
 
-Three layers, so no route keeps private rules:
-1. Operator applicability and target selection: each operator's
-   `applies_to` and its draws of sensor, slot or pair, and destination.
-2. One shared birth policy in the graph mutation layer: given a declared
-   reference, a destination and the operator's form, it picks the wiring
-   from the sensor's shape, draws learning and the birth law, and asks the
-   container to build. One feasibility rule serves `AddSensor*` and
-   `AddBundle*`; when a bundle cannot be hosted, `AddSensor*` has no site
-   for that sensor and draws again, never leaving an unwired declaration on
-   a Graph node.
-3. The container: deterministic materialization of a bundle from its
-   wiring, seed alignment, no RNG, as T25.F01 set it.
+The seam between sampling and structure (revised after an architecture
+challenge, Codex Astra, 2026-10-22):
+1. **Operators** (mutation): applicability and target selection, each
+   operator's `applies_to` and its draws.
+2. **Birth policy** (mutation, the stochastic half): asks the graph domain
+   for the admissible plans for a declared field set (which wirings,
+   destinations and offsets are legal on this node), samples one, and
+   draws the live or silent birth law and the learning attributes. One
+   policy serves `AddSensor*` and `AddBundle*`; when no plan is
+   admissible, `AddSensor*` has no site for that sensor and draws again,
+   never leaving an unwired declaration on a Graph node.
+3. **Graph domain** (deterministic, no RNG): the wiring definitions, plan
+   enumeration and legality, and the container that validates and applies
+   the chosen plan atomically, keeping seed alignment as T25.F01 set it.
+   Wiring belongs here, with the graph's developmental representation, not
+   in the input contract.
+
+The graph is the aggregate root: it stores every edge on its surfaces; a
+bundle is a record, and a member is an edge whose membership links it to
+that record, identified by its occurrence (surface and position). The
+bundle never stores its members, so there is one structural owner. The
+container keeps atomic edits and payload alignment together; pure wiring
+functions (coordinates, pattern, destinations) and, in T25.F12, learning
+resolution are extracted from it rather than spread across operators.
+
+The `Wiring` enum (`Plain | Ring | DirectionPair`) is closed on purpose:
+a finite, serializable extension point whose behavior lives in one
+module; a trait or plugin hierarchy would add machinery without removing
+the need to define mutation, persistence and validation per wiring.
 
 The **wiring** owns the legal member coordinates, the pattern and the
 destination mapping, and its destination requirements; creation,
@@ -252,6 +282,14 @@ F04 use); silent synapses beside transmitting ones (Isaac, Nicoll and
 Malenka 1995; Liao, Hessler and Malinow 1995).
 
 ## Shape of the work
+
+The final seams come first: the sensor descriptor, the wiring plan, the
+graph edit transaction and the birth policy are defined in their final
+places before any behavior moves, so the preservation stage does not
+shape the abstraction (assistant proposal, after the architecture
+challenge). Temporary old semantics stay internal to those seams and are
+deleted at the stated transition. The whole-creature redesign (body,
+inheritance, birth transaction) is not a prerequisite of this row.
 
 Three commits (assistant proposal, after T25.F01, F03 and F06):
 1. Extract the shared birth policy with every caller keeping its current
