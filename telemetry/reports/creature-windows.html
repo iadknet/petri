@@ -157,7 +157,6 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     </form>
     <div class="meta" id="meta"></div>
     <p class="status" id="status" role="status">Loading…</p>
-    <p class="status err" id="notice" hidden></p>
   </header>
 
   <div class="content" id="content" hidden style="display:grid;gap:40px">
@@ -251,47 +250,30 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     return [Number.isFinite(f) && f > 0 ? Math.floor(f / 1000) : nowS() - 30 * 86400, Number.isFinite(t) && t > 0 ? Math.ceil(t / 1000) : nowS()];
   };
 
-  function val(v) {
-    if (v.arrayValue) return (v.arrayValue.values || []).map(val);
-    if ("stringValue" in v) return v.stringValue;
-    if ("doubleValue" in v) return v.doubleValue;
-    if ("boolValue" in v) return v.boolValue;
-    if ("intValue" in v) return Number(v.intValue);
-    return null;
-  }
-  const attrs = (o) => Object.fromEntries((o.attributes || []).map((a) => [a.key.replace(/^petri\./, ""), val(a.value)]));
-  const ring = (a, k) => (Array.isArray(a[k]) && a[k].length === 8 ? a[k].map((x) => Math.round(x * 100) / 100) : null);
+  const SERVICES = `service_name=~"v3-cli|v3-server|v3-lab"`;
+  const PAGE = 5000; // Loki's per-query entry limit
+  const ring = (a) => (Array.isArray(a) && a.length === 8 ? a.map((x) => Math.round(x * 100) / 100) : null);
 
-  // one Tempo trace → one window, the same shape the prototype used
-  function parseWindow(trace) {
-    const spans = (trace.trace || trace).resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans));
-    const ws = spans.find((s) => s.name === "creature_window");
-    if (!ws) return null;
-    const w = attrs(ws);
-    const ticks = spans.filter((s) => s.name === "creature_tick").map((s) => {
-      const a = attrs(s);
-      const sel = a.actions_selected || [];
-      const res = sel.map(() => null);
-      const hops = [];
-      for (const e of s.events || []) {
-        const ea = attrs(e);
-        if (e.name === "hop") hops.push([ea.node, (ea.backend || "?")[0], (ea.vote_contribution || []).reduce((t, x) => t + Math.abs(x), 0)]);
-        else if (e.name === "action" && Number.isInteger(ea.index) && ea.index < sel.length) res[ea.index] = ea.result;
-      }
-      return { t: a.tick, e0: a.energy_start || 0, e1: a.energy_end || 0, here: a.food_here || 0,
-        f0: ring(a, "neighbor_food.0"), f1: ring(a, "neighbor_food.1"), b: ring(a, "neighbor_barrier"), o: ring(a, "neighbor_occupied"),
-        sel, res, hops };
+  // one stored creature.window record (T23.F10) → one window
+  function parseWindow(b) {
+    if (!b || !Number.isInteger(b.window) || !Array.isArray(b.ticks) || !b.ticks.length) return null;
+    const ticks = b.ticks.map((t) => {
+      const sel = t.sel || [];
+      const res = sel.map((_, i) => (t.res && i < t.res.length ? t.res[i] : null)); // applied results pair with chosen actions by position
+      const byType = t.food_by_type || [];
+      return { t: t.t, e0: t.e0 || 0, e1: t.e1 ?? t.e0 ?? 0, here: t.here || 0,
+        f0: ring(byType[0] || t.food), f1: ring(byType[1]), b: ring(t.barrier), o: ring(t.occupied),
+        sel, res, hops: t.hops || [] };
     }).sort((x, y) => x.t - y.t);
-    if (!ticks.length) return null;
     const seq = ticks.map((t) => t.sel.join("+") || "-");
     const moveRes = ticks.flatMap((t) => t.sel.map((s, i) => (s.startsWith("move:") ? t.res[i] : null)).filter(Boolean));
     const tags = [];
-    if (w.end_reason === "died") tags.push("died");
+    if (b.end === "died") tags.push("died");
     if (moveRes.length >= 4 && moveRes.every((r) => r !== "Success")) tags.push("stuck");
     if (seq.length >= 4 && [1, 2, 3].some((p) => seq.every((x, i) => x === seq[i % p]))) tags.push("fixed");
     if (new Set(seq.flatMap((x) => x.split("+")).filter((m) => m.startsWith("move:"))).size > 2) tags.push("varied");
-    return { id: w.window, creature: w.creature_id, lineage: w.lineage_id, gen: w.generation, gsize: w.genome_size, end: w.end_reason,
-      truncated: w.truncated === true || w.truncated === "true", tags, ticks };
+    return { id: b.window, creature: b.creature, lineage: b.lineage, gen: b.generation, gsize: b.genome_size, end: b.end,
+      truncated: !!b.truncated, tags, ticks };
   }
 
   // the readings: same definitions as the prototype (first move only; Eat before the first move)
@@ -358,48 +340,24 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     }).sort((a, b) => b.ts - a.ts);
   }
 
-  // Tempo searches at most 7 days at a time: walk the range newest first in 7-day slices
+  // The newest stored records in range. The window store keeps every record of a run's
+  // newest 300 window indexes and a thinned sample of older ones (T23.F10).
   async function windowsFor(run, limit, from, to) {
-    const q = `{ span.petri.run_id = "${run}" && name = "creature_window" } | select(span.petri.tick, span.petri.ticks_recorded, span.petri.window)`;
-    const SLICE = 7 * 86400 - 60;
-    let found = [];
-    for (let end = to; end > from && found.length < limit; end -= SLICE) {
-      const start = Math.max(from, end - SLICE);
-      say(`Finding creature windows… ${found.length} so far`);
-      const r = await getJSON(`${PROXY}/tempo/api/search?` + new URLSearchParams({ q, start: String(start), end: String(end), limit: "20000", spss: "1" }));
-      found = found.concat(r.traces || []);
+    const sel = `{${SERVICES}} | event_name="creature.window" | petri_run_id="${run}"`;
+    const c = await getJSON(`${PROXY}/loki/loki/api/v1/query?` + new URLSearchParams({ query: `sum(count_over_time(${sel} [${Math.max(60, to - from)}s]))`, time: String(to) }));
+    const total = c.data.result.length ? Number(c.data.result[0].value[1]) : 0;
+    say(`Reading window records… (${fmt(total)} stored in range)`);
+    const r = await getJSON(`${PROXY}/loki/loki/api/v1/query_range?` + new URLSearchParams({ query: sel, start: String(from) + "000000000", end: String(to) + "000000000", limit: String(Math.min(limit, PAGE)), direction: "backward" }));
+    const seen = new Map();
+    let empty = 0;
+    for (const st of r.data.result) for (const [, line] of st.values) {
+      let w = null;
+      try { w = parseWindow(JSON.parse(line)); } catch { /* not a window record */ }
+      if (!w) empty++; // a record without ticks, or not a window
+      else if (!seen.has(w.id)) seen.set(w.id, w);
     }
-    found = [...new Map(found.map((t) => [t.traceID, t])).values()].sort((a, b) => Number(b.startTimeUnixNano) - Number(a.startTimeUnixNano));
-    const pick = found.slice(0, limit);
-    let newest = null;
-    if (found.length) {
-      const t0 = found[0];
-      const a = Object.fromEntries(((t0.spanSet || (t0.spanSets || [])[0] || {}).spans || []).flatMap((sp) => sp.attributes || []).map((x) => [x.key, val(x.value)]));
-      const tick = Number(a["petri.tick"]), n = Number(a["petri.ticks_recorded"]) || 1;
-      const startS = Number(t0.startTimeUnixNano) / 1e9;
-      if (Number.isFinite(tick)) newest = { startS, endS: startS + (Number(t0.durationMs) || 0) / 1000, endTick: tick + n - 1, index: Number(a["petri.window"]) };
-    }
-    const W = [], failed = [];
-    let done = 0, incomplete = 0;
-    const queue = pick.map((t) => t.traceID);
-    const fetchTrace = async (id) => {
-      try { return await getJSON(`${PROXY}/tempo/api/v2/traces/${id}`); }
-      catch { return getJSON(`${PROXY}/tempo/api/v2/traces/${id}`); } // one retry
-    };
-    const worker = async () => {
-      while (queue.length) {
-        const id = queue.shift();
-        try {
-          const w = parseWindow(await fetchTrace(id));
-          if (w) W.push(w); else incomplete++; // trace without a window span or ticks
-        } catch (e) { failed.push({ id, msg: e.message }); }
-        done++;
-        if (done % 10 === 0 || done === pick.length) say(`Loading creature windows… ${done} of ${pick.length}${failed.length ? ` (${failed.length} failed)` : ""}`);
-      }
-    };
-    await Promise.all(Array.from({ length: 8 }, worker));
-    W.sort((a, b) => a.id - b.id);
-    return { W, total: found.length, requested: pick.length, failed, incomplete, newest };
+    const W = [...seen.values()].sort((a, b) => a.id - b.id);
+    return { W, total, requested: W.length + empty, empty };
   }
 
   async function main() {
@@ -430,79 +388,22 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     if (id.ts) { from = Math.max(params.get("from") ? from : 0, Math.floor(id.ts / 1000) - 60); }
     if (id.endTs && !params.get("to")) to = Math.ceil(id.endTs / 1000) + 60;
     document.getElementById("dash-link").href = `/d/petri-run?var-run_id=${encodeURIComponent(wanted)}&from=${from * 1000}&to=${to * 1000}`;
-    say("Finding creature windows…");
-    let W, total, requested, failed, incomplete, newest;
-    try { ({ W, total, requested, failed, incomplete, newest } = await windowsFor(wanted, Number(limSel.value) || 300, from, to)); }
-    catch (e) { say(`Could not search Tempo for creature windows: ${e.message}`, true); return; }
-    if (!W.length && requested) {
-      say(`Found ${requested} creature windows but could not read any of them: ${failed.length} failed to load${failed.length ? ` (first error: ${failed[0].msg})` : ""}, ${incomplete} were incomplete traces. No readings shown.`, true);
-      return;
-    }
+    say("Reading window records…");
+    let W, total, requested, empty;
+    try { ({ W, total, requested, empty } = await windowsFor(wanted, Number(limSel.value) || 300, from, to)); }
+    catch (e) { say(`Could not read window records from Loki: ${e.message}`, true); return; }
     if (!W.length) {
-      say(id.petri_creature_windows === "on" ? "No creature windows for this run in the selected time range." : "This run recorded no creature windows: they were off for it, or it ran before telemetry recorded them.", true);
+      say(total ? `The ${fmt(requested)} newest window records in range hold no ticks. No readings shown.`
+        : id.petri_creature_windows === "on" ? "The telemetry stack holds no window records for this run in the selected time range."
+        : "This run stored no window records: windows were off for it, or it ran before the window store (T23.F10).", true);
       return;
     }
     const META = { run: wanted, service: id.service_name, world: id.petri_world, seed: id.petri_seed, build: id.petri_build_revision,
       windowTicks: id.petri_window_ticks, windowIntervalMs: Number(id.petri_window_interval_ms) || null, total,
-      requested, failed: failed.length, incomplete, truncated: W.filter((w) => w.truncated).length };
-    if (failed.length || incomplete) {
-      say(`Readings cover ${W.length} of the ${requested} windows requested: ${failed.length} failed to load${failed.length ? ` (first error: ${failed[0].msg})` : ""} and ${incomplete} were incomplete traces. Press Load to try again.`, true);
-    } else {
-      say(`Showing ${W.length} creature windows.`);
-    }
+      requested, empty, truncated: W.filter((w) => w.truncated).length };
+    say(`Showing the ${fmt(W.length)} newest creature windows${empty ? ` (${empty} more had no ticks)` : ""}.`);
     document.getElementById("content").hidden = false;
-    const R = readings(W);
-    render(R, W, META);
-    // Each run records at most 4,096 windows or 256 MiB of them (T21.F04), and says
-    // which cap it met only in its run.ended record. Windows start on a wall-clock
-    // interval, so "recording stopped" means: after the newest window ended and a
-    // new one was due, the run kept ticking with creatures alive and none started.
-    const notice = document.getElementById("notice");
-    const nw = newest;
-    if (nw) {
-      const at = `tick ${fmt(nw.endTick)} (${new Date(nw.startS * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC)`;
-      if (id.windowsCapped) {
-        notice.textContent = `This run used up its creature-window budget (${id.windowsCapped === "bytes" ? "256 MiB of windows" : "4,096 windows"}). Its newest window ends at ${at}; readings describe the run up to there.`;
-        notice.hidden = false;
-      } else {
-        const intervalS = (Number(META.windowIntervalMs) || 10000) / 1000;
-        const dueS = Math.max(nw.startS + intervalS, nw.endS) + 30;
-        const spanS = Math.floor(to - dueS);
-        // A sample's trace ID is the run ID's first half plus 2^63 + its index (T21.F04),
-        // so later samples can be asked for directly, without waiting on search to catch up.
-        const laterExists = async () => {
-          if (!Number.isInteger(nw.index)) return true; // cannot check: say nothing
-          for (let k = nw.index + 1; k <= nw.index + 3; k++) {
-            const tid = wanted.slice(0, 16) + (BigInt(2) ** BigInt(63) + BigInt(k)).toString(16).padStart(16, "0");
-            // 404 or an empty trace: that sample is absent. Any other failure: cannot
-            // tell, so claim nothing.
-            let r;
-            try { r = await fetch(`${PROXY}/tempo/api/v2/traces/${tid}`, { credentials: "same-origin" }); } catch { return true; }
-            if (r.status === 404) continue;
-            if (!r.ok) return true;
-            let t;
-            try { t = await r.json(); } catch { return true; }
-            if (((t.trace || {}).resourceSpans || []).length) return true;
-          }
-          return false;
-        };
-        if (spanS >= Math.max(300, 10 * intervalS) && !(await laterExists())) {
-          const sel = `{petri_run_id="${wanted}"}`;
-          const q1 = `max_over_time(petri_run_tick${sel}[${spanS}s]) - min_over_time(petri_run_tick${sel}[${spanS}s])`;
-          const q2 = `max_over_time(petri_tick_population${sel}[${spanS}s])`;
-          const q3 = `max_over_time(petri_run_tick${sel}[${spanS}s])`;
-          try {
-            const ask = (q) => getJSON(`${PROXY}/prometheus/api/v1/query?` + new URLSearchParams({ query: q, time: String(to) }))
-              .then((r) => (r.data.result.length ? Number(r.data.result[0].value[1]) : null));
-            const [advanced, pop, runTick] = await Promise.all([ask(q1), ask(q2), ask(q3)]);
-            if (advanced > 0 && pop > 0) {
-              notice.textContent = `The telemetry stack holds no creature window from this run after the one ending at ${at}, although the run kept ticking with creatures alive for at least ${Math.round(spanS / 60)} minutes after the next was due, to tick ${fmt(runTick)}. Each run records at most 4,096 windows or 256 MiB of them and names the cap it met only when it ends, so the likeliest cause is that this run used up its budget. Readings describe the run up to ${at.split(" (")[0]}.`;
-              notice.hidden = false;
-            }
-          } catch (e) { console.warn("stopped-recording check skipped:", e); }
-        }
-      }
-    }
+    render(readings(W), W, META);
   }
 
   function render(R, W, META) {
@@ -541,8 +442,7 @@ td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabula
     `${R.windows} windows · ${fmt(R.ticks)} creature-ticks`,
     `ticks ${fmt(R.tick_range[0])}–${fmt(R.tick_range[1])}`,
     `windows of ${META.windowTicks || "?"} ticks every ${META.windowIntervalMs ? META.windowIntervalMs / 1000 + " s" : "?"}`,
-    META.total > META.requested ? `latest ${fmt(META.requested)} of ${fmt(META.total)} windows in range requested` : `all ${fmt(META.total)} windows in range requested`,
-    ...(META.failed || META.incomplete ? [`${META.failed} failed to load · ${META.incomplete} incomplete · readings use ${R.windows}`] : []),
+    META.total > META.requested ? `newest ${fmt(META.requested)} of ${fmt(META.total)} stored window records in range` : `all ${fmt(META.total)} stored window records in range`,
     ...(META.truncated ? [`${META.truncated} windows cut short by the recorder's size cap`] : []),
   ].map((t) => html("span", "", t)));
   document.getElementById("title").textContent = `Creature windows · run ${META.run.slice(0, 8)}`;

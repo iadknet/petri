@@ -339,7 +339,7 @@ td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: 
     return [...seen.values()];
   }
 
-  // one stored record → one window, in the shape the Snapshot page reads from a trace
+  // one stored record → one window, in the shape the Snapshot page reads
   function parseRecord({ b, ts }) {
     if (!Array.isArray(b.ticks) || !b.ticks.length) return null;
     const ring = (a) => (Array.isArray(a) && a.length === 8 ? a : null);
