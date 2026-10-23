@@ -1,7 +1,7 @@
 # T27 — Social Signals and Exchange
 
 **Status**: In Progress
-**Last updated**: 2026-10-21
+**Last updated**: 2026-10-22
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -25,13 +25,21 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 - [x] **T27.F01 — Colour Vision** — Depends on: None
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
-- [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F10, T27.F03
+- [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F11, T27.F03
   - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
 - [x] **T27.F03 — Giving Energy** — Depends on: T26.F01
   - Goal: Trophallaxis and parental feeding: a creature can pass part of its store to a neighbour, and stealing takes part of the victim's the same way; how much is inherited and pushed by effort, so care and exploitation are both possible.
 
 ## Notes for AI Agents
 
+- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
+  contracts (the NearbyCreature descriptor's fields), runtime (signal sinks)
+  and energy ledger (named flows), A4 runtime state (held signals are per-life
+  state, reset at birth) and A5 sensor fields and inherited-store policy. F02
+  follows `T25.F11` (user, 2026-10-22), so its signal facts join the
+  NearbyCreature slot's field set and a `DirectionPair` bundle wires them;
+  recruitment is gone by then. F03's shares become body genes under G5
+  (`T29.F02`). No gap is closed here.
 - User decisions (2026-10-20): eight held signal channels sensed per
   NearbyCreature slot (the display-colour option was declined, so heritable
   colour stays a pure inherited label); the research's one-channel finding
@@ -70,11 +78,11 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   writes sinks and others read them. F02 owns the
   inspector, trace and frontend type surfaces for signals, measures tick
   time, and reports per-channel wiring and value variance. User decision
-  (2026-10-20): the eight signal fields are ordinary slot facts, so a slot
-  recruitment wires them into the drive with the slot's other facts (16
-  facts after F01 retires two fields, so a directed recruitment builds 12
-  pair members plus 16 facts). T25.F10 makes that recruitment cost one
-  gene rather than 28 silent edges, so F02 waits for it. F02's goal-long run
+  (2026-10-20): the eight signal fields are ordinary slot facts, so the
+  slot's `DirectionPair` bundle wires them into the drive with the slot's
+  other facts (16 facts after F01 retires two fields: 12 pair members plus
+  16 facts, one gene by T25.F10). F02 waits for T25.F11, which makes the
+  bundle the one wiring route (user, 2026-10-22). F02's goal-long run
   also carries T25.F10's deferred reading: group, materialized-member and
   corrected-member counts beside genome size, compute and energy.
 - F03 amount (user decisions, 2026-10-21): the user rejected the fixed

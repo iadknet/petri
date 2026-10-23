@@ -291,6 +291,18 @@ an opt-in slow tier (`make rust-test-slow`) that the Verification Plan declares.
 A per-test pass then moved six lab end-to-end tests (about 108 s of serial time)
 into the same tier; the v3-cli suite has no dominant test, so it stayed.
 
+On 2026-10-22 the user added [`docs/architecture.md`](architecture.md), the
+desired architecture with a Gaps section that reconciles it against the code.
+Redesigning sensor wiring (T25.F11, F12) and heredity (T29) had found one
+concept built by three routes with three rule sets, and the T25 premise that a
+sensor arrives as a group never reaching the most common path: specs had been
+checked only against earlier specs and notes, never against a picture of the
+intended system. Plans now cite the file and change it when they move a
+boundary, the design challenge and the design lens check against it, and
+closure deletes the gaps a feature closed. The user-level review skills
+already read any architecture document `AGENTS.md` points to, so they needed
+no edit.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

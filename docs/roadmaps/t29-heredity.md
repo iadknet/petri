@@ -30,6 +30,12 @@ user decisions and review:
 
 ## Notes for AI Agents
 
+- Architecture: serves [`docs/architecture.md`](../architecture.md) A4
+  body chromosome, A5 offspring construction, birth payload, learnable
+  identity, birth randomness, provenance, inherited-store policy and energy
+  provisioning, and A6 birth. Gaps: G4: `T29.F01`; G5: `T29.F02`; G6:
+  `T29.F03`. F01 keeps the dispatch record a named mutation input; G8's
+  contracts-level view is `T30.F07`, which follows F01.
 - Decisions (user, 2026-10-22): body traits live in the genome under one
   mutation law (multiple choice "Genome, one law"), accepting that capacity
   and the shares mutate about 16 to 18 times less often than today's 0.1 per

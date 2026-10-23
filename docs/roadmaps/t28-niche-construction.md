@@ -1,7 +1,7 @@
 # T28 — Niche Construction
 
 **Status**: Planned
-**Last updated**: 2026-10-20
+**Last updated**: 2026-10-22
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -27,6 +27,12 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Notes for AI Agents
 
+- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
+  world (kernel: barrier placement and removal), simulation (action
+  resolution), sensors (slot inputs), contracts (slot actions and
+  parameters) and energy ledger (named buckets), A4 world-facing state
+  (carried slots) and A2 `v3-server` (projection publication). No gap is
+  closed here.
 - User decisions (2026-10-20): four slots with a slot-index parameter per
   action (`PickUpSlot`, `PlaceSlot`, rounded to 0..3) and per-slot self
   inputs reading 0 empty, 1 food, 2 barrier; directions use the drive plus

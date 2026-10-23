@@ -61,6 +61,16 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 ## Notes for AI Agents
 
+- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
+  contracts (sensor descriptor, brain I/O) and genome, A4 Graph and bundles,
+  A5 wiring, bundle and membership, learning settings, learning layout and
+  learned values, and A6 mutation and learning. Gaps: G1, G14 (the
+  inheritance witness): `T25.F11`; G2 (the brain I/O vocabulary the sensor
+  descriptor needs: vote and outcome counts, `OUTPUT_SLOT_COUNT`, moved to
+  contracts so the descriptor depends on nothing above it): `T25.F11`; G13
+  (the minimum node transaction that applies a declaration and its bundles
+  together, which `AddSensor*` needs): `T25.F11`; G3: `T25.F12`. The rest of
+  G13 is `T30.F06` (design review 2026-10-22).
 - Decisions (user, 2026-10-13): only geometry is built in (the compass
   pattern and the `(x, y)` pairs declared in `contracts::inputs`), never a
   computation; the "bundle gene" was rejected (a gene multiplying who a

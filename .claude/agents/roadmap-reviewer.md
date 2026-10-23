@@ -56,6 +56,11 @@ original roadmap row, not only against each other.
   features, speculative work, or prerequisite work are findings, declared or
   not: a prerequisite lands as its own feature. So is a declared preparatory
   refactor the diff skips or exceeds.
+- Architecture: the spec's Architecture section cites the
+  `docs/architecture.md` sections the diff touches, the gaps it closes and
+  the gaps it preserves, and says truthfully what the diff does. A diff that
+  changes the desired contract (A1–A7) without the matching
+  `docs/architecture.md` edit is P1.
 - Spec truthfulness: every checked box in the spec corresponds to an artifact
   in the diff; status, dates, and commit references describe what exists.
 - Verification record: every command and result recorded in the spec's
@@ -118,25 +123,28 @@ original roadmap row, not only against each other.
 
 ### What to read
 
-- The spec's Goal and Inputs and Invariants sections, and the crate layout in
-  `AGENTS.md`.
+- The spec's Goal, Inputs and Invariants, and Architecture sections, and the
+  crate layout in `AGENTS.md`.
+- `docs/architecture.md` in the worktree, the desired state: A3 (domains and
+  allowed imports), A5 (owners), A7 (boundary rules), A8 (gaps), and the
+  sections the spec's Architecture section cites.
 - The diff's code hunks and the items that enclose them. Follow a caller or
   an import only to settle a named boundary question, one search each.
-- Not the files under `docs/` the diff touches (specs, readings, roadmaps),
-  the workflow documents, the roadmap row, the telemetry template, or the
-  spec's Verification and Performance sections; lens 1 owns them.
+- Not the other files under `docs/` the diff touches (specs, readings,
+  roadmaps), the workflow documents, the roadmap row, the telemetry template,
+  or the spec's Verification and Performance sections; lens 1 owns them.
 
 ### Petri boundaries
 
-- Concerns the codebase keeps apart: simulation rules, energy accounting,
-  telemetry, transport, I/O and configuration parsing.
-- Dependency direction: `v3-core` depends on none of `v3-cli`, `v3-server`,
-  `v3-lab`; lab code never reaches production; `creature::genome` does not
-  import `sensors`.
-- Telemetry and test-only hooks sit behind `telemetry` and `telemetry-seams`;
-  runtime state and telemetry derive from applied simulation behavior.
-- An internal struct reused as a transport or telemetry shape, or a field read
-  raw at many sites where one resolver belongs, is a boundary finding.
+- The boundaries are `docs/architecture.md` A7 and its A3 graph. Check the
+  diff against the desired state there, not against today's code: report a
+  leaky abstraction (a domain's internals read or built outside it), drift
+  from an A5 owner or an A7 rule, and a design decision in the diff that
+  means a boundary or the desired state should change (an `architecture:`
+  line proposing the edit to that file).
+- Against an A8 gap, apply the workflow Review section's rule: inherited use
+  is `pre-existing:` P2; added coupling is P1 unless the spec's Architecture
+  section declares it with the gap's owning row.
 - Step back: run the skill's step-back challenge on the touched area, using
   `git log` on its paths for earlier features that patched it. A `step-back:`
   finding does not block this feature; the orchestrator reports it.
@@ -186,8 +194,10 @@ original roadmap row, not only against each other.
 - Telemetry P2: a departure that only causes later rework (a name, a
   description, an attribute set). A spec planned before 2026-09-29 is still
   not required to have a Telemetry section.
-- Lens 2: P1 only for a breach of a boundary `AGENTS.md` or the Petri
-  boundaries list above states, or a module import cycle. Lens 3: P1 only for
+- Lens 2: P1 only for a breach the diff adds of an `AGENTS.md` rule or a
+  `docs/architecture.md` A7 rule, a new import cycle between its A3
+  domains among them,
+  with A8 gaps graded as above. Lens 3: P1 only for
   an unmarked workaround. Scope and invariant findings belong to lens 1.
 - P2: likely to cause rework or mislead a later feature; for lenses 2 and 3,
   code a later roadmap feature is expected to extend. Advisory.
@@ -196,6 +206,7 @@ original roadmap row, not only against each other.
 ## Report
 
 Lenses 2 and 3 start with their skill's coverage section: one line per check,
-clean ones included, naming what was examined. Then list findings ordered by
+clean ones included, naming what was examined; lens 2 then adds any ungraded
+`step-back:` and `architecture:` lines. Then list findings ordered by
 severity, each with file and line, the issue, why it matters, and the smallest
 fix. Then state what you could not verify. Then stop.

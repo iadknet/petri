@@ -1,7 +1,7 @@
 # T26 — Body Traits
 
 **Status**: Complete
-**Last updated**: 2026-10-21
+**Last updated**: 2026-10-22
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -28,6 +28,10 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Notes for AI Agents
 
+- Architecture: served [`docs/architecture.md`](../architecture.md) A3
+  creature (body rules) and A4 body traits. Its one-record body is superseded
+  by the body chromosome (G5: `T29.F02`); the body rules stay where A3 puts
+  them. No open gap is owned here.
 - F01 is behavior-preserving in the T25.F01 shape: any pin that moves is a
   defect. Scope (design note §4, corrected by review findings 2 and 12):
   - the heritable record replaces `CreatureState::new`'s loose phenotype and
