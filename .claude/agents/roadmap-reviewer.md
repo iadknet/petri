@@ -56,11 +56,9 @@ original roadmap row, not only against each other.
   features, speculative work, or prerequisite work are findings, declared or
   not: a prerequisite lands as its own feature. So is a declared preparatory
   refactor the diff skips or exceeds.
-- Architecture: the spec's Architecture section cites the
-  `docs/architecture.md` sections the diff touches, the gaps it closes and
-  the gaps it preserves, and says truthfully what the diff does. A diff that
-  changes the desired contract (A1–A7) without the matching
-  `docs/architecture.md` edit is P1.
+- Architecture: the spec's Architecture paragraph says truthfully what the
+  diff does to `docs/architecture.md`'s owners and boundaries; a diff that
+  changes the desired architecture without editing that file is P1.
 - Spec truthfulness: every checked box in the spec corresponds to an artifact
   in the diff; status, dates, and commit references describe what exists.
 - Verification record: every command and result recorded in the spec's
@@ -116,9 +114,7 @@ original roadmap row, not only against each other.
 
 - The spec's Goal, Inputs and Invariants, and Architecture sections, and the
   crate layout in `AGENTS.md`.
-- `docs/architecture.md` in the worktree, the desired state: A3 (domains and
-  allowed imports), A5 (owners), A7 (boundary rules), A8 (gaps), and the
-  sections the spec's Architecture section cites.
+- `docs/architecture.md` in the worktree, the desired state.
 - The diff's code hunks and the items that enclose them. Follow a caller or
   an import only to settle a named boundary question, one search each.
 - Not the other files under `docs/` the diff touches (specs, readings,
@@ -127,15 +123,13 @@ original roadmap row, not only against each other.
 
 ### Petri boundaries
 
-- The boundaries are `docs/architecture.md` A7 and its A3 graph. Check the
-  diff against the desired state there, not against today's code: report a
-  leaky abstraction (a domain's internals read or built outside it), drift
-  from an A5 owner or an A7 rule, and a design decision in the diff that
-  means a boundary or the desired state should change (an `architecture:`
-  line proposing the edit to that file).
-- Against an A8 gap, apply the workflow Review section's rule: inherited use
-  is `pre-existing:` P2; added coupling is P1 unless the spec's Architecture
-  section declares it with the gap's owning row.
+- The boundaries are `docs/architecture.md`'s rules, dependency order,
+  prohibitions and owners. Check the coupling the diff introduces or widens
+  against them, not today's code: a leaky abstraction (a domain's internals
+  read or built outside it), a second owner, a forbidden import, and a
+  design decision in the diff that means the file should change (an
+  `architecture:` line proposing the edit). Unchanged existing debt is not
+  reported. Severity follows the workflow's Review section.
 - Step back: run the skill's step-back challenge on the touched area, using
   `git log` on its paths for earlier features that patched it. A `step-back:`
   finding does not block this feature; the orchestrator reports it.
@@ -183,10 +177,7 @@ original roadmap row, not only against each other.
 - Telemetry P2: a departure that only causes later rework (a name, a
   description, an attribute set). A spec planned before 2026-09-29 is still
   not required to have a Telemetry section.
-- Lens 2: P1 only for a breach the diff adds of an `AGENTS.md` rule or a
-  `docs/architecture.md` A7 rule, a new import cycle between its A3
-  domains among them,
-  with A8 gaps graded as above. Lens 3: P1 only for
+- Lens 2: P1 only as the workflow's Review section states. Lens 3: P1 only for
   an unmarked workaround. Scope and invariant findings belong to lens 1.
 - P2: likely to cause rework or mislead a later feature; for lenses 2 and 3,
   code a later roadmap feature is expected to extend. Advisory.

@@ -30,12 +30,9 @@ user decisions and review:
 
 ## Notes for AI Agents
 
-- Architecture: serves [`docs/architecture.md`](../architecture.md) A4
-  body chromosome, A5 offspring construction, birth payload, learnable
-  identity, birth randomness, provenance, inherited-store policy and energy
-  provisioning, and A6 birth. Gaps: G4: `T29.F01`; G5: `T29.F02`; G6:
-  `T29.F03`. F01 keeps the dispatch record a named mutation input; G8's
-  contracts-level view is `T30.F07`, which follows F01.
+- Pays known debts G4 (F01), G5 (F02) and G6 (F03) in
+  [`docs/architecture.md`](../architecture.md). F01 keeps the dispatch
+  record a named mutation input; `T30.F02` gives it a narrow query.
 - Decisions (user, 2026-10-22): body traits live in the genome under one
   mutation law (multiple choice "Genome, one law"), accepting that capacity
   and the shares mutate about 16 to 18 times less often than today's 0.1 per
@@ -56,7 +53,10 @@ user decisions and review:
   one genome gets a new identity naming its source, a detach composes
   `scale × pattern + modifier` seeds, a removal drops), so seeds leave
   `CgpGraphBackendDef` without birth repeating graph-edit semantics
-  (`docs/architecture.md` A5 inheritance correspondence; user, 2026-10-22).
+  (user, 2026-10-22). Three addresses keep three lifetimes: an occurrence
+  (surface and position) is valid for one graph revision, a learnable
+  identity while structural correspondence holds, a runtime slot only
+  inside one compiled layout; inspectors read resolved views.
   The preservation cases are today's seed behavior: a source change or a
   weight or scale write invalidates a seed; detach falls back to genomic
   values when a seed is absent; topology copies clone whole backends; and

@@ -39,11 +39,9 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   predeclaration; open a readings file only when a specific number is needed.
   Read the relevant code directly.
 - Read `docs/architecture.md`, the desired state, and fill the spec's
-  Architecture section as the workflow's "Architecture" paragraph defines:
-  the sections the feature works within, the gaps it closes or preserves.
-  When the feature changes the desired contract (A1–A7), edit
-  `docs/architecture.md` and add an A8 line naming the feature. Name that
-  file and the paragraph's preservation rule in every Codex challenge brief.
+  Architecture paragraph as the workflow's "Architecture" paragraph defines,
+  edit `docs/architecture.md` when the feature changes the desired
+  architecture, and name that file in every Codex challenge brief.
 - Read each document once and work from what you read. When a Bash result is
   spilled to a `tool-results/*.txt` file, re-run the command narrowed rather
   than reading the saved file, and never read the same spilled file twice.

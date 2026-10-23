@@ -36,15 +36,9 @@ truth for feature dependencies.
 
 ## Architecture
 
-Cite [`docs/architecture.md`](../../architecture.md), the desired state: the
-sections this feature works within, the A8 gaps it closes or preserves, and
-any change to the desired contract (A1–A7), which the plan commit makes in
-that file with an A8 line naming this feature. Closure deletes what it closed.
-
-| Section or gap | Role |
-| --- | --- |
-| `A5 <concept>` | works within, or changes (edited in `docs/architecture.md`) |
-| `G<n>` | closes; or closes part (name the part); or preserves (owning row; any new use and why) |
+A short paragraph against [`docs/architecture.md`](../../architecture.md):
+the owners this feature touches, the known debts it pays, and any boundary
+it changes (the plan commit edits that file).
 
 ## Telemetry
 

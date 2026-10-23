@@ -75,3 +75,21 @@ Verdict: `not-ready`. Six blocking findings, two advisory, no `step-back:`.
 
 Output: `/tmp/claude-501/-Users-<user>-projects-petri/dfc7ccd8-7685-41ad-a73b-a4c0e7045a0a/scratchpad/t30-review-2/codex-out.md`
 (outside the repository). No confirming round was run.
+
+## Simplicity review (2026-10-22)
+
+A fresh Astra (`gpt-6-astra`, `high`) review of the desired architecture,
+the T30 rows and the hooks, asked only what could be cut, merged or stated
+more simply while still preventing spaghetti, returned `trim`. The user took
+all four proposals:
+
+| Proposal | Disposition |
+| --- | --- |
+| Slim `docs/architecture.md`: five sections, about twelve owners, six rules; creature and simulation one domain each; feature detail (learning variants, the two-mask rule, address lifetimes, birth API names, phase cells, signal timing, material stocks) to the implementing rows | Done; detail lives in T25, T27, T28, T29 and T30 Notes |
+| Replace the 26-arrow allowlist with a dependency order, no cycles and five named prohibitions (reverses the morning's "direct arrows only") | Done (section 3) |
+| T30 from ten rows to six: F07 into F02 (no T29.F01 dependency; reproduction already passes the dispatch record), F09 into F08 (now F06, with one removal-settlement path), the old F06's edits folded into T25.F11, F10 and the independent-streams rule cut (G21 dropped) | Done; rows renumbered F01–F06 |
+| Lighter process: no roadmap-check citation rule or track Architecture notes; a one-paragraph spec Architecture section; the design lens reports only coupling a diff introduces or widens; known debts instead of an exhaustive gap ledger; the reviewer agent points to the workflow's rule | Done; checker reverted to its state before `bf876ae7` |
+
+Output: `/tmp/claude-501/-Users-<user>-projects-petri/dfc7ccd8-7685-41ad-a73b-a4c0e7045a0a/scratchpad/arch-review-3/codex-out.md`
+(outside the repository). Row IDs in the sections above are the pre-trim
+numbering.

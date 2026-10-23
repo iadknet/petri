@@ -52,7 +52,7 @@ design choice; the decision below removes it.
   a slot passing when both bits are set.
 - Learned seeds cross structural edits by inheritance mappings the Graph's
   edits return, not by stable ids alone (user, after the architecture
-  review; [architecture](../architecture.md) A5).
+  review; [architecture](../architecture.md) section 3).
 
 ## Model
 

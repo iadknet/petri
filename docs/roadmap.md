@@ -45,11 +45,9 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   kin-tag affinity). Ordinary condition readings of another body (its
   energy, its readiness) are facts, not comparisons. Its roadmap goal line names
   the analog first. Measurement features are exempt.
-- Every track, row and spec serves [`docs/architecture.md`](architecture.md),
-  the desired architecture: one owner per concept, the domain dependency
-  graph, composition over inheritance, and as few built-in assumptions as
-  clean layers allow. A track's Notes name the sections it serves and the
-  gaps its rows close.
+- Every track, row and spec follows [`docs/architecture.md`](architecture.md),
+  the desired architecture: one owner per concept, dependencies pointing
+  down, composition over inheritance.
 - Brain and sensorimotor features improve what evolution can find on its
   own; they never target a specific behavior. Specific sensors and scenes are
   yardsticks only.
@@ -80,20 +78,18 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 
 Priority order for new starts: T26.F01, T25.F10, T27.F01, T26.F02, T27.F03,
 T30.F01, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03, T30.F02,
-T30.F03, T30.F04, T30.F05, T30.F06, T30.F07, T30.F08, T30.F09, T30.F10,
-T28.F01, T28.F02.
+T30.F03, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
 
 - T30 (core boundaries) was placed on 2026-10-22 at the user's direction
-  from the gaps [`docs/architecture.md`](architecture.md) found without an
-  owning row; the same change made T27.F02 depend on T25.F11 (user) and
-  entered T29's rows, missing from this order since that track was added.
-  T30.F01 is ordered before T25.F11 so the genome refactors change a server
-  projection rather than the frontend's copy of genome types; the other
-  rows follow T29 and precede T28, whose ledger buckets and transfers would
-  build on T30.F02, F08 and F09; F08 to F10 were added after the
-  architecture review the same day, F10 being T30's one behavior-changing
-  row. Both are scheduling preferences, not prerequisites (assistant
-  proposal; [design review](progress/readings/t30-design-review.md)).
+  from the known debts in [`docs/architecture.md`](architecture.md) that no
+  row owned, and trimmed to six rows the same day after a simplicity review;
+  the same change made T27.F02 depend on T25.F11 (user) and entered T29's
+  rows, missing from this order since that track was added. T30.F01 is
+  ordered before T25.F11 so the genome refactors change a core read API
+  rather than the frontend's copy of genome types; the other rows follow
+  T29 and precede T28, whose transfers build on T30.F02 and F06. These are
+  scheduling preferences, not prerequisites (assistant proposal;
+  [design review](progress/readings/t30-design-review.md)).
 
 - T26–T28 were placed on 2026-10-20 at the user's direction from the
   [interaction features design note](strategy/interaction-features-design-2026-10-20.md),

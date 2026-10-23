@@ -37,8 +37,8 @@ row, report the contradiction with the evidence instead of choosing a reading.
   assigns — no adjacent features or speculative work.
 - Before coding, read the roadmap contract (`docs/roadmaps/README.md`), the
   owning track roadmap, and the flat feature spec at
-  `docs/specs/roadmap/tNN-fNN-<slug>.md`, and the `docs/architecture.md`
-  sections its Architecture section cites. Build toward that desired state;
+  `docs/specs/roadmap/tNN-fNN-<slug>.md`, and `docs/architecture.md`. Build
+  toward that desired state;
   a design the code would need that contradicts it is a contradiction to
   report, not a choice to make.
 - Use `$rust-skills` (via the Skill tool) for every Rust change, loading only the

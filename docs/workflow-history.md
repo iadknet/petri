@@ -301,7 +301,15 @@ intended system. Plans now cite the file and change it when they move a
 boundary, the design challenge and the design lens check against it, and
 closure deletes the gaps a feature closed. The user-level review skills
 already read any architecture document `AGENTS.md` points to, so they needed
-no edit.
+no edit. Three review rounds the same day each added owners, rules and rows;
+a fourth, aimed at simplicity, found the result heavier than the evidence
+supported, and the user trimmed it: five sections and about twelve owners
+instead of a 35-row table, a dependency order with five named prohibitions
+instead of a 26-arrow allowlist, feature detail moved to the rows that
+implement it, T30 cut from ten rows to six, and the roadmap-check citation
+rule, the track Architecture notes and the paperwork-based review grading
+removed. A spec now writes one Architecture paragraph, and the design lens
+reports only coupling a diff introduces or widens.
 
 The same day the user removed the mutation gate from the workflow after an
 audit of its record, ahead of heavy refactoring it would have slowed: about 100

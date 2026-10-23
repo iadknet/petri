@@ -101,9 +101,8 @@ Codex Sol `high` job through the Codex channel applying `$plan-design-review` to
 the changed rows and any design note they cite, with all six of the skill's
 checks and its coverage section, and with
 [`docs/architecture.md`](architecture.md) named in the brief as the desired
-state the rows are checked against. The track's Notes name the architecture
-sections the rows serve and the A8 gaps each row closes; rows that change the
-desired state edit that file in the same commit, and a gap no row closes is
+state the rows are checked against. Rows that change the desired
+architecture edit that file in the same commit; a known debt no row pays is
 proposed to the user, never added as a row silently. Record the coverage table, findings and
 dispositions in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
 `step-back:` and premise findings go to the user before the rows are committed.
@@ -200,20 +199,13 @@ only when round 2 or later has run and its verdict is `ready` or every open
 blocking finding carries a rebuttal that round accepted.
 
 **Architecture.** [`docs/architecture.md`](architecture.md) is the desired
-state of the system. The spec owner reads it and fills the spec's Architecture
-section: the A-sections the feature works within, the A8 gaps (or the parts of
-one) it closes, and the gaps owned by other rows it preserves. A feature that
-changes the desired contract itself (A1–A7: a domain, an allowed dependency,
-an owner or a boundary rule) edits `docs/architecture.md` in the plan commit,
-with an A8 line naming the feature for the code it has not yet changed; work
-the desired state already allows needs only the citations. A plan may preserve
-a gap another row owns without taking on that row's scope; when the feature
-cannot avoid adding a new use of that gap, the section declares it with the
-owning row and the reason. Every challenge round's brief names that file and
-states this rule, so a declared preservation is not a blocking finding.
-`make roadmap-check` fails a spec without the section or citing a section the
-file does not define. The orchestrator commits the plan only when the
-Architecture section is filled and any such edit is in the commit.
+state of the system. The spec owner reads it and writes the spec's short
+Architecture paragraph: the owners the feature touches, the known debts it
+pays, and any boundary it changes. A feature that changes the desired
+architecture edits that file in the plan commit. A feature may leave a debt
+another row owns in place without taking on that row's scope; when it must
+use that debt anyway, the paragraph says so and why. Every challenge round's
+brief names the file.
 
 **Preparatory refactoring.** While writing the spec, the spec owner applies
 `$refactor-audit` in preparatory mode to the modules the feature will change,
@@ -237,9 +229,9 @@ applies `$plan-design-review` only and runs all six of its checks, namely code
 decomposition, task decomposition, domain boundaries and separation of concerns,
 outdated or never-correct premises, a larger design flaw (step back), and
 workarounds that should be refactors. Checks 3 and 5 run against
-`docs/architecture.md`: the round reports a leaky abstraction, drift from an
-A7 rule or an A5 owner, a design decision that means a boundary or the desired
-state should change, and a missing edit to that file. The brief supplies the spec owner's
+`docs/architecture.md`: the round reports a leaky abstraction, coupling the
+file forbids, a design decision that means it should change, and a missing
+edit to it. The brief supplies the spec owner's
 `$refactor-audit` table for check 6 to test, not to trust, and requires the
 skill's full report: the coverage section, with one line per check naming what
 was examined, any `step-back:` lines, the assumptions and workaround tables, and
@@ -322,8 +314,7 @@ implementer; see `docs/workflow-codex.md`.)
 **Brief 1 — build.** Give it the feature ID, the spec path, the change requested,
 and the exact spec sections this pass needs — normally Goal, Inputs and
 Invariants, Architecture, Telemetry, Implementation Tasks, and the Verification
-checklist — and requires it to read the `docs/architecture.md` sections the
-Architecture section cites and build toward them.
+checklist — and requires it to build toward `docs/architecture.md`.
 A spec whose Plan step ran before 2026-09-29 has no Telemetry section and
 carries no telemetry obligation. Its scope is
 implementation, tests (TDD, property tests for pure invariants), the viability
@@ -387,7 +378,7 @@ host without them cannot run this step:
 | Lens | Skill | The brief adds |
 | --- | --- | --- |
 | Correctness | `$adversarial-code-review` | lens 1; the spec sections Goal, Inputs and Invariants, Architecture, Telemetry, Verification, and the Performance predeclaration when the feature is subject to it; the Review section of this file |
-| Design | `$architecture-review` | lens 2; the spec's Goal, Inputs and Invariants, and Architecture sections; `docs/architecture.md` sections A3, A5, A7, A8 and those the spec cites |
+| Design | `$architecture-review` | lens 2; the spec's Goal, Inputs and Invariants, and Architecture sections; `docs/architecture.md` |
 | Code health | `$code-health-review` | lens 3; the spec's Goal section and its `Decision:` and `Deferred:` notes |
 
 Each brief also names `.claude/agents/roadmap-reviewer.md` as the project
@@ -412,17 +403,13 @@ builds or tests, or consults the spec owner. Do not reuse a spec challenge
 thread for a review. Quote each output file path, the findings and the
 design and code-health coverage lines in your own message.
 
-Only a P1 finding blocks progress. The design lens raises P1 only for a
-breach the diff adds of an `AGENTS.md` rule or a `docs/architecture.md` A7
-rule, a new import cycle between its A3 domains among them. Against an A8 gap: code that
-already used it and that the diff only touches or moves is inherited, a
-`pre-existing:` P2 naming the gap; a new use of it (a new import site, a new
-caller, a wider type crossing the boundary) is added coupling and P1, unless
-the spec's Architecture section declares it with the gap's owning row, which
-makes it P2. The correctness lens raises P1 when the diff changes the desired
-contract (A1–A7) without the matching `docs/architecture.md` edit, or the
-spec's Architecture section misstates what the diff does. The
-code-health lens raises P1 only for an unmarked workaround. A design-lens
+Only a P1 finding blocks progress. The design lens raises P1 only for
+coupling the diff introduces or widens that `AGENTS.md` or
+`docs/architecture.md` forbids, a new import cycle among it, unless the
+spec's Architecture paragraph explains it and names the row that removes
+it; unchanged existing debt is not reported. The correctness lens raises P1
+when the diff changes the desired architecture without the matching edit to
+that file. The code-health lens raises P1 only for an unmarked workaround. A design-lens
 `step-back:` finding, or an `architecture:` line proposing a change to the
 desired state, never blocks closure and is never remediated in the feature:
 record it as a `Deferred:` note and report it to the user at closure. P2 and P3 are advisory and are
@@ -746,14 +733,13 @@ against the original roadmap goal before closure.
 In the worktree: run `make check` once on the final feature code, plus
 `make rust-test-slow` when the Verification Plan declares it, and record
 that commit as the tested commit. Then set the spec to `Complete`, check the
-feature row, delete the `docs/architecture.md` A8 lines the feature closed
-and remove the parts of a line it closed in part, update the track and master rollups only if
+feature row, delete the `docs/architecture.md` known debts the feature
+paid, update the track and master rollups only if
 their own criteria are now satisfied, run `make check-docs` (the closure edits are documentation, and
 the full suite was just run on the same code), and commit. Then:
 
 0. Confirm every check the spec's Verification Plan declares ran on the final
-   code, and that each gap, or part of one, the spec's Architecture section
-   closes is gone from `docs/architecture.md` A8 while the remainder stays. For a telemetry feature, confirm the spec records
+   code. For a telemetry feature, confirm the spec records
    `Not applicable: telemetry feature`, the reviewer accepted the
    no-behavior-change claim, and the parent comparison and the overhead check
    are each recorded with a result or a `not applicable` reason.

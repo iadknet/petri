@@ -1,6 +1,6 @@
 # Petri documentation
 
-- [Architecture](architecture.md) (the desired state: domains, owners, dependency graph, boundary rules, and the gaps between it and today's code with the rows that close them)
+- [Architecture](architecture.md) (the desired state: rules, domains and owners, dependency order, and the known debts with the rows that pay them)
 - [Program roadmap](roadmap.md) (program 2 master: success definition, standing rules, priority order)
 - [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
 - [Codex adapter](workflow-codex.md) (Codex model, tool, and worktree substitutions for that contract)

@@ -32,14 +32,11 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Notes for AI Agents
 
-- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
-  contracts (the NearbyCreature descriptor's fields), runtime (signal sinks)
-  and energy ledger (named flows), A4 runtime state (held signals are per-life
-  state, reset at birth) and A5 sensor fields and inherited-store policy. F02
-  follows `T25.F11` (user, 2026-10-22), so its signal facts join the
-  NearbyCreature slot's field set and a `DirectionPair` bundle wires them;
-  recruitment is gone by then. F03's shares become body genes under G5
-  (`T29.F02`). No gap is closed here.
+- F02 follows `T25.F11` (user, 2026-10-22), so its signal facts join the
+  NearbyCreature slot's field set and a `DirectionPair` bundle wires them.
+  Held signals: runtime emits the committed writes, the creature record
+  holds them for the creature's life, and sensors read the previous tick's
+  values. F03's shares become body genes in `T29.F02`.
 - User decisions (2026-10-20): eight held signal channels sensed per
   NearbyCreature slot (the display-colour option was declined, so heritable
   colour stays a pure inherited label); the research's one-channel finding

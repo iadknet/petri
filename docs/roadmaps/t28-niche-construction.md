@@ -27,16 +27,11 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Notes for AI Agents
 
-- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
-  world (kernel: barrier placement and removal), simulation (action
-  resolution), sensors (slot inputs), contracts (slot actions and
-  parameters) and energy ledger (named buckets), A4 world-facing state
-  (carried slots), A5 multi-party transactions, material stocks and
-  carried slots (simulation mechanics owns pick-up, placement, digging,
-  building and death drops as atomic transactions with typed stock records)
-  and A2 `v3-server` (projection publication). The master order puts
-  `T30.F02`, `T30.F08` and `T30.F09` first, as a preference. No gap is
-  closed here.
+- Simulation mechanics owns pick-up, placement, digging, building and death
+  drops as transactions: the material move is atomic and settles once, its
+  stock, transfer and sink records stay apart from energy, and the
+  attempt's effort is charged either way. The master order puts `T30.F02`
+  and `T30.F06` first, as a preference.
 - User decisions (2026-10-20): four slots with a slot-index parameter per
   action (`PickUpSlot`, `PlaceSlot`, rounded to 0..3) and per-slot self
   inputs reading 0 empty, 1 food, 2 barrier; directions use the drive plus
@@ -65,7 +60,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
     from administrative removal (paint eviction), which discards;
   - carried stock, overflow and destruction as named ledger buckets;
   - successful and failed handling charges, and the load surcharge through
-    the mechanics' action cost law (T30.F08 moves move-effort composition
+    the mechanics' action cost law (T30.F06 moves move-effort composition
     there from T26.F01's `CreatureState::move_effort`; archived start 0.05
     per slot);
   - inspection, frontend types and trace surfaces for slots.

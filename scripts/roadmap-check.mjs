@@ -36,23 +36,6 @@ const BUDGET_GRANDFATHERED = new Set([
   't12-f04-baseline-world-set.md',
   't13-f01-module-recruitment-observability.md',
 ]);
-// Specs planned before docs/architecture.md (2026-10-22). New specs are never added here.
-const ARCHITECTURE_GRANDFATHERED = new Set([
-  't25-f01-edge-container-constructors-and-birth-seeds.md',
-  't25-f02-uniform-genome-size.md',
-  't25-f03-ring-groups-replace-ring-projections.md',
-  't25-f04-direction-pair-groups.md',
-  't25-f05-nearby-creature-family.md',
-  't25-f06-learning-per-edge.md',
-  't25-f07-group-scope-learning.md',
-  't25-f08-creation-forms-detach-and-the-catalog.md',
-  't25-f09-learned-weight-decay.md',
-  't25-f10-group-genes-cost-as-genes.md',
-  't26-f01-one-body-record-and-body-rules.md',
-  't26-f02-evolvable-energy-reserves.md',
-  't27-f01-colour-vision.md',
-  't27-f03-giving-energy.md',
-]);
 const TRACK_ID = /^T\d{2}$/;
 const FEATURE_ID = /^T\d{2}\.F\d{2}$/;
 const TRACK_FILE = /^t(\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
@@ -188,30 +171,6 @@ function budget(text, file, errors) {
   }
 }
 
-// Cited sections must exist; gaps are not checked, because closure deletes them from A8.
-function architectureCitations(body, file, label, sections, errors) {
-  const refs = new Set([...body.matchAll(/\b(A\d+)\b/g)].map((match) => match[1]));
-  if (!refs.size && !/\bG\d+\b/.test(body)) {
-    errors.push(`${file}: ${label} cites no docs/architecture.md section (A<n>) or gap (G<n>)`);
-    return;
-  }
-  for (const ref of refs) {
-    if (!sections.has(ref)) errors.push(`${file}: ${label} cites ${ref}, which docs/architecture.md does not define`);
-  }
-}
-
-function trackArchitecture(text, file, sections, errors) {
-  const lines = (section(text, NOTES_HEADING) ?? '').split(/\r?\n/);
-  const start = lines.findIndex((line) => line.startsWith('- Architecture:'));
-  if (start < 0) {
-    errors.push(`${file}: ${NOTES_HEADING} needs an "- Architecture:" bullet citing docs/architecture.md`);
-    return;
-  }
-  let end = start + 1;
-  while (end < lines.length && /^\s+\S/.test(lines[end])) end += 1;
-  architectureCitations(lines.slice(start, end).join('\n'), file, 'Architecture note', sections, errors);
-}
-
 function checklistComplete(text, heading, file, errors) {
   const body = section(text, heading);
   const boxes = body?.split(/\r?\n/).map((line) => line.match(/^\s*[-*+] \[([ xX])\]/)).filter(Boolean) ?? [];
@@ -262,12 +221,6 @@ function validate(root) {
     return errors;
   }
 
-  const architectureText = read(join(root, 'docs', 'architecture.md'));
-  if (architectureText === undefined && (trackFiles.length || specFiles.length)) {
-    errors.push('docs/architecture.md: live tracks or specs require the architecture document');
-  }
-  const sections = new Set([...(architectureText ?? '').matchAll(/^## (A\d+)\b/gm)].map((match) => match[1]));
-
   const masterStatus = status(masterText, 'docs/roadmap.md', ['Planning', 'Active', 'Complete'], errors);
   const rows = trackRows(masterText, 'docs/roadmap.md', errors);
   const rowsById = new Map();
@@ -294,7 +247,6 @@ function validate(root) {
     const text = read(join(tracksDir, path));
     const trackStatus = status(text, file, ['Planned', 'In Progress', 'Complete'], errors);
     const owned = featureRows(text, file, id, errors);
-    if (architectureText !== undefined) trackArchitecture(text, file, sections, errors);
     if (tracks.has(id)) errors.push(`${file}: duplicate track ${id}`);
     tracks.set(id, { file, text, status: trackStatus, features: owned });
     for (const feature of owned) {
@@ -330,11 +282,6 @@ function validate(root) {
     if (featureId !== pathId) errors.push(`${file}: Feature metadata must match ${pathId}`);
     if (!features.has(pathId)) errors.push(`${file}: orphan feature spec for ${pathId}`);
     if (!BUDGET_GRANDFATHERED.has(path)) budget(text, file, errors);
-    if (architectureText !== undefined && !ARCHITECTURE_GRANDFATHERED.has(path)) {
-      const cited = section(text, 'Architecture');
-      if (cited === undefined) errors.push(`${file}: missing ## Architecture section citing docs/architecture.md`);
-      else architectureCitations(cited, file, 'Architecture section', sections, errors);
-    }
     if (!specs.has(pathId)) specs.set(pathId, []);
     specs.get(pathId).push({ file, text, status: specStatus });
   }

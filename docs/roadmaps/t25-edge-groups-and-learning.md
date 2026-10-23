@@ -61,16 +61,16 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 ## Notes for AI Agents
 
-- Architecture: serves [`docs/architecture.md`](../architecture.md) A3
-  contracts (sensor descriptor, brain I/O) and genome, A4 Graph and bundles,
-  A5 wiring, bundle and membership, learning settings, learning layout and
-  learned values, and A6 mutation and learning. Gaps: G1, G14 (the
-  inheritance witness): `T25.F11`; G2 (the brain I/O vocabulary the sensor
-  descriptor needs: vote and outcome counts, `OUTPUT_SLOT_COUNT`, moved to
-  contracts so the descriptor depends on nothing above it): `T25.F11`; G13
-  (the minimum node transaction that applies a declaration and its bundles
-  together, which `AddSensor*` needs): `T25.F11`; G3: `T25.F12`. The rest of
-  G13 is `T30.F06` (design review 2026-10-22).
+- F11 pays known debts G1, G13 and G14's inheritance witness in
+  [`docs/architecture.md`](../architecture.md), and moves the brain I/O
+  vocabulary its sensor descriptor needs (vote and outcome counts,
+  `OUTPUT_SLOT_COUNT`) into contracts (G2), so the descriptor depends on
+  nothing above it. It owns the node's declaration edits: adding a sensor
+  applies the declaration and its bundles together, and pruning or removing
+  a declaration repairs its uses in the same edit
+  (`mutation/input_ref/mod.rs:338,366`); unused declarations and the
+  parseability gate's soft defaults stay supported (user, 2026-10-22,
+  folded from T30). F12 pays G3.
 - Decisions (user, 2026-10-13): only geometry is built in (the compass
   pattern and the `(x, y)` pairs declared in `contracts::inputs`), never a
   computation; the "bundle gene" was rejected (a gene multiplying who a
