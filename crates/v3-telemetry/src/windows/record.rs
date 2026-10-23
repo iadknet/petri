@@ -29,6 +29,8 @@ pub(crate) const fn keep_level(index: u64) -> u8 {
     }
 }
 
+/// `v` and `window` lead the body: the window store job and the report pages
+/// read the index from that prefix, not from the record's metadata.
 #[derive(Serialize)]
 struct Body<'a> {
     v: u8,
