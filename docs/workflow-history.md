@@ -311,6 +311,21 @@ rule, the track Architecture notes and the paperwork-based review grading
 removed. A spec now writes one Architecture paragraph, and the design lens
 reports only coupling a diff introduces or widens.
 
+Later that day the user added two guards after asking what still slips
+through. Mess inside one domain (three mutation routes wiring sensors by
+three rule sets, with no bad import) is met by owner-held rules: the
+architecture's rule 1 makes compound changes complete owner operations,
+the spec's Architecture paragraph names each shared rule's owner and every
+path that applies or interprets it, and T25.F11, F12 and T29.F01 carry
+conformance tests over the operator catalogs. Requirements the user stated
+in conversation but nobody recorded (the T25 intent audit's T3, T5, T6,
+T12) are met by an Intent section in the track design review: the same
+Codex job reconciles an export of the planning conversations against the
+rows and design notes, and feature readiness reviews check the spec keeps
+the source-quoted requirements. Both were challenged by Codex Astra before
+adoption, which folded a proposed second job into the existing one and
+dropped a proposed grep inventory.
+
 The same day the user removed the mutation gate from the workflow after an
 audit of its record, ahead of heavy refactoring it would have slowed: about 100
 recorded runs (roughly 36 hours of wall time, agent triage unmeasured)

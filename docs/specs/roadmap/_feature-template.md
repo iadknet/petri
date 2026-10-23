@@ -38,7 +38,10 @@ truth for feature dependencies.
 
 A short paragraph against [`docs/architecture.md`](../../architecture.md):
 the owners this feature touches, the known debts it pays, and any boundary
-it changes (the plan commit edits that file).
+it changes (the plan commit edits that file). For each shared rule it
+changes: the owner and the existing paths that apply or interpret it, with
+code references; the feature reuses the owner's operation or resolved view,
+or says why a separate policy or retained debt remains.
 
 ## Telemetry
 

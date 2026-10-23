@@ -20,8 +20,11 @@ belongs in the rows and specs that implement it; this file links to them.
 
 ## 1 Rules
 
-1. **One owner per concept.** One module builds, validates and edits a
-   concept; every route to it calls that owner.
+1. **One owner per concept.** Its module owns the rules for building,
+   validating, editing and interpreting it, and callers use its operations
+   or resolved views. Invariant-bearing state stays private and compound
+   changes are complete owner operations: callers supply choices, never
+   assemble shared rules through low-level writes.
 2. **Dependencies point down, with no cycles** (section 3's order and
    prohibitions).
 3. **Composition over inheritance.** Aggregates are composed of parts; a

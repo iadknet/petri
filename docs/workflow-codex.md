@@ -42,7 +42,10 @@ Give it the original user requirements, absolute repository/worktree paths,
 feature ID, and instructions to read `AGENTS.md`, the roadmap contract and
 template, `docs/architecture.md` (the shared Plan step's "Architecture"
 paragraph applies, and its plan-design-review runs checks 3 and 5 against
-that file), and the sections it needs rather than whole files: from
+that file), the feature's source-quoted requirements from its row and cited
+design note, which its readiness review checks the spec preserves (the
+shared track-planning intent review takes Codex conversation exports on the
+same terms), and the sections it needs rather than whole files: from
 `docs/workflow.md`, "Plan", "Review", and "Environmental pressures in the
 standard baseline"; from this adapter, "Planning and spec ownership". From the
 owning track it reads the feature's row, its dependency rows, and the "Notes for

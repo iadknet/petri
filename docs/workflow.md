@@ -103,9 +103,24 @@ checks and its coverage section, and with
 [`docs/architecture.md`](architecture.md) named in the brief as the desired
 state the rows are checked against. Rows that change the desired
 architecture edit that file in the same commit; a known debt no row pays is
-proposed to the user, never added as a row silently. Record the coverage table, findings and
+proposed to the user, never added as a row silently. Changes to the
+requirements in a cited design note also trigger this review. The same job
+reviews intent: give it an export, outside the repository, of the
+conversations that established or changed the affected requirements,
+keeping speakers, session and turn locators, answered option text and the
+proposal each answer accepted, without routine tool output. In an Intent
+section of the readings file it reconciles each distinct user goal, premise
+and decision with its owning row or design-note requirement by a short
+source quote, checks that the planned behavior reaches the code routes the
+requirement covers, verifies material assistant claims about the code, and
+separates user choices from planner or reviewer proposals. Record the coverage table, findings and
 dispositions in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
-`step-back:` and premise findings go to the user before the rows are committed.
+`step-back:` and premise findings, missing or contradicted goals, ambiguous
+intent and proposed tradeoffs go to the user before the rows are committed;
+the requirement records and factual errors are corrected, and the Intent
+section is confirmed against the final plan. Requirements live in the rows
+and design notes, each recorded once with its source quote; the readings
+file is evidence, not a second contract.
 
 **Concurrent sessions.** Before launching, inspect `git worktree list` for
 existing Claude and Codex feature worktrees. An unchecked feature may already
@@ -201,7 +216,10 @@ blocking finding carries a rebuttal that round accepted.
 **Architecture.** [`docs/architecture.md`](architecture.md) is the desired
 state of the system. The spec owner reads it and writes the spec's short
 Architecture paragraph: the owners the feature touches, the known debts it
-pays, and any boundary it changes. A feature that changes the desired
+pays, and any boundary it changes. For each shared rule the feature changes,
+it names the rule's owner and the existing paths that apply or interpret
+it, with code references, and reuses the owner's operation or resolved
+view, explaining any separate policy or retained debt. A feature that changes the desired
 architecture edits that file in the plan commit. A feature may leave a debt
 another row owns in place without taking on that row's scope; when it must
 use that debt anyway, the paragraph says so and why. Every challenge round's
@@ -224,7 +242,8 @@ one resumes.
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
 Codex Sol `high` job through the Codex channel, whose brief names the spec
 path, the original requirement, the roadmap contract, the feature's track row,
-dependency rows, and matching Notes entries. Round 1 is the design round: it
+dependency rows, matching Notes entries, and the feature's source-quoted
+requirements from its row and cited design note. Round 1 is the design round: it
 applies `$plan-design-review` only and runs all six of its checks, namely code
 decomposition, task decomposition, domain boundaries and separation of concerns,
 outdated or never-correct premises, a larger design flaw (step back), and
@@ -243,7 +262,8 @@ it.
 Round 2 is the readiness round: it applies `$spec-review`, confirms the round-1
 dispositions, and asks Codex to break confidence that the spec is ready to
 implement. Its attack surface is contradiction with the roadmap row or
-requirement, scope widened or narrowed, acceptance criteria that cannot be
+requirement, a source-quoted requirement the spec drops or covers on fewer
+routes than it names, scope widened or narrowed, acceptance criteria that cannot be
 tested, claims about current code that the code does not support, missing
 invariants and edge cases, determinism, the natural-analog rule, an unrealistic
 Performance predeclaration, a Verification Plan the change does not fit, and

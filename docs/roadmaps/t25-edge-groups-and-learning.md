@@ -71,6 +71,18 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   (`mutation/input_ref/mod.rs:338,366`); unused declarations and the
   parseability gate's soft defaults stay supported (user, 2026-10-22,
   folded from T30). F12 pays G3.
+- F11 acceptance (2026-10-22, in-domain guard): exercise sensor and bundle
+  creation through the existing Graph and InputRef catalogs on applicable
+  fixtures, checking descriptor-defined fields and facts, the requested
+  live or silent law and the one learning-birth policy; every relevant
+  operator must apply at least once, and whole-sensor wiring is a creation
+  postcondition (removal and detach may leave partial structures).
+- F12 acceptance (2026-10-22, in-domain guard): exercise each learning-edit
+  operator on its applicable edge, member and bundle targets, checking
+  broadcast behavior and unaffected settings; runtime construction, the
+  census and structural classification agree with the genome-owned
+  learning layout, including bundle-only learners and scales without
+  contributors.
 - Decisions (user, 2026-10-13): only geometry is built in (the compass
   pattern and the `(x, y)` pairs declared in `contracts::inputs`), never a
   computation; the "bundle gene" was rejected (a gene multiplying who a

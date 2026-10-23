@@ -44,6 +44,12 @@ user decisions and review:
   constructor argument and inherited by one call". T26's body rules and
   T26.F02's capacity law are kept. T27.F03's `steal_share` and `give_share`
   become body genes in F02.
+- F01 acceptance (2026-10-22, in-domain guard): shared finalization
+  assertions run through the founder, unchanged-child and mutated-child
+  birth paths, covering inherited learning, per-life initialization and
+  energy provisioning and caps; committed and rejected structural edits are
+  exercised against the inheritance-mapping contract through the existing
+  operator catalogs.
 - F01 is behavior-preserving in the T25.F01 shape: any pin that moves is a
   defect. Scope from the note: the coordinator in a creature-birth module,
   called by seeding and delivery with world context; the payload object;
