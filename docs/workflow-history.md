@@ -303,6 +303,19 @@ closure deletes the gaps a feature closed. The user-level review skills
 already read any architecture document `AGENTS.md` points to, so they needed
 no edit.
 
+The same day the user removed the mutation gate from the workflow after an
+audit of its record, ahead of heavy refactoring it would have slowed: about 100
+recorded runs (roughly 36 hours of wall time, agent triage unmeasured)
+escalated no production defect, and the 84 survivor-kill commits added about
+10,000 test lines, 41% of them in bench and lab code that never ships. Of the
+364 test functions they added, 283 were never touched again and the rest were
+edited or deleted by intentional redesigns; bugs still landed in gated code,
+since mutants check tests against code as written, not against the spec.
+Google's published use (Petrović et al., ICSE 2021 and TSE 2021) surfaces a few
+survivors per change in review rather than resolving all of them. The mutation
+specialist role and the spec's mutation line are gone; `make rust-mutants` and
+`make rust-mutants-ci` stay for runs the user asks for.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

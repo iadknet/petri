@@ -68,18 +68,9 @@ original roadmap row, not only against each other.
   recorded result is implausible given the code (for example, a test file the
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
-- Verification Plan: the spec's declared benchmark profiles, mutation gate and
+- Verification Plan: the spec's declared benchmark profiles and
   slow tests fit the diff under the workflow's "Verification plan" table. A plan the diff
-  contradicts, such as `none` with a simulation trajectory change or mutation
-  `not run` on new production logic in `v3-core`, `v3-cli` or `v3-server`, is a
-  P1.
-- **Not** the mutation survivor record. The mutation gate runs after this review,
-  on the final code, so there is nothing final for you to audit; the orchestrator
-  audits it at the closure gate. Do not report a missing survivor list as a
-  finding, and do not ask for a mutation run. If the diff already carries a
-  `#[mutants::skip]` attribute or an `exclude_re` entry without a written
-  justification, that *is* yours to report — it is a change to the gate's scope,
-  not a result of running it.
+  contradicts, such as `none` with a simulation trajectory change, is a P1.
 - Repository rules from `AGENTS.md`: TDD for behavior changes, property tests
   for pure invariants with assertions that do not depend on which cases were
   drawn, POSIX `sh` in shell automation, telemetry derived from applied
@@ -181,9 +172,7 @@ original roadmap row, not only against each other.
 ## Severity
 
 - P1: wrong behavior, untruthful spec state, a waived required check, scope
-  beyond the feature, or a blocking regression. Blocks closure. An unjustified
-  `#[mutants::skip]` or `exclude_re` in the diff is a waived check. The survivor
-  list itself is not yours to audit — see above.
+  beyond the feature, or a blocking regression. Blocks closure.
 - Telemetry P1: a counter, per-tick value, config value or mechanism switch
   the diff adds without its exported signal, because the T21.F07 row makes
   the signal part of the feature; a policy-sampled observation (span,

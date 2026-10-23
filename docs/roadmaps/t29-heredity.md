@@ -79,4 +79,4 @@ user decisions and review:
   carrier: body-gene distributions move slowly), reading capacity, share
   and colour distributions beside T26.F02's baseline, kin-tag diversity and
   body events by gene; F03 viability first, gate + goal, reading mask bit
-  frequencies. Mutation gate and slow tests run on all three.
+  frequencies. Slow tests run on all three.

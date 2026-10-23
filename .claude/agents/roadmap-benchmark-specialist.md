@@ -3,7 +3,7 @@ name: roadmap-benchmark-specialist
 description: >-
   Runs the benchmark profiles a roadmap feature's Verification Plan declares
   (gate, goal, goal-long), stores their reports, and records their verdicts
-  after final review and before the mutation gate.
+  after final review.
   Does not remediate code, change thresholds, or replace baselines.
 model: sonnet
 tools: Read, Edit, Write, Bash, Grep, Glob

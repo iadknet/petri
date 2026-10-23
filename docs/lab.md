@@ -59,7 +59,7 @@ Lab experiments are not roadmap features and do not use
   recommendation among a roadmap feature, no action, or more exploration.
 - A new arena, arm, reading or diagnostic worth keeping lands inside
   `crates/v3-lab` through an ordinary commit gated by `make check`, with no
-  spec, Codex challenge, mutation gate or benchmark.
+  spec, Codex challenge or benchmark.
 - An exploration commit touches only `crates/v3-lab/src`,
   `crates/v3-lab/tests` and `docs/strategy/`. Its message lists the paths
   touched. A change to any `Cargo.toml` or `Cargo.lock`, a build script, the

@@ -162,8 +162,8 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   birth policy, recruitment and its config deleted), its assistant-proposed parts
   and the Codex review's changes are in the
   [sensor wiring note](../strategy/group-creation-unification-2026-10-22.md).
-  Verification: viability first, gate + goal; mutation gate and slow tests
-  run; no goal-long (T25's allowance is spent).
+  Verification: viability first, gate + goal; slow tests run; no goal-long
+  (T25's allowance is spent).
 - Decided (user, 2026-10-22): F12 follows F11, after the user asked whether
   sensors, sinks, edges and bundles keep clean layers around learning. The
   [bundle learning note](../strategy/bundle-learning-ownership-2026-10-22.md)
@@ -182,7 +182,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   that rule. F12 supersedes member-owned scale-learning configuration, not
   only the names `Scope` and `inherit_scale`. Details, update law, detach
   table, commit shape and acceptance cases are in the note. Verification:
-  viability first, gate + goal; mutation gate and slow tests run.
+  viability first, gate + goal; slow tests run.
 - Decided (F08, 2026-10-19): `Slots` deleted on nine empty post-F05
   refinement-by-key readings (F05, F06, F07 goal); `RefineHeritableStructure`,
   `mutation.structured_heritable_refinement` and the inferred-set code are

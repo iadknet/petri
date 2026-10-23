@@ -90,5 +90,5 @@ closes gaps listed in that file's A8 and changes no simulation behavior.
 - Scheduling, not prerequisites: the master order puts F01 before T25.F11
   and F02 before T28, as preferences; either integration order works.
 - Verification (assistant proposal): each row gate with pins unchanged;
-  mutation gate run where a row moves production logic; F01 adds the
+  F01 adds the
   frontend's own tests and the type-parity test.

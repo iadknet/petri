@@ -21,7 +21,6 @@ Claude:
 | Spec owner and advisor | Fable 5.1, effort `high`, persistent | `.claude/agents/roadmap-spec-owner.md` |
 | Implementer | Opus 5.5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
-| Mutation specialist | Opus 5.5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
 | Spec challenger | Codex Sol (`gpt-6.1-sol`), effort `high`, read-only, fresh thread per round | run by the spec owner; see "Codex channel" |
 | Reviewers | three Codex Sol (`gpt-6.1-sol`) jobs, effort `high`, read-only, fresh threads, one lens skill each | run by the orchestrator; see "Review" |
 
@@ -44,12 +43,8 @@ when the build fails or exceeds 900 seconds. A passing check suppresses further
 fires for `PETRI_COMPILE_CHECK_COOLDOWN` seconds (15); a failure never does. It
 is feedback, not a gate: a breaking edit that ends a burst inside the cooldown
 is caught by `make check`.
-`make rust-mutants` runs cargo-mutants (installed through aqua's local
-registry) on the feature diff, and `make rust-mutants-ci` runs the same fresh
-run sharded on GitHub Actions; both are deliberately outside `make check` and
-the stop gate, because their output is a survivor list to triage, not a score.
-The benchmark and mutation specialists run sequentially and never alongside
-each other or competing builds, tests, servers, or measurements.
+The benchmark specialist never runs alongside competing builds, tests,
+servers, or measurements.
 
 **Codex channel.** Both Codex roles run as read-only `codex exec` jobs on
 CLI 0.159.1 or later, called directly: the `openai-codex` plugin's companion
@@ -132,14 +127,14 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, as the spec's Verification Plan declares them, the benchmark profile runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as three fresh read-only Codex Sol high jobs, one lens skill each, through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, as the spec's Verification Plan declares them, the benchmark profile runs and their records to roadmap-benchmark-specialist; run the final diff review as three fresh read-only Codex Sol high jobs, one lens skill each, through the Codex channel; run the benchmark specialist never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
 surface command output and the checked roadmap rows in your own messages, not
 only inside subagent results. Run a heavyweight check once, redirect its output
-to a log file, and read the log; never re-invoke `make check`, a benchmark, or
-a mutation run just to filter its output differently.
+to a log file, and read the log; never re-invoke `make check` or a benchmark
+just to filter its output differently.
 
 **`make check` runs once per feature** (user decision, 2026-10-10): at Close,
 on the final feature code, and nowhere else. No implementer, specialist, or
@@ -196,7 +191,7 @@ The spec owner creates the flat feature spec at
 challenge loop below, with its own `$spec-review` readiness review after the
 design round and before the readiness rounds. The spec
 declares its [Verification Plan](#verification-plan): which benchmark profiles
-and whether the mutation gate run, each with its reason. It then sets
+and slow tests run, each with its reason. It then sets
 the spec to `In Progress`, promotes a `Planned` track and a `Planning` master,
 and runs `make roadmap-check`. Verify its report against the files — the spec
 exists, the statuses moved, the checker passed — read the final challenge
@@ -299,7 +294,7 @@ and never rebuts them on its own authority.
 requirement questions for the rest of the run. Resume it by `SendMessage`,
 never while an implementer or specialist is running, for: a proposed change to
 requirements or acceptance criteria, conflicting technical advice, a request for
-a verification exception, a benchmark or mutation result that does not fit the
+a verification exception, a benchmark result that does not fit the
 predeclaration, or an integration conflict that changes behavior. Wait for its
 answer before the dependent work proceeds. It resolves against the original
 feature contract and records any spec revision as an explicit, checked edit; it
@@ -315,8 +310,7 @@ deviation once in the spec's "Notes for AI Agents" as a `Decision:` bullet.
 ### Implement
 
 Delegate feature implementation and production-code remediation to
-`roadmap-implementer`. Mutation-gate test-only remediation belongs to
-`roadmap-mutation-specialist`. Write no feature code yourself. Every implementer
+`roadmap-implementer`. Write no feature code yourself. Every implementer
 pass starts a fresh agent and its brief carries what it needs. This is a cost
 decision, not a tool limit: measured first launches carried ~300k tokens of
 context against 89–142k for later ones, and a continued agent carries the large
@@ -351,10 +345,6 @@ new code gets one self-review pass before it reaches the gate. A remediation
 brief that only strengthens tests, or only edits documents, does not need it.
 The implementer never decides this for itself; it does what its brief names.
 
-**The mutation gate is not part of implementation.** When the spec's
-Verification Plan declares it, it runs once, after review and any remediation,
-on the code that ships. See "Mutation gate" below.
-
 Splitting the work this way is a cost measure, not a correctness one: first
 launches were the expensive ones in the sessions this rule came from. If it
 proves worse in practice, collapse the two briefs back into one.
@@ -377,68 +367,15 @@ faith; if brief 2's report does not mention the simplify pass, send it back
 before review.
 
 **Order after implementation.** Review, then any post-review remediation, then
-the declared benchmark profiles, then the mutation gate, then closure. Both
-gates measure the code that ships, so neither runs before the review can still
-change it.
+the declared benchmark profiles, then closure. The benchmark gate measures the
+code that ships, so it never runs before the review can still change it.
 
-**Mutation gate.** This is a closure gate, not an implementation step. It runs
-only when the spec's [Verification Plan](#verification-plan) declares it, and
-then **once, after the review and any post-review remediation are complete**, on
-the final feature code. Running it earlier tests code that then changes and forces a
-second full run; that ordering cost about two fresh runs per feature and up to
-six on one of them. Delegate it to a fresh `roadmap-mutation-specialist` whose
-only scope is this gate, its test-only triage, and the spec's Verification
-record. Give it the worktree and spec paths, feature ID, final-review result,
-and only the spec's Verification and Notes for AI Agents sections.
-
-The gate is a fresh `make rust-mutants-ci` on the committed feature branch. It
-requires a clean tree, pushes the branch to `origin`, and dispatches the
-Offload workflow (`.github/workflows/offload.yml`) against the local merge
-base with `main`, passed explicitly because `origin/main` may lag it. Four
-macOS shards run `scripts/rust-mutants`, `scripts/rust-mutants-merge` refuses a
-result unless every shard finished fresh on the same diff, and the target
-downloads the merged output to `~/.local/share/petri-tools/mutants/<worktree>/`,
-where a later `MUTANTS_ITERATE=1` pass reuses it. A run that fails or is
-cancelled produces no result and is not a fresh run; dispatch it again. When
-Actions is unavailable, the gate is a local fresh `make rust-mutants`
-(`MUTANTS_ITERATE=0`, the default), recorded as such in the spec.
-Either target diffs against the merge base with `main` (the local one also
-includes uncommitted and untracked files), runs `cargo mutants --in-diff` with
-the caps in `.cargo/mutants.toml`, and reports every survivor: mutants missed
-by every test and mutants that timed out. The
-diff limits where mutations are generated; each viable mutant invokes the
-affected package's unfiltered test suite, including integration tests and
-doctests. Test filtering and reducing property-test case counts are not part of
-this target.
-The `mutants` Cargo profile uses optimization level 1 with debug assertions and
-overflow checks retained. The wrapper records `fresh` or `incremental` in
-`run-mode.txt` beside `mutants.out` and identifies the mode in its output.
-The mutation specialist records in the spec's Verification section the summary line, the
-output path, and the full survivor list, each survivor resolved as **killed**
-(a test added or strengthened, then the target rerun), **equivalent** (one
-sentence on why it cannot change observable behavior), or **deferred** (a
-deferred finding in "Notes for AI Agents"). Production code is never edited to
-kill a mutant, and any `#[mutants::skip]` or `exclude_re` entry carries a
-written justification. "No survivors" or "nothing to mutate" are valid records
-when that is what the target printed.
-
-While adding or strengthening tests to resolve survivors on unchanged production
-content, use `MUTANTS_ITERATE=1 make rust-mutants` for intermediate feedback.
-This passes cargo-mutants' `--iterate`: prior caught/unviable results in the
-same output directory may be reused, with accumulated entries in
-`mutants.out/previously_caught.txt`. Matching is heuristic and does not prove
-that coverage survived other changes. Incremental output is never closure
-evidence, even if no survivors remain in that pass.
-
-**One fresh run, two at most.** Killing survivors by adding or strengthening
-tests does not require another fresh run: the contract already forbids editing
-production code to kill a mutant, so the production content the first run
-measured is unchanged. Run a second fresh `MUTANTS_ITERATE=0` pass only when
-triage actually changed production code, test selection, or tool configuration,
-or deleted or weakened a test — and record why in the spec. **A third fresh run
-is not authorized:** stop, report the reason to the user, and let them decide.
-Do not close a feature with unresolved survivors to stay under the limit; an
-unresolved survivor is a blocker to report, not a number to hide.
+**Mutation testing is ad hoc** (user decision, 2026-10-22). No feature
+declares, runs or records it, and no closure waits on it. `make rust-mutants`
+(local) and `make rust-mutants-ci` (sharded on GitHub Actions; it pushes the
+branch, so it needs the user's authorization) remain for a run the user asks
+for; both diff against the merge base with `main` and print survivors for
+inspection, not a score.
 
 ### Review
 
@@ -531,19 +468,9 @@ untruthful claim is P1 under the existing spec-truthfulness rule.
 (Both were recorded as user decisions on 2026-09-05 alongside the one-goal-run
 rule below, but never reached this contract until 2026-09-09.)
 
-The reviewer audits neither the benchmark reports nor the mutation record: both
-gates run after this review, so there is nothing final to audit yet. **The
-orchestrator audits both at the closure gate instead**; the mutation record against the diff and, where readable, against the
-`missed.txt` and `timeout.txt` in the recorded output path. A missing survivor
-list, or a `#[mutants::skip]` or `exclude_re` without justification, is a waived
-check and blocks closure. An unresolved survivor blocks closure until it is
-killed, justified as equivalent, or explicitly deferred with the user's
-agreement. A survivor "killed" by editing production code rather than a test is a
-behavior change that must go back through review at the severity it warrants.
-
-(Across the seventeen features closed before 2026-09-09, the reviewer's survivor
-audit produced no P1. Moving it to the orchestrator keeps the check at the point
-where the record is final, with one reader rather than two.)
+The reviewer does not audit the benchmark reports: the benchmark gate runs
+after this review, so there is nothing final to audit yet. **The orchestrator
+audits them at the closure gate instead.**
 
 ### Benchmark gate
 
@@ -578,11 +505,6 @@ profile can answer the question. The track plan names those carriers; every
 other feature declares at most `gate + goal` and defers its long-run reading
 to the next carrier as a `Deferred:` bullet.
 
-| Mutation gate | Declare for |
-| --- | --- |
-| `run` | new or changed production logic in `v3-core`, `v3-cli` or `v3-server` whose behavior tests must pin |
-| `not run` | documentation, frontend, telemetry export, lab code, tooling, test-only changes, or a change confined to config values or constants that existing tests already pin |
-
 | Slow tests (`make rust-test-slow`) | Declare for |
 | --- | --- |
 | `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move; or a change to `crates/v3-lab`: the tier holds the lab's end-to-end runs |
@@ -590,25 +512,23 @@ to the next carrier as a `Deferred:` bullet.
 
 **Worked examples**: closed program 1 features, classified under these rules:
 
-| Feature | What it changed | Benchmark | Mutation | Slow tests |
-| --- | --- | --- | --- | --- |
-| T23.F10 thinned creature window store | telemetry export and a stack job; no simulation behavior | `none` | `not run` | `not run` |
-| T14.F11 progress page design | a static page in `docs/progress/` | `none` | `not run` | `not run` |
-| T22.F02 barrier-navigation assay | lab code in `crates/v3-lab` only | `none` | `not run` | `run` (lab) |
-| T24.F03 food growth phase timing | timing spans inside the tick loop; seeded output byte-identical | `gate` | `not run` | `not run` |
-| T16.F02 effort-priced actions | action costs: early ecology moves | `gate + goal` | `run` | `not run` |
-| Effort-cost defaults, 2026-10-10 | three cost values only | `gate + goal` | `not run` | `not run` |
-| T02.F08 partial bites | a new action sink and its decoding | `gate + goal` | `run` | `run` (sink catalog) |
-| T11.F31 ring projection motif | a mutation operator whose claim, avoidance evolving, shows only in long runs | `gate + goal-long` | `run` | `run` (draws) |
+| Feature | What it changed | Benchmark | Slow tests |
+| --- | --- | --- | --- |
+| T23.F10 thinned creature window store | telemetry export and a stack job; no simulation behavior | `none` | `not run` |
+| T14.F11 progress page design | a static page in `docs/progress/` | `none` | `not run` |
+| T22.F02 barrier-navigation assay | lab code in `crates/v3-lab` only | `none` | `run` (lab) |
+| T24.F03 food growth phase timing | timing spans inside the tick loop; seeded output byte-identical | `gate` | `not run` |
+| T16.F02 effort-priced actions | action costs: early ecology moves | `gate + goal` | `not run` |
+| Effort-cost defaults, 2026-10-10 | three cost values only | `gate + goal` | `not run` |
+| T02.F08 partial bites | a new action sink and its decoding | `gate + goal` | `run` (sink catalog) |
+| T11.F31 ring projection motif | a mutation operator whose claim, avoidance evolving, shows only in long runs | `gate + goal-long` | `run` (draws) |
 
 The slow tier holds `#[ignore]` tests marked `slow tier`, kept out of
 `make check` because they cost minutes (user decision, 2026-10-12). When
-declared it runs once at Close, beside `make check`, on the final code. A
-cargo-mutants run does not execute it.
+declared it runs once at Close, beside `make check`, on the final code.
 
 The reviewer checks the plan against the diff. A plan the diff contradicts,
-such as `none` with a trajectory change or `not run` on new production logic,
-is a P1. The user may set either line; the spec records that decision with its
+such as `none` with a trajectory change, is a P1. The user may set either line; the spec records that decision with its
 date. A declared check that is skipped is a closure blocker, not a waiver.
 
 A closure that runs no profile adds no benchmark summary and no series entry,
@@ -642,7 +562,7 @@ on that ground, and neither can one whose manifest or lock change does more
 than register the crate.
 
 **Telemetry features.** A feature that exports or records observations
-declares `none` and mutation `not run` on the ground that it changes no
+declares `none` on the ground that it changes no
 simulation behavior, even when it wires export into `v3-cli`, `v3-server` and
 observation seams in `v3-core`. That ground holds only while it changes no
 simulation behavior: no
@@ -731,8 +651,7 @@ cleanup command, and a T21 spec that adds a trace predeclares its projected
 size per run and its per-run cap. The stack's Compose file, configuration,
 dashboard definitions and cleanup script are source.
 
-After the review and any post-review remediation are complete, and before the
-mutation gate, delegate the profiles the spec's Verification Plan declares to a fresh
+After the review and any post-review remediation are complete, delegate the profiles the spec's Verification Plan declares to a fresh
 `roadmap-benchmark-specialist`. Give it the worktree and spec paths, feature ID
 and slug, exact commands, and only the spec's Verification and Performance and
 Goal Impact sections. It owns the runs, local raw artifacts, committed summaries
@@ -745,8 +664,7 @@ the spec owner and a fresh implementer as appropriate. If production
 remediation after the run invalidates a report, return only the affected
 final-code measurement to a fresh benchmark specialist before closure; this is
 not a second determinism check. A production fix prompted by a benchmark result
-goes back through review at the severity it warrants, as a production-code
-mutation kill does.
+goes back through review at the severity it warrants.
 
 From T11.F14 onward, the evolved-neighborhood observation cap is **180 seconds
 per goal-profile run, summed across seeds**
@@ -791,12 +709,7 @@ counters, not host wall-clock timings.
 
 `make rust-mutants` runs the same preflight restricted to `cargo-mutants`
 (`BENCH_WAIT_BLOCKERS=mutants`), so a second mutation run never starts while
-one is in progress anywhere on the host; a running server or benchmark does
-not hold it up. The per-mutant caps in `.cargo/mutants.toml` are deliberately
-generous (five times the baseline test time with a two minute floor, eight
-times for builds): a mutant that times out is reported as a survivor to
-triage, so a tight cap on a loaded host manufactures survivors and a retriage
-loop rather than catching anything.
+one is in progress anywhere on the host.
 
 ### Environmental pressures in the standard baseline
 
@@ -848,12 +761,6 @@ the full suite was just run on the same code), and commit. Then:
    Performance and Goal Impact section: every declared profile ran on the final
    code, and every severe compute regression is predeclared and justified or
    accepted by the user.
-   When the mutation gate is declared, audit its record: the
-   summary line and output path in the spec's Verification section, every
-   survivor resolved as killed, equivalent, or deferred, and `missed.txt` /
-   `timeout.txt` at the recorded path agreeing with the list. A `#[mutants::skip]`
-   or `exclude_re` without a written justification blocks closure. This replaces
-   the reviewer's former survivor audit.
    Verify each new summary's raw hash/byte count against the available local
    file, its original measured identity and verification time, and its preserved
    comparison verdicts. Availability is local and time-stamped, not a download
@@ -876,8 +783,7 @@ the full suite was just run on the same code), and commit. Then:
    rebase and its re-verification. Stop and report only when the conflicts
    cannot be resolved on the feature's own terms or the re-verification fails.
 3. `git worktree remove .claude/worktrees/<tnn-fnn>` and
-   `git branch -d worktree-<tnn-fnn>`; if the mutation gate pushed it, also
-   `git push origin --delete worktree-<tnn-fnn>`.
+   `git branch -d worktree-<tnn-fnn>`.
 4. Show `git status`, `git worktree list`, and the worktree's `make check`
    result with its tested commit in your own message, so the goal evaluator can
    see them. Do not rerun `make check` on `main`.
@@ -886,9 +792,7 @@ Executing a user-pasted goal authorizes local branch, worktree, and commit
 creation, rebasing the feature branch onto `main`, the fast-forward of `main`,
 and removal of the completed feature's worktree and branch. Merely reading or
 editing this workflow grants no such authorization. It does **not** authorize
-pushing, opening or updating a pull request, or any other remote mutation,
-except that `make rust-mutants-ci` pushes the feature branch for the mutation
-gate and closure deletes that remote branch.
+pushing, opening or updating a pull request, or any other remote mutation.
 
 ### Cost record
 

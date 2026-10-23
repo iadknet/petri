@@ -99,7 +99,6 @@ show it wrong.
 | Check | Declared | Reason |
 | --- | --- | --- |
 | Benchmark profiles | `none`, `gate`, `gate + goal`, or `gate + goal-long` (`+ goal` if the 2,000-tick series also matters) | one sentence |
-| Mutation gate | `run` or `not run` | one sentence |
 | Slow tests (`make rust-test-slow`) | `run` or `not run` | one sentence |
 
 ## Implementation Tasks
@@ -113,18 +112,13 @@ name, a report path, or a link. Do not prescribe test design in prose — the
 implementer chooses the design and records what it actually ran.
 
 - [ ] Focused tests or checks: `<command>` -> `<result>`.
-- [ ] When the Verification Plan declares the mutation gate: fresh
-      `MUTANTS_ITERATE=0 make rust-mutants`, its summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
-      Otherwise `Not run: Verification Plan`.
 - [ ] For each declared benchmark profile: summary stored at
       `docs/progress/features/<id>.json` (gate), `<id>-goal.json` or
       `<id>-goal-long.json`, local raw hash/byte count and verification time
       checked, series entry points to the summary, and no new full report
       staged. Otherwise `Not run: Verification Plan`.
 
-Keep this section under about 3 KB excluding the survivor list. Pass-by-pass
+Keep this section under about 3 KB. Pass-by-pass
 logs, transcripts, and raw test output go to `docs/progress/readings/<id>.md`,
 linked from the item that produced them.
 
@@ -175,7 +169,7 @@ of four labels — the checker rejects anything else, including prose paragraphs
 
 - `Decision:` a user decision later work must honour.
 - `Exception:` an accepted exception, with what it applies to.
-- `Deferred:` a deferred review finding or mutation survivor.
+- `Deferred:` a deferred review finding.
 - `Cost:` this feature's closure cost record.
 
 Keep execution policy in `docs/workflow.md`.
