@@ -15,24 +15,27 @@ T26 and T27 roadmaps; the companion
 
 ## Finding
 
-A child gets what it inherits through four separate routes in
-`spawn_child`, under three mutation laws:
+`spawn_child` already coordinates a birth, but it lives in the simulation
+layer, has a second builder beside it (seeding), and works under three
+mutation laws:
 
 | Leak | Today |
 |---|---|
 | L1 | The heritable body (`HeritableBody`: colour, kin identity, capacity, two exchange shares) sits on `CreatureState` outside `CreatureGenome`. It costs 0 genome units and is not part of genome equality. |
 | L2 | Three mutation laws. Genome: `Binomial(genome_size, 0.0060625)`. Capacity and both shares: chance 0.1 per birth each. Colour and kin tag mutate only on births where a genome event was applied (`applied_events > 0`, about 39% of founder births), which couples body heredity to brain heredity. |
-| L3 | No single owner of what a child receives. `spawn_child` clones and mutates the genome, calls `HeritableBody::inherit`, copies `shared_memory` and captures learned seeds; `cap_energy` runs after construction; seeding (`simulation/seeding.rs`) is a fifth route. |
-| L4 | Inherited runtime state follows no rule. Learned weights pass by each edge's heritable `lamarckian` flag; `shared_memory` passes always, with no gene; stateful operator state, `prev_shared_memory` and T27.F02's planned signals start at zero. |
+| L3 | The birth transaction is implicit. `spawn_child` (simulation layer) clones and mutates the genome, calls `HeritableBody::inherit` (which draws its own randomness, `identity.rs` `mutate_kin_tag`), copies `shared_memory`, smuggles learned seeds through the genome draft and advances `generation`; the constructors rebuild caches and runtime, or copy the caches on an unchanged-genome birth; `cap_energy` runs after construction; seeding (`simulation/seeding.rs`) is a second builder. |
+| L4 | Each inherited store has its own policy, which is legitimate, but only learning's is heritable. Learned weights pass by each edge's `lamarckian` flag; `shared_memory` passes always; stateful operator state, `prev_shared_memory`, `previous_outcome`, the dispatch record and T27.F02's planned signals start at zero. |
 | L5 | The parent's dispatch record (`ParentExecuted::Record`, T11.F17) biases where the child's mutations land. That is runtime state feeding heredity, and the code does not name it as such. |
 | L6 | Learned seeds ride inside the genome type: `CgpGraphBackendDef.birth_seeds`, `#[serde(skip)]`, outside equality. They are there so the container's edit primitives keep them aligned with edge indices (T25.F01). |
-| L7 | Declaring a sensor (`input_refs`, InputRef domain, 1 unit) and wiring it (bundles, Graph domain, 1 unit each) are two domains. T25.F11's `AddSensor*` joins them for Graph nodes only. |
+| L7 | Declaring a sensor (`input_refs`, 1 unit) and using it (VM `ReadInput`, Graph bundles and edges) are separate, which is legitimate: VM and Graph consume declarations differently and an unused declaration is a supported state. The open part is narrower: the InputRef mutation category edits both (`mutation/input_ref/mod.rs`), so the node, not a mutation category, should own the cross-reference invariants. |
 
 How it drifted: T26.F01 made the body one record to replace ten positional
 constructor arguments at 55 sites (interaction design note §4). That was a
 refactor convenience, never a decision that the body stays out of the
 genome. T26.F02 and T27.F03 then added traits to the record with their own
-per-birth chances.
+per-birth chances. T26.F01 kept the colour and kin-tag gate on brain
+mutation deliberately, as inherited coupling to preserve behavior, not as a
+design choice; the decision below removes it.
 
 ## Decision (user, 2026-10-22)
 
@@ -51,13 +54,21 @@ per-birth chances.
 
 | Object | Holds | Counted | Owner of edits |
 |---|---|---|---|
-| `CreatureGenome` | `brain` (today's `entry_node_id` and mesh nodes, unchanged) and `body` | yes, `genome_size = brain units + body units` | the mutation engine |
-| `BodyGenome` | colour, kin tag, capacity, steal share, give share, memory mask: six genes (the mask's place here is an assistant proposal: a parent's provisioning is a body trait) | 1 unit per gene | a Body mutation domain |
-| `BirthPayload` | learned seeds and the parent's memory, captured at delivery | no | the zygote builder |
-| `Zygote` | a mutated genome and its payload | — | one builder, for founders and children |
+| `CreatureGenome` | a brain chromosome (today's `entry_node_id` and mesh nodes, unchanged) and a body chromosome | yes, `genome_size = brain units + body units`, an explicitly defined economic measure (user decision) | each chromosome's own edit API |
+| `BodyGenome` | colour, kin tag, capacity, steal share, give share, memory mask: six genes (the mask's place here is an assistant proposal: a parent's provisioning is a body trait) | 1 unit per gene | its own edit API; a body mutation policy samples and calls it |
+| `BirthPayload` | learned seeds and the parent's memory, captured at delivery | no | the birth transaction |
+| `Zygote` | a mutated genome, its payload and its provenance (parent, `lineage_id`, `generation`) | — | the birth transaction, for founders and children |
 
-`CreatureState` is built from one `Zygote` plus a position and an energy.
-Nothing else is heritable. The body's rules (`move_factor`, `upkeep`,
+Mutation categories (Topology, VM, Graph, InputRef and the new body
+policy) are how the engine dispatches events, not owners: each chromosome,
+and within the brain each node, owns its data and its invariants, and a
+mutation policy only samples an edit and calls that owner's API. All
+randomness of a birth lives in the mutation policies; no trait draws its
+own (today `mutate_kin_tag` and `mutate_phenotype` do).
+
+`CreatureState` is the application aggregate the birth transaction builds
+from one `Zygote` plus a position and an energy; it is not a foundational
+type other layers build on. Nothing else is heritable. The body's rules (`move_factor`, `upkeep`,
 `energy_scale`, the energy cap) read the body genes and stay where they are.
 
 ### Mutation supply: one law
@@ -74,10 +85,25 @@ domain odds nor the body's rate depends on the other.
 
 ### The builder
 
-`Zygote::founder` (seeding) and `Zygote::conceive` (delivery) are the only
-two constructors. Each produces a genome and a payload; a child's also
-produces the `MutationSummary`, which stays the record of applied events.
-The constructor consumes the payload by the child's genome:
+One birth transaction coordinates every newborn; specialist components
+supply each part, and each store keeps its own policy (one coordinator,
+not one universal rule). Assistant proposal: it lives in a creature-birth
+module beside the genome, mutation and runtime, and the simulation calls
+it with world context (position, litter energy, birth direction).
+
+1. **Draft.** `Zygote::founder` (seeding) or `Zygote::conceive`
+   (delivery): the genome draft, the payload, provenance; a child's also
+   runs the mutation policies and returns the `MutationSummary`, which
+   stays the record of applied events.
+2. **Finalize.** Resolve the learning layout from the child's mutated
+   genome (T25.F12), apply the child's inheritance settings to the payload
+   (table below), build caches, sink weights and runtime (or reuse the
+   parent's caches when no event applied, as the fast path does today),
+   reset per-life state (`prev_shared_memory`, `previous_outcome`,
+   operator state, dispatch history, signals), set the heading from the
+   birth direction, and provision energy.
+
+The finalizer consumes the payload by the child's genome:
 
 | Payload part | Child receives it when |
 |---|---|
@@ -150,6 +176,31 @@ keeps L6 and would need a `WORKAROUND` marker.
   structure.
 - L7 overlaps T25.F11 and is not decided here.
 
+## Review
+
+A Codex architecture challenge of the parent session's domain diagrams
+(2026-10-22, forwarded with the user's request; full output outside the
+repo) was weighed against the code after this note's first version:
+
+- Mutation domains are dispatch categories, not ownership boundaries
+  (`mutation/engine/mod.rs`; `mutation/input_ref/mod.rs` writes a Graph
+  edge). Accepted: owners are chromosomes and nodes, policies call their
+  edit APIs; L7 narrowed.
+- Body/brain separation is reasonable, and charging body fields as genome
+  units changes what `genome_size` means, which is the user's model
+  decision. Already decided by the user ("Genome, one law"); the note now
+  names `genome_size` an explicitly defined economic measure. Accepted:
+  trait randomness moves into mutation policies; lineage provenance
+  separates from the evolvable kin tag.
+- "Two inheritance owners" mistook different payload policies for
+  duplicate ownership, and the birth transaction was missing (generation,
+  cache reuse, rebuilt caches and learner state, resets, heading).
+  Accepted: L3 and L4 restated, the builder became a two-step birth
+  transaction with one coordinator and per-store policies.
+- `CreatureState` is an application aggregate, not a foundational type;
+  the coordinator does not live in the simulation layer. Accepted as an
+  assistant proposal.
+
 ## Natural analogs
 
 - One genome encodes both the body plan and the nervous system.
@@ -163,9 +214,11 @@ keeps L6 and would need a `WORKAROUND` marker.
 Three rows, after T25.F12, in a new track, T29 Heredity (user, 2026-10-22,
 multiple choice; not yet added). The track states that it supersedes
 T26.F01's record criterion:
-1. **Zygote builder and birth payload**, behavior-preserving: one builder
-   for founders and children, the payload object, stable learnable ids,
-   provisioning inside the builder. Every pin holds; any moved pin is a
+1. **Birth transaction and payload**, behavior-preserving: one
+   coordinator for founders and children in a creature-birth module, the
+   payload object, provenance on the zygote, stable learnable ids,
+   provisioning inside finalization, trait randomness moved into mutation
+   policies with today's draw order kept. Every pin holds; any moved pin is a
    defect.
 2. **Body genes**: `BodyGenome` in `CreatureGenome`, per-part supply, the
    Body domain and its operators, the gate deleted, `lineage_id` moved to
@@ -182,9 +235,9 @@ baseline, kin-tag diversity, and mask bit frequencies.
 
 ## Open
 
-- L7: whether a sensor declaration should stop being its own domain and be
-  owned by what reads it (the VM node's declaration list, the Graph node's
-  bundles). Decide after T25.F11 lands.
+- L7: whether every edit touching a node's declarations goes through one
+  node edit transaction that owns the declaration–use invariants, so no
+  mutation category keeps them by hand. Decide after T25.F11 lands.
 - Whether T27.F02's signals join the birth payload under their own mask.
 - For the spec owner: the Body operators' draw order and the per-part
   supply's effect on existing draw streams; the stable-id representation.
