@@ -64,15 +64,20 @@ The user's model, in their words (a side discussion pasted as the answer to
 
 ## Model
 
+Revised after an architecture challenge (Codex Astra, 2026-10-22) of the
+domain diagrams: two learning slots on a bundle, a learning layout derived
+from the genome rather than owned by runtime, and `Inherit` resolved once
+at birth.
+
 ### Three meanings of "inherit", kept apart
 
 | Word | Meaning | Where |
 |---|---|---|
-| **default settings** | a member without its own `Learning` uses its bundle's `Learning` for its modifier | bundle switch `members_learn` |
+| **default settings** | a member with policy `Inherit` uses its bundle's member default `Learning` for its modifier | the bundle's `member_default` slot |
 | **Lamarckian** | a learned value is a child's birth value | one `lamarckian` flag on every `Learning` (replaces `inherit_scale`) |
 | **shared scale** | a member's weight moves when its bundle's scale moves | always: `weight = scale × pattern + modifier` |
 
-### Objects
+### Objects (genome data)
 
 **One `Learning` value type**, the same wherever it appears: rule, learning
 rate, clamp, reward modulation (source, trace decay), retention, and the
@@ -82,78 +87,94 @@ rate, clamp, reward modulation (source, trace decay), retention, and the
 | Object | Stores | Learnable number |
 |---|---|---|
 | Lone edge | `Option<Learning>` | its weight |
-| Bundle | `Option<Learning>`; two switches, `scale_learns` and `members_learn` | its scale |
+| Bundle | two slots of the same type: `scale_learning: Option<Learning>` ("learns as a group") and `member_default: Option<Learning>` ("learns per edge") | its scale |
 | Member | its evolvable **modifier** (today's own correction); a **policy**: `Inherit`, `Static` or `Own(Learning)` (the override); a `credits` switch | its modifier |
 
-Every member's weight is `scale × pattern + modifier`, in every case.
+Two slots rather than one shared `Learning` plus two switches (assistant
+proposal, by the maximum-flexibility rule): the scale's learning and the
+members' default evolve independently, and a slot's presence is its
+switch, so no switch can be on with nothing to run. Every member's weight
+is `scale × pattern + modifier`, in every case.
+
+The graph remains the aggregate root that stores every edge; a member is
+an edge whose membership links it to a bundle, identified by its
+occurrence (surface and position), not stored by the bundle.
 
 ### Who learns what
 
-A bundle's two switches are independent (assistant proposal from the
-maximum-flexibility rule: the user's answer named "the shared scale" or
-"the members" as the target; both at once is allowed rather than
-excluded), and a member's override always wins:
+A member's override always wins:
 
-| Bundle switches | Member with policy `Inherit` | Member with `Own` (override) |
+| Bundle slots | Member with policy `Inherit` | Member with `Own` (override) |
 |---|---|---|
 | neither (static bundle) | modifier stays as evolved | learns its modifier with its own `Learning` |
-| `scale_learns` ("learns as a group") | modifier stays as evolved; the scale learns from crediting members | learns its modifier with its own `Learning`; the scale also learns |
-| `members_learn` ("learns per edge") | learns its modifier with the bundle's `Learning` | learns its modifier with its own `Learning` |
-| both | learns its modifier with the bundle's `Learning`; the scale also learns | learns its modifier with its own `Learning`; the scale also learns |
+| `scale_learning` ("learns as a group") | modifier stays as evolved; the scale learns from crediting members | learns its modifier with its own `Learning`; the scale also learns |
+| `member_default` ("learns per edge") | learns its modifier with `member_default` | learns its modifier with its own `Learning` |
+| both (assistant proposal) | learns its modifier with `member_default`; the scale also learns | learns its modifier with its own `Learning`; the scale also learns |
 
 A member with policy `Static` keeps its modifier as evolved under every
-bundle setting (assistant proposal: an explicit static override, so
-"stop this member learning" never means "fall back to the bundle"; by the
-maximum-flexibility rule). `credits` (per member, evolvable) says whether the member's activity feeds
-the scale when `scale_learns` is on; with or without an override, so a
-member may credit the bundle and learn itself at once. A bundle switch
-with no `Learning` on the bundle is inert.
+bundle setting (assistant proposal: an explicit static override, so "stop
+this member learning" never means "fall back to the bundle"). `credits`
+(per member, evolvable) says whether the member's activity feeds the scale
+when `scale_learning` is present, with or without an override, so a member
+may credit the bundle and learn itself at once.
+
+### Learning layout (derived from the genome) and runtime (values)
+
+Two owners, split by what they hold:
+
+- **Learning layout**: a pure analysis of the finalized genome, computed
+  once at birth after the child's mutation and before construction. It
+  resolves each member's policy against its bundle (so `Inherit` is looked
+  up once, not per visit; the genome still stores `Inherit`), and yields
+  every learner with its identity and effective `Learning` (lone edge
+  weights, member modifiers with an effective `Learning`, bundle scales
+  with `scale_learning`) and, separately, each learner's contributing
+  occurrences. It lives with the genome analysis, so structural
+  classification (`creature/genome/companions.rs`), the plasticity census
+  and runtime construction all read it without the genome depending on
+  runtime.
+- **Runtime** (`runtime/plasticity`): learned values, traces, birth values
+  and seeds, and the update law below. It consumes the layout.
+
+A scale's state does not depend on having contributors (assistant
+proposal, by the maximum-flexibility rule): a scale whose last crediting
+member was switched off, for example by a child's mutation after the
+parent's seeds were captured (`simulation/actions/reproduction.rs`), keeps
+its learned value, still decays by its retention and still passes to
+descendants when `lamarckian`; it only stops receiving credit. Today's rule
+allocates a scale slot only when a group-scope contributor exists
+(`learned.rs` `from_seeds`). Every gate that asks "does an edge have
+plasticity" is replaced by a layout read, named in the spec, beginning with
+`learned.rs`'s empty-state return when no edge is plastic and its learner
+lookup, `companions.rs`'s `plastic_edges()` use and
+`plasticity_census.rs`'s carrier marking. The scattered `scope == Group`
+branches go with `Scope`.
 
 ### Update law (today's scalar formulas, one owner; the configuration choice changes)
 
-Within one committed visit, from the same pre-update state:
+Two steps, kept distinct: **contribution aggregation** (per learner: one
+edge's activity for a modifier or a lone edge; the pattern-weighted sum
+over crediting members for a scale), then **scalar state update** (one
+add, one clamp, or one trace accumulation per learner). Within one
+committed visit, from the same pre-update state:
 
-- **Modifier** (a member learning by its override or by the bundle's
-  defaults) and **lone-edge weight**: the effective `Learning`'s rule is
+- **Modifier** and **lone-edge weight**: the effective `Learning`'s rule is
   evaluated on the edge's `pre`, `post` and its composed visit-start
   weight; the delta is added and clamped by that `Learning`'s clamp; a
   reward-modulated `Learning` adds the activity to that learner's trace
   instead.
-- **Scale**: for each crediting member, the bundle's rule is evaluated on
-  that member's `pre`, `post` and composed visit-start weight (the rule
-  receives that weight, which Oja uses; covariance ignores it, as
-  `rules.rs` does today); the
-  deltas are multiplied by the member's pattern and summed, not
-  normalized; the scale is written once after the loop, clamped by the
-  bundle's clamp (replacing today's smallest-member clamp). A
-  reward-modulated bundle accumulates the pattern-weighted activities in
-  one trace. This is a behavior change: today each crediting member
-  evaluates its own rule, rate, reward source and trace, and the scale's
-  clamp is the smallest among them.
+- **Scale**: for each crediting member, `scale_learning`'s rule is
+  evaluated on that member's `pre`, `post` and composed visit-start weight
+  (the rule receives that weight, which Oja uses; covariance ignores it, as
+  `rules.rs` does today); the deltas are multiplied by the member's pattern
+  and summed, not normalized; the scale is written once after the loop,
+  clamped by `scale_learning`'s clamp. A reward-modulated scale
+  accumulates the pattern-weighted activities in one trace. This is a
+  behavior change: today each crediting member evaluates its own rule,
+  rate, reward source and trace, and the scale's clamp is the smallest
+  among them.
 - A member that learns its modifier and credits the scale contributes to
   both from the same samples.
-
-### One owner of the learner set
-
-One enumeration, built once from the genome, yields every learner (lone
-edge weights, member modifiers with an effective `Learning`, bundle scales
-with `scale_learns` and a `Learning`) and, separately, each learner's
-contributing occurrences. A scale's state does not depend on having
-contributors (assistant proposal, by the maximum-flexibility rule): a
-scale whose last crediting member was switched off, for example by a
-child's mutation after the parent's seeds were captured
-(`simulation/actions/reproduction.rs`), keeps its learned value, still
-decays by its retention and still passes to descendants when
-`lamarckian`; it only stops receiving credit. Today's rule allocates a
-scale slot only when a group-scope contributor exists
-(`learned.rs` `from_seeds`). Runtime construction, sampling,
-reward eligibility, decay, birth-seed capture, structural classification
-(`creature/genome/companions.rs`) and the plasticity census consume it.
-Every gate that asks "does an edge have plasticity" is replaced, named in
-the spec, beginning with `learned.rs`'s empty-state return when no edge is
-plastic and its learner lookup, `companions.rs`'s `plastic_edges()` use
-and `plasticity_census.rs`'s carrier marking. The scattered
-`scope == Group` branches go with `Scope`.
 
 ### Detach and other membership transitions
 
@@ -163,63 +184,71 @@ edit, a split), it becomes a lone edge:
 | Before | Lone edge's weight | Lone edge's `Learning` |
 |---|---|---|
 | `Own` | composed weight | the override |
-| `Inherit`, `members_learn` on | composed weight | a copy of the bundle's `Learning` |
-| `Inherit`, `members_learn` off | composed weight | none (static) |
+| `Inherit`, `member_default` present | composed weight | a copy of `member_default` |
+| `Inherit`, no `member_default` | composed weight | none (static) |
 | `Static` | composed weight | none (static) |
 
 `credits` is dropped. The birth seed composes as today
 (`scale × pattern + modifier` seed) and is consumed only when the resulting
 `Learning` is `lamarckian`. The container keeps seed alignment; the runtime
-owner interprets inheritance. Detaching the last member removes the
-bundle.
+interprets inheritance. Detaching the last member removes the bundle.
 
 ### Mutation
 
 Two separate draws, never confused:
 
-1. **Which `Learning` is edited**: a lone edge's, a member's override, or a
-   bundle's. Each existing learning operator (enable, disable, rule, rate,
-   Lamarckian toggle, reward source, trace decay, retention) applies to any
-   of the three. On a member, enable sets `Own` (drawing a `Learning`),
-   disable sets `Static`, and a separate "clear override" sets `Inherit`;
-   disabling one member changes neither its siblings nor the scale's
-   credit.
+1. **Which `Learning` is edited**: a lone edge's, a member's override, a
+   bundle's `scale_learning` or its `member_default`. Each existing
+   learning operator (enable, disable, rule, rate, Lamarckian toggle,
+   reward source, trace decay, retention) applies to any of the four. On a
+   member, enable sets `Own` (drawing a `Learning`), disable sets `Static`,
+   and a separate "clear override" sets `Inherit`; on a bundle slot,
+   enable and disable add or remove that slot. Disabling one member changes
+   neither its siblings nor the scale's credit.
 2. **Broadcast** (the F07 scope coin, unchanged in meaning): an edit
-   picked on a member's override lands on that member alone or on every
-   member of its bundle that admits it (T25 audit row T16: "change this
-   attribute for all edges in the group, or … for a single edge").
+   picked on a member lands on that member alone or on every member of its
+   bundle that admits it (T25 audit row T16: "change this attribute for
+   all edges in the group, or … for a single edge").
 
-New toggles: `scale_learns`, `members_learn` (bundle), `credits` and the
-member policy (member, with the broadcast coin). `SetScope` is removed with `Scope`. Bundle
-creation draws the bundle's `Learning`, its two switches, and every
-member's override and `credits` in the F07 uniform or F08 randomized form.
+New toggles: `credits` and the member policy (member, with the broadcast
+coin). `SetScope` is removed with `Scope`. Bundle creation draws both slots
+and every member's policy and `credits` in the F07 uniform or F08
+randomized form. Mutation makes these random choices; the graph domain
+validates and applies them.
 
 ## Shape of the work
 
-Two commits (assistant proposal):
-1. **Extraction, behavior preserving.** The one learner enumeration and
-   the update-law owner over today's representation and today's
-   execution: each crediting member keeps its own configuration, trace,
-   reward source and rate; a scale keeps the smallest-member clamp and
-   allocates only when a group-scope contributor exists; a group-scope
-   member's own correction stays unlearned. Every pin holds. Preservation
-   cases written first: a randomized group whose contributors differ in
-   rule, rate, reward source and trace decay; mixed reward sources on one
-   scale; group-scope members with nonzero own corrections.
-2. **The new ownership model**: bundle `Learning` and its two switches,
-   member policy and `credits`, `lamarckian` unification, scale state
-   independent of contributors, the detach table, the mutation draws; with
-   predeclared re-pins.
+The final seams come first (assistant proposal, after the architecture
+challenge): the learning layout and the update-law owner are defined in
+their final places before any behavior moves, so the preservation stage
+does not shape the abstraction. Two commits:
+1. **Extraction, behavior preserving.** The layout and the update-law
+   owner over today's representation and today's execution: each crediting
+   member keeps its own configuration, trace, reward source and rate; a
+   scale keeps the smallest-member clamp and allocates only when a
+   group-scope contributor exists; a group-scope member's own correction
+   stays unlearned. These old semantics live inside the layout's builder
+   and are deleted in commit 2; no switch or config preserves them. Every
+   pin holds. Preservation cases written first: a randomized group whose
+   contributors differ in rule, rate, reward source and trace decay; mixed
+   reward sources on one scale; group-scope members with nonzero own
+   corrections.
+2. **The new ownership model**: the two bundle slots, member policy and
+   `credits`, `lamarckian` unification, scale state independent of
+   contributors, the detach table, the mutation draws; with predeclared
+   re-pins.
 
 Acceptance cases for commit 2, written first: a bundle-only learner (every
-member `Inherit`, `scale_learns` on) learns; an `Inherit` member under a
-learning scale moves only through the scale; `members_learn` gives
-`Inherit` members the bundle's settings and leaves `Own` and `Static`
-members alone; a member that credits and learns itself updates both from
-one visit's samples; disabling one member leaves its siblings and the
-scale's credit unchanged; a child whose last crediting member was switched
-off keeps, decays and passes on the inherited scale; each row of the
-detach table; Lamarckian seeding of a scale and of a modifier.
+member `Inherit`, `scale_learning` present) learns; an `Inherit` member
+under a learning scale moves only through the scale; `member_default`
+gives `Inherit` members its settings and leaves `Own` and `Static` members
+alone; the two slots evolve independently (an edit to one leaves the other
+unchanged); a member that credits and learns itself updates both from one
+visit's samples; disabling one member leaves its siblings and the scale's
+credit unchanged; a child whose last crediting member was switched off
+keeps, decays and passes on the inherited scale; each row of the detach
+table; Lamarckian seeding of a scale and of a modifier; the layout is
+computed once per birth and `Inherit` is never resolved during a visit.
 
 ## Settled
 
@@ -230,7 +259,7 @@ detach table; Lamarckian seeding of a scale and of a modifier.
 
 ## Open for the spec owner
 
-- Birth draws for the two bundle switches and `credits` (default: each a
-  fair coin, by the maximum-flexibility rule).
+- Birth draws for the two bundle slots and `credits` (default: each a fair
+  coin, by the maximum-flexibility rule).
 - Verification: viability first, gate + goal; mutation gate and slow tests
   run; the acceptance cases above.
