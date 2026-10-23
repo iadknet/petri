@@ -43,10 +43,16 @@ design choice; the decision below removes it.
   mutates at the same per-unit rate as a brain unit (multiple choice:
   "Genome, one law"). The user accepted that capacity and the shares then
   mutate about 16 to 18 times less often than today's 0.1 per birth.
-- Whether a child receives the parent's memory is heritable: one 16-bit
-  gene, 1 genome unit, one bit per `shared_memory` slot; a set bit passes
-  that slot, a clear bit gives the child 0; mutation flips one bit; the
-  founder has every bit set (multiple choice: "One gene, per-slot mask").
+- Whether a child receives the parent's memory is heritable, slot by slot,
+  through 16-bit mask genes, 1 genome unit each, one bit per
+  `shared_memory` slot, mutation flipping one bit; the founder has every
+  bit set. First decided as one mask (multiple choice: "One gene, per-slot
+  mask"); after the architecture review the user chose two ("Both
+  evolvable"): the parent's provisioning mask and the child's uptake mask,
+  a slot passing when both bits are set.
+- Learned seeds cross structural edits by inheritance mappings the Graph's
+  edits return, not by stable ids alone (user, after the architecture
+  review; [architecture](../architecture.md) A5).
 
 ## Model
 
@@ -55,7 +61,7 @@ design choice; the decision below removes it.
 | Object | Holds | Counted | Owner of edits |
 |---|---|---|---|
 | `CreatureGenome` | a brain chromosome (today's `entry_node_id` and mesh nodes, unchanged) and a body chromosome | yes, `genome_size = brain units + body units`, an explicitly defined economic measure (user decision) | each chromosome's own edit API |
-| `BodyGenome` | colour, kin tag, capacity, steal share, give share, memory mask: six genes (the mask's place here is an assistant proposal: a parent's provisioning is a body trait) | 1 unit per gene | its own edit API; a body mutation policy samples and calls it |
+| `BodyGenome` | colour, kin tag, capacity, steal share, give share, memory provisioning mask, memory uptake mask: seven genes (provisioning is a parent's body trait, uptake a child's) | 1 unit per gene | its own edit API; a body mutation policy samples and calls it |
 | `BirthPayload` | learned seeds and the parent's memory, captured at delivery | no | the birth transaction |
 | `Zygote` | a mutated genome, its payload and its provenance (parent, `lineage_id`, `generation`) | — | the birth transaction, for founders and children |
 
@@ -79,7 +85,7 @@ is `Binomial(genome_size, rate)`, today's supply law. Brain dispatch
 (mesh layer, then node-internal domains) is unchanged. A body event picks
 one body gene uniformly and applies that gene's operator: today's
 phenotype step, today's one-bit kin flip, today's log step for capacity and
-the shares, and one bit flip for the memory mask. The `applied_events > 0`
+the shares, and one bit flip for either memory mask. The `applied_events > 0`
 gate is deleted. Assistant proposal: per-part draws, so neither the brain's
 domain odds nor the body's rate depends on the other.
 
@@ -108,11 +114,11 @@ The finalizer consumes the payload by the child's genome:
 | Payload part | Child receives it when |
 |---|---|
 | a learned seed | the child's edge or bundle `Learning` is `lamarckian` (today's rule, after T25.F12) |
-| a memory slot | the child's memory-mask bit for that slot is set |
+| a memory slot | the parent's provisioning bit and the child's uptake bit for that slot are both set |
 
-Assistant proposal: the child's genome decides in both cases, as seeds do
-today. A maternal-effect reading (the parent's mask decides) is the
-alternative; it would make a mask mutation show up only in grandchildren.
+Seeds follow the child's genome, as today. Memory follows both
+generations (user): a provisioning mutation shows in the mutant's
+offspring, an uptake mutation in the mutant itself.
 
 Provisioning belongs to the builder: the litter energy and its cap against
 the child's capacity (today's `cap_energy` after construction) are one
@@ -125,13 +131,16 @@ and get repaired at different rates from silent ones.
 ### Seeds leave the genome type
 
 L6 exists because seeds are keyed by edge index, and only the container's
-edit primitives know how indices move. The payload can leave the genome
-only if every learnable number has a key that survives edits: a stable id
-per edge and per bundle, kept by copies, fresh on creation, dropped on
-removal. Assistant proposal: stable ids, which T25.F12's learning layout
-(every learner with its identity, derived once at birth) can carry.
-The alternative, keeping seeds in the container behind the builder,
-keeps L6 and would need a `WORKAROUND` marker.
+edit primitives know how indices move. A key alone is not enough: a copy
+inside one genome makes two learnable numbers from one, and a detach
+composes two seeds into one. So every Graph edit returns an inheritance
+mapping (an unchanged locus keeps its identity, a copy gets a new identity
+naming its source, a detach composes `scale × pattern + modifier`, a
+removal drops, a source change or weight or scale write invalidates);
+mappings compose across one birth's committed edits and vanish with a
+rejected edit, and the learning layout exposes the identities. Birth
+applies the composed mapping to the payload and repeats no graph-edit
+semantics (user, after the architecture review).
 
 ### Other moves
 
@@ -150,16 +159,16 @@ keeps L6 and would need a `WORKAROUND` marker.
   size. Kin tags then drift about 70 times more slowly, so `KIN_AFFINITY`
   separates lineages later in a run. Step sizes are not retuned here; a
   later sweep may change them.
-- **The founder grows** from 80 to 86 units (five body traits and the
-  memory mask). To keep the founder's supply at 0.485 events per birth,
-  `per_unit_rate` becomes `0.485 / 86` (about 0.00564), as T25.F02 did at
+- **The founder grows** from 80 to 87 units (five body traits and two
+  memory masks). To keep the founder's supply at 0.485 events per birth,
+  `per_unit_rate` becomes `0.485 / 87` (about 0.00557), as T25.F02 did at
   80. The replication-cost and gestation anchors move with the founder
   size.
 - **Body genes have a carrying cost**: each pays carry, replication and
   gestation like any unit.
 - **Genome equality and serialization include the body**, so the
   no-mutation fast path, mutation-effect screens and genome digests move.
-- **A memory mask with every bit set matches today's behavior.** Selection
+- **Two memory masks with every bit set match today's behavior.** Selection
   can now clear bits.
 - No backward compatibility: genomes, draws and pins move, predeclared.
 
@@ -172,7 +181,7 @@ keeps L6 and would need a `WORKAROUND` marker.
   signals keep their own row; whether signals join the payload under a
   mask is T27's decision.
 - T25.F11 and F12 land first: F12 rewrites seed capture and adds the
-  learning layout this note's stable ids build on. Nothing here changes bundle
+  learning layout whose identities this note's inheritance mappings use. Nothing here changes bundle
   structure.
 - L7 overlaps T25.F11 and is not decided here.
 
@@ -225,14 +234,15 @@ T26.F01's record criterion:
    Body domain and its operators, the gate deleted, `lineage_id` moved to
    observation, founder 85 and the rate re-pinned. Predeclared re-pins:
    draw streams, trajectories, genome format, both epochs.
-3. **Memory inheritance mask**: the gene, founder all-on, the finalizer
-   reading it; founder 86 and the rate re-pinned. Pins move only through
-   the extra unit.
+3. **Memory inheritance masks**: the provisioning and uptake genes,
+   founder all-on, the finalizer reading both; founder 87 and the rate
+   re-pinned. Pins move only through
+   the two extra units.
 
 Verification for each: viability first (founder and supply change), gate +
 goal; mutation gate and slow tests run. Goal readings: body-gene mutation
 counts by gene, the capacity, share and colour distributions beside T26.F02's
-baseline, kin-tag diversity, and mask bit frequencies.
+baseline, kin-tag diversity, and both masks' bit frequencies.
 
 ## Open
 

@@ -37,3 +37,41 @@ Verdict: `not-ready`. Two blocking findings, six advisory, no `step-back:`.
 
 Output: `/tmp/claude-501/-Users-<user>-projects-petri/dfc7ccd8-7685-41ad-a73b-a4c0e7045a0a/scratchpad/t30-review/codex-out.md`
 (outside the repository).
+
+## Architecture-review follow-up (2026-10-22)
+
+A fresh Astra (`gpt-6-astra`, `high`) adversarial review of
+`docs/architecture.md` at `bf876ae7` returned `sound with changes`. The user
+chose, for its four design questions: Graph edits own inheritance
+correspondence; simulation splits into scheduling and mechanics with one
+applied result per action; imports follow direct arrows only; memory
+inheritance uses a parent provisioning mask and a child uptake mask; and
+both new gaps get rows ("Yes, add them": T30.F08, F09). One fresh Codex Sol
+`high` plan-design-review job then covered the resulting changes: T29's
+re-scoped F01 criterion and F03, T30.F03's added G20, T30.F08 and F09, T28's
+note, the master order and the doc.
+
+Verdict: `not-ready`. Six blocking findings, two advisory, no `step-back:`.
+
+| Check | Verdict | What was examined | Findings or why clear |
+| --- | --- | --- | --- |
+| C1 Code decomposition | finding | A3–A5, T29.F01, T30.F03, F08, F09, action executors, aggregate and sensor types | 1, 2, 7 |
+| C2 Task decomposition | finding | every G1–G20 owner and the relevant rows; F09 after F08, both before T28 as preference | 2, 4, 8 |
+| C3 Domain boundaries | finding | the direct arrows against cognition, construction, perception, action resolution and removal | 1, 2, 3 |
+| C4 Premises | finding | current code, the cited notes, blame for seed alignment, RNG derivation, gestation and sensor caches | 3, 4, 5, 6, 7 |
+| C5 Larger design flaw | clear | `e33b4861`, `5329bd53`, `7e01c9b4`, `24c7aca3`: the proposed changes address the repeated pressure points | — |
+| C6 Workarounds | finding | seed transport, mutation rollback, reproduction reseeding, census-backed caches, the `WORKAROUND(T25.F08)` group-edit tallies | 4, 7 |
+
+| # | Severity | Finding | Disposition |
+| --- | --- | --- | --- |
+| 1 | blocking | Direct arrows forbade work owners do: scheduling calling cognition, holding aggregate and world state, seeding through birth; the aggregate's key-set and mutation summary imports | Fixed: arrows scheduling → runtime, aggregate, kernel, birth and aggregate → mutation (summary types); sensor key sets go to contracts (G9); G8's wording matches the graph |
+| 2 | blocking | Moving executors alone leaves mechanics taking the whole `Simulation`, removals and flooring in the scheduler, and move effort composed on the aggregate | Fixed: A5 mechanics inputs and cost-law rows; G19 widened with evidence; F08 Notes cover narrow inputs, removal settlement and cost composition; T28's surcharge goes through the mechanics' cost law |
+| 3 | blocking | "Rejection leaves every party unchanged" contradicts give and steal charging attempt effort before rejection | Fixed: the transfer is atomic, the attempt effort is charged and carried in the applied result (A5; F08, F09 Notes) |
+| 4 | blocking | Run-start independent streams are not today's behavior (reproduction reseeded from the queue RNG each tick) and no row changed it | Fixed: gap G21 and behavior-changing row T30.F10; F08 keeps the reseeding marked `WORKAROUND(T30.F10)`; T30's criteria name F10 as the one row that moves draws |
+| 5 | blocking | The heredity note's model still had six body genes, a child-only mask, founder 86 and stable ids alone; T29's Decisions still said one mask | Fixed: note rewritten to seven genes, both masks, founder 87, graph-returned mappings; the one-mask decision kept as superseded history; T29's Decisions updated |
+| 6 | blocking | The phase table omitted cognition's energy debits and shared-memory writes, the world-update memory snapshot, and delivery in the parent's action slot | Fixed: A6 phase table rows |
+| 7 | advisory | Mappings must cover seed invalidation on source, weight and scale writes, detach fallbacks, whole-backend clones and rollback | Adopted: A5 inheritance row and T29.F01 Notes, with the `WORKAROUND(T25.F08)` tallies as a retirement candidate |
+| 8 | advisory | F08 and F09 overlap T27.F02, T28.F01, T29.F01 and T30.F02; lifecycle events are not action results | Adopted: T30 integration note; A5 applied-result row |
+
+Output: `/tmp/claude-501/-Users-<user>-projects-petri/dfc7ccd8-7685-41ad-a73b-a4c0e7045a0a/scratchpad/t30-review-2/codex-out.md`
+(outside the repository). No confirming round was run.

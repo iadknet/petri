@@ -16,7 +16,8 @@ closes gaps listed in that file's A8 and changes no simulation behavior.
 
 - [ ] `v3-core` has no import cycle between the domains of `docs/architecture.md` A3, and none of the A8 gaps this track's rows name remains.
 - [ ] The creature inspector and the sampler read a server-owned brain view whose frontend types are generated from, or checked field by field against, the Rust types; no frontend file copies a genome type or recomputes a genome rule.
-- [ ] Every row leaves trajectories, populations and draw streams unchanged: any pin that moves is a defect.
+- [ ] Every row but F10 leaves trajectories, populations and draw streams unchanged: any pin that moves is a defect; F10 moves draw streams by design and predeclares its re-pins.
+- [ ] Each mechanism draws from its own named stream allocated at run start; no stream seeds another during a run.
 
 ## Executable Features
 
@@ -34,15 +35,22 @@ closes gaps listed in that file's A8 and changes no simulation behavior.
   - Goal: Offspring carry exactly the sensors and wiring they carried before, every edit to a node's declarations and their uses kept consistent by the node itself, with no behavior change.
 - [ ] **T30.F07 — Runtime Owns Runtime State** — Depends on: T29.F01, T30.F02
   - Goal: Creatures think and inherit exactly as before, their running brain state owned by brain execution and the parent's dispatch history reaching mutation through the birth transaction, with no behavior change.
+- [ ] **T30.F08 — Scheduling and Mechanics** — Depends on: None
+  - Goal: Creatures act exactly as before, each action resolved as one transaction by the simulation's mechanics while the tick only orders them, with no behavior change.
+- [ ] **T30.F09 — One Applied Result** — Depends on: T30.F08
+  - Goal: Every action has one outcome that the creature's history, its learning reward and the run's totals all read, with no behavior change.
+- [ ] **T30.F10 — Independent Random Streams** — Depends on: T30.F08
+  - Goal: Each kind of chance a creature meets (who acts first, how a child varies, where food grows) comes from its own stream, so a change to one mechanism's draws never shifts another's.
 
 ## Notes for AI Agents
 
 - Architecture: serves [`docs/architecture.md`](../architecture.md) A2
   shared shapes, A3 (the domain graph and its import rule), A5 owners and
   A7 rules 1, 3, 5 and 8. Gaps: G17: `T30.F01`; G7, G16: `T30.F02`; G9, G14
-  (sensor caches): `T30.F03`; G10, G11: `T30.F04`; G2 (route resolution and
+  (sensor caches), G20: `T30.F03`; G10, G11: `T30.F04`; G2 (route resolution and
   jump targets), G12, G15: `T30.F05`; G13 (the edit paths T25.F11 leaves):
-  `T30.F06`; G8: `T30.F07`.
+  `T30.F06`; G8: `T30.F07`; G19: `T30.F08`; G18: `T30.F09`; G21:
+  `T30.F10`.
 - Placed 2026-10-22 at the user's direction ("Aren't all of those good
   things?") from the gaps the architecture document found without an owning
   row; the [design review](../progress/readings/t30-design-review.md)
@@ -66,8 +74,10 @@ closes gaps listed in that file's A8 and changes no simulation behavior.
   simulation composes tick records (action outcomes, phase timings) around
   them (A5 traces). It keeps every debit's arithmetic and recording.
 - F03 keeps the sensor caches computed once per birth (`163a68b0` added them
-  for speed); the declared and wired key sets move to genome analysis and
-  the census reads them. F03 and T29.F01 both touch `CreatureState`
+  for speed); the declared and wired key sets, and the perception
+  requirements sensors read from the genome today (G20), move to genome
+  analysis; sensors receive the requirements value and the census reads
+  the key sets. F03 and T29.F01 both touch `CreatureState`
   construction; concurrent sessions reconcile that file at integration.
 - F04 removes the config→patterns→kernel cycle (pattern parameter types
   become config data) and the kernel's import of the creature hash helper
@@ -87,8 +97,34 @@ closes gaps listed in that file's A8 and changes no simulation behavior.
 - F07 waits for T29.F01, whose birth transaction hands mutation the dispatch
   history view, and for F02, which removes the trace types' dependency on
   the creature record; mutation keeps resolving the record lazily.
+- F08 and F09 were added after the architecture review of 2026-10-22 (user:
+  "Yes, add them"). F08 moves the per-action executors, the action energy
+  flooring and the removals actions cause out of `simulation/tick.rs` into
+  mechanics; gives mechanics narrow inputs instead of the whole
+  `Simulation`, with no call back into scheduling; and moves action-cost
+  composition into mechanics, the body supplying factors (today's
+  `CreatureState::move_effort`). Scheduling keeps tick order, phase
+  contracts and stream allocation. Attempt effort stays charged on a
+  rejected give or steal (T27.F03's contract). The per-tick reproduction
+  RNG seeded from the queue RNG stays as it is, marked
+  `WORKAROUND(T30.F10)`, so F08's draws do not move.
+- F09 makes mechanics return one applied result per action, carrying the
+  attempt effort, and derives the action log, the reward success count and
+  run totals from it (A5 applied action result); every derived reading
+  keeps today's classification. Delayed deliveries and world-update
+  removals are lifecycle records of their own, not action results.
+- F10 is the track's one behavior-changing row: scheduling allocates the
+  queue, reproduction and food-growth streams at run start, and the
+  reproduction stream stops being reseeded from the queue stream each tick.
+  It predeclares the moved draw pins and trajectories and runs viability
+  first.
+- Integration: F08 and F09 overlap T27.F02 (`simulation/tick.rs`,
+  `MeshOutput`), T28.F01 (action dispatch, stocks, removal), T29.F01
+  (reproduction) and T30.F02 (energy recording, traces); whichever lands
+  later extends the applied-result path rather than adding a second one.
 - Scheduling, not prerequisites: the master order puts F01 before T25.F11
-  and F02 before T28, as preferences; either integration order works.
+  and F02, F08, F09 and F10 before T28, as preferences; either integration order
+  works.
 - Verification (assistant proposal): each row gate with pins unchanged;
   F01 adds the
   frontend's own tests and the type-parity test.
