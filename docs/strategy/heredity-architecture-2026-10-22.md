@@ -102,9 +102,10 @@ L6 exists because seeds are keyed by edge index, and only the container's
 edit primitives know how indices move. The payload can leave the genome
 only if every learnable number has a key that survives edits: a stable id
 per edge and per bundle, kept by copies, fresh on creation, dropped on
-removal. Assistant proposal: stable ids, which T25.F12's single learner
-enumeration can carry. The alternative, keeping seeds in the container
-behind the builder, keeps L6 and would need a `WORKAROUND` marker.
+removal. Assistant proposal: stable ids, which T25.F12's learning layout
+(every learner with its identity, derived once at birth) can carry.
+The alternative, keeping seeds in the container behind the builder,
+keeps L6 and would need a `WORKAROUND` marker.
 
 ### Other moves
 
@@ -144,8 +145,8 @@ behind the builder, keeps L6 and would need a `WORKAROUND` marker.
 - T27.F03: `steal_share` and `give_share` become body genes. T27.F02's
   signals keep their own row; whether signals join the payload under a
   mask is T27's decision.
-- T25.F11 and F12 land first: F12 rewrites seed capture and the learner
-  enumeration this note's stable ids build on. Nothing here changes bundle
+- T25.F11 and F12 land first: F12 rewrites seed capture and adds the
+  learning layout this note's stable ids build on. Nothing here changes bundle
   structure.
 - L7 overlaps T25.F11 and is not decided here.
 
