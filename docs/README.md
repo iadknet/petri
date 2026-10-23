@@ -8,6 +8,7 @@
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
 - [Edge groups and per-edge learning design, 2026-10-13](strategy/edge-groups-and-learning-design-2026-10-13.md) (companion to the T25 track: edges and edge groups as domain objects, learning per edge and group, the two mutation layers, boundaries and feature contracts)
+- [Heredity architecture, 2026-10-22](strategy/heredity-architecture-2026-10-22.md) (body genes in the genome under one mutation law, a heritable memory mask, one zygote builder and a birth payload outside the genome)
 - [Bundle learning ownership, 2026-10-22](strategy/bundle-learning-ownership-2026-10-22.md) (T25.F12: learning as one type on edges and bundles; members credit the bundle, learn themselves, or both)
 - [Sensor wiring as orthogonal mutations, 2026-10-22](strategy/group-creation-unification-2026-10-22.md) (T25.F11: three composite routes built groups by three rule sets; bundles as the one concept, wiring the only difference, live or silent)
 - [Learned-weight decay research, 2026-10-19](strategy/weight-decay-research-2026-10-19.md) (passive forgetting for plastic edges: decay toward the birth value, a heritable per-edge retention, the literature and a probe on the production law)
