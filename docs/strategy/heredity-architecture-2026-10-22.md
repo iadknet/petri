@@ -211,8 +211,9 @@ repo) was weighed against the code after this note's first version:
 
 ## Shape of the work (assistant proposal)
 
-Three rows, after T25.F12, in a new track, T29 Heredity (user, 2026-10-22,
-multiple choice; not yet added). The track states that it supersedes
+Three rows, after T25.F12, in a new track,
+[T29 Heredity](../roadmaps/t29-heredity.md) (user, 2026-10-22, multiple
+choice). The track states that it supersedes
 T26.F01's record criterion:
 1. **Birth transaction and payload**, behavior-preserving: one
    coordinator for founders and children in a creature-birth module, the
@@ -222,11 +223,11 @@ T26.F01's record criterion:
    defect.
 2. **Body genes**: `BodyGenome` in `CreatureGenome`, per-part supply, the
    Body domain and its operators, the gate deleted, `lineage_id` moved to
-   observation, founder 86 and the rate re-pinned. Predeclared re-pins:
+   observation, founder 85 and the rate re-pinned. Predeclared re-pins:
    draw streams, trajectories, genome format, both epochs.
-3. **Memory inheritance mask**: the gene, founder all-on, the constructor
-   reading it. Pins move only through the extra unit, if row 2 has not
-   already counted it.
+3. **Memory inheritance mask**: the gene, founder all-on, the finalizer
+   reading it; founder 86 and the rate re-pinned. Pins move only through
+   the extra unit.
 
 Verification for each: viability first (founder and supply change), gate +
 goal; mutation gate and slow tests run. Goal readings: body-gene mutation

@@ -23,6 +23,7 @@ attributed to the feature whose closure moved it.
 - [x] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
 - [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
 - [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
+- [ ] **T29 — Heredity** — [Roadmap](roadmaps/t29-heredity.md) — Depends on: T25
 
 ## Final Success Criteria
 
