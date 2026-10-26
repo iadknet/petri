@@ -11,7 +11,8 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-// Section 3's order, bottom up; a domain imports only lower levels.
+// Section 3's order, bottom up; a domain imports only lower levels. The
+// document's own list must match it (sectionOrderErrors).
 const LEVELS = new Map([
   ['contracts', 1],
   ['config', 2],
@@ -26,7 +27,8 @@ const LEVELS = new Map([
   ['simulation', 9],
   ['readers', 10],
 ]);
-// Readers that live inside `creature/` today.
+// WORKAROUND(G26): four readers still live under `creature/`; T30.F07 moves
+// them into `neighborhood/` and deletes this list.
 const CREATURE_READERS = new Set(['plasticity_census', 'sensor_census', 'drives', 'ring_rules']);
 
 function usage(message) {
@@ -59,6 +61,8 @@ function isTestPath(path) {
     /_tests\//.test(path) ||
     /tests?\.rs$/.test(path) ||
     /(^|\/)test_support\.rs$/.test(path) ||
+    // WORKAROUND(G25): the profiling binary lives in v3-core until T30.F07
+    // moves it to v3-cli and deletes this skip.
     path.startsWith('bin/')
   );
 }
@@ -173,6 +177,29 @@ function importedPaths(text, module) {
   return paths;
 }
 
+// Section 3's numbered list against LEVELS, so the document and the checker
+// cannot drift apart. Each item names its domains by module path.
+function sectionOrderErrors(text) {
+  const section = text.split(/^## 3 Core domains$/m)[1]?.split(/^## /m)[0];
+  if (!section) return [];
+  const errors = [];
+  for (const match of section.matchAll(/^(\d+)\. (.+)$/gm)) {
+    const level = Number(match[1]);
+    for (const part of match[2].split(', ')) {
+      const name = part.match(/`([A-Za-z_]\w*)\/?`/)?.[1];
+      const domain = name && domainOf([name]);
+      if (!domain) {
+        errors.push(`docs/architecture.md: section 3 level ${level} names no domain the checker knows ("${part}")`);
+      } else if (LEVELS.get(domain) !== level) {
+        errors.push(
+          `docs/architecture.md: section 3 places ${domain} at level ${level}; the checker has level ${LEVELS.get(domain)}`,
+        );
+      }
+    }
+  }
+  return errors;
+}
+
 function knownDebts(text) {
   return new Set([...(text ?? '').matchAll(/^\| (G\d+) \|/gm)].map((match) => match[1]));
 }
@@ -239,7 +266,9 @@ function labDependents(root) {
 function validate(root) {
   const errors = [];
   const sourceRoot = join(root, 'crates', 'v3-core', 'src');
-  const documented = knownDebts(readFileSync(join(root, 'docs', 'architecture.md'), 'utf8'));
+  const architecture = readFileSync(join(root, 'docs', 'architecture.md'), 'utf8');
+  const documented = knownDebts(architecture);
+  errors.push(...sectionOrderErrors(architecture));
   const debtsFile = join(root, 'scripts', 'architecture-debts.txt');
   const debts = readDebts(existsSync(debtsFile) ? readFileSync(debtsFile, 'utf8') : '', errors);
 

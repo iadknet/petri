@@ -240,7 +240,7 @@ T26.F01's record criterion:
    the two extra units.
 
 Verification for each: viability first (founder and supply change), gate +
-goal; mutation gate and slow tests run. Goal readings: body-gene mutation
+goal; slow tests run (the mutation gate left the workflow on 2026-10-22). Goal readings: body-gene mutation
 counts by gene, the capacity, share and colour distributions beside T26.F02's
 baseline, kin-tag diversity, and both masks' bit frequencies.
 

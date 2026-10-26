@@ -21,7 +21,7 @@ behavior.
 ## Executable Features
 
 - [ ] **T30.F01 — Inspector Brain View** — Depends on: None
-  - Goal: A person inspecting a creature sees its brain as the simulation applies it, every weight and learner resolved by the core, with no behavior change.
+  - Goal: A person inspecting a creature sees its brain as the simulation applies it, every weight and learner resolved by the core, and the inspector and the paint tools read types the server owns, with no behavior change.
 - [ ] **T30.F02 — Brain Execution Stands Alone** — Depends on: None
   - Goal: A creature thinks, spends energy and dies exactly as before, its brain's execution owning its own state and drawing on one shared energy accounting, with no behavior change.
 - [ ] **T30.F03 — Sensors Read Views** — Depends on: None
@@ -43,10 +43,11 @@ behavior.
   [design review](../progress/readings/t30-design-review.md) records the
   challenges. Debts each row pays: F01 G17, G22 (paint); F02 G7, G8, G16;
   F03 G9, G14 (sensor caches), G20; F04 G10, G11; F05 G2 (routes and jumps),
-  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25. Every row is
+  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25, G26. Every row is
   behavior-preserving in the T25.F01 shape. On 2026-10-25 an architecture
   review added G22–G25 and F07 (user decisions: F07 moves the genome; paint's
-  wire types join F01; F06 stays one row in two halves).
+  wire types join F01; F06 stays one row in two halves), and on 2026-10-26
+  G26 (user: F07 also moves the census readers).
 - F01 projects today's applied semantics, not a future model: a scale whose
   contributors differ in rule, rate, reward source and trace, and
   `DirectionPair` fact members outside the scale, are shown as they run and
@@ -98,16 +99,24 @@ behavior.
   (`splice_program_with_reference_repair`, also used by
   `mutation::topology::routing`), and the register-count resize with its
   admissible-width predicate and program canonicalization
-  (`register_count_moves`, `apply_register_count_mutation`), become
-  genome-owned edit operations with their semantics unchanged; the direction
-  draw and all other sampling stay in mutation (G23).
+  (`register_count_moves`, `apply_register_count_mutation`), and the
+  dormant-tail copy with its terminal classification, conditional `Halt` and
+  copied-instruction provenance (`copy_span_to_dormant_tail`, which commit
+  `ba806236` keeps whole so jumps and fall-through never enter the copied
+  span), and the route composition that calls that repair through gate
+  writes (`add_gate_write`, `apply_add_route_target`,
+  `apply_add_feedback_route` in `mutation::topology::routing`) become
+  genome-owned edit operations with their semantics unchanged;
+  mutation supplies the sampled indices and direction, and all other sampling
+  stays in mutation (G23).
 - F06 moves the per-action executors, action energy flooring and the
   removals actions cause from `simulation/tick.rs` into mechanics with
   narrow inputs (no whole `Simulation`), composes action costs there with
   the body supplying factors (today's `CreatureState::move_effort`), and
   returns one applied result per action, a contracts type carrying the
-  outcome kind and the attempt effort (the creature's log stores it and the
-  simulation produces it, so neither can own it), from
+  outcome kind and the attempt effort (the simulation interprets outcomes
+  under rule 1 and the creature's log only stores them, so the result is a
+  shared contracts value, as `ActionType` already is), from
   which the action log, the reward success count and run totals derive with
   today's classifications. Attempt effort stays charged on a rejected give
   or steal (T27.F03). Action deaths, upkeep deaths and paint eviction reuse
@@ -115,19 +124,25 @@ behavior.
   observation logic pulled into mechanics. Delayed deliveries and
   world-update removals stay lifecycle records, not action results. The
   action log reaches the frontend through a server-owned wire type built from
-  the applied result (G22). F06 lands in two halves, each verified on its own
-  with pins unchanged: first the executors with narrow inputs and the cost
-  composition, then the one applied result and the records derived from it
-  (user, 2026-10-25). The per-tick reproduction RNG derivation in
-  `simulation/tick.rs` stays, because it keeps draw streams unchanged, and
-  gets a `WORKAROUND(T30.F06)` comment naming that reason. It overlaps T27.F02,
+  the applied result (G22); if F06 lands before F01's generator, it ships that
+  wire type with a parity test the generator later replaces. F06 lands in two
+  implementation passes under one spec, the gate run after each with pins
+  unchanged and one closure: first the executors with narrow inputs and the
+  cost composition, then the one applied result and the records derived from
+  it (user, 2026-10-25). The per-tick reproduction RNG derivation in
+  `simulation/tick.rs` stays as the tick's design (`docs/architecture.md`
+  section 4), not a workaround (user, 2026-10-26). It overlaps T27.F02,
   T28.F01, T29.F01 and T30.F02 in action and reproduction code; whichever
   lands later extends the applied-result path.
 - F07 moves `creature/genome/` to a top-level `genome/` with a crate-wide
   import rewrite and no compatibility re-exports, and deletes the import
   checker's special case for the old path (G24). It also moves
-  `v3-core/src/bin/profile_ticks.rs` into `v3-cli` and deletes the checker's
-  `bin/` skip (G25, user, 2026-10-25). It touches the import lines
+  `v3-core/src/bin/profile_ticks.rs` into `v3-cli` with its `dhat-heap`
+  feature and `dhat` dependency, where the per-binary telemetry flag then
+  applies, and deletes the checker's `bin/` skip (G25, user, 2026-10-25). It
+  moves the census readers `plasticity_census`, `sensor_census`, `drives` and
+  `ring_rules` from `creature/` into `neighborhood/` and deletes the checker's
+  hand list of them (G26, user, 2026-10-26). It touches the import lines
   of every row that edits genome code, so it lands while no such row is in
   flight.
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before

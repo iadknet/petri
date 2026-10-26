@@ -182,3 +182,36 @@ no frontend boundary or ADR tooling. The user took the checker hardening (an
 import of a module no domain owns, non-`mod` lines in `lib.rs` and any
 dependency on `v3-lab` now fail) and `ts-rs` for T30.F01, and dropped the clippy
 guard (row 24).
+
+## Third round (2026-10-26)
+
+Four fresh jobs from the fixed briefs: `adhoc-plan` on the document, the T30
+track and the debts file (base `b86e075a`) and `arch-scenarios` over the 15
+open rows, each run by Codex Astra and a Fable subagent. No `step-back:`.
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| 26 | Fable plan P2, Fable scenarios P2 | Rule 3 keyed on priority position, while rows run by dependency readiness and in concurrent sessions | Rule 3 now applies to a row that lands before the payer |
+| 27 | Fable plan P2, Fable scenarios P2 | The `WORKAROUND(T30.F06)` on the reproduction reseed names no intended design or payer, since independent streams were cut | The reseed is the tick's design (section 4); no marker (user). Reverses row 3 |
+| 28 | Fable plan P2, Fable scenarios P2 | The census readers under `creature/` have G24's shape with no debt | G26, paid by T30.F07 moving them into `neighborhood/` (user); checker list marked `WORKAROUND(G26)` |
+| 29 | Fable plan P2 | An extension under rule 3 also needs its import in the debts file | Rule 3 says so |
+| 30 | Astra plan P2 | T30.F05 misses the dormant-tail copy operation | Added to G23 and F05 |
+| 31 | Astra scenarios P2 | Compound mesh copy and removal stay caller-assembled while T29.F01 removes seeds from cloned backends | G4 and T29.F01 now make them genome edits returning mappings |
+| 32 | Fable plan P3 | F01's goal line omitted paint | Goal names the inspector and the paint tools |
+| 33 | Fable plan P3 | F07's binary move omits its feature and dependency | Note names `dhat-heap`, `dhat` and the telemetry flag |
+| 34 | Fable plan P3 | F06's action-log wire type needs F01's generator | F06 ships a parity test if it lands first |
+| 35 | Fable plan P3 | "Two halves" has no workflow meaning | Two implementation passes under one spec, one closure |
+| 36 | Fable plan P3 | "Neither can own it" does not follow from the order; G22 listed `ActionType` | Reason is rule 1; `ActionType` noted as already in contracts |
+| 37 | Fable plan P3 | Field access through another type is review-only but unlisted; "line-level" list | Section 5 lists it; "file-level" |
+| 38 | Fable scenarios P3 | No owner for the sensor views | `sensors` defines them; the creature record and scheduler build them |
+| 39 | Fable scenarios P3 | Ledger row carried T28 detail | Shortened |
+| 40 | Fable scenarios P3 | Section 5 restated the checker | One sentence pointing at its header |
+| 41 | Fable scenarios P3 | The checker hand-kept section 3's order | The checker now fails when section 3's list and its levels differ |
+| 42 | Fable plan P3 | The `bin/` skip was unmarked | Marked `WORKAROUND(G25)` |
+
+A confirming `track-design` job (`gpt-6.1-sol`, `high`) on the round's changes:
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| 43 | track-design P1 | Row 31 gave T29.F01 route composition, which calls the VM repair T30.F05 moves later | Route composition moved to G23 and T30.F05; T29.F01 keeps the backend copies in `mutation::topology::structural`, which do not call that repair |
+| 44 | track-design P2 | The heredity and bundle-learning notes still required the mutation gate | Removed from both notes |

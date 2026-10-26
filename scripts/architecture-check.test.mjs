@@ -210,3 +210,18 @@ test('no crate depends on v3-lab', () => withRoot((repository) => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /crates\/v3-cli\/Cargo\.toml:5: depends on v3-lab, which nothing may depend on/);
 }));
+
+test("the checker's dependency order matches the document's section 3", () => withRoot((repository) => {
+  const order = (levels) => `# Architecture\n\n## 3 Core domains\n\n${levels}\n\n## 5 Known debts\n\n| Debt | Today | Paid by |\n| --- | --- | --- |\n| G7 | energy | T30.F02 |\n`;
+  const matching = [
+    '1. `contracts`', '2. `config`, energy ledger (`ledger/`)', '3. world (`kernel`)', '4. `patterns`',
+    '5. genome (`genome/`)', '6. `sensors`', '7. `mutation`, `runtime`', '8. `creature`', '9. `simulation`',
+    '10. readers (`neighborhood/`)',
+  ].join('\n');
+  const clean = run(repository, { doc: order(matching) });
+  assert.equal(clean.status, 0, clean.stderr);
+  const swapped = matching.replace('6. `sensors`', '6. `patterns`').replace('4. `patterns`', '4. `sensors`');
+  const result = run(repository, { doc: order(swapped) });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /section 3 places sensors at level 4; the checker has level 6/);
+}));

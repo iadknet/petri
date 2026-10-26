@@ -3,7 +3,7 @@
 **State**: desired. This file describes where the system is going, not what
 the code does today. [Known debts](#5-known-debts) lists where the code
 differs and the row that pays each debt.
-**Last updated**: 2026-10-25
+**Last updated**: 2026-10-26
 
 ## Use this file
 
@@ -12,11 +12,12 @@ differs and the row that pays each debt.
    the same change.
 2. **Implement** toward it, never toward a shape listed as a debt.
 3. **Review**: a diff that introduces or widens coupling this file forbids
-   is a finding; unchanged existing debt is not. A row the priority order
-   places before a debt's payer may extend that debt in its present shape,
-   inside the modules the debt names, with a `WORKAROUND(<debt id>)`
-   comment at the site naming the row that pays it; that extension is not a finding, and any other
-   widening is.
+   is a finding; unchanged existing debt is not. A row that lands before a
+   debt's payer may extend that debt in its present shape, inside the
+   modules the debt names: it adds a `WORKAROUND(<debt id>)` comment at the
+   site and, for an import, the import's line under that debt in
+   `scripts/architecture-debts.txt`. That extension is not a finding; any
+   other widening is.
 4. **Close**: delete the debts the feature paid.
 
 The workflow says how ([Plan, Review, Close](workflow.md)). Design detail
@@ -88,8 +89,7 @@ on its own row:
 7. `mutation`, `runtime`
 8. `creature`
 9. `simulation`
-10. readers (`neighborhood/` and the census modules `plasticity_census`,
-    `sensor_census`, `drives` and `ring_rules`)
+10. readers (`neighborhood/`)
 
 The order already rules out `mutation` and `runtime` importing each other,
 `runtime` importing `simulation` or the creature record, and simulation
@@ -97,14 +97,15 @@ behavior depending on readers. Two prohibitions it does not say:
 
 - The genome imports nothing but `contracts`.
 - Sensors never read the genome or a whole creature, by import or by field
-  access through another type; they get explicit views and a
+  access through another type; they get explicit views, which `sensors`
+  defines and the creature record and the scheduler build, and a
   perception-requirements value.
 
 | Concept | Owner |
 | --- | --- |
 | shared vocabulary: ids, directions, actions, sensor descriptors (fields, field sets, geometry), the brain I/O catalog (action kinds, vote sinks, parameters, widths derived from it), the applied action result (outcome kind and attempt effort); values, and pure functions over them, that no domain above owns (deterministic hashing among them). Behavior a domain owns never moves here to dodge the order | `contracts` |
 | configuration schema, pattern parameters included | `config` |
-| energy and material accounting primitives (death cause, debits, cognition energy; carried-stock, overflow and destruction records from T28.F01) | energy ledger (`ledger/`) |
+| energy and material accounting primitives (death cause, debits, cognition energy, stock and sink records) | energy ledger (`ledger/`) |
 | world state and world-edit primitives | world (`kernel`) |
 | genome structure: chromosomes, nodes, declarations, edges, bundles and wiring; edits that validate and return their effects on inherited values; deterministic analysis, the learning layout among it | genome (the Graph is the aggregate root of edges and bundles) |
 | mutation supply, dispatch and every birth draw | `mutation` (samples; owners apply) |
@@ -112,7 +113,7 @@ behavior depending on readers. Two prohibitions it does not say:
 | brain execution, its state, learned values and the learning update law | `runtime` |
 | the creature record, body rules, and one birth constructor for founders and children (finalization, inherited payload, per-life initialization, energy provisioning) | `creature` |
 | tick order; action resolution, each action one transaction with one applied result; removal settled through one path; records derived from applied results | `simulation` (a scheduler and mechanics) |
-| censuses and indicators | readers (`neighborhood/`, the census modules) |
+| censuses and indicators | readers (`neighborhood/`) |
 | transport, the inspector view, telemetry export | outer crates (section 2) |
 
 ## 4 Composition and flow
@@ -131,6 +132,9 @@ flowchart TD
   (parallel, world frozen) → `actions` → `reward_learning`. The scheduler
   owns the order; mechanics commits actions; runtime updates learning.
   Feature timing contracts (signal visibility, delivery) live in their rows.
+  Reproduction draws from a stream derived from the scheduler's RNG each
+  tick; that keeps draw streams as they are, and has been the design since
+  independent per-purpose streams were cut on 2026-10-22.
 - **Birth**: the birth constructor drafts the child (genome, mutation,
   inherited payload, provenance) and finalizes it; the simulation supplies
   world context. Design: [T29](roadmaps/t29-heredity.md).
@@ -143,16 +147,13 @@ flowchart TD
 ## 5 Known debts
 
 Where today's code differs from sections 1–4, with the row that pays it.
-Delete a line when the code matches. Rows name modules and symbols, not
-lines; `scripts/architecture-debts.txt` is the one line-level list.
-`scripts/architecture-check.mjs` (in `make check-docs` and `make check`)
-fails any `v3-core` import against section 3, through `crate::`, `self::`
-or `super::` paths and grouped `use` trees, except those
-`scripts/architecture-debts.txt` lists under a debt here, and fails a listed
-import the code no longer needs. It also fails an import of a module no domain
-owns, anything but module declarations in `v3-core`'s `lib.rs`, and any crate
-depending on `v3-lab`. Debts outside `v3-core` imports (the wire,
-the frontend, binaries) are checked by review only. Design notes:
+Delete a line when the code matches. Rows name modules and symbols;
+`scripts/architecture-debts.txt` is the file-level list of owed imports.
+`scripts/architecture-check.mjs` (in `make check-docs` and `make check`; its
+header says what it checks) enforces section 3 on `v3-core` imports and
+fails an import neither allowed nor listed, or listed and no longer needed.
+Review alone checks the rest: the wire, the frontend, binaries, and sensors'
+field access through another type. Design notes:
 [sensor wiring](strategy/group-creation-unification-2026-10-22.md),
 [bundle learning](strategy/bundle-learning-ownership-2026-10-22.md),
 [heredity](strategy/heredity-architecture-2026-10-22.md).
@@ -162,7 +163,7 @@ the frontend, binaries) are checked by review only. Design notes:
 | G1 | Three routes wire a sensor with three rule sets (`mutation::input_ref`, `mutation::graph::recruitment`, `mutation::graph::group`); fact-only branches and split hosting in `creature::genome::cgp::container`; non-world sensor widths in `mutation::compound` | T25.F11 |
 | G2 | Brain I/O vocabulary outside `contracts` (`creature::genome::vote`, outcome channels read by `sensors::static_inputs`, `OUTPUT_SLOT_COUNT` in `runtime::types` imported by `mutation::sampling`); route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | vocabulary: T25.F11; routes and jumps: T30.F05 |
 | G3 | Learning configured on edges only (the genome's edge type), group flags beside it (`creature::genome::cgp::group`), `Scope::Group` branches in `runtime::plasticity::learned`, learners found from plastic edges (`creature::genome::companions`) | T25.F12 |
-| G4 | No birth constructor: `spawn_child` (`simulation::actions::reproduction`) and `simulation::seeding` build creatures separately; learned seeds ride in the genome (`creature::genome::cgp::container`); `cap_energy` runs after construction; traits draw their own RNG (`creature::identity`, `creature::body`) | T29.F01 |
+| G4 | No birth constructor: `spawn_child` (`simulation::actions::reproduction`) and `simulation::seeding` build creatures separately; learned seeds ride in the genome (`creature::genome::cgp::container`); `cap_energy` runs after construction; traits draw their own RNG (`creature::identity`, `creature::body`); mesh copy and slice cloning are assembled by mutation callers (`mutation::topology::structural`) rather than genome operations that return their inherited-value effects | T29.F01 |
 | G5 | Body outside the genome (`creature::body`), per-birth trait chances, colour and kin tag gated on brain mutation (`simulation::actions::reproduction`), `lineage_id` in the body (`creature::identity`), mutation importing creature's `Phenotype` (`mutation::phenotype`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`simulation::actions::reproduction`) | T29.F03 |
 | G7 | Energy primitives (`DeathCause`, debits, cognition energy) in `simulation::energy_accounting`, imported by runtime (`runtime::{mesh, vm, cgp::execute, types, trace}`) and the creature record (`creature::state`) | T30.F02 |
@@ -179,7 +180,8 @@ the frontend, binaries) are checked by review only. Design notes:
 | G18 | Two result vocabularies: `ActionResult` (`creature::action_log`) and a success boolean for rewards (`simulation::outcomes`) | T30.F06 |
 | G19 | Action resolution mixed with scheduling: per-action executors, action flooring and removal in `simulation::tick` beside `run_tick`; mechanics taking the whole `Simulation` (`simulation::actions::{giving, predation}`); move effort composed on the creature record (`creature::state`) | T30.F06 |
 | G20 | Sensors read the genome to decide what to assemble (`sensors::{perception, typed_food}`) | T30.F03 |
-| G22 | Core structs on the wire outside section 2's exemption: the action log (`ActionLogEntry`, `ActionResult`, `ActionType` in `v3-server`'s creature response) and paint (`PaintTool`, `PaintStats` in its paint API); `frontend/src/types/action-log.ts` and `paint.ts` copy them by hand | action log: T30.F06; paint: T30.F01 |
-| G23 | Program edits applied in mutation: splice and insertion with jump-reference repair (`mutation::vm::operators::splice_program_with_reference_repair`, also used by `mutation::topology::routing`) and the register-count resize with its width predicate (`register_count_moves`, `apply_register_count_mutation`) | T30.F05 |
+| G22 | Core structs on the wire outside section 2's exemption: the action log (`ActionLogEntry`, `ActionResult` in `v3-server`'s creature response; `ActionType` is already a contracts type the catalog test pins) and paint (`PaintTool`, `PaintStats` in its paint API); `frontend/src/types/action-log.ts` and `paint.ts` copy them by hand | action log: T30.F06; paint: T30.F01 |
+| G23 | Program edits applied in mutation: splice and insertion with jump-reference repair (`mutation::vm::operators::splice_program_with_reference_repair`, also used by `mutation::topology::routing`) the register-count resize with its width predicate (`register_count_moves`, `apply_register_count_mutation`), the dormant-tail copy with its terminal classification and conditional `Halt` (`copy_span_to_dormant_tail`), and route composition through gate writes (`mutation::topology::routing`: `add_gate_write`, `apply_add_route_target`, `apply_add_feedback_route`) | T30.F05 |
 | G24 | The genome lives under the creature record (`creature/genome/`), and the import checker special-cases that path | T30.F07 |
 | G25 | A profiling binary with file I/O in the core crate (`v3-core/src/bin/profile_ticks.rs`), which the import checker skips | T30.F07 |
+| G26 | Four readers live under the creature record (`creature::{plasticity_census, sensor_census, drives, ring_rules}`), and the import checker keeps a hand list of them | T30.F07 |

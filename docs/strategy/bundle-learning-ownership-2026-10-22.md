@@ -261,5 +261,5 @@ computed once per birth and `Inherit` is never resolved during a visit.
 
 - Birth draws for the two bundle slots and `credits` (default: each a fair
   coin, by the maximum-flexibility rule).
-- Verification: viability first, gate + goal; mutation gate and slow tests
-  run; the acceptance cases above.
+- Verification: viability first, gate + goal; slow tests run (the mutation
+  gate left the workflow on 2026-10-22); the acceptance cases above.

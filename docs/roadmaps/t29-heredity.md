@@ -59,7 +59,12 @@ user decisions and review:
   one genome gets a new identity naming its source, a detach composes
   `scale × pattern + modifier` seeds, a removal drops), so seeds leave
   `CgpGraphBackendDef` without birth repeating graph-edit semantics
-  (user, 2026-10-22). Three addresses keep three lifetimes: an occurrence
+  (user, 2026-10-22). The compound mesh edits that copy or remove whole
+  backends, mesh copy and attachment and slice cloning and remapping
+  (`mutation::topology::structural`), become genome edit operations that
+  return their inheritance mappings too; mutation keeps their draws (G4,
+  2026-10-26 architecture review). Route composition stays with T30.F05,
+  because it calls the VM repair that row moves (G23). Three addresses keep three lifetimes: an occurrence
   (surface and position) is valid for one graph revision, a learnable
   identity while structural correspondence holds, a runtime slot only
   inside one compiled layout; inspectors read resolved views.
