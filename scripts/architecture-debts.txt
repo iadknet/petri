@@ -11,11 +11,6 @@ G2 mutation/topology/routing.rs runtime::routing
 G2 mutation/vm/operators.rs runtime::vm
 G2 sensors/static_inputs.rs creature::genome
 G5 mutation/phenotype.rs creature::phenotype
-G8 mutation/reachability.rs creature::state
-G8 runtime/cgp/execute.rs creature::state
-G8 runtime/cgp/traced.rs creature::state
-G8 runtime/mesh.rs creature::state
-G8 runtime/traced_mesh.rs creature::state
 G12 mutation/engine/mod.rs creature::parseability
 G14 simulation/actions/reproduction.rs creature::drives
 G16 runtime/trace/domain.rs creature::action_log

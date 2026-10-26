@@ -17,9 +17,9 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
 };
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::mesh::execute_creature_mesh;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;

@@ -58,9 +58,10 @@ use v3_core::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
 };
-use v3_core::creature::state::{CreatureState, GraphRuntimeState};
+use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::runtime::mesh::execute_creature_mesh;
+use v3_core::runtime::state::GraphRuntimeState;
 use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use v3_core::sensors::static_inputs::{age_fraction, StaticInputs};
 use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;

@@ -11,7 +11,7 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::config::{MutationConfig, SimulationConfig};
-use crate::contracts::NodeId;
+use crate::contracts::{NodeId, SHARED_MEMORY_SLOTS};
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::analysis::{mesh_reachable_nodes, vm_backward_slice};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
@@ -294,9 +294,9 @@ fn work_on_fixtures(genome: &CreatureGenome, family: Family, config: &Simulation
             genome,
             &scenario.sensors,
             &mut energy,
-            &mut [0.0; 16],
-            &[0.0; 16],
-            &mut crate::creature::state::GraphRuntimeState::for_genome(genome, Vec::new()),
+            &mut [0.0; SHARED_MEMORY_SLOTS],
+            &[0.0; SHARED_MEMORY_SLOTS],
+            &mut crate::runtime::state::GraphRuntimeState::for_genome(genome, Vec::new()),
             &config.runtime,
             crate::contracts::Direction::N,
             UntracedMeshExecution,

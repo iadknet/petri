@@ -1490,8 +1490,11 @@ fn size_pressure_restriction_disables_the_executed_layer() {
 
 #[test]
 fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
-    let mut record = crate::creature::state::DispatchRecord::default();
-    record.record_dispatch(0);
+    let calls = std::cell::Cell::new(0_u32);
+    let query = |_window: u64| {
+        calls.set(calls.get() + 1);
+        vec![0]
+    };
     let config = MutationConfig {
         per_unit_rate: 0.0,
         ..SimulationConfig::default().mutation
@@ -1501,12 +1504,37 @@ fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
         &mut genome,
         &config,
         &[0],
-        ParentExecuted::Record(&record, 10),
+        ParentExecuted::Query(&query),
         &mut rng(1),
         1,
     );
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.executed_target_events, 0);
+    assert_eq!(calls.get(), 0, "a zero-event birth never calls the query");
+}
+
+#[test]
+fn a_birth_with_events_asks_the_parent_query_once_for_the_configured_window() {
+    let windows = std::cell::RefCell::new(Vec::new());
+    let query = |window: u64| {
+        windows.borrow_mut().push(window);
+        vec![0]
+    };
+    let config = MutationConfig {
+        per_unit_rate: 1.0,
+        ..SimulationConfig::default().mutation
+    };
+    let mut genome = v3alpha1_founder_genome();
+    let summary = MutationEngine::apply_mutations_with_food_type_count(
+        &mut genome,
+        &config,
+        &[0],
+        ParentExecuted::Query(&query),
+        &mut rng(1),
+        1,
+    );
+    assert!(summary.attempted_events > 0);
+    assert_eq!(*windows.borrow(), vec![config.executed_window_ticks]);
 }
 
 #[test]

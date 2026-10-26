@@ -117,7 +117,9 @@ fn e3_fixed_pool_selection_audit() {
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
-                    ParentExecuted::Record(&frozen.record, frozen.age),
+                    ParentExecuted::Query(&|window| {
+                        frozen.record.executed_indices(frozen.age, window)
+                    }),
                     &mut rng,
                     food_types,
                 );
@@ -276,7 +278,9 @@ fn e4_elite_neighbourhood_audit() {
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
-                    ParentExecuted::Record(&frozen.record, frozen.age),
+                    ParentExecuted::Query(&|window| {
+                        frozen.record.executed_indices(frozen.age, window)
+                    }),
                     &mut rng,
                     food_types,
                 );
@@ -348,7 +352,7 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
         &mut child,
         &setup.config.mutation,
         &mesh_reachable_nodes(parent),
-        ParentExecuted::Record(&frozen.record, frozen.age),
+        ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
         &mut rng,
         setup.config.world.food.types.len(),
     );
@@ -684,10 +688,11 @@ fn eval_rule(
     rule: Rule,
 ) -> (f64, u32, bool, u32, u64, u64) {
     use slotmap::SlotMap;
+    use v3_core::contracts::SHARED_MEMORY_SLOTS;
     use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
     use v3_core::creature::action_log::ActionType;
     use v3_core::creature::body::HeritableBody;
-    use v3_core::creature::state::{CreatureState, SHARED_MEMORY_SLOTS};
+    use v3_core::creature::state::CreatureState;
     use v3_core::kernel::WorldState;
     use v3_core::simulation::{run_tick, Simulation};
     use v3_lab::eval::{efficiency, expressed, Progress};

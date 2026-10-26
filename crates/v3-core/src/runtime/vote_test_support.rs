@@ -11,10 +11,10 @@ use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{
     execute_creature_mesh_impl, ObservedMeshExecution, UntracedMeshExecution,
 };
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{MeshHopTrace, MeshPassTrace};
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;

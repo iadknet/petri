@@ -754,8 +754,13 @@ fn advance(
         elite: candidate.genome.as_ref().map(|genome| EliteShape {
             genome_size: genome.genome_size(),
             reachable_nodes: mesh_reachable_nodes(genome).len(),
-            executed_nodes: ParentExecuted::Record(&best.frozen().record, best.frozen().age)
-                .resolve(arm.setup.config.mutation.executed_window_ticks)
+            executed_nodes: best
+                .frozen()
+                .record
+                .executed_indices(
+                    best.frozen().age,
+                    arm.setup.config.mutation.executed_window_ticks,
+                )
                 .len(),
         }),
         validation_mean,
@@ -895,7 +900,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
                 &mut child,
                 &config.mutation,
                 &reachable[pick],
-                ParentExecuted::Record(&frozen.record, frozen.age),
+                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
                 &mut rng,
                 config.world.food.types.len(),
             );
@@ -1298,7 +1303,7 @@ mod tests {
                 &mut genome,
                 &arm.setup.config.mutation,
                 &reachable,
-                ParentExecuted::Record(&frozen.record, frozen.age),
+                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
                 &mut rng,
                 arm.setup.config.world.food.types.len(),
             );

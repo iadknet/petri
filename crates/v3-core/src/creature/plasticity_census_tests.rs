@@ -15,8 +15,8 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
 };
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::plasticity::PlasticityKind;
+use crate::runtime::state::GraphRuntimeState;
 
 fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> PlasticityConfig {
     PlasticityConfig {

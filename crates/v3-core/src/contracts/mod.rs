@@ -22,3 +22,7 @@ pub use inputs::{
 };
 pub use position::Position;
 pub use routing::{RouteTarget, MAX_GATE_SLOTS};
+
+/// Number of f32 slots in a creature's shared memory, read and written by
+/// both VM and Graph backends.
+pub const SHARED_MEMORY_SLOTS: usize = 16;

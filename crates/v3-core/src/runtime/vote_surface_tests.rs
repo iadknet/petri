@@ -14,8 +14,8 @@ use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT}
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{execute_creature_mesh_impl, ObservedMeshExecution};
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
 use crate::sensors::{

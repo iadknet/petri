@@ -1,4 +1,4 @@
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::cgp::{GraphEdge, GraphSource};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 
@@ -17,8 +17,8 @@ pub(crate) fn resolve_source(
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &[f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> f32 {
     match source {
         GraphSource::InputLeaf { ref_idx, sub_idx } => {
@@ -62,8 +62,8 @@ pub(crate) fn resolve_source_post_convergence(
     final_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &[f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> f32 {
     resolve_source(
         source,
@@ -92,8 +92,8 @@ pub(crate) fn collect_cgp_weighted_inputs(
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &[f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     buf: &mut Vec<f32>,
 ) {
     buf.clear();

@@ -9,7 +9,7 @@ use super::{
 };
 use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, PlasticityConfig};
-use crate::creature::state::GraphRuntimeState;
+use crate::runtime::state::GraphRuntimeState;
 
 /// An editable copy of one output sink.
 #[derive(Debug, Clone)]

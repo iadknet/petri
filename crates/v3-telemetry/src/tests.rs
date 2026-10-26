@@ -1398,7 +1398,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     use v3_core::creature::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
-    use v3_core::creature::state::GraphRuntimeState;
+    use v3_core::runtime::state::GraphRuntimeState;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));

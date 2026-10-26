@@ -1,5 +1,5 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::{InputReference, MAX_GATE_SLOTS};
+use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
@@ -36,8 +36,8 @@ pub(crate) fn execute_vm_node(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
@@ -121,8 +121,8 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
@@ -159,7 +159,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     let mut steps: usize = 0;
 
     // Working copy of shared memory slots (64 bytes — unconditional copy).
-    let mut slot_copy: [f32; 16] = *shared_memory;
+    let mut slot_copy: [f32; SHARED_MEMORY_SLOTS] = *shared_memory;
 
     // What this dispatch owes so far (T03.F10). Held in `f64` and settled once
     // on the way out: summed into `f32` energy step by step, every charge below

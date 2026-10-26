@@ -7,7 +7,9 @@ use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 
 use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::{CreatureId, Direction, PerceptionRequirements, Position, WorldAction};
+use crate::contracts::{
+    CreatureId, Direction, PerceptionRequirements, Position, WorldAction, SHARED_MEMORY_SLOTS,
+};
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
 use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::creature::state::CreatureState;
@@ -126,8 +128,8 @@ fn barrier_reader_state_for_creature(creature: &CreatureState) -> BarrierReaderS
 /// `run_phase_0` and the mutational-neighborhood indicator's multi-tick battery
 /// (T11.F01) both call it rather than duplicating the snapshot-then-decay order.
 pub fn advance_shared_memory(
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &mut [f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
     decay_rate: f32,
 ) {
     *prev_shared_memory = *shared_memory;
@@ -406,7 +408,12 @@ pub fn observe_final_actions(sim: &Simulation) -> Vec<FinalActionObservation> {
                     creature.shared_memory,
                     &sim.config.runtime,
                 ),
-                zeroed: observe_action_queue(creature, &sensors, [0.0; 16], &sim.config.runtime),
+                zeroed: observe_action_queue(
+                    creature,
+                    &sensors,
+                    [0.0; SHARED_MEMORY_SLOTS],
+                    &sim.config.runtime,
+                ),
                 scrambled: observe_action_queue(
                     creature,
                     &sensors,
@@ -451,8 +458,8 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
         let creature = &sim.creatures[id];
         let mut prepared = creature.graph_runtime.clone();
         prepared.begin_tick(creature.age);
-        let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
-                        previous: &[f32; 16]| {
+        let evaluate = |graph: &mut crate::runtime::state::GraphRuntimeState,
+                        previous: &[f32; SHARED_MEMORY_SLOTS]| {
             execute_creature_mesh(
                 &creature.genome,
                 &sensors,
@@ -513,7 +520,7 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
 fn observe_action_queue(
     creature: &CreatureState,
     sensors: &SensorSnapshot,
-    mut shared_memory: [f32; 16],
+    mut shared_memory: [f32; SHARED_MEMORY_SLOTS],
     runtime_config: &crate::config::RuntimeConfig,
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
@@ -1644,7 +1651,7 @@ mod final_action_observation_tests {
         let creature = &mut sim.creatures[id];
         creature.genome = memory_direction_genome();
         creature.graph_runtime =
-            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
+            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
         creature.prev_shared_memory[0] = 0.75;
@@ -1716,7 +1723,7 @@ mod final_action_observation_tests {
         let creature = &mut sim.creatures[id];
         creature.genome = runtime_state_action_genome();
         creature.graph_runtime =
-            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
+            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
         creature.graph_runtime.node_state = vec![vec![1.0]];
@@ -1781,7 +1788,7 @@ mod final_action_observation_tests {
             );
             creature.genome = genome;
             creature.graph_runtime =
-                crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
+                crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
             creature.graph_runtime.learned.set_slot(0, 0, 1.0, 0.5);
             creature.prev_shared_memory[0] = 1.0;
             creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
@@ -1832,7 +1839,7 @@ mod final_action_observation_tests {
             let creature = &mut sim.creatures[id];
             creature.genome = memory_direction_genome();
         creature.graph_runtime =
-            crate::creature::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
+            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
             creature.shared_memory[0] = slot_zero;
             creature.shared_memory[1] = slot_one;
 

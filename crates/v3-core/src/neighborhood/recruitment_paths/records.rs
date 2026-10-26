@@ -1,6 +1,6 @@
 use super::super::recruitment::{Module, ModuleBackend, Opportunities, RecruitmentCheckpoint};
 use super::super::Signature;
-use crate::contracts::{NodeId, Position, WorldAction};
+use crate::contracts::{NodeId, Position, WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::cgp::{GraphSource, NodeClass};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{MutationDomain, MutationEventRecord, MutationOperator};
@@ -304,7 +304,7 @@ pub struct Scene {
     pub routing: Vec<(NodeId, usize, NodeId)>,
     pub output_slots: Vec<(NodeId, [f32; 24])>,
     /// Observed zero is distinct from state unavailable after subject removal.
-    pub shared_memory: Option<[f32; 16]>,
+    pub shared_memory: Option<[f32; SHARED_MEMORY_SLOTS]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

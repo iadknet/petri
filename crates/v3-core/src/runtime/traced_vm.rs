@@ -1,7 +1,7 @@
 //! Trace recording adapter for the shared VM execution loop.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::trace::domain::{SlotWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
@@ -16,8 +16,8 @@ pub(crate) fn execute_vm_node_traced(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,

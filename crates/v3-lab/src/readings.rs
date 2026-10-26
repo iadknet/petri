@@ -769,7 +769,7 @@ fn mutants(
                 &mut child,
                 &config.mutation,
                 reachable,
-                ParentExecuted::Record(&frozen.record, frozen.age),
+                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
                 &mut seed.rng(k),
                 config.world.food.types.len(),
             );

@@ -20,12 +20,13 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
-use v3_core::contracts::{CreatureId, Direction, Position};
+use v3_core::contracts::{CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::genome::{BackendDef, CreatureGenome};
-use v3_core::creature::state::{CreatureState, DispatchRecord, SHARED_MEMORY_SLOTS};
+use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::ledger::EnergyFlows;
+use v3_core::runtime::state::DispatchRecord;
 use v3_core::simulation::actions::{apply_move, apply_typed_eat};
 use v3_core::simulation::{run_tick, SimStats, Simulation};
 
@@ -673,7 +674,6 @@ mod tests {
     use crate::arena::arena_config;
     use crate::scene::{centre, SceneSpec};
     use v3_core::creature::founder::founder_genome_with_age_gate;
-    use v3_core::mutation::reachability::ParentExecuted;
 
     fn setup(lifetime: u32, start_energy: f32) -> Setup {
         Setup::new(arena_config(48), start_energy, lifetime)
@@ -734,9 +734,7 @@ mod tests {
             score.food_eaten >= alive.food_eaten,
             "bites never decrease; a_bite_in_the_death_tick_counts_exactly pins the death-tick bite"
         );
-        assert!(!ParentExecuted::Record(&frozen.record, frozen.age)
-            .resolve(100)
-            .is_empty());
+        assert!(!frozen.record.executed_indices(frozen.age, 100).is_empty());
     }
 
     #[test]
@@ -768,9 +766,7 @@ mod tests {
         let (score, frozen) = evaluate_genome(&setup, &founder(&setup), &scene(3));
         assert_eq!(score.death_tick, None);
         assert_eq!(frozen.age, 1);
-        assert!(!ParentExecuted::Record(&frozen.record, frozen.age)
-            .resolve(100)
-            .is_empty());
+        assert!(!frozen.record.executed_indices(frozen.age, 100).is_empty());
     }
 
     #[test]

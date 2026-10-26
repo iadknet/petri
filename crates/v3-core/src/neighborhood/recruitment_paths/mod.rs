@@ -14,7 +14,7 @@ pub use qualification::{
 pub use records::*;
 
 use crate::config::SimulationConfig;
-use crate::contracts::{Direction, Position, WorldAction};
+use crate::contracts::{Direction, Position, WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::body::HeritableBody;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
@@ -77,7 +77,7 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                         config.exchange.founder_share,
                     )
                 },
-                [0.0; 16],
+                [0.0; SHARED_MEMORY_SLOTS],
             )
         });
         world.place_creature(centre, id);

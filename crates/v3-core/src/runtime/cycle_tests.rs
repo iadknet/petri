@@ -8,7 +8,7 @@ use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeK
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
-use crate::creature::state::GraphRuntimeState;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;

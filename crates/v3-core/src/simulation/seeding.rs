@@ -114,7 +114,7 @@ pub fn seed_simulation_with_founder_genomes(
                     config.energy.capacity.founder,
                     config.exchange.founder_share,
                 ),
-                [0.0; crate::creature::state::SHARED_MEMORY_SLOTS],
+                [0.0; crate::contracts::SHARED_MEMORY_SLOTS],
             );
             founder.heading = heading;
             founder
@@ -362,7 +362,7 @@ mod tests {
         use crate::creature::genome::sensor_analysis::{
             declared_world_keys, has_barrier_reader, live_vm_world_reads, sensor_census,
         };
-        use crate::creature::state::GraphRuntimeState;
+        use crate::runtime::state::GraphRuntimeState;
         use crate::sensors::reads::WorldKeySet;
         let sim = seed_simulation_with_perception_mix(small_config(), 42, 2);
         for creature in sim.creatures.values() {

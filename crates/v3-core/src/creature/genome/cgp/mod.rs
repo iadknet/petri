@@ -130,7 +130,7 @@ impl OutputSinkKind {
 /// Number of CustomOutput sinks in the fixed catalog.
 pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
-pub const SHARED_MEMORY_SLOTS: u8 = 16;
+pub const SHARED_MEMORY_SLOTS: u8 = crate::contracts::SHARED_MEMORY_SLOTS as u8;
 /// Catalog index of the first `ActionVote` sink, which is also the count of
 /// the sinks before it: N CustomOutput + 8 RouterGate + 16 WriteSlot +
 /// 16 ClearSlot. The vote sinks run from here in `VoteSink` index order, and

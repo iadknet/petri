@@ -255,8 +255,8 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{Direction, WorldAction};
-    use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::{age_fraction, energy_fraction, StaticInputs};
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;

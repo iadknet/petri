@@ -1,7 +1,6 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
-use crate::creature::state::GraphRuntimeState;
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
@@ -10,6 +9,7 @@ use crate::runtime::cgp::tracer::{GraphTracer, NoopTracer};
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -26,8 +26,8 @@ fn collect_learning_inputs(
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &[f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     learner: &mut Learner<'_>,
     buf: &mut Vec<f32>,
 ) {
@@ -67,8 +67,8 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> NodeResult {
     let node_count = def.compute_nodes().len();
 
@@ -286,8 +286,8 @@ pub(crate) fn execute_graph_node(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> NodeResult {
     execute_graph_impl(
         &mut NoopTracer,
@@ -330,8 +330,8 @@ mod work_counter_tests {
     use crate::creature::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
     };
-    use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;

@@ -35,7 +35,7 @@ mod tests {
         GraphSource, FIRST_ACTION_VOTE_SINK, FIXED_SINK_COUNT,
     };
     use crate::creature::genome::{HebbianRule, NodeGenome, PlasticityConfig};
-    use crate::creature::state::GraphRuntimeState;
+    use crate::runtime::state::GraphRuntimeState;
 
     /// The compute seed rows a draft carries.
     fn rows(def: &CgpGraphBackendDef) -> &[Vec<Option<f32>>] {

@@ -1,7 +1,7 @@
 //! Backend-neutral growth: attachment properties, live activation, and reproduction evidence.
 use super::*;
-use crate::creature::state::GraphRuntimeState;
 use crate::neighborhood::{mesh_execution::static_successor_bypass, Battery};
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::BackendTrace;
 
 const GROWTH: [TopologyOperator; 3] = [

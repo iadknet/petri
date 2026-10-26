@@ -7,7 +7,7 @@ use crate::creature::genome::cgp::{
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
-use crate::creature::state::GraphRuntimeState;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{BackendTrace, TerminationReason};
 use crate::runtime::types::{sanitize_f32, MeshOutput};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};

@@ -18,19 +18,20 @@ use rand::Rng;
 use super::types::TargetReachability;
 use crate::contracts::NodeId;
 use crate::creature::genome::NodeGenome;
-use crate::creature::state::DispatchRecord;
 
 /// Where a birth's executed node set comes from.
 ///
 /// The set is resolved only once the birth draws at least one mutation event,
 /// so zero-event births derive nothing (T11.F17).
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum ParentExecuted<'a> {
     /// An explicit sorted ascending index set, as the observation harnesses
     /// derive it from battery hop records.
     Indices(&'a [usize]),
-    /// The live parent's dispatch record, read at the parent's current age.
-    Record(&'a DispatchRecord, u64),
+    /// The live parent's dispatch history, asked with the window length: it
+    /// answers with the sorted ascending indices dispatched less than
+    /// `window` ticks before the parent's current age.
+    Query(&'a dyn Fn(u64) -> Vec<usize>),
 }
 
 impl ParentExecuted<'_> {
@@ -42,7 +43,16 @@ impl ParentExecuted<'_> {
     pub fn resolve(&self, window: u64) -> Cow<'_, [usize]> {
         match *self {
             Self::Indices(indices) => Cow::Borrowed(indices),
-            Self::Record(record, age) => Cow::Owned(record.executed_indices(age, window)),
+            Self::Query(query) => Cow::Owned(query(window)),
+        }
+    }
+}
+
+impl std::fmt::Debug for ParentExecuted<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Indices(indices) => f.debug_tuple("Indices").field(indices).finish(),
+            Self::Query(_) => f.debug_tuple("Query").finish_non_exhaustive(),
         }
     }
 }

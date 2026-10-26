@@ -1,13 +1,15 @@
 //! Trace recording adapter for the shared mesh routing loop.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, NodeId};
+use crate::contracts::{
+    Direction, DynamicIntrospectionKey, InputReference, NodeId, SHARED_MEMORY_SLOTS,
+};
 use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{
     BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
@@ -28,8 +30,8 @@ pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
     heading: Direction,
@@ -59,8 +61,8 @@ pub(crate) fn execute_creature_mesh_budgeted(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
     heading: Direction,
@@ -240,8 +242,8 @@ impl MeshExecutionMode for RecordingMeshExecution {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        shared_memory: &mut [f32; 16],
-        prev_shared_memory: &[f32; 16],
+        shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+        prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
         graph_runtime: &mut GraphRuntimeState,
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,
@@ -407,8 +409,8 @@ mod tests {
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,
     };
-    use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::state::GraphRuntimeState;
     use crate::runtime::trace::domain::{
         BackendTrace, PassEndReason, StaticInputsSnapshot, TerminationReason,
     };

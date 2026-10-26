@@ -10,14 +10,14 @@
 //! non-empty queue, when the queue is full, or on exhaustion.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{Direction, NodeId, WorldAction};
+use crate::contracts::{Direction, NodeId, WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::vote::{VoteKind, VoteSink, VoteVector};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::creature::state::GraphRuntimeState;
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::action_decode::decode_commit;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::routing::resolve_gated_route;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{MeshPassTrace, PassEndReason, TerminationReason};
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
@@ -69,8 +69,8 @@ pub fn execute_creature_mesh(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
     heading: Direction,
@@ -105,8 +105,8 @@ pub(crate) trait MeshExecutionMode {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        shared_memory: &mut [f32; 16],
-        prev_shared_memory: &[f32; 16],
+        shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+        prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
         graph_runtime: &mut GraphRuntimeState,
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,
@@ -156,8 +156,8 @@ impl MeshExecutionMode for UntracedMeshExecution {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        shared_memory: &mut [f32; 16],
-        prev_shared_memory: &[f32; 16],
+        shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+        prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
         graph_runtime: &mut GraphRuntimeState,
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,
@@ -248,8 +248,8 @@ impl MeshExecutionMode for ObservedMeshExecution {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        shared_memory: &mut [f32; 16],
-        prev_shared_memory: &[f32; 16],
+        shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+        prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
         graph_runtime: &mut GraphRuntimeState,
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,
@@ -315,8 +315,8 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
     mut heading: Direction,
@@ -596,7 +596,7 @@ mod tests {
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
-    use crate::creature::state::GraphRuntimeState;
+    use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;

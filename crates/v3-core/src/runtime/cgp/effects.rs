@@ -1,6 +1,6 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
-use crate::contracts::{InputReference, MAX_GATE_SLOTS};
+use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::ActionParams;
@@ -28,8 +28,8 @@ fn edges_wsum(
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &[f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
     mut learner: Option<&mut Learner<'_>>,
     buf: &mut Vec<f32>,
 ) -> f32 {
@@ -77,8 +77,8 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
     buf: &mut Vec<f32>,
     shared_memory_writes_changed: &mut u32,
     action_params: &mut ActionParams,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> (NodeResult, VoteVector) {
     let mut output_slots = *upstream_slots;
     let mut route_gates = RouteGateMap::default();

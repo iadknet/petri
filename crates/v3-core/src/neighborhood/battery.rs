@@ -17,12 +17,12 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use crate::config::{EnergyLifecycleConfig, RuntimeConfig};
-use crate::contracts::WorldAction;
+use crate::contracts::{WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::colour::unit_rgb;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::phenotype::Phenotype;
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::MeshOutput;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::{age_fraction, StaticInputs};
@@ -264,7 +264,7 @@ impl Battery {
 /// The cognition state one execution left behind, lent to a reader.
 pub(super) struct PostState<'a> {
     pub energy: f32,
-    pub shared_memory: &'a [f32; 16],
+    pub shared_memory: &'a [f32; SHARED_MEMORY_SLOTS],
     pub graph_runtime: &'a GraphRuntimeState,
 }
 
@@ -332,8 +332,8 @@ fn visit_sequence<M: MeshExecutionMode, B>(
     mode: &mut impl FnMut() -> M,
     visit: &mut impl FnMut(M::Output, PostState<'_>) -> ControlFlow<B>,
 ) -> ControlFlow<B> {
-    let mut shared_memory = [0.0f32; 16];
-    let mut prev_shared_memory = [0.0f32; 16];
+    let mut shared_memory = [0.0f32; SHARED_MEMORY_SLOTS];
+    let mut prev_shared_memory = [0.0f32; SHARED_MEMORY_SLOTS];
     let mut graph_runtime = GraphRuntimeState::for_genome(genome, Vec::new());
     for (tick, scenario) in sequence.iter().enumerate() {
         graph_runtime.begin_tick(tick as u64);
@@ -430,8 +430,8 @@ fn execute_scenario_tick_reading<M: MeshExecutionMode, T>(
     read: impl FnOnce(M::Output, PostState<'_>) -> T,
 ) -> T {
     let mut energy = scenario.energy;
-    let mut shared_memory = [0.0f32; 16];
-    let prev_shared_memory = [0.0f32; 16];
+    let mut shared_memory = [0.0f32; SHARED_MEMORY_SLOTS];
+    let prev_shared_memory = [0.0f32; SHARED_MEMORY_SLOTS];
     let mut graph_runtime = GraphRuntimeState::for_genome(genome, Vec::new());
     let output = execute_creature_mesh_impl(
         genome,

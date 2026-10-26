@@ -1,9 +1,9 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{
     kind_label, GraphNodeEvalTrace, GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
 };
@@ -118,8 +118,8 @@ pub(crate) fn execute_graph_node_traced(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
+    shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+    prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.compute_nodes().len();
 

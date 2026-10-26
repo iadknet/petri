@@ -2728,7 +2728,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     };
     use v3_core::creature::genome::vote::{DirectedVoteKind, VoteSink};
     use v3_core::creature::genome::{BackendDef, HebbianRule, PlasticityConfig};
-    use v3_core::creature::state::GraphRuntimeState;
+    use v3_core::runtime::state::GraphRuntimeState;
 
     let state = test_state();
     let creature_id = {
@@ -2885,7 +2885,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::creature::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
-    use v3_core::creature::state::GraphRuntimeState;
+    use v3_core::runtime::state::GraphRuntimeState;
 
     let state = test_state();
     let creature_id = {

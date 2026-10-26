@@ -478,7 +478,7 @@ fn temporal_report_keeps_substrate_counts_separate() {
             ),
         }],
     };
-    sim.creatures[id].graph_runtime = v3_core::creature::state::GraphRuntimeState::for_genome(
+    sim.creatures[id].graph_runtime = v3_core::runtime::state::GraphRuntimeState::for_genome(
         &sim.creatures[id].genome,
         Vec::new(),
     );

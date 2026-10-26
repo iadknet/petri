@@ -15,10 +15,10 @@ use crate::creature::genome::cgp::{
 use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::cgp::traced::execute_graph_node_traced;
 use crate::runtime::mesh::execute_creature_mesh;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};

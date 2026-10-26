@@ -389,7 +389,13 @@ fn spawn_child(
     // T11.F17: the parent's own recent dispatches bias the offspring's targets.
     // Passed unresolved, so a zero-event birth derives nothing.
     let parent = &sim.creatures[parent_id];
-    let parent_executed = ParentExecuted::Record(&parent.graph_runtime.dispatch_record, parent.age);
+    let executed_within = |window| {
+        parent
+            .graph_runtime
+            .dispatch_record
+            .executed_indices(parent.age, window)
+    };
+    let parent_executed = ParentExecuted::Query(&executed_within);
 
     // Step 10: Apply genome mutations to the draft, which carries the
     // parent's learned weights as birth seeds (T25.F01).
@@ -597,8 +603,8 @@ mod tests {
     fn parent_state(
         genome: &CreatureGenome,
         parent: &[Vec<f32>],
-    ) -> crate::creature::state::GraphRuntimeState {
-        let mut state = crate::creature::state::GraphRuntimeState::for_genome(genome, Vec::new());
+    ) -> crate::runtime::state::GraphRuntimeState {
+        let mut state = crate::runtime::state::GraphRuntimeState::for_genome(genome, Vec::new());
         for (node, values) in parent.iter().enumerate() {
             for (slot, &value) in values.iter().enumerate() {
                 state.learned.set_slot(node, slot, value, 0.0);
@@ -620,7 +626,7 @@ mod tests {
         cgp_reproduction::capture_birth_seeds(&mut child, state.learned());
         mutate(&mut child);
         let seeds = crate::creature::newborn::take_birth_seeds(&mut child);
-        let built = crate::creature::state::GraphRuntimeState::for_genome(&child, seeds);
+        let built = crate::runtime::state::GraphRuntimeState::for_genome(&child, seeds);
         let learned = (0..child.nodes.len())
             .map(|node| {
                 built
@@ -970,7 +976,7 @@ mod tests {
                 vm(1, vec![]),
             ],
         };
-        let parent = crate::creature::state::GraphRuntimeState::for_genome(&child, Vec::new());
+        let parent = crate::runtime::state::GraphRuntimeState::for_genome(&child, Vec::new());
         cgp_reproduction::capture_birth_seeds(&mut child, parent.learned());
         TopologyMutator::apply(
             &mut child,
@@ -986,7 +992,7 @@ mod tests {
         assert!(created.birth_seeds().is_none());
         assert!(crate::creature::newborn::take_birth_seeds(&mut child).is_empty());
         assert!(
-            !crate::creature::state::GraphRuntimeState::for_genome(&child, Vec::new())
+            !crate::runtime::state::GraphRuntimeState::for_genome(&child, Vec::new())
                 .learned()
                 .has_learning()
         );
@@ -1123,7 +1129,7 @@ mod tests {
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
         parent.energy = 10000.0;
         parent.graph_runtime =
-            crate::creature::state::GraphRuntimeState::for_genome(&genome, Vec::new());
+            crate::runtime::state::GraphRuntimeState::for_genome(&genome, Vec::new());
         if let Some(learned) = learned {
             parent.graph_runtime.learned.set_slot(0, 0, learned, 99.0);
         }

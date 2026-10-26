@@ -7,12 +7,13 @@
 use std::collections::BTreeSet;
 
 use crate::config::RuntimeConfig;
+use crate::contracts::SHARED_MEMORY_SLOTS;
 use crate::creature::genome::cgp::ComputeNodeKind;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::mesh::MeshExecutionMode;
+use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::{execute_vm_node_impl, nr, VmTraceSink};
 use crate::sensors::perception::SensorSnapshot;
@@ -136,8 +137,8 @@ impl MeshExecutionMode for ReadRecording {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        shared_memory: &mut [f32; 16],
-        prev_shared_memory: &[f32; 16],
+        shared_memory: &mut [f32; SHARED_MEMORY_SLOTS],
+        prev_shared_memory: &[f32; SHARED_MEMORY_SLOTS],
         graph_runtime: &mut GraphRuntimeState,
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,

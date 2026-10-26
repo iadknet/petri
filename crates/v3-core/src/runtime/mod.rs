@@ -4,6 +4,7 @@ pub mod inputs;
 pub mod mesh;
 pub mod plasticity;
 pub(crate) mod routing;
+pub mod state;
 pub mod trace;
 pub mod traced_mesh;
 pub mod traced_vm;
