@@ -215,8 +215,8 @@ moved deterministic block or a changed test value would show it wrong.
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0 on the final code (Verification Plan).
-- [ ] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
-      -> inconclusive twice, no ratio (readings); user decision pending.
+- [x] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
+      -> pass, median 0.9984 (readings).
 - [x] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
       local raw hash and byte count and verification time checked, series
       entry points to the summary, deterministic blocks identical to the
@@ -235,10 +235,11 @@ Overhead check: `scripts/telemetry-overhead`'s method on the harness (as
 T21.F06 did for `bench`), ceiling 1.10; expected well under it, since the
 record pair sits outside the timed loop.
 
-**Measured verdict.** Overhead: inconclusive twice, no ratio, 89.6 s of
-300 s used (the script reuses the `run` workload's T 6908: 15.1 s runs,
-n 24; the permitted rerun at T 1800: 3.7 s runs, 16.5% spread, n 32).
-Reported to the user under the time-cap rule; not rounded, not rerun.
+**Measured verdict.** Overhead at `eb03d13e`:
+
+| T | Spread | Pairs | Median ratio | 90% interval | Verdict | Used |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1989 (calibrated) | 9.19% | 24/24 | 0.9984 | [0.9920, 1.0124] | pass | 204.0 s of 300 s |
 
 Gate at `d5ffb1a1`: exits 0/0, `severe=false`, counters `ok`, deterministic
 block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
@@ -269,3 +270,7 @@ block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
   rule: one record pair exported after the timed loop, nothing inside it;
   run telemetry is not installed, since it would add work to the profiled
   loop.
+- Decision: user grant, 2026-10-26: "An
+  implementer first fixes scripts/telemetry-overhead so the profile-ticks
+  arm calibrates its own tick count. Then one fresh check runs under a new
+  5-minute cap, and the spec records your grant as a Decision."
