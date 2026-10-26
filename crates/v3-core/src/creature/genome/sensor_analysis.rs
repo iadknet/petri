@@ -256,6 +256,7 @@ impl SensorCensus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::world_key_strategy;
     use crate::contracts::{DynamicIntrospectionKey, NodeId, OrdinaryFoodTypeId};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
@@ -806,19 +807,6 @@ mod tests {
             declared_world_keys(&genome, &[7]).is_empty(),
             "an out-of-range reachable index is skipped"
         );
-    }
-
-    fn world_key_strategy() -> impl Strategy<Value = WorldInputKey> {
-        prop_oneof![
-            (0u16..3).prop_map(|i| WorldInputKey::food_here(OrdinaryFoodTypeId::new(i))),
-            (0u16..3).prop_map(|i| WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(i))),
-            (0u16..3).prop_map(|i| WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(i))),
-            Just(WorldInputKey::NeighborBarrierRing),
-            Just(WorldInputKey::NeighborOccupiedRing),
-            Just(WorldInputKey::AreaBarrierSummary),
-            Just(WorldInputKey::AreaOccupancySummary),
-            Just(WorldInputKey::NearbyCreature),
-        ]
     }
 
     /// A graph whose wired sink reads the drawn refs: the census is exactly the

@@ -66,6 +66,7 @@ pub fn world_input_key_label(key: WorldInputKey) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::world_key_strategy;
     use crate::contracts::OrdinaryFoodTypeId;
     use crate::sensors::reads::WorldReads;
     use proptest::prelude::*;
@@ -92,19 +93,6 @@ mod tests {
         );
         let labels: BTreeSet<String> = two.iter().copied().map(world_input_key_label).collect();
         assert_eq!(labels.len(), two.len(), "no two keys share a label");
-    }
-
-    fn world_key_strategy() -> impl Strategy<Value = WorldInputKey> {
-        prop_oneof![
-            (0u16..3).prop_map(|i| WorldInputKey::food_here(OrdinaryFoodTypeId::new(i))),
-            (0u16..3).prop_map(|i| WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(i))),
-            (0u16..3).prop_map(|i| WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(i))),
-            Just(WorldInputKey::NeighborBarrierRing),
-            Just(WorldInputKey::NeighborOccupiedRing),
-            Just(WorldInputKey::AreaBarrierSummary),
-            Just(WorldInputKey::AreaOccupancySummary),
-            Just(WorldInputKey::NearbyCreature),
-        ]
     }
 
     fn key_set(keys: &[WorldInputKey]) -> WorldKeySet {

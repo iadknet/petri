@@ -14,6 +14,8 @@ pub use direction::{compass_x, compass_y, Direction};
 pub use food_type_id::OrdinaryFoodTypeId;
 pub use hash::splitmix64;
 pub use ids::{CreatureId, NodeId};
+#[cfg(test)]
+pub(crate) use inputs::world_key_strategy;
 pub use inputs::{
     barrier_idx, food_idx, nearby_idx, occupancy_idx, DirectionPair, DynamicIntrospectionKey,
     InputReference, NearbyField, PerceptionRequirements, StaticIntrospectionKey, WorldInputKey,

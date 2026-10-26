@@ -484,6 +484,16 @@ impl InputReference {
     }
 }
 
+/// Draws a world input key from [`WorldInputKey::universe`] over food types
+/// 0..3, so property tests track the key families without a hand-kept list.
+#[cfg(test)]
+pub(crate) fn world_key_strategy() -> impl proptest::strategy::Strategy<Value = WorldInputKey> {
+    let keys: Vec<_> = WorldInputKey::universe((0..3).map(OrdinaryFoodTypeId::new))
+        .into_iter()
+        .collect();
+    proptest::sample::select(keys)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
