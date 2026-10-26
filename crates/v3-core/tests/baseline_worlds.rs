@@ -865,16 +865,17 @@ fn seeded_map_digest(sim: &v3_core::simulation::Simulation) -> u64 {
 
 /// T30.F04: each checked-in world's seed-time map (barriers and fertility),
 /// pinned on the code before the terrain schema moved into `config`. A moved
-/// value is a changed world.
+/// value is a changed world. The digests are computed over `RECIPES`, so a
+/// recipe added there without a pinned entry fails here.
 #[test]
 fn recipe_seed_time_maps_are_pinned() {
-    const PINNED: [(&str, u64); 4] = [
+    const PINNED: [(&str, u64); RECIPES.len()] = [
         ("plains", 14_775_210_727_583_933_416),
         ("orchards-in-grassland", 3_471_738_112_455_463_929),
         ("canyon-country", 7_111_894_697_302_656_956),
         ("confluence", 13_834_098_584_569_698_020),
     ];
-    let actual = PINNED.map(|(name, _)| {
+    let actual = RECIPES.map(|(name, _)| {
         (
             name,
             seeded_map_digest(&seed_baseline_map(baseline_config(name))),

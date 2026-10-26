@@ -168,7 +168,9 @@ changed food-stream or pattern test value, would show it wrong.
       from `crate::config`.
 - [x] Map digests: pinned at `44e53179` in commit `59832f7b` before any move
       (values in the readings); `cargo test -p v3-core --test
-      baseline_worlds` -> 20 passed after the move.
+      baseline_worlds` -> 20 passed after the move; the digests are computed
+      over `RECIPES` and `PINNED` is sized by `RECIPES.len()`, so a recipe
+      without a pinned entry fails.
 - [x] Focused tests: `cargo test -p v3-core --test terrain --test
       reproducibility` -> 14 passed; `cargo test -p v3-core
       ordinary_food::stream` -> 4 passed; `cargo test -p v3-core
@@ -227,3 +229,8 @@ is a defect, not a cost to accept. No indicator can move.
   `PatternParams`, `PatternBounds` and `TerrainLayer` (audit R5); payer
   proposed to the user at closure (T30.F01's generator extended to the
   config schema, or a new T30 row).
+- Deferred: final review (three Codex Sol high lenses on 63cdc027):
+  correctness and design raised no findings; code health raised two P3s —
+  the PINNED/RECIPES sync (fixed in this pass) and the frontend schema-copy
+  note having no named payer, which stays the workflow's unpaid-accept form
+  with the payer proposed to the user at closure.
