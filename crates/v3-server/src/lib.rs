@@ -9,6 +9,8 @@ pub mod state;
 pub mod telemetry;
 pub mod transport;
 pub mod types;
+#[cfg(test)]
+mod wire_types;
 pub mod ws;
 
 use axum::routing::{get, patch, post};

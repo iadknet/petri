@@ -15,6 +15,7 @@ use crate::transport::session::ProjectionNotice;
 use crate::transport::session_registry::SessionRegistry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum SimulationStatus {
     Idle,
@@ -91,6 +92,7 @@ impl SimHandle {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LastTickActions {
     #[serde(rename = "move")]
     pub move_count: u32,
@@ -103,6 +105,7 @@ pub struct LastTickActions {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PredationEventSnapshot {
     pub attacker_x: u16,
     pub attacker_y: u16,
@@ -113,6 +116,7 @@ pub struct PredationEventSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StatusPayload {
     pub state: SimulationStatus,
     pub population: usize,
@@ -141,6 +145,7 @@ pub struct StatusPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CreatureSnapshot {
     pub id: u64,
     pub x: u16,
@@ -151,6 +156,7 @@ pub struct CreatureSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FoodCell {
     pub x: u16,
     pub y: u16,
@@ -159,6 +165,7 @@ pub struct FoodCell {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FoodTypeSnapshot {
     pub type_idx: u16,
     pub name: String,
@@ -167,12 +174,14 @@ pub struct FoodTypeSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BarrierCell {
     pub x: u16,
     pub y: u16,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FramePayload {
     pub width: u16,
     pub height: u16,
@@ -184,6 +193,7 @@ pub struct FramePayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct HealthPayload {
     pub population: usize,
     pub mean_energy: f32,
@@ -307,6 +317,7 @@ impl PopulationCensus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MutationTargetReachabilityTotalPayload {
     pub reachable: u64,
     pub unreachable: u64,
@@ -316,6 +327,7 @@ pub struct MutationTargetReachabilityTotalPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MutationOperatorFunnelPayload {
     pub attempted: u64,
     pub applicable: u64,
@@ -325,6 +337,7 @@ pub struct MutationOperatorFunnelPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MutationOperatorValueTotalsPayload {
     pub carriers_observed_total: u64,
     pub survival_ticks_sum: u64,
@@ -349,6 +362,7 @@ pub struct MutationOperatorValueTotalsPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct WsFrame {
     pub tick: u64,
     pub status: StatusPayload,

@@ -42,6 +42,8 @@ axum = { workspace = true }
 rmp-serde = { workspace = true }
 criterion = "0.5"
 tokio-tungstenite = "0.24"
+ts-rs = { workspace = true }
+v3-core = { path = "../v3-core", features = ["ts"] }
 
 [[bench]]
 name = "transport"

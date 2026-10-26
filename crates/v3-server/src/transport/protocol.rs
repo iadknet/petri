@@ -11,6 +11,7 @@ use crate::state::{
 pub use crate::types::PROTOCOL_VERSION;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ZoomTier {
     Overview,
@@ -19,6 +20,7 @@ pub enum ZoomTier {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
     SubscribeView {
@@ -35,6 +37,7 @@ pub enum ClientMessage {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PerfPayload {
     pub projection_publish_ms: f64,
     pub ws_frame_publish_ms: f64,
@@ -42,6 +45,7 @@ pub struct PerfPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StatusEventPayload {
     pub state: SimulationStatus,
     pub population: usize,
@@ -109,6 +113,7 @@ pub struct StatusEventPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FoodTypePayload {
     pub type_idx: u16,
     pub name: String,
@@ -117,6 +122,7 @@ pub struct FoodTypePayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct WorldStaticPayload {
     pub width: u16,
     pub height: u16,
@@ -127,6 +133,7 @@ pub struct WorldStaticPayload {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ViewRectPayload {
     pub x: u16,
     pub y: u16,
@@ -135,6 +142,7 @@ pub struct ViewRectPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ViewOverviewPayload {
     /// Overview payloads intentionally omit predation events; only detail views
     /// carry exact event locations because overview mode is aggregate-only.
@@ -146,6 +154,7 @@ pub struct ViewOverviewPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct OverviewFoodCellPayload {
     pub bucket_x: u16,
     pub bucket_y: u16,
@@ -154,6 +163,7 @@ pub struct OverviewFoodCellPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ViewDetailPayload {
     pub rect: ViewRectPayload,
     pub width: u16,
@@ -164,6 +174,7 @@ pub struct ViewDetailPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
     Status {

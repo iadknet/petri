@@ -1,0 +1,5 @@
+# ts-rs reads these when v3-server's generator test renders the frontend's
+# wire types (T30.F01): 64-bit integers as `number`, imports with `.ts`.
+[env]
+TS_RS_LARGE_INT = "number"
+TS_RS_IMPORT_EXTENSION = "ts"
