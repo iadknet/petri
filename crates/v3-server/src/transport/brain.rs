@@ -370,14 +370,13 @@ pub struct LearningScale {
 
 // ── Assembly ────────────────────────────────────────────────────────────────
 
-/// One edge of a Graph node in canonical order: its occurrence, genomic
-/// weight, weight in force and learner view.
+/// One edge of a Graph node in canonical order: its occurrence, its
+/// weight in force when dynamic (`applied_weights`; a static edge's weight
+/// in force is its genomic weight) and its learner view.
 struct WalkedEdge {
     occurrence: EdgeOccurrence,
-    genomic: f32,
-    applied: f32,
+    dynamic: Option<f32>,
     view: Option<LearnedEdge>,
-    dynamic: bool,
 }
 
 /// Every edge of Graph node `node_idx` in canonical order, by one merge-walk
@@ -385,22 +384,17 @@ struct WalkedEdge {
 /// views, all in canonical order.
 fn walk_edges<'a>(
     def: &'a CgpGraphBackendDef,
-    input_refs: &'a [InputReference],
     learned: &'a LearnedState,
     node_idx: usize,
 ) -> impl Iterator<Item = WalkedEdge> + 'a {
     let mut applied = learned.applied_weights(node_idx).peekable();
     let mut views = learned.edges(node_idx).peekable();
-    def.edge_sites().map(move |occurrence| {
-        let genomic = def.genomic_weight(occurrence, input_refs);
-        let dynamic = applied.next_if(|&(at, _)| at == occurrence);
-        WalkedEdge {
-            occurrence,
-            genomic,
-            applied: dynamic.map_or(genomic, |(_, weight)| weight),
-            view: views.next_if(|view| view.occurrence == occurrence),
-            dynamic: dynamic.is_some(),
-        }
+    def.edge_sites().map(move |occurrence| WalkedEdge {
+        occurrence,
+        dynamic: applied
+            .next_if(|&(at, _)| at == occurrence)
+            .map(|(_, weight)| weight),
+        view: views.next_if(|view| view.occurrence == occurrence),
     })
 }
 
@@ -466,7 +460,7 @@ fn graph_brain(
             edges: Vec::with_capacity(sink.inputs.len()),
         })
         .collect();
-    for walked in walk_edges(def, input_refs, learned, node_idx) {
+    for walked in walk_edges(def, learned, node_idx) {
         let edge = brain_edge(def, input_refs, &walked);
         match walked.occurrence.surface {
             EdgeSurface::ComputeInput(index) => compute_nodes[index].edges.push(edge),
@@ -526,6 +520,7 @@ fn brain_edge(
     walked: &WalkedEdge,
 ) -> BrainEdge {
     let edge = def.edge_at(walked.occurrence);
+    let genomic = def.genomic_weight(walked.occurrence, input_refs);
     let member = edge.membership().map(|membership| EdgeMember {
         group: membership.group.index(),
         scope: membership.scope.into(),
@@ -558,8 +553,8 @@ fn brain_edge(
     BrainEdge {
         source: edge.source().into(),
         own: edge.own_weight(),
-        genomic: walked.genomic,
-        applied: walked.applied,
+        genomic,
+        applied: walked.dynamic.unwrap_or(genomic),
         member,
         learner,
     }
@@ -578,19 +573,19 @@ pub fn learning_view(genome: &CreatureGenome, learned: &LearnedState) -> Option<
             let BackendDef::Graph(def) = &node.backend_def else {
                 return None;
             };
-            let edges: Vec<LearningEdge> = walk_edges(def, &node.input_refs, learned, node_idx)
-                .filter(|walked| walked.dynamic)
-                .map(|walked| {
+            let edges: Vec<LearningEdge> = walk_edges(def, learned, node_idx)
+                .filter_map(|walked| {
+                    let applied = walked.dynamic?;
                     let (surface, container) = surface_of(walked.occurrence);
-                    LearningEdge {
+                    Some(LearningEdge {
                         surface,
                         container,
                         edge: walked.occurrence.index,
-                        applied: walked.applied,
+                        applied,
                         learned: walked.view.and_then(|view| view.learned),
                         trace: walked.view.and_then(|view| view.trace),
                         initialized: walked.view.map(|view| view.initialized),
-                    }
+                    })
                 })
                 .collect();
             (!edges.is_empty()).then(|| NodeLearning {
