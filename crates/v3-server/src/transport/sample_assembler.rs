@@ -150,6 +150,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> MeshHopTracePayload {
             }),
             core_trace::BackendTrace::Graph(graph) => {
                 BackendTracePayload::Graph(GraphTracePayload {
+                    temporal_committed: graph.temporal_committed,
                     passes: graph
                         .passes
                         .into_iter()
@@ -467,6 +468,7 @@ mod tests {
         );
         let graph_json = &hop["backend_trace"]["Graph"];
         assert!(graph_json.get("converged").is_none());
+        assert_eq!(graph_json["temporal_committed"], true);
         assert!(graph_json.get("stable_passes_count").is_none());
     }
 }

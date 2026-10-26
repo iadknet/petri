@@ -56,9 +56,7 @@ fn render_roots(render: &mut Render<'_>) {
     render.visit::<crate::http::creature::CreatureDetailResponse<'static>>();
     render.visit::<crate::http::creature::StartSampleRequest>();
     render.visit::<crate::http::creature::StartSampleResponse>();
-    render.visit::<crate::http::creature::SampleIdleResponse>();
-    render.visit::<crate::http::creature::SampleRecordingResponse>();
-    render.visit::<crate::http::creature::SampleCompleteResponse>();
+    render.visit::<crate::http::creature::SampleResponse>();
     render.visit::<crate::http::lifecycle::LifecycleResponse>();
     render.visit::<crate::http::lifecycle::StartupResponse>();
     render.visit::<crate::http::lifecycle::StepResponse>();
@@ -120,7 +118,10 @@ fn generated_dir() -> PathBuf {
 
 #[test]
 fn generated_types_match_the_wire_types() {
-    let cfg = Config::from_env();
+    // Fixed arrays up to a direction ring (8) render as tuples, whose
+    // positions mean something (a direction, a colour channel); longer ones
+    // (slot banks, vote vectors, the nearby block) as `number[]`.
+    let cfg = Config::from_env().with_array_tuple_limit(8);
     assert_eq!(
         cfg.large_int(),
         "number",

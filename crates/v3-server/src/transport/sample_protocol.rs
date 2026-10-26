@@ -195,6 +195,8 @@ pub struct SlotWritePayload {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GraphTracePayload {
     pub passes: Vec<GraphPassTracePayload>,
+    /// Whether candidate operator state and outputs were committed.
+    pub temporal_committed: bool,
     pub final_outputs: Vec<f32>,
     pub output_sinks: Vec<GraphOutputSinkTracePayload>,
 }

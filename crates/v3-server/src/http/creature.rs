@@ -133,37 +133,41 @@ pub(crate) struct CreatureRecentActionsDiagnostics {
     by_action_result: BTreeMap<String, u32>,
 }
 
+/// The status of a sample that has started recording.
+#[derive(serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum StartedSampleStatus {
+    Recording,
+}
+
 #[derive(serde::Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub(crate) struct StartSampleResponse {
     protocol_version: &'static str,
-    status: &'static str,
+    status: StartedSampleStatus,
     ticks_requested: u32,
     include_perception_debug: bool,
 }
 
+/// A creature's sample, by status: none recording, recording, or complete
+/// (handed over once).
 #[derive(serde::Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub(crate) struct SampleIdleResponse {
-    protocol_version: &'static str,
-    status: &'static str,
-}
-
-#[derive(serde::Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub(crate) struct SampleRecordingResponse {
-    protocol_version: &'static str,
-    status: &'static str,
-    ticks_completed: usize,
-    ticks_remaining: u32,
-}
-
-#[derive(serde::Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub(crate) struct SampleCompleteResponse {
-    protocol_version: &'static str,
-    status: &'static str,
-    sample: ExecutionSamplePayload,
+#[serde(tag = "status", rename_all = "snake_case")]
+pub(crate) enum SampleResponse {
+    Idle {
+        protocol_version: &'static str,
+    },
+    Recording {
+        protocol_version: &'static str,
+        ticks_completed: usize,
+        ticks_remaining: u32,
+    },
+    Complete {
+        protocol_version: &'static str,
+        sample: ExecutionSamplePayload,
+    },
 }
 
 fn to_json_value<T: serde::Serialize>(value: T) -> Result<Json<serde_json::Value>, AppError> {
@@ -506,7 +510,7 @@ pub async fn start_sample(
 
     to_json_value(StartSampleResponse {
         protocol_version: PROTOCOL_VERSION,
-        status: "recording",
+        status: StartedSampleStatus::Recording,
         ticks_requested: req.ticks,
         include_perception_debug: req.include_perception_debug,
     })
@@ -519,9 +523,8 @@ pub async fn get_sample(
     let mut handle = app.sim.lock().await;
 
     let Some(creature_id) = creature_id_from_ffi_exact(id) else {
-        return to_json_value(SampleIdleResponse {
+        return to_json_value(SampleResponse::Idle {
             protocol_version: PROTOCOL_VERSION,
-            status: "idle",
         });
     };
     let Some(active) = handle
@@ -529,9 +532,8 @@ pub async fn get_sample(
         .as_ref()
         .filter(|trace| trace.creature_id == creature_id)
     else {
-        return to_json_value(SampleIdleResponse {
+        return to_json_value(SampleResponse::Idle {
             protocol_version: PROTOCOL_VERSION,
-            status: "idle",
         });
     };
 
@@ -545,16 +547,14 @@ pub async fn get_sample(
         app.telemetry.hand_over(&handle.sim, &trace);
         let sample = assemble_execution_sample(trace.into_sample(ffi_id));
 
-        return to_json_value(SampleCompleteResponse {
+        return to_json_value(SampleResponse::Complete {
             protocol_version: PROTOCOL_VERSION,
-            status: "complete",
             sample,
         });
     }
 
-    to_json_value(SampleRecordingResponse {
+    to_json_value(SampleResponse::Recording {
         protocol_version: PROTOCOL_VERSION,
-        status: "recording",
         ticks_completed: active.ticks.len(),
         ticks_remaining: active.ticks_remaining,
     })
