@@ -1,9 +1,11 @@
 import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
+import type { GraphTracePayload } from "../../types/generated/GraphTracePayload.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
+import type { RouteTarget } from "../../types/generated/RouteTarget.ts";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
-import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { GraphBackendDef, InputReference, RouteTarget } from "../../types/genome.ts";
-import type { GraphTrace } from "../../types/trace.ts";
 import { EdgeGroupList } from "./EdgeGroupList.tsx";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
 import { PlasticEdgeList } from "./PlasticEdgeList.tsx";
@@ -19,14 +21,14 @@ import {
 import { buildComputeTraceOverlay, buildOutputTraceOverlay } from "./graphTraceOverlay.ts";
 
 interface GraphInternalsVizProps {
-	graphDef: GraphBackendDef;
+	graphDef: GraphBrain;
 	/** The server's genomic member weights for this node (T25.F03). */
-	graphWeights?: NodeGraphWeights | null;
+	learning?: NodeLearning | null;
 	liveIndices: number[];
-	inputRefs: InputReference[];
+	inputRefs: InputRef[];
 	targets: RouteTarget[];
 	routeTargetIdx: number | null;
-	trace: GraphTrace | null;
+	trace: GraphTracePayload | null;
 	detailIndex: number;
 }
 
@@ -49,7 +51,7 @@ export function resolveSelectedTarget(
 
 export const GraphInternalsViz = memo(function GraphInternalsViz({
 	graphDef,
-	graphWeights = null,
+	learning = null,
 	liveIndices,
 	inputRefs,
 	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterGate nodes
@@ -64,8 +66,8 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 
 	// 1. Build domain model
 	const model = useMemo(
-		() => buildFullGraphModel(graphDef, inputRefs, graphWeights),
-		[graphDef, inputRefs, graphWeights],
+		() => buildFullGraphModel(graphDef, inputRefs, learning),
+		[graphDef, inputRefs, learning],
 	);
 
 	// 2. Compute layout input (nodes with layer constraints + edges)
@@ -179,8 +181,8 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 					/>
 				</ReactFlowProvider>
 			</div>
-			<EdgeGroupList graphDef={graphDef} inputRefs={inputRefs} graphWeights={graphWeights} />
-			<PlasticEdgeList graphDef={graphDef} inputRefs={inputRefs} graphWeights={graphWeights} />
+			<EdgeGroupList graphDef={graphDef} inputRefs={inputRefs} learning={learning} />
+			<PlasticEdgeList graphDef={graphDef} inputRefs={inputRefs} learning={learning} />
 		</div>
 	);
 });

@@ -43,6 +43,7 @@ describe("buildRenderModel", () => {
 					width: 20,
 					height: 10,
 					barrier_mask: [],
+					food_fertility_u8: [],
 					food_types: [
 						{
 							type_idx: 0,
@@ -192,6 +193,7 @@ describe("buildRenderModel", () => {
 				width: 2,
 				height: 2,
 				barrier_mask: [],
+				food_fertility_u8: [],
 				food_types: [
 					{
 						type_idx: 0,

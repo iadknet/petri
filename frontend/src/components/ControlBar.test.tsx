@@ -6,7 +6,7 @@ import { PanelLayoutProvider } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
-import type { SimulationConfig } from "../types/api.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
 import { ControlBar } from "./ControlBar.tsx";
 
 vi.mock("../api/rest.ts", async (importOriginal) => ({
@@ -55,6 +55,10 @@ const MOCK_CONFIG: SimulationConfig = {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
 					growth_inhibitor: 0.2,
+					energy_per_unit: null,
+					growth_rate: null,
+					recovery_spawn_rate: null,
+					initial_fertility_only: false,
 				},
 			],
 			fertility: {
@@ -292,6 +296,10 @@ describe("ControlBar", () => {
 							initial_density: 1.0,
 							initial_coverage: 0.4,
 							growth_inhibitor: 0.2,
+							energy_per_unit: null,
+							growth_rate: null,
+							recovery_spawn_rate: null,
+							initial_fertility_only: false,
 						},
 					],
 					fertility: {
@@ -369,6 +377,10 @@ describe("ControlBar", () => {
 									initial_density: 1.0,
 									initial_coverage: 0.4,
 									growth_inhibitor: 0.2,
+									energy_per_unit: null,
+									growth_rate: null,
+									recovery_spawn_rate: null,
+									initial_fertility_only: false,
 								}),
 							]),
 							fertility: {
@@ -417,6 +429,10 @@ describe("ControlBar", () => {
 							initial_density: 1.0,
 							initial_coverage: 0.4,
 							growth_inhibitor: 0.2,
+							energy_per_unit: null,
+							growth_rate: null,
+							recovery_spawn_rate: null,
+							initial_fertility_only: false,
 						},
 					],
 					fertility: {

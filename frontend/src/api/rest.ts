@@ -1,24 +1,23 @@
-import type {
-	ConfigResponse,
-	CreatureDetail,
-	LifecycleResponse,
-	PaintRequest,
-	PaintResponse,
-	PatternApplyResponse,
-	PatternPreviewResponse,
-	PatternRequest,
-	SampleResponse,
-	SimulationConfig,
-	SnapshotResponse,
-	StartSampleResponse,
-	StartupRequest,
-	StartupResponse,
-	StatusResponse,
-	StepRequest,
-	StepResponse,
-	ZoomTier,
-} from "../types/api.ts";
-import type { ApiError, FieldError } from "../types/errors.ts";
+import type { ApplyResponse } from "../types/generated/ApplyResponse.ts";
+import type { ConfigResponse } from "../types/generated/ConfigResponse.ts";
+import type { CreatureDetailResponse } from "../types/generated/CreatureDetailResponse.ts";
+import type { ErrorEnvelope } from "../types/generated/ErrorEnvelope.ts";
+import type { FieldError } from "../types/generated/FieldError.ts";
+import type { LifecycleResponse } from "../types/generated/LifecycleResponse.ts";
+import type { PaintRequest } from "../types/generated/PaintRequest.ts";
+import type { PaintResponse } from "../types/generated/PaintResponse.ts";
+import type { PatternRequest } from "../types/generated/PatternRequest.ts";
+import type { PreviewResponse } from "../types/generated/PreviewResponse.ts";
+import type { SampleResponse } from "../types/generated/SampleResponse.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
+import type { SnapshotResponse } from "../types/generated/SnapshotResponse.ts";
+import type { StartSampleResponse } from "../types/generated/StartSampleResponse.ts";
+import type { StartupResponse } from "../types/generated/StartupResponse.ts";
+import type { StatusResponse } from "../types/generated/StatusResponse.ts";
+import type { StepRequest } from "../types/generated/StepRequest.ts";
+import type { StepResponse } from "../types/generated/StepResponse.ts";
+import type { ZoomTier } from "../types/generated/ZoomTier.ts";
+import type { StartupRequest } from "../types/http.ts";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
@@ -35,7 +34,7 @@ class ApiClient {
 			...options,
 		});
 		if (!res.ok) {
-			const body = (await res.json()) as ApiError;
+			const body = (await res.json()) as ErrorEnvelope;
 			throw new ApiRequestError(res.status, body);
 		}
 		return res;
@@ -127,7 +126,7 @@ class ApiClient {
 		id: number,
 		signal?: AbortSignal,
 		query?: { since_tick?: number; exclude?: string },
-	): Promise<CreatureDetail> {
+	): Promise<CreatureDetailResponse> {
 		const params = new URLSearchParams();
 		if (query?.since_tick !== undefined) {
 			params.set("since_tick", String(query.since_tick));
@@ -146,7 +145,7 @@ class ApiClient {
 		});
 	}
 
-	async patternPreview(req: PatternRequest, signal?: AbortSignal): Promise<PatternPreviewResponse> {
+	async patternPreview(req: PatternRequest, signal?: AbortSignal): Promise<PreviewResponse> {
 		return this.request("/v3/simulation/pattern/preview", {
 			method: "POST",
 			body: JSON.stringify(req),
@@ -154,7 +153,7 @@ class ApiClient {
 		});
 	}
 
-	async patternApply(req: PatternRequest): Promise<PatternApplyResponse> {
+	async patternApply(req: PatternRequest): Promise<ApplyResponse> {
 		return this.request("/v3/simulation/pattern/apply", {
 			method: "POST",
 			body: JSON.stringify(req),
@@ -178,7 +177,7 @@ class ApiClient {
  * Builds a non-empty message for a failed request. An empty message renders as
  * no message at all, which is how config rejections used to go unnoticed.
  */
-function errorMessage(status: number, body: ApiError): string {
+function errorMessage(status: number, body: ErrorEnvelope): string {
 	const message = body?.error?.message;
 	if (message) return message;
 	const code = body?.error?.code;
@@ -187,11 +186,11 @@ function errorMessage(status: number, body: ApiError): string {
 
 export class ApiRequestError extends Error {
 	status: number;
-	body: ApiError;
+	body: ErrorEnvelope;
 	/** Per-field reasons from `error.details.field_errors`; empty when absent. */
 	fieldErrors: FieldError[];
 
-	constructor(status: number, body: ApiError) {
+	constructor(status: number, body: ErrorEnvelope) {
 		super(errorMessage(status, body));
 		this.name = "ApiRequestError";
 		this.status = status;

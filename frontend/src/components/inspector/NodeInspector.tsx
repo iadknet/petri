@@ -1,7 +1,8 @@
 import { Suspense, lazy, useMemo } from "react";
-import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { GraphTrace, VmTrace } from "../../types/trace.ts";
-import type { MeshHopTrace } from "../../types/trace.ts";
+import type { GraphTracePayload } from "../../types/generated/GraphTracePayload.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
+import type { VmTracePayload } from "../../types/generated/VmTracePayload.ts";
 import { NodeBackendDetail } from "./NodeBackendDetail.tsx";
 import { NodeConnections } from "./NodeConnections.tsx";
 import { NodeExecutionTrace } from "./NodeExecutionTrace.tsx";
@@ -20,30 +21,30 @@ interface NodeInspectorProps {
 	node: MeshAnalyzedNode | null;
 	semantics: MeshNodeSemantics | null;
 	/** This node's member genomic weights, when it carries an edge group. */
-	graphWeights?: NodeGraphWeights | null;
+	learning?: NodeLearning | null;
 	sharedMemory: number[] | null;
-	executionHop: { hop: MeshHopTrace; detailIndex: number } | null;
+	executionHop: { hop: MeshHopTracePayload; detailIndex: number } | null;
 }
 
 export function NodeInspector({
 	node,
 	semantics,
-	graphWeights = null,
+	learning = null,
 	sharedMemory,
 	executionHop,
 }: NodeInspectorProps) {
 	// Hooks must be called unconditionally (Rules of Hooks)
-	const isGraph = node ? "Graph" in node.node.backend_def : false;
-	const isVm = node ? "Vm" in node.node.backend_def : false;
+	const isGraph = node ? "Graph" in node.node.backend : false;
+	const isVm = node ? "Vm" in node.node.backend : false;
 
-	const graphTrace: GraphTrace | null = useMemo(() => {
+	const graphTrace: GraphTracePayload | null = useMemo(() => {
 		if (!executionHop || !isGraph) return null;
 		const bt = executionHop.hop.backend_trace;
 		if ("Graph" in bt) return bt.Graph;
 		return null;
 	}, [executionHop, isGraph]);
 
-	const vmTrace: VmTrace | null = useMemo(() => {
+	const vmTrace: VmTracePayload | null = useMemo(() => {
 		if (!executionHop || !isVm) return null;
 		const bt = executionHop.hop.backend_trace;
 		if ("Vm" in bt) return bt.Vm;
@@ -59,7 +60,7 @@ export function NodeInspector({
 	}
 
 	const badges = semantics?.badges ?? [];
-	const summary = summarizeBackendDef(node.node.backend_def);
+	const summary = summarizeBackendDef(node.node.backend);
 	const hasMemoryWrite = semantics?.writeClasses.includes("memory") ?? false;
 
 	return (
@@ -74,7 +75,7 @@ export function NodeInspector({
 				badges={badges}
 			/>
 			<NodeConnections inputRefs={node.node.input_refs} targets={node.node.targets} />
-			{isGraph && "Graph" in node.node.backend_def ? (
+			{isGraph && "Graph" in node.node.backend ? (
 				<Suspense
 					fallback={
 						<div className="px-3 py-4 text-center">
@@ -83,8 +84,8 @@ export function NodeInspector({
 					}
 				>
 					<GraphInternalsViz
-						graphDef={node.node.backend_def.Graph}
-						graphWeights={graphWeights}
+						graphDef={node.node.backend.Graph}
+						learning={learning}
 						liveIndices={semantics?.liveInternalNodeIndices ?? []}
 						inputRefs={node.node.input_refs}
 						targets={node.node.targets}
@@ -96,7 +97,7 @@ export function NodeInspector({
 			) : (
 				<>
 					<NodeBackendDetail
-						backendDef={node.node.backend_def}
+						backendDef={node.node.backend}
 						inputRefs={node.node.input_refs}
 						liveInstructionIndices={semantics?.liveInstructionIndices ?? []}
 						liveInternalNodeIndices={semantics?.liveInternalNodeIndices ?? []}

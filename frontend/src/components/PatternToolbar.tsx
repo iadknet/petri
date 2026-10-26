@@ -1,6 +1,6 @@
 import { usePaintStore } from "../stores/paint.ts";
 import { usePatternStore } from "../stores/pattern.ts";
-import type { PatternType } from "../types/api.ts";
+import type { PatternType } from "../types/pattern.ts";
 import { PatternParamsPanel } from "./pattern-params/PatternParamsPanel.tsx";
 
 const PATTERNS: { id: PatternType; label: string }[] = [

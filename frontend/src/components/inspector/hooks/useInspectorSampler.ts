@@ -7,10 +7,10 @@ import {
 	useSamplePlaybackStore,
 } from "../../../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../../../stores/sampleSession.ts";
-import type { ExecutionSample } from "../../../types/trace.ts";
+import type { ExecutionSamplePayload } from "../../../types/generated/ExecutionSamplePayload.ts";
 
 export interface UseInspectorSamplerResult {
-	sample: ExecutionSample | null;
+	sample: ExecutionSamplePayload | null;
 	position: SamplerPosition;
 	playbackState: PlaybackState | "sampling";
 	playbackSpeed: number;

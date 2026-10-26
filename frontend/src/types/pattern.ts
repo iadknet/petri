@@ -1,99 +1,14 @@
-import type { DirtyRect, PaintStats } from "./paint.ts";
+import type { PatternParams } from "./generated/PatternParams.ts";
 
-// --- Pattern parameter types ---
+/** A pattern's kind: its `pattern_type` tag. */
+export type PatternType = PatternParams["pattern_type"];
 
-// Hand copies of `v3_core::config::{PatternParams, PatternBounds}`.
-// WORKAROUND(T30.F04): generated from or tested against the server's config schema.
-export type PatternType = "Maze" | "Spiral" | "Noise" | "ParallelLines" | "Star" | "FbmThreshold";
-
-export interface FbmThresholdParams {
-	pattern_type: "FbmThreshold";
-	octaves: number;
-	frequency: number;
-	lacunarity: number;
-	persistence: number;
-	threshold: number;
-}
-
-export interface MazeParams {
-	pattern_type: "Maze";
-	corridor_width: number;
-	wall_thickness: number;
-	open_center_radius: number;
-}
-
-export interface SpiralParams {
-	pattern_type: "Spiral";
-	arm_count: number;
-	arm_thickness: number;
-	gap_width: number;
-	clockwise: boolean;
-	open_center_radius: number;
-}
-
-export interface NoiseParams {
-	pattern_type: "Noise";
-	density: number;
-	cluster_size: number;
-}
-
-export interface ParallelLinesParams {
-	pattern_type: "ParallelLines";
-	spacing: number;
-	thickness: number;
-	jaggedness: number;
-	angle_degrees: number;
-}
-
-export interface StarParams {
-	pattern_type: "Star";
-	point_count: number;
-	ray_count: number;
-	ray_length: number;
-	ray_thickness: number;
-}
-
-export type PatternParams =
-	| FbmThresholdParams
-	| MazeParams
-	| SpiralParams
-	| NoiseParams
-	| ParallelLinesParams
-	| StarParams;
-
-// --- Request / Response ---
-
-// WORKAROUND(T30.F04): generated from or tested against the server's config schema.
-export interface PatternBounds {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-}
-
-export interface PatternRequest {
-	params: PatternParams;
-	bounds: PatternBounds;
-	seed: number;
-}
-
-export interface PatternPreviewResponse {
-	protocol_version: string;
-	bounds: PatternBounds;
-	bitmap: string;
-	cell_count: number;
-}
-
-export interface PatternApplyResponse {
-	protocol_version: string;
-	stats: PaintStats;
-	dirty_rect: DirtyRect;
-	world_static_changed: boolean;
-}
+/** One pattern's parameters, by its kind. */
+export type PatternParamsOf<T extends PatternType> = Extract<PatternParams, { pattern_type: T }>;
 
 // --- Default params per pattern type ---
 
-export const DEFAULT_PATTERN_PARAMS: Record<PatternType, PatternParams> = {
+export const DEFAULT_PATTERN_PARAMS: { [T in PatternType]: PatternParamsOf<T> } = {
 	FbmThreshold: {
 		pattern_type: "FbmThreshold",
 		octaves: 4,

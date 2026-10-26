@@ -1,13 +1,11 @@
 import { create } from "zustand";
 import { buildFrameFromTransport } from "../adapters/worldFrame.ts";
-import type {
-	Frame,
-	PredationEvent,
-	SnapshotResponse,
-	ViewDetailPayload,
-	ViewOverviewPayload,
-	WorldStaticPayload,
-} from "../types/api.ts";
+import type { PredationEventSnapshot } from "../types/generated/PredationEventSnapshot.ts";
+import type { SnapshotResponse } from "../types/generated/SnapshotResponse.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { ViewOverviewPayload } from "../types/generated/ViewOverviewPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
+import type { Frame } from "../types/protocol.ts";
 
 interface WorldStaticEvent {
 	projectionRevision: number;
@@ -43,12 +41,12 @@ export interface WorldViewState {
 	worldStatic: WorldStaticPayload | null;
 	currentView: StoredView | null;
 	frame: Frame | null;
-	predationEvents: PredationEvent[];
+	predationEvents: PredationEventSnapshot[];
 	applySnapshot: (snapshot: SnapshotResponse, requestIdFloor?: number) => void;
 	applyWorldStatic: (event: WorldStaticEvent) => void;
 	applyOverviewView: (event: ViewEventBase<ViewOverviewPayload>) => void;
 	applyDetailView: (event: ViewEventBase<ViewDetailPayload>) => void;
-	setPredationEvents: (events: PredationEvent[]) => void;
+	setPredationEvents: (events: PredationEventSnapshot[]) => void;
 	reset: () => void;
 }
 
@@ -58,7 +56,7 @@ const initialState = {
 	worldStatic: null as WorldStaticPayload | null,
 	currentView: null as StoredView | null,
 	frame: null as Frame | null,
-	predationEvents: [] as PredationEvent[],
+	predationEvents: [] as PredationEventSnapshot[],
 };
 
 function buildLegacyFrame(

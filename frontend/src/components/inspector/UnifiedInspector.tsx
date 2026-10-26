@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
-import type { ActionLogEntry } from "../../types/action-log.ts";
-import type {
-	CreatureDiagnostics,
-	CreatureMeshAnnotation,
-	NodeGraphWeights,
-} from "../../types/creature-detail.ts";
-import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
+import type { ActionLogEntry } from "../../types/generated/ActionLogEntry.ts";
+import type { BrainView } from "../../types/generated/BrainView.ts";
+import type { CreatureDiagnosticsResponse } from "../../types/generated/CreatureDiagnosticsResponse.ts";
+import type { CreaturePhenotypeResponse } from "../../types/generated/CreaturePhenotypeResponse.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import { InspectorDiagnosticsCards } from "./InspectorDiagnosticsCards.tsx";
 import { InspectorEmptyState } from "./InspectorEmptyState.tsx";
 import { NodeInspector } from "./NodeInspector.tsx";
@@ -20,13 +18,12 @@ import { deriveTraceFocus } from "./mesh/traceFocus.ts";
 
 interface UnifiedInspectorProps {
 	creatureId: number;
-	genome: CreatureGenome;
-	meshAnnotations: CreatureMeshAnnotation[] | null;
+	brain: BrainView;
 	/** Member genomic weights per Graph node with an edge group (T25.F03). */
-	graphWeights?: NodeGraphWeights[] | null;
+	learning?: NodeLearning[] | null;
 	sharedMemory: number[] | null;
 	actionLog: ActionLogEntry[] | null;
-	diagnostics: CreatureDiagnostics | null;
+	diagnostics: CreatureDiagnosticsResponse | null;
 	isDead: boolean;
 	stats: {
 		id: number;
@@ -38,16 +35,15 @@ interface UnifiedInspectorProps {
 		complexity: number;
 		genomeSize: number;
 		position: { x: number; y: number };
-		phenotype: CreaturePhenotype;
+		phenotype: CreaturePhenotypeResponse;
 	};
 	onClose: () => void;
 }
 
 export function UnifiedInspector({
 	creatureId,
-	genome,
-	meshAnnotations,
-	graphWeights = null,
+	brain,
+	learning = null,
 	sharedMemory,
 	actionLog,
 	diagnostics,
@@ -58,10 +54,10 @@ export function UnifiedInspector({
 	// ── Sampler domain ──────────────────────────────────────────────────
 	const sampler = useInspectorSampler(creatureId);
 
-	// ── Cross-domain derivation: traceFocus (genome + sampler state) ───
+	// ── Cross-domain derivation: traceFocus (brain + sampler state) ───
 	const traceFocus = useMemo(
-		() => deriveTraceFocus(genome, sampler.sample, sampler.position),
-		[genome, sampler.sample, sampler.position],
+		() => deriveTraceFocus(brain, sampler.sample, sampler.position),
+		[brain, sampler.sample, sampler.position],
 	);
 
 	const activeNodeId = useMemo(() => {
@@ -72,7 +68,7 @@ export function UnifiedInspector({
 	}, [sampler.playbackState, traceFocus.activeNodeId]);
 
 	// ── Mesh domain ─────────────────────────────────────────────────────
-	const mesh = useMeshDerivation(genome, meshAnnotations, activeNodeId);
+	const mesh = useMeshDerivation(brain, activeNodeId);
 
 	// ── Cross-domain derivation: executionHop (mesh + sampler) ─────────
 	const executionHop = useMemo(() => {
@@ -225,7 +221,7 @@ export function UnifiedInspector({
 						{mesh.layoutError ? (
 							<InspectorEmptyState
 								title="Layout failed"
-								description="The mesh layout engine could not produce a stable topology for this genome."
+								description="The mesh layout engine could not produce a stable topology for this brain."
 							/>
 						) : (
 							<MeshCanvas
@@ -251,9 +247,7 @@ export function UnifiedInspector({
 							<NodeInspector
 								node={mesh.detailNode}
 								semantics={mesh.detailSemantics}
-								graphWeights={
-									graphWeights?.find((entry) => entry.node_id === mesh.detailNode?.id) ?? null
-								}
+								learning={learning?.find((entry) => entry.node_id === mesh.detailNode?.id) ?? null}
 								sharedMemory={sharedMemory}
 								executionHop={executionHop}
 							/>

@@ -2,9 +2,16 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
 import { useSamplePlaybackStore } from "../../stores/samplePlayback.ts";
-import type { CreatureGenome } from "../../types/genome.ts";
-import type { ExecutionSample, MeshHopTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../types/trace.ts";
+import { annotation } from "../../test/brainFixtures.ts";
+import {
+	zeroDecisionInputs,
+	zeroKindCounts,
+	zeroRing,
+	zeroVotes,
+} from "../../test/traceFixtures.ts";
+import type { BrainView } from "../../types/generated/BrainView.ts";
+import type { ExecutionSamplePayload } from "../../types/generated/ExecutionSamplePayload.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
 import { UnifiedInspector } from "./UnifiedInspector.tsx";
 
 vi.mock("./mesh/useMeshLayout.ts", () => ({
@@ -18,23 +25,24 @@ vi.mock("./mesh/MeshCanvas.tsx", () => ({
 }));
 // The node view's execution trace, reduced to which recorded hop it shows.
 vi.mock("./NodeExecutionTrace.tsx", () => ({
-	NodeExecutionTrace: ({ executionHop }: { executionHop: { hop: MeshHopTrace } | null }) => (
+	NodeExecutionTrace: ({ executionHop }: { executionHop: { hop: MeshHopTracePayload } | null }) => (
 		<div data-testid="node-view-hop">{executionHop ? executionHop.hop.hop_index : "none"}</div>
 	),
 }));
 
 /** Node 1 routes to node 2, which routes back: node 1 runs in both passes. */
-const genome: CreatureGenome = {
+const genome: BrainView = {
 	entry_node_id: 1,
 	nodes: [1, 2].map((id) => ({
 		node_id: id,
+		annotation: annotation(),
 		input_refs: [],
 		targets: [{ target_id: 3 - id, slot: 0, gate_bias: 0 }],
-		backend_def: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
+		backend: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
 	})),
 };
 
-function hop(hop_index: number, pass_index: number, node_id: number): MeshHopTrace {
+function hop(hop_index: number, pass_index: number, node_id: number): MeshHopTracePayload {
 	return {
 		hop_index,
 		pass_index,
@@ -45,8 +53,8 @@ function hop(hop_index: number, pass_index: number, node_id: number): MeshHopTra
 		energy_after: 9,
 		output_slots: [],
 		route: null,
-		vote_contribution: ZERO_VOTES,
-		decision_inputs: ZERO_DECISION_INPUTS,
+		vote_contribution: zeroVotes(),
+		decision_inputs: zeroDecisionInputs(),
 		backend_trace: {
 			Vm: {
 				register_count: 1,
@@ -60,7 +68,7 @@ function hop(hop_index: number, pass_index: number, node_id: number): MeshHopTra
 	};
 }
 
-const sample: ExecutionSample = {
+const sample: ExecutionSamplePayload = {
 	creature_id: 5,
 	ticks: [
 		{
@@ -70,9 +78,9 @@ const sample: ExecutionSample = {
 			energy_after: 6,
 			static_inputs: {
 				food_here: 0,
-				neighbor_food: [],
-				neighbor_barrier: [],
-				neighbor_occupied: [],
+				neighbor_food: zeroRing(),
+				neighbor_barrier: zeroRing(),
+				neighbor_occupied: zeroRing(),
 				age_ticks: 0,
 				previous_outcome: [0, 0, 0, 0],
 			},
@@ -81,22 +89,22 @@ const sample: ExecutionSample = {
 			passes: [0, 1].map((pass_index) => ({
 				pass_index,
 				end_reason: "PassCapReached" as const,
-				votes: ZERO_VOTES,
+				votes: zeroVotes(),
 				best: [
 					"Eat",
 					{ Directed: ["Move", 0] },
 					{ Directed: ["Reproduce", 0] },
 					{ Directed: ["StealEnergy", 0] },
 				],
-				bars: ZERO_KIND_COUNTS,
-				effective_votes: ZERO_KIND_COUNTS,
+				bars: zeroKindCounts(),
+				effective_votes: zeroKindCounts(),
 				committed: null,
 				hops: 2,
 			})),
 			final_actions: [],
 			termination_reason: "NoDecision",
 			priority_bid: 0,
-			commit_counts: ZERO_KIND_COUNTS,
+			commit_counts: zeroKindCounts(),
 		},
 	],
 };
@@ -113,8 +121,7 @@ describe("UnifiedInspector node view", () => {
 		render(
 			<UnifiedInspector
 				creatureId={5}
-				genome={genome}
-				meshAnnotations={null}
+				brain={genome}
 				sharedMemory={null}
 				actionLog={null}
 				diagnostics={null}

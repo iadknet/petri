@@ -1,16 +1,16 @@
 import { memo, useMemo } from "react";
-import type { InputReference } from "../../types/genome.ts";
-import type { VmTrace } from "../../types/trace.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { VmTracePayload } from "../../types/generated/VmTracePayload.ts";
 import { InputsPanel } from "./InputsPanel.tsx";
 
 interface VmExecutionViewProps {
-	trace: VmTrace;
-	inputRefs: InputReference[];
+	trace: VmTracePayload;
+	inputRefs: InputRef[];
 	upstreamSlots: number[];
 	detailIndex: number;
 }
 
-function computeRegistersAtStep(trace: VmTrace, stepIndex: number): number[] {
+function computeRegistersAtStep(trace: VmTracePayload, stepIndex: number): number[] {
 	const regs = new Array<number>(trace.register_count).fill(0);
 	const limit = Math.min(stepIndex + 1, trace.steps.length);
 	for (let i = 0; i < limit; i++) {

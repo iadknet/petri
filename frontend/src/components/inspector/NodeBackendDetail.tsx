@@ -1,15 +1,16 @@
 import { useMemo } from "react";
-import type { BackendDef, InputReference } from "../../types/genome.ts";
-import type { VmTrace } from "../../types/trace.ts";
+import type { BrainBackend } from "../../types/generated/BrainBackend.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { VmTracePayload } from "../../types/generated/VmTracePayload.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
-	backendDef: BackendDef;
-	inputRefs: InputReference[];
+	backendDef: BrainBackend;
+	inputRefs: InputRef[];
 	liveInstructionIndices: number[];
 	liveInternalNodeIndices: number[];
-	vmTrace?: VmTrace | null;
+	vmTrace?: VmTracePayload | null;
 	detailIndex?: number;
 }
 

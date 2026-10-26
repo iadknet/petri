@@ -1,9 +1,10 @@
-import type { InputReference, RouteTarget } from "../../types/genome.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { RouteTarget } from "../../types/generated/RouteTarget.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { describeWholeInputRef } from "./inputRefUtils.ts";
 
 interface NodeConnectionsProps {
-	inputRefs: InputReference[];
+	inputRefs: InputRef[];
 	targets: RouteTarget[];
 }
 

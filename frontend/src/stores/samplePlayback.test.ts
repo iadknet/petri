@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ExecutionSample } from "../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../types/trace.ts";
+import { zeroDecisionInputs, zeroKindCounts, zeroRing, zeroVotes } from "../test/traceFixtures.ts";
+import type { ExecutionSamplePayload } from "../types/generated/ExecutionSamplePayload.ts";
 import { useSamplePlaybackStore } from "./samplePlayback.ts";
 
-function makeSample(): ExecutionSample {
+function makeSample(): ExecutionSamplePayload {
 	return {
 		creature_id: 7,
 		ticks: [
@@ -14,9 +14,9 @@ function makeSample(): ExecutionSample {
 				energy_after: 9,
 				static_inputs: {
 					food_here: 0,
-					neighbor_food: [],
-					neighbor_barrier: [],
-					neighbor_occupied: [],
+					neighbor_food: zeroRing(),
+					neighbor_barrier: zeroRing(),
+					neighbor_occupied: zeroRing(),
 					age_ticks: 0,
 					previous_outcome: [0, 0, 0, 0],
 				},
@@ -24,8 +24,8 @@ function makeSample(): ExecutionSample {
 					{
 						hop_index: 0,
 						pass_index: 0,
-						vote_contribution: ZERO_VOTES,
-						decision_inputs: ZERO_DECISION_INPUTS,
+						vote_contribution: zeroVotes(),
+						decision_inputs: zeroDecisionInputs(),
 						node_id: 1,
 						input_refs: [],
 						upstream_slots: [],
@@ -62,8 +62,8 @@ function makeSample(): ExecutionSample {
 					{
 						hop_index: 1,
 						pass_index: 0,
-						vote_contribution: ZERO_VOTES,
-						decision_inputs: ZERO_DECISION_INPUTS,
+						vote_contribution: zeroVotes(),
+						decision_inputs: zeroDecisionInputs(),
 						node_id: 2,
 						input_refs: [],
 						upstream_slots: [],
@@ -101,7 +101,7 @@ function makeSample(): ExecutionSample {
 				termination_reason: "NoDecision",
 				debug_perception: null,
 				priority_bid: 0,
-				commit_counts: ZERO_KIND_COUNTS,
+				commit_counts: zeroKindCounts(),
 			},
 			{
 				tick_number: 2,
@@ -110,9 +110,9 @@ function makeSample(): ExecutionSample {
 				energy_after: 9,
 				static_inputs: {
 					food_here: 0,
-					neighbor_food: [],
-					neighbor_barrier: [],
-					neighbor_occupied: [],
+					neighbor_food: zeroRing(),
+					neighbor_barrier: zeroRing(),
+					neighbor_occupied: zeroRing(),
 					age_ticks: 1,
 					previous_outcome: [0, 0, 0, 0],
 				},
@@ -120,8 +120,8 @@ function makeSample(): ExecutionSample {
 					{
 						hop_index: 0,
 						pass_index: 0,
-						vote_contribution: ZERO_VOTES,
-						decision_inputs: ZERO_DECISION_INPUTS,
+						vote_contribution: zeroVotes(),
+						decision_inputs: zeroDecisionInputs(),
 						node_id: 3,
 						input_refs: [],
 						upstream_slots: [],
@@ -154,7 +154,7 @@ function makeSample(): ExecutionSample {
 				termination_reason: "NoDecision",
 				debug_perception: null,
 				priority_bid: 0,
-				commit_counts: ZERO_KIND_COUNTS,
+				commit_counts: zeroKindCounts(),
 			},
 		],
 	};

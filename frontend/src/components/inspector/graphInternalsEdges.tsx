@@ -6,37 +6,31 @@ import { composeTerms } from "./edgeGroupWeights.ts";
 import type { GraphModelEdge } from "./graphFullModel.ts";
 
 /** An edge's tooltip facts: its endpoints' labels and the model's weights. */
-export interface EdgeTip extends Pick<GraphModelEdge, "weight" | "own" | "member" | "plastic"> {
+export interface EdgeTip
+	extends Pick<GraphModelEdge, "weight" | "own" | "genomic" | "member" | "plastic"> {
 	source: string;
 	target: string;
 }
 
 export interface WeightEdgeData extends Record<string, unknown> {
-	/** `null` when the edge's weight in force is unavailable. */
-	weight: number | null;
+	/** The weight in force. */
+	weight: number;
 	opacity: number;
 	tint?: { r: number; g: number; b: number };
 	tip?: EdgeTip;
 }
 
-/** A plastic edge's weights: genomic, and applied when the payload carries it. */
+/** A plastic edge's weights: genomic and in force. */
 function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
-	const genomic = `genomic ${plastic.genomic.toFixed(3)}`;
-	if (plastic.applied === undefined) return `${genomic} · applied unavailable`;
-	return `${genomic} · applied ${plastic.applied.toFixed(3)}${
+	return `genomic ${plastic.genomic.toFixed(3)} · applied ${plastic.applied.toFixed(3)}${
 		plastic.initialized ? "" : " (not initialized)"
 	}`;
 }
 
-/**
- * A member's weight in force and scope (T25.F07); without the payload the
- * applied weight is unavailable (a static member of a learning group
- * weighs through the learned scale).
- */
+/** A member's weight in force and scope (T25.F07): a static member of a
+ * learning group weighs through the learned scale. */
 export function memberApplied(member: NonNullable<EdgeTip["member"]>): string {
-	const applied =
-		member.applied === undefined ? "applied unavailable" : `applied ${member.applied.toFixed(3)}`;
-	return `${applied} · scope ${member.scope}`;
+	return `applied ${member.applied.toFixed(3)} · scope ${member.scope}`;
 }
 
 /** The tooltip body: endpoints, then a member's composition and a plastic edge's learning. */
@@ -53,7 +47,12 @@ function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 						group #{tip.member.group} member: scale × pattern + correction
 					</span>
 					<span className={`${line} font-mono`}>
-						{composeTerms(tip.own, tip.member.scale, tip.member.pattern)}
+						{composeTerms({
+							scale: tip.member.scale,
+							pattern: tip.member.pattern,
+							own: tip.own,
+							genomic: tip.genomic,
+						})}
 					</span>
 					<span className={`${line} font-mono`} data-testid="member-applied">
 						{memberApplied(tip.member)}
@@ -63,7 +62,7 @@ function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 			{tip.plastic ? (
 				<>
 					<span className={`${line} font-mono`}>{plasticWeights(tip.plastic)}</span>
-					{plasticityDetail(tip.plastic.config, tip.member).map((detail) => (
+					{plasticityDetail(tip.plastic.learner).map((detail) => (
 						<span key={detail} className={`${line} text-slate-400`}>
 							{detail}
 						</span>
@@ -109,10 +108,9 @@ function EdgeHit({ d, tip }: { d: string; tip: EdgeTip | undefined }) {
 	);
 }
 
-/** The edge's weight label: `n/a` when unavailable, none at the unit weight. */
+/** The edge's weight label: none at the unit weight. */
 export function weightLabel(data: WeightEdgeData | undefined): string | null {
 	if (data === undefined) return null;
-	if (data.weight === null) return "n/a";
 	return Math.abs(data.weight - 1.0) > 0.01 ? data.weight.toFixed(2) : null;
 }
 

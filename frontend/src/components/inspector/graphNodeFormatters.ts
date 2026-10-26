@@ -1,11 +1,9 @@
-import type {
-	ActionParamField,
-	ComputeNodeKind,
-	GraphSource,
-	InputReference,
-	OutputSinkKind,
-	VoteSink,
-} from "../../types/genome.ts";
+import type { ActionParamField } from "../../types/generated/ActionParamField.ts";
+import type { ComputeNodeKind } from "../../types/generated/ComputeNodeKind.ts";
+import type { GraphSource } from "../../types/generated/GraphSource.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { OutputSinkKind } from "../../types/generated/OutputSinkKind.ts";
+import type { VoteSink } from "../../types/generated/VoteSink.ts";
 import { ACTION_PARAM_FIELDS } from "../../types/vote-sinks.ts";
 import { directionWord } from "./directions.ts";
 import { describeInputRef } from "./inputRefUtils.ts";
@@ -101,12 +99,12 @@ export function describeComputeKind(kind: ComputeNodeKind): Described {
 }
 
 /** Produce a human-readable label for a compute node kind. */
-export function getKindLabel(kind: ComputeNodeKind, _inputRefs: InputReference[]): string {
+export function getKindLabel(kind: ComputeNodeKind, _inputRefs: InputRef[]): string {
 	return describeComputeKind(kind).label;
 }
 
 /** Describe the source of a graph edge: an input, a memory read or a node. */
-export function describeGraphSource(source: GraphSource, inputRefs: InputReference[]): Described {
+export function describeGraphSource(source: GraphSource, inputRefs: InputRef[]): Described {
 	if ("ComputeNode" in source) {
 		return { label: `CN${source.ComputeNode}`, description: `Compute node ${source.ComputeNode}.` };
 	}
@@ -137,7 +135,7 @@ export function describeGraphSource(source: GraphSource, inputRefs: InputReferen
 }
 
 /** Format a GraphSource as a human-readable label. */
-export function formatGraphSource(source: GraphSource, inputRefs: InputReference[]): string {
+export function formatGraphSource(source: GraphSource, inputRefs: InputRef[]): string {
 	return describeGraphSource(source, inputRefs).label;
 }
 

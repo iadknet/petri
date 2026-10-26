@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { annotation } from "../../../test/brainFixtures.ts";
 import { MeshFlowCanvas } from "./MeshFlowCanvas.tsx";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
 import type { MeshLayout, MeshLayoutNode } from "./meshLayout.ts";
@@ -33,9 +34,10 @@ function makeAnalysis(): MeshAnalysis {
 		id: 1,
 		node: {
 			node_id: 1,
+			annotation: annotation(),
 			input_refs: [],
 			targets: [],
-			backend_def: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
+			backend: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
 		},
 		backendKind: "vm" as const,
 		isEntry: true,

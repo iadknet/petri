@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { CreatureMeshAnnotation } from "../../../types/creature-detail.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation, withAnnotations } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { NodeAnnotation } from "../../../types/generated/NodeAnnotation.ts";
 import { searchMeshSemantics } from "./meshSearch.ts";
 import { deriveMeshSemantics } from "./meshSemantics.ts";
 
-const genome: CreatureGenome = {
+const genome: BrainView = {
 	entry_node_id: 1,
 	nodes: [
 		{
 			node_id: 1,
-			input_refs: [{ World: "FoodHere" }],
+			annotation: annotation(),
+			input_refs: [{ family: "world", key: "FoodHere" }],
 			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 1,
 					constants: [],
@@ -21,27 +23,40 @@ const genome: CreatureGenome = {
 		},
 		{
 			node_id: 2,
-			input_refs: [{ UpstreamSlot: 0 }],
+			annotation: annotation(),
+			input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 			targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
-			backend_def: {
+			backend: {
 				Graph: {
+					groups: [],
 					compute_nodes: [
 						{
 							kind: "Add",
-							inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
+							edges: [
+								{
+									source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+									own: 1,
+									genomic: 1,
+									applied: 1,
+								},
+							],
 						},
 					],
 					output_sinks: [
-						{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }] },
+						{
+							kind: { RouterGate: 0 },
+							edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
+						},
 					],
 				},
 			},
 		},
 		{
 			node_id: 3,
-			input_refs: [{ DynamicIntrospection: "AgeTicks" }],
+			annotation: annotation(),
+			input_refs: [{ family: "dynamic", key: "AgeTicks" }],
 			targets: [],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 1,
 					constants: [],
@@ -52,36 +67,33 @@ const genome: CreatureGenome = {
 	],
 };
 
-const annotations: CreatureMeshAnnotation[] = [
-	{
-		node_id: 1,
+const annotations: Record<number, Partial<NodeAnnotation>> = {
+	1: {
 		reachable: true,
 		read_classes: ["food"],
 		write_classes: ["route"],
 		has_stateful_behavior: false,
 		live_instruction_indices: [0],
 	},
-	{
-		node_id: 2,
+	2: {
 		reachable: true,
 		read_classes: ["upstream"],
 		write_classes: ["route"],
 		has_stateful_behavior: false,
 		live_internal_node_indices: [0],
 	},
-	{
-		node_id: 3,
+	3: {
 		reachable: true,
 		read_classes: ["introspection"],
 		write_classes: [],
 		has_stateful_behavior: false,
 		live_instruction_indices: [0],
 	},
-];
+};
 
 describe("meshSearch", () => {
 	it("ranks exact label and id matches ahead of partial semantic matches", () => {
-		const semantics = deriveMeshSemantics(genome, annotations);
+		const semantics = deriveMeshSemantics(withAnnotations(genome, annotations));
 
 		expect(searchMeshSemantics(semantics, "Route Selector")[0]?.nodeId).toBe(1);
 		expect(searchMeshSemantics(semantics, "#3")[0]?.nodeId).toBe(3);

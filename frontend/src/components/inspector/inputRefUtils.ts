@@ -1,5 +1,5 @@
-import type { InputReference, WorldInputReference } from "../../types/genome.ts";
-import type { WorldAction } from "../../types/trace.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { WorldAction } from "../../types/generated/WorldAction.ts";
 import { VOTE_KINDS, voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import directionPairsFixture from "./directionPairs.json";
 import { directionName, directionWord } from "./directions.ts";
@@ -11,13 +11,7 @@ export { directionName } from "./directions.ts";
 export function formatAction(action: WorldAction | null | undefined): string {
 	if (!action) return "?";
 	if (typeof action === "string") return action;
-	if ("Eat" in action) {
-		const payload = action.Eat;
-		if (typeof payload === "object" && payload && "type_idx" in payload) {
-			return `Eat(food${(payload as { type_idx: number }).type_idx})`;
-		}
-		return "Eat";
-	}
+	if ("Eat" in action) return `Eat(food${action.Eat.type_idx})`;
 	if ("Move" in action) return `Move(${action.Move})`;
 	if ("Reproduce" in action) return `Reproduce(${action.Reproduce.direction})`;
 	if ("StealEnergy" in action) return `Steal(${action.StealEnergy.direction})`;
@@ -85,9 +79,9 @@ export interface DirectionPair {
 const DIRECTION_PAIRS: Record<string, readonly DirectionPair[]> = directionPairsFixture;
 
 /** The pairs `ref` declares; none for a non-world reference. */
-export function directionPairs(ref: InputReference | undefined): readonly DirectionPair[] {
-	if (ref === undefined || typeof ref !== "object" || !("World" in ref)) return [];
-	return DIRECTION_PAIRS[parseWorldInputRef(ref.World).key] ?? [];
+export function directionPairs(ref: InputRef | undefined): readonly DirectionPair[] {
+	if (ref?.family !== "world") return [];
+	return DIRECTION_PAIRS[ref.key] ?? [];
 }
 
 /** Area summary sub-fields, in the index order of `perception.rs`. */
@@ -201,39 +195,6 @@ export function isRingSensor(worldKey: string): boolean {
 	return worldKey in RING_LABELS;
 }
 
-export interface ParsedWorldInputReference {
-	key: string;
-	typeIdx: number | null;
-}
-
-export function parseWorldInputRef(world: WorldInputReference): ParsedWorldInputReference {
-	if (typeof world === "string") {
-		return {
-			key: world,
-			typeIdx: null,
-		};
-	}
-
-	const [key, payload] = Object.entries(world)[0] ?? ["?", null];
-	const keyString = String(key);
-	if (
-		payload &&
-		typeof payload === "object" &&
-		"type_idx" in payload &&
-		typeof (payload as { type_idx?: unknown }).type_idx === "number"
-	) {
-		return {
-			key: keyString,
-			typeIdx: (payload as { type_idx: number }).type_idx,
-		};
-	}
-
-	return {
-		key: keyString,
-		typeIdx: null,
-	};
-}
-
 /** A readable name for an input and a plain-words explanation for its tooltip. */
 export interface InputDescription {
 	label: string;
@@ -241,61 +202,55 @@ export interface InputDescription {
 }
 
 /** Describe a whole input reference (no sub-value selected). */
-export function describeWholeInputRef(ref: InputReference): InputDescription {
-	if (typeof ref === "string") {
-		return STRING_REFS[ref] ?? { label: ref, description: "" };
-	}
-	if ("World" in ref) {
-		const parsed = parseWorldInputRef(ref.World);
-		const base = SENSOR_LABELS[parsed.key] ?? parsed.key;
-		const description = SENSOR_DESCRIPTIONS[parsed.key] ?? "";
-		if (parsed.typeIdx !== null) {
-			return {
-				label: `${base}[t${parsed.typeIdx}]`,
-				description: `${description} Food type ${parsed.typeIdx} only.`,
-			};
+export function describeWholeInputRef(ref: InputRef): InputDescription {
+	switch (ref.family) {
+		case "world": {
+			const base = SENSOR_LABELS[ref.key] ?? ref.key;
+			const description = SENSOR_DESCRIPTIONS[ref.key] ?? "";
+			if (ref.food_type !== undefined) {
+				return {
+					label: `${base}[t${ref.food_type}]`,
+					description: `${description} Food type ${ref.food_type} only.`,
+				};
+			}
+			return { label: base, description };
 		}
-		return { label: base, description };
+		case "static":
+		case "dynamic":
+			return SCALAR_LABELS[ref.key] ?? { label: ref.key, description: "" };
+		case "upstream":
+			return {
+				label: `Bus[${ref.slot}]`,
+				description: `Bus slot ${ref.slot}: the value the previous mesh node wrote there (0 at tick start).`,
+			};
+		case "action_queue":
+		case "decision":
+			return STRING_REFS[ref.key] ?? { label: ref.key, description: "" };
 	}
-	if ("StaticIntrospection" in ref) {
-		const key = String(ref.StaticIntrospection);
-		return SCALAR_LABELS[key] ?? { label: key, description: "" };
-	}
-	if ("DynamicIntrospection" in ref) {
-		const key = String(ref.DynamicIntrospection);
-		return SCALAR_LABELS[key] ?? { label: key, description: "" };
-	}
-	if ("UpstreamSlot" in ref) {
-		return {
-			label: `Bus[${ref.UpstreamSlot}]`,
-			description: `Bus slot ${ref.UpstreamSlot}: the value the previous mesh node wrote there (0 at tick start).`,
-		};
-	}
-	return { label: "?", description: "" };
 }
 
-export function formatInputRef(ref: InputReference): string {
+export function formatInputRef(ref: InputRef): string {
 	return describeWholeInputRef(ref).label;
 }
 
 /** Name one sub-value of an input: a direction, rank or field, never a bare
  * index. Scalars stay bare; an index past the compound's width shows raw. */
-export function describeInputRef(ref: InputReference, subIdx: number): InputDescription {
+export function describeInputRef(ref: InputRef, subIdx: number): InputDescription {
 	const whole = describeWholeInputRef(ref);
 	const raw = (): InputDescription => ({
 		label: subIdx > 0 ? `${whole.label}[${subIdx}]` : whole.label,
 		description: whole.description,
 	});
 
-	if (typeof ref === "string") {
-		switch (ref) {
+	if (ref.family === "decision" || ref.family === "action_queue") {
+		switch (ref.key) {
 			case "ActionVotes":
 			case "PreviousPassVotes": {
 				const sink = voteSinkFromIndex(subIdx);
 				if (sink === null) return raw();
 				const name = formatVoteSink(sink);
 				const description =
-					ref === "ActionVotes"
+					ref.key === "ActionVotes"
 						? `This pass's running vote for ${name}.`
 						: `The vote for ${name} at the end of the previous pass (0 in the first pass).`;
 				return { label: `${whole.label}.${name}`, description };
@@ -325,30 +280,29 @@ export function describeInputRef(ref: InputReference, subIdx: number): InputDesc
 		}
 	}
 
-	if (!("World" in ref)) return raw();
-	const parsed = parseWorldInputRef(ref.World);
+	if (ref.family !== "world") return raw();
 
-	if (isRingSensor(parsed.key)) {
+	if (isRingSensor(ref.key)) {
 		const cell = `the cell to the ${directionWord(subIdx)}`;
-		const food = parsed.typeIdx !== null ? ` Food type ${parsed.typeIdx} only.` : "";
+		const food = ref.food_type !== undefined ? ` Food type ${ref.food_type} only.` : "";
 		const description =
-			parsed.key === "NeighborFoodRing"
+			ref.key === "NeighborFoodRing"
 				? `Food on ${cell} (0 to 1).${food}`
-				: parsed.key === "NeighborBarrierRing"
+				: ref.key === "NeighborBarrierRing"
 					? `1 when ${cell} is a barrier, 0 when open.`
 					: `1 when another creature stands on ${cell}.`;
 		return { label: `${whole.label}[${directionName(subIdx)}]`, description };
 	}
 
-	const area = AREA_FIELDS[parsed.key];
+	const area = AREA_FIELDS[ref.key];
 	if (area) {
 		const described = field(whole.label, area[subIdx]);
 		if (!described) return raw();
-		const food = parsed.typeIdx !== null ? ` Food type ${parsed.typeIdx} only.` : "";
+		const food = ref.food_type !== undefined ? ` Food type ${ref.food_type} only.` : "";
 		return { ...described, description: `${described.description}${food}` };
 	}
 
-	if (parsed.key === "NearbyCreature") {
+	if (ref.key === "NearbyCreature") {
 		const { slots, fields } = nearbyFields;
 		const slot = Math.floor(subIdx / fields.length);
 		const nearbyField = fields[subIdx % fields.length];
@@ -371,7 +325,7 @@ function lowerFirst(text: string): string {
 	return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
-export function formatInputRefWithSubIndex(ref: InputReference, subIdx: number): string {
+export function formatInputRefWithSubIndex(ref: InputRef, subIdx: number): string {
 	return describeInputRef(ref, subIdx).label;
 }
 
@@ -383,9 +337,17 @@ const STRING_REF_COLORS: Record<string, string> = {
 	PreviousOutcome: "#60a5fa", // blue: introspection
 };
 
-export function inputRefColor(ref: InputReference): string {
-	if (typeof ref === "string") return STRING_REF_COLORS[ref] ?? "#94a3b8";
-	if ("World" in ref) return "#34d399"; // green
-	if ("StaticIntrospection" in ref || "DynamicIntrospection" in ref) return "#60a5fa"; // blue
-	return "#94a3b8"; // gray for upstream
+export function inputRefColor(ref: InputRef): string {
+	switch (ref.family) {
+		case "world":
+			return "#34d399"; // green
+		case "static":
+		case "dynamic":
+			return "#60a5fa"; // blue
+		case "upstream":
+			return "#94a3b8"; // gray
+		case "action_queue":
+		case "decision":
+			return STRING_REF_COLORS[ref.key] ?? "#94a3b8";
+	}
 }

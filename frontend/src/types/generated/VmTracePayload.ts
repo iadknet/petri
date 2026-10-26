@@ -7,31 +7,6 @@ export type VmTracePayload = {
 	constants: Array<number>;
 	steps: Array<VmStepTracePayload>;
 	final_registers: Array<number>;
-	final_payload: [
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-	];
+	final_payload: Array<number>;
 	slot_writes: Array<SlotWritePayload>;
 };

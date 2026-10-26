@@ -4,8 +4,9 @@ import { ApiRequestError, api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useStartupConfigStore } from "../stores/startupConfig.ts";
-import type { SimulationConfig } from "../types/api.ts";
-import { type FieldError, describeApiFailure } from "../types/errors.ts";
+import { describeApiFailure } from "../types/errors.ts";
+import type { FieldError } from "../types/generated/FieldError.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
 import {
 	RUNTIME_PATCH_FIELDS,
 	RuntimeConfigPanel,

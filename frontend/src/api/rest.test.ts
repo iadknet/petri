@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ApiError } from "../types/errors.ts";
+import type { ErrorEnvelope } from "../types/generated/ErrorEnvelope.ts";
 import { ApiRequestError, api } from "./rest.ts";
 
-function envelope(error: Partial<ApiError["error"]>): ApiError {
+function envelope(error: Partial<ErrorEnvelope["error"]>): ErrorEnvelope {
 	return {
 		protocol_version: "v3alpha2",
-		error: error as ApiError["error"],
+		error: error as ErrorEnvelope["error"],
 	};
 }
 
@@ -46,7 +46,7 @@ describe("ApiRequestError", () => {
 	});
 
 	it("falls back to a generic message when the body carries no error payload", () => {
-		const error = new ApiRequestError(500, {} as ApiError);
+		const error = new ApiRequestError(500, {} as ErrorEnvelope);
 
 		expect(error.message).toBe("Request failed (HTTP 500)");
 		expect(error.fieldErrors).toEqual([]);

@@ -4,6 +4,10 @@ import type { GraphPassTracePayload } from "./GraphPassTracePayload.ts";
 
 export type GraphTracePayload = {
 	passes: Array<GraphPassTracePayload>;
+	/**
+	 * Whether candidate operator state and outputs were committed.
+	 */
+	temporal_committed: boolean;
 	final_outputs: Array<number>;
 	output_sinks: Array<GraphOutputSinkTracePayload>;
 };

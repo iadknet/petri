@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { InputReference } from "../../types/genome.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
 import { NodeConnections } from "./NodeConnections.tsx";
 
 describe("NodeConnections", () => {
 	it("lists input refs by label, each explained in a tooltip", () => {
-		const inputRefs: InputReference[] = [{ World: "AreaBarrierSummary" }, { UpstreamSlot: 0 }];
+		const inputRefs: InputRef[] = [
+			{ family: "world", key: "AreaBarrierSummary" },
+			{ family: "upstream", key: "UpstreamSlot", slot: 0 },
+		];
 
 		const { container } = render(
 			<NodeConnections

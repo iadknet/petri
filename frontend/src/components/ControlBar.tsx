@@ -6,8 +6,9 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { buildStartupRequest, useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { useViewportStore } from "../stores/viewport.ts";
-import type { SimState, SimulationConfig } from "../types/api.ts";
 import { describeApiFailure } from "../types/errors.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
+import type { SimulationStatus } from "../types/generated/SimulationStatus.ts";
 import { RUNTIME_PATCH_FIELDS } from "./config-panel/runtime/RuntimeConfigPanel.tsx";
 import { buildPatch, getByPath, mergePatch } from "./config-panel/shared/pathUtils.ts";
 
@@ -80,7 +81,7 @@ function SimButton({
 	);
 }
 
-function buttonEnabled(state: SimState) {
+function buttonEnabled(state: SimulationStatus) {
 	return {
 		start: state === "idle" || state === "paused",
 		restart: true,

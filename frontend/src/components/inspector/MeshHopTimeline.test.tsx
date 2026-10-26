@@ -1,16 +1,17 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { MeshHopTrace, MeshPassTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../types/trace.ts";
+import { zeroDecisionInputs, zeroKindCounts, zeroVotes } from "../../test/traceFixtures.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
+import type { MeshPassTracePayload } from "../../types/generated/MeshPassTracePayload.ts";
 import { MeshHopTimeline } from "./MeshHopTimeline.tsx";
 
 function hop(
 	hop_index: number,
 	pass_index: number,
 	node_id: number,
-	route: MeshHopTrace["route"],
+	route: MeshHopTracePayload["route"],
 	graph = false,
-): MeshHopTrace {
+): MeshHopTracePayload {
 	return {
 		hop_index,
 		pass_index,
@@ -21,8 +22,8 @@ function hop(
 		energy_after: 9,
 		output_slots: [],
 		route,
-		vote_contribution: ZERO_VOTES,
-		decision_inputs: ZERO_DECISION_INPUTS,
+		vote_contribution: zeroVotes(),
+		decision_inputs: zeroDecisionInputs(),
 		backend_trace: graph
 			? {
 					Graph: {
@@ -47,28 +48,28 @@ function hop(
 
 function pass(
 	pass_index: number,
-	end_reason: MeshPassTrace["end_reason"],
+	end_reason: MeshPassTracePayload["end_reason"],
 	hops: number,
-	committed: MeshPassTrace["committed"],
-): MeshPassTrace {
+	committed: MeshPassTracePayload["committed"],
+): MeshPassTracePayload {
 	return {
 		pass_index,
 		end_reason,
-		votes: ZERO_VOTES,
+		votes: zeroVotes(),
 		best: [
 			"Eat",
 			{ Directed: ["Move", 0] },
 			{ Directed: ["Reproduce", 0] },
 			{ Directed: ["StealEnergy", 0] },
 		],
-		bars: ZERO_KIND_COUNTS,
-		effective_votes: ZERO_KIND_COUNTS,
+		bars: zeroKindCounts(),
+		effective_votes: zeroKindCounts(),
 		committed,
 		hops,
 	};
 }
 
-const toNode = (id: number): MeshHopTrace["route"] => ({
+const toNode = (id: number): MeshHopTracePayload["route"] => ({
 	gate_scores: [],
 	selected_target_idx: 0,
 	selected_target_id: id,

@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { HealthPayload, LastTickActions } from "../types/api.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
+import type { LastTickActions } from "../types/generated/LastTickActions.ts";
 
 export const SAMPLE_RING_SIZE = 600;
 

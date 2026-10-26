@@ -1,9 +1,9 @@
 import { memo } from "react";
-import type { TickTrace } from "../../types/trace.ts";
+import type { TickTracePayload } from "../../types/generated/TickTracePayload.ts";
 import { formatActionList } from "./inputRefUtils.ts";
 
 interface TickTimelineProps {
-	ticks: TickTrace[];
+	ticks: TickTracePayload[];
 	activeTickIndex: number;
 	onTickSelect: (index: number) => void;
 }

@@ -1,4 +1,6 @@
-import type { SpiralParams as SpiralParamsType } from "../../types/api.ts";
+import type { PatternParamsOf } from "../../types/pattern.ts";
+
+type SpiralParamsType = PatternParamsOf<"Spiral">;
 import { ParamField } from "./ParamField.tsx";
 
 interface SpiralParamsProps {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Creature } from "../types/api.ts";
+import type { CreatureSnapshot } from "../types/generated/CreatureSnapshot.ts";
 import {
 	birthPop,
 	glideProgress,
@@ -9,7 +9,7 @@ import {
 	sampleMotion,
 } from "./motion.ts";
 
-function creature(id: number, x: number, y: number): Creature {
+function creature(id: number, x: number, y: number): CreatureSnapshot {
 	return { id, x, y, energy: 50, generation: 0, phenotype_rgb: [10, 20, 30] };
 }
 

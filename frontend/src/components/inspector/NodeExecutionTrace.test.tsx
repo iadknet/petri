@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { MeshHopTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../types/trace.ts";
+import { zeroDecisionInputs, zeroVotes } from "../../test/traceFixtures.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
 import { NodeExecutionTrace } from "./NodeExecutionTrace.tsx";
 
 vi.mock("./VmExecutionView.tsx", () => ({
@@ -19,13 +19,13 @@ describe("NodeExecutionTrace", () => {
 	});
 
 	it("renders VmExecutionView when VM trace provided", () => {
-		const hop: MeshHopTrace = {
+		const hop: MeshHopTracePayload = {
 			hop_index: 0,
 			pass_index: 0,
-			vote_contribution: ZERO_VOTES,
-			decision_inputs: ZERO_DECISION_INPUTS,
+			vote_contribution: zeroVotes(),
+			decision_inputs: zeroDecisionInputs(),
 			node_id: 1,
-			input_refs: [{ World: "FoodHere" }],
+			input_refs: [{ family: "world", key: "FoodHere" }],
 			upstream_slots: [0.5],
 			energy_before: 100,
 			energy_after: 95,
@@ -49,13 +49,13 @@ describe("NodeExecutionTrace", () => {
 	});
 
 	it("renders GraphExecutionView when Graph trace provided", () => {
-		const hop: MeshHopTrace = {
+		const hop: MeshHopTracePayload = {
 			hop_index: 0,
 			pass_index: 0,
-			vote_contribution: ZERO_VOTES,
-			decision_inputs: ZERO_DECISION_INPUTS,
+			vote_contribution: zeroVotes(),
+			decision_inputs: zeroDecisionInputs(),
 			node_id: 2,
-			input_refs: [{ UpstreamSlot: 0 }],
+			input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 			upstream_slots: [0.5],
 			energy_before: 95,
 			energy_after: 90,

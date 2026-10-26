@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { HealthPayload, SimState, StatusPayload } from "../types/api.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
+import type { SimulationStatus } from "../types/generated/SimulationStatus.ts";
+import type { StatusEventPayload } from "../types/generated/StatusEventPayload.ts";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
@@ -9,19 +11,19 @@ export interface SimulationState {
 
 	// Simulation state
 	projectionRevision: number;
-	simState: SimState;
+	simState: SimulationStatus;
 	tick: number;
 	ticksPerSecond: number;
 	_tpsSample: { tick: number; timestamp: number } | null;
 
-	status: StatusPayload | null;
+	status: StatusEventPayload | null;
 	health: HealthPayload | null;
 
 	// Actions
 	setConnectionStatus: (status: ConnectionStatus) => void;
-	setSimState: (state: SimState) => void;
+	setSimState: (state: SimulationStatus) => void;
 	setTick: (tick: number) => void;
-	setStatus: (projectionRevision: number, tick: number, status: StatusPayload) => void;
+	setStatus: (projectionRevision: number, tick: number, status: StatusEventPayload) => void;
 	setHealth: (projectionRevision: number, tick: number, health: HealthPayload) => void;
 	reset: () => void;
 }
@@ -29,7 +31,7 @@ export interface SimulationState {
 const initialState = {
 	connectionStatus: "disconnected" as ConnectionStatus,
 	projectionRevision: 0,
-	simState: "idle" as SimState,
+	simState: "idle" as SimulationStatus,
 	tick: 0,
 	ticksPerSecond: 0,
 	_tpsSample: null as { tick: number; timestamp: number } | null,

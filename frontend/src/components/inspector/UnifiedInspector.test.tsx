@@ -1,8 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
+import { annotation } from "../../test/brainFixtures.ts";
 import { targetSize } from "../../test/targetSize.ts";
-import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
+import type { BrainView } from "../../types/generated/BrainView.ts";
+import type { CreaturePhenotypeResponse } from "../../types/generated/CreaturePhenotypeResponse.ts";
 import { UnifiedInspector } from "./UnifiedInspector.tsx";
 
 // Mock ELK layout (async)
@@ -23,15 +26,16 @@ vi.mock("./mesh/MeshCanvas.tsx", () => ({
 	MeshCanvas: () => <div data-testid="mesh-canvas">MeshCanvas</div>,
 }));
 
-function makeGenome(): CreatureGenome {
+function makeGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
-				input_refs: [{ World: "FoodHere" }],
+				annotation: annotation(),
+				input_refs: [{ family: "world", key: "FoodHere" }],
 				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 2,
 						constants: [1],
@@ -45,18 +49,30 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
-				input_refs: [{ UpstreamSlot: 0 }],
+				annotation: annotation(),
+				input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Graph: {
+						groups: [],
 						compute_nodes: [
 							{
 								kind: "Add",
-								inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
+								edges: [
+									{
+										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+										own: 1,
+										genomic: 1,
+										applied: 1,
+									},
+								],
 							},
 						],
 						output_sinks: [
-							{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }] },
+							{
+								kind: { RouterGate: 0 },
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
+							},
 						],
 					},
 				},
@@ -65,7 +81,7 @@ function makeGenome(): CreatureGenome {
 	};
 }
 
-function makePhenotype(): CreaturePhenotype {
+function makePhenotype(): CreaturePhenotypeResponse {
 	return {
 		channels: [100, 200, 50, 150, 80, 120],
 		active_channel: 0,
@@ -74,10 +90,9 @@ function makePhenotype(): CreaturePhenotype {
 	};
 }
 
-const defaultProps = {
+const defaultProps: ComponentProps<typeof UnifiedInspector> = {
 	creatureId: 12345,
-	genome: makeGenome(),
-	meshAnnotations: null,
+	brain: makeGenome(),
 	sharedMemory: null,
 	actionLog: null,
 	diagnostics: {
@@ -91,6 +106,8 @@ const defaultProps = {
 			reachable_node_count: 2,
 			stateful_reachable_node_count: 1,
 			barrier_reader_reachable_node_count: 1,
+			barrier_decision_writer_reachable_node_count: 0,
+			barrier_reader_without_decision_writer_reachable_node_count: 1,
 			distinct_upstream_slots_read: [0, 1],
 			distinct_payload_slots_written: [0],
 			distinct_custom_output_slots_written: [2],

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ExecutionSample } from "../types/trace.ts";
+import type { ExecutionSamplePayload } from "../types/generated/ExecutionSamplePayload.ts";
 
 export type PlaybackState = "idle" | "loaded" | "playing" | "stepping";
 
@@ -10,12 +10,12 @@ export interface SamplerPosition {
 }
 
 interface SamplePlaybackState {
-	sample: ExecutionSample | null;
+	sample: ExecutionSamplePayload | null;
 	playbackState: PlaybackState;
 	position: SamplerPosition;
 	playbackSpeed: number;
 
-	setSample: (sample: ExecutionSample) => void;
+	setSample: (sample: ExecutionSamplePayload) => void;
 	clear: () => void;
 	setPlaying: () => void;
 	setPaused: () => void;
@@ -159,7 +159,7 @@ export const useSamplePlaybackStore = create<SamplePlaybackState>()((set, get) =
 }));
 
 export function getDetailCount(
-	trace: ExecutionSample["ticks"][0]["hops"][0]["backend_trace"],
+	trace: ExecutionSamplePayload["ticks"][0]["hops"][0]["backend_trace"],
 ): number {
 	if (typeof trace === "string") return 0;
 	if ("Vm" in trace) return trace.Vm.steps.length;

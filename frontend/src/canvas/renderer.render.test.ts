@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Frame } from "../types/api.ts";
+import type { Frame } from "../types/protocol.ts";
 import type { CameraState } from "./camera.ts";
 import { FLASH_MS } from "./flash-overlay.ts";
 import type { RenderModel } from "./renderModel.ts";

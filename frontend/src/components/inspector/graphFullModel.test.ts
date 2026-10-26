@@ -1,116 +1,100 @@
 import { describe, expect, it } from "vitest";
-import type { ComputeNode, GraphBackendDef, GraphEdge, OutputSink } from "../../types/genome.ts";
+import { graphBrain, ringGroup } from "../../test/brainFixtures.ts";
+import type { BrainComputeNode } from "../../types/generated/BrainComputeNode.ts";
+import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
+import type { BrainSink } from "../../types/generated/BrainSink.ts";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 
-function makeGraphDef(overrides: Partial<GraphBackendDef> = {}): GraphBackendDef {
+function makeGraphDef(overrides: Partial<GraphBrain> = {}): GraphBrain {
+	return graphBrain(overrides);
+}
+
+function inputEdge(ref_idx: number, sub_idx: number, weight = 1): BrainEdge {
 	return {
-		compute_nodes: [],
-		output_sinks: [],
-		...overrides,
+		source: { InputLeaf: { ref_idx, sub_idx } },
+		own: weight,
+		genomic: weight,
+		applied: weight,
 	};
 }
 
-function inputEdge(ref_idx: number, sub_idx: number, weight = 1): GraphEdge {
-	return { source: { InputLeaf: { ref_idx, sub_idx } }, own_weight: weight };
-}
-
-function computeEdge(nodeIdx: number, weight = 1): GraphEdge {
-	return { source: { ComputeNode: nodeIdx }, own_weight: weight };
+function computeEdge(nodeIdx: number, weight = 1): BrainEdge {
+	return { source: { ComputeNode: nodeIdx }, own: weight, genomic: weight, applied: weight };
 }
 
 describe("buildFullGraphModel edge-group members", () => {
-	/** A Move group member on sink 0 (scale 0.5, correction 0) beside an
-	 * independent edge. */
-	function grouped(): GraphBackendDef {
+	/** A Move group member on sink 0 (scale 0.5, correction 0, composed
+	 * 0.5) beside an independent edge. */
+	function grouped(): GraphBrain {
 		return makeGraphDef({
 			output_sinks: [
 				{
 					kind: { ActionVote: { Directed: ["Move", 0] } },
-					inputs: [
+					edges: [
 						inputEdge(1, 3, 0.25),
-						{ ...inputEdge(0, 0, 0), membership: { group: 0, scope: "Edge" } },
+						{
+							...inputEdge(0, 0, 0),
+							genomic: 0.5,
+							applied: 0.5,
+							member: {
+								group: 0,
+								scope: "Edge",
+								site: { Direction: 0 },
+								field: 0,
+								pattern: 1,
+								scale: 0.5,
+							},
+						},
 					],
 				},
 			],
-			groups: [
-				{
-					shape: { Ring: { ring_ref: 0 } },
-					kind: "Move",
-					offset: 0,
-					scale: 0.5,
-					inherit_scale: false,
-					retention: 1,
-				},
-			],
+			groups: [ringGroup(0, { scale: 0.5 })],
 		});
 	}
 
-	it("draws a member at the server's applied weight, never its own or its genomic one", () => {
-		// A static member of a learning group weighs through the learned scale
-		// (T25.F07): applied 0.9 while its genomic weight is 0.5.
-		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }], {
-			node_id: 0,
-			scales: [{ group: 0, genomic: 0.5, learned: 0.9 }],
-			edges: [{ surface: "sink", container: 0, edge: 1, genomic: 0.5, applied: 0.9 }],
-		});
+	it("draws a listed edge at learning's applied weight: a passive member follows the learned scale", () => {
+		// Preservation case (T30.F01 invariant 5): a static member of a
+		// learning group, genomic 0.5, applied 1.5 through the learned scale.
+		const model = buildFullGraphModel(
+			grouped(),
+			[{ family: "world", key: "NeighborBarrierRing" }],
+			{
+				node_id: 0,
+				scales: [{ group: 0, learned: 3, initialized: true }],
+				edges: [{ surface: "sink", container: 0, edge: 1, applied: 1.5 }],
+			},
+		);
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
-		expect(member?.weight).toBe(0.9);
-		expect(member?.member?.applied).toBe(0.9);
+		expect(member?.weight).toBe(1.5);
+		expect(member?.genomic).toBe(0.5);
+		expect(member?.member?.applied).toBe(1.5);
 		expect(member?.isMember).toBe(true);
 		const independent = model.edges.find((edge) => edge.id === "sink:0:0");
 		expect(independent?.weight).toBe(0.25);
 		expect(independent?.isMember).toBe(false);
 	});
 
-	it("composes scale plus correction and marks the applied weight unavailable when the payload is missing", () => {
-		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
+	it("draws an unlisted edge at the brain's applied weight", () => {
+		const model = buildFullGraphModel(grouped(), [{ family: "world", key: "NeighborBarrierRing" }]);
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
 		expect(member?.weight).toBe(0.5);
-		expect(member?.member?.applied).toBeUndefined();
+		expect(member?.member?.applied).toBe(0.5);
 	});
 
-	it("carries a member's composition for its tooltip", () => {
-		const model = buildFullGraphModel(grouped(), [{ World: "NeighborBarrierRing" }]);
+	it("carries the view's composition for its tooltip", () => {
+		const model = buildFullGraphModel(grouped(), [{ family: "world", key: "NeighborBarrierRing" }]);
 		const member = model.edges.find((edge) => edge.id === "sink:0:1");
 		expect(member?.own).toBe(0);
+		expect(member?.genomic).toBe(0.5);
 		expect(member?.member).toEqual({
 			group: 0,
+			scope: "Edge",
 			scale: 0.5,
 			pattern: 1,
-			scope: "Edge",
-			inheritScale: false,
+			applied: 0.5,
 		});
 		expect(model.edges.find((edge) => edge.id === "sink:0:0")?.member).toBeUndefined();
-	});
-
-	it("composes a pair member at its pattern, not 1, when the payload is missing", () => {
-		// AreaFoodSummary pair 0 is (gradX 1, gradY 2); sink E at offset 0 has
-		// pattern compass_x(E) = 1 for x and compass_y(E) = 0 for y; sink W
-		// has compass_x(W) = -1.
-		const model = buildFullGraphModel(
-			makeGraphDef({
-				output_sinks: [
-					{
-						kind: { ActionVote: { Directed: ["Move", 6] } },
-						inputs: [{ ...inputEdge(0, 1, 0.25), membership: { group: 0, scope: "Edge" } }],
-					},
-				],
-				groups: [
-					{
-						shape: { DirectionPair: { ref_idx: 0, pair: 0 } },
-						kind: "Move",
-						offset: 0,
-						scale: 0.5,
-						inherit_scale: false,
-						retention: 1,
-					},
-				],
-			}),
-			[{ World: "AreaFoodSummary" }],
-		);
-		const member = model.edges.find((edge) => edge.id === "sink:0:0");
-		expect(member?.member?.pattern).toBe(-1);
-		expect(member?.weight).toBe(-0.25);
 	});
 });
 
@@ -122,18 +106,18 @@ describe("buildFullGraphModel", () => {
 	});
 
 	it("deduplicates input sources across compute nodes", () => {
-		const cn0: ComputeNode = {
+		const cn0: BrainComputeNode = {
 			kind: "Add",
-			inputs: [inputEdge(0, 0), inputEdge(1, 0)],
+			edges: [inputEdge(0, 0), inputEdge(1, 0)],
 		};
-		const cn1: ComputeNode = {
+		const cn1: BrainComputeNode = {
 			kind: "Add",
-			inputs: [inputEdge(0, 0), inputEdge(2, 0)],
+			edges: [inputEdge(0, 0), inputEdge(2, 0)],
 		};
 		const model = buildFullGraphModel(makeGraphDef({ compute_nodes: [cn0, cn1] }), [
-			{ World: "FoodHere" },
-			{ World: "EnergyLevel" },
-			{ StaticIntrospection: "Age" },
+			{ family: "world", key: "FoodHere" },
+			{ family: "world", key: "EnergyCurrent" },
+			{ family: "static", key: "AgeTicks" },
 		]);
 		const inputNodes = model.nodes.filter((n) => n.nodeType === "input");
 		// ref 0 appears in both cn0 and cn1 but should only produce one node
@@ -148,9 +132,9 @@ describe("buildFullGraphModel", () => {
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [
-					{ kind: "Add", inputs: [] },
-					{ kind: "Sigmoid", inputs: [] },
-					{ kind: { DecayIntegrator: 0.9 }, inputs: [] },
+					{ kind: "Add", edges: [] },
+					{ kind: "Sigmoid", edges: [] },
+					{ kind: { DecayIntegrator: 0.9 }, edges: [] },
 				],
 			}),
 			[],
@@ -166,14 +150,14 @@ describe("buildFullGraphModel", () => {
 	});
 
 	it("creates output sink nodes only for wired sinks", () => {
-		const wired: OutputSink = {
+		const wired: BrainSink = {
 			kind: { CustomOutput: 0 },
-			inputs: [computeEdge(0)],
+			edges: [computeEdge(0)],
 		};
-		const unwired: OutputSink = { kind: { CustomOutput: 1 }, inputs: [] };
+		const unwired: BrainSink = { kind: { CustomOutput: 1 }, edges: [] };
 		const model = buildFullGraphModel(
 			makeGraphDef({
-				compute_nodes: [{ kind: "Add", inputs: [] }],
+				compute_nodes: [{ kind: "Add", edges: [] }],
 				output_sinks: [wired, unwired],
 			}),
 			[],
@@ -184,19 +168,19 @@ describe("buildFullGraphModel", () => {
 	});
 
 	it("draws wired vote and parameter sinks as action outputs and skips unwired ones", () => {
-		const vote: OutputSink = {
+		const vote: BrainSink = {
 			kind: { ActionVote: { Directed: ["Move", 2] } },
-			inputs: [computeEdge(0)],
+			edges: [computeEdge(0)],
 		};
-		const param: OutputSink = {
+		const param: BrainSink = {
 			kind: { ActionParam: "ReproduceTransferFraction" },
-			inputs: [computeEdge(0)],
+			edges: [computeEdge(0)],
 		};
-		const unwired: OutputSink = { kind: { ActionVote: "Eat" }, inputs: [] };
-		const route: OutputSink = { kind: { RouterGate: 0 }, inputs: [computeEdge(0)] };
+		const unwired: BrainSink = { kind: { ActionVote: "Eat" }, edges: [] };
+		const route: BrainSink = { kind: { RouterGate: 0 }, edges: [computeEdge(0)] };
 		const model = buildFullGraphModel(
 			makeGraphDef({
-				compute_nodes: [{ kind: "Add", inputs: [] }],
+				compute_nodes: [{ kind: "Add", edges: [] }],
 				output_sinks: [vote, param, unwired, route],
 			}),
 			[],
@@ -213,12 +197,12 @@ describe("buildFullGraphModel", () => {
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [
-					{ kind: "Add", inputs: [inputEdge(0, 0)] },
-					{ kind: "Add", inputs: [computeEdge(0)] },
+					{ kind: "Add", edges: [inputEdge(0, 0)] },
+					{ kind: "Add", edges: [computeEdge(0)] },
 				],
-				output_sinks: [{ kind: { CustomOutput: 0 }, inputs: [computeEdge(1)] }],
+				output_sinks: [{ kind: { CustomOutput: 0 }, edges: [computeEdge(1)] }],
 			}),
-			[{ World: "FoodHere" }],
+			[{ family: "world", key: "FoodHere" }],
 		);
 		expect(model.edges).toHaveLength(3);
 
@@ -243,8 +227,8 @@ describe("buildFullGraphModel", () => {
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [
-					{ kind: "Add", inputs: [computeEdge(1)] }, // cn:0 reads cn:1 → backward
-					{ kind: "Add", inputs: [computeEdge(0)] }, // cn:1 reads cn:0 → forward
+					{ kind: "Add", edges: [computeEdge(1)] }, // cn:0 reads cn:1 → backward
+					{ kind: "Add", edges: [computeEdge(0)] }, // cn:1 reads cn:0 → forward
 				],
 			}),
 			[],
@@ -261,7 +245,7 @@ describe("buildFullGraphModel", () => {
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [
-					{ kind: "Add", inputs: [computeEdge(5)] }, // index 5 doesn't exist
+					{ kind: "Add", edges: [computeEdge(5)] }, // index 5 doesn't exist
 				],
 			}),
 			[],
@@ -273,7 +257,7 @@ describe("buildFullGraphModel", () => {
 	it("drops edges with negative compute node source", () => {
 		const model = buildFullGraphModel(
 			makeGraphDef({
-				compute_nodes: [{ kind: "Add", inputs: [computeEdge(-1)] }],
+				compute_nodes: [{ kind: "Add", edges: [computeEdge(-1)] }],
 			}),
 			[],
 		);
@@ -281,15 +265,17 @@ describe("buildFullGraphModel", () => {
 	});
 
 	it("preserves SharedMemory input source deduplication", () => {
-		const memEdge = (slot: number, prev: boolean): GraphEdge => ({
+		const memEdge = (slot: number, prev: boolean): BrainEdge => ({
 			source: { SharedMemory: { slot, previous: prev } },
-			own_weight: 1,
+			own: 1,
+			genomic: 1,
+			applied: 1,
 		});
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [
-					{ kind: "Add", inputs: [memEdge(0, false), memEdge(0, false)] },
-					{ kind: "Add", inputs: [memEdge(0, false)] },
+					{ kind: "Add", edges: [memEdge(0, false), memEdge(0, false)] },
+					{ kind: "Add", edges: [memEdge(0, false)] },
 				],
 			}),
 			[],

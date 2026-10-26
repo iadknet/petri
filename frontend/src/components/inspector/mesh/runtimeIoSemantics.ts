@@ -1,4 +1,5 @@
-import type { ComputeNodeKind, VmInstruction } from "../../../types/genome.ts";
+import type { ComputeNodeKind } from "../../../types/generated/ComputeNodeKind.ts";
+import type { VmInstruction } from "../../../types/generated/VmInstruction.ts";
 
 export type RuntimeIoBadge = "action" | "input" | "slot" | "output" | "route" | "stateful";
 

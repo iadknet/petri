@@ -1,112 +1,104 @@
 import { type ReactNode, useState } from "react";
-import type { NodeGraphWeights } from "../../types/creature-detail.ts";
-import type { EdgeGroup, GraphBackendDef, InputReference, Scope } from "../../types/genome.ts";
+import type { BrainGroup } from "../../types/generated/BrainGroup.ts";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
+import type { GroupCoordinate } from "../../types/generated/GroupCoordinate.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
+import type { Scope } from "../../types/generated/Scope.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
+import { joinLearning } from "./brainLearning.ts";
 import { directionName } from "./directions.ts";
-import { composeTerms, memberPattern, scopeLabel, sinkDirection } from "./edgeGroupWeights.ts";
-import { learnedScaleLookup } from "./graphFullModel.ts";
+import { composeTerms, scopeLabel } from "./edgeGroupWeights.ts";
 import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
 
-const RING_CHANNELS = 8;
-
-/**
- * The twelve `(field, relative direction)` coordinates a new pair group
- * materializes (T25.F04): `x` where the compass `x` is non-zero (NE, E, SE,
- * SW, W, NW), `y` where the compass `y` is (N, NE, SE, S, SW, NW).
- */
-const PAIR_BIRTH: readonly (readonly ["x" | "y", number])[] = [
-	...[1, 2, 3, 5, 6, 7].map((d) => ["x", d] as const),
-	...[0, 1, 3, 4, 5, 7].map((d) => ["y", d] as const),
-];
-const PAIR_BIRTH_KEYS = PAIR_BIRTH.map(([field, d]) => `${field}:${d}`);
-const PAIR_BIRTH_SET = new Set(PAIR_BIRTH_KEYS);
-
 interface EdgeGroupListProps {
-	graphDef: GraphBackendDef;
-	inputRefs: InputReference[];
-	/** The server's member weights and learned scales for this node. */
-	graphWeights: NodeGraphWeights | null;
+	graphDef: GraphBrain;
+	inputRefs: InputRef[];
+	/** This node's `learning` entry: the weights in force and learned scales. */
+	learning: NodeLearning | null;
 }
 
 export interface GroupMember {
-	/** The field the member reads: a ring cell, or a pair's `x` or `y`. */
-	channel: number;
-	/** The direction of the sink the member sits on, when it is one. */
+	/** The field the member reads: a ring cell, or a pair's field. */
+	field: number | undefined;
+	/** The direction of the sink the member sits on; absent on the drive. */
 	direction: number | undefined;
 	sink: number;
 	edge: number;
-	ownWeight: number;
+	own: number;
+	/** The member's genomic (composed) weight. */
+	genomic: number;
+	scale: number;
+	pattern: number;
 	/** How the member learns when plastic (T25.F07). */
 	scope: Scope;
-	/** The server's genomic weight, when the payload carries it. */
-	genomic: number | undefined;
-	/** The server's weight in force, when the payload carries it (T25.F07). */
-	applied: number | undefined;
+	/** The weight in force. */
+	applied: number;
 }
 
 /** The reference a group reads, or its dangling index. */
-function refLabel(refIdx: number, inputRefs: InputReference[]): string {
+function refLabel(refIdx: number, inputRefs: InputRef[]): string {
 	const ref = inputRefs[refIdx];
 	return ref === undefined ? `ref ${refIdx} (missing)` : formatInputRef(ref);
 }
 
-/** Each group's members in sink order, read from the genome's memberships. */
+/** Each group's members in sink order, as the brain view lists them. */
 export function collectGroupMembers(
-	graphDef: GraphBackendDef,
-	graphWeights: NodeGraphWeights | null,
+	graphDef: GraphBrain,
+	learning: NodeLearning | null,
 ): GroupMember[][] {
-	const weights = new Map(
-		(graphWeights?.edges ?? [])
-			.filter((entry) => entry.surface === "sink")
-			.map((entry) => [`${entry.container}:${entry.edge}`, entry]),
-	);
-	const members: GroupMember[][] = (graphDef.groups ?? []).map(() => []);
+	const join = joinLearning(learning);
+	const members: GroupMember[][] = graphDef.groups.map(() => []);
 	graphDef.output_sinks.forEach((sink, sinkIndex) => {
-		sink.inputs.forEach((edge, edgeIndex) => {
-			const membership = edge.membership;
-			const list = membership ? members[membership.group] : undefined;
-			if (!membership || !list || !("InputLeaf" in edge.source)) return;
-			const entry = weights.get(`${sinkIndex}:${edgeIndex}`);
+		sink.edges.forEach((edge, edgeIndex) => {
+			const member = edge.member;
+			const list = member ? members[member.group] : undefined;
+			if (!member || !list) return;
 			list.push({
-				channel: edge.source.InputLeaf.sub_idx,
-				direction: sinkDirection(sink.kind),
+				field: member.field,
+				direction:
+					member.site !== undefined && member.site !== "Drive" ? member.site.Direction : undefined,
 				sink: sinkIndex,
 				edge: edgeIndex,
-				ownWeight: edge.own_weight,
-				scope: membership.scope,
-				genomic: entry?.genomic,
-				applied: entry?.applied,
+				own: edge.own,
+				genomic: edge.genomic,
+				scale: member.scale,
+				pattern: member.pattern,
+				scope: member.scope,
+				applied: join.edge("sink", sinkIndex, edgeIndex, edge).applied,
 			});
 		});
 	});
 	return members;
 }
 
+/** Whether `member` sits on one of `coordinates`. */
+function atCoordinate(member: GroupMember, coordinates: readonly GroupCoordinate[]): boolean {
+	return coordinates.some(
+		(coordinate) => coordinate.field === member.field && coordinate.direction === member.direction,
+	);
+}
+
+/** A coordinate list's presence: `count/total ●○…`. */
+function presence(present: readonly boolean[]): string {
+	return `${present.filter(Boolean).length}/${present.length} ${present
+		.map((here) => (here ? "●" : "○"))
+		.join("")}`;
+}
+
 /** A member's weights, its composition from the group in a tooltip. */
-function MemberWeights({
-	member,
-	group,
-	inputRefs,
-}: {
-	member: GroupMember;
-	group: EdgeGroup;
-	inputRefs: InputReference[];
-}) {
-	const pattern = memberPattern(group, inputRefs, member.channel, member.direction);
+function MemberWeights({ member }: { member: GroupMember }) {
 	return (
 		<Tip
 			content={
 				<>
 					<span className="block text-slate-400">scale × pattern + correction</span>
-					<span className="block font-mono">
-						{composeTerms(member.ownWeight, group.scale, pattern)}
-					</span>
+					<span className="block font-mono">{composeTerms(member)}</span>
 				</>
 			}
 		>
-			own={member.ownWeight.toFixed(3)}
-			{member.genomic !== undefined ? ` genomic=${member.genomic.toFixed(3)}` : ""}
-			{member.applied !== undefined ? ` applied=${member.applied.toFixed(3)}` : ""}
+			own={member.own.toFixed(3)} genomic={member.genomic.toFixed(3)} applied=
+			{member.applied.toFixed(3)}
 			<span data-testid="edge-group-member-scope"> {scopeLabel(member.scope)}</span>
 		</Tip>
 	);
@@ -118,7 +110,7 @@ function GroupFacts({
 	learnedScale,
 	offsetTip,
 }: {
-	group: EdgeGroup;
+	group: BrainGroup;
 	/** The learned scale, for an initialized scale slot (T25.F07). */
 	learnedScale: number | undefined;
 	offsetTip: string;
@@ -201,15 +193,14 @@ function RingRow({
 	inputRefs,
 	learnedScale,
 }: {
-	group: EdgeGroup;
+	group: BrainGroup;
 	ringRef: number;
 	index: number;
 	members: GroupMember[];
-	inputRefs: InputReference[];
+	inputRefs: InputRef[];
 	learnedScale: number | undefined;
 }) {
-	const present = new Set(members.map((member) => member.channel));
-	const byChannel = [...members].sort((a, b) => a.channel - b.channel);
+	const byField = [...members].sort((a, b) => (a.field ?? 0) - (b.field ?? 0));
 	return (
 		<GroupRowShell
 			name={
@@ -228,19 +219,15 @@ function RingRow({
 						data-testid="edge-group-members"
 						content="Members present, by ring cell from N clockwise (● present, ○ hole)."
 					>
-						{present.size}/{RING_CHANNELS}{" "}
-						{Array.from({ length: RING_CHANNELS }, (_, channel) =>
-							present.has(channel) ? "●" : "○",
-						).join("")}
+						{presence(group.coordinates.map((coordinate) => coordinate.present))}
 					</Tip>
 				</>
 			}
 		>
-			{byChannel.map((member) => (
+			{byField.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
-					cell {directionName(member.channel)} → {group.kind}[
-					{directionName(member.channel + group.offset)}]{" "}
-					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
+					cell {directionName(member.field ?? 0)} → {group.kind}[
+					{directionName(member.direction ?? 0)}] <MemberWeights member={member} />
 				</li>
 			))}
 		</GroupRowShell>
@@ -256,12 +243,12 @@ function PairRow({
 	inputRefs,
 	learnedScale,
 }: {
-	group: EdgeGroup;
+	group: BrainGroup;
 	refIdx: number;
 	pair: number;
 	index: number;
 	members: GroupMember[];
-	inputRefs: InputReference[];
+	inputRefs: InputRef[];
 	learnedScale: number | undefined;
 }) {
 	const ref = inputRefs[refIdx];
@@ -273,22 +260,15 @@ function PairRow({
 					describeInputRef(ref, fields.y).label.split(".").pop() ?? fields.y
 				}`;
 	const role = (member: GroupMember): "x" | "y" | "?" =>
-		member.channel === fields?.x ? "x" : member.channel === fields?.y ? "y" : "?";
+		member.field === fields?.x ? "x" : member.field === fields?.y ? "y" : "?";
 	// A fact member (T25.F10) sits on the kind's drive: no sink direction.
 	const directions = members.filter((member) => member.direction !== undefined);
 	const factMembers = members.filter((member) => member.direction === undefined);
-	const declaredFacts = fields?.facts ?? [];
-	const presentFacts = new Set(factMembers.map((member) => member.channel));
-	const factLabel = (channel: number) =>
+	const factLabel = (field: number) =>
 		ref === undefined
-			? `field ${channel}`
-			: (describeInputRef(ref, channel).label.split(".").pop() ?? `field ${channel}`);
-	const relative = (member: GroupMember) =>
-		member.direction === undefined ? undefined : (member.direction - group.offset + 8) % 8;
-	const coordinate = (member: GroupMember) => `${role(member)}:${relative(member)}`;
-	const present = new Set(directions.map(coordinate));
-	const presentAtBirth = PAIR_BIRTH_KEYS.map((key) => present.has(key));
-	const extra = directions.filter((member) => !PAIR_BIRTH_SET.has(coordinate(member)));
+			? `field ${field}`
+			: (describeInputRef(ref, field).label.split(".").pop() ?? `field ${field}`);
+	const extra = directions.filter((member) => !atCoordinate(member, group.coordinates));
 	return (
 		<GroupRowShell
 			name={
@@ -305,12 +285,11 @@ function PairRow({
 					/>
 					<Tip
 						data-testid="edge-group-members"
-						content={`Members present over the twelve birth coordinates: x at NE E SE SW W NW, then y at N NE SE S SW NW, relative to the offset (● present, ○ hole${
+						content={`Members present over the birth coordinates, in birth order (● present, ○ hole${
 							extra.length > 0 ? `; +${extra.length} outside them, zero pattern` : ""
 						}).`}
 					>
-						{presentAtBirth.filter(Boolean).length}/{PAIR_BIRTH.length}{" "}
-						{presentAtBirth.map((here) => (here ? "●" : "○")).join("")}
+						{presence(group.coordinates.map((coordinate) => coordinate.present))}
 						{extra.length > 0 ? ` +${extra.length}` : ""}
 					</Tip>
 					{factMembers.length > 0 ? (
@@ -318,9 +297,7 @@ function PairRow({
 							data-testid="edge-group-facts"
 							content="Fact members present over the pair's declared facts, wired into the kind's drive; each weighs its own weight alone (● present, ○ hole)."
 						>
-							facts {declaredFacts.filter((fact) => presentFacts.has(fact)).length}/
-							{declaredFacts.length}{" "}
-							{declaredFacts.map((fact) => (presentFacts.has(fact) ? "●" : "○")).join("")}
+							facts {presence(group.facts.map((fact) => fact.present))}
 						</Tip>
 					) : null}
 				</>
@@ -328,16 +305,14 @@ function PairRow({
 		>
 			{factMembers.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-fact">
-					{factLabel(member.channel)} → {group.kind} drive{" "}
-					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
+					{factLabel(member.field ?? 0)} → {group.kind} drive <MemberWeights member={member} />
 				</li>
 			))}
 			{directions.map((member) => (
 				<li key={`${member.sink}:${member.edge}`} data-testid="edge-group-member">
-					{role(member)}:{directionName(relative(member) ?? 0)} → {group.kind}[
-					{directionName(member.direction ?? 0)}]{" "}
-					<MemberWeights member={member} group={group} inputRefs={inputRefs} />
-					{PAIR_BIRTH_SET.has(coordinate(member)) ? "" : " (zero pattern)"}
+					{role(member)} → {group.kind}[{directionName(member.direction ?? 0)}]{" "}
+					<MemberWeights member={member} />
+					{atCoordinate(member, group.coordinates) ? "" : " (zero pattern)"}
 				</li>
 			))}
 		</GroupRowShell>
@@ -350,11 +325,11 @@ function PairRow({
  * coordinates (holes shown), each row expandable to its member edges and
  * open by default.
  */
-export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupListProps) {
-	const groups = graphDef.groups ?? [];
+export function EdgeGroupList({ graphDef, inputRefs, learning }: EdgeGroupListProps) {
+	const groups = graphDef.groups;
 	if (groups.length === 0) return null;
-	const members = collectGroupMembers(graphDef, graphWeights);
-	const learned = learnedScaleLookup(graphWeights);
+	const members = collectGroupMembers(graphDef, learning);
+	const join = joinLearning(learning);
 	return (
 		<section aria-label="Edge groups" className="mt-2">
 			<h4 className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -371,7 +346,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
-							learnedScale={learned(index)}
+							learnedScale={join.learnedScale(index, group)}
 						/>
 					) : (
 						<PairRow
@@ -383,7 +358,7 @@ export function EdgeGroupList({ graphDef, inputRefs, graphWeights }: EdgeGroupLi
 							index={index}
 							members={members[index] ?? []}
 							inputRefs={inputRefs}
-							learnedScale={learned(index)}
+							learnedScale={join.learnedScale(index, group)}
 						/>
 					),
 				)}

@@ -1,4 +1,8 @@
-import type { Creature, FoodTypeMetadata, Frame, PaintTool, ViewRect } from "../types/api.ts";
+import type { CreatureSnapshot } from "../types/generated/CreatureSnapshot.ts";
+import type { FoodTypePayload } from "../types/generated/FoodTypePayload.ts";
+import type { PaintToolRequest } from "../types/generated/PaintToolRequest.ts";
+import type { ViewRectPayload } from "../types/generated/ViewRectPayload.ts";
+import type { Frame } from "../types/protocol.ts";
 import {
 	type CameraState,
 	type CanvasSize,
@@ -132,7 +136,7 @@ function shadeFoodRgb(
 }
 
 function buildFoodTypeColorMap(
-	foodTypes: FoodTypeMetadata[],
+	foodTypes: FoodTypePayload[],
 ): Map<number, [number, number, number]> {
 	return new Map(foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]));
 }
@@ -330,8 +334,8 @@ interface OverviewLayerCache {
 interface FoodLayerCache {
 	layer: Layer;
 	food: Frame["food"];
-	foodTypes: FoodTypeMetadata[];
-	rect: ViewRect;
+	foodTypes: FoodTypePayload[];
+	rect: ViewRectPayload;
 	pxPerCell: number;
 }
 
@@ -339,7 +343,7 @@ interface CreatureLook {
 	fill: string;
 }
 
-function creatureLook(creature: Creature): CreatureLook {
+function creatureLook(creature: CreatureSnapshot): CreatureLook {
 	const [r, g, b] = creature.phenotype_rgb;
 	return { fill: `rgb(${r},${g},${b})` };
 }
@@ -374,7 +378,7 @@ export class WorldRenderer {
 	private reducedMotion = prefersReducedMotion();
 
 	private previewCells: Set<string> | null = null;
-	private previewTool: PaintTool | null = null;
+	private previewTool: PaintToolRequest | null = null;
 	private selectedCreatureId: number | null = null;
 
 	private fertilityCache: FertilityLayerCache | null = null;
@@ -383,11 +387,11 @@ export class WorldRenderer {
 	private foodCache: FoodLayerCache | null = null;
 
 	private motionFrame: Frame | null = null;
-	private motionRect: ViewRect | null = null;
+	private motionRect: ViewRectPayload | null = null;
 	private motionTick = -1;
 	private motions = new Map<number, CreatureMotion>();
 	private looks = new Map<number, CreatureLook>();
-	private creaturesById = new Map<number, Creature>();
+	private creaturesById = new Map<number, CreatureSnapshot>();
 	private hasBirths = false;
 	private glideStart = 0;
 	private glideDuration: number | null = null;
@@ -482,7 +486,7 @@ export class WorldRenderer {
 	}
 
 	/** Update paint preview overlay. Pass null to clear. */
-	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
+	setPreview(cells: Set<string> | null, tool: PaintToolRequest | null): void {
 		this.previewCells = cells;
 		this.previewTool = tool;
 		this.dirty = true;
@@ -605,7 +609,7 @@ export class WorldRenderer {
 		}
 
 		const looks = new Map<number, CreatureLook>();
-		const byId = new Map<number, Creature>();
+		const byId = new Map<number, CreatureSnapshot>();
 		for (const creature of creatures) {
 			looks.set(creature.id, this.looks.get(creature.id) ?? creatureLook(creature));
 			byId.set(creature.id, creature);
@@ -797,8 +801,8 @@ export class WorldRenderer {
 
 	private drawFoodLayer(
 		frame: Frame,
-		foodTypes: FoodTypeMetadata[],
-		detailRect: ViewRect | null,
+		foodTypes: FoodTypePayload[],
+		detailRect: ViewRectPayload | null,
 		camera: CameraState,
 	): void {
 		const rect = detailRect ?? { x: 0, y: 0, width: frame.width, height: frame.height };
@@ -817,7 +821,7 @@ export class WorldRenderer {
 		);
 	}
 
-	private foodSpriteScale(rect: ViewRect, zoom: number): number {
+	private foodSpriteScale(rect: ViewRectPayload, zoom: number): number {
 		const wanted = Math.min(MAX_FOOD_SPRITE_PX, Math.max(1, Math.round(zoom * this.dpr)));
 		const fit = Math.floor(MAX_LAYER_PX / Math.max(rect.width, rect.height));
 		return Math.max(1, Math.min(wanted, fit));
@@ -830,8 +834,8 @@ export class WorldRenderer {
 	 */
 	private ensureFoodLayer(
 		food: Frame["food"],
-		foodTypes: FoodTypeMetadata[],
-		rect: ViewRect,
+		foodTypes: FoodTypePayload[],
+		rect: ViewRectPayload,
 		zoom: number,
 	): FoodLayerCache {
 		const wanted = this.foodSpriteScale(rect, zoom);
@@ -1221,7 +1225,7 @@ export class WorldRenderer {
 		ctx.stroke();
 	}
 
-	private previewColor(tool: PaintTool): Rgb {
+	private previewColor(tool: PaintToolRequest): Rgb {
 		switch (tool) {
 			case "barrier":
 				return [220, 120, 50];

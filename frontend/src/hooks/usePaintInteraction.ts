@@ -5,13 +5,14 @@ import { usePaintStore } from "../stores/paint.ts";
 import type { ViewRequest } from "../stores/viewport.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
-import type { PaintPoint, PaintTool } from "../types/api.ts";
+import type { PaintPointDto } from "../types/generated/PaintPointDto.ts";
+import type { PaintToolRequest } from "../types/generated/PaintToolRequest.ts";
 import { applySnapshotToStores } from "./useViewSubscription.ts";
 
 type SnapshotQuery = Parameters<typeof api.getSnapshot>[0];
 
 /** Border color for the brush overlay, keyed by active tool. */
-const BORDER_COLORS: Record<PaintTool, string> = {
+const BORDER_COLORS: Record<PaintToolRequest, string> = {
 	barrier: "rgba(139, 69, 19, 0.8)",
 	food: "rgba(0, 180, 0, 0.8)",
 	erase_barrier: "rgba(239, 68, 68, 0.6)",
@@ -22,8 +23,8 @@ const BORDER_COLORS: Record<PaintTool, string> = {
  * Bresenham line interpolation between two grid points.
  * Returns all integer cell coordinates along the line (inclusive).
  */
-function bresenhamLine(x0: number, y0: number, x1: number, y1: number): PaintPoint[] {
-	const points: PaintPoint[] = [];
+function bresenhamLine(x0: number, y0: number, x1: number, y1: number): PaintPointDto[] {
+	const points: PaintPointDto[] = [];
 	const dx = Math.abs(x1 - x0);
 	const dy = Math.abs(y1 - y0);
 	const sx = x0 < x1 ? 1 : -1;
@@ -96,12 +97,12 @@ export function usePaintInteraction(
 	rendererRef: RefObject<WorldRenderer | null>,
 ): PaintInteractionHandlers {
 	const isPaintingRef = useRef(false);
-	const strokePointsRef = useRef<PaintPoint[]>([]);
+	const strokePointsRef = useRef<PaintPointDto[]>([]);
 	const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 	const brushOverlayRef = useRef<HTMLDivElement>(null);
 	const previewCellsRef = useRef(new Set<string>());
 	/** Tool + brush captured at drag start so mid-drag changes don't cause mismatches. */
-	const dragToolRef = useRef<PaintTool>("barrier");
+	const dragToolRef = useRef<PaintToolRequest>("barrier");
 	const dragBrushRef = useRef<0 | 1 | 2>(0);
 
 	const updateOverlay = useCallback(
@@ -140,7 +141,7 @@ export function usePaintInteraction(
 
 		// Deduplicate via Set
 		const seen = new Set<string>();
-		const unique: PaintPoint[] = [];
+		const unique: PaintPointDto[] = [];
 		for (const p of points) {
 			const key = `${p.x},${p.y}`;
 			if (!seen.has(key)) {

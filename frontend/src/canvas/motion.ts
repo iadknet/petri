@@ -1,4 +1,5 @@
-import type { Creature, ViewRect } from "../types/api.ts";
+import type { CreatureSnapshot } from "../types/generated/CreatureSnapshot.ts";
+import type { ViewRectPayload } from "../types/generated/ViewRectPayload.ts";
 
 /**
  * Presentation-only motion between ticks. The simulation moves creatures one
@@ -27,14 +28,14 @@ export const MAX_GLIDE_CELLS = 2;
 const MIN_GLIDE_MS = 60;
 const MAX_GLIDE_MS = 420;
 
-function insideRect(rect: ViewRect, x: number, y: number): boolean {
+function insideRect(rect: ViewRectPayload, x: number, y: number): boolean {
 	return x > rect.x && y > rect.y && x < rect.x + rect.width - 1 && y < rect.y + rect.height - 1;
 }
 
 export function planCreatureMotion(
 	drawn: ReadonlyMap<number, CellPoint> | null,
-	creatures: readonly Creature[],
-	drawnRect: ViewRect | null,
+	creatures: readonly CreatureSnapshot[],
+	drawnRect: ViewRectPayload | null,
 ): Map<number, CreatureMotion> {
 	const motions = new Map<number, CreatureMotion>();
 	for (const creature of creatures) {

@@ -1,16 +1,13 @@
 import { create } from "zustand";
-import type { SimulationConfig } from "../types/api.ts";
-import type {
-	FertilityLayer,
-	FoodFertilityLayerTarget,
-	FoodSharedConfig,
-	FoodTypeConfig,
-	FounderProfile,
-	StartupFoodConfig,
-	StartupFoodRequest,
-	TerrainLayer,
-	WorldEdgeMode,
-} from "../types/config.ts";
+import type { FertilityLayer } from "../types/generated/FertilityLayer.ts";
+import type { FertilityLayerTarget } from "../types/generated/FertilityLayerTarget.ts";
+import type { FoodConfig } from "../types/generated/FoodConfig.ts";
+import type { FoodResourceConfig } from "../types/generated/FoodResourceConfig.ts";
+import type { FoodTypeConfig } from "../types/generated/FoodTypeConfig.ts";
+import type { FounderProfile } from "../types/generated/FounderProfile.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
+import type { TerrainLayer } from "../types/generated/TerrainLayer.ts";
+import type { WorldEdgeMode } from "../types/generated/WorldEdgeMode.ts";
 import type { StartupRequest } from "../types/http.ts";
 import { deepSet } from "../utils/deepSet.ts";
 
@@ -26,7 +23,7 @@ export interface StartupPreset {
 		edge_mode: WorldEdgeMode;
 		terrain: TerrainLayer[];
 		world_seed: number | null;
-		food: StartupFoodConfig;
+		food: FoodConfig;
 	};
 	energy: {
 		initial_energy: number;
@@ -44,7 +41,7 @@ export interface StartupConfigState {
 	removeFoodType: (index: number) => void;
 	updateFoodType: (index: number, patch: Partial<FoodTypeConfig>) => void;
 	addFertilityLayer: () => void;
-	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
+	updateFertilityLayerTarget: (index: number, target: FertilityLayerTarget) => void;
 	randomizeSeed: () => void;
 	hydrateFromServerConfig: (config: SimulationConfig) => void;
 	applyRecipeConfig: (config: SimulationConfig) => void;
@@ -64,10 +61,14 @@ function createFoodType(index: number): FoodTypeConfig {
 		initial_density: 1.0,
 		initial_coverage: 0.54,
 		growth_inhibitor: 0.2,
+		energy_per_unit: null,
+		growth_rate: null,
+		recovery_spawn_rate: null,
+		initial_fertility_only: false,
 	};
 }
 
-function defaultFoodShared(): FoodSharedConfig {
+function defaultFoodShared(): FoodResourceConfig {
 	return {
 		growth_rate: 0.09,
 		spread_threshold_ratio: 0.8,
@@ -91,12 +92,14 @@ function defaultFoodShared(): FoodSharedConfig {
 function defaultPoissonLayer(): FertilityLayer {
 	return {
 		weight: 1.0,
+		target: "AllFoods",
 		algorithm: {
 			PoissonBlobs: {
 				blob_count: 900,
 				min_radius: 5.0,
 				max_radius: 15.0,
 				falloff: 0.5,
+				seed: null,
 			},
 		},
 	};
@@ -146,20 +149,18 @@ function cloneFertilityLayer(layer: FertilityLayer): FertilityLayer {
 	return structuredClone(layer);
 }
 
-function cloneFertilityTarget(
-	target: FoodFertilityLayerTarget | undefined,
-): FoodFertilityLayerTarget | undefined {
-	if (!target) return undefined;
-	if (target === "AllFoods") return "AllFoods";
+/** A layer target, omitted meaning all foods as the server defaults it. */
+function cloneFertilityTarget(target: FertilityLayerTarget | undefined): FertilityLayerTarget {
+	if (target === undefined || target === "AllFoods") return "AllFoods";
 	return { SingleType: { type_idx: target.SingleType.type_idx } };
 }
 
 function normalizeFertilityTarget(
-	target: FoodFertilityLayerTarget | undefined,
+	target: FertilityLayerTarget | undefined,
 	typeCount: number,
-): FoodFertilityLayerTarget | undefined {
+): FertilityLayerTarget {
 	const cloned = cloneFertilityTarget(target);
-	if (!cloned || cloned === "AllFoods") {
+	if (cloned === "AllFoods") {
 		return cloned;
 	}
 
@@ -171,7 +172,7 @@ function normalizeFertilityTarget(
 	return cloned;
 }
 
-function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
+function normalizeFoodConfig(food: FoodConfig): FoodConfig {
 	const sharedDefaults = defaultFoodShared();
 	const shared = {
 		...sharedDefaults,
@@ -212,8 +213,7 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 			...food.fertility,
 			layers: food.fertility.layers.map((layer) => {
 				const cloned = cloneFertilityLayer(layer);
-				const target = normalizeFertilityTarget(layer.target, types.length);
-				return target ? { ...cloned, target } : cloned;
+				return { ...cloned, target: normalizeFertilityTarget(layer.target, types.length) };
 			}),
 		},
 		annealing: {
@@ -222,7 +222,7 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 	};
 }
 
-function buildDefaultFoodConfig(): StartupFoodConfig {
+function buildDefaultFoodConfig(): FoodConfig {
 	return normalizeFoodConfig({
 		shared: defaultFoodShared(),
 		types: [createFoodType(0)],
@@ -241,7 +241,7 @@ function buildDefaultFoodConfig(): StartupFoodConfig {
 	});
 }
 
-function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): StartupFoodConfig {
+function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): FoodConfig {
 	return normalizeFoodConfig({
 		shared: {
 			growth_rate: config.shared.growth_rate,
@@ -279,7 +279,7 @@ function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): Startu
 
 function updateFoodConfig(
 	preset: StartupPreset,
-	updater: (food: StartupFoodConfig) => StartupFoodConfig,
+	updater: (food: FoodConfig) => FoodConfig,
 ): StartupPreset {
 	return withFoodPreset(preset, updater(normalizeFoodConfig(preset.world.food)));
 }
@@ -351,7 +351,7 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 	};
 }
 
-function withFoodPreset(preset: StartupPreset, food: StartupFoodConfig): StartupPreset {
+function withFoodPreset(preset: StartupPreset, food: FoodConfig): StartupPreset {
 	return {
 		...preset,
 		world: {
@@ -361,7 +361,7 @@ function withFoodPreset(preset: StartupPreset, food: StartupFoodConfig): Startup
 	};
 }
 
-function buildStartupFoodRequest(food: StartupFoodConfig): StartupFoodRequest {
+function buildStartupFoodRequest(food: FoodConfig): FoodConfig {
 	const normalized = normalizeFoodConfig(food);
 	return {
 		shared: {
@@ -478,12 +478,14 @@ export const useStartupConfigStore = create<StartupConfigState>()((set) => ({
 						...food.fertility.layers,
 						{
 							weight: 1.0,
+							target: "AllFoods",
 							algorithm: {
 								PoissonBlobs: {
 									blob_count: 900,
 									min_radius: 5.0,
 									max_radius: 15.0,
 									falloff: 0.5,
+									seed: null,
 								},
 							},
 						},

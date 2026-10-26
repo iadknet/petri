@@ -6,6 +6,9 @@ import {
 	useCreatureInspectorStore,
 } from "../stores/creatureInspector.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { MOCK_STATUS } from "../test/fixtures.ts";
+import type { CreatureDetailResponse } from "../types/generated/CreatureDetailResponse.ts";
+import type { NodeLearning } from "../types/generated/NodeLearning.ts";
 import { useCreatureDetailResource } from "./useCreatureDetailResource.ts";
 
 vi.mock("../api/rest.ts", () => ({
@@ -30,7 +33,7 @@ function Harness() {
 	return null;
 }
 
-function buildCreatureDetail() {
+function buildCreatureDetail(): CreatureDetailResponse {
 	return {
 		protocol_version: "v3alpha2",
 		id: 7,
@@ -45,23 +48,15 @@ function buildCreatureDetail() {
 		complexity: 5,
 		genome_size: 2,
 		phenotype: {
-			channels: [10, 20, 30, 40, 50, 60] as [number, number, number, number, number, number],
+			channels: [10, 20, 30, 40, 50, 60],
 			active_channel: 0,
-			polarity: [true, false, true, false, true, false] as [
-				boolean,
-				boolean,
-				boolean,
-				boolean,
-				boolean,
-				boolean,
-			],
-			rgb: [1, 2, 3] as [number, number, number],
+			polarity: [true, false, true, false, true, false],
+			rgb: [1, 2, 3],
 		},
-		genome: {
+		brain: {
 			entry_node_id: 2,
 			nodes: [],
 		},
-		mesh_annotations: [],
 		shared_memory: [0, 1],
 		action_log: [],
 		diagnostics: {
@@ -75,6 +70,8 @@ function buildCreatureDetail() {
 				reachable_node_count: 2,
 				stateful_reachable_node_count: 1,
 				barrier_reader_reachable_node_count: 1,
+				barrier_decision_writer_reachable_node_count: 0,
+				barrier_reader_without_decision_writer_reachable_node_count: 1,
 				distinct_upstream_slots_read: [0],
 				distinct_payload_slots_written: [0],
 				distinct_custom_output_slots_written: [],
@@ -107,7 +104,7 @@ describe("useCreatureDetailResource", () => {
 
 	it("updates store with new data when tick changes via setStatus", async () => {
 		const detail1 = buildCreatureDetail();
-		const detail2 = {
+		const detail2: CreatureDetailResponse = {
 			...buildCreatureDetail(),
 			energy: 35,
 			age: 9,
@@ -147,6 +144,7 @@ describe("useCreatureDetailResource", () => {
 		act(() => {
 			vi.advanceTimersByTime(200);
 			useSimulationStore.getState().setStatus(1, 2733, {
+				...MOCK_STATUS,
 				state: "running",
 				population: 50,
 				mean_energy: 40,
@@ -200,42 +198,38 @@ describe("useCreatureDetailResource", () => {
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(9);
 	});
 
-	it("replaces graph_weights on every poll, which excludes the genome only, and clears it on a new selection", async () => {
-		const graphWeights = [
+	it("replaces learning on every poll, which excludes the brain only, and clears it on a new selection", async () => {
+		const learning: NodeLearning[] = [
 			{
 				node_id: 2,
-				scales: [{ group: 0, genomic: 0.5 }],
-				edges: [{ surface: "sink" as const, container: 65, edge: 0, genomic: 0.5, applied: 0.5 }],
+				edges: [{ surface: "sink", container: 65, edge: 0, applied: 0.5, initialized: false }],
+				scales: [],
 			},
 		];
-		// Learned weights move between polls (T25.F06).
-		const polledWeights = [
+		// The weights in force move between polls.
+		const polledLearning: NodeLearning[] = [
 			{
 				node_id: 2,
-				scales: [{ group: 0, genomic: 0.5 }],
 				edges: [
 					{
-						surface: "sink" as const,
+						surface: "sink",
 						container: 65,
-						edge: 1,
-						genomic: 0.5,
+						edge: 0,
 						applied: 0.75,
 						learned: 0.75,
+						initialized: true,
 					},
 				],
+				scales: [],
 			},
 		];
-		const {
-			genome: _genome,
-			mesh_annotations: _annotations,
-			...polled
-		} = {
+		const { brain: _brain, ...polled } = {
 			...buildCreatureDetail(),
 			latest_tick: 2733,
-			graph_weights: polledWeights,
+			learning: polledLearning,
 		};
 		vi.mocked(api.getCreature)
-			.mockResolvedValueOnce({ ...buildCreatureDetail(), graph_weights: graphWeights })
+			.mockResolvedValueOnce({ ...buildCreatureDetail(), learning })
 			.mockResolvedValueOnce(polled)
 			.mockResolvedValueOnce({ ...buildCreatureDetail(), id: 8 });
 
@@ -245,8 +239,8 @@ describe("useCreatureDetailResource", () => {
 			await Promise.resolve();
 		});
 		const stored = () =>
-			creatureInspectorSelectors.creatureGraphWeights(useCreatureInspectorStore.getState());
-		expect(stored()).toEqual(graphWeights);
+			creatureInspectorSelectors.creatureLearning(useCreatureInspectorStore.getState());
+		expect(stored()).toEqual(learning);
 
 		act(() => {
 			vi.advanceTimersByTime(200);
@@ -258,9 +252,9 @@ describe("useCreatureDetailResource", () => {
 		expect(api.getCreature).toHaveBeenCalledTimes(2);
 		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({
 			since_tick: 2732,
-			exclude: "genome",
+			exclude: "brain",
 		});
-		expect(stored()).toEqual(polledWeights);
+		expect(stored()).toEqual(polledLearning);
 
 		act(() => {
 			useCreatureInspectorStore.getState().selectCreature(8);

@@ -1,10 +1,8 @@
 import { randomSeed } from "../../../stores/startupConfig.ts";
-import type {
-	FertilityAlgorithm,
-	FertilityBlend,
-	FertilityLayer,
-	FoodFertilityLayerTarget,
-} from "../../../types/config.ts";
+import type { FertilityAlgorithm } from "../../../types/generated/FertilityAlgorithm.ts";
+import type { FertilityBlend } from "../../../types/generated/FertilityBlend.ts";
+import type { FertilityLayer } from "../../../types/generated/FertilityLayer.ts";
+import type { FertilityLayerTarget } from "../../../types/generated/FertilityLayerTarget.ts";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";
@@ -146,6 +144,7 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 					frequency: 0.04,
 					lacunarity: 2.0,
 					persistence: 0.5,
+					seed: null,
 				},
 			};
 		case "PoissonBlobs":
@@ -155,6 +154,7 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 					min_radius: 5.0,
 					max_radius: 15.0,
 					falloff: 0.5,
+					seed: null,
 				},
 			};
 		case "Channels":
@@ -166,6 +166,7 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 					persistence: 0.5,
 					width: 3.0,
 					value: 1.0,
+					seed: null,
 				},
 			};
 		default:
@@ -173,14 +174,14 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 	}
 }
 
-function targetValue(target: FoodFertilityLayerTarget | undefined): string {
+function targetValue(target: FertilityLayerTarget | undefined): string {
 	if (!target || target === "AllFoods") {
 		return "all_foods";
 	}
 	return `single_type:${target.SingleType.type_idx}`;
 }
 
-function parseTarget(value: string): FoodFertilityLayerTarget {
+function parseTarget(value: string): FertilityLayerTarget {
 	if (value === "all_foods") {
 		return "AllFoods";
 	}
@@ -381,7 +382,7 @@ function SeedFields({ seed, testIdPrefix, tooltips, onChange }: SeedFieldsProps)
 
 interface FertilitySectionProps extends StartupSectionProps {
 	addFertilityLayer: () => void;
-	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
+	updateFertilityLayerTarget: (index: number, target: FertilityLayerTarget) => void;
 }
 
 export function FertilitySection({

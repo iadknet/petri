@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
-import type { HealthPayload } from "../types/api.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
 import { SAMPLE_RING_SIZE, sampleFromHealth, useStatsHistoryStore } from "./stats.ts";
 
 function health(overrides: Partial<HealthPayload> = {}): HealthPayload {
@@ -49,6 +49,7 @@ describe("sampleFromHealth", () => {
 				lineages_alive: 3,
 				lineages_effective: 2.4,
 				mutation_outcome_summary: {
+					...MOCK_HEALTH_CENSUS.mutation_outcome_summary,
 					carriers_observed_total: 10,
 					helpful_total: 2,
 					neutral_total: 5,

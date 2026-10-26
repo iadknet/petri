@@ -1,12 +1,12 @@
 import { memo } from "react";
-import type { InputReference } from "../../types/genome.ts";
-import type { GraphTrace } from "../../types/trace.ts";
+import type { GraphTracePayload } from "../../types/generated/GraphTracePayload.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
 import { InputsPanel } from "./InputsPanel.tsx";
 import { describeGraphTraceKind } from "./mesh/meshPresentation.ts";
 
 interface GraphExecutionViewProps {
-	trace: GraphTrace;
-	inputRefs: InputReference[];
+	trace: GraphTracePayload;
+	inputRefs: InputRef[];
 	upstreamSlots: number[];
 	detailIndex: number;
 }

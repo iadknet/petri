@@ -1,20 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { VoteKind } from "../../types/genome.ts";
-import type { MeshHopTrace } from "../../types/trace.ts";
-import { VOTE_KINDS, ZERO_VOTES } from "../../types/trace.ts";
+import { kindCounts, zeroVotes } from "../../test/traceFixtures.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
+import { VOTE_KINDS } from "../../types/trace.ts";
+import type { VoteKind } from "../../types/vote-sinks.ts";
 import { voteSinkIndex } from "../../types/vote-sinks.ts";
 import { SelectedHopBlock } from "./SelectedHopBlock.tsx";
 
 function votes(entries: Record<number, number>): number[] {
-	const vector = [...ZERO_VOTES];
+	const vector = zeroVotes();
 	for (const [index, value] of Object.entries(entries)) vector[Number(index)] = value;
 	return vector;
 }
 
 const COMMIT_COUNTS: Partial<Record<VoteKind, number>> = { Eat: 1, Reproduce: 2 };
 
-const selected: MeshHopTrace = {
+const selected: MeshHopTracePayload = {
 	hop_index: 4,
 	pass_index: 1,
 	node_id: 3,
@@ -28,7 +29,7 @@ const selected: MeshHopTrace = {
 	decision_inputs: {
 		action_votes: votes({ 4: 0.5 }),
 		previous_pass_votes: votes({ 0: 1, [voteSinkIndex("Terminate")]: 0.125 }),
-		commit_counts: VOTE_KINDS.map((kind) => COMMIT_COUNTS[kind] ?? 0),
+		commit_counts: kindCounts(COMMIT_COUNTS),
 		hops_this_tick: 5,
 	},
 	backend_trace: {
@@ -72,7 +73,7 @@ describe("SelectedHopBlock", () => {
 	it("reads all zero for an empty vote vector", () => {
 		render(
 			<SelectedHopBlock
-				hop={{ ...selected, vote_contribution: ZERO_VOTES }}
+				hop={{ ...selected, vote_contribution: zeroVotes() }}
 				previousOutcome={[0, 0, 0, 0]}
 			/>,
 		);

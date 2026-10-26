@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MOCK_CONFIG } from "../../../test/fixtures.ts";
-import type { SimulationConfig } from "../../../types/api.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
 import type { FieldDef } from "../shared/types.ts";
 import { RUNTIME_PATCH_FIELDS } from "./RuntimeConfigPanel.tsx";
 import { resolveRuntimeBounds } from "./bounds.ts";

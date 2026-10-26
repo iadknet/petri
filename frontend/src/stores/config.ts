@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { SimState, SimulationConfig } from "../types/api.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
+import type { SimulationStatus } from "../types/generated/SimulationStatus.ts";
 import { deepSet } from "../utils/deepSet.ts";
 
 export interface ConfigState {
@@ -8,12 +9,12 @@ export interface ConfigState {
 	/** Local draft with user edits */
 	localDraft: SimulationConfig | null;
 	/** Current sim state (for editability rules) */
-	simState: SimState;
+	simState: SimulationStatus;
 	/** Whether local draft differs from server config */
 	isDirty: boolean;
 
-	setServerConfig: (config: SimulationConfig, simState: SimState) => void;
-	commitServerConfig: (config: SimulationConfig, simState: SimState) => void;
+	setServerConfig: (config: SimulationConfig, simState: SimulationStatus) => void;
+	commitServerConfig: (config: SimulationConfig, simState: SimulationStatus) => void;
 	updateDraft: (path: string, value: number | string | boolean) => void;
 	resetDraft: () => void;
 	reset: () => void;

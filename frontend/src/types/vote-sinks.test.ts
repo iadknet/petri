@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ActionType } from "./action-log.ts";
-import type { ActionParamField, DirectedVoteKind, VoteKind } from "./genome.ts";
+import { zeroDecisionInputs, zeroKindCounts } from "../test/traceFixtures.ts";
+import type { ActionParamField } from "./generated/ActionParamField.ts";
+import type { ActionType } from "./generated/ActionType.ts";
+import type { DirectedVoteKind } from "./generated/DirectedVoteKind.ts";
 import {
 	VOTE_KINDS as TRACE_VOTE_KINDS,
 	VOTE_SINK_COUNT as TRACE_VOTE_SINK_COUNT,
-	ZERO_DECISION_INPUTS,
-	ZERO_KIND_COUNTS,
 } from "./trace.ts";
 import catalogFixture from "./vote-sinks.json";
+import type { VoteKind } from "./vote-sinks.ts";
 import {
 	ACTION_PARAM_FIELDS,
 	ACTION_TYPES,
@@ -66,12 +67,11 @@ describe("vote-sinks.json parity", () => {
 		expect(TRACE_VOTE_SINK_COUNT).toBe(VOTE_SINK_COUNT);
 		expect(VOTE_KINDS).toEqual(catalogFixture.voteKinds);
 		expect(TRACE_VOTE_KINDS).toEqual(VOTE_KINDS);
-		expect(ZERO_DECISION_INPUTS.commit_counts).toEqual(VOTE_KINDS.map(() => 0));
-		expect(ZERO_KIND_COUNTS).toEqual(VOTE_KINDS.map(() => 0));
+		expect(zeroDecisionInputs().commit_counts).toEqual(VOTE_KINDS.map(() => 0));
+		expect(zeroKindCounts()).toEqual(VOTE_KINDS.map(() => 0));
 		expect(DIRECTED_VOTE_KINDS).toEqual(catalogFixture.directedKinds);
 		expect(ACTION_PARAM_FIELDS).toEqual(catalogFixture.actionParamFields.map(({ field }) => field));
 		expect(ACTION_TYPES).toEqual(catalogFixture.actionTypes);
-		expect(Object.values(ActionType)).toEqual(fixtureNames);
 		expect(witnessKeys(ACTION_TYPE_WITNESS)).toEqual([...fixtureNames].sort());
 		expect(witnessKeys(VOTE_KIND_WITNESS)).toEqual([...catalogFixture.voteKinds].sort());
 		expect(witnessKeys(DIRECTED_VOTE_KIND_WITNESS)).toEqual(

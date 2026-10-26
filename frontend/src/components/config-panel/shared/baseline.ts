@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { SimulationConfig } from "../../../types/api.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
 import { getByPath } from "./pathUtils.ts";
 
 /**

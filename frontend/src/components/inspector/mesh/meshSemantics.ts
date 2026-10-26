@@ -1,10 +1,8 @@
-import type {
-	CreatureDetail,
-	CreatureMeshAnnotation,
-	MeshReadClass,
-	MeshWriteClass,
-} from "../../../types/creature-detail.ts";
-import type { CreatureGenome, NodeGenome } from "../../../types/genome.ts";
+import type { BrainNode } from "../../../types/generated/BrainNode.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { MeshReadClass } from "../../../types/generated/MeshReadClass.ts";
+import type { MeshWriteClass } from "../../../types/generated/MeshWriteClass.ts";
+import type { NodeAnnotation } from "../../../types/generated/NodeAnnotation.ts";
 import { formatInputRef } from "../inputRefUtils.ts";
 import { type MeshAnalysis, type MeshBackendKind, analyzeMesh } from "./meshAnalysis.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
@@ -69,24 +67,13 @@ const SOURCE_PRIORITY: MeshReadClass[] = [
 
 const BADGE_ORDER: MeshNodeBadge[] = ["input", "slot", "action", "route", "output", "stateful"];
 
-type CreatureMeshAnnotations = CreatureDetail["mesh_annotations"] | null | undefined;
-
 export function deriveMeshSemantics(
-	genome: CreatureGenome,
-	annotations: CreatureMeshAnnotations = null,
+	genome: BrainView,
 	precomputedAnalysis?: MeshAnalysis,
 ): MeshSemantics {
 	const analysis = precomputedAnalysis ?? analyzeMesh(genome);
-	const annotationById = new Map(
-		(annotations ?? []).map((annotation) => [annotation.node_id, annotation]),
-	);
 	const nodes = analysis.nodes.map((analysisNode) =>
-		deriveNodeSemantics(
-			analysisNode.node,
-			analysisNode.backendKind,
-			analysisNode.reachable,
-			annotationById.get(analysisNode.id),
-		),
+		deriveNodeSemantics(analysisNode.node, analysisNode.backendKind),
 	);
 
 	return {
@@ -95,17 +82,12 @@ export function deriveMeshSemantics(
 	};
 }
 
-function deriveNodeSemantics(
-	node: NodeGenome,
-	backendKind: MeshBackendKind,
-	reachableFallback: boolean,
-	annotation?: CreatureMeshAnnotation,
-): MeshNodeSemantics {
-	// The server's annotations are required whenever the genome is present
-	// (T25.F03); a node without one reads, writes and holds nothing here.
-	const readClasses = unique(annotation?.read_classes ?? []);
-	const writeClasses = unique(annotation?.write_classes ?? []);
-	const hasStatefulBehavior = annotation?.has_stateful_behavior ?? false;
+function deriveNodeSemantics(node: BrainNode, backendKind: MeshBackendKind): MeshNodeSemantics {
+	// The brain view carries each node's annotation (T30.F01).
+	const annotation = node.annotation;
+	const readClasses = unique(annotation.read_classes);
+	const writeClasses = unique(annotation.write_classes);
+	const hasStatefulBehavior = annotation.has_stateful_behavior;
 	const slotReads = hasSlotRead(node);
 	const sourceClass = deriveSourceClass(readClasses);
 	const role = deriveRole({
@@ -131,14 +113,8 @@ function deriveNodeSemantics(
 		hasStatefulBehavior,
 		slotReads,
 	});
-	const liveInstructionIndices =
-		annotation?.live_instruction_indices ??
-		("Vm" in node.backend_def ? node.backend_def.Vm.program.map((_, index) => index) : []);
-	const liveInternalNodeIndices =
-		annotation?.live_internal_node_indices ??
-		("Graph" in node.backend_def
-			? node.backend_def.Graph.compute_nodes.map((_, index) => index)
-			: []);
+	const liveInstructionIndices = annotation.live_instruction_indices;
+	const liveInternalNodeIndices = annotation.live_internal_node_indices;
 	const searchTokens = buildSearchTokens({
 		nodeId: node.node_id,
 		backendKind,
@@ -153,7 +129,7 @@ function deriveNodeSemantics(
 	return {
 		nodeId: node.node_id,
 		backendKind,
-		reachable: annotation?.reachable ?? reachableFallback,
+		reachable: annotation.reachable,
 		role,
 		sourceClass,
 		confidence,
@@ -177,20 +153,18 @@ function deriveNodeSemantics(
 	};
 }
 
-function hasSlotRead(node: NodeGenome): boolean {
-	if ("Vm" in node.backend_def) {
-		return node.backend_def.Vm.program.some((instruction) => {
+function hasSlotRead(node: BrainNode): boolean {
+	if ("Vm" in node.backend) {
+		return node.backend.Vm.program.some((instruction) => {
 			const semantics = classifyVmInstruction(instruction);
 			return semantics.readsSlot || semantics.readsPrevSlot;
 		});
 	}
 
-	if ("Graph" in node.backend_def) {
+	if ("Graph" in node.backend) {
 		// SharedMemory sources in any edge indicate slot reads
-		const graph = node.backend_def.Graph;
-		return graph.compute_nodes.some((cn) =>
-			cn.inputs.some((edge) => "SharedMemory" in edge.source),
-		);
+		const graph = node.backend.Graph;
+		return graph.compute_nodes.some((cn) => cn.edges.some((edge) => "SharedMemory" in edge.source));
 	}
 
 	return false;
@@ -248,21 +222,19 @@ function deriveConfidence({
 	hasStatefulBehavior,
 	slotReads,
 }: {
-	annotation?: CreatureMeshAnnotation;
+	annotation: NodeAnnotation;
 	role: MeshSemanticRole;
 	writeClasses: MeshWriteClass[];
 	readClasses: MeshReadClass[];
 	hasStatefulBehavior: boolean;
 	slotReads: boolean;
 }): MeshSemanticConfidence {
-	const hasAnnotationSignal = Boolean(
-		annotation &&
-			(annotation.read_classes.length > 0 ||
-				annotation.write_classes.length > 0 ||
-				annotation.has_stateful_behavior ||
-				(annotation.live_instruction_indices?.length ?? 0) > 0 ||
-				(annotation.live_internal_node_indices?.length ?? 0) > 0),
-	);
+	const hasAnnotationSignal =
+		annotation.read_classes.length > 0 ||
+		annotation.write_classes.length > 0 ||
+		annotation.has_stateful_behavior ||
+		annotation.live_instruction_indices.length > 0 ||
+		annotation.live_internal_node_indices.length > 0;
 
 	if (hasAnnotationSignal && role !== "memory_reader" && role !== "relay") {
 		return "high";

@@ -1,6 +1,8 @@
 import type { StartupPreset } from "../../../stores/startupConfig.ts";
-import type { SimState, SimulationConfig } from "../../../types/api.ts";
-import type { FoodFertilityLayerTarget, FoodTypeConfig } from "../../../types/config.ts";
+import type { FertilityLayerTarget } from "../../../types/generated/FertilityLayerTarget.ts";
+import type { FoodTypeConfig } from "../../../types/generated/FoodTypeConfig.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
+import type { SimulationStatus } from "../../../types/generated/SimulationStatus.ts";
 
 export interface FieldDef {
 	path: string;
@@ -58,7 +60,7 @@ export interface StartupPanelProps {
 	removeFoodType: (index: number) => void;
 	updateFoodType: (index: number, patch: Partial<FoodTypeConfig>) => void;
 	addFertilityLayer: () => void;
-	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
+	updateFertilityLayerTarget: (index: number, target: FertilityLayerTarget) => void;
 	randomizeSeed: () => void;
 }
 
@@ -70,7 +72,7 @@ export interface StartupSectionProps {
 export interface RuntimePanelProps {
 	localDraft: SimulationConfig;
 	serverConfig: SimulationConfig;
-	simState: SimState;
+	simState: SimulationStatus;
 	updateDraft: RuntimeUpdater;
 	/** Server reasons from the last rejected Apply, keyed by config path. */
 	fieldErrors: Record<string, string>;

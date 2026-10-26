@@ -1,7 +1,7 @@
 import { usePaintStore } from "../stores/paint.ts";
-import type { PaintTool } from "../types/api.ts";
+import type { PaintToolRequest } from "../types/generated/PaintToolRequest.ts";
 
-const TOOLS: { id: PaintTool; label: string; title: string }[] = [
+const TOOLS: { id: PaintToolRequest; label: string; title: string }[] = [
 	{ id: "barrier", label: "Barrier", title: "Draw barriers" },
 	{ id: "food", label: "Food", title: "Place food at max density" },
 	{ id: "erase_barrier", label: "- Barrier", title: "Erase barriers" },

@@ -1,5 +1,5 @@
 import { randomSeed } from "../../../stores/startupConfig.ts";
-import type { TerrainLayer } from "../../../types/config.ts";
+import type { TerrainLayer } from "../../../types/generated/TerrainLayer.ts";
 import { DEFAULT_PATTERN_PARAMS, type PatternType } from "../../../types/pattern.ts";
 import { PatternParamsPanel } from "../../pattern-params/PatternParamsPanel.tsx";
 import { NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";

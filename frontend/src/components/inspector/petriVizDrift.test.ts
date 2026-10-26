@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { ComputeNodeKind } from "../../types/genome.ts";
+import type { ComputeNodeKind } from "../../types/generated/ComputeNodeKind.ts";
 import { CATEGORY_COLORS } from "./GraphInternalsNode.tsx";
 import { EDGE_TINTS } from "./graphFlowAdapter.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
@@ -19,10 +19,10 @@ const SKILL = join(ROOT, ".agents/skills/petri-visuals/viz");
 // both, then update this fingerprint.
 const EVAL_RS_SHA256 = "7633522e8358e69eca347c5b29321ba1b109bc41cd7f3b4f207771366f1e6946";
 // sha256 of crates/v3-core/src/creature/genome/cgp/group.rs, the composition
-// source (`compose(own, scale, pattern)`) the renderer's edgeGroups and the
-// inspector's member-weight fallback mirror. When group.rs changes, review
-// both, then update this fingerprint.
-const GROUP_RS_SHA256 = "0e3ba70c063bb73e119aa930263d88a101542a11da830932f0575f9f5e8799c1";
+// source (`compose(own, scale, pattern)`, the ring and pair birth members)
+// the renderer's edgeGroups mirrors. When group.rs changes, review it, then
+// update this fingerprint.
+const GROUP_RS_SHA256 = "4224f6bbbedfbebce7b20a825135051e42aec28ff98157e69677eb8ed880836c";
 
 type Rgb = [number, number, number];
 interface PetriViz {

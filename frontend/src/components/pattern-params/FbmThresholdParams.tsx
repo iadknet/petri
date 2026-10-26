@@ -1,4 +1,6 @@
-import type { FbmThresholdParams as Params } from "../../types/pattern.ts";
+import type { PatternParamsOf } from "../../types/pattern.ts";
+
+type Params = PatternParamsOf<"FbmThreshold">;
 import { ParamField } from "./ParamField.tsx";
 
 const fields = [

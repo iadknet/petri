@@ -1,4 +1,4 @@
-import type { SimulationConfig } from "../../../types/api.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
 import { Category } from "../shared/Category.tsx";
 import { matchField, useConfigFilter } from "../shared/filter.ts";
 import { sameConfigNumber } from "../shared/numberFormat.ts";

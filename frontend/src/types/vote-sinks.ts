@@ -1,5 +1,11 @@
-import type { ActionParamField, DirectedVoteKind, VoteKind, VoteSink } from "./genome.ts";
+import type { ActionParamField } from "./generated/ActionParamField.ts";
+import type { ActionType } from "./generated/ActionType.ts";
+import type { DirectedVoteKind } from "./generated/DirectedVoteKind.ts";
+import type { VoteSink } from "./generated/VoteSink.ts";
 import catalog from "./vote-sinks.json";
+
+/** An action kind carrying votes and a bar: every action but `NoOp`. */
+export type VoteKind = Exclude<ActionType, "NoOp">;
 
 /** The action-vote catalog, as v3-core declares it (`creature/genome/vote.rs`
  * pins `vote-sinks.json` to the declarations; T27.F03). */

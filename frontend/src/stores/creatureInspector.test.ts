@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ActionResult, ActionType } from "../types/action-log.ts";
-import type { ActionLogEntry } from "../types/action-log.ts";
-import type { CreatureMeshAnnotation } from "../types/creature-detail.ts";
+import { annotation } from "../test/brainFixtures.ts";
+import type { ActionLogEntry } from "../types/generated/ActionLogEntry.ts";
+import type { ActionType } from "../types/generated/ActionType.ts";
+import type { NodeLearning } from "../types/generated/NodeLearning.ts";
 import { useCreatureInspectorStore } from "./creatureInspector.ts";
 
-function makeEntry(tick: number, actionType: ActionType = ActionType.Move): ActionLogEntry {
+function makeEntry(tick: number, actionType: ActionType = "Move"): ActionLogEntry {
 	return {
 		tick,
 		action_type: actionType,
-		result: ActionResult.Success,
+		result: "Success",
 		direction: 2,
 		energy_before: 100,
 		energy_after: 95,
@@ -18,7 +19,10 @@ function makeEntry(tick: number, actionType: ActionType = ActionType.Move): Acti
 	};
 }
 
-function makeDetail(overrides: Record<string, unknown> = {}) {
+/** The `setDetail` argument the resource hook builds. */
+type Detail = Parameters<ReturnType<typeof useCreatureInspectorStore.getState>["setDetail"]>[0];
+
+function makeDetail(overrides: Partial<Detail> = {}): Detail {
 	return {
 		id: 1,
 		position: { x: 10, y: 20 },
@@ -42,9 +46,20 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 			],
 			rgb: [255, 128, 64] as [number, number, number],
 		},
-		genome: { entry_node_id: 0, nodes: [] },
+		brain: {
+			entry_node_id: 0,
+			nodes: [
+				{
+					node_id: 0,
+					annotation: annotation({ read_classes: ["food"], write_classes: ["route"] }),
+					input_refs: [],
+					backend: { Vm: { register_count: 0, constants: [], program: [] } },
+					targets: [],
+				},
+			],
+		},
 		sharedMemory: [0, 1, 2],
-		actionLog: [makeEntry(1), makeEntry(2, ActionType.Eat)],
+		actionLog: [makeEntry(1), makeEntry(2, "Eat")],
 		diagnostics: {
 			current_inputs: {
 				food_here: 0.4,
@@ -56,6 +71,8 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 				reachable_node_count: 3,
 				stateful_reachable_node_count: 1,
 				barrier_reader_reachable_node_count: 1,
+				barrier_decision_writer_reachable_node_count: 1,
+				barrier_reader_without_decision_writer_reachable_node_count: 0,
 				distinct_upstream_slots_read: [0],
 				distinct_payload_slots_written: [1],
 				distinct_custom_output_slots_written: [2],
@@ -73,14 +90,11 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 	};
 }
 
-const meshAnnotationsFixture: CreatureMeshAnnotation[] = [
+const learningFixture: NodeLearning[] = [
 	{
 		node_id: 0,
-		reachable: true,
-		read_classes: ["food"],
-		write_classes: ["route"],
-		has_stateful_behavior: false,
-		live_instruction_indices: [0],
+		edges: [{ surface: "sink", container: 3, edge: 0, applied: 1.5 }],
+		scales: [{ group: 0, learned: 1.5, initialized: true }],
 	},
 ];
 
@@ -94,7 +108,7 @@ describe("creatureInspectorStore actionLog", () => {
 		const state = useCreatureInspectorStore.getState();
 
 		expect(state.selection.selectedCreatureId).toBeNull();
-		expect(state.staticDetail.genome?.entry_node_id).toBe(0);
+		expect(state.staticDetail.brain?.entry_node_id).toBe(0);
 		expect(state.runtimeSnapshot.sharedMemory).toEqual([0, 1, 2]);
 		expect(state.liveDetail.stats?.id).toBe(1);
 		expect(state.liveDetail.actionLog).toHaveLength(2);
@@ -114,9 +128,9 @@ describe("creatureInspectorStore actionLog", () => {
 		const log = useCreatureInspectorStore.getState().liveDetail.actionLog;
 		expect(log).toHaveLength(2);
 		expect(log?.[0]?.tick).toBe(1);
-		expect(log?.[0]?.action_type).toBe(ActionType.Move);
+		expect(log?.[0]?.action_type).toBe("Move");
 		expect(log?.[1]?.tick).toBe(2);
-		expect(log?.[1]?.action_type).toBe(ActionType.Eat);
+		expect(log?.[1]?.action_type).toBe("Eat");
 	});
 
 	it("replaces actionLog reference on every setDetail call", () => {
@@ -141,7 +155,7 @@ describe("creatureInspectorStore actionLog", () => {
 		const state = useCreatureInspectorStore.getState();
 		expect(state.selection.selectedCreatureId).toBe(99);
 		expect(state.liveDetail.actionLog).toBeNull();
-		expect(state.staticDetail.genome).toBeNull();
+		expect(state.staticDetail.brain).toBeNull();
 		expect(state.resourceMeta.isLoading).toBe(true);
 	});
 
@@ -153,7 +167,7 @@ describe("creatureInspectorStore actionLog", () => {
 		const state = useCreatureInspectorStore.getState();
 		expect(state.selection.selectedCreatureId).toBeNull();
 		expect(state.liveDetail.actionLog).toBeNull();
-		expect(state.staticDetail.genome).toBeNull();
+		expect(state.staticDetail.brain).toBeNull();
 		expect(state.resourceMeta.isLoading).toBe(false);
 	});
 
@@ -215,36 +229,34 @@ describe("creatureInspectorStore actionLog", () => {
 		expect(diagnostics).toBe(originalDiagnostics);
 	});
 
-	it("setDetail with genome: undefined preserves existing genome", () => {
+	it("setDetail with brain: undefined preserves existing genome", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		const originalGenome = useCreatureInspectorStore.getState().staticDetail.genome;
-		expect(originalGenome).not.toBeNull();
+		const originalBrain = useCreatureInspectorStore.getState().staticDetail.brain;
+		expect(originalBrain).not.toBeNull();
 
-		// Call setDetail without genome field.
-		useCreatureInspectorStore.getState().setDetail(makeDetail({ genome: undefined }));
-		const genome = useCreatureInspectorStore.getState().staticDetail.genome;
-		expect(genome).toBe(originalGenome);
+		// Call setDetail without the brain field.
+		useCreatureInspectorStore.getState().setDetail(makeDetail({ brain: undefined }));
+		const genome = useCreatureInspectorStore.getState().staticDetail.brain;
+		expect(genome).toBe(originalBrain);
 	});
 
-	it("stores mesh annotations with static detail and preserves them across incremental updates", () => {
-		const initialDetail = {
-			...makeDetail(),
-			meshAnnotations: meshAnnotationsFixture,
-		};
-		useCreatureInspectorStore.getState().setDetail(initialDetail);
+	it("keeps the brain across polls and replaces learning on every poll", () => {
+		useCreatureInspectorStore.getState().setDetail({ ...makeDetail(), learning: learningFixture });
 
 		const initialStatic = useCreatureInspectorStore.getState().staticDetail;
-		expect(initialStatic.meshAnnotations).toEqual(meshAnnotationsFixture);
+		expect(initialStatic.learning).toEqual(learningFixture);
+		expect(initialStatic.brain?.nodes[0]?.annotation.read_classes).toEqual(["food"]);
 
 		useCreatureInspectorStore.getState().setDetail(
 			makeDetail({
-				genome: undefined,
+				brain: undefined,
 				actionLog: [makeEntry(9)],
 				incremental: true,
 			}),
 		);
 
 		const nextStatic = useCreatureInspectorStore.getState().staticDetail;
-		expect(nextStatic.meshAnnotations).toEqual(meshAnnotationsFixture);
+		expect(nextStatic.brain).toBe(initialStatic.brain);
+		expect(nextStatic.learning).toBeNull();
 	});
 });

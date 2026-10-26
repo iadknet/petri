@@ -8,17 +8,15 @@ import { useStatsHistoryStore } from "../stores/stats.ts";
 import type { ViewRequest } from "../stores/viewport.ts";
 import { deriveViewRequest, useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
-import type {
-	HealthPayload,
-	ServerMessage,
-	SnapshotResponse,
-	StatusPayload,
-} from "../types/api.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
+import type { ServerMessage } from "../types/generated/ServerMessage.ts";
+import type { SnapshotResponse } from "../types/generated/SnapshotResponse.ts";
+import type { StatusEventPayload } from "../types/generated/StatusEventPayload.ts";
 
 function applyStatusToStores(
 	projectionRevision: number,
 	tick: number,
-	status: StatusPayload,
+	status: StatusEventPayload,
 	options?: { recordHistory?: boolean },
 ): void {
 	const sim = useSimulationStore.getState();

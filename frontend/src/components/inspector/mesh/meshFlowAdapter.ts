@@ -68,7 +68,7 @@ export function buildMeshFlowScene({
 
 		const semantics = semanticsById?.get(layoutNode.id) ?? null;
 		const tone = meshBackendTones[analysisNode.backendKind];
-		const summary = summarizeBackendDef(analysisNode.node.backend_def);
+		const summary = summarizeBackendDef(analysisNode.node.backend);
 		const dimmed = dimmedNodeIds.has(layoutNode.id);
 		const active = activeNodeId === layoutNode.id;
 		const inputPreview = semantics?.inputTexts.slice(0, 2).join(" · ") ?? "";

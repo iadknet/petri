@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { InputReference } from "../../types/genome.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
 import { resolveSelectedTarget } from "./GraphInternalsViz.tsx";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
 import { getKindLabel, getKindName } from "./graphNodeFormatters.ts";
@@ -32,10 +32,10 @@ describe("getKindName", () => {
 });
 
 describe("getKindLabel", () => {
-	const inputRefs: InputReference[] = [
-		{ World: "NeighborFoodRing" },
-		{ World: "FoodHere" },
-		{ UpstreamSlot: 0 },
+	const inputRefs: InputRef[] = [
+		{ family: "world", key: "NeighborFoodRing" },
+		{ family: "world", key: "FoodHere" },
+		{ family: "upstream", key: "UpstreamSlot", slot: 0 },
 	];
 
 	it("returns friendly names for string kinds", () => {

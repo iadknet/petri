@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
 import { analyzeMesh, collectMeshClosure, matchesBackendFilter } from "./meshAnalysis.ts";
 
-function makeGenome(): CreatureGenome {
+function makeGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
-				input_refs: [{ World: "FoodHere" }],
+				annotation: annotation(),
+				input_refs: [{ family: "world", key: "FoodHere" }],
 				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 2,
 						constants: [1],
@@ -20,17 +22,21 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
-				input_refs: [{ UpstreamSlot: 0 }],
+				annotation: annotation(),
+				input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 				targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Graph: {
+						groups: [],
 						compute_nodes: [
 							{
 								kind: "Add",
-								inputs: [
+								edges: [
 									{
 										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
-										own_weight: 1,
+										own: 1,
+										genomic: 1,
+										applied: 1,
 									},
 								],
 							},
@@ -38,7 +44,7 @@ function makeGenome(): CreatureGenome {
 						output_sinks: [
 							{
 								kind: { RouterGate: 0 },
-								inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
 							},
 						],
 					},
@@ -46,9 +52,10 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 3,
-				input_refs: [{ DynamicIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [{ family: "dynamic", key: "AgeTicks" }],
 				targets: [{ target_id: 99, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 1,
 						constants: [],
@@ -58,11 +65,13 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 8,
-				input_refs: [{ StaticIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [{ family: "static", key: "AgeTicks" }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Graph: {
-						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
+						groups: [],
+						compute_nodes: [{ kind: { Constant: 1 }, edges: [] }],
 						output_sinks: [],
 					},
 				},

@@ -2,8 +2,14 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSamplePlaybackStore } from "../../../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../../../stores/sampleSession.ts";
-import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../../types/trace.ts";
+import {
+	zeroDecisionInputs,
+	zeroKindCounts,
+	zeroRing,
+	zeroVotes,
+} from "../../../test/traceFixtures.ts";
+import type { ExecutionSamplePayload } from "../../../types/generated/ExecutionSamplePayload.ts";
+import type { TickTracePayload } from "../../../types/generated/TickTracePayload.ts";
 import { useInspectorSampler } from "./useInspectorSampler.ts";
 
 const mockClearSampling = vi.fn();
@@ -16,96 +22,99 @@ vi.mock("../../../hooks/useExecutionSampler.ts", () => ({
 	}),
 }));
 
-function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
-	const ticks = Array.from({ length: tickCount }, (_, i) => ({
-		tick_number: i,
-		heading: "N",
-		energy_before: 10,
-		energy_after: 9,
-		static_inputs: {
-			food_here: 0,
-			neighbor_food: [0, 0, 0, 0],
-			neighbor_barrier: [0, 0, 0, 0],
-			neighbor_occupied: [0, 0, 0, 0],
-			age_ticks: 5,
-			previous_outcome: [0, 0, 0, 0],
-		},
-		hops: [
-			{
-				hop_index: 0,
-				pass_index: 0,
-				vote_contribution: ZERO_VOTES,
-				decision_inputs: ZERO_DECISION_INPUTS,
-				node_id: 1,
-				input_refs: [],
-				upstream_slots: [],
-				energy_before: 10,
-				energy_after: 9.5,
-				output_slots: [],
-				route: null,
-				backend_trace: {
-					Vm: {
-						register_count: 4,
-						constants: [],
-						steps: [
-							{
-								pc: 0,
-								instruction: { Add: { dst: 0, a: 1, b: 2 } },
-								energy_cost: 0.1,
-								energy_after: 9.9,
-								register_changes: [],
-							},
-							{
-								pc: 1,
-								instruction: { Add: { dst: 0, a: 1, b: 2 } },
-								energy_cost: 0.1,
-								energy_after: 9.8,
-								register_changes: [],
-							},
-						],
-						final_registers: [0, 0, 0, 0],
-						final_payload: [],
-						slot_writes: [],
+function buildSample(creatureId: number, tickCount = 2): ExecutionSamplePayload {
+	const ticks = Array.from(
+		{ length: tickCount },
+		(_, i): TickTracePayload => ({
+			tick_number: i,
+			heading: "N",
+			energy_before: 10,
+			energy_after: 9,
+			static_inputs: {
+				food_here: 0,
+				neighbor_food: zeroRing(),
+				neighbor_barrier: zeroRing(),
+				neighbor_occupied: zeroRing(),
+				age_ticks: 5,
+				previous_outcome: [0, 0, 0, 0],
+			},
+			hops: [
+				{
+					hop_index: 0,
+					pass_index: 0,
+					vote_contribution: zeroVotes(),
+					decision_inputs: zeroDecisionInputs(),
+					node_id: 1,
+					input_refs: [],
+					upstream_slots: [],
+					energy_before: 10,
+					energy_after: 9.5,
+					output_slots: [],
+					route: null,
+					backend_trace: {
+						Vm: {
+							register_count: 4,
+							constants: [],
+							steps: [
+								{
+									pc: 0,
+									instruction: { Add: { dst: 0, a: 1, b: 2 } },
+									energy_cost: 0.1,
+									energy_after: 9.9,
+									register_changes: [],
+								},
+								{
+									pc: 1,
+									instruction: { Add: { dst: 0, a: 1, b: 2 } },
+									energy_cost: 0.1,
+									energy_after: 9.8,
+									register_changes: [],
+								},
+							],
+							final_registers: [0, 0, 0, 0],
+							final_payload: [],
+							slot_writes: [],
+						},
 					},
 				},
-			},
-			{
-				hop_index: 1,
-				pass_index: 0,
-				vote_contribution: ZERO_VOTES,
-				decision_inputs: ZERO_DECISION_INPUTS,
-				node_id: 2,
-				input_refs: [],
-				upstream_slots: [],
-				energy_before: 9.5,
-				energy_after: 9,
-				output_slots: [],
-				route: null,
-				backend_trace: {
-					Graph: {
-						passes: [
-							{
-								pass_index: 0,
-								energy_cost: 0.1,
-								energy_after: 9.4,
-								node_evaluations: [],
-								max_delta: 0,
-							},
-						],
-						temporal_committed: true,
-						final_outputs: [],
-						output_sinks: [],
+				{
+					hop_index: 1,
+					pass_index: 0,
+					vote_contribution: zeroVotes(),
+					decision_inputs: zeroDecisionInputs(),
+					node_id: 2,
+					input_refs: [],
+					upstream_slots: [],
+					energy_before: 9.5,
+					energy_after: 9,
+					output_slots: [],
+					route: null,
+					backend_trace: {
+						Graph: {
+							passes: [
+								{
+									pass_index: 0,
+									energy_cost: 0.1,
+									energy_after: 9.4,
+									node_evaluations: [],
+									max_delta: 0,
+								},
+							],
+							temporal_committed: true,
+							final_outputs: [],
+							output_sinks: [],
+						},
 					},
 				},
-			},
-		],
-		passes: [],
-		final_actions: ["NoOp" as const],
-		termination_reason: "NoDecision" as const,
-		debug_perception: null,
-		priority_bid: 0,
-		commit_counts: ZERO_KIND_COUNTS,
-	}));
+			],
+			passes: [],
+			final_actions: ["NoOp" as const],
+			termination_reason: "NoDecision" as const,
+			debug_perception: null,
+			priority_bid: 0,
+			commit_counts: zeroKindCounts(),
+		}),
+	);
 
 	return { creature_id: creatureId, ticks };
 }

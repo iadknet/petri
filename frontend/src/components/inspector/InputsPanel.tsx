@@ -1,10 +1,10 @@
 import { memo } from "react";
-import type { InputReference } from "../../types/genome.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { describeWholeInputRef, formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 interface InputsPanelProps {
-	inputRefs: InputReference[];
+	inputRefs: InputRef[];
 	upstreamSlots: number[];
 }
 

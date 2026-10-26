@@ -1,4 +1,6 @@
-import type { ParallelLinesParams } from "../../types/api.ts";
+import type { PatternParamsOf } from "../../types/pattern.ts";
+
+type ParallelLinesParams = PatternParamsOf<"ParallelLines">;
 import { ParamField } from "./ParamField.tsx";
 
 interface LinesParamsProps {

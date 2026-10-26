@@ -1,11 +1,9 @@
 import { create } from "zustand";
-import type { ActionLogEntry } from "../types/action-log.ts";
-import type {
-	CreatureDiagnostics,
-	CreatureMeshAnnotation,
-	NodeGraphWeights,
-} from "../types/creature-detail.ts";
-import type { CreatureGenome, CreaturePhenotype } from "../types/genome.ts";
+import type { ActionLogEntry } from "../types/generated/ActionLogEntry.ts";
+import type { BrainView } from "../types/generated/BrainView.ts";
+import type { CreatureDiagnosticsResponse } from "../types/generated/CreatureDiagnosticsResponse.ts";
+import type { CreaturePhenotypeResponse } from "../types/generated/CreaturePhenotypeResponse.ts";
+import type { NodeLearning } from "../types/generated/NodeLearning.ts";
 
 export interface CreatureStats {
 	id: number;
@@ -18,7 +16,7 @@ export interface CreatureStats {
 	heading: string;
 	complexity: number;
 	genomeSize: number;
-	phenotype: CreaturePhenotype;
+	phenotype: CreaturePhenotypeResponse;
 }
 
 export interface CreatureSelectionState {
@@ -26,10 +24,11 @@ export interface CreatureSelectionState {
 }
 
 export interface CreatureStaticDetailState {
-	genome: CreatureGenome | null;
-	meshAnnotations: CreatureMeshAnnotation[] | null;
-	/** Member genomic weights from the full fetch; `null` with no member. */
-	graphWeights: NodeGraphWeights[] | null;
+	/** The brain view from the full fetch (T30.F01). */
+	brain: BrainView | null;
+	/** The weights in force of the dynamic edges and the learned scales,
+	 * replaced on every poll; `null` with no dynamic edge. */
+	learning: NodeLearning[] | null;
 }
 
 export interface CreatureRuntimeSnapshotState {
@@ -39,7 +38,7 @@ export interface CreatureRuntimeSnapshotState {
 export interface CreatureLiveDetailState {
 	stats: CreatureStats | null;
 	actionLog: ActionLogEntry[] | null;
-	diagnostics: CreatureDiagnostics | null;
+	diagnostics: CreatureDiagnosticsResponse | null;
 }
 
 export interface CreatureResourceMetaState {
@@ -67,13 +66,12 @@ interface CreatureInspectorState {
 		heading: string;
 		complexity: number;
 		genomeSize: number;
-		phenotype: CreaturePhenotype;
-		genome?: CreatureGenome;
-		meshAnnotations?: CreatureMeshAnnotation[];
-		graphWeights?: NodeGraphWeights[];
+		phenotype: CreaturePhenotypeResponse;
+		brain?: BrainView;
+		learning?: NodeLearning[];
 		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
-		diagnostics?: CreatureDiagnostics;
+		diagnostics?: CreatureDiagnosticsResponse;
 		incremental?: boolean;
 	}) => void;
 	setDead: () => void;
@@ -100,7 +98,7 @@ function makeEmptyState(
 > {
 	return {
 		selection: { selectedCreatureId },
-		staticDetail: { genome: null, meshAnnotations: null, graphWeights: null },
+		staticDetail: { brain: null, learning: null },
 		runtimeSnapshot: { sharedMemory: null },
 		liveDetail: { stats: null, actionLog: null, diagnostics: null },
 		resourceMeta: { isLoading, error: null, isDead: false },
@@ -110,9 +108,8 @@ function makeEmptyState(
 export const creatureInspectorSelectors = {
 	selectedCreatureId: (state: CreatureInspectorState) => state.selection.selectedCreatureId,
 	creatureStats: (state: CreatureInspectorState) => state.liveDetail.stats,
-	creatureGenome: (state: CreatureInspectorState) => state.staticDetail.genome,
-	creatureMeshAnnotations: (state: CreatureInspectorState) => state.staticDetail.meshAnnotations,
-	creatureGraphWeights: (state: CreatureInspectorState) => state.staticDetail.graphWeights,
+	creatureBrain: (state: CreatureInspectorState) => state.staticDetail.brain,
+	creatureLearning: (state: CreatureInspectorState) => state.staticDetail.learning,
 	creatureSharedMemory: (state: CreatureInspectorState) => state.runtimeSnapshot.sharedMemory,
 	actionLog: (state: CreatureInspectorState) => state.liveDetail.actionLog,
 	creatureDiagnostics: (state: CreatureInspectorState) => state.liveDetail.diagnostics,
@@ -149,20 +146,14 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			phenotype: detail.phenotype,
 		};
 
-		let genome = state.staticDetail.genome;
-		if (detail.genome && !genome) {
-			genome = detail.genome;
+		let brain = state.staticDetail.brain;
+		if (detail.brain && !brain) {
+			brain = detail.brain;
 		}
 
-		let meshAnnotations = state.staticDetail.meshAnnotations;
-		if (detail.meshAnnotations && !meshAnnotations) {
-			meshAnnotations = detail.meshAnnotations;
-		}
-
-		// Every fetch carries the weights (absent: no member and no plastic
-		// edge), and learned weights move between polls (T25.F06), so each
-		// response replaces the stored value.
-		const graphWeights = detail.graphWeights ?? null;
+		// Every fetch carries `learning` (absent: no dynamic edge), and the
+		// weights in force move between polls, so each response replaces it.
+		const learning = detail.learning ?? null;
 
 		let sharedMemory = state.runtimeSnapshot.sharedMemory;
 		if (detail.sharedMemory && (!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))) {
@@ -185,7 +176,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 		const diagnostics = detail.diagnostics ?? state.liveDetail.diagnostics;
 
 		set({
-			staticDetail: { genome, meshAnnotations, graphWeights },
+			staticDetail: { brain, learning },
 			runtimeSnapshot: { sharedMemory },
 			liveDetail: { stats, actionLog, diagnostics },
 			resourceMeta: {

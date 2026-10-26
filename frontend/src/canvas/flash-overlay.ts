@@ -1,4 +1,4 @@
-import type { PredationEvent } from "../types/api.ts";
+import type { PredationEventSnapshot } from "../types/generated/PredationEventSnapshot.ts";
 import type { CameraState } from "./camera.ts";
 
 /** How long a predation ring stays on screen, in milliseconds. */
@@ -23,7 +23,7 @@ interface FlashEntry {
 export class FlashOverlay {
 	private flashes = new Map<string, FlashEntry>();
 
-	ingest(events: readonly PredationEvent[], now: number): void {
+	ingest(events: readonly PredationEventSnapshot[], now: number): void {
 		for (const event of events) {
 			this.flashes.set(`a${event.attacker_x},${event.attacker_y}`, {
 				x: event.attacker_x,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { MOCK_STATUS } from "../test/fixtures.ts";
 import { useSimulationStore } from "./simulation.ts";
 
 describe("SimulationStore", () => {
@@ -22,6 +23,7 @@ describe("SimulationStore", () => {
 
 	it("updates simState from status payload", () => {
 		useSimulationStore.getState().setStatus(1, 10, {
+			...MOCK_STATUS,
 			state: "paused",
 			population: 50,
 			mean_energy: 37.4,
@@ -67,6 +69,7 @@ describe("SimulationStore", () => {
 
 	it("does not regress paused state on same-tick running status update", () => {
 		useSimulationStore.getState().setStatus(1, 10, {
+			...MOCK_STATUS,
 			state: "paused",
 			population: 50,
 			mean_energy: 37.4,
@@ -107,6 +110,7 @@ describe("SimulationStore", () => {
 		});
 
 		useSimulationStore.getState().setStatus(1, 10, {
+			...MOCK_STATUS,
 			state: "running",
 			population: 51,
 			mean_energy: 37.8,
@@ -152,6 +156,7 @@ describe("SimulationStore", () => {
 
 	it("allows a newer projection revision to reset tick back to zero", () => {
 		useSimulationStore.getState().setStatus(3, 25, {
+			...MOCK_STATUS,
 			state: "paused",
 			population: 50,
 			mean_energy: 37.4,
@@ -192,6 +197,7 @@ describe("SimulationStore", () => {
 		});
 
 		useSimulationStore.getState().setStatus(4, 0, {
+			...MOCK_STATUS,
 			state: "idle",
 			population: 0,
 			mean_energy: 0,
@@ -239,6 +245,7 @@ describe("SimulationStore", () => {
 
 	it("ignores stale status from an older projection revision even if the tick is higher", () => {
 		useSimulationStore.getState().setStatus(4, 0, {
+			...MOCK_STATUS,
 			state: "idle",
 			population: 0,
 			mean_energy: 0,
@@ -279,6 +286,7 @@ describe("SimulationStore", () => {
 		});
 
 		useSimulationStore.getState().setStatus(3, 30, {
+			...MOCK_STATUS,
 			state: "running",
 			population: 50,
 			mean_energy: 37.4,

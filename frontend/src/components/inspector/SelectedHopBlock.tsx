@@ -1,10 +1,10 @@
 import { memo } from "react";
-import type { MeshHopTrace } from "../../types/trace.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
 import { OUTCOME_CHANNELS, VOTE_KINDS } from "../../types/trace.ts";
 import { voteSinkLabel } from "./graphNodeFormatters.ts";
 
 interface SelectedHopBlockProps {
-	hop: MeshHopTrace;
+	hop: MeshHopTracePayload;
 	/** The tick's `PreviousOutcome` channels, frozen for every dispatch. */
 	previousOutcome: readonly number[];
 }

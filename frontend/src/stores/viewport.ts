@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import type { CameraState } from "../canvas/camera.ts";
-import type { ViewRect, ZoomTier } from "../types/api.ts";
+import type { ViewRectPayload } from "../types/generated/ViewRectPayload.ts";
+import type { ZoomTier } from "../types/generated/ZoomTier.ts";
 
 export const DETAIL_ZOOM_THRESHOLD = 4;
 export const INSPECT_ZOOM_THRESHOLD = 6;
 
 export interface ViewRequest {
-	rect: ViewRect;
+	rect: ViewRectPayload;
 	canvas: { width: number; height: number };
 	zoomTier: ZoomTier;
 }
@@ -50,7 +51,7 @@ function deriveRect(
 	camera: CameraState,
 	canvas: ViewportDimensions,
 	world: ViewportDimensions,
-): ViewRect {
+): ViewRectPayload {
 	const left = clamp(Math.floor(-camera.x / camera.zoom), 0, world.width);
 	const top = clamp(Math.floor(-camera.y / camera.zoom), 0, world.height);
 	const right = clamp(Math.ceil((canvas.width - camera.x) / camera.zoom), left, world.width);

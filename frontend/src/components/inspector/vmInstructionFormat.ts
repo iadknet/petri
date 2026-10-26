@@ -1,4 +1,5 @@
-import type { InputReference, VmInstruction } from "../../types/genome.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { VmInstruction } from "../../types/generated/VmInstruction.ts";
 import { voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import {
 	actionParamDescription,
@@ -81,7 +82,7 @@ const OPCODE_LABELS: Record<string, string> = {
  */
 export function formatReadableInstruction(
 	instruction: VmInstruction,
-	inputRefs: InputReference[],
+	inputRefs: InputRef[],
 	constants: number[],
 	index: number,
 ): ReadableInstruction {
@@ -126,7 +127,7 @@ function reg(idx: number): string {
 	return `r${idx}`;
 }
 
-function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputReference[]): string {
+function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputRef[]): string {
 	const ref = inputRefs[refIdx];
 	if (!ref) return `input[${refIdx}]`;
 	return describeInputRef(ref, subIdx).label;
@@ -136,7 +137,7 @@ function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputReferen
 function describeOperands(
 	name: string,
 	p: Record<string, number>,
-	inputRefs: InputReference[],
+	inputRefs: InputRef[],
 ): string | undefined {
 	switch (name) {
 		case "ReadInput": {
@@ -174,7 +175,7 @@ function describeOperands(
 function formatOperands(
 	name: string,
 	p: Record<string, number>,
-	inputRefs: InputReference[],
+	inputRefs: InputRef[],
 	constants: number[],
 	index: number,
 ): string {

@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { BackendDef } from "../../types/genome.ts";
+import type { BrainBackend } from "../../types/generated/BrainBackend.ts";
 import { NodeBackendDetail } from "./NodeBackendDetail.tsx";
 
 describe("NodeBackendDetail", () => {
 	it("renders VM instructions with junk marking", () => {
-		const backendDef: BackendDef = {
+		const backendDef: BrainBackend = {
 			Vm: {
 				register_count: 2,
 				constants: [1, 2],
@@ -20,7 +20,7 @@ describe("NodeBackendDetail", () => {
 		render(
 			<NodeBackendDetail
 				backendDef={backendDef}
-				inputRefs={[{ World: "FoodHere" }]}
+				inputRefs={[{ family: "world", key: "FoodHere" }]}
 				liveInstructionIndices={[0, 2]}
 				liveInternalNodeIndices={[]}
 			/>,
@@ -36,12 +36,15 @@ describe("NodeBackendDetail", () => {
 	});
 
 	it("returns null for Graph backends (handled by GraphInternalsViz)", () => {
-		const backendDef: BackendDef = {
+		const backendDef: BrainBackend = {
 			Graph: {
+				groups: [],
 				compute_nodes: [
 					{
 						kind: "Add",
-						inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
+						edges: [
+							{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own: 1, genomic: 1, applied: 1 },
+						],
 					},
 				],
 				output_sinks: [],

@@ -1,5 +1,5 @@
 import type { StartupPreset } from "../../../stores/startupConfig.ts";
-import type { SimulationConfig } from "../../../types/api.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
 import { Category, Unfiltered } from "../shared/Category.tsx";
 import { baselineValueAt } from "../shared/baseline.ts";
 import { matchesTerms, useConfigFilter } from "../shared/filter.ts";

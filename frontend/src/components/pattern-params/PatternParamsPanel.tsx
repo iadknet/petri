@@ -1,4 +1,4 @@
-import type { PatternParams } from "../../types/pattern.ts";
+import type { PatternParams } from "../../types/generated/PatternParams.ts";
 import { FbmThresholdParams } from "./FbmThresholdParams.tsx";
 import { LinesParams } from "./LinesParams.tsx";
 import { MazeParams } from "./MazeParams.tsx";

@@ -1,4 +1,4 @@
-import type { PatternBounds } from "../types/api.ts";
+import type { PatternBounds } from "../types/generated/PatternBounds.ts";
 
 /**
  * Decode a base64-encoded pattern bitmap into a Set of "x,y" cell keys.

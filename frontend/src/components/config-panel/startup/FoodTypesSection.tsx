@@ -1,5 +1,5 @@
 import type { StartupPreset } from "../../../stores/startupConfig.ts";
-import type { FoodTypeConfig } from "../../../types/config.ts";
+import type { FoodTypeConfig } from "../../../types/generated/FoodTypeConfig.ts";
 import { FoodTypeCard } from "./FoodTypeCard.tsx";
 
 interface FoodTypesSectionProps {

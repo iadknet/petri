@@ -7,10 +7,11 @@ import {
 } from "../stores/inspectorWorkspace.ts";
 import { useSamplePlaybackStore } from "../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../stores/sampleSession.ts";
-import { ActionResult, ActionType } from "../types/action-log.ts";
-import type { ActionLogEntry } from "../types/action-log.ts";
-import type { CreatureMeshAnnotation } from "../types/creature-detail.ts";
-import type { CreatureGenome } from "../types/genome.ts";
+import { annotation, withAnnotations } from "../test/brainFixtures.ts";
+import type { ActionLogEntry } from "../types/generated/ActionLogEntry.ts";
+import type { ActionType } from "../types/generated/ActionType.ts";
+import type { BrainView } from "../types/generated/BrainView.ts";
+import type { NodeAnnotation } from "../types/generated/NodeAnnotation.ts";
 import CreatureInspector from "./CreatureInspector.tsx";
 
 const startSampling = vi.fn();
@@ -32,11 +33,11 @@ vi.mock("./inspector/mesh/MeshCanvas.tsx", () => ({
 	MeshCanvas: () => <div data-testid="mesh-canvas">MeshCanvas</div>,
 }));
 
-function makeActionEntry(tick: number, actionType: ActionType = ActionType.Move): ActionLogEntry {
+function makeActionEntry(tick: number, actionType: ActionType = "Move"): ActionLogEntry {
 	return {
 		tick,
 		action_type: actionType,
-		result: ActionResult.Success,
+		result: "Success",
 		direction: 2,
 		energy_before: 20,
 		energy_after: 18,
@@ -46,15 +47,19 @@ function makeActionEntry(tick: number, actionType: ActionType = ActionType.Move)
 	};
 }
 
-function makeGenome(): CreatureGenome {
+function makeGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
-				input_refs: [{ World: "FoodHere" }, { DynamicIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [
+					{ family: "world", key: "FoodHere" },
+					{ family: "dynamic", key: "AgeTicks" },
+				],
 				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 2,
 						constants: [1, 2],
@@ -68,18 +73,30 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
-				input_refs: [{ DynamicIntrospection: "Random" }],
+				annotation: annotation(),
+				input_refs: [{ family: "dynamic", key: "EnergyCurrent" }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Graph: {
+						groups: [],
 						compute_nodes: [
 							{
 								kind: "Add",
-								inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
+								edges: [
+									{
+										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+										own: 1,
+										genomic: 1,
+										applied: 1,
+									},
+								],
 							},
 						],
 						output_sinks: [
-							{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }] },
+							{
+								kind: { RouterGate: 0 },
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
+							},
 						],
 					},
 				},
@@ -88,26 +105,11 @@ function makeGenome(): CreatureGenome {
 	};
 }
 
-function makeMeshAnnotations(): CreatureMeshAnnotation[] {
-	return [
-		{
-			node_id: 1,
-			reachable: true,
-			read_classes: ["food"],
-			write_classes: ["route"],
-			has_stateful_behavior: false,
-			live_instruction_indices: [0, 1],
-		},
-		{
-			node_id: 2,
-			reachable: true,
-			read_classes: ["upstream"],
-			write_classes: ["route"],
-			has_stateful_behavior: false,
-			live_internal_node_indices: [0],
-		},
-	];
-}
+/** The server's annotations of `makeGenome`'s nodes, by node id. */
+const MESH_ANNOTATIONS = {
+	1: { read_classes: ["food"], write_classes: ["route"], live_instruction_indices: [0, 1] },
+	2: { read_classes: ["upstream"], write_classes: ["route"], live_internal_node_indices: [0] },
+} satisfies Record<number, Partial<NodeAnnotation>>;
 
 function makeDetail(id: number) {
 	return {
@@ -133,10 +135,9 @@ function makeDetail(id: number) {
 			],
 			rgb: [255, 128, 64] as [number, number, number],
 		},
-		genome: makeGenome(),
-		meshAnnotations: makeMeshAnnotations(),
+		brain: withAnnotations(makeGenome(), MESH_ANNOTATIONS),
 		sharedMemory: [0, 65, 255, 12, 0, 1],
-		actionLog: [makeActionEntry(10), makeActionEntry(11, ActionType.Eat)],
+		actionLog: [makeActionEntry(10), makeActionEntry(11, "Eat")],
 	};
 }
 

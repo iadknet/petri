@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { annotation } from "../../test/brainFixtures.ts";
 import { NodeInspector } from "./NodeInspector.tsx";
 import type { MeshAnalyzedNode } from "./mesh/meshAnalysis.ts";
 import type { MeshNodeSemantics } from "./mesh/meshSemantics.ts";
@@ -31,9 +32,10 @@ function makeAnalyzedNode(overrides: Partial<MeshAnalyzedNode> = {}): MeshAnalyz
 		id: 1,
 		node: {
 			node_id: 1,
-			input_refs: [{ World: "FoodHere" }],
+			annotation: annotation(),
+			input_refs: [{ family: "world", key: "FoodHere" }],
 			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 2,
 					constants: [],

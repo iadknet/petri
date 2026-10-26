@@ -1,25 +1,27 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useInspectorWorkspaceStore } from "../../../stores/inspectorWorkspace.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
 import { useMeshDerivation } from "./useMeshDerivation.ts";
 
 vi.mock("../mesh/useMeshLayout.ts", () => ({
 	useMeshLayout: () => ({ layout: null, error: null }),
 }));
 
-function makeGenome(): CreatureGenome {
+function makeGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
-				input_refs: [{ World: "FoodHere" }],
+				annotation: annotation(),
+				input_refs: [{ family: "world", key: "FoodHere" }],
 				targets: [
 					{ target_id: 2, slot: 0, gate_bias: 0.0 },
 					{ target_id: 4, slot: 1, gate_bias: 0.0 },
 				],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 2,
 						constants: [1, 2],
@@ -33,31 +35,44 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
-				input_refs: [{ UpstreamSlot: 0 }],
+				annotation: annotation(),
+				input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 				targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Graph: {
+						groups: [],
 						compute_nodes: [
 							{
 								kind: "Add",
-								inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 1 }],
+								edges: [
+									{
+										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+										own: 1,
+										genomic: 1,
+										applied: 1,
+									},
+								],
 							},
 							{
 								kind: { DecayIntegrator: 0.2 },
-								inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
 							},
 						],
 						output_sinks: [
-							{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 1 }, own_weight: 1 }] },
+							{
+								kind: { RouterGate: 0 },
+								edges: [{ source: { ComputeNode: 1 }, own: 1, genomic: 1, applied: 1 }],
+							},
 						],
 					},
 				},
 			},
 			{
 				node_id: 3,
-				input_refs: [{ UpstreamSlot: 0 }],
+				annotation: annotation(),
+				input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 1,
 						constants: [],
@@ -67,15 +82,17 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 4,
-				input_refs: [{ DynamicIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [{ family: "dynamic", key: "AgeTicks" }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Graph: {
-						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
+						groups: [],
+						compute_nodes: [{ kind: { Constant: 1 }, edges: [] }],
 						output_sinks: [
 							{
 								kind: { CustomOutput: 1 },
-								inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
 							},
 						],
 					},
@@ -83,9 +100,10 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 9,
-				input_refs: [{ StaticIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [{ family: "static", key: "AgeTicks" }],
 				targets: [],
-				backend_def: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
+				backend: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
 			},
 		],
 	};
@@ -98,15 +116,15 @@ describe("useMeshDerivation", () => {
 
 	it("returns analysis with correct node count", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		expect(result.current.analysis.nodes).toHaveLength(5);
 		expect(result.current.analysis.entryNodeId).toBe(1);
 	});
 
-	it("derives mesh semantics from genome and annotations", () => {
+	it("derives mesh semantics from the brain view", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		expect(result.current.semantics).not.toBeNull();
 		expect(result.current.semantics!.nodes).toHaveLength(5);
@@ -115,7 +133,7 @@ describe("useMeshDerivation", () => {
 
 	it("defaults detailNode to entry node when no selection", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		expect(result.current.detailNode).not.toBeNull();
 		expect(result.current.detailNode!.id).toBe(1);
@@ -126,7 +144,7 @@ describe("useMeshDerivation", () => {
 
 		// Case 1: Neither selectedNodeId nor activeNodeId => entryNodeId (1)
 		const { result, rerender } = renderHook(
-			({ activeNodeId }) => useMeshDerivation(genome, null, activeNodeId),
+			({ activeNodeId }) => useMeshDerivation(genome, activeNodeId),
 			{ initialProps: { activeNodeId: null as number | null } },
 		);
 		expect(result.current.detailNode!.id).toBe(1);
@@ -145,7 +163,7 @@ describe("useMeshDerivation", () => {
 	it("dims unreachable nodes when dimUnreachable is true", () => {
 		const genome = makeGenome();
 		// dimUnreachable defaults to true in the store
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		// Node 9 is unreachable (not in the entry node's forward closure)
 		expect(result.current.dimmedNodeIds.has(9)).toBe(true);
@@ -155,7 +173,7 @@ describe("useMeshDerivation", () => {
 
 	it("dims filtered-out backend nodes", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		// Set filter to "graph" — VM nodes (1, 3, 9) should be dimmed
 		act(() => {
@@ -173,7 +191,7 @@ describe("useMeshDerivation", () => {
 
 	it("dims nodes outside focus closure", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		// First disable dimUnreachable so only focus affects dimming
 		act(() => {
@@ -198,7 +216,7 @@ describe("useMeshDerivation", () => {
 
 	it("handleNodeSelect updates store selectedNodeId", () => {
 		const genome = makeGenome();
-		const { result } = renderHook(() => useMeshDerivation(genome, null, null));
+		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
 		act(() => {
 			result.current.handleNodeSelect(3);

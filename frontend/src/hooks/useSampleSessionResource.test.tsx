@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
 import { useSamplePlaybackStore } from "../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../stores/sampleSession.ts";
-import type { ExecutionSample, SampleResponse } from "../types/trace.ts";
-import { ZERO_KIND_COUNTS } from "../types/trace.ts";
+import { zeroKindCounts, zeroRing } from "../test/traceFixtures.ts";
+import type { ExecutionSamplePayload } from "../types/generated/ExecutionSamplePayload.ts";
+import type { SampleResponse } from "../types/generated/SampleResponse.ts";
 import { useSampleSessionResource } from "./useSampleSessionResource.ts";
 
 vi.mock("../api/rest.ts", () => ({
@@ -21,7 +22,7 @@ function Harness() {
 	return null;
 }
 
-function buildSample(creatureId: number): ExecutionSample {
+function buildSample(creatureId: number): ExecutionSamplePayload {
 	return {
 		creature_id: creatureId,
 		ticks: [
@@ -32,9 +33,9 @@ function buildSample(creatureId: number): ExecutionSample {
 				energy_after: 9,
 				static_inputs: {
 					food_here: 0,
-					neighbor_food: [0, 0, 0, 0],
-					neighbor_barrier: [0, 0, 0, 0],
-					neighbor_occupied: [0, 0, 0, 0],
+					neighbor_food: zeroRing(),
+					neighbor_barrier: zeroRing(),
+					neighbor_occupied: zeroRing(),
 					age_ticks: 5,
 					previous_outcome: [0, 0, 0, 0],
 				},
@@ -44,7 +45,7 @@ function buildSample(creatureId: number): ExecutionSample {
 				termination_reason: "NoDecision",
 				debug_perception: null,
 				priority_bid: 0,
-				commit_counts: ZERO_KIND_COUNTS,
+				commit_counts: zeroKindCounts(),
 			},
 		],
 	};

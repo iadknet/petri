@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { annotation } from "../../../test/brainFixtures.ts";
 import { MeshFlowCanvas } from "./MeshFlowCanvas.tsx";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
 import type { MeshLayout, MeshLayoutNode } from "./meshLayout.ts";
@@ -57,9 +58,10 @@ vi.mock("./MeshFlowEdge.tsx", () => ({
 function makeAnalysis(): MeshAnalysis {
 	const node = {
 		node_id: 1,
-		input_refs: [{ World: "FoodHere" }],
+		annotation: annotation(),
+		input_refs: [{ family: "world", key: "FoodHere" }],
 		targets: [],
-		backend_def: {
+		backend: {
 			Vm: {
 				register_count: 1,
 				constants: [],

@@ -1,17 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
 import { analyzeMesh } from "./meshAnalysis.ts";
 import { createElk, layoutMesh } from "./meshLayout.ts";
 
-function makeCyclicGenome(): CreatureGenome {
+function makeCyclicGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
+				annotation: annotation(),
 				input_refs: [],
 				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 1,
 						constants: [],
@@ -21,20 +23,23 @@ function makeCyclicGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
+				annotation: annotation(),
 				input_refs: [],
 				targets: [{ target_id: 1, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Graph: {
-						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
+						groups: [],
+						compute_nodes: [{ kind: { Constant: 1 }, edges: [] }],
 						output_sinks: [],
 					},
 				},
 			},
 			{
 				node_id: 9,
+				annotation: annotation(),
 				input_refs: [],
 				targets: [{ target_id: 42, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 1,
 						constants: [],

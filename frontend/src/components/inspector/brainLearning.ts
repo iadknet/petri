@@ -1,0 +1,64 @@
+import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
+import type { BrainGroup } from "../../types/generated/BrainGroup.ts";
+import type { LearningEdge } from "../../types/generated/LearningEdge.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
+import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
+
+/**
+ * The runtime state of one edge: `brain`'s edge joined to its `learning`
+ * entry by `(surface, container, edge)` (T30.F01 invariant 5). A listed edge
+ * takes the poll's values; any other keeps the brain's. Nothing is
+ * recomputed.
+ */
+export interface EdgeState {
+	/** The weight in force. */
+	applied: number;
+	/** A learner's learned own quantity, when initialized. */
+	learned?: number;
+	/** A modulated learner's eligibility trace, when initialized. */
+	trace?: number;
+	/** A learner's initialization; absent for a non-learner. */
+	initialized?: boolean;
+}
+
+/** Joins a node's `learning` entry to its brain edges. */
+export interface LearningJoin {
+	/** The runtime state of `edge` at `(surface, container, index)`. */
+	edge(surface: WeightSurface, container: number, index: number, edge: BrainEdge): EdgeState;
+	/** The learned scale of group `index`, when its scale slot is initialized. */
+	learnedScale(index: number, group: BrainGroup | undefined): number | undefined;
+}
+
+export function joinLearning(learning: NodeLearning | null): LearningJoin {
+	const entries = new Map<string, LearningEdge>(
+		(learning?.edges ?? []).map((entry) => [
+			`${entry.surface}:${entry.container}:${entry.edge}`,
+			entry,
+		]),
+	);
+	const scales = new Map((learning?.scales ?? []).map((scale) => [scale.group, scale]));
+	return {
+		edge(surface, container, index, edge) {
+			const entry = entries.get(`${surface}:${container}:${index}`);
+			if (entry === undefined) {
+				const learner = edge.learner;
+				return {
+					applied: edge.applied,
+					...(learner?.learned === undefined ? {} : { learned: learner.learned }),
+					...(learner?.trace === undefined ? {} : { trace: learner.trace }),
+					...(learner === undefined ? {} : { initialized: learner.initialized }),
+				};
+			}
+			return {
+				applied: entry.applied,
+				...(entry.learned === undefined ? {} : { learned: entry.learned }),
+				...(entry.trace === undefined ? {} : { trace: entry.trace }),
+				...(entry.initialized === undefined ? {} : { initialized: entry.initialized }),
+			};
+		},
+		learnedScale(index, group) {
+			const scale = scales.get(index);
+			return scale === undefined ? group?.learned_scale : scale.learned;
+		},
+	};
+}

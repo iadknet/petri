@@ -1,4 +1,4 @@
-import type { ClientMessage } from "../types/api.ts";
+import type { ClientMessage } from "../types/generated/ClientMessage.ts";
 import {
 	type WsClientEvent,
 	type WsConnectionStatus,

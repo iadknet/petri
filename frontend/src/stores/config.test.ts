@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
-import type { SimulationConfig } from "../types/api.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
 import { useConfigStore } from "./config.ts";
 
 describe("ConfigStore", () => {

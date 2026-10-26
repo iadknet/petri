@@ -1,4 +1,6 @@
-import type { BackendDef, ComputeNodeKind, VmInstruction } from "../../../types/genome.ts";
+import type { BrainBackend } from "../../../types/generated/BrainBackend.ts";
+import type { ComputeNodeKind } from "../../../types/generated/ComputeNodeKind.ts";
+import type { VmInstruction } from "../../../types/generated/VmInstruction.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
 import {
 	classifyComputeNodeKind,
@@ -39,7 +41,7 @@ export const meshBackendTones: Record<"vm" | "graph", MeshBackendTone> = {
 	},
 };
 
-export function summarizeBackendDef(backendDef: BackendDef): MeshPresentationSummary {
+export function summarizeBackendDef(backendDef: BrainBackend): MeshPresentationSummary {
 	if ("Vm" in backendDef) {
 		return {
 			label: "VM",
@@ -48,7 +50,7 @@ export function summarizeBackendDef(backendDef: BackendDef): MeshPresentationSum
 	}
 
 	const graph = backendDef.Graph;
-	const wired = graph.output_sinks.filter((s) => s.inputs.length > 0);
+	const wired = graph.output_sinks.filter((s) => s.edges.length > 0);
 	const wiredActions = wired.filter(
 		(s) => "ActionVote" in s.kind || "ActionParam" in s.kind,
 	).length;

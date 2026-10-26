@@ -11,11 +11,8 @@ function CreatureInspector() {
 	useCreatureDetail();
 
 	const stats = useCreatureInspectorStore(creatureInspectorSelectors.creatureStats);
-	const genome = useCreatureInspectorStore(creatureInspectorSelectors.creatureGenome);
-	const meshAnnotations = useCreatureInspectorStore(
-		creatureInspectorSelectors.creatureMeshAnnotations,
-	);
-	const graphWeights = useCreatureInspectorStore(creatureInspectorSelectors.creatureGraphWeights);
+	const brain = useCreatureInspectorStore(creatureInspectorSelectors.creatureBrain);
+	const learning = useCreatureInspectorStore(creatureInspectorSelectors.creatureLearning);
 	const sharedMemory = useCreatureInspectorStore(creatureInspectorSelectors.creatureSharedMemory);
 	const actionLog = useCreatureInspectorStore(creatureInspectorSelectors.actionLog);
 	const diagnostics = useCreatureInspectorStore(creatureInspectorSelectors.creatureDiagnostics);
@@ -66,16 +63,15 @@ function CreatureInspector() {
 		);
 	}
 
-	if (!stats || !genome) {
+	if (!stats || !brain) {
 		return null;
 	}
 
 	return (
 		<UnifiedInspector
 			creatureId={stats.id}
-			genome={genome}
-			meshAnnotations={meshAnnotations}
-			graphWeights={graphWeights}
+			brain={brain}
+			learning={learning}
 			sharedMemory={sharedMemory}
 			actionLog={actionLog}
 			diagnostics={diagnostics}

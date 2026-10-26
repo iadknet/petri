@@ -8,7 +8,7 @@ import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
-import type { Frame } from "../types/api.ts";
+import type { Frame } from "../types/protocol.ts";
 import { StatsPanel } from "./StatsPanel.tsx";
 import { WorldViewport } from "./WorldViewport.tsx";
 

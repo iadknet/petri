@@ -1,10 +1,10 @@
-import type { MeshHopTrace } from "../../types/trace.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
 import { GraphExecutionView } from "./GraphExecutionView.tsx";
 import { VmExecutionView } from "./VmExecutionView.tsx";
 
 interface NodeExecutionTraceProps {
 	executionHop: {
-		hop: MeshHopTrace;
+		hop: MeshHopTracePayload;
 		detailIndex: number;
 	} | null;
 }

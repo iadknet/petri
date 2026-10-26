@@ -1,8 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { SamplerPosition } from "../../stores/samplePlayback.ts";
-import type { ExecutionSample, TickTrace } from "../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../types/trace.ts";
+import {
+	zeroDecisionInputs,
+	zeroKindCounts,
+	zeroRing,
+	zeroVotes,
+} from "../../test/traceFixtures.ts";
+import type { ExecutionSamplePayload } from "../../types/generated/ExecutionSamplePayload.ts";
+import type { TickTracePayload } from "../../types/generated/TickTracePayload.ts";
 import { SamplerBar } from "./SamplerBar.tsx";
 
 vi.mock("./TickTimeline.tsx", () => ({
@@ -12,17 +18,17 @@ vi.mock("./MeshHopTimeline.tsx", () => ({
 	MeshHopTimeline: () => <div data-testid="mesh-hop-timeline">MeshHopTimeline</div>,
 }));
 
-function buildSample(tickCount = 2): ExecutionSample {
-	const ticks: TickTrace[] = Array.from({ length: tickCount }, (_, i) => ({
+function buildSample(tickCount = 2): ExecutionSamplePayload {
+	const ticks: TickTracePayload[] = Array.from({ length: tickCount }, (_, i) => ({
 		tick_number: i,
 		heading: "N",
 		energy_before: 10,
 		energy_after: 9,
 		static_inputs: {
 			food_here: 0,
-			neighbor_food: [0, 0, 0, 0],
-			neighbor_barrier: [0, 0, 0, 0],
-			neighbor_occupied: [0, 0, 0, 0],
+			neighbor_food: zeroRing(),
+			neighbor_barrier: zeroRing(),
+			neighbor_occupied: zeroRing(),
 			age_ticks: 5,
 			previous_outcome: [0, 0, 0, 0],
 		},
@@ -30,8 +36,8 @@ function buildSample(tickCount = 2): ExecutionSample {
 			{
 				hop_index: 0,
 				pass_index: 0,
-				vote_contribution: ZERO_VOTES,
-				decision_inputs: ZERO_DECISION_INPUTS,
+				vote_contribution: zeroVotes(),
+				decision_inputs: zeroDecisionInputs(),
 				node_id: 1,
 				input_refs: [],
 				upstream_slots: [],
@@ -61,8 +67,8 @@ function buildSample(tickCount = 2): ExecutionSample {
 			{
 				hop_index: 1,
 				pass_index: 0,
-				vote_contribution: ZERO_VOTES,
-				decision_inputs: ZERO_DECISION_INPUTS,
+				vote_contribution: zeroVotes(),
+				decision_inputs: zeroDecisionInputs(),
 				node_id: 2,
 				input_refs: [],
 				upstream_slots: [],
@@ -93,7 +99,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 		termination_reason: "NoDecision" as const,
 		debug_perception: null,
 		priority_bid: 0,
-		commit_counts: ZERO_KIND_COUNTS,
+		commit_counts: zeroKindCounts(),
 	}));
 
 	return { creature_id: 1, ticks };
@@ -106,7 +112,7 @@ const defaultPosition: SamplerPosition = {
 };
 
 const defaultProps = {
-	sample: null as ExecutionSample | null,
+	sample: null as ExecutionSamplePayload | null,
 	position: defaultPosition,
 	playbackState: "idle" as const,
 	playbackSpeed: 500,
@@ -251,15 +257,15 @@ describe("SamplerBar", () => {
 		tick.passes = Array.from({ length: 10 }, (_, pass_index) => ({
 			pass_index,
 			end_reason: "NoTargets" as const,
-			votes: ZERO_VOTES,
+			votes: zeroVotes(),
 			best: [
 				"Eat",
 				{ Directed: ["Move", 0] },
 				{ Directed: ["Reproduce", 0] },
 				{ Directed: ["StealEnergy", 0] },
 			],
-			bars: ZERO_KIND_COUNTS,
-			effective_votes: ZERO_KIND_COUNTS,
+			bars: zeroKindCounts(),
+			effective_votes: zeroKindCounts(),
 			committed: null,
 			hops: 1,
 		}));

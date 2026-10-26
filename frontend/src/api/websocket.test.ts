@@ -1,7 +1,8 @@
 import { encode } from "@msgpack/msgpack";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSimulationStore } from "../stores/simulation.ts";
-import type { ServerMessage } from "../types/api.ts";
+import { MOCK_STATUS } from "../test/fixtures.ts";
+import type { ServerMessage } from "../types/generated/ServerMessage.ts";
 import { WsClient } from "./websocket.ts";
 
 class MockWebSocket {
@@ -103,6 +104,7 @@ describe("WsClient", () => {
 			world_static_revision: 3,
 			tick: 42,
 			payload: {
+				...MOCK_STATUS,
 				state: "running",
 				population: 99,
 				mean_energy: 18,

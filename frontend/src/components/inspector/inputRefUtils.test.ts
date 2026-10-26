@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { InputReference } from "../../types/genome.ts";
-import type { WorldAction } from "../../types/trace.ts";
+import type { InputKey } from "../../types/generated/InputKey.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { WorldAction } from "../../types/generated/WorldAction.ts";
 import directionPairsFixture from "./directionPairs.json";
 import {
 	describeInputRef,
@@ -12,7 +13,6 @@ import {
 	formatInputRefWithSubIndex,
 	inputRefColor,
 	isRingSensor,
-	parseWorldInputRef,
 } from "./inputRefUtils.ts";
 import nearbyFieldsFixture from "./nearbyFields.json";
 
@@ -31,7 +31,9 @@ describe("formatAction", () => {
 
 	it("summarizes action arrays without crashing on empty entries", () => {
 		expect(formatActionList(["NoOp"])).toBe("NoOp");
-		expect(formatActionList(["Eat", { Move: "S" }])).toBe("Eat +1");
+		expect(formatActionList([{ Eat: { type_idx: 1, leave: 0 } }, { Move: "S" }])).toBe(
+			"Eat(food1) +1",
+		);
 		expect(formatActionList([])).toBe("NoOp");
 		expect(formatAction(undefined)).toBe("?");
 	});
@@ -39,29 +41,23 @@ describe("formatAction", () => {
 
 describe("formatInputRef", () => {
 	it("formats World string variant", () => {
-		const ref: InputReference = { World: "FoodHere" };
+		const ref: InputRef = { family: "world", key: "FoodHere" };
 		expect(formatInputRef(ref)).toBe("FoodHere");
 	});
 
 	it("formats ring sensor variants", () => {
-		expect(formatInputRef({ World: "NeighborFoodRing" })).toBe("FoodRing");
-		expect(formatInputRef({ World: "NeighborBarrierRing" })).toBe("BarrierRing");
-		expect(formatInputRef({ World: "NeighborOccupiedRing" })).toBe("OccRing");
+		expect(formatInputRef({ family: "world", key: "NeighborFoodRing" })).toBe("FoodRing");
+		expect(formatInputRef({ family: "world", key: "NeighborBarrierRing" })).toBe("BarrierRing");
+		expect(formatInputRef({ family: "world", key: "NeighborOccupiedRing" })).toBe("OccRing");
 	});
 
 	it("formats typed world food variants", () => {
-		const ref = {
-			World: {
-				FoodHere: {
-					type_idx: 2,
-				},
-			},
-		} as unknown as InputReference;
+		const ref: InputRef = { family: "world", key: "FoodHere", food_type: 2 };
 		expect(formatInputRef(ref)).toBe("FoodHere[t2]");
 	});
 
 	it("formats StaticIntrospection variant", () => {
-		const ref: InputReference = { StaticIntrospection: "AgeTicks" };
+		const ref: InputRef = { family: "static", key: "AgeTicks" };
 		expect(formatInputRef(ref)).toBe("Age");
 	});
 
@@ -71,7 +67,7 @@ describe("formatInputRef", () => {
 			["OwnGreen", "green"],
 			["OwnBlue", "blue"],
 		] as const) {
-			const described = describeInputRef({ StaticIntrospection: key }, 0);
+			const described = describeInputRef({ family: "static", key }, 0);
 			expect(described.label).toBe(key);
 			expect(described.description).toBe(
 				`Own ${channel}: this creature's own ${channel} channel (0 to 1).`,
@@ -80,93 +76,99 @@ describe("formatInputRef", () => {
 	});
 
 	it("formats UpstreamSlot variant", () => {
-		const ref: InputReference = { UpstreamSlot: 3 };
+		const ref: InputRef = { family: "upstream", key: "UpstreamSlot", slot: 3 };
 		expect(formatInputRef(ref)).toBe("Bus[3]");
 	});
 
 	it("labels the decision-state references by short names", () => {
-		expect(formatInputRef("ActionVotes")).toBe("Votes");
-		expect(formatInputRef("PreviousOutcome")).toBe("PrevOutcome");
-		expect(formatInputRef({ DynamicIntrospection: "HopsThisTick" })).toBe("Hops");
+		expect(formatInputRef({ family: "decision", key: "ActionVotes" })).toBe("Votes");
+		expect(formatInputRef({ family: "decision", key: "PreviousOutcome" })).toBe("PrevOutcome");
+		expect(formatInputRef({ family: "dynamic", key: "HopsThisTick" })).toBe("Hops");
 	});
 
 	it("handles ActionQueue string variant without crashing", () => {
-		const ref: InputReference = "ActionQueue";
+		const ref: InputRef = { family: "action_queue", key: "ActionQueue" };
 		expect(formatInputRef(ref)).toBe("Queue");
-	});
-
-	it("handles unknown string variant gracefully", () => {
-		const ref = "SomeFutureVariant" as unknown as InputReference;
-		expect(formatInputRef(ref)).toBe("SomeFutureVariant");
 	});
 });
 
 describe("inputRefColor", () => {
 	it("returns green for World refs", () => {
-		const ref: InputReference = { World: "FoodHere" };
+		const ref: InputRef = { family: "world", key: "FoodHere" };
 		expect(inputRefColor(ref)).toBe("#34d399");
 	});
 
 	it("returns blue for introspection refs", () => {
-		const ref: InputReference = { StaticIntrospection: "Age" };
+		const ref: InputRef = { family: "static", key: "AgeTicks" };
 		expect(inputRefColor(ref)).toBe("#60a5fa");
 	});
 
 	it("returns gray for upstream refs", () => {
-		const ref: InputReference = { UpstreamSlot: 0 };
+		const ref: InputRef = { family: "upstream", key: "UpstreamSlot", slot: 0 };
 		expect(inputRefColor(ref)).toBe("#94a3b8");
 	});
 
 	it("returns amber for ActionQueue string variant", () => {
-		const ref: InputReference = "ActionQueue";
+		const ref: InputRef = { family: "action_queue", key: "ActionQueue" };
 		expect(inputRefColor(ref)).toBe("#f59e0b");
 	});
 
 	it("returns violet for the in-tick decision-state references", () => {
-		for (const ref of ["ActionVotes", "PreviousPassVotes", "CommitCounts"] as const) {
-			expect(inputRefColor(ref)).toBe("#a78bfa");
+		for (const key of ["ActionVotes", "PreviousPassVotes", "CommitCounts"] as const) {
+			expect(inputRefColor({ family: "decision", key })).toBe("#a78bfa");
 		}
 	});
 
 	it("returns blue for the frozen previous outcome", () => {
-		expect(inputRefColor("PreviousOutcome")).toBe("#60a5fa");
-	});
-
-	it("returns gray for unknown string variant", () => {
-		const ref = "UnknownFuture" as unknown as InputReference;
-		expect(inputRefColor(ref)).toBe("#94a3b8");
+		expect(inputRefColor({ family: "decision", key: "PreviousOutcome" })).toBe("#60a5fa");
 	});
 });
 
 describe("formatInputRefWithSubIndex", () => {
 	it("uses direction labels for ring sensors, with the food type", () => {
-		expect(formatInputRefWithSubIndex({ World: "NeighborBarrierRing" }, 0)).toBe("BarrierRing[N]");
-		expect(formatInputRefWithSubIndex({ World: { NeighborFoodRing: { type_idx: 1 } } }, 2)).toBe(
-			"FoodRing[t1][E]",
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NeighborBarrierRing" }, 0)).toBe(
+			"BarrierRing[N]",
 		);
+		expect(
+			formatInputRefWithSubIndex({ family: "world", key: "NeighborFoodRing", food_type: 1 }, 2),
+		).toBe("FoodRing[t1][E]");
 	});
 
 	it("names every area-summary sub-field, index 0 included", () => {
-		const barrier: InputReference = { World: "AreaBarrierSummary" };
+		const barrier: InputRef = { family: "world", key: "AreaBarrierSummary" };
 		expect(formatInputRefWithSubIndex(barrier, 0)).toBe("AreaBarrier.density");
 		expect(formatInputRefWithSubIndex(barrier, 1)).toBe("AreaBarrier.adjacent");
 		expect(formatInputRefWithSubIndex(barrier, 6)).toBe("AreaBarrier.nearestDist");
-		expect(formatInputRefWithSubIndex({ World: { AreaFoodSummary: { type_idx: 0 } } }, 0)).toBe(
-			"AreaFood[t0].amount",
-		);
-		expect(formatInputRefWithSubIndex({ World: "AreaOccupancySummary" }, 6)).toBe(
+		expect(
+			formatInputRefWithSubIndex({ family: "world", key: "AreaFoodSummary", food_type: 0 }, 0),
+		).toBe("AreaFood[t0].amount");
+		expect(formatInputRefWithSubIndex({ family: "world", key: "AreaOccupancySummary" }, 6)).toBe(
 			"AreaOcc.crowding",
 		);
 	});
 
 	it("names nearby-creature fields by rank, nearest first", () => {
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 0)).toBe("Nearest1.present");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 12)).toBe("Nearest2.dy");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 5)).toBe("Nearest1.ready");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 14)).toBe("Nearest2.energy");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 16)).toBe("Nearest2.kin");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 17)).toBe("Nearest2.red");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 7)).toBe("Nearest1.red");
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 0)).toBe(
+			"Nearest1.present",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 12)).toBe(
+			"Nearest2.dy",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 5)).toBe(
+			"Nearest1.ready",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 14)).toBe(
+			"Nearest2.energy",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 16)).toBe(
+			"Nearest2.kin",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 17)).toBe(
+			"Nearest2.red",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 7)).toBe(
+			"Nearest1.red",
+		);
 	});
 
 	it("names every field of the nearbyFields fixture at every rank, in layout order", () => {
@@ -186,43 +188,69 @@ describe("formatInputRefWithSubIndex", () => {
 		for (let slot = 0; slot < slots; slot++) {
 			fields.forEach((field, index) => {
 				const channel = slot * fields.length + index;
-				const described = describeInputRef({ World: "NearbyCreature" }, channel);
+				const described = describeInputRef({ family: "world", key: "NearbyCreature" }, channel);
 				expect(described.label).toBe(`Nearest${slot + 1}.${field.name}`);
 				expect(described.description).toContain(field.description.slice(1));
 			});
 		}
 		const width = slots * fields.length;
 		expect(width).toBe(40);
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 39)).toBe("Nearest4.blue");
-		expect(formatInputRefWithSubIndex({ World: "NearbyCreature" }, 40)).toBe("Nearby[40]");
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 39)).toBe(
+			"Nearest4.blue",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "NearbyCreature" }, 40)).toBe(
+			"Nearby[40]",
+		);
 	});
 
 	it("names decision-state and queue sub-values", () => {
-		expect(formatInputRefWithSubIndex("ActionVotes", 0)).toBe("Votes.Eat");
-		expect(formatInputRefWithSubIndex("ActionVotes", 22)).toBe("Votes.StealEnergy[SW]");
-		expect(formatInputRefWithSubIndex("PreviousPassVotes", 33)).toBe("PrevVotes.Drive Move");
-		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("Commits.Reproduce");
-		expect(formatInputRefWithSubIndex("PreviousOutcome", 0)).toBe("PrevOutcome.energy");
-		expect(formatInputRefWithSubIndex("ActionQueue", 0)).toBe("Queue1.type");
-		expect(formatInputRefWithSubIndex("ActionQueue", 4)).toBe("Queue2.param0");
+		expect(formatInputRefWithSubIndex({ family: "decision", key: "ActionVotes" }, 0)).toBe(
+			"Votes.Eat",
+		);
+		expect(formatInputRefWithSubIndex({ family: "decision", key: "ActionVotes" }, 22)).toBe(
+			"Votes.StealEnergy[SW]",
+		);
+		expect(formatInputRefWithSubIndex({ family: "decision", key: "PreviousPassVotes" }, 33)).toBe(
+			"PrevVotes.Drive Move",
+		);
+		expect(formatInputRefWithSubIndex({ family: "decision", key: "CommitCounts" }, 2)).toBe(
+			"Commits.Reproduce",
+		);
+		expect(formatInputRefWithSubIndex({ family: "decision", key: "PreviousOutcome" }, 0)).toBe(
+			"PrevOutcome.energy",
+		);
+		expect(formatInputRefWithSubIndex({ family: "action_queue", key: "ActionQueue" }, 0)).toBe(
+			"Queue1.type",
+		);
+		expect(formatInputRefWithSubIndex({ family: "action_queue", key: "ActionQueue" }, 4)).toBe(
+			"Queue2.param0",
+		);
 	});
 
 	it("keeps scalars bare and shows an out-of-range sub-index raw", () => {
-		expect(formatInputRefWithSubIndex({ DynamicIntrospection: "EnergyCurrent" }, 0)).toBe("Energy");
-		expect(formatInputRefWithSubIndex({ World: "AreaBarrierSummary" }, 9)).toBe("AreaBarrier[9]");
+		expect(formatInputRefWithSubIndex({ family: "dynamic", key: "EnergyCurrent" }, 0)).toBe(
+			"Energy",
+		);
+		expect(formatInputRefWithSubIndex({ family: "world", key: "AreaBarrierSummary" }, 9)).toBe(
+			"AreaBarrier[9]",
+		);
 	});
 });
 
 describe("describeInputRef", () => {
 	it("explains a sub-field in plain words", () => {
-		const d = describeInputRef({ World: "AreaBarrierSummary" }, 0);
+		const d = describeInputRef({ family: "world", key: "AreaBarrierSummary" }, 0);
 		expect(d.label).toBe("AreaBarrier.density");
 		expect(d.description).toMatch(/barrier/i);
 	});
 
 	it("explains every ring direction and nearby rank", () => {
-		expect(describeInputRef({ World: "NeighborOccupiedRing" }, 4).description).toMatch(/south/i);
-		expect(describeInputRef({ World: "NearbyCreature" }, 10).description).toMatch(/2nd-nearest/);
+		expect(
+			describeInputRef({ family: "world", key: "NeighborOccupiedRing" }, 4).description,
+		).toMatch(/south/i);
+		expect(describeInputRef({ family: "world", key: "NearbyCreature" }, 10).description).toMatch(
+			/2nd-nearest/,
+		);
 	});
 });
 
@@ -257,39 +285,17 @@ describe("isRingSensor", () => {
 	});
 });
 
-describe("parseWorldInputRef", () => {
-	it("extracts key and type index from typed world payloads", () => {
-		expect(
-			parseWorldInputRef({
-				NeighborFoodRing: {
-					type_idx: 3,
-				},
-			}),
-		).toEqual({
-			key: "NeighborFoodRing",
-			typeIdx: 3,
-		});
-	});
-
-	it("passes through legacy world string payloads", () => {
-		expect(parseWorldInputRef("FoodHere")).toEqual({
-			key: "FoodHere",
-			typeIdx: null,
-		});
-	});
-});
-
 describe("directionPairs", () => {
 	it("reads every family's pairs from the fixture v3-core is pinned to", () => {
 		for (const [key, pairs] of Object.entries(directionPairsFixture)) {
-			expect(directionPairs({ World: key } as InputReference)).toEqual(pairs);
+			expect(directionPairs({ family: "world", key: key as InputKey })).toEqual(pairs);
 		}
-		expect(directionPairs({ World: "NearbyCreature" })[1]).toEqual({
+		expect(directionPairs({ family: "world", key: "NearbyCreature" })[1]).toEqual({
 			x: 11,
 			y: 12,
 			facts: [10, 13, 14, 15, 16, 17, 18, 19],
 		});
-		expect(directionPairs({ World: "NeighborBarrierRing" })).toEqual([]);
-		expect(directionPairs("ActionQueue")).toEqual([]);
+		expect(directionPairs({ family: "world", key: "NeighborBarrierRing" })).toEqual([]);
+		expect(directionPairs({ family: "action_queue", key: "ActionQueue" })).toEqual([]);
 	});
 });

@@ -4,8 +4,7 @@ import {
 	type MeshFocusMode,
 	useInspectorWorkspaceStore,
 } from "../../../stores/inspectorWorkspace.ts";
-import type { CreatureMeshAnnotation } from "../../../types/creature-detail.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
 import {
 	type MeshWorkspaceController,
 	useMeshWorkspaceController,
@@ -44,8 +43,7 @@ export interface UseMeshDerivationResult {
 }
 
 export function useMeshDerivation(
-	genome: CreatureGenome,
-	meshAnnotations: CreatureMeshAnnotation[] | null,
+	genome: BrainView,
 	activeNodeId: number | null,
 ): UseMeshDerivationResult {
 	const selectedNodeId = useInspectorWorkspaceStore((state) => state.selectedNodeId);
@@ -62,10 +60,7 @@ export function useMeshDerivation(
 	const deferredAnalysis = useDeferredValue(analysis);
 	const { layout, error: layoutError } = useMeshLayout(deferredAnalysis);
 
-	const semantics = useMemo(
-		() => deriveMeshSemantics(genome, meshAnnotations, analysis),
-		[genome, meshAnnotations, analysis],
-	);
+	const semantics = useMemo(() => deriveMeshSemantics(genome, analysis), [genome, analysis]);
 
 	const detailNodeId = selectedNodeId ?? activeNodeId ?? analysis.entryNodeId;
 	const detailNode = analysis.nodesById.get(detailNodeId) ?? analysis.nodes[0] ?? null;

@@ -1,15 +1,12 @@
-import type { EdgeGenomicWeight, NodeGraphWeights } from "../../types/creature-detail.ts";
-import type {
-	GraphBackendDef,
-	GraphEdge,
-	GraphSource,
-	InputReference,
-	Membership,
-	OutputSinkKind,
-	PlasticityConfig,
-	Scope,
-} from "../../types/genome.ts";
-import { compose, memberPattern, sinkDirection } from "./edgeGroupWeights.ts";
+import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
+import type { EdgeLearner } from "../../types/generated/EdgeLearner.ts";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
+import type { GraphSource } from "../../types/generated/GraphSource.ts";
+import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
+import type { Scope } from "../../types/generated/Scope.ts";
+import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
+import { joinLearning } from "./brainLearning.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
 import {
@@ -36,13 +33,10 @@ export interface GraphModelEdge {
 	sourceId: string;
 	targetId: string;
 	/**
-	 * The weight drawn: a listed edge's applied weight (the server's
-	 * `graph_weights` value, T25.F06, T25.F07); without the payload a
-	 * member's genomic composition (its applied weight marked unavailable),
-	 * `null` for an ungrouped plastic edge (runtime state the UI does not
-	 * invent), else the own weight.
+	 * The weight drawn: the weight in force, a `learning` entry's when the
+	 * poll lists the edge, else the brain's (T30.F01 invariant 5).
 	 */
-	weight: number | null;
+	weight: number;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
 	isBackward: boolean;
 	/** Whether the edge is an edge-group member (T25.F03), drawn dashed. */
@@ -51,46 +45,38 @@ export interface GraphModelEdge {
 	isPlastic: boolean;
 	/** The edge's own weight: a member's correction. */
 	own: number;
-	/** A member's composition: genomic = scale × pattern + own (T25.F03). */
+	/** The edge's genomic weight: a member's composed weight. */
+	genomic: number;
+	/** A member's composition, as the brain view resolved it (T25.F03). */
 	member?: MemberComposition;
-	/** A plastic edge's learning and weights (T25.F06). */
+	/** A plastic edge's learner and runtime state (T25.F06). */
 	plastic?: PlasticFacts;
 }
 
-/**
- * How a member learns when plastic (T25.F07): its scope and its group's
- * `inherit_scale`, which governs a group learner's inheritance in place of
- * its inert `lamarckian` flag.
- */
-export interface MemberLearning {
-	scope: Scope;
-	inheritScale: boolean;
-}
-
-export interface MemberComposition extends MemberLearning {
+/** A member's composition: `genomic = scale × pattern + own`, each term the
+ * server's. */
+export interface MemberComposition {
 	group: number;
+	scope: Scope;
 	scale: number;
 	pattern: number;
-	/** The weight in force, when the payload carries it; else unavailable. */
-	applied?: number;
+	/** The weight in force. */
+	applied: number;
 }
 
 export interface PlasticFacts {
-	config: PlasticityConfig;
+	learner: EdgeLearner;
 	genomic: number;
-	/** The weight in force, when the payload carries it. */
-	applied?: number;
+	/** The weight in force. */
+	applied: number;
 	/** The learned own quantity, once initialized; never for a group-scope member. */
 	learned?: number;
-	/** Whether the learner is initialized, as `learnerInitialized`. */
+	/** Whether the learner is initialized (at group scope, its scale slot). */
 	initialized: boolean;
 }
 
-/** The field a non-leaf member reads: none (v3-core's `u16::MAX`). */
-const NO_FIELD = 0xffff;
-
 /** What the model knows of an edge beyond its endpoints. */
-type EdgeFacts = Pick<GraphModelEdge, "weight" | "own" | "member" | "plastic">;
+type EdgeFacts = Pick<GraphModelEdge, "weight" | "own" | "genomic" | "member" | "plastic">;
 
 export interface FullGraphModel {
 	nodes: GraphModelNode[];
@@ -114,8 +100,8 @@ function computeBaseWidth(label: string): number {
 }
 
 function collectEdgesFromSources(
-	edges: GraphEdge[],
-	factsOf: (edge: GraphEdge, index: number) => EdgeFacts,
+	edges: BrainEdge[],
+	factsOf: (edge: BrainEdge, index: number) => EdgeFacts,
 	targetId: string,
 	targetArrayIndex: number,
 	targetType: "compute" | "output",
@@ -141,8 +127,8 @@ function collectEdgesFromSources(
 				...factsOf(edge, i),
 				edgeType,
 				isBackward,
-				isMember: edge.membership !== undefined,
-				isPlastic: edge.plasticity !== undefined,
+				isMember: edge.member !== undefined,
+				isPlastic: edge.learner !== undefined,
 			});
 		} else {
 			const inId = inputNodeId(source);
@@ -155,8 +141,8 @@ function collectEdgesFromSources(
 					...factsOf(edge, i),
 					edgeType,
 					isBackward: false,
-					isMember: edge.membership !== undefined,
-					isPlastic: edge.plasticity !== undefined,
+					isMember: edge.member !== undefined,
+					isPlastic: edge.learner !== undefined,
 				});
 			}
 		}
@@ -164,96 +150,34 @@ function collectEdgesFromSources(
 	return result;
 }
 
-/** A lookup of the server's `graph_weights` entry by surface, container and edge index. */
-export function edgeWeightLookup(
-	graphWeights: NodeGraphWeights | null,
-): (surface: "compute" | "sink", container: number, edge: number) => EdgeGenomicWeight | undefined {
-	const weights = new Map(
-		(graphWeights?.edges ?? []).map((entry) => [
-			`${entry.surface}:${entry.container}:${entry.edge}`,
-			entry,
-		]),
-	);
-	return (surface, container, edge) => weights.get(`${surface}:${container}:${edge}`);
-}
-
-/** A lookup of each group's learned scale in `graph_weights`; absent for an uninitialized scale slot. */
-export function learnedScaleLookup(
-	graphWeights: NodeGraphWeights | null,
-): (group: number) => number | undefined {
-	const learned = new Map(
-		(graphWeights?.scales ?? []).map((scale) => [scale.group, scale.learned]),
-	);
-	return (group) => learned.get(group);
-}
-
-/**
- * Whether a learner is initialized (T25.F07): a group-scope member stores no
- * own quantity, so it is by its group's scale slot; any other learner by its own.
- */
-export function learnerInitialized(
-	membership: Membership | undefined,
-	entry: EdgeGenomicWeight | undefined,
-	learnedScale: (group: number) => number | undefined,
-): boolean {
-	return membership?.scope === "Group"
-		? learnedScale(membership.group) !== undefined
-		: entry?.learned !== undefined;
-}
-
 export function buildFullGraphModel(
-	graphDef: GraphBackendDef,
-	inputRefs: InputReference[],
-	graphWeights: NodeGraphWeights | null = null,
+	graphDef: GraphBrain,
+	inputRefs: InputRef[],
+	learning: NodeLearning | null = null,
 ): FullGraphModel {
-	const weightEntry = edgeWeightLookup(graphWeights);
-	const learnedScale = learnedScaleLookup(graphWeights);
+	const join = joinLearning(learning);
 	const factsOf =
-		(surface: "compute" | "sink", container: number, sink?: OutputSinkKind) =>
-		(edge: GraphEdge, index: number): EdgeFacts => {
-			const entry = weightEntry(surface, container, index);
-			const applied = entry === undefined ? {} : { applied: entry.applied };
-			const group = edge.membership ? graphDef.groups?.[edge.membership.group] : undefined;
-			const member =
-				edge.membership && group
-					? {
-							group: edge.membership.group,
-							scale: group.scale,
-							// As v3-core's `pattern_at`: a non-leaf member reads no field.
-							pattern: memberPattern(
-								group,
-								inputRefs,
-								"InputLeaf" in edge.source ? edge.source.InputLeaf.sub_idx : NO_FIELD,
-								sinkDirection(sink),
-							),
-							scope: edge.membership.scope,
-							inheritScale: group.inherit_scale,
-							...applied,
-						}
-					: undefined;
-			const plastic = edge.plasticity
-				? {
-						config: edge.plasticity,
-						genomic: entry?.genomic ?? edge.own_weight,
-						...applied,
-						...(entry?.learned === undefined ? {} : { learned: entry.learned }),
-						initialized: learnerInitialized(edge.membership, entry, learnedScale),
-					}
-				: undefined;
-			// A listed edge is drawn at the weight in force (T25.F06, T25.F07);
-			// without the payload a member at its genomic composition, as
-			// v3-core's `compose` (`cgp/group.rs`), never its own weight alone.
-			const weight =
-				entry !== undefined
-					? entry.applied
-					: member
-						? compose(edge.own_weight, member.scale, member.pattern)
-						: plastic
-							? null
-							: edge.own_weight;
+		(surface: WeightSurface, container: number) =>
+		(edge: BrainEdge, index: number): EdgeFacts => {
+			const state = join.edge(surface, container, index, edge);
+			const member = edge.member && {
+				group: edge.member.group,
+				scope: edge.member.scope,
+				scale: edge.member.scale,
+				pattern: edge.member.pattern,
+				applied: state.applied,
+			};
+			const plastic = edge.learner && {
+				learner: edge.learner,
+				genomic: edge.genomic,
+				applied: state.applied,
+				...(state.learned === undefined ? {} : { learned: state.learned }),
+				initialized: state.initialized ?? false,
+			};
 			return {
-				weight,
-				own: edge.own_weight,
+				weight: state.applied,
+				own: edge.own,
+				genomic: edge.genomic,
 				...(member ? { member } : {}),
 				...(plastic ? { plastic } : {}),
 			};
@@ -263,12 +187,12 @@ export function buildFullGraphModel(
 	const inputNodeIds = new Set<string>();
 
 	// Phase 1: Discover all unique input sources across the entire graph
-	const allGraphEdges: GraphEdge[] = [];
+	const allGraphEdges: BrainEdge[] = [];
 	for (const cn of graphDef.compute_nodes) {
-		for (const edge of cn.inputs) allGraphEdges.push(edge);
+		for (const edge of cn.edges) allGraphEdges.push(edge);
 	}
 	for (const sink of graphDef.output_sinks) {
-		for (const edge of sink.inputs) allGraphEdges.push(edge);
+		for (const edge of sink.edges) allGraphEdges.push(edge);
 	}
 
 	for (const edge of allGraphEdges) {
@@ -310,7 +234,7 @@ export function buildFullGraphModel(
 	// Phase 3: Create output nodes (only wired sinks)
 	for (let i = 0; i < graphDef.output_sinks.length; i++) {
 		const sink = graphDef.output_sinks[i];
-		if (!sink || sink.inputs.length === 0) continue;
+		if (!sink || sink.edges.length === 0) continue;
 		const { label, subtitle, description } = describeOutputSink(sink.kind);
 		nodes.push({
 			id: `sink:${i}`,
@@ -333,7 +257,7 @@ export function buildFullGraphModel(
 		if (!cn) continue;
 		allEdges.push(
 			...collectEdgesFromSources(
-				cn.inputs,
+				cn.edges,
 				factsOf("compute", i),
 				`cn:${i}`,
 				i,
@@ -347,11 +271,11 @@ export function buildFullGraphModel(
 
 	for (let i = 0; i < graphDef.output_sinks.length; i++) {
 		const sink = graphDef.output_sinks[i];
-		if (!sink || sink.inputs.length === 0) continue;
+		if (!sink || sink.edges.length === 0) continue;
 		allEdges.push(
 			...collectEdgesFromSources(
-				sink.inputs,
-				factsOf("sink", i, sink.kind),
+				sink.edges,
+				factsOf("sink", i),
 				`sink:${i}`,
 				i,
 				"output",

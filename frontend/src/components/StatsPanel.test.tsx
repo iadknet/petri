@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
-import type { HealthPayload } from "../types/api.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
 import { StatsPanel } from "./StatsPanel.tsx";
 
 function health(overrides: Partial<HealthPayload>): HealthPayload {

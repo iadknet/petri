@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { CreatureMeshAnnotation } from "../../../types/creature-detail.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation, withAnnotations } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { NodeAnnotation } from "../../../types/generated/NodeAnnotation.ts";
 import { analyzeMesh } from "./meshAnalysis.ts";
 import {
 	MESH_FLOW_SOURCE_HANDLE_ID,
@@ -10,14 +11,15 @@ import {
 import type { MeshLayout } from "./meshLayout.ts";
 import { deriveMeshSemantics } from "./meshSemantics.ts";
 
-const genome: CreatureGenome = {
+const genome: BrainView = {
 	entry_node_id: 1,
 	nodes: [
 		{
 			node_id: 1,
-			input_refs: [{ World: "FoodHere" }],
+			annotation: annotation(),
+			input_refs: [{ family: "world", key: "FoodHere" }],
 			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 1,
 					constants: [],
@@ -27,17 +29,21 @@ const genome: CreatureGenome = {
 		},
 		{
 			node_id: 2,
-			input_refs: [{ UpstreamSlot: 0 }],
+			annotation: annotation(),
+			input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 			targets: [],
-			backend_def: {
+			backend: {
 				Graph: {
+					groups: [],
 					compute_nodes: [
 						{
 							kind: "Add",
-							inputs: [
+							edges: [
 								{
 									source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
-									own_weight: 1,
+									own: 1,
+									genomic: 1,
+									applied: 1,
 								},
 							],
 						},
@@ -45,7 +51,7 @@ const genome: CreatureGenome = {
 					output_sinks: [
 						{
 							kind: { RouterGate: 0 },
-							inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
+							edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
 						},
 					],
 				},
@@ -54,24 +60,22 @@ const genome: CreatureGenome = {
 	],
 };
 
-const annotations: CreatureMeshAnnotation[] = [
-	{
-		node_id: 1,
+const annotations: Record<number, Partial<NodeAnnotation>> = {
+	1: {
 		reachable: true,
 		read_classes: ["food"],
 		write_classes: ["route"],
 		has_stateful_behavior: false,
 		live_instruction_indices: [0],
 	},
-	{
-		node_id: 2,
+	2: {
 		reachable: true,
 		read_classes: ["upstream"],
 		write_classes: ["route"],
 		has_stateful_behavior: false,
 		live_internal_node_indices: [0],
 	},
-];
+};
 
 const layout: MeshLayout = {
 	topologyKey: "1:2|2:",
@@ -101,7 +105,7 @@ layout.nodesById = new Map(layout.nodes.map((node) => [node.id, node]));
 describe("meshFlowAdapter", () => {
 	it("maps mesh layout and semantics into React Flow scene data without owning layout", () => {
 		const analysis = analyzeMesh(genome);
-		const semantics = deriveMeshSemantics(genome, annotations);
+		const semantics = deriveMeshSemantics(withAnnotations(genome, annotations));
 
 		const scene = buildMeshFlowScene({
 			analysis,
@@ -127,25 +131,23 @@ describe("meshFlowAdapter", () => {
 
 	it("derives hasSharedMemory from semantics writeClasses", () => {
 		const analysis = analyzeMesh(genome);
-		const memoryAnnotations: CreatureMeshAnnotation[] = [
-			{
-				node_id: 1,
+		const memoryAnnotations: Record<number, Partial<NodeAnnotation>> = {
+			1: {
 				reachable: true,
 				read_classes: ["food"],
 				write_classes: ["memory"],
 				has_stateful_behavior: true,
 				live_instruction_indices: [0],
 			},
-			{
-				node_id: 2,
+			2: {
 				reachable: true,
 				read_classes: ["upstream"],
 				write_classes: ["route"],
 				has_stateful_behavior: false,
 				live_internal_node_indices: [0],
 			},
-		];
-		const semantics = deriveMeshSemantics(genome, memoryAnnotations);
+		};
+		const semantics = deriveMeshSemantics(withAnnotations(genome, memoryAnnotations));
 
 		const scene = buildMeshFlowScene({
 			analysis,
@@ -163,7 +165,7 @@ describe("meshFlowAdapter", () => {
 
 	it("gives each node a keyboard-facing accessible label, role and focus ring", () => {
 		const analysis = analyzeMesh(genome);
-		const semantics = deriveMeshSemantics(genome, annotations);
+		const semantics = deriveMeshSemantics(withAnnotations(genome, annotations));
 
 		const scene = buildMeshFlowScene({
 			analysis,

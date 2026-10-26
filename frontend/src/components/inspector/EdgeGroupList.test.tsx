@@ -1,38 +1,84 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { GraphBackendDef, GraphEdge, OutputSink } from "../../types/genome.ts";
+import { graphBrain, ringGroup } from "../../test/brainFixtures.ts";
+import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
+import type { BrainGroup } from "../../types/generated/BrainGroup.ts";
+import type { BrainSink } from "../../types/generated/BrainSink.ts";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
+import type { MemberSite } from "../../types/generated/MemberSite.ts";
 import { EdgeGroupList } from "./EdgeGroupList.tsx";
 
-const leaf = (ref_idx: number, sub_idx: number, own_weight: number, group?: number): GraphEdge => ({
-	source: { InputLeaf: { ref_idx, sub_idx } },
-	own_weight,
-	...(group === undefined ? {} : { membership: { group, scope: "Edge" as const } }),
-});
+/** A member of group 0 as the brain view resolves it: every number given,
+ * none composed here. */
+function member(
+	field: number,
+	site: MemberSite,
+	terms: { own: number; genomic: number; pattern: number; scale: number },
+): BrainEdge {
+	return {
+		source: { InputLeaf: { ref_idx: 0, sub_idx: field } },
+		own: terms.own,
+		genomic: terms.genomic,
+		applied: terms.genomic,
+		member: { group: 0, scope: "Edge", site, field, pattern: terms.pattern, scale: terms.scale },
+	};
+}
 
-/** A Move group at offset 1 on ring 1 missing its channel-3 member. */
-function grouped(): GraphBackendDef {
-	const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-		kind: { ActionVote: { Directed: ["Move", d] } },
-		inputs: [] as GraphEdge[],
+/** Eight `kind` direction sinks, empty. */
+function directionSinks(kind: "Move" | "StealEnergy"): BrainSink[] {
+	return Array.from({ length: 8 }, (_, d) => ({
+		kind: { ActionVote: { Directed: [kind, d] } },
+		edges: [] as BrainEdge[],
 	}));
+}
+
+/** A Move ring group at offset 1 on ring 1, missing its channel-3 member. */
+function grouped(): GraphBrain {
+	const sinks = directionSinks("Move");
 	for (let channel = 0; channel < 8; channel++) {
 		if (channel === 3) continue;
-		sinks[(channel + 1) % 8]?.inputs.push(leaf(1, channel, channel === 0 ? 0.25 : 0, 0));
+		const own = channel === 0 ? 0.25 : 0;
+		sinks[(channel + 1) % 8]?.edges.push(
+			member(
+				channel,
+				{ Direction: (channel + 1) % 8 },
+				{
+					own,
+					genomic: 0.5 + own,
+					pattern: 1,
+					scale: 0.5,
+				},
+			),
+		);
 	}
-	return {
-		compute_nodes: [],
+	return graphBrain({
 		output_sinks: sinks,
 		groups: [
-			{
-				shape: { Ring: { ring_ref: 1 } },
-				kind: "Move",
+			ringGroup(1, {
 				offset: 1,
 				scale: 0.5,
-				inherit_scale: false,
-				retention: 1,
-			},
+				coordinates: Array.from({ length: 8 }, (_, c) => ({
+					field: c,
+					direction: (c + 1) % 8,
+					present: c !== 3,
+				})),
+			}),
 		],
-	};
+	});
+}
+
+const refs = [
+	{ family: "world", key: "FoodHere" },
+	{ family: "world", key: "NeighborBarrierRing" },
+] as const;
+
+/** The pair coordinates the view lists for a Move gene at offset 2 on
+ * AreaFoodSummary pair 1 (x field 3, y field 4), in birth order, with the
+ * x coordinate on direction 4 absent. */
+function pairCoordinates(offset: number, missing?: number): BrainGroup["coordinates"] {
+	const x = [1, 2, 3, 5, 6, 7].map((r) => ({ field: 3, direction: (r + offset) % 8 }));
+	const y = [0, 1, 3, 4, 5, 7].map((r) => ({ field: 4, direction: (r + offset) % 8 }));
+	return [...x, ...y].map((c) => ({ ...c, present: !(c.field === 3 && c.direction === missing) }));
 }
 
 describe("EdgeGroupList", () => {
@@ -40,11 +86,11 @@ describe("EdgeGroupList", () => {
 		render(
 			<EdgeGroupList
 				graphDef={grouped()}
-				inputRefs={[{ World: "FoodHere" }, { World: "NeighborBarrierRing" }]}
-				graphWeights={{
+				inputRefs={[...refs]}
+				learning={{
 					node_id: 0,
-					scales: [{ group: 0, genomic: 0.5 }],
-					edges: [{ surface: "sink", container: 1, edge: 0, genomic: 0.75, applied: 0.75 }],
+					scales: [],
+					edges: [{ surface: "sink", container: 1, edge: 0, applied: 0.75 }],
 				}}
 			/>,
 		);
@@ -64,18 +110,18 @@ describe("EdgeGroupList", () => {
 
 	it("shows the learned scale, inherit_scale, and each member's scope and applied weight", () => {
 		const def = grouped();
-		const group = def.groups?.[0];
+		const group = def.groups[0];
 		if (group) group.inherit_scale = true;
-		const member = def.output_sinks[1]?.inputs[0];
-		if (member?.membership) member.membership.scope = "Group";
+		const first = def.output_sinks[1]?.edges[0]?.member;
+		if (first) first.scope = "Group";
 		render(
 			<EdgeGroupList
 				graphDef={def}
-				inputRefs={[{ World: "FoodHere" }, { World: "NeighborBarrierRing" }]}
-				graphWeights={{
+				inputRefs={[...refs]}
+				learning={{
 					node_id: 0,
-					scales: [{ group: 0, genomic: 0.5, learned: 1.25 }],
-					edges: [{ surface: "sink", container: 1, edge: 0, genomic: 0.75, applied: 1.5 }],
+					scales: [{ group: 0, learned: 1.25, initialized: true }],
+					edges: [{ surface: "sink", container: 1, edge: 0, applied: 1.5 }],
 				}}
 			/>,
 		);
@@ -85,29 +131,32 @@ describe("EdgeGroupList", () => {
 		expect(screen.queryByTestId("edge-group-retention")).toBeNull();
 		const members = screen.getAllByTestId("edge-group-member");
 		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 group scope");
-		expect(members[1]).toHaveTextContent("edge scope");
-		expect(members[1]).not.toHaveTextContent("applied=");
+		expect(members[1]).toHaveTextContent("applied=0.500 edge scope");
 	});
 
 	it("shows a group's retention when it decays (T25.F09)", () => {
 		const def = grouped();
-		const group = def.groups?.[0];
+		const group = def.groups[0];
 		if (group) group.retention = 0.99;
-		render(<EdgeGroupList graphDef={def} inputRefs={[]} graphWeights={null} />);
+		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
 		expect(screen.getByTestId("edge-group-retention")).toHaveTextContent("retention=0.9900");
 	});
 
-	it("shows neither a learned scale nor applied weights without the payload", () => {
-		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} graphWeights={null} />);
+	it("takes the learned scale from the brain when the poll lists none", () => {
+		const def = grouped();
+		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
 		expect(screen.queryByTestId("edge-group-learned-scale")).toBeNull();
 		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent(
 			"genomic scale at birth",
 		);
-		expect(screen.getAllByTestId("edge-group-member")[0]).not.toHaveTextContent("applied=");
+		const group = def.groups[0];
+		if (group) group.learned_scale = 2;
+		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
+		expect(screen.getByTestId("edge-group-learned-scale")).toHaveTextContent("learned=2.000");
 	});
 
 	it("explains the offset and the members glyphs in tooltips, outside the toggle", () => {
-		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} graphWeights={null} />);
+		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} learning={null} />);
 		const toggle = screen.getByRole("button");
 		const offset = screen.getByText("offset 1");
 		expect(toggle).not.toContainElement(offset);
@@ -120,7 +169,7 @@ describe("EdgeGroupList", () => {
 	});
 
 	it("collapses and reopens a group's member rows, open by default", () => {
-		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} graphWeights={null} />);
+		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} learning={null} />);
 		const toggle = screen.getByRole("button");
 		expect(toggle).toHaveAttribute("aria-expanded", "true");
 		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(7);
@@ -132,41 +181,40 @@ describe("EdgeGroupList", () => {
 		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(7);
 	});
 
-	it("lists a pair group's fields, kind, offset, scale and members over twelve with holes", () => {
-		// AreaFoodSummary pair 1 is (nearestDx 3, nearestDy 4); a Move group at
-		// offset 2 without its x member at relative E (sink 4), plus a
-		// hand-built zero-pattern x member at relative N (sink 2).
-		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-			kind: { ActionVote: { Directed: ["Move", d] } },
-			inputs: [] as GraphEdge[],
-		}));
-		const birth: [number, number][] = [
-			...[1, 2, 3, 5, 6, 7].map((r): [number, number] => [3, r]),
-			...[0, 1, 3, 4, 5, 7].map((r): [number, number] => [4, r]),
-		];
-		for (const [field, relative] of birth) {
-			if (field === 3 && relative === 2) continue;
-			sinks[(relative + 2) % 8]?.inputs.push(leaf(0, field, 0, 0));
+	it("renders a pair gene's coordinates from the view and a zero-pattern member outside them", () => {
+		// Preservation case (T30.F01 invariant 4): a zero-pattern direction
+		// member, x at relative N (sink 2), is listed as present outside the
+		// coordinates; the x coordinate on sink 4 is a hole.
+		const sinks = directionSinks("Move");
+		for (const c of pairCoordinates(2, 4).filter((c) => c.present)) {
+			sinks[c.direction]?.edges.push(
+				member(
+					c.field,
+					{ Direction: c.direction },
+					{ own: 0, genomic: 0.5, pattern: 0.5, scale: 1 },
+				),
+			);
 		}
-		sinks[2]?.inputs.push(leaf(0, 3, 0.125, 0));
+		sinks[2]?.edges.push(
+			member(3, { Direction: 2 }, { own: 0.125, genomic: 0.125, pattern: 0, scale: 1 }),
+		);
+		const group: BrainGroup = {
+			...ringGroup(0),
+			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
+			offset: 2,
+			scale: 1,
+			coordinates: pairCoordinates(2, 4),
+			facts: [
+				{ field: 0, present: false },
+				{ field: 5, present: false },
+				{ field: 6, present: false },
+			],
+		};
 		render(
 			<EdgeGroupList
-				graphDef={{
-					compute_nodes: [],
-					output_sinks: sinks,
-					groups: [
-						{
-							shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
-							kind: "Move",
-							offset: 2,
-							scale: 1,
-							inherit_scale: false,
-							retention: 1,
-						},
-					],
-				}}
-				inputRefs={[{ World: { AreaFoodSummary: { type_idx: 0 } } }]}
-				graphWeights={null}
+				graphDef={graphBrain({ output_sinks: sinks, groups: [group] })}
+				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
+				learning={null}
 			/>,
 		);
 		const row = screen.getByTestId("edge-group");
@@ -177,44 +225,48 @@ describe("EdgeGroupList", () => {
 		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("11/12 ●○●●●●●●●●●● +1");
 		const members = screen.getAllByTestId("edge-group-member");
 		expect(members).toHaveLength(12);
-		expect(members.filter((m) => m.textContent?.includes("(zero pattern)"))).toHaveLength(1);
-		expect(members.some((m) => m.textContent?.includes("y:N → Move[E]"))).toBe(true);
+		const zero = members.filter((m) => m.textContent?.includes("(zero pattern)"));
+		expect(zero).toHaveLength(1);
+		expect(zero[0]).toHaveTextContent("x → Move[E]");
 		fireEvent.mouseEnter(screen.getByText(/own=0\.125/));
 		expect(screen.getByTestId("tooltip")).toHaveTextContent("1.000 × 0.00 + 0.125 = 0.125");
 	});
 
-	it("lists a pair gene's fact members on a facts line with own weights and holes", () => {
-		// AreaFoodSummary pair 1 (nearestDx 3, nearestDy 4, facts amount 0,
-		// nearestDist 5, max 6); a StealEnergy gene at offset 0 whose fact
-		// `max` is a hole.
-		const sinks: OutputSink[] = Array.from({ length: 8 }, (_, d) => ({
-			kind: { ActionVote: { Directed: ["StealEnergy", d] } },
-			inputs: [] as GraphEdge[],
-		}));
-		for (const r of [1, 2, 3, 5, 6, 7]) sinks[r]?.inputs.push(leaf(0, 3, 0, 0));
-		for (const r of [0, 1, 3, 4, 5, 7]) sinks[r]?.inputs.push(leaf(0, 4, 0, 0));
+	it("lists a pair gene's fact members on a facts line with the view's presence", () => {
+		// Preservation case (T30.F01 invariant 4): a fact member sits on the
+		// drive at pattern 0 with `genomic == own`; the declared fact `max`
+		// (field 6) is a hole.
+		const sinks = directionSinks("StealEnergy");
+		for (const c of pairCoordinates(0)) {
+			sinks[c.direction]?.edges.push(
+				member(c.field, { Direction: c.direction }, { own: 0, genomic: 1, pattern: 0.5, scale: 2 }),
+			);
+		}
 		sinks.push({
 			kind: { ActionVote: { Drive: "StealEnergy" } },
-			inputs: [leaf(0, 1, 0.5), leaf(0, 0, 0, 0), leaf(0, 5, 0.25, 0)],
+			edges: [
+				{ source: { InputLeaf: { ref_idx: 0, sub_idx: 1 } }, own: 0.5, genomic: 0.5, applied: 0.5 },
+				member(0, "Drive", { own: 0, genomic: 0, pattern: 0, scale: 2 }),
+				member(5, "Drive", { own: 0.25, genomic: 0.25, pattern: 0, scale: 2 }),
+			],
 		});
+		const group: BrainGroup = {
+			...ringGroup(0),
+			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
+			kind: "StealEnergy",
+			scale: 2,
+			coordinates: pairCoordinates(0),
+			facts: [
+				{ field: 0, present: true },
+				{ field: 5, present: true },
+				{ field: 6, present: false },
+			],
+		};
 		render(
 			<EdgeGroupList
-				graphDef={{
-					compute_nodes: [],
-					output_sinks: sinks,
-					groups: [
-						{
-							shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
-							kind: "StealEnergy",
-							offset: 0,
-							scale: 2,
-							inherit_scale: false,
-							retention: 1,
-						},
-					],
-				}}
-				inputRefs={[{ World: { AreaFoodSummary: { type_idx: 0 } } }]}
-				graphWeights={null}
+				graphDef={graphBrain({ output_sinks: sinks, groups: [group] })}
+				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
+				learning={null}
 			/>,
 		);
 		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("12/12 ●●●●●●●●●●●●");
@@ -223,18 +275,14 @@ describe("EdgeGroupList", () => {
 		const facts = screen.getAllByTestId("edge-group-fact");
 		expect(facts).toHaveLength(2);
 		expect(facts[0]).toHaveTextContent("amount → StealEnergy drive own=0.000");
-		expect(facts[1]).toHaveTextContent("nearestDist → StealEnergy drive own=0.250");
+		expect(facts[1]).toHaveTextContent("nearestDist → StealEnergy drive own=0.250 genomic=0.250");
 		fireEvent.mouseEnter(screen.getByText(/own=0\.250/));
 		expect(screen.getByTestId("tooltip")).toHaveTextContent("2.000 × 0.00 + 0.250 = 0.250");
 	});
 
 	it("renders nothing without groups", () => {
 		const { container } = render(
-			<EdgeGroupList
-				graphDef={{ compute_nodes: [], output_sinks: [] }}
-				inputRefs={[]}
-				graphWeights={null}
-			/>,
+			<EdgeGroupList graphDef={graphBrain()} inputRefs={[]} learning={null} />,
 		);
 		expect(container.innerHTML).toBe("");
 	});

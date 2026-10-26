@@ -1,7 +1,6 @@
 import { memo, useMemo, useState } from "react";
-import { ActionResult } from "../../types/action-log.ts";
-import type { ActionLogEntry } from "../../types/action-log.ts";
-import type { CreaturePhenotype } from "../../types/genome.ts";
+import type { ActionLogEntry } from "../../types/generated/ActionLogEntry.ts";
+import type { CreaturePhenotypeResponse } from "../../types/generated/CreaturePhenotypeResponse.ts";
 import { PhenotypeDetail } from "./PhenotypeDetail.tsx";
 
 const ACTION_COLORS: Record<string, string> = {
@@ -56,7 +55,7 @@ interface VitalsBannerProps {
 	maxEnergy: number;
 	position: { x: number; y: number };
 	actionLog: ActionLogEntry[] | null;
-	phenotype?: CreaturePhenotype;
+	phenotype?: CreaturePhenotypeResponse;
 	isDead: boolean;
 	onClose: () => void;
 }
@@ -172,7 +171,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 					{/* Action dots */}
 					<div className="relative flex items-center gap-px">
 						{visibleActions.map((entry, i) => {
-							const failed = entry.result !== ActionResult.Success;
+							const failed = entry.result !== "Success";
 							return (
 								<div
 									key={`${entry.tick}-${i}`}
@@ -195,7 +194,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 							visibleActions[hoveredIdx] &&
 							(() => {
 								const entry = visibleActions[hoveredIdx]!;
-								const failed = entry.result !== ActionResult.Success;
+								const failed = entry.result !== "Success";
 								const energyDelta = entry.energy_after - entry.energy_before;
 								const dir = DIRECTION_LABELS[entry.direction];
 								// Reproduce logs its transfer fraction in [0, 1]; other types log energy or food.

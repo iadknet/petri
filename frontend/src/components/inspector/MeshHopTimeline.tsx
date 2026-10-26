@@ -1,19 +1,17 @@
 import { memo } from "react";
-import type {
-	MeshHopTrace,
-	MeshPassTrace,
-	TerminationReason,
-	WorldAction,
-} from "../../types/trace.ts";
+import type { MeshHopTracePayload } from "../../types/generated/MeshHopTracePayload.ts";
+import type { MeshPassTracePayload } from "../../types/generated/MeshPassTracePayload.ts";
+import type { TerminationReasonPayload } from "../../types/generated/TerminationReasonPayload.ts";
+import type { WorldAction } from "../../types/generated/WorldAction.ts";
 import { formatAction } from "./inputRefUtils.ts";
 import type { MeshSemantics } from "./mesh/meshSemantics.ts";
 
 interface MeshHopTimelineProps {
-	hops: MeshHopTrace[];
-	passes: readonly MeshPassTrace[];
+	hops: MeshHopTracePayload[];
+	passes: readonly MeshPassTracePayload[];
 	meshSemantics: MeshSemantics | null;
 	activeHopIndex: number;
-	terminationReason: TerminationReason;
+	terminationReason: TerminationReasonPayload;
 	finalActions: readonly WorldAction[];
 	onHopSelect: (index: number) => void;
 }
@@ -21,7 +19,7 @@ interface MeshHopTimelineProps {
 const VM_COLOR = "#f59e0b";
 const GRAPH_COLOR = "#8b5cf6";
 
-function hopSummary(hop: MeshHopTrace): string {
+function hopSummary(hop: MeshHopTracePayload): string {
 	if (typeof hop.backend_trace === "string") return "";
 	if ("Vm" in hop.backend_trace) {
 		return `${hop.backend_trace.Vm.steps.length} ops`;
@@ -33,13 +31,13 @@ function hopSummary(hop: MeshHopTrace): string {
 	return "";
 }
 
-function hopBackendType(hop: MeshHopTrace): string {
+function hopBackendType(hop: MeshHopTracePayload): string {
 	if (typeof hop.backend_trace === "string") return hop.backend_trace;
 	return "Vm" in hop.backend_trace ? "Vm" : "Graph";
 }
 
 interface HopButtonProps {
-	hop: MeshHopTrace;
+	hop: MeshHopTracePayload;
 	index: number;
 	isActive: boolean;
 	semanticsLabel: string | null;

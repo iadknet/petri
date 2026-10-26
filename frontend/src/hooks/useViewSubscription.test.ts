@@ -3,24 +3,23 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
-import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
-import type {
-	HealthPayload,
-	ServerMessage,
-	SnapshotResponse,
-	StatusPayload,
-	ViewDetailPayload,
-	ViewOverviewPayload,
-	WorldStaticPayload,
-} from "../types/api.ts";
+import { MOCK_HEALTH_CENSUS, MOCK_STATUS } from "../test/fixtures.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
+import type { ServerMessage } from "../types/generated/ServerMessage.ts";
+import type { SnapshotResponse } from "../types/generated/SnapshotResponse.ts";
+import type { StatusEventPayload } from "../types/generated/StatusEventPayload.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { ViewOverviewPayload } from "../types/generated/ViewOverviewPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
 import {
 	applyServerMessageToStores,
 	applySnapshotToStores,
 	defaultRequestFromSnapshot,
 } from "./useViewSubscription.ts";
 
-function buildStatusPayload(): StatusPayload {
+function buildStatusPayload(): StatusEventPayload {
 	return {
+		...MOCK_STATUS,
 		state: "running",
 		population: 7,
 		mean_energy: 15,
@@ -116,6 +115,7 @@ function buildWorldStaticPayload(partial?: Partial<WorldStaticPayload>): WorldSt
 		width: 12,
 		height: 10,
 		barrier_mask: new Array(15).fill(0),
+		food_fertility_u8: [],
 		food_types: [
 			{
 				type_idx: 0,

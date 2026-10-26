@@ -1,4 +1,6 @@
-import type { StarParams as StarParamsType } from "../../types/api.ts";
+import type { PatternParamsOf } from "../../types/pattern.ts";
+
+type StarParamsType = PatternParamsOf<"Star">;
 import { ParamField } from "./ParamField.tsx";
 
 interface StarParamsProps {

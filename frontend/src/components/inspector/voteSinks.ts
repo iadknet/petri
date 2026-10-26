@@ -1,4 +1,4 @@
-import type { VoteSink } from "../../types/genome.ts";
+import type { VoteSink } from "../../types/generated/VoteSink.ts";
 import { ACTION_TYPES, voteSinkFromIndex } from "../../types/vote-sinks.ts";
 import { directionName } from "./directions.ts";
 

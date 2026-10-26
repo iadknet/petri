@@ -1,4 +1,4 @@
-import type { SimulationConfig } from "../../../types/api.ts";
+import type { SimulationConfig } from "../../../types/generated/SimulationConfig.ts";
 import type { FieldDef } from "../shared/types.ts";
 
 export interface FieldBounds {

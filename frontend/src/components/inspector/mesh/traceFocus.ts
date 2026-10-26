@@ -1,6 +1,6 @@
 import type { SamplerPosition } from "../../../stores/samplePlayback.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
-import type { ExecutionSample } from "../../../types/trace.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { ExecutionSamplePayload } from "../../../types/generated/ExecutionSamplePayload.ts";
 import { formatMeshEdgeId, getMeshEdgeOccurrenceIndex } from "./meshAnalysis.ts";
 
 export interface TraceFocus {
@@ -22,8 +22,8 @@ export const EMPTY_TRACE_FOCUS: TraceFocus = {
 };
 
 export function deriveTraceFocus(
-	genome: CreatureGenome | null,
-	sample: ExecutionSample | null,
+	genome: BrainView | null,
+	sample: ExecutionSamplePayload | null,
 	position: SamplerPosition,
 ): TraceFocus {
 	if (!genome || !sample) {

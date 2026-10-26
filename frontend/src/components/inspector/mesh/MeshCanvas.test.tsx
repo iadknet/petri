@@ -2,7 +2,8 @@ import { act, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { MeshFocusMode } from "../../../stores/inspectorWorkspace.ts";
-import type { NodeGenome } from "../../../types/genome.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import type { BrainNode } from "../../../types/generated/BrainNode.ts";
 import { MeshCanvas } from "./MeshCanvas.tsx";
 import type { MeshAnalysis } from "./meshAnalysis.ts";
 import type { MeshLayout, MeshLayoutNode } from "./meshLayout.ts";
@@ -30,12 +31,13 @@ const meshFlowCanvasModule = vi.hoisted(() => {
 
 vi.mock("./MeshFlowCanvas.tsx", () => meshFlowCanvasModule.promise);
 
-function makeNode(): NodeGenome {
+function makeNode(): BrainNode {
 	return {
 		node_id: 1,
-		input_refs: [{ World: "FoodHere" }],
+		annotation: annotation(),
+		input_refs: [{ family: "world", key: "FoodHere" }],
 		targets: [],
-		backend_def: {
+		backend: {
 			Vm: {
 				register_count: 1,
 				constants: [],
@@ -45,7 +47,7 @@ function makeNode(): NodeGenome {
 	};
 }
 
-function makeAnalysis(node: NodeGenome): MeshAnalysis {
+function makeAnalysis(node: BrainNode): MeshAnalysis {
 	const analyzedNode = {
 		id: 1,
 		node,

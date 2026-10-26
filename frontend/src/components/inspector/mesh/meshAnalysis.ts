@@ -1,4 +1,6 @@
-import type { CreatureGenome, NodeGenome, RouteTarget } from "../../../types/genome.ts";
+import type { BrainNode } from "../../../types/generated/BrainNode.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { RouteTarget } from "../../../types/generated/RouteTarget.ts";
 
 export type MeshBackendKind = "vm" | "graph";
 export type MeshBackendFilter = "all" | MeshBackendKind;
@@ -6,7 +8,7 @@ export type MeshClosureDirection = "upstream" | "downstream";
 
 export interface MeshAnalyzedNode {
 	id: number;
-	node: NodeGenome;
+	node: BrainNode;
 	backendKind: MeshBackendKind;
 	isEntry: boolean;
 	reachable: boolean;
@@ -51,7 +53,7 @@ export function formatMeshEdgeId(fromId: number, toId: number, occurrenceIndex =
 	return occurrenceIndex === 0 ? `${fromId}->${toId}` : `${fromId}->${toId}#${occurrenceIndex}`;
 }
 
-export function analyzeMesh(genome: CreatureGenome): MeshAnalysis {
+export function analyzeMesh(genome: BrainView): MeshAnalysis {
 	const sortedNodes = [...genome.nodes].toSorted((left, right) => left.node_id - right.node_id);
 	const nodesById = new Map<number, MeshAnalyzedNode>();
 	const reachableNodeIds = collectReachableNodeIds(genome);
@@ -164,7 +166,7 @@ export function matchesBackendFilter(
 	return filter === "all" ? true : node.backendKind === filter;
 }
 
-function collectReachableNodeIds(genome: CreatureGenome): Set<number> {
+function collectReachableNodeIds(genome: BrainView): Set<number> {
 	const nodeMap = new Map(genome.nodes.map((node) => [node.node_id, node] as const));
 	const visited = new Set<number>();
 	const queue = [genome.entry_node_id];
@@ -189,7 +191,7 @@ function collectReachableNodeIds(genome: CreatureGenome): Set<number> {
 	return visited;
 }
 
-function buildTopologyKey(nodes: NodeGenome[]): string {
+function buildTopologyKey(nodes: BrainNode[]): string {
 	return nodes
 		.map(
 			(node) =>
@@ -201,6 +203,6 @@ function buildTopologyKey(nodes: NodeGenome[]): string {
 		.join("|");
 }
 
-function getBackendKind(node: NodeGenome): MeshBackendKind {
-	return "Vm" in node.backend_def ? "vm" : "graph";
+function getBackendKind(node: BrainNode): MeshBackendKind {
+	return "Vm" in node.backend ? "vm" : "graph";
 }

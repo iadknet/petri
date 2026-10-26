@@ -1,4 +1,4 @@
-import type { ComputeNodeKind } from "../../types/genome.ts";
+import type { ComputeNodeKind } from "../../types/generated/ComputeNodeKind.ts";
 import { getKindName } from "./graphNodeFormatters.ts";
 
 export type NodeCategory =

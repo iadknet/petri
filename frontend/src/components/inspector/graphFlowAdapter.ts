@@ -77,8 +77,7 @@ export function buildGraphFlowScene(input: {
 			targetNode?.nodeType === "compute" ? liveSet.has(targetNode.arrayIndex) : true;
 		const endpointsLive = sourceLive && targetLive;
 
-		// An unavailable weight draws at the floor opacity.
-		const weightOpacity = Math.max(0.2, Math.min(Math.abs(me.weight ?? 0), 1));
+		const weightOpacity = Math.max(0.2, Math.min(Math.abs(me.weight), 1));
 		const opacity = endpointsLive ? weightOpacity : weightOpacity * 0.35;
 
 		const tint = me.isMember ? EDGE_TINTS.group_member : EDGE_TINTS[me.edgeType];
@@ -91,6 +90,7 @@ export function buildGraphFlowScene(input: {
 			target: targetNode?.label ?? me.targetId,
 			weight: me.weight,
 			own: me.own,
+			genomic: me.genomic,
 			...(me.member ? { member: me.member } : {}),
 			...(me.plastic ? { plastic: me.plastic } : {}),
 		};

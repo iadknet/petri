@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { GraphTrace } from "../../types/trace.ts";
+import type { GraphTracePayload } from "../../types/generated/GraphTracePayload.ts";
 import { GraphExecutionView } from "./GraphExecutionView.tsx";
 
 describe("GraphExecutionView temporal commit", () => {
 	it.each([true, false])("reports applied state when committed=%s", (committed) => {
-		const trace: GraphTrace = {
+		const trace: GraphTracePayload = {
 			temporal_committed: committed,
 			passes: [],
 			final_outputs: [],

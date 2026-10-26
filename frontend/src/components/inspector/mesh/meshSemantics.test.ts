@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { CreatureMeshAnnotation } from "../../../types/creature-detail.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { NodeAnnotation } from "../../../types/generated/NodeAnnotation.ts";
 import { deriveMeshSemantics } from "./meshSemantics.ts";
 
-function makeGenome(): CreatureGenome {
+function makeGenome(): BrainView {
 	return {
 		entry_node_id: 1,
 		nodes: [
 			{
 				node_id: 1,
-				input_refs: [{ World: "FoodHere" }],
+				annotation: annotation(),
+				input_refs: [{ family: "world", key: "FoodHere" }],
 				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 2,
 						constants: [1],
@@ -25,17 +27,21 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 2,
-				input_refs: [{ UpstreamSlot: 0 }],
+				annotation: annotation(),
+				input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 				targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
-				backend_def: {
+				backend: {
 					Graph: {
+						groups: [],
 						compute_nodes: [
 							{
 								kind: { DecayIntegrator: 0.25 },
-								inputs: [
+								edges: [
 									{
 										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
-										own_weight: 1,
+										own: 1,
+										genomic: 1,
+										applied: 1,
 									},
 								],
 							},
@@ -43,7 +49,7 @@ function makeGenome(): CreatureGenome {
 						output_sinks: [
 							{
 								kind: { RouterGate: 0 },
-								inputs: [{ source: { ComputeNode: 0 }, own_weight: 1 }],
+								edges: [{ source: { ComputeNode: 0 }, own: 1, genomic: 1, applied: 1 }],
 							},
 						],
 					},
@@ -51,9 +57,10 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 3,
-				input_refs: [{ DynamicIntrospection: "AgeTicks" }],
+				annotation: annotation(),
+				input_refs: [{ family: "dynamic", key: "AgeTicks" }],
 				targets: [],
-				backend_def: {
+				backend: {
 					Vm: {
 						register_count: 1,
 						constants: [],
@@ -65,36 +72,39 @@ function makeGenome(): CreatureGenome {
 	};
 }
 
-const annotations: CreatureMeshAnnotation[] = [
-	{
-		node_id: 1,
-		reachable: true,
+/** The server's annotations of `makeGenome`'s nodes, by node id. */
+const annotations: Record<number, NodeAnnotation> = {
+	1: annotation({
 		read_classes: ["food"],
 		write_classes: ["route"],
-		has_stateful_behavior: false,
 		live_instruction_indices: [0, 1],
-	},
-	{
-		node_id: 2,
-		reachable: true,
+	}),
+	2: annotation({
 		read_classes: ["upstream"],
 		write_classes: ["route"],
 		has_stateful_behavior: true,
 		live_internal_node_indices: [0],
-	},
-	{
-		node_id: 3,
-		reachable: true,
+	}),
+	3: annotation({
 		read_classes: ["introspection"],
-		write_classes: [],
-		has_stateful_behavior: false,
 		live_instruction_indices: [0],
-	},
-];
+	}),
+};
+
+/** `brain` with each node's annotation from `byId`. */
+function annotate(brain: BrainView, byId: Record<number, NodeAnnotation>): BrainView {
+	return {
+		...brain,
+		nodes: brain.nodes.map((node) => ({
+			...node,
+			annotation: byId[node.node_id] ?? node.annotation,
+		})),
+	};
+}
 
 describe("meshSemantics", () => {
 	it("derives deterministic labels and rationale from factual annotations", () => {
-		const semantics = deriveMeshSemantics(makeGenome(), annotations);
+		const semantics = deriveMeshSemantics(annotate(makeGenome(), annotations));
 		const node = semantics.nodesById.get(1);
 
 		expect(node?.role).toBe("route_selector");
@@ -106,26 +116,18 @@ describe("meshSemantics", () => {
 		expect(node?.rationale.confidence).toContain("server-provided");
 	});
 
-	it("reads classes only from the server's annotations, never from the genome", () => {
+	it("reads classes only from the brain view's annotations, never from the structure", () => {
 		const genome = makeGenome();
-		genome.nodes[0]!.input_refs = [
-			{
-				World: {
-					FoodHere: {
-						type_idx: 1,
-					},
-				},
-			} as unknown as CreatureGenome["nodes"][number]["input_refs"][number],
-		];
+		genome.nodes[0]!.input_refs = [{ family: "world", key: "FoodHere", food_type: 1 }];
 
-		expect(() => deriveMeshSemantics(genome, null)).not.toThrow();
-		const semantics = deriveMeshSemantics(genome, null);
+		expect(() => deriveMeshSemantics(genome)).not.toThrow();
+		const semantics = deriveMeshSemantics(genome);
 		for (const node of semantics.nodes) {
 			expect(node.readClasses).toEqual([]);
 			expect(node.writeClasses).toEqual([]);
 			expect(node.hasStatefulBehavior).toBe(false);
 		}
-		const annotated = deriveMeshSemantics(genome, annotations);
+		const annotated = deriveMeshSemantics(annotate(genome, annotations));
 		expect(annotated.nodesById.get(1)?.sourceClass).toBe("food");
 	});
 });

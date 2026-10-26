@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { PlaybackState, SamplerPosition } from "../../stores/samplePlayback.ts";
-import type { ExecutionSample } from "../../types/trace.ts";
+import type { ExecutionSamplePayload } from "../../types/generated/ExecutionSamplePayload.ts";
 import { MeshHopTimeline } from "./MeshHopTimeline.tsx";
 import { SelectedHopBlock } from "./SelectedHopBlock.tsx";
 import { TickTimeline } from "./TickTimeline.tsx";
@@ -10,7 +10,7 @@ import type { MeshSemantics } from "./mesh/meshSemantics.ts";
 const SPEED_OPTIONS = [250, 500, 1000, 2000] as const;
 
 interface SamplerBarProps {
-	sample: ExecutionSample | null;
+	sample: ExecutionSamplePayload | null;
 	position: SamplerPosition;
 	playbackState: PlaybackState | "sampling";
 	playbackSpeed: number;

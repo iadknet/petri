@@ -1,6 +1,8 @@
 import { memo } from "react";
-import type { VoteKind } from "../../types/genome.ts";
-import type { MeshPassTrace, TickTrace, WorldAction } from "../../types/trace.ts";
+import type { MeshPassTracePayload } from "../../types/generated/MeshPassTracePayload.ts";
+import type { TickTracePayload } from "../../types/generated/TickTracePayload.ts";
+import type { WorldAction } from "../../types/generated/WorldAction.ts";
+import type { VoteKind } from "../../types/vote-sinks.ts";
 import {
 	VOTE_KINDS,
 	VOTE_SINK_COUNT,
@@ -12,7 +14,7 @@ import { formatVoteSink, voteSinkLabel } from "./graphNodeFormatters.ts";
 import { formatAction } from "./inputRefUtils.ts";
 
 interface VoteSurfaceBlockProps {
-	tick: TickTrace;
+	tick: TickTracePayload;
 }
 
 /** The vote catalog, by index. */
@@ -23,7 +25,6 @@ const DECIDE_SINK = SINKS.indexOf("Decide");
 /** The vote kind of a committed action; `NoOp` has none. */
 function actionKind(action: WorldAction | null): VoteKind | null {
 	if (action === null || action === "NoOp") return null;
-	if (action === "Eat") return "Eat";
 	return Object.keys(action)[0] as VoteKind;
 }
 
@@ -38,7 +39,7 @@ function maxRecorded(values: readonly number[]): number {
  * pass started with, and the effective vote it compared; the committed kind
  * is highlighted. Kinds with no vote, drive, or effective vote are omitted.
  */
-function KindRows({ pass }: { pass: MeshPassTrace }) {
+function KindRows({ pass }: { pass: MeshPassTracePayload }) {
 	const committedKind = actionKind(pass.committed);
 	const shown = VOTE_KINDS.flatMap((kind, index) => {
 		const best = pass.best[index];
@@ -69,7 +70,7 @@ function KindRows({ pass }: { pass: MeshPassTrace }) {
 }
 
 interface PassRowProps {
-	pass: MeshPassTrace;
+	pass: MeshPassTracePayload;
 	endsTerminateVotedTick: boolean;
 }
 

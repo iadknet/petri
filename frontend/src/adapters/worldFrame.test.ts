@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ViewDetailPayload, WorldStaticPayload } from "../types/api.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
 import { buildFrameFromTransport } from "./worldFrame.ts";
 
 function worldStatic(partial?: Partial<WorldStaticPayload>): WorldStaticPayload {
@@ -7,8 +8,9 @@ function worldStatic(partial?: Partial<WorldStaticPayload>): WorldStaticPayload 
 		width: 4,
 		height: 2,
 		// bits 0 and 5 set: cells (0,0) and (1,1)
-		barrier_mask: new Uint8Array([0b0010_0001]),
+		barrier_mask: [0b0010_0001],
 		food_types: [],
+		food_fertility_u8: [],
 		...partial,
 	};
 }
@@ -46,10 +48,7 @@ describe("buildFrameFromTransport", () => {
 
 	it("decodes again when the world static payload is replaced", () => {
 		const first = buildFrameFromTransport(worldStatic(), detail());
-		const second = buildFrameFromTransport(
-			worldStatic({ barrier_mask: new Uint8Array([0b0000_0010]) }),
-			detail(),
-		);
+		const second = buildFrameFromTransport(worldStatic({ barrier_mask: [0b0000_0010] }), detail());
 
 		expect(second?.barriers).not.toBe(first?.barriers);
 		expect(second?.barriers).toEqual([{ x: 1, y: 0 }]);

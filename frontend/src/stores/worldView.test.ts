@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { MOCK_HEALTH_CENSUS } from "../test/fixtures.ts";
-import type {
-	HealthPayload,
-	SnapshotResponse,
-	StatusPayload,
-	ViewDetailPayload,
-	ViewOverviewPayload,
-	WorldStaticPayload,
-} from "../types/api.ts";
+import { MOCK_HEALTH_CENSUS, MOCK_STATUS } from "../test/fixtures.ts";
+import type { HealthPayload } from "../types/generated/HealthPayload.ts";
+import type { SnapshotResponse } from "../types/generated/SnapshotResponse.ts";
+import type { StatusEventPayload } from "../types/generated/StatusEventPayload.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { ViewOverviewPayload } from "../types/generated/ViewOverviewPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
 import { useWorldViewStore } from "./worldView.ts";
 
-function buildStatusPayload(): StatusPayload {
+function buildStatusPayload(): StatusEventPayload {
 	return {
+		...MOCK_STATUS,
 		state: "running",
 		population: 12,
 		mean_energy: 42,
@@ -93,6 +92,7 @@ function buildWorldStaticPayload(partial?: Partial<WorldStaticPayload>): WorldSt
 		width: 8,
 		height: 6,
 		barrier_mask: [0, 1, 2, 3, 4, 5],
+		food_fertility_u8: [],
 		food_types: [
 			{
 				type_idx: 0,

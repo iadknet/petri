@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { CreaturePhenotype } from "../../types/genome.ts";
+import type { CreaturePhenotypeResponse } from "../../types/generated/CreaturePhenotypeResponse.ts";
 
 const CHANNEL_LABELS = ["H1", "H2", "S1", "S2", "L1", "L2"] as const;
 
@@ -13,7 +13,7 @@ const CHANNEL_COLORS = [
 ] as const;
 
 interface PhenotypeDetailProps {
-	phenotype: CreaturePhenotype;
+	phenotype: CreaturePhenotypeResponse;
 }
 
 export const PhenotypeDetail = memo(function PhenotypeDetail({ phenotype }: PhenotypeDetailProps) {

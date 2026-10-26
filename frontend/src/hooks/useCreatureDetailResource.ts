@@ -32,9 +32,9 @@ export function useCreatureDetailResource() {
 			const query: { since_tick?: number; exclude?: string } = {};
 			if (incremental && hasFullFetchRef.current && latestTickRef.current !== null) {
 				query.since_tick = latestTickRef.current;
-				// `graph_weights` carries learned weights that move every tick
-				// (T25.F06), so polls exclude the genome only.
-				query.exclude = "genome";
+				// `learning` carries the weights in force, which move every
+				// tick, so polls exclude the brain only.
+				query.exclude = "brain";
 			}
 
 			try {
@@ -54,9 +54,8 @@ export function useCreatureDetailResource() {
 					complexity: detail.complexity,
 					genomeSize: detail.genome_size,
 					phenotype: detail.phenotype,
-					genome: detail.genome,
-					meshAnnotations: detail.mesh_annotations,
-					graphWeights: detail.graph_weights,
+					brain: detail.brain,
+					learning: detail.learning,
 					sharedMemory: detail.shared_memory,
 					actionLog: detail.action_log,
 					diagnostics: detail.diagnostics,

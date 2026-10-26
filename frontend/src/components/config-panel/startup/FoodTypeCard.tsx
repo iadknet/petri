@@ -1,5 +1,5 @@
 import { useConfigStore } from "../../../stores/config.ts";
-import type { FoodTypeConfig } from "../../../types/config.ts";
+import type { FoodTypeConfig } from "../../../types/generated/FoodTypeConfig.ts";
 import { FieldRow, NUMBER_INPUT_CLASS } from "../shared/FieldRow.tsx";
 import { NumberInput } from "../shared/NumberInput.tsx";
 import { formatConfigNumber } from "../shared/numberFormat.ts";

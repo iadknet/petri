@@ -1,4 +1,4 @@
-import type { GraphTrace } from "../../types/trace.ts";
+import type { GraphTracePayload } from "../../types/generated/GraphTracePayload.ts";
 
 export interface NodeTraceData {
 	// Compute nodes
@@ -14,7 +14,7 @@ export interface NodeTraceData {
 const STATEFUL_KINDS = new Set(["DecayIntegrator", "Momentum", "Oscillator", "AdaptiveGain"]);
 
 export function buildComputeTraceOverlay(
-	trace: GraphTrace,
+	trace: GraphTracePayload,
 	detailIndex: number,
 ): Map<string, NodeTraceData> {
 	const result = new Map<string, NodeTraceData>();
@@ -44,7 +44,7 @@ export function buildComputeTraceOverlay(
 	return result;
 }
 
-export function buildOutputTraceOverlay(trace: GraphTrace): Map<string, NodeTraceData> {
+export function buildOutputTraceOverlay(trace: GraphTracePayload): Map<string, NodeTraceData> {
 	const result = new Map<string, NodeTraceData>();
 
 	const sinks = trace.output_sinks ?? [];

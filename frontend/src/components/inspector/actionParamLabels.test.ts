@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { OutputSinkKind, VmInstruction } from "../../types/genome.ts";
+import type { OutputSinkKind } from "../../types/generated/OutputSinkKind.ts";
+import type { VmInstruction } from "../../types/generated/VmInstruction.ts";
 import { formatOutputSinkKind } from "./graphNodeFormatters.ts";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 

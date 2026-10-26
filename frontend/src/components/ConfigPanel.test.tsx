@@ -6,7 +6,7 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useStartupConfigStore } from "../stores/startupConfig.ts";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
 import { targetSize } from "../test/targetSize.ts";
-import type { FieldError } from "../types/errors.ts";
+import type { FieldError } from "../types/generated/FieldError.ts";
 import { ConfigPanel } from "./ConfigPanel.tsx";
 
 vi.mock("../api/rest.ts", async (importOriginal) => ({
@@ -384,6 +384,7 @@ describe("ConfigPanel", () => {
 
 		expect(useStartupConfigStore.getState().preset.world.food.fertility.layers[0]).toEqual({
 			weight: 0.65,
+			target: "AllFoods",
 			algorithm: {
 				Fbm: {
 					octaves: 5,

@@ -1,5 +1,6 @@
 import { decode } from "@msgpack/msgpack";
-import type { ClientMessage, ServerMessage } from "../types/api.ts";
+import type { ClientMessage } from "../types/generated/ClientMessage.ts";
+import type { ServerMessage } from "../types/generated/ServerMessage.ts";
 
 export type WsConnectionStatus = "disconnected" | "connecting" | "connected";
 

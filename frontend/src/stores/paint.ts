@@ -1,18 +1,18 @@
 import { create } from "zustand";
-import type { PaintTool } from "../types/api.ts";
+import type { PaintToolRequest } from "../types/generated/PaintToolRequest.ts";
 
 export type PaintSubMode = "brush" | "pattern";
 
 export interface PaintState {
 	paintMode: boolean;
 	mode: PaintSubMode;
-	tool: PaintTool;
+	tool: PaintToolRequest;
 	brushHalfExtent: 0 | 1 | 2;
 
 	togglePaintMode: () => void;
 	setPaintMode: (mode: boolean) => void;
 	setMode: (mode: PaintSubMode) => void;
-	setTool: (tool: PaintTool) => void;
+	setTool: (tool: PaintToolRequest) => void;
 	setBrushHalfExtent: (extent: 0 | 1 | 2) => void;
 }
 

@@ -1,4 +1,6 @@
-import type { Frame, ViewDetailPayload, WorldStaticPayload } from "../types/api.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
+import type { Frame } from "../types/protocol.ts";
 
 // Barriers only change with the world static payload, but view messages arrive
 // every tick; decoding a 1600x1600 mask per message stalled the main thread.

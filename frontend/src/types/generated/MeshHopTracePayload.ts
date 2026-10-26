@@ -12,60 +12,10 @@ export type MeshHopTracePayload = {
 	pass_index: number;
 	node_id: number;
 	input_refs: Array<InputRef>;
-	upstream_slots: [
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-	];
+	upstream_slots: Array<number>;
 	energy_before: number;
 	energy_after: number;
-	output_slots: [
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-		number,
-	];
+	output_slots: Array<number>;
 	route: RouteDecisionPayload | null;
 	/**
 	 * The vote contribution this hop committed (T19.F03).

@@ -1,21 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { SamplerPosition } from "../../../stores/samplePlayback.ts";
-import type { CreatureGenome } from "../../../types/genome.ts";
-import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_DECISION_INPUTS, ZERO_KIND_COUNTS, ZERO_VOTES } from "../../../types/trace.ts";
+import { annotation } from "../../../test/brainFixtures.ts";
+import {
+	zeroDecisionInputs,
+	zeroKindCounts,
+	zeroRing,
+	zeroVotes,
+} from "../../../test/traceFixtures.ts";
+import type { BrainView } from "../../../types/generated/BrainView.ts";
+import type { ExecutionSamplePayload } from "../../../types/generated/ExecutionSamplePayload.ts";
 import { deriveTraceFocus } from "./traceFocus.ts";
 
-const genome: CreatureGenome = {
+const genome: BrainView = {
 	entry_node_id: 1,
 	nodes: [
 		{
 			node_id: 1,
-			input_refs: [{ World: "FoodHere" }],
+			annotation: annotation(),
+			input_refs: [{ family: "world", key: "FoodHere" }],
 			targets: [
 				{ target_id: 2, slot: 0, gate_bias: 0.0 },
 				{ target_id: 4, slot: 1, gate_bias: 0.0 },
 			],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 1,
 					constants: [],
@@ -25,20 +32,23 @@ const genome: CreatureGenome = {
 		},
 		{
 			node_id: 2,
-			input_refs: [{ UpstreamSlot: 0 }],
+			annotation: annotation(),
+			input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 			targets: [],
-			backend_def: {
+			backend: {
 				Graph: {
+					groups: [],
 					compute_nodes: [],
-					output_sinks: [{ kind: { RouterGate: 0 }, inputs: [] }],
+					output_sinks: [{ kind: { RouterGate: 0 }, edges: [] }],
 				},
 			},
 		},
 		{
 			node_id: 4,
-			input_refs: [{ UpstreamSlot: 0 }],
+			annotation: annotation(),
+			input_refs: [{ family: "upstream", key: "UpstreamSlot", slot: 0 }],
 			targets: [],
-			backend_def: {
+			backend: {
 				Vm: {
 					register_count: 1,
 					constants: [],
@@ -49,7 +59,7 @@ const genome: CreatureGenome = {
 	],
 };
 
-const sample: ExecutionSample = {
+const sample: ExecutionSamplePayload = {
 	creature_id: 44,
 	ticks: [
 		{
@@ -59,9 +69,9 @@ const sample: ExecutionSample = {
 			energy_after: 9,
 			static_inputs: {
 				food_here: 1,
-				neighbor_food: [0, 0, 0, 0],
-				neighbor_barrier: [0, 0, 0, 0],
-				neighbor_occupied: [0, 0, 0, 0],
+				neighbor_food: zeroRing(),
+				neighbor_barrier: zeroRing(),
+				neighbor_occupied: zeroRing(),
 				age_ticks: 8,
 				previous_outcome: [0, 0, 0, 0],
 			},
@@ -69,10 +79,10 @@ const sample: ExecutionSample = {
 				{
 					hop_index: 0,
 					pass_index: 0,
-					vote_contribution: ZERO_VOTES,
-					decision_inputs: ZERO_DECISION_INPUTS,
+					vote_contribution: zeroVotes(),
+					decision_inputs: zeroDecisionInputs(),
 					node_id: 1,
-					input_refs: [{ World: "FoodHere" }],
+					input_refs: [{ family: "world", key: "FoodHere" }],
 					upstream_slots: [1],
 					energy_before: 10,
 					energy_after: 9.5,
@@ -103,7 +113,7 @@ const sample: ExecutionSample = {
 			termination_reason: "NoDecision",
 			debug_perception: null,
 			priority_bid: 0,
-			commit_counts: ZERO_KIND_COUNTS,
+			commit_counts: zeroKindCounts(),
 		},
 	],
 };
@@ -145,7 +155,7 @@ describe("deriveTraceFocus", () => {
 			throw new Error("missing duplicate-route trace fixture");
 		}
 
-		const duplicateGenome: CreatureGenome = {
+		const duplicateGenome: BrainView = {
 			...genome,
 			nodes: [
 				{
@@ -159,7 +169,7 @@ describe("deriveTraceFocus", () => {
 				terminalNode,
 			],
 		};
-		const duplicateSample: ExecutionSample = {
+		const duplicateSample: ExecutionSamplePayload = {
 			...sample,
 			ticks: [
 				{

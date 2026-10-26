@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { CreatureDiagnostics } from "../../types/creature-detail.ts";
+import type { CreatureDiagnosticsResponse } from "../../types/generated/CreatureDiagnosticsResponse.ts";
 
 interface InspectorDiagnosticsCardsProps {
-	diagnostics: CreatureDiagnostics | null;
+	diagnostics: CreatureDiagnosticsResponse | null;
 }
 
 function activeNeighborCount(values: number[]): number {

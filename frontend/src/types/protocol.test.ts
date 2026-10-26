@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PROTOCOL_VERSION } from "./protocol.ts";
 
 describe("PROTOCOL_VERSION", () => {
-	it("matches the server's v3alpha13 contract", () => {
-		expect(PROTOCOL_VERSION).toBe("v3alpha13");
+	it("matches the server's v3alpha14 contract", () => {
+		expect(PROTOCOL_VERSION).toBe("v3alpha14");
 	});
 });

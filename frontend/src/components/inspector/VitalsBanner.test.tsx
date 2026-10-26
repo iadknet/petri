@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ActionResult, ActionType } from "../../types/action-log.ts";
-import type { ActionLogEntry } from "../../types/action-log.ts";
-import type { CreaturePhenotype } from "../../types/genome.ts";
+import type { ActionLogEntry } from "../../types/generated/ActionLogEntry.ts";
+import type { CreaturePhenotypeResponse } from "../../types/generated/CreaturePhenotypeResponse.ts";
 import { VitalsBanner } from "./VitalsBanner.tsx";
 
 vi.mock("./PhenotypeDetail.tsx", () => ({
@@ -12,8 +11,8 @@ vi.mock("./PhenotypeDetail.tsx", () => ({
 function makeEntry(overrides: Partial<ActionLogEntry> = {}): ActionLogEntry {
 	return {
 		tick: 1,
-		action_type: ActionType.Move,
-		result: ActionResult.Success,
+		action_type: "Move",
+		result: "Success",
 		direction: 2,
 		energy_before: 100,
 		energy_after: 95,
@@ -38,7 +37,7 @@ const defaultProps = {
 	onClose: vi.fn(),
 };
 
-function makePhenotype(): CreaturePhenotype {
+function makePhenotype(): CreaturePhenotypeResponse {
 	return {
 		channels: [100, 150, 200, 50, 75, 125],
 		active_channel: 0,
@@ -104,7 +103,7 @@ describe("VitalsBanner", () => {
 		const entries = Array.from({ length: 55 }, (_, i) =>
 			makeEntry({
 				tick: i + 1,
-				action_type: i % 2 === 0 ? ActionType.Move : ActionType.Eat,
+				action_type: i % 2 === 0 ? "Move" : "Eat",
 			}),
 		);
 		const { container } = render(<VitalsBanner {...defaultProps} actionLog={entries} />);

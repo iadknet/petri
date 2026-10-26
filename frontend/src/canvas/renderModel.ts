@@ -1,14 +1,11 @@
-import type {
-	ByteArrayLike,
-	FoodTypeMetadata,
-	Frame,
-	OverviewFoodCellPayload,
-	PredationEvent,
-	ViewDetailPayload,
-	ViewOverviewPayload,
-	ViewRect,
-	WorldStaticPayload,
-} from "../types/api.ts";
+import type { FoodTypePayload } from "../types/generated/FoodTypePayload.ts";
+import type { OverviewFoodCellPayload } from "../types/generated/OverviewFoodCellPayload.ts";
+import type { PredationEventSnapshot } from "../types/generated/PredationEventSnapshot.ts";
+import type { ViewDetailPayload } from "../types/generated/ViewDetailPayload.ts";
+import type { ViewOverviewPayload } from "../types/generated/ViewOverviewPayload.ts";
+import type { ViewRectPayload } from "../types/generated/ViewRectPayload.ts";
+import type { WorldStaticPayload } from "../types/generated/WorldStaticPayload.ts";
+import type { ByteArrayLike, Frame } from "../types/protocol.ts";
 import type { CameraState } from "./camera.ts";
 
 export interface OverviewRenderLayer {
@@ -16,7 +13,7 @@ export interface OverviewRenderLayer {
 	gridWidth: number;
 	gridHeight: number;
 	food: OverviewFoodCellPayload[];
-	foodTypes: FoodTypeMetadata[];
+	foodTypes: FoodTypePayload[];
 	creatureCounts: number[];
 }
 
@@ -30,12 +27,12 @@ export interface FertilityOverlay {
 
 export interface RenderModel {
 	frame: Frame;
-	foodTypes: FoodTypeMetadata[];
+	foodTypes: FoodTypePayload[];
 	overview: OverviewRenderLayer | null;
 	/** World cells covered by the detail view the frame's food and creatures came from. */
-	detailRect: ViewRect | null;
+	detailRect: ViewRectPayload | null;
 	tick: number;
-	predationEvents: PredationEvent[];
+	predationEvents: PredationEventSnapshot[];
 	camera: CameraState;
 	fertilityOverlay: FertilityOverlay | null;
 	/** Configured max creature energy from the server config; null when not yet known. */
@@ -48,7 +45,7 @@ export function buildRenderModel(input: {
 	detailView?: ViewDetailPayload | null;
 	worldStatic: WorldStaticPayload | null;
 	tick: number;
-	predationEvents: PredationEvent[];
+	predationEvents: PredationEventSnapshot[];
 	camera: CameraState;
 	fertilityGrid: ByteArrayLike | null;
 	fertilityRevision: number;

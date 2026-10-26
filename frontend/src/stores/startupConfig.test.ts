@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
-import type { SimulationConfig } from "../types/api.ts";
+import type { SimulationConfig } from "../types/generated/SimulationConfig.ts";
 import { buildStartupRequest, useStartupConfigStore } from "./startupConfig.ts";
 
 describe("StartupConfigStore", () => {
@@ -80,23 +80,27 @@ describe("StartupConfigStore", () => {
 		expect(preset.world.food.fertility.layers).toEqual([
 			{
 				weight: 1.0,
+				target: "AllFoods",
 				algorithm: {
 					PoissonBlobs: {
 						blob_count: 900,
 						min_radius: 5.0,
 						max_radius: 15.0,
 						falloff: 0.5,
+						seed: null,
 					},
 				},
 			},
 			{
 				weight: 1.0,
+				target: "AllFoods",
 				algorithm: {
 					PoissonBlobs: {
 						blob_count: 900,
 						min_radius: 5.0,
 						max_radius: 15.0,
 						falloff: 0.5,
+						seed: null,
 					},
 				},
 			},
@@ -149,7 +153,7 @@ describe("StartupConfigStore", () => {
 						enabled: true,
 						min_fertility: 0.4,
 						max_fertility: 1.8,
-						layers: [{ algorithm: { Uniform: { value: 0.0 } }, weight: 1.0 }],
+						layers: [{ algorithm: { Uniform: { value: 0.0 } }, weight: 1.0, target: "AllFoods" }],
 					},
 					annealing: {
 						enabled: true,

@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Position } from "@xyflow/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
-import type { GraphBackendDef } from "../../types/genome.ts";
+import { graphBrain, learner, ringGroup } from "../../test/brainFixtures.ts";
+import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 import {
@@ -41,23 +42,24 @@ function hover(tip: EdgeTip, Edge = WeightEdge): HTMLElement {
 
 describe("graph edge tooltips", () => {
 	it("names a plain edge's endpoints and weight", () => {
-		const tip = hover({ source: "FoodHere", target: "CN0", weight: 0.5, own: 0.5 });
+		const tip = hover({ source: "FoodHere", target: "CN0", weight: 0.5, own: 0.5, genomic: 0.5 });
 		expect(tip).toHaveTextContent("FoodHere → CN0");
 		expect(tip).toHaveTextContent("weight 0.500");
 	});
 
-	it("shows a member as scale × pattern + correction", () => {
+	it("prints a member's scale, pattern, own and genomic weight as the view resolved them", () => {
 		const tip = hover({
 			source: "OccRing.N",
 			target: "Move[NE]",
-			weight: 0.75,
+			weight: 1.5,
 			own: 0.25,
-			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge", inheritScale: false },
+			genomic: 0.75,
+			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge", applied: 1.5 },
 		});
 		expect(tip).toHaveTextContent("group #2 member");
 		expect(tip).toHaveTextContent("scale × pattern + correction");
 		expect(tip).toHaveTextContent("0.500 × 1.00 + 0.250 = 0.750");
-		expect(tip).toHaveTextContent("applied unavailable · scope Edge");
+		expect(tip).toHaveTextContent("applied 1.500 · scope Edge");
 	});
 
 	it("shows a plastic edge's weights, rule, reward source, trace decay and inheritance", () => {
@@ -67,15 +69,12 @@ describe("graph edge tooltips", () => {
 				target: "CN0",
 				weight: 1.25,
 				own: 1.5,
+				genomic: 1.5,
 				plastic: {
-					config: {
-						rule: "Classic",
-						learning_rate: 0.1,
-						weight_clamp: 2,
-						lamarckian: true,
-						retention: 1,
+					learner: learner({
+						inherits: true,
 						modulation: { reward_source: "EnergyDelta", trace_decay: 0.5 },
-					},
+					}),
 					genomic: 1.5,
 					applied: 1.25,
 					initialized: false,
@@ -89,77 +88,50 @@ describe("graph edge tooltips", () => {
 		expect(tip).toHaveTextContent("Lamarckian");
 	});
 
-	it("marks a plastic edge's applied weight unavailable without the payload", () => {
-		const tip = hover({
-			source: "CN0",
-			target: "Eat",
-			weight: null,
-			own: 1.5,
-			plastic: {
-				config: {
-					rule: "Oja",
-					learning_rate: 0.1,
-					weight_clamp: 2,
-					lamarckian: false,
-					retention: 1,
-				},
-				genomic: 1.5,
-				initialized: false,
-			},
-		});
-		expect(tip).toHaveTextContent("genomic 1.500 · applied unavailable");
-		expect(tip).toHaveTextContent("Hebbian");
-	});
-
 	it("shows an initialized group learner's scope and scale inheritance", () => {
-		const graphDef: GraphBackendDef = {
-			compute_nodes: [],
+		const graphDef: GraphBrain = graphBrain({
 			output_sinks: [
 				{
 					kind: { ActionVote: { Directed: ["Move", 1] } },
-					inputs: [
+					edges: [
 						{
 							source: { InputLeaf: { ref_idx: 1, sub_idx: 0 } },
-							own_weight: 0.25,
-							plasticity: {
-								rule: "Oja",
-								learning_rate: 0.1,
-								weight_clamp: 2,
-								lamarckian: true,
-								retention: 1,
+							own: 0.25,
+							genomic: 0.75,
+							applied: 0.75,
+							learner: learner({ rule: "Oja", scope: "group", inherits: false }),
+							member: {
+								group: 0,
+								scope: "Group",
+								site: { Direction: 1 },
+								field: 0,
+								pattern: 1,
+								scale: 0.5,
 							},
-							membership: { group: 0, scope: "Group" },
 						},
 					],
 				},
 			],
-			groups: [
-				{
-					shape: { Ring: { ring_ref: 1 } },
-					kind: "Move",
-					offset: 1,
-					scale: 0.5,
-					inherit_scale: false,
-					retention: 1,
-				},
-			],
-		};
+			groups: [ringGroup(1, { offset: 1, scale: 0.5 })],
+		});
 		const model = buildFullGraphModel(
 			graphDef,
-			[{ World: "FoodHere" }, { World: "NeighborBarrierRing" }],
+			[
+				{ family: "world", key: "FoodHere" },
+				{ family: "world", key: "NeighborBarrierRing" },
+			],
 			{
 				node_id: 0,
-				scales: [{ group: 0, genomic: 0.5, learned: 0.8 }],
-				edges: [{ surface: "sink", container: 0, edge: 0, genomic: 0.25, applied: 1.05 }],
+				scales: [{ group: 0, learned: 0.8, initialized: true }],
+				edges: [{ surface: "sink", container: 0, edge: 0, applied: 1.05, initialized: true }],
 			},
 		);
 		const edge = model.edges.find((candidate) => candidate.id === "sink:0:0");
 		expect(edge?.plastic?.initialized).toBe(true);
 		expect(edge?.plastic?.learned).toBeUndefined();
-		expect(edge?.member?.inheritScale).toBe(false);
 		if (edge === undefined) throw new Error("the member is drawn");
 		const tip = hover({ ...edge, source: "OccRing.N", target: "Move[NE]" });
-		expect(tip).toHaveTextContent("genomic 0.250 · applied 1.050");
+		expect(tip).toHaveTextContent("genomic 0.750 · applied 1.050");
 		expect(tip).not.toHaveTextContent("not initialized");
 		expect(tip).toHaveTextContent(/shared scale/);
 		expect(tip).toHaveTextContent(/genomic scale/);
@@ -167,7 +139,7 @@ describe("graph edge tooltips", () => {
 	});
 
 	it("closes when the pointer leaves", () => {
-		hover({ source: "A", target: "B", weight: 1, own: 1 });
+		hover({ source: "A", target: "B", weight: 1, own: 1, genomic: 1 });
 		fireEvent.mouseLeave(screen.getByTestId("edge-hit"));
 		expect(screen.queryByTestId("tooltip")).toBeNull();
 	});
@@ -176,16 +148,22 @@ describe("graph edge tooltips", () => {
 describe("buildGraphFlowScene edge tips", () => {
 	it("labels each edge's tip with its endpoints' node labels", () => {
 		const model = buildFullGraphModel(
-			{
-				compute_nodes: [],
+			graphBrain({
 				output_sinks: [
 					{
 						kind: { ActionVote: "Eat" },
-						inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, own_weight: 0.5 }],
+						edges: [
+							{
+								source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+								own: 0.5,
+								genomic: 0.5,
+								applied: 0.5,
+							},
+						],
 					},
 				],
-			},
-			[{ World: "FoodHere" }],
+			}),
+			[{ family: "world", key: "FoodHere" }],
 		);
 		const box = { x: 0, y: 0, width: 80, height: 24 };
 		const scene = buildGraphFlowScene({
@@ -200,7 +178,13 @@ describe("buildGraphFlowScene edge tips", () => {
 		});
 		const source = model.nodes.find((node) => node.nodeType === "input")?.label;
 		const target = model.nodes.find((node) => node.nodeType === "output_sink")?.label;
-		expect(scene.edges[0]?.data?.tip).toEqual({ source, target, weight: 0.5, own: 0.5 });
+		expect(scene.edges[0]?.data?.tip).toEqual({
+			source,
+			target,
+			weight: 0.5,
+			own: 0.5,
+			genomic: 0.5,
+		});
 		// The node's content is its one tab stop, not React Flow's wrapper too.
 		expect(scene.nodes.every((node) => node.focusable === false)).toBe(true);
 	});
@@ -209,7 +193,7 @@ describe("buildGraphFlowScene edge tips", () => {
 		render(
 			<svg>
 				<title>graph edge</title>
-				<WeightEdge {...edgeProps({ source: "A", target: "B", weight: 1, own: 1 })} />
+				<WeightEdge {...edgeProps({ source: "A", target: "B", weight: 1, own: 1, genomic: 1 })} />
 			</svg>,
 		);
 		fireEvent.pointerDown(screen.getByTestId("edge-hit"), { clientX: 5, clientY: 5 });
