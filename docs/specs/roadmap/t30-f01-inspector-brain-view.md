@@ -125,13 +125,18 @@ would show it wrong.
 
 - [x] Core: `cargo test -p v3-core` -> 2305 lib tests and every
       integration target pass, the learned-view and coordinates tests among
-      them; `cargo build -p v3-core --no-default-features` and
+      them, the viability target first; `ActionResult::ALL` is checked
+      complete and in discriminant order at compile time;
+      `cargo build -p v3-core --no-default-features` and
       `cargo build -p v3-core --features ts` both succeed; `cargo tree -e
-      normal,build` shows no `ts-rs` under `v3-server` or `v3-cli`.
+      normal,build -i ts-rs` finds no `ts-rs` under `v3-server` or `v3-cli`.
 - [x] Server: `cargo test -p v3-server` -> 53 unit, 106 `server`, 11
       `telemetry` tests pass (generator parity, the five preservation cases,
       the `exclude` tokens, paint and pattern round trips, sampler shapes, the
-      `ActionType`/`ActionResult` pin); deleting two generated files, then
+      `ActionType`/`ActionResult` pin over both core `ALL` lists, whose
+      conversions have no wildcard arm); test builds print no ts-rs serde
+      warning (`no-serde-warnings`, the skipped attributes listed in the
+      readings); deleting two generated files, then
       `PETRI_WRITE_TS_TYPES=1 cargo test -p v3-server --lib generated_types`
       and `npm run lint:fix` -> `git status` clean.
 - [x] Frontend: `npm run lint` (0, four pre-existing warnings),
