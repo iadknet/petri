@@ -32,7 +32,9 @@ Apply `$spec-review`. Two jobs:
 1. Judge each disposition in the readings file against the spec as it now
    stands. The dispositions and rebuttals are the spec owner's arguments for
    its own spec: accept one only when the spec, the row or the code supports
-   it.
+   it. Check that each fix is the smallest change that resolves its finding:
+   a fix that adds more than the finding needed (a requirement, invariant,
+   test, option or mechanism beyond it) is an `advisory:` over-fix.
 2. Break confidence that the spec is ready to implement. Attack: contradiction
    with the row or the requirement; a source-quoted requirement the spec drops
    or covers on fewer routes than it names; scope widened or narrowed;

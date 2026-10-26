@@ -66,7 +66,11 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   never into its prompt. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the
   requirement, or the code — not in your own authorship — except the
-  workflow's user-owned findings, which you report instead. Record every round's
+  workflow's user-owned findings, which you report instead. Drop an advisory
+  finding unless adopting it costs nothing (a wording or factual correction);
+  adopt one that adds a requirement, invariant, test, option or mechanism only
+  with a one-line reason naming the failure it prevents in this feature.
+  Record every round's
   findings and dispositions in one table in `docs/progress/readings/<id>.md`.
   A new blocking finding first raised in round 3 is not fixed silently: report
   it as unresolved.

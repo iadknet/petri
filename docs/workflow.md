@@ -302,13 +302,19 @@ code, except for the user-owned findings below. Rounds 2 and 3 read the
 previous findings and their dispositions from the readings file, which the
 spec owner updates before each round, and the earlier reports; they confirm the
 fixes, accept or reject each rebuttal as the spec owner's argument rather than
-a settled fact, and, in round 3, report only new blocking findings. The loop
+a settled fact, report a fix that adds more than its finding needed as an
+advisory over-fix, and, in round 3, report only new blocking findings and
+over-fixes. The loop
 ends, from round 2 on, at a `ready` verdict, which by its definition means no
 blocking finding remains that Codex upholds. A blocking finding Codex
 still upholds after round 3, or a new one first raised in round 3, is an
 unresolved requirement: the spec owner reports it, and it follows the blocker
-rule when only the user can settle it. Advisory findings are adopted or dropped
-at the spec owner's judgment. Round 1's coverage section is copied into
+rule when only the user can settle it. An advisory finding is dropped unless
+adopting it costs nothing, as a wording or factual correction does; adopting
+one that adds a requirement, invariant, test, option or mechanism needs a
+one-line reason in the dispositions table naming the failure it prevents in
+this feature. Review findings are not free: each adoption is carried by every
+later feature that reads the spec or the code. Round 1's coverage section is copied into
 `docs/progress/readings/<id>.md` as a six-row table (check, verdict, what was
 examined, finding references or why it is clear). The findings and dispositions of every round go
 in one table in `docs/progress/readings/<id>.md`, never in the spec; the spec

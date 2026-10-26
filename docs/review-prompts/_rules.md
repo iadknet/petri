@@ -17,6 +17,9 @@ not part of the brief.
 - A report with no findings is valid when its coverage lines, or a line on
   what you tried, show the work. Do not pad the report, and grade each finding
   at the severity its evidence supports, no higher.
+- Propose the smallest fix. A finding whose fix adds a requirement, invariant,
+  test, option or mechanism names the failure it prevents in this change; a
+  future need or general robustness is not a finding.
 - A decision is the user's only where a roadmap row or a design note it cites
   records it with a source quote. Such a decision is still open to challenge:
   report a challenge to it as a premise finding, which goes to the user. An

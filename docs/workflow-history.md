@@ -360,6 +360,13 @@ verdict is derived from the findings, each finding is tagged `[verified]` or
 `[plausible]`, and an empty report is valid. Codex's built-in review rubric was
 not adopted: it excludes intentional changes and unstated intent, the findings
 this workflow exists to produce.
+Against review-driven over-engineering: spec owners had adopted 239 of 247
+advisory findings, against the 7–36% of LLM review comments human developers
+accept, and the 14 T25–T27 specs grew 22% after their plan commits. An advisory
+finding is now dropped unless it costs nothing, as Google's optional "Nit:"
+comments are, and an adoption that adds a requirement, test or mechanism names
+the failure it prevents. Reviewers name that failure for any fix that adds one,
+and readiness rounds report fixes larger than their findings as over-fixes.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),

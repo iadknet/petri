@@ -25,16 +25,20 @@ cites.
 Apply `$spec-review`. Confirm the fixes made since the last round and judge
 each rebuttal: the dispositions and rebuttals are the spec owner's arguments
 for its own spec, so accept one only when the spec, the row or the code
-supports it. Report only new blocking findings beyond those.
+supports it. Check that each fix is the smallest change that resolves its
+finding: a fix that adds more than the finding needed (a requirement,
+invariant, test, option or mechanism beyond it) is an `advisory:` over-fix.
+Report only new blocking findings and over-fixes beyond those.
 
 ## Output
 
 First one line per disposition: `disposition <ref>: confirmed`, `disposition
 <ref>: rejected — <why>` or `disposition <ref>: accepted rebuttal`. Then any
-new finding the skill would grade P1, one per line starting `blocking:`,
-citing the spec section and the evidence, proposing a concrete change, and
-ending with `[verified]` when you checked it against the code, the documents
-or stored output, or `[plausible]` when it is reasoned but not confirmed. Then
-a `Could not verify:` list. End with exactly one line, which follows from the
-findings: `verdict: ready` when you report no blocking finding and reject no
-disposition of a blocking one, otherwise `verdict: not-ready`.
+new finding the skill would grade P1, one per line starting `blocking:`, and
+any over-fix, one per line starting `advisory:`. Each cites the spec section
+and the evidence, proposes a concrete change, and ends with `[verified]` when
+you checked it against the code, the documents or stored output, or
+`[plausible]` when it is reasoned but not confirmed. Then a `Could not verify:`
+list. End with exactly one line, which follows from the findings:
+`verdict: ready` when you report no blocking finding and reject no disposition
+of a blocking one, otherwise `verdict: not-ready`.
