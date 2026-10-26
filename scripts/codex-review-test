@@ -128,6 +128,18 @@ expect_ok adhoc-diff
 contains "$test_root/out/diff.md.brief.md" 'Apply `$code-health-review`.'
 lacks "$test_root/out/diff.md.brief.md" 'Focus requested by the user'
 
+# The architecture review lists every open row and takes no slots.
+run arch-scenarios --worktree "$repo" --out "$test_root/out/arch.md" --render-only
+expect_ok arch-scenarios
+# shellcheck disable=SC2016 # literal backticks in the brief
+contains "$test_root/out/arch.md.brief.md" '  - T99.F02 — Signals, in `docs/roadmaps/t99-test.md`'
+# shellcheck disable=SC2016 # literal backticks in the brief
+contains "$test_root/out/arch.md.brief.md" '  - T99.F04 — Unrelated, in `docs/roadmaps/t99-test.md`'
+lacks "$test_root/out/arch.md.brief.md" 'T99.F01 —'
+lacks "$test_root/out/arch.md.brief.md" '{{'
+run arch-scenarios --worktree "$repo" --out "$test_root/out/arch.md" --doc docs/plan.md --render-only
+expect_refused 'a document slot on the architecture review'
+
 # User focus renders under the fixed heading, verbatim, even with characters
 # awk and sed treat specially.
 run adhoc-plan --worktree "$repo" --out "$test_root/out/plan.md" --doc docs/plan.md \

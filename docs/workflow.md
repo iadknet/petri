@@ -135,6 +135,12 @@ section is confirmed against the final plan. Requirements live in the rows
 and design notes, each recorded once with its source quote; the readings
 file is evidence, not a second contract.
 
+**Review the architecture itself.** A change to `docs/architecture.md` beyond
+fixing a debt line also runs `scripts/codex-review arch-scenarios`. It walks
+every open roadmap row through the document and checks that each rule,
+prohibition, owner and debt is needed by current code or a planned row. Its
+findings are dispositioned in the same readings file as the design review.
+
 **Concurrent sessions.** Before launching, inspect `git worktree list` for
 existing Claude and Codex feature worktrees. An unchecked feature may already
 be in progress; do not assign it twice. If the next feature is already active,

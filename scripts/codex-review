@@ -15,6 +15,8 @@ Usage: scripts/codex-review <kind> --worktree DIR --out FILE [slots] [--render-o
   track-design                 --doc PATH... --intent-export FILE [--base REF]
   adhoc-plan                   --doc PATH... [--base REF] [--user-focus TEXT]
   adhoc-diff                   --skill NAME --base REF [--user-focus TEXT]
+  arch-scenarios               (no slots: reviews docs/architecture.md against
+                               every open roadmap row)
 
 The brief is written to FILE.brief.md and Codex's report to FILE, which must
 lie outside the repository and must not be symlinks. --render-only writes the brief, prints its path and
@@ -38,6 +40,7 @@ case "$kind" in
   track-design) allowed='doc base intent-export' ;;
   adhoc-plan) allowed='doc base user-focus' ;;
   adhoc-diff) allowed='skill base user-focus' ;;
+  arch-scenarios) allowed='' ;;
   *) usage ;;
 esac
 
@@ -218,6 +221,18 @@ if [ -n "$feature" ]; then
 fi
 [ -n "$extenders" ] || extenders='  - none'
 
+# Every open row, for the architecture review's planned-work scenarios.
+open_rows=$(cd "$worktree" && awk '
+  FILENAME ~ /\/_/ { next }
+  /^- \[ \] \*\*T[0-9][0-9]\.F[0-9][0-9] — / {
+    row = $0
+    sub(/^- \[ \] \*\*/, "", row)
+    sub(/\*\* — Depends on: .*$/, "", row)
+    printf "  - %s, in `%s`\n", row, FILENAME
+  }
+' docs/roadmaps/*.md)
+[ -n "$open_rows" ] || open_rows='  - none'
+
 template=$prompts/$kind.md
 render() {
   while IFS= read -r line || [ -n "$line" ]; do
@@ -227,6 +242,7 @@ render() {
       '{{DOCS}}') printf '%s' "$doc_list" ;;
       '{{PRIORS}}') printf '%s' "$prior_list" ;;
       '{{EXTENDERS}}') printf '%s\n' "$extenders" ;;
+      '{{OPEN_ROWS}}') printf '%s\n' "$open_rows" ;;
       '{{INTENT}}') [ -z "$intent" ] || cat "$prompts/_intent.md" ;;
       '{{FOCUS}}') [ -z "$focus" ] || cat "$prompts/_focus.md" ;;
       *) printf '%s\n' "$line" ;;

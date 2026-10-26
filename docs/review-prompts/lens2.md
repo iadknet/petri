@@ -47,7 +47,9 @@ P1 only for coupling the diff introduces or widens that `AGENTS.md` or
 `docs/architecture.md` forbids, or a new import cycle. Report it as P1 even
 when the spec's Architecture paragraph explains it or names a row that removes
 it: that is the author's argument, and the requester judges it after this
-review. Unchanged existing debt is not reported.
+review. Unchanged existing debt is not reported, nor is a debt extended in its
+present shape inside the modules `docs/architecture.md` names for it and
+marked `WORKAROUND(<debt id>)` by a row ordered before the debt's payer.
 
 {{LENS}}
 
