@@ -6,13 +6,18 @@ use v3_cli::bench::{self, NeighborhoodSizes, ProfileParams};
 use v3_cli::RunError;
 use v3_core::config::SimulationConfig;
 
+/// `profile-ticks` heap profiling (`v3_cli::profile`).
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 #[derive(Parser)]
 #[command(name = "v3-cli")]
 struct Cli {
     /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
-    /// default on. `run` exports its run; `bench`, `recruitment` and
-    /// `input-opportunity` export one measurement record pair (and `bench`
-    /// one run per seed) after their work ends.
+    /// default on. `run` exports its run; `bench`, `recruitment`,
+    /// `input-opportunity` and `profile-ticks` export one measurement record
+    /// pair (and `bench` one run per seed) after their work ends.
     #[cfg(feature = "telemetry")]
     #[arg(long, global = true, value_name = "on|off")]
     telemetry: Option<v3_telemetry::Switch>,
@@ -38,6 +43,23 @@ enum Commands {
     /// Exit status 3 when a cap stopped the run and the record is marked
     /// incomplete.
     InputOpportunity(InputOpportunityArgs),
+    /// The profiling harness: a default-config world seeded with 42 and run
+    /// for `--ticks`, with the tick loop timed (`v3_cli::profile`). Run it
+    /// under samply on the `profiling` build, or with the `dhat-heap`
+    /// feature for a heap profile.
+    ProfileTicks(ProfileTicksArgs),
+}
+
+#[derive(clap::Args)]
+struct ProfileTicksArgs {
+    #[arg(long, default_value_t = 200)]
+    ticks: u64,
+    /// Founders seeded.
+    #[arg(long, default_value_t = 200)]
+    creatures: u32,
+    /// The square world's side, in cells.
+    #[arg(long, default_value_t = 200)]
+    world_size: u16,
 }
 
 #[derive(clap::Args)]
@@ -292,6 +314,7 @@ fn main() {
         }
         Commands::Recruitment(args) => run_recruitment(args, switch),
         Commands::InputOpportunity(args) => run_input_opportunity(args, switch),
+        Commands::ProfileTicks(args) => run_profile_ticks(&args, switch),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -603,6 +626,29 @@ fn run_recruitment(args: RecruitmentArgs, switch: Switch) {
             .map(|outcome| outcome.summary.as_path()),
     );
     exit_with(code);
+}
+
+fn run_profile_ticks(args: &ProfileTicksArgs, switch: Switch) {
+    // Writes `dhat-heap.json` when it drops at the command's end.
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+    let options = v3_cli::profile::Options {
+        ticks: args.ticks,
+        creatures: args.creatures,
+        world_size: args.world_size,
+    };
+    eprintln!(
+        "Profiling: {} ticks, {} creatures, {}x{} world",
+        options.ticks, options.creatures, options.world_size, options.world_size
+    );
+    let measurement = measure::profile_ticks(switch, &options);
+    let outcome = v3_cli::profile::run(&options);
+    let tps = options.ticks as f64 / outcome.elapsed.as_secs_f64();
+    eprintln!(
+        "Done: {:.2?} elapsed, {:.1} ticks/sec, {} creatures remaining",
+        outcome.elapsed, tps, outcome.creatures_remaining
+    );
+    measure::profile_ticks_end(measurement, &options, &outcome);
 }
 
 fn run_bench(args: &BenchArgs, switch: Switch) {
@@ -1041,6 +1087,38 @@ mod measure {
         assay_end(measurement, code, summary, opportunity_readings);
     }
 
+    pub(super) fn profile_ticks(switch: Switch, options: &v3_cli::profile::Options) -> Measurement {
+        // Building the config to digest it is work only a record needs.
+        let digest =
+            (switch == Switch::On).then(|| v3_core::config::config_digest(&options.config()));
+        begin(
+            switch,
+            MeasurementStart {
+                command: "profile-ticks",
+                config_digest: digest.as_deref(),
+                ..MeasurementStart::default()
+            },
+        )
+    }
+
+    /// The harness writes no summary: its body is the run's tick count and
+    /// final population.
+    pub(super) fn profile_ticks_end(
+        measurement: Measurement,
+        options: &v3_cli::profile::Options,
+        outcome: &v3_cli::profile::Outcome,
+    ) {
+        let body = json!({
+            "creatures_remaining": outcome.creatures_remaining,
+            "ticks": options.ticks,
+        });
+        measurement.finish(MeasurementEnd {
+            exit_code: 0,
+            body: Some(body.to_string()),
+            ..MeasurementEnd::default()
+        });
+    }
+
     #[cfg(test)]
     mod tests;
 }
@@ -1071,6 +1149,17 @@ mod measure {
     pub(super) fn recruitment_end(_: Measurement, _: u8, _: Option<&Path>) {}
 
     pub(super) fn opportunity_end(_: Measurement, _: u8, _: Option<&Path>) {}
+
+    pub(super) fn profile_ticks(_: Switch, _: &v3_cli::profile::Options) -> Measurement {
+        Measurement
+    }
+
+    pub(super) fn profile_ticks_end(
+        _: Measurement,
+        _: &v3_cli::profile::Options,
+        _: &v3_cli::profile::Outcome,
+    ) {
+    }
 }
 
 #[cfg(test)]
@@ -1166,10 +1255,28 @@ mod tests {
             | Commands::World(_)
             | Commands::BenchSummarize(_)
             | Commands::Recruitment(_)
-            | Commands::InputOpportunity(_) => {
+            | Commands::InputOpportunity(_)
+            | Commands::ProfileTicks(_) => {
                 panic!("expected the bench subcommand")
             }
         }
+    }
+
+    #[test]
+    fn profile_ticks_arguments_default_to_200_and_reject_a_repeated_option() {
+        let Commands::ProfileTicks(args) = Cli::try_parse_from(["v3-cli", "profile-ticks"])
+            .expect("arguments must parse")
+            .command
+        else {
+            panic!("expected the profile-ticks subcommand");
+        };
+        assert_eq!(
+            (args.ticks, args.creatures, args.world_size),
+            (200, 200, 200)
+        );
+        let repeated =
+            Cli::try_parse_from(["v3-cli", "profile-ticks", "--ticks", "2", "--ticks", "3"]);
+        assert!(repeated.is_err(), "a repeated --ticks is a usage error");
     }
 
     #[test]

@@ -33,6 +33,8 @@
 # or, with PETRI_OVERHEAD_WORKLOAD=bench, the bench workload (T21.F06)
 #   v3-cli bench --profile sweep --config telemetry/overhead-world.json
 #     --seeds 7 --ticks T --out <scratch> --summary-out <scratch>
+# or, with PETRI_OVERHEAD_WORKLOAD=profile-ticks, the profiling harness (T30.F07)
+#   v3-cli profile-ticks --ticks T
 # under a 300 s cap of measured run time; TELEMETRY_USED_MS carries the time
 # an earlier attempt used. A pair count the cap cannot hold (two runs a pair,
 # at the slowest spread run) makes it inconclusive before any pair. In bench
@@ -63,8 +65,8 @@ whole() {
   case "$2" in ''|*[!0-9]*) die "$1 must be a whole number, not $2" ;; esac
 }
 case "$workload" in
-  run | bench) ;;
-  *) die "PETRI_OVERHEAD_WORKLOAD must be run or bench, not $workload" ;;
+  run | bench | profile-ticks) ;;
+  *) die "PETRI_OVERHEAD_WORKLOAD must be run, bench or profile-ticks, not $workload" ;;
 esac
 cap_ms=300000
 used_ms=${TELEMETRY_USED_MS:-0}
@@ -120,6 +122,9 @@ timed() {
     set -- "$@" bench --profile sweep --config "$recipe" --seeds 7 --ticks "$run_ticks" \
       --out "$scratch/raw.json" --summary-out "$scratch/summary.json"
     raw=$scratch/raw.json
+  elif [ "$workload" = profile-ticks ]; then
+    set -- "$@" profile-ticks --ticks "$run_ticks"
+    raw=''
   else
     set -- "$@" run --seed 7 --ticks "$run_ticks" --sample-every "$run_ticks" --config "$recipe"
     raw=''

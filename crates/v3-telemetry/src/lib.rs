@@ -329,7 +329,8 @@ impl RunHandle {
 /// (T21.F06): an absent field is omitted from the record.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MeasurementStart<'a> {
-    /// `bench`, `recruitment`, `input-opportunity`, `run` or `why-not`.
+    /// `bench`, `recruitment`, `input-opportunity`, `profile-ticks`, `run` or
+    /// `why-not`.
     pub command: &'a str,
     pub feature: Option<&'a str>,
     /// The benchmark profile.

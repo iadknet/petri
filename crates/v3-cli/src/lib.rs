@@ -288,6 +288,7 @@ fn emit<W: std::io::Write, T: Serialize>(out: &mut W, event: &T) -> Result<(), R
 pub mod bench;
 pub mod inspect;
 pub mod opportunity;
+pub mod profile;
 pub mod recruitment;
 #[cfg(feature = "telemetry")]
 pub mod telemetry;

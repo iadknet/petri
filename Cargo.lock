@@ -2143,6 +2143,7 @@ name = "v3-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "dhat",
  "png",
  "proptest",
  "rayon",
@@ -2159,7 +2160,6 @@ name = "v3-core"
 version = "0.1.0"
 dependencies = [
  "criterion",
- "dhat",
  "hex",
  "noise",
  "proptest",

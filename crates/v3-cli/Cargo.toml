@@ -17,6 +17,9 @@ path = "src/main.rs"
 default = ["telemetry"]
 # T21 run telemetry; `--no-default-features` is the reference build without it.
 telemetry = ["dep:v3-telemetry", "v3-core/telemetry-seams"]
+# Heap profiling for `profile-ticks` (`v3_cli::profile`): dhat as the global
+# allocator, writing `dhat-heap.json` when the command ends.
+dhat-heap = ["dep:dhat"]
 
 [dependencies]
 v3-core = { path = "../v3-core" }
@@ -29,6 +32,7 @@ serde_json = { workspace = true, features = ["float_roundtrip"] }
 sha2 = { workspace = true }
 same-file = "=1.0.6"
 png = "=0.18.1"
+dhat = { version = "0.3", optional = true }
 
 [dev-dependencies]
 proptest = "1.11"

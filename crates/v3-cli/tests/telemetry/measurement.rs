@@ -1,5 +1,5 @@
-//! Measurement commands (T21.F06): `bench`, `recruitment` and
-//! `input-opportunity` with telemetry on record the measurement and, for
+//! Measurement commands (T21.F06): `bench`, `recruitment`,
+//! `input-opportunity` and `profile-ticks` with telemetry on record the measurement and, for
 //! `bench`, each seed at region boundaries only; the exporter sends nothing
 //! before the measurement has ended; the deterministic output is the same
 //! with telemetry off, on, and on against a closed port.
@@ -573,4 +573,59 @@ fn assays_record_one_measurement_with_their_summary_totals() {
         &text(&output.stderr),
         ended.attribute("petri.run_id").unwrap(),
     );
+}
+
+#[test]
+fn profile_ticks_records_one_measurement_with_its_workload() {
+    let scratch = Scratch::new("profile-ticks");
+    let receiver = Receiver::start();
+    let output = cli(
+        &scratch.0,
+        &[
+            "--telemetry",
+            "on",
+            "profile-ticks",
+            "--ticks",
+            "2",
+            "--creatures",
+            "10",
+            "--world-size",
+            "20",
+        ],
+        Some(receiver.endpoint()),
+        &[],
+    );
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(receiver.records().len(), 2);
+    let (started, ended) = measurement_pair(&receiver);
+    let options = v3_cli::profile::Options {
+        ticks: 2,
+        creatures: 10,
+        world_size: 20,
+    };
+    assert_eq!(started.attribute("petri.command"), Some("profile-ticks"));
+    assert_eq!(
+        started.attribute("petri.config_digest"),
+        Some(v3_core::config::config_digest(&options.config()).as_str())
+    );
+    assert_eq!(ended.attribute("petri.exit_code"), Some("0"));
+    assert_eq!(ended.attribute("petri.summary_path"), None);
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("Profiling: 2 ticks, 10 creatures, 20x20 world"),
+        "{stderr}"
+    );
+    let remaining = stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("Done: "))
+        .and_then(|done| done.split(", ").nth(2))
+        .and_then(|part| part.strip_suffix(" creatures remaining"))
+        .expect("the Done line names the creatures remaining");
+    let body = serde_json::json!({
+        "creatures_remaining": remaining.parse::<u64>().expect("a count"),
+        "ticks": 2,
+    });
+    assert_eq!(ended.body.as_deref(), Some(compact(&body).as_str()));
+    assert_exported_after(&receiver, &ended);
+    assert_line_last(&stderr, ended.attribute("petri.run_id").unwrap());
 }
