@@ -129,11 +129,11 @@ changed food-stream or pattern test value, would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] First, on the untouched code: the map-digest test of invariant 6 in
+- [x] First, on the untouched code: the map-digest test of invariant 6 in
       `crates/v3-core/tests/baseline_worlds.rs`, one pinned `u64` per
       `RECIPES` entry, its values computed at `44e53179` and recorded in
       the readings; it passes before any move and after every task below.
-- [ ] `config/terrain.rs`: move `PatternBounds`, `PatternParams` and
+- [x] `config/terrain.rs`: move `PatternBounds`, `PatternParams` and
       `normalize` from `patterns/mod.rs` and `TerrainLayer` from
       `config/simulation.rs`, with their doc comments (`patterns`'s
       generation tests stay); export the three from `config/mod.rs`; `patterns`
@@ -141,37 +141,43 @@ changed food-stream or pattern test value, would show it wrong.
       `v3-server/src/http/pattern.rs` and the `terrain`, `baseline_worlds`
       and `reproducibility` integration tests import from `v3_core::config`
       (invariants 1, 5).
-- [ ] `PatternBounds::clipped_to(width, height)` with a proptest property
+- [x] `PatternBounds::clipped_to(width, height)` with a proptest property
       test (the result lies inside the world and inside the input, origin
       unchanged); `seed_simulation` and `validate_request` call it in place
       of their inline arithmetic (invariant 4, audit R3), with one
       `validate_request` fixture pinning the origin clamp: in a 40×40 world,
       bounds `(50, 0, 10, 10)` return `(39, 0, 1, 10)`.
-- [ ] `contracts/hash.rs`: `pub fn splitmix64` with its determinism test,
+- [x] `contracts/hash.rs`: `pub fn splitmix64` with its determinism test,
       exported from `contracts`; `creature/identity.rs`,
       `kernel/ordinary_food/stream.rs` and `crates/v3-telemetry/src/windows.rs`
       import it and the two local definitions are deleted (invariant 3,
       audit R2).
-- [ ] Delete the G10 and G11 lines from `scripts/architecture-debts.txt`
+- [x] Delete the G10 and G11 lines from `scripts/architecture-debts.txt`
       and the G10 and G11 rows from `docs/architecture.md` section 5
       (invariant 2).
-- [ ] `WORKAROUND(T30.F04): generated from or tested against the server's
+- [x] `WORKAROUND(T30.F04): generated from or tested against the server's
       config schema` comments on the hand-copied types in
       `frontend/src/types/pattern.ts` and `config.ts` (audit R5).
 - [ ] `make check`; the gate profile.
 
 ## Verification
 
-- [ ] Architecture: `scripts/architecture-check.mjs` -> exit 0 with no G10
-      or G11 entry; `grep -rn "fn splitmix64" crates/` -> one definition.
-- [ ] Map digests: the pinned values per world at `44e53179` and after the
-      move, recorded in the readings; `cargo test -p v3-core --test
-      baseline_worlds` -> pass.
-- [ ] Focused tests: `cargo test -p v3-core --test terrain --test
-      reproducibility`, `cargo test -p v3-core ordinary_food::stream`,
-      `cargo test -p v3-core config::terrain`, `cargo test -p v3-server
-      pattern` (the origin-clamp fixture among them), `cargo test -p
-      v3-telemetry` -> pass with no existing expected value edited.
+- [x] Architecture: `node scripts/architecture-check.mjs` -> exit 0 with no
+      G10 or G11 entry; `grep -rn "fn splitmix64" crates/` -> one definition
+      (`contracts/hash.rs`).
+- [x] Map digests: pinned at `44e53179` in commit `59832f7b` before any move
+      (values in the readings); `cargo test -p v3-core --test
+      baseline_worlds` -> 20 passed after the move.
+- [x] Focused tests: `cargo test -p v3-core --test terrain --test
+      reproducibility` -> 14 passed; `cargo test -p v3-core
+      ordinary_food::stream` -> 4 passed; `cargo test -p v3-core
+      config::terrain` -> 1 passed (the `clipped_to` property); `cargo test
+      -p v3-server pattern` -> 9 passed (the origin-clamp fixture among
+      them); `cargo test -p v3-telemetry` -> 80 passed; no existing expected
+      value edited.
+- [x] Crate suites: `cargo test -p v3-core` -> 2400 passed; `cargo test -p
+      v3-server -p v3-telemetry` -> 249 passed; `cargo check --workspace
+      --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
 - [ ] `make check` -> exit 0.
 - [ ] Gate profile: summary at `docs/progress/features/t30-f04.json`, local
       raw hash and byte count and verification time checked, series entry

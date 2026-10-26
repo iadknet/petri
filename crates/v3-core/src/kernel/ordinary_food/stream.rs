@@ -7,7 +7,7 @@
 //! finalizer rounds once per pass; each draw is one more round.
 
 use crate::config::OrdinaryFoodTypeId;
-use crate::creature::identity::splitmix64;
+use crate::contracts::splitmix64;
 
 /// Separates the food stream from other uses of the run seed ("FOODSTRM").
 const FOOD_STREAM_TAG: u64 = 0x464f_4f44_5354_524d;

@@ -3,6 +3,7 @@ pub use recipe::{
     config_digest, deep_merge, resolve_config, sort_json_keys_recursive, ConfigError,
 };
 mod simulation;
+mod terrain;
 
 pub use crate::contracts::OrdinaryFoodTypeId;
 #[cfg(test)]
@@ -13,9 +14,10 @@ pub use simulation::{
     FertilityLayerTarget, FoodConfig, FoodResourceConfig, FoodTypeConfig, FounderProfile,
     GrazingConfig, LogStepMutationConfig, MutationConfig, NeutralInputRecruitment,
     OccupancyDepletionConfig, PhenotypeConfig, PopulationConfig, PredationConfig,
-    ReachableBiasConfig, RuntimeConfig, SensorScale, SimulationConfig, TerrainLayer,
-    VmRuntimeConfig, WorldConfig, WorldEdgeMode,
+    ReachableBiasConfig, RuntimeConfig, SensorScale, SimulationConfig, VmRuntimeConfig,
+    WorldConfig, WorldEdgeMode,
 };
+pub use terrain::{PatternBounds, PatternParams, TerrainLayer};
 
 #[cfg(test)]
 mod recipe_tests {

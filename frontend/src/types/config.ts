@@ -128,6 +128,8 @@ export interface FoodConfig {
 
 export type WorldEdgeMode = "Wrap" | "Bounded";
 
+// Hand copy of `v3_core::config::TerrainLayer`.
+// WORKAROUND(T30.F04): generated from or tested against the server's config schema.
 export interface TerrainLayer {
 	params: PatternParams;
 	bounds?: PatternBounds | null;

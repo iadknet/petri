@@ -293,11 +293,11 @@ fn terrain_config() -> SimulationConfig {
     let mut cfg = reproducibility_config();
     cfg.world.world_seed = Some(817);
     cfg.world.terrain = vec![v3_core::config::TerrainLayer {
-        params: v3_core::patterns::PatternParams::Noise {
+        params: v3_core::config::PatternParams::Noise {
             density: 0.001,
             cluster_size: 20,
         },
-        bounds: Some(v3_core::patterns::PatternBounds {
+        bounds: Some(v3_core::config::PatternBounds {
             x: 0,
             y: 0,
             width: 40,
@@ -306,14 +306,14 @@ fn terrain_config() -> SimulationConfig {
         seed: None,
     }];
     cfg.world.terrain.push(v3_core::config::TerrainLayer {
-        params: v3_core::patterns::PatternParams::FbmThreshold {
+        params: v3_core::config::PatternParams::FbmThreshold {
             octaves: 4,
             frequency: 0.04,
             lacunarity: 2.0,
             persistence: 0.5,
             threshold: 0.2,
         },
-        bounds: Some(v3_core::patterns::PatternBounds {
+        bounds: Some(v3_core::config::PatternBounds {
             x: 40,
             y: 40,
             width: 40,

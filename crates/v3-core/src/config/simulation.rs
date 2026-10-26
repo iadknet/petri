@@ -1,3 +1,4 @@
+use super::terrain::TerrainLayer;
 use crate::contracts::OrdinaryFoodTypeId;
 
 /// Edge mode for the world grid.
@@ -351,15 +352,6 @@ impl Default for AnnealingConfig {
             initial_max_fertility: 1.5,
         }
     }
-}
-
-/// One additive startup barrier layer, using the existing pattern schema.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct TerrainLayer {
-    pub params: crate::patterns::PatternParams,
-    pub bounds: Option<crate::patterns::PatternBounds>,
-    pub seed: Option<u64>,
 }
 
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.

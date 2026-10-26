@@ -27,9 +27,6 @@ G9 sensors/reducers.rs creature::colour
 G9 sensors/reducers.rs creature::state
 G9 sensors/static_inputs.rs creature::colour
 G9 sensors/static_inputs.rs creature::state
-G10 config/simulation.rs patterns::PatternParams
-G10 config/simulation.rs patterns::PatternBounds
-G11 kernel/ordinary_food/stream.rs creature::identity
 G12 mutation/engine/mod.rs creature::parseability
 G14 creature/state.rs creature::sensor_census
 G14 simulation/actions/reproduction.rs creature::drives

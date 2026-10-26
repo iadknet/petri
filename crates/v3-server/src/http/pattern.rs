@@ -4,8 +4,9 @@ use axum::Json;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use v3_core::config::{PatternBounds, PatternParams};
 use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
-use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
+use v3_core::patterns::generate_pattern_seeded;
 
 use crate::error::{AppError, FieldError};
 use crate::query::cache::{world_static_changed, DirtyRect};
@@ -53,13 +54,15 @@ fn validate_request(
         });
     }
 
-    // Clip bounds to world dimensions.
-    let x = req.bounds.x.min(world_width.saturating_sub(1));
-    let y = req.bounds.y.min(world_height.saturating_sub(1));
-    let width = req.bounds.width.min(world_width.saturating_sub(x));
-    let height = req.bounds.height.min(world_height.saturating_sub(y));
+    // Clamp the origin to the last cell, then clip the bounds to the world.
+    let bounds = PatternBounds {
+        x: req.bounds.x.min(world_width.saturating_sub(1)),
+        y: req.bounds.y.min(world_height.saturating_sub(1)),
+        ..req.bounds
+    }
+    .clipped_to(world_width, world_height);
 
-    let area = width as u32 * height as u32;
+    let area = u32::from(bounds.width) * u32::from(bounds.height);
     if area > MAX_PATTERN_AREA {
         return Err(AppError::ValidationRejected {
             field_errors: vec![FieldError {
@@ -70,12 +73,7 @@ fn validate_request(
         });
     }
 
-    Ok(PatternBounds {
-        x,
-        y,
-        width,
-        height,
-    })
+    Ok(bounds)
 }
 
 /// Pack generated paint points into a row-major bitmap within bounds.
@@ -176,6 +174,35 @@ pub async fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An origin past the world is clamped to the last cell before the
+    /// bounds are clipped, so the request keeps a one-cell-wide strip.
+    #[test]
+    fn validate_request_clamps_origin_before_clipping() {
+        let req = PatternRequest {
+            params: PatternParams::Noise {
+                density: 0.5,
+                cluster_size: 1,
+            },
+            bounds: PatternBounds {
+                x: 50,
+                y: 0,
+                width: 10,
+                height: 10,
+            },
+            seed: 0,
+        };
+        let bounds = validate_request(&req, 40, 40).unwrap();
+        assert_eq!(
+            bounds,
+            PatternBounds {
+                x: 39,
+                y: 0,
+                width: 1,
+                height: 10,
+            }
+        );
+    }
 
     #[test]
     fn encode_bitmap_single_cell() {

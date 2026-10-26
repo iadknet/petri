@@ -1,3 +1,5 @@
+use crate::contracts::splitmix64;
+
 /// Per-creature identity state for kin recognition and lineage tracking.
 ///
 /// See `docs/reference/v3-creature-identity-spec.md` for canonical rules.
@@ -44,15 +46,6 @@ impl CreatureIdentityState {
         let bit = rng.gen_range(0..32u32);
         self.kin_tag ^= 1 << bit;
     }
-}
-
-/// splitmix64 finalizer — deterministic hash for seed derivation.
-/// Also the per-cell hash of the food stream (T24.F02).
-pub(crate) fn splitmix64(mut x: u64) -> u64 {
-    x = x.wrapping_add(0x9e3779b97f4a7c15);
-    x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
-    x = (x ^ (x >> 27)).wrapping_mul(0x94d049bb133111eb);
-    x ^ (x >> 31)
 }
 
 #[cfg(test)]
@@ -122,14 +115,5 @@ mod tests {
         let original_lineage = identity.lineage_id;
         identity.mutate_kin_tag(&mut rng);
         assert_eq!(identity.lineage_id, original_lineage);
-    }
-
-    #[test]
-    fn splitmix64_is_deterministic() {
-        let a = splitmix64(42);
-        let b = splitmix64(42);
-        assert_eq!(a, b);
-        // Different inputs produce different outputs
-        assert_ne!(splitmix64(42), splitmix64(43));
     }
 }

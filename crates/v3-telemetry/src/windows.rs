@@ -27,7 +27,7 @@ use opentelemetry_proto::tonic::trace::v1::Span;
 use prost::Message as _;
 use sha2::{Digest as _, Sha256};
 use slotmap::Key as _;
-use v3_core::contracts::{CreatureId, WorldAction};
+use v3_core::contracts::{splitmix64, CreatureId, WorldAction};
 use v3_core::creature::action_log::NO_DIRECTION;
 use v3_core::creature::genome::CreatureGenome;
 use v3_core::runtime::trace::domain::{
@@ -139,14 +139,6 @@ impl WindowSettings {
     pub(crate) fn interval_ms(&self) -> u64 {
         u64::try_from(self.interval.as_millis()).unwrap_or(u64::MAX)
     }
-}
-
-/// SplitMix64's output function.
-fn splitmix64(mut z: u64) -> u64 {
-    z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    z ^ (z >> 31)
 }
 
 /// The position, in `sim.creatures` iteration order, of window `k`'s

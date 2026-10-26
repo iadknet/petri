@@ -1,6 +1,6 @@
 use serde_json::json;
-use v3_core::config::{FoodTypeConfig, SimulationConfig};
-use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
+use v3_core::config::{FoodTypeConfig, PatternBounds, PatternParams, SimulationConfig};
+use v3_core::patterns::generate_pattern_seeded;
 
 #[test]
 fn food_overrides_and_fertile_placement_roundtrip() {

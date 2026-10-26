@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use slotmap::{SecondaryMap, SlotMap};
 
-use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
+use crate::config::{OrdinaryFoodTypeId, PatternBounds, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
@@ -11,7 +11,7 @@ use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::patterns::{generate_pattern_seeded, PatternBounds};
+use crate::patterns::generate_pattern_seeded;
 use crate::simulation::simulation::Simulation;
 
 /// Seed a new simulation from a `SimulationConfig` and a deterministic seed.
@@ -35,18 +35,15 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     );
     let map_seed = config.world.world_seed.unwrap_or(seed);
     for (index, layer) in config.world.terrain.iter().enumerate() {
-        let bounds = layer.bounds.unwrap_or(PatternBounds {
-            x: 0,
-            y: 0,
-            width: world.width,
-            height: world.height,
-        });
-        // Intersect without wrapping or adding potentially overflowing u16 endpoints.
-        let bounds = PatternBounds {
-            width: bounds.width.min(world.width.saturating_sub(bounds.x)),
-            height: bounds.height.min(world.height.saturating_sub(bounds.y)),
-            ..bounds
-        };
+        let bounds = layer
+            .bounds
+            .unwrap_or(PatternBounds {
+                x: 0,
+                y: 0,
+                width: world.width,
+                height: world.height,
+            })
+            .clipped_to(world.width, world.height);
         if bounds.width == 0 || bounds.height == 0 {
             continue;
         }

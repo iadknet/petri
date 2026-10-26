@@ -13,90 +13,9 @@ mod star;
 
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
 
+use crate::config::{PatternBounds, PatternParams};
 use crate::kernel::paint::PaintPoint;
-
-/// Axis-aligned bounding rectangle in world coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PatternBounds {
-    pub x: u16,
-    pub y: u16,
-    pub width: u16,
-    pub height: u16,
-}
-
-/// Pattern configuration. The enum discriminant serves as the pattern type tag.
-/// No separate PatternType enum — the variant IS the type, avoiding mismatched
-/// type+params pairs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(tag = "pattern_type")]
-pub enum PatternParams {
-    FbmThreshold {
-        octaves: u32,
-        frequency: f32,
-        lacunarity: f32,
-        persistence: f32,
-        threshold: f32,
-    },
-    Maze {
-        corridor_width: u8,
-        wall_thickness: u8,
-        open_center_radius: u8,
-    },
-    Spiral {
-        arm_count: u8,
-        arm_thickness: u8,
-        gap_width: u8,
-        clockwise: bool,
-        open_center_radius: u8,
-    },
-    Noise {
-        density: f32,
-        cluster_size: u8,
-    },
-    ParallelLines {
-        spacing: u8,
-        thickness: u8,
-        jaggedness: f32,
-        angle_degrees: f32,
-    },
-    Star {
-        point_count: u8,
-        ray_count: u8,
-        ray_length: u8,
-        ray_thickness: u8,
-    },
-}
-
-impl PatternParams {
-    /// Normalize thresholded fBm parameters at config and runtime boundaries.
-    pub fn normalize(&mut self) {
-        if let Self::FbmThreshold {
-            octaves,
-            frequency,
-            lacunarity,
-            persistence,
-            threshold,
-        } = self
-        {
-            *octaves = (*octaves).clamp(1, 32);
-            for (value, min, max, default) in [
-                (frequency, 0.000001, 1.0, 0.02),
-                (lacunarity, 1.0, 4.0, 2.0),
-                (persistence, 0.0, 1.0, 0.5),
-                (threshold, -1.0, 1.0, 0.0),
-            ] {
-                *value = if value.is_finite() {
-                    value.clamp(min, max)
-                } else {
-                    default
-                };
-            }
-        }
-    }
-}
 
 /// Generate barrier cell positions for a pattern within the given bounds.
 ///

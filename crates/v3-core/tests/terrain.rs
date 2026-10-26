@@ -30,7 +30,8 @@ fn terrain_precedes_food_and_clamps_founders() {
 
 #[test]
 fn clustered_noise_trimming_has_reproducible_set() {
-    use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
+    use v3_core::config::{PatternBounds, PatternParams};
+    use v3_core::patterns::generate_pattern_seeded;
     // A tiny target with a large central cluster forces excess-cell trimming.
     let bounds = PatternBounds {
         x: 0,
@@ -59,8 +60,8 @@ fn clustered_noise_trimming_has_reproducible_set() {
 
 use proptest::prelude::*;
 use std::collections::BTreeSet;
-use v3_core::config::TerrainLayer;
-use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
+use v3_core::config::{PatternBounds, PatternParams, TerrainLayer};
+use v3_core::patterns::generate_pattern_seeded;
 
 fn config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();

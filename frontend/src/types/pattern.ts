@@ -2,6 +2,8 @@ import type { DirtyRect, PaintStats } from "./paint.ts";
 
 // --- Pattern parameter types ---
 
+// Hand copies of `v3_core::config::{PatternParams, PatternBounds}`.
+// WORKAROUND(T30.F04): generated from or tested against the server's config schema.
 export type PatternType = "Maze" | "Spiral" | "Noise" | "ParallelLines" | "Star" | "FbmThreshold";
 
 export interface FbmThresholdParams {
@@ -61,6 +63,7 @@ export type PatternParams =
 
 // --- Request / Response ---
 
+// WORKAROUND(T30.F04): generated from or tested against the server's config schema.
 export interface PatternBounds {
 	x: number;
 	y: number;

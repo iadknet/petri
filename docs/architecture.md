@@ -169,8 +169,6 @@ field access through another type. Design notes:
 | G7 | Energy primitives (`DeathCause`, debits, cognition energy) in `simulation::energy_accounting`, imported by runtime (`runtime::{mesh, vm, cgp::execute, types, trace}`) and the creature record (`creature::state`) | T30.F02 |
 | G8 | Runtime state types in the creature record (`creature::state`), imported by runtime (`runtime::{mesh, cgp::execute, cgp::traced, traced_mesh}`) and mutation (`mutation::reachability`, through `DispatchRecord`) | T30.F02 |
 | G9 | Sensors read the whole creature and its colour helper (`sensors::{reducers, static_inputs}`) while the creature record imports `sensors::reads` (`WorldKeySet`) | T30.F03 |
-| G10 | A config→patterns→kernel cycle (`config::simulation`, `patterns`, `kernel::fertility`) | T30.F04 |
-| G11 | The kernel imports a creature hash helper (`kernel::ordinary_food::stream`) | T30.F04 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
 | G13 | The InputRef mutations edit declarations and Graph edges by hand (`mutation::input_ref`) | T25.F11 |
 | G14 | Production reads readers: sensor caches computed by a census at construction (`creature::state`); the inheritance witness reads `creature::drives::PATH_WEIGHT_FLOOR` (`simulation::actions::reproduction`) | caches: T30.F03; witness: T25.F11 |
