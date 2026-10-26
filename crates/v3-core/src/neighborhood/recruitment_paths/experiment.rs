@@ -1053,7 +1053,7 @@ impl Assay {
         let (start, _) = self.arm(record.arm);
         let mut check = ReplayCheck::default();
         let mut parent = start.genome.clone();
-        for pair in record.proposals.chunks_exact(2) {
+        for pair in record.proposals.as_chunks::<2>().0 {
             let mut retained = None;
             for proposal in pair {
                 let mut child = parent.clone();
@@ -1395,7 +1395,7 @@ mod tests {
                 );
 
                 let mut viable_path = start.task_reading.live();
-                for siblings in lineage.proposals.chunks_exact(2) {
+                for siblings in lineage.proposals.as_chunks::<2>().0 {
                     for proposal in siblings {
                         let child_score = match start.task {
                             Task::A => proposal.outcome.correct_a,

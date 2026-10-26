@@ -17,7 +17,7 @@ use crate::neighborhood::{Battery, Signature};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)

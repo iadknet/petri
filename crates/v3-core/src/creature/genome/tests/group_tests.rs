@@ -64,18 +64,16 @@ proptest! {
     ) {
         let (mut genome, idx, ring) = founder_with_ring();
         let before = genome.genome_size();
-        let mut expected = before;
-        for (kind, offset, lost) in groups {
+        for (earlier, (kind, offset, lost)) in (before..).zip(groups) {
             let def = graph_mut(&mut genome.nodes[idx]);
             let id = def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
-            prop_assert_eq!(genome.genome_size(), expected + 1);
+            prop_assert_eq!(genome.genome_size(), earlier + 1);
             let def = graph_mut(&mut genome.nodes[idx]);
             for _ in 0..lost {
                 let member = def.members(id).next().unwrap();
                 def.remove_edge(member);
             }
-            expected += 1;
-            prop_assert_eq!(genome.genome_size(), expected);
+            prop_assert_eq!(genome.genome_size(), earlier + 1);
         }
         prop_assert!(validate_graph(&genome.nodes[idx]).is_ok());
     }

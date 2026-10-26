@@ -37,7 +37,6 @@ base64 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
-tower = "0.5"
 http-body-util = "0.1"
 axum = { workspace = true }
 rmp-serde = { workspace = true }

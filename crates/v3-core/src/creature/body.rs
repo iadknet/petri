@@ -146,7 +146,7 @@ mod tests {
     use crate::config::{LogStepMutationConfig, PhenotypeConfig};
     use proptest::prelude::*;
     use rand::rngs::SmallRng;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
 
     /// A mutation config whose capacity and share mutations both draw at
     /// `chance` with step `log_step`.

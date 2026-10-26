@@ -215,7 +215,8 @@ fn recruitment_paths_matched_starts_and_history_preserve_incumbents() {
         .iter()
         .filter(|start| start.task == Task::B)
         .collect::<Vec<_>>()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
     {
         let (unprepared, prepared) = (pair[0], pair[1]);
         assert_eq!(prepared.task_reading.correct(Task::A), 8);
@@ -395,7 +396,7 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
             .find(|start| start.name == arm.start)
             .unwrap();
         let mut parent = start.genome.clone();
-        for pair in arm.lineages[0].proposals.chunks_exact(2) {
+        for pair in arm.lineages[0].proposals.as_chunks::<2>().0 {
             let task = evaluate(&parent);
             let reachable = mesh_reachable_nodes(&parent);
             let executed = indices_for_node_ids(&parent, &task.dispatched());

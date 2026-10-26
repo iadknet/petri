@@ -7,6 +7,7 @@ use crate::creature::genome::analysis::mesh_cycle_nodes;
 use crate::mutation::reachability::TargetSets;
 use crate::neighborhood::Battery;
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
+use rand::Rng;
 use routing::{feedback_destinations, losing_bias};
 
 fn ids(values: &[u32]) -> Vec<NodeId> {

@@ -36,7 +36,7 @@ learning and predicting, not only reacting.
 
 ## Quick start
 
-Install [Aqua](https://aquaproj.github.io/) 2.60.1 or newer and Rust 1.93.0
+Install [Aqua](https://aquaproj.github.io/) 2.60.1 or newer and Rust 1.99.1
 through rustup, then run:
 
 ```sh

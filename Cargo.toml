@@ -10,7 +10,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.93"
+rust-version = "1.99"
 version = "0.1.0"
 license = "MIT"
 authors = ["Petri Developers"]
@@ -25,7 +25,7 @@ axum = { version = "0.7", features = ["ws"] }
 base64 = "0.22"
 tokio = { version = "1", features = ["full"] }
 sha2 = "0.10"
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.5", features = ["compression-gzip", "compression-br"] }
 rayon = "1.10"
 rmp-serde = "1.3"

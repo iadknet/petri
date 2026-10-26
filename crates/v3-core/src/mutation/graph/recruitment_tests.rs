@@ -9,7 +9,7 @@ use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
 use proptest::prelude::*;
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 fn node() -> NodeGenome {
     NodeGenome {

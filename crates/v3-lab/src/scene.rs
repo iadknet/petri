@@ -455,7 +455,7 @@ mod tests {
     use super::*;
     use crate::layout::{tests::rows, LayoutFile};
     use proptest::prelude::*;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
 
     fn draw_scene(
         rng: &mut SmallRng,
