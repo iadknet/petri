@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha13 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha14 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha13 protocol-version posture;
+- v3alpha14 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,15 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha13"`.
-- Breaking payload changes require protocol-version bump. `v3alpha13`
+- Canonical value: `"v3alpha14"`.
+- Breaking payload changes require protocol-version bump. `v3alpha14`
+  (T30.F01) replaced the creature detail's `genome`, `mesh_annotations` and
+  `graph_weights` with `brain` and `learning` (section 4.11), made a sampler
+  hop's `input_refs` flat records `{family, key, food_type?, slot?}`, added
+  the graph trace's `temporal_committed` and gave every response a typed
+  shape. The
+  frontend's types are generated from the server's
+  (`frontend/src/types/generated/`). `v3alpha13`
   (T27.F03) serializes a directed vote sink as `{"Directed":[kind,d]}`
   (`{"Directed":["Move",3]}` where `{"Move":3}` stood) in genome
   `ActionVote` sinks, `AddVote` instructions and trace `best` entries; a
@@ -132,7 +139,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha13 shape):
+Request (conceptual v3alpha14 shape):
 
 ```json
 {
@@ -267,7 +274,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -288,7 +295,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "running",
   "tick": 123
 }
@@ -303,7 +310,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "paused",
   "tick": 123
 }
@@ -332,7 +339,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -345,7 +352,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -399,7 +406,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -448,7 +455,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "paused",
   "config": {
     "population": {
@@ -591,7 +598,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -622,7 +629,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -635,7 +642,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -646,7 +653,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -736,15 +743,15 @@ Query parameters (all optional):
 - `since_tick` (u64) — when present, only action_log entries with
   `entry.tick > since_tick` are returned. Omit for the full log.
 - `exclude` (string) — comma-separated field names to omit from the response.
-  Valid values: `genome`, `action_log`, `shared_memory`, `diagnostics`,
-  `graph_weights`. Excluded fields are absent from the JSON (not set to null).
+  Valid values: `brain`, `learning`, `action_log`, `shared_memory`,
+  `diagnostics`. Excluded fields are absent from the JSON (not set to null).
   Unknown names are silently ignored.
 
 Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -762,7 +769,7 @@ Response (full, no query parameters):
     "rgb": [128, 0, 64]
   },
   "latest_tick": 84,
-  "genome": { "entry_node_id": 0, "nodes": ["..."] },
+  "brain": { "entry_node_id": 0, "nodes": ["..."] },
   "shared_memory": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   "action_log": [
     {
@@ -784,7 +791,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha13"`. |
+| `protocol_version` | string | Always `"v3alpha14"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -796,9 +803,8 @@ Field definitions:
 | `complexity` | u32 | Genome complexity (node count). |
 | `phenotype` | object | Visual phenotype state. |
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
-| `genome` | object | Full genome (omitted when `exclude` contains `genome`). A Graph backend's edges carry `own_weight` and, for an edge-group member, `membership: {group, scope}` (`scope` `"Edge"` or `"Group"`, T25.F07); its `groups` list (`{shape: {Ring: {ring_ref}} \| {DirectionPair: {ref_idx, pair}}, kind, offset, scale, inherit_scale, retention}`) is omitted when empty (T25.F03, T25.F04, T25.F07); every `plasticity` config and every group carries `retention` (T25.F09). |
-| `mesh_annotations` | array | Per-node read and write classes, reachability and liveness; present whenever `genome` is. |
-| `graph_weights` | array | Per Graph node carrying an edge group or a plastic edge, in genome order: `{node_id, scales: [{group, genomic, learned?}], edges: [{surface: "compute" \| "sink", container, edge, genomic, applied, learned?}]}`, in canonical edge order one `edges` entry per group member actually present (eight for a new `Ring` group, twelve for a new `DirectionPair` group) with its genomic weight `scale × pattern + own_weight`, the pattern 1 for a `Ring` member and the member's compass component for a `DirectionPair` member (T25.F03, T25.F04), and one per plastic edge on either surface (T25.F06). Every listed edge carries `applied`, the weight in force `own + scale × pattern` through the learned own quantity and the learned scale where they exist; `learned` is present only for an initialized own quantity (an ungrouped edge's weight or an edge-scope member's correction, never a group-scope member's), and a scale's `learned` only for an initialized scale slot of a group with a group-scope learner (T25.F07). Built by one merge-walk over the canonical edge order. Computed on every request whether or not `genome` is included; omitted when the creature has neither or `exclude` contains `graph_weights`. |
+| `brain` | object | The brain as the simulation applies it (T30.F01; omitted when `exclude` contains `brain`): `entry_node_id` and per node its `annotation` (reachability, read and write classes, liveness), flat `input_refs`, `backend` and route `targets`. A Graph backend lists `compute_nodes` and `output_sinks`, each `{kind, edges}`; an edge carries `source`, `own`, `genomic` (the composed weight), `applied` (the weight in force) and, for a member, `member: {group, scope, site?, field?, pattern, scale}` and, for a plastic edge, `learner: {rule, learning_rate, weight_clamp, modulation?, retention, scope, initialized, inherits, learned?, trace?}`; its `groups` list `{shape, kind, offset, scale, inherit_scale, retention, learned_scale?, coordinates: [{field, direction, present}], facts: [{field, present}]}`. A VM backend carries `register_count`, `constants` and `program`. Every number is read from a genome or runtime read API. |
+| `learning` | array | Per Graph node with a dynamic edge: `{node_id, edges: [{surface: "compute" \| "sink", container, edge, applied, learned?, trace?, initialized?}], scales: [{group, learned?, initialized}]}`, every learner and passive member in canonical edge order, a learner adding `initialized` and, once initialized, `learned` and `trace`. Built by one merge-walk; computed on every request; omitted when no node carries a dynamic edge or `exclude` contains `learning`. |
 | `shared_memory` | `f32[]` | 16-slot creature shared memory (omitted when `exclude` contains `shared_memory`). |
 | `action_log` | array | Action log entries (omitted when `exclude` contains `action_log`). |
 
@@ -827,7 +833,7 @@ Field definitions:
 
 Incremental polling pattern:
 1. First request: `GET /v3/simulation/creature/:id` (no query params) — full response.
-2. Subsequent requests: `GET /v3/simulation/creature/:id?since_tick={latest_tick}&exclude=genome` — returns only new action_log entries and omits the immutable genome, which the client keeps from the first request; `graph_weights` is returned on every poll because learned weights move (T25.F06), and the client replaces its copy.
+2. Subsequent requests: `GET /v3/simulation/creature/:id?since_tick={latest_tick}&exclude=brain` — returns only new action_log entries and omits the brain, which the client keeps from the first request; `learning` is returned on every poll because the weights in force move, and the client replaces its copy and joins it to the brain by `(surface, container, edge)`.
 3. Client appends returned action_log entries to its local cache, trimming to ring buffer capacity.
 
 Error cases:
@@ -841,7 +847,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -949,7 +955,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha13
+  performance, but must document the throttle policy. The default v3alpha14
   behavior is per-tick emission.
 
 Ordering rules:
@@ -966,7 +972,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha13",
+  "protocol_version": "v3alpha14",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -992,7 +998,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha13)
+## 7. Out-of-Scope API Surfaces (v3alpha14)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -1014,7 +1020,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha13 server transport/API semantics.
+This file remains canonical for v3alpha14 server transport/API semantics.
 
 ---
 
