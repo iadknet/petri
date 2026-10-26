@@ -226,6 +226,9 @@ feature's wall per creature-tick lies within the gate's `ok` wall band of
 the base's in each pair; otherwise the cost is real and closure stops for
 the user.
 
+Result: both pairs `ok` (feature/base 0.835, 0.960; band +25%); the +122.7%
+was host state ([readings](../../progress/readings/t30-f03.md)).
+
 | Item | Value |
 | --- | --- |
 | Command | `make bench PROFILE=gate FEATURE=t30-f03` |
