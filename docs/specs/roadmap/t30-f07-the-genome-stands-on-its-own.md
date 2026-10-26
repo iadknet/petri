@@ -147,7 +147,7 @@ moved deterministic block or a changed test value would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Genome: `git mv crates/v3-core/src/creature/genome
+- [x] Genome: `git mv crates/v3-core/src/creature/genome
       crates/v3-core/src/genome`; `pub mod genome;` in `lib.rs`; delete the
       declaration in `creature/mod.rs`; rewrite `crate::creature::genome` →
       `crate::genome` and `v3_core::creature::genome` → `v3_core::genome`
@@ -156,7 +156,7 @@ moved deterministic block or a changed test value would show it wrong.
       `include_str!` path at `creature/genome/vote.rs:434` by one `../` so it still
       reaches `frontend/src/types/vote-sinks.json`; `git mv` the
       `container_tests.txt` regression file (invariants 1, 6; audit R1).
-- [ ] Readers: `git mv` the seven files to `crates/v3-core/src/neighborhood/`;
+- [x] Readers: `git mv` the seven files to `crates/v3-core/src/neighborhood/`;
       declare the four modules in `neighborhood/mod.rs` and delete them from
       `creature/mod.rs`; rewrite the 15 external paths, `ring_rules.rs:29`
       and `simulation/actions/reproduction.rs:128`; `git mv` the
@@ -165,7 +165,7 @@ moved deterministic block or a changed test value would show it wrong.
       `pub mod` and `pub use`, and rewrite the parity test at
       `creature/genome/companions.rs:144-156` to assert only against the genome API
       (audit R5) (invariants 2, 6).
-- [ ] Harness: `crates/v3-cli/src/profile.rs` with an options struct
+- [x] Harness: `crates/v3-cli/src/profile.rs` with an options struct
       (ticks, creatures, world size) and a run function returning the
       elapsed time and remaining population; `Commands::ProfileTicks` in
       `main.rs` with clap arguments defaulting to 200, printing today's two
@@ -185,7 +185,7 @@ moved deterministic block or a changed test value would show it wrong.
       `crates/v3-cli/tests/telemetry/measurement.rs` runs the subcommand
       with `--telemetry on` against the receiver fixture and checks the
       pair's command, digest, exit code and body (invariant 3; audit R2).
-- [ ] Checker: delete the three special cases and their comments from
+- [x] Checker: delete the three special cases and their comments from
       `scripts/architecture-check.mjs`; rewrite the fixture paths in
       `scripts/architecture-check.test.mjs` (invariant 4).
 - [ ] Debts and docs: delete the G24, G25 and G26 rows and update the paths
@@ -195,17 +195,17 @@ moved deterministic block or a changed test value would show it wrong.
 
 ## Verification
 
-- [ ] Paths: the two greps of invariants 1 and 2 -> empty;
+- [x] Paths: the two greps of invariants 1 and 2 -> empty;
       `ls crates/v3-core/src/creature/genome crates/v3-core/src/bin` -> no
       such directory; `grep -n "dhat" crates/v3-core/Cargo.toml` -> empty.
 - [ ] Architecture: `make architecture-check architecture-check-test` ->
       exit 0 with no G24, G25 or G26 entry; `grep -n "WORKAROUND(G2[456])"
       scripts/architecture-check.mjs` -> empty.
-- [ ] Harness: `cargo run -p v3-cli -- profile-ticks --ticks 2 --creatures
+- [x] Harness: `cargo run -p v3-cli -- profile-ticks --ticks 2 --creatures
       10 --world-size 20 --telemetry off` -> two stderr lines, exit 0;
       `cargo check -p v3-cli --features dhat-heap` -> exit 0; `cargo test
       -p v3-cli profile` -> the unit and measurement-record tests pass.
-- [ ] Crate suites: `cargo test -p v3-core -p v3-cli -p v3-server -p v3-lab
+- [x] Crate suites: `cargo test -p v3-core -p v3-cli -p v3-server -p v3-lab
       -p v3-telemetry` -> pass counts in the readings, no expected value
       edited, no test ignored or deleted; `cargo check --workspace
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
