@@ -27,9 +27,6 @@ const LEVELS = new Map([
   ['simulation', 9],
   ['readers', 10],
 ]);
-// WORKAROUND(G26): four readers still live under `creature/`; T30.F07 moves
-// them into `neighborhood/` and deletes this list.
-const CREATURE_READERS = new Set(['plasticity_census', 'sensor_census', 'drives', 'ring_rules']);
 
 function usage(message) {
   console.error(`architecture-check: ${message}`);
@@ -39,11 +36,7 @@ function usage(message) {
 
 // Domain of a module path given as segments under `crate::`.
 function domainOf(segments) {
-  const [first, second] = segments;
-  // WORKAROUND(G24): the genome still lives under `creature/`; T30.F07 moves
-  // it to `genome/` and deletes this case.
-  if (first === 'creature' && second === 'genome') return 'genome';
-  if (first === 'creature' && CREATURE_READERS.has(second)) return 'readers';
+  const [first] = segments;
   if (first === 'neighborhood') return 'readers';
   return LEVELS.has(first) ? first : undefined;
 }
@@ -60,10 +53,7 @@ function isTestPath(path) {
     /(^|\/)tests\//.test(path) ||
     /_tests\//.test(path) ||
     /tests?\.rs$/.test(path) ||
-    /(^|\/)test_support\.rs$/.test(path) ||
-    // WORKAROUND(G25): the profiling binary lives in v3-core until T30.F07
-    // moves it to v3-cli and deletes this skip.
-    path.startsWith('bin/')
+    /(^|\/)test_support\.rs$/.test(path)
   );
 }
 

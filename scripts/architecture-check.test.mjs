@@ -38,9 +38,9 @@ function withRoot(body) {
 }
 
 test('downward imports pass', () => withRoot((repository) => {
-  source(repository, 'simulation/tick.rs', 'use crate::runtime::mesh::run;\nuse crate::creature::genome::CreatureGenome;\n');
+  source(repository, 'simulation/tick.rs', 'use crate::runtime::mesh::run;\nuse crate::genome::CreatureGenome;\n');
   source(repository, 'runtime/mesh.rs', 'use crate::sensors::perception::Snapshot;\nuse crate::contracts::Position;\n');
-  source(repository, 'creature/genome/mod.rs', 'use crate::contracts::InputReference;\n');
+  source(repository, 'genome/mod.rs', 'use crate::contracts::InputReference;\n');
   const result = run(repository);
   assert.equal(result.status, 0, result.stderr);
 }));
@@ -60,17 +60,17 @@ test('domains on one row never import each other', () => withRoot((repository) =
 }));
 
 test('the named prohibitions hold even downward', () => withRoot((repository) => {
-  source(repository, 'creature/genome/vote.rs', 'use crate::config::RuntimeConfig;\n');
-  source(repository, 'sensors/typed_food.rs', 'use crate::creature::genome::CreatureGenome;\n');
+  source(repository, 'genome/vote.rs', 'use crate::config::RuntimeConfig;\n');
+  source(repository, 'sensors/typed_food.rs', 'use crate::genome::CreatureGenome;\n');
   const result = run(repository);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /genome imports config/);
   assert.match(result.stderr, /sensors imports genome/);
 }));
 
-test('reader modules inside creature count as readers', () => withRoot((repository) => {
-  source(repository, 'creature/state.rs', 'use crate::creature::sensor_census::census;\n');
-  source(repository, 'creature/sensor_census.rs', 'use crate::creature::state::CreatureState;\n');
+test('readers may import the creature record, not the reverse', () => withRoot((repository) => {
+  source(repository, 'creature/state.rs', 'use crate::neighborhood::sensor_census::census;\n');
+  source(repository, 'neighborhood/sensor_census.rs', 'use crate::creature::state::CreatureState;\n');
   const result = run(repository);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /creature\/state\.rs:1: creature imports readers/);
@@ -167,17 +167,17 @@ test('nested import groups are checked', () => withRoot((repository) => {
 }));
 
 test('super and self paths resolve against the importing module', () => withRoot((repository) => {
-  source(repository, 'creature/genome/mod.rs', 'use super::state::CreatureState;\nuse self::vote::Vote;\n');
-  source(repository, 'creature/genome/vote.rs', 'fn f() { super::super::state::CreatureState::new(); }\n');
+  source(repository, 'genome/cgp/mod.rs', 'use super::super::creature::state::CreatureState;\nuse self::edge::Edge;\n');
+  source(repository, 'genome/cgp/edge.rs', 'fn f() { super::super::super::creature::state::CreatureState::new(); }\n');
   const result = run(repository);
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /creature\/genome\/mod\.rs:1: genome imports creature \(creature::state\)/);
-  assert.match(result.stderr, /creature\/genome\/vote\.rs:1: genome imports creature \(creature::state\)/);
+  assert.match(result.stderr, /genome\/cgp\/mod\.rs:1: genome imports creature \(creature::state\)/);
+  assert.match(result.stderr, /genome\/cgp\/edge\.rs:1: genome imports creature \(creature::state\)/);
   assert.doesNotMatch(result.stderr, /mod\.rs:2/);
 }));
 
 test('pub(super) visibility is not an import', () => withRoot((repository) => {
-  source(repository, 'creature/genome/vote.rs', 'pub(super) fn f() {}\npub(in crate::creature::genome) fn g() {}\n');
+  source(repository, 'genome/vote.rs', 'pub(super) fn f() {}\npub(in crate::genome) fn g() {}\n');
   const result = run(repository);
   assert.equal(result.status, 0, result.stderr);
 }));
