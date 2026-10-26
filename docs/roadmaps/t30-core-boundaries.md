@@ -1,7 +1,7 @@
 # T30 — Core Boundaries
 
-**Status**: Planned
-**Last updated**: 2026-10-25
+**Status**: In Progress
+**Last updated**: 2026-10-26
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
