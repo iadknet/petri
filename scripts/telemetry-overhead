@@ -40,8 +40,9 @@
 # at the slowest spread run) makes it inconclusive before any pair. In bench
 # mode the report also gives the median, over the pairs, of the raw reports'
 # environment.wall_clock_ms_total ratio (no ceiling). T comes from
-# TELEMETRY_TICKS or the `- Workload ticks T: N` line of
-# docs/progress/readings/t21-f01.md; without either it is calibrated with up
+# TELEMETRY_TICKS or, for the run and bench workloads, the `- Workload ticks
+# T: N` line of docs/progress/readings/t21-f01.md (measured on their world, not
+# the profile-ticks default world); without either it is calibrated with up
 # to three reference runs to about 4 s, the first in 3 to 5 s.
 set -eu
 
@@ -296,7 +297,7 @@ used_line() {
 }
 
 ticks=${TELEMETRY_TICKS:-}
-if [ -z "$ticks" ] && [ -f "$f01_readings" ]; then
+if [ -z "$ticks" ] && [ "$workload" != profile-ticks ] && [ -f "$f01_readings" ]; then
   ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$f01_readings" | head -n 1)
 fi
 if [ -z "$ticks" ]; then
