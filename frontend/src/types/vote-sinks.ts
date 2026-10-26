@@ -7,7 +7,7 @@ import catalog from "./vote-sinks.json";
 /** An action kind carrying votes and a bar: every action but `NoOp`. */
 export type VoteKind = Exclude<ActionType, "NoOp">;
 
-/** The action-vote catalog, as v3-core declares it (`creature/genome/vote.rs`
+/** The action-vote catalog, as v3-core declares it (`genome/vote.rs`
  * pins `vote-sinks.json` to the declarations; T27.F03). */
 const VOTE_SINKS = Object.freeze(catalog.voteSinks as VoteSink[]);
 

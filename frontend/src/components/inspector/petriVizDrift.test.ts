@@ -17,12 +17,12 @@ const SKILL = join(ROOT, ".agents/skills/petri-visuals/viz");
 // sha256 of crates/v3-core/src/runtime/cgp/eval.rs when evalKind and the math
 // expectations below were last checked against it. When eval.rs changes, review
 // both, then update this fingerprint.
-const EVAL_RS_SHA256 = "7633522e8358e69eca347c5b29321ba1b109bc41cd7f3b4f207771366f1e6946";
-// sha256 of crates/v3-core/src/creature/genome/cgp/group.rs, the composition
+const EVAL_RS_SHA256 = "fde4089551ef272cec1ecbcdbff439dff308a7c9cdc5a0edda194719aa64478f";
+// sha256 of crates/v3-core/src/genome/cgp/group.rs, the composition
 // source (`compose(own, scale, pattern)`, the ring and pair birth members)
 // the renderer's edgeGroups mirrors. When group.rs changes, review it, then
 // update this fingerprint.
-const GROUP_RS_SHA256 = "4224f6bbbedfbebce7b20a825135051e42aec28ff98157e69677eb8ed880836c";
+const GROUP_RS_SHA256 = "ca210dba88e56a68ee6db2638e009996398996e80116fea8ae8a7f15f0433d29";
 
 type Rgb = [number, number, number];
 interface PetriViz {
@@ -70,7 +70,7 @@ describe("petri-visuals renderer sources", () => {
 	});
 
 	it("checked its member composition against the current group source", () => {
-		const groupRs = readFileSync(join(ROOT, "crates/v3-core/src/creature/genome/cgp/group.rs"));
+		const groupRs = readFileSync(join(ROOT, "crates/v3-core/src/genome/cgp/group.rs"));
 		expect(createHash("sha256").update(groupRs).digest("hex")).toBe(GROUP_RS_SHA256);
 	});
 
