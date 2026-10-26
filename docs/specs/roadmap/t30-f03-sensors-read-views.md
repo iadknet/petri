@@ -258,4 +258,9 @@ move; nothing is re-pinned.
 - Decision: `PerceptionConfig::energy_capacity`, left unread by the views,
   is removed (build-pass escalation, 2026-10-26); invariant 11 guards the
   run configuration, not sensors' narrow view of it.
+- Decision: the perception-requirements cache is private behind an
+  accessor (review P1).
+- Deferred: fixtures (`tick.rs:1649`, v3-cli `bench/tracking/tests.rs:428`)
+  replace genomes and resync derived state by hand; encapsulating finalized
+  genomes and derived state behind construction is proposed at closure.
 - Cost: see the readings file at closure.
