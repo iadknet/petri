@@ -260,7 +260,11 @@ move; nothing is re-pinned.
   run configuration, not sensors' narrow view of it.
 - Decision: the perception-requirements cache is private behind an
   accessor (review P1).
-- Deferred: fixtures (`tick.rs:1649`, v3-cli `bench/tracking/tests.rs:428`)
-  replace genomes and resync derived state by hand; encapsulating finalized
-  genomes and derived state behind construction is proposed at closure.
+- Deferred: design-lens step-back: test fixtures
+  `final_action_observation_uses_full_actions_and_leaves_simulation_unchanged`
+  (`simulation/tick.rs`) and
+  `each_stateful_split_counts_the_creatures_that_qualify_for_it` (v3-cli
+  `bench/tracking/tests.rs`) replace genomes and resync derived state by
+  hand; encapsulating finalized genomes and derived state behind
+  construction is proposed at closure.
 - Cost: see the readings file at closure.
