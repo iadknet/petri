@@ -165,7 +165,17 @@ identical, with no indicator moving in any direction. A moved pin is a defect
 `learning` payload costs the inspector one merge-walk per poll, as
 `graph_weights` does today, and is not benchmarked.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate, 2026-10-26, HEAD 1038e63d: no pin moved and
+compute cost is zero, as predeclared. `make bench PROFILE=gate
+FEATURE=t30-f01`: outer `make` exit 0, CLI exit 0 (the recipe passed and the
+CLI wrote both files). `severe=false`; threshold verdict `ok` on all nine
+indicators, each delta 0.000000% against
+`t27-f03-giving-energy.json`; the whole `deterministic` object equals the
+reference (final populations 622, 632, 645). Raw report 132637 bytes, sha256
+`2833000d811388c62e37a976f63d63652f17e01276fd914e3e24de439f6de6e5`, at the
+main checkout's ignored `.bench-artifacts/t30-f01/gate.json`; summary 27481
+bytes. No benchmark-series entry was added (none exists for the reference
+summary either).
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f01.json).
 - Full readings: [`docs/progress/readings/t30-f01.md`](../../progress/readings/t30-f01.md).
