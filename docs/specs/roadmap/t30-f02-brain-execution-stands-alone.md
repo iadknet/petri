@@ -209,21 +209,18 @@ wrong.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> 30 passed (run first).
-- [x] Focused tests: the ledger's property tests, the moved
-      `runtime::state` tests, `mutation::engine::tests::a_zero_event_birth_never_resolves_the_parent_dispatch_record`,
-      `simulation/tick/tests/{dispatch_record,window_seam,energy_accounting}.rs`,
-      the v3-telemetry `windows` tests and the v3-server sampler tests ->
-      69, 21 and 2 passed.
+- [x] Focused tests (ledger properties, `runtime::state`, the mutation
+      dispatch-record test, `simulation/tick/tests`, v3-telemetry
+      `windows`, v3-server sampler) -> 69, 21 and 2 passed.
 - [x] `cargo check --workspace --all-targets`, `cargo fmt --all --check`,
       clippy `-D warnings`, architecture and roadmap checkers -> clean;
       v3-lab 212, v3-core 2,407 (2,440 with `telemetry-seams`) passed;
       v3-telemetry, v3-server, v3-cli pass.
 - [ ] `make check` -> exit code and commit; `make rust-test-slow` -> exit
       code.
-- [ ] Gate: summary at `docs/progress/features/t30-f02.json`, local raw
-      hash, byte count and verification time checked, series entry points
-      to it, no full report staged; every `deterministic` value and work
-      counter equal to the reference's. Goal: `Not run: Verification Plan`.
+- [x] Gate: summary `docs/progress/features/t30-f02.json`, raw hash and
+      byte counts, series entry, no raw staged; every `deterministic` value
+      and work counter equal. Goal: `Not run: Verification Plan`.
 
 ## Performance and Goal Impact
 
@@ -238,7 +235,10 @@ direction: the nine work counters and every `deterministic` value
 identical; wall clock neutral within the gate's noise, a regression there
 attributed before closure. No indicator can move; nothing is re-pinned.
 
-**Measured verdict.** Not yet run.
+**Measured verdict.** Gate, code 3406622d: `severe=false`, all nine
+indicators `ok` (0.000000%), `deterministic` equal to t30-f01's, as
+predeclared. Exit 0 (`make`) and 0 (CLI). Raw 134942 bytes, sha256
+`e714eab1…f1318` (`.bench-artifacts/t30-f02/gate.json`); summary 28783 bytes.
 
 - Summary: [gate](../../progress/features/t30-f02.json).
 - Readings: [`t30-f02.md`](../../progress/readings/t30-f02.md).
