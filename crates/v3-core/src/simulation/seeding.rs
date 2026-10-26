@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                .filter(|creature| creature.perception_requirements().extended_perception)
                 .count(),
             0
         );
@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                .filter(|creature| creature.perception_requirements().extended_perception)
                 .count(),
             2
         );
@@ -380,7 +380,7 @@ mod tests {
                 live_vm_world_reads(genome, &reachable)
             );
             assert_eq!(
-                creature.cached_perception_requirements,
+                creature.perception_requirements(),
                 perception_requirements(genome)
             );
             let declared: WorldKeySet = declared_world_keys(genome, &reachable)
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                .filter(|creature| creature.perception_requirements().extended_perception)
                 .count(),
             sim.creature_count()
         );
@@ -437,7 +437,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                .filter(|creature| creature.perception_requirements().extended_perception)
                 .count(),
             200
         );

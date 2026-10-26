@@ -297,9 +297,7 @@ fn assemble_sensor_inputs(
     sim: &Simulation,
     queue: &[CreatureId],
 ) -> Vec<(CreatureId, SensorSnapshot)> {
-    assemble_sensor_inputs_with(sim, queue, |creature| {
-        creature.cached_perception_requirements
-    })
+    assemble_sensor_inputs_with(sim, queue, |creature| creature.perception_requirements())
 }
 
 /// The body view of every living creature, as sensors read it this tick.
@@ -649,11 +647,9 @@ fn run_cognition(
                         age,
                         typed_local_food: ss.typed_local_food.clone(),
                         typed_area_food: ss.perception.typed_area_food.clone(),
-                        uses_typed_local_food: creature
-                            .cached_perception_requirements
-                            .typed_local_food,
+                        uses_typed_local_food: creature.perception_requirements().typed_local_food,
                         uses_extended_perception: creature
-                            .cached_perception_requirements
+                            .perception_requirements()
                             .extended_perception,
                         applied: Vec::with_capacity(runtime_config.max_actions_per_turn),
                         damage_received: 0.0,

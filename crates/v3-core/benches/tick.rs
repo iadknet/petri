@@ -130,7 +130,7 @@ fn bench_perception_assembly_stress(c: &mut Criterion) {
                 let extended_count = sim
                     .creatures
                     .values()
-                    .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                    .filter(|creature| creature.perception_requirements().extended_perception)
                     .count();
                 assert_eq!(
                     extended_count, RUNTIME_STRESS_PERCEPTION_CREATURES,
@@ -144,7 +144,7 @@ fn bench_perception_assembly_stress(c: &mut Criterion) {
                 let mut visible_scratch = VisibilityScratch::default();
                 let views = body_views(&sim);
                 for (id, creature) in sim.creatures.iter() {
-                    if !creature.cached_perception_requirements.extended_perception {
+                    if !creature.perception_requirements().extended_perception {
                         continue;
                     }
                     let visible = compute_visible_cells_into(
@@ -189,7 +189,7 @@ fn bench_full_tick_large_population(c: &mut Criterion) {
                 let extended_count = sim
                     .creatures
                     .values()
-                    .filter(|creature| creature.cached_perception_requirements.extended_perception)
+                    .filter(|creature| creature.perception_requirements().extended_perception)
                     .count();
                 assert_eq!(
                     extended_count, LARGE_TICK_PERCEPTION_CREATURES,
