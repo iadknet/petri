@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-10-22
+**Last updated**: 2026-10-25
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
 closed, what made evolution start working and the findings it carried
@@ -24,7 +24,7 @@ attributed to the feature whose closure moved it.
 - [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
 - [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
 - [ ] **T29 — Heredity** — [Roadmap](roadmaps/t29-heredity.md) — Depends on: T25
-- [ ] **T30 — Core Boundaries** — [Roadmap](roadmaps/t30-core-boundaries.md) — Depends on: T25, T29
+- [ ] **T30 — Core Boundaries** — [Roadmap](roadmaps/t30-core-boundaries.md) — Depends on: None
 
 ## Final Success Criteria
 
@@ -76,9 +76,9 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   past 20,000 ticks. The unbounded steal request and the zero-energy live
   steals (2026-10-12 probe) are owned by T27.F03.
 
-Priority order for new starts: T26.F01, T25.F10, T27.F01, T26.F02, T27.F03,
-T30.F01, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03, T30.F02,
-T30.F03, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
+Priority order for new starts: T30.F03, T26.F01, T25.F10, T27.F01, T26.F02,
+T27.F03, T30.F01, T30.F07, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03,
+T30.F02, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
 
 - T30 (core boundaries) was placed on 2026-10-22 at the user's direction
   from the known debts in [`docs/architecture.md`](architecture.md) that no
@@ -86,7 +86,14 @@ T30.F03, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
   the same change made T27.F02 depend on T25.F11 (user) and entered T29's
   rows, missing from this order since that track was added. T30.F01 is
   ordered before T25.F11 so the genome refactors change a core read API
-  rather than the frontend's copy of genome types; the other rows follow
+  rather than the frontend's copy of genome types, and T30.F07 (added
+  2026-10-25 by user decision) moves the genome to its own module before the
+  genome rows build on its old path. T30.F03 comes first (user, 2026-10-25):
+  it refactors sensors onto explicit views now, rather than guarding the
+  whole-creature and genome reads (G9, G20) until it lands, and T27.F02 and
+  T29.F02 then put their new sensed state on those views; a row still ordered before its debt's
+  payer extends the debt only as `docs/architecture.md` rule 3 of "Use this
+  file" allows. The other rows follow
   T29 and precede T28, whose transfers build on T30.F02 and F06. These are
   scheduling preferences, not prerequisites (assistant proposal;
   [design review](progress/readings/t30-design-review.md)).

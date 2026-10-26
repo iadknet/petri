@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
-// Enforces docs/architecture.md section 3 on crates/v3-core: every `crate::`
-// import points down the dependency order and breaks none of the named
-// prohibitions. Imports the code still owes are listed in
+// Enforces docs/architecture.md on crates/v3-core: every `crate::`, `self::`
+// and `super::` path points down section 3's dependency order into a domain it
+// names and breaks neither named prohibition; lib.rs only declares modules;
+// and, from section 2, no crate depends on v3-lab. Imports the code still owes are listed in
 // scripts/architecture-debts.txt under a debt ID from section 5; an entry the
 // code no longer needs, or whose ID the document no longer lists, fails, so
 // paying a debt deletes it from both places.
@@ -37,6 +38,8 @@ function usage(message) {
 // Domain of a module path given as segments under `crate::`.
 function domainOf(segments) {
   const [first, second] = segments;
+  // WORKAROUND(G24): the genome still lives under `creature/`; T30.F07 moves
+  // it to `genome/` and deletes this case.
   if (first === 'creature' && second === 'genome') return 'genome';
   if (first === 'creature' && CREATURE_READERS.has(second)) return 'readers';
   if (first === 'neighborhood') return 'readers';
@@ -108,15 +111,63 @@ function productionLines(text) {
   return { kept, testModules };
 }
 
-function importedPaths(line) {
-  const paths = [];
-  for (const match of line.matchAll(/\bcrate::([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)/g)) {
-    paths.push(match[1].split('::'));
+// The use tree that starts at `start`: a path, then any balanced brace group.
+function treeAt(text, start) {
+  let end = start;
+  let depth = 0;
+  while (end < text.length) {
+    const char = text[end];
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      if (depth === 0) break;
+      depth -= 1;
+    } else if (depth === 0 && !/[\w:*]/.test(char)) break;
+    end += 1;
   }
-  for (const match of line.matchAll(/\bcrate::\{([^}]*)\}/g)) {
-    for (const part of match[1].split(',')) {
-      const path = part.trim().match(/^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*/)?.[0];
-      if (path) paths.push(path.split('::'));
+  return text.slice(start, end);
+}
+
+function splitTopLevel(text) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    else if (text[index] === '}') depth -= 1;
+    else if (text[index] === ',' && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts;
+}
+
+// Every path a use tree names, nested groups expanded.
+function expandTree(tree) {
+  const text = tree.trim();
+  if (!text) return [];
+  if (text.startsWith('{')) return splitTopLevel(text.slice(1, -1)).flatMap(expandTree);
+  const match = text.match(/^([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)(?:::(\{[\s\S]*))?/);
+  if (!match) return [];
+  const head = match[1].split('::');
+  const groups = match[2] ? expandTree(match[2]) : [];
+  return groups.length ? groups.map((tail) => head.concat(tail)) : [head];
+}
+
+// Module paths a statement names, resolved to segments under `crate::`:
+// `crate::` paths, and `self::` and `super::` paths relative to `module`.
+function importedPaths(text, module) {
+  const paths = [];
+  for (const match of text.matchAll(/(?<![\w:])(crate|self|super(?:::super)*)::/g)) {
+    const root = match[1];
+    let base;
+    if (root === 'crate') base = [];
+    else if (root === 'self') base = module;
+    else base = module.slice(0, module.length - root.split('::').length);
+    for (const path of expandTree(treeAt(text, match.index + match[0].length))) {
+      const segments = base.concat(path).filter((segment) => segment !== 'self');
+      if (segments.length) paths.push(segments);
     }
   }
   return paths;
@@ -139,6 +190,50 @@ function readDebts(text, errors) {
     debts.push({ id: fields[0], file: fields[1], module: fields[2], used: false });
   }
   return debts;
+}
+
+// lib.rs only declares modules: an item or re-export there would sit outside
+// every domain, where no import rule reaches it.
+function libLines(sourceRoot) {
+  const file = join(sourceRoot, 'lib.rs');
+  if (!existsSync(file)) return [];
+  const errors = [];
+  for (const [index, raw] of readFileSync(file, 'utf8').split(/\r?\n/).entries()) {
+    const line = raw.trim();
+    if (
+      line === '' ||
+      line.startsWith('//') ||
+      /^#!?\[.*\]$/.test(line) ||
+      /^(pub(\([^)]*\))?\s+)?mod\s+[A-Za-z_]\w*\s*;$/.test(line)
+    ) {
+      continue;
+    }
+    errors.push(
+      `crates/v3-core/src/lib.rs:${index + 1}: lib.rs holds only module declarations, attributes and comments`,
+    );
+  }
+  return errors;
+}
+
+// Section 2: v3-lab is never depended on.
+function labDependents(root) {
+  const manifests = [join(root, 'Cargo.toml')];
+  const crates = join(root, 'crates');
+  if (existsSync(crates)) {
+    for (const entry of readdirSync(crates, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name !== 'v3-lab') manifests.push(join(crates, entry.name, 'Cargo.toml'));
+    }
+  }
+  const errors = [];
+  for (const manifest of manifests) {
+    if (!existsSync(manifest)) continue;
+    for (const [index, line] of readFileSync(manifest, 'utf8').split(/\r?\n/).entries()) {
+      if (/^\s*v3[-_]lab\s*=/.test(line) || /^\s*\[[^\]]*dependencies\.v3[-_]lab\]/.test(line)) {
+        errors.push(`${relative(root, manifest)}:${index + 1}: depends on v3-lab, which nothing may depend on`);
+      }
+    }
+  }
+  return errors;
 }
 
 function validate(root) {
@@ -175,10 +270,27 @@ function validate(root) {
       errors.push(`crates/v3-core/src/${path}: module ${modulePath[0]} has no domain in docs/architecture.md section 3`);
       continue;
     }
-    for (const { number, line } of parsed.get(path)) {
-      for (const segments of importedPaths(line)) {
+    const lines = parsed.get(path);
+    for (let index = 0; index < lines.length; index += 1) {
+      const { number } = lines[index];
+      // A use statement can span lines; join it up to its semicolon.
+      let text = lines[index].line;
+      if (/^\s*(pub(\([^)]*\))?\s+)?use\b/.test(text)) {
+        while (!text.includes(';') && index + 1 < lines.length) {
+          index += 1;
+          text += ` ${lines[index].line}`;
+        }
+      }
+      for (const segments of importedPaths(text, modulePath)) {
         const to = domainOf(segments);
-        if (!to || allowed(from, to)) continue;
+        if (!to) {
+          errors.push(
+            `crates/v3-core/src/${path}:${number}: ${from} imports crate::${segments[0]}, ` +
+              'which no domain in docs/architecture.md section 3 owns',
+          );
+          continue;
+        }
+        if (allowed(from, to)) continue;
         const module = segments.slice(0, 2).join('::');
         const debt = debts.find((entry) => entry.file === path && entry.module === module);
         if (debt) {
@@ -189,6 +301,8 @@ function validate(root) {
       }
     }
   }
+
+  errors.push(...libLines(sourceRoot), ...labDependents(root));
 
   for (const debt of debts) {
     if (!debt.used) {

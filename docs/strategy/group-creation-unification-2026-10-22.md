@@ -221,8 +221,9 @@ appears.
 The vote vocabulary (the 39 vote sinks: four directed kinds of nine, plus
 `Eat`, `Terminate`, `Decide`, and the action parameters) lives in
 `creature/genome/vote.rs` today. It is a brain I/O contract that the VM,
-the Graph, decoding and readers share; the spec owner decides whether F11
-moves it beside the sensor descriptor or a later row does. Graph-only
+the Graph, decoding and readers share; F11 moves the part its sensor
+descriptor needs into contracts (G2 in `docs/architecture.md`; corrected
+2026-10-25 to match the T25 notes, which assign it to F11). Graph-only
 output surfaces (the bus, memory writes) stay in the graph domain.
 
 F11 keeps today's learning representation (per-member `PlasticityConfig`

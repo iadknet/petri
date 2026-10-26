@@ -93,3 +93,92 @@ all four proposals:
 Output: `/tmp/claude-501/-Users-<user>-projects-petri/dfc7ccd8-7685-41ad-a73b-a4c0e7045a0a/scratchpad/arch-review-3/codex-out.md`
 (outside the repository). Row IDs in the sections above are the pre-trim
 numbering.
+
+## Architecture reviews (2026-10-25)
+
+Three fresh read-only jobs from the fixed templates in
+[`docs/review-prompts/`](../../review-prompts/): `adhoc-plan` on
+`docs/architecture.md`, the T30 track and `scripts/architecture-debts.txt`
+(base `d5361607`, before the document existed), run once by Codex Astra
+(`gpt-6-astra`, `high`) and once by a Fable subagent; then `track-design`
+(`gpt-6.1-sol`, `high`) on the resulting planning changes, with an intent
+export of the session's turns. Debt IDs below are the committed ones (the
+track-design job saw G21–G24 for today's G22–G25; G21 stays retired).
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| 1 | Astra P2 | VM splice and insertion with jump repair have no owner | G23 added; T30.F05 makes them genome-owned edits |
+| 2 | Astra P2 | The import checker missed multi-line and nested `use` groups and `super::`/`self::` paths | Fixed in `scripts/architecture-check.mjs` with tests; the code still passes |
+| 3 | Astra P3 | F06's per-tick reproduction RNG lost its workaround treatment | F06 note requires a `WORKAROUND(T30.F06)` comment |
+| 4 | Fable P2 | Action log and paint structs on the wire, copied by the frontend | G22; action log to F06, paint to F01 (user) |
+| 5 | Fable P2 | Master T30 "Depends on: T25, T29" stale since the trim | Now None |
+| 6 | Fable P2 | Readers and ledger had no paths in section 3 | Paths named |
+| 7 | Fable P2 | F02 and F03 move types across a prohibition without naming their homes | F02: a contracts- or mutation-owned view; F03: contracts keys or `WorldKeySet` to contracts |
+| 8 | Fable P3 | F02 overlaps with F03 and F06 unstated | Overlap notes added |
+| 9 | Fable P3 | F06 is the track's largest row | One row in two halves (user) |
+| 10 | Fable P3 | `contracts` has no admission rule | Rule added to its owner cell |
+| 11 | Fable P3 | The genome sits under `creature/`, special-cased by the checker | G24; new row T30.F07 (user); checker case marked `WORKAROUND(G24)` |
+| 12 | Fable P3 | Section 5's `file:line` cites duplicate the debts file | Rows cite modules and symbols |
+| 13 | Fable P3 | `v3-core/src/bin/profile_ticks.rs` does I/O in the core crate | G25, unpaid; proposed to the user |
+| 14 | track-design P2 | Register-count resize also left in mutation | Added to G23 and F05 |
+| 15 | track-design P2 | G25 has no payer | Awaiting the user's disposition |
+| 16 | track-design P2 | The sensor-wiring note still let F11 defer the vote vocabulary | Note corrected to the T25 assignment |
+
+track-design coverage:
+
+| Check | Verdict | What was examined | Findings or why clear |
+| --- | --- | --- | --- |
+| C1 Code decomposition | clear | F01–F07, the three design notes, server projections, runtime state, sensor caches, VM edit helpers | units separate transport, execution, analysis and scheduling |
+| C2 Task decomposition | finding | every debt payer, row dependencies, priority order, F06's halves | 15 |
+| C3 Domain boundaries | finding | serialization, paint, dispatch history, sensor requirements, energy primitives, VM edits | 14 |
+| C4 Premises | finding | intent export, design notes, roadmap records, blame and history | 16 |
+| C5 Larger design flaw | clear | `d5f94720`, `729681fb`, `e33b4861`, `163a68b0`, `7e01c9b4`, `24c7aca3`, `6a1987d0` | the rows address the repeated leaks; no step-back |
+| C6 Workarounds | clear | wire serialization, frontend rule copies, census caches, dispatch coupling, seed transport, tallies, reseeding, checker case | each has an owner and reason |
+
+Intent: the job reconciled every user decision in the export (the review
+request, waiting before more templates, fixing the agreed findings, F06's two
+halves, F07, paint to F01) with the rows and found each recorded. It marked
+T30.F07's priority position as an assistant proposal, which the master note
+states, and the 2026-10-22 requirements as unverified because their source
+conversations were not in the export.
+
+### Planned-work and proportion review (2026-10-25)
+
+`scripts/codex-review arch-scenarios`, run by Codex Astra and by a Fable
+subagent from the same brief, walked all 15 open rows through the document and
+checked every rule, prohibition, owner and debt against current code and the
+open rows. Both found no larger design flaw.
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| 17 | Astra P2, Fable P2 | Rows ordered before a debt's payer must build on it: T27.F02 and T29.F02 add sensed state before T30.F03's views (G9); T25.F11 and F12 extend seed alignment before T29.F01 (G4) | T30.F03 moved ahead of T27.F02 and T29.F02; rule 3 of "Use this file" lets an earlier row extend a debt in its present shape, inside the debt's modules, marked `WORKAROUND(<debt id>)` (user) |
+| 18 | Astra P2, Fable P2 | G25 has no payer | T30.F07 moves the binary to `v3-cli` and deletes the checker's `bin/` skip (user) |
+| 19 | Fable P2 | The one applied result has no named home | A contracts type (outcome kind, attempt effort); F06 note and contracts cell |
+| 20 | Astra P3 | Rule 5's "once per birth" is broader than its purpose | Rule 5 keeps the separation; when derived data is computed is the owning row's choice |
+| 21 | Fable P3 | Three prohibitions repeat the order | Folded into one sentence; the two the order does not say stay, the sensors one now covering field access |
+| 22 | Fable P3 | T28.F01's material records have no owner | The ledger cell names energy and material accounting |
+| 23 | Fable P3 | Put runtime below mutation and drop the view type F02 needs | Kept as siblings (user) |
+| 24 | tooling research | A clippy `disallowed_fields` guard on sensors' reads until G9 and G20 are paid | Dropped; T30.F03 moved to the front of the priority order to pay them instead (user) |
+
+A second `track-design` job (`gpt-6.1-sol`, `high`) reviewed findings 17–24's
+planning changes, including T30.F03 at the front of the order, after the
+first attempt stopped at Codex's usage limit. All six checks were clear but
+C6, with no `step-back:`.
+
+| # | Source | Finding | Disposition |
+| --- | --- | --- | --- |
+| 25 | track-design P2 | `group_edits`' `WORKAROUND(T25.F08)` tallies have no firm payer: T29.F01 "can also retire" them | T29.F01's note now requires the retirement |
+
+Markers name their id as `AGENTS.md` and the workflow use it: a feature's own
+workaround carries its `TNN.FNN`, and a debt extended under rule 3 carries the
+debt ID (`WORKAROUND(G24)` on the checker's genome case).
+
+Tooling research (2026-10-25, a read-only subagent): keep and harden
+`scripts/architecture-check.mjs` rather than adopt cargo-modules, cargo-pup,
+dylint or Semgrep (each misses function-body paths, needs nightly, or adds
+nothing); generate frontend wire types with `ts-rs` (typeshare cannot emit
+64-bit integers or internally tagged enums; specta is a release candidate);
+no frontend boundary or ADR tooling. The user took the checker hardening (an
+import of a module no domain owns, non-`mod` lines in `lib.rs` and any
+dependency on `v3-lab` now fail) and `ts-rs` for T30.F01, and dropped the clippy
+guard (row 24).

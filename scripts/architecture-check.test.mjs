@@ -150,3 +150,63 @@ test('a module its parent gates behind cfg(test) is skipped with its children', 
   const result = run(repository);
   assert.equal(result.status, 0, result.stderr);
 }));
+
+test('a grouped import spread over several lines is checked', () => withRoot((repository) => {
+  source(repository, 'runtime/mesh.rs', 'use crate::{\n    contracts::Position,\n    simulation::tick::Tick,\n};\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /runtime\/mesh\.rs:1: runtime imports simulation \(simulation::tick\)/);
+}));
+
+test('nested import groups are checked', () => withRoot((repository) => {
+  source(repository, 'runtime/mesh.rs', 'use crate::{contracts::Position, simulation::{tick::Tick, world::World}};\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /runtime imports simulation \(simulation::tick\)/);
+  assert.match(result.stderr, /runtime imports simulation \(simulation::world\)/);
+}));
+
+test('super and self paths resolve against the importing module', () => withRoot((repository) => {
+  source(repository, 'creature/genome/mod.rs', 'use super::state::CreatureState;\nuse self::vote::Vote;\n');
+  source(repository, 'creature/genome/vote.rs', 'fn f() { super::super::state::CreatureState::new(); }\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /creature\/genome\/mod\.rs:1: genome imports creature \(creature::state\)/);
+  assert.match(result.stderr, /creature\/genome\/vote\.rs:1: genome imports creature \(creature::state\)/);
+  assert.doesNotMatch(result.stderr, /mod\.rs:2/);
+}));
+
+test('pub(super) visibility is not an import', () => withRoot((repository) => {
+  source(repository, 'creature/genome/vote.rs', 'pub(super) fn f() {}\npub(in crate::creature::genome) fn g() {}\n');
+  const result = run(repository);
+  assert.equal(result.status, 0, result.stderr);
+}));
+
+test('an import of a module no domain owns fails instead of passing', () => withRoot((repository) => {
+  source(repository, 'sensors/perception.rs', 'use crate::reexported::CreatureState;\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /sensors\/perception\.rs:1: sensors imports crate::reexported, which no domain in docs\/architecture\.md section 3 owns/);
+}));
+
+test('lib.rs holds only module declarations, attributes and comments', () => withRoot((repository) => {
+  source(repository, 'lib.rs', '//! The crate.\n#![forbid(unsafe_code)]\npub mod sensors;\n#[cfg(test)]\nmod tests;\n\n// note\n');
+  const clean = run(repository);
+  assert.equal(clean.status, 0, clean.stderr);
+  source(repository, 'lib.rs', 'pub mod sensors;\npub use crate::sensors::Snapshot;\npub fn helper() {}\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /lib\.rs:2: lib\.rs holds only module declarations/);
+  assert.match(result.stderr, /lib\.rs:3: lib\.rs holds only module declarations/);
+}));
+
+test('no crate depends on v3-lab', () => withRoot((repository) => {
+  write(repository, 'crates/v3-lab/Cargo.toml', '[package]\nname = "v3-lab"\n\n[lib]\nname = "v3-lab"\n');
+  write(repository, 'crates/v3-cli/Cargo.toml', '[package]\nname = "v3-cli"\n\n[dependencies]\nv3-core = { path = "../v3-core" }\n');
+  const clean = run(repository);
+  assert.equal(clean.status, 0, clean.stderr);
+  write(repository, 'crates/v3-cli/Cargo.toml', '[package]\nname = "v3-cli"\n\n[dev-dependencies]\nv3-lab = { path = "../v3-lab" }\n');
+  const result = run(repository);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /crates\/v3-cli\/Cargo\.toml:5: depends on v3-lab, which nothing may depend on/);
+}));

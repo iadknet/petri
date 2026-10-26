@@ -68,8 +68,9 @@ user decisions and review:
   values when a seed is absent; topology copies clone whole backends; and
   `apply_gated` rolls back genome and seeds together, so mappings compose
   across committed edits and vanish with a rejected one. Edits returning
-  their effects can also retire the `WORKAROUND(T25.F08)` group-edit
-  tallies in `mutation/engine/mod.rs`;
+  their effects retire the `WORKAROUND(T25.F08)` group-edit tallies in
+  `mutation/engine/mod.rs` (the operator-kind list and the before/after
+  scans go; required, 2026-10-25 architecture review);
   finalization owns cache reuse on an unchanged genome, resets of per-life
   state, heading and the energy cap; `mutate_kin_tag` and
   `mutate_phenotype` randomness moves into mutation policies with today's
