@@ -16,7 +16,7 @@ pub use hash::splitmix64;
 pub use ids::{CreatureId, NodeId};
 pub use inputs::{
     barrier_idx, food_idx, nearby_idx, occupancy_idx, DirectionPair, DynamicIntrospectionKey,
-    InputReference, NearbyField, StaticIntrospectionKey, WorldInputKey,
+    InputReference, NearbyField, PerceptionRequirements, StaticIntrospectionKey, WorldInputKey,
 };
 pub use position::Position;
 pub use routing::{RouteTarget, MAX_GATE_SLOTS};

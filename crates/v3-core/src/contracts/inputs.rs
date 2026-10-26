@@ -345,6 +345,62 @@ impl WorldInputKey {
     }
 }
 
+/// What a brain needs assembled before its turn: the typed local-food
+/// snapshot, the extended perception snapshot (visibility, area reducers and
+/// nearby banks), both or neither. A genome's value is the union of
+/// [`Self::of_key`] over the world keys it references.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct PerceptionRequirements {
+    /// `FoodHere` or `NeighborFoodRing` is referenced.
+    pub typed_local_food: bool,
+    /// An area summary or `NearbyCreature` is referenced.
+    pub extended_perception: bool,
+}
+
+impl PerceptionRequirements {
+    /// Nothing beyond the local snapshot.
+    pub const NONE: Self = Self {
+        typed_local_food: false,
+        extended_perception: false,
+    };
+
+    /// Every snapshot, whatever a genome reads.
+    pub const ALL: Self = Self {
+        typed_local_food: true,
+        extended_perception: true,
+    };
+
+    /// The key family classification: the snapshot a world key resolves
+    /// through. The barrier and occupied rings read the local snapshot, so
+    /// they require neither.
+    #[must_use]
+    pub const fn of_key(key: &WorldInputKey) -> Self {
+        match key {
+            WorldInputKey::FoodHere { .. } | WorldInputKey::NeighborFoodRing { .. } => Self {
+                typed_local_food: true,
+                extended_perception: false,
+            },
+            WorldInputKey::AreaFoodSummary { .. }
+            | WorldInputKey::AreaBarrierSummary
+            | WorldInputKey::AreaOccupancySummary
+            | WorldInputKey::NearbyCreature => Self {
+                typed_local_food: false,
+                extended_perception: true,
+            },
+            WorldInputKey::NeighborBarrierRing | WorldInputKey::NeighborOccupiedRing => Self::NONE,
+        }
+    }
+
+    /// Both requirement sets: a snapshot either needs.
+    #[must_use]
+    pub const fn union(self, other: Self) -> Self {
+        Self {
+            typed_local_food: self.typed_local_food || other.typed_local_food,
+            extended_perception: self.extended_perception || other.extended_perception,
+        }
+    }
+}
+
 /// Static introspection values assembled at tick start (snapshot).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StaticIntrospectionKey {
@@ -698,5 +754,65 @@ mod tests {
         assert_eq!(here.compound_width(), 1);
         assert_eq!(ring.compound_width(), 8);
         assert_eq!(area.compound_width(), 7);
+    }
+
+    #[test]
+    fn each_key_family_requires_the_snapshot_it_resolves_through() {
+        let food = OrdinaryFoodTypeId::default();
+        let typed = PerceptionRequirements {
+            typed_local_food: true,
+            extended_perception: false,
+        };
+        let extended = PerceptionRequirements {
+            typed_local_food: false,
+            extended_perception: true,
+        };
+        let cases = [
+            (WorldInputKey::food_here(food), typed),
+            (WorldInputKey::neighbor_food_ring(food), typed),
+            (WorldInputKey::area_food_summary(food), extended),
+            (WorldInputKey::AreaBarrierSummary, extended),
+            (WorldInputKey::AreaOccupancySummary, extended),
+            (WorldInputKey::NearbyCreature, extended),
+            (
+                WorldInputKey::NeighborBarrierRing,
+                PerceptionRequirements::NONE,
+            ),
+            (
+                WorldInputKey::NeighborOccupiedRing,
+                PerceptionRequirements::NONE,
+            ),
+        ];
+        for (key, expected) in cases {
+            assert_eq!(PerceptionRequirements::of_key(&key), expected, "{key:?}");
+        }
+        assert_eq!(typed.union(extended), PerceptionRequirements::ALL);
+    }
+
+    fn requirements() -> impl proptest::strategy::Strategy<Value = PerceptionRequirements> {
+        use proptest::prelude::*;
+        (any::<bool>(), any::<bool>()).prop_map(|(typed_local_food, extended_perception)| {
+            PerceptionRequirements {
+                typed_local_food,
+                extended_perception,
+            }
+        })
+    }
+
+    proptest::proptest! {
+        /// Union is a join: commutative, idempotent, `NONE` its identity and
+        /// `ALL` absorbing; no key requires both snapshots.
+        #[test]
+        fn requirements_union_is_a_join(a in requirements(), b in requirements()) {
+            use PerceptionRequirements as R;
+            proptest::prop_assert_eq!(a.union(b), b.union(a));
+            proptest::prop_assert_eq!(a.union(a), a);
+            proptest::prop_assert_eq!(a.union(R::NONE), a);
+            proptest::prop_assert_eq!(a.union(R::ALL), R::ALL);
+            for key in every_world_key() {
+                let r = R::of_key(&key);
+                proptest::prop_assert!(!(r.typed_local_food && r.extended_perception));
+            }
+        }
     }
 }
