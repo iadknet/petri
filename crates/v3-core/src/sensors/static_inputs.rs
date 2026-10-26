@@ -125,7 +125,6 @@ pub fn assemble_static_inputs(
 ) -> StaticInputs {
     let pos = body.position;
     let food_here = world.food_at(pos).clamp(0.0, 1.0);
-    let energy_scale = body.energy_scale;
 
     let mut neighbor_food = [0.0f32; 8];
     let mut neighbor_barrier = [0.0f32; 8];
@@ -156,8 +155,8 @@ pub fn assemble_static_inputs(
         neighbor_occupied,
         age_ticks: age_fraction(body.age, energy.lifecycle.age_reference_ticks),
         own_colour: body.colour,
-        energy_scale,
-        previous_outcome: previous_outcome_read(&body.previous_outcome, energy_scale),
+        energy_scale: body.energy_scale,
+        previous_outcome: previous_outcome_read(&body.previous_outcome, body.energy_scale),
     }
 }
 

@@ -382,9 +382,8 @@ fn fill_nearby_banks(
         };
 
         // Vitals
-        let energy_scale = target.energy_scale;
-        fields[nearby_idx::ENERGY_RATIO] = if energy_scale > 0.0 {
-            (target.energy / energy_scale).clamp(0.0, 1.0)
+        fields[nearby_idx::ENERGY_RATIO] = if target.energy_scale > 0.0 {
+            (target.energy / target.energy_scale).clamp(0.0, 1.0)
         } else {
             0.0
         };
