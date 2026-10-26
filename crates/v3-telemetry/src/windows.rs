@@ -31,10 +31,11 @@ use v3_core::contracts::{splitmix64, CreatureId, WorldAction};
 use v3_core::creature::action_log::NO_DIRECTION;
 use v3_core::creature::genome::CreatureGenome;
 use v3_core::ledger::DeathCause;
-use v3_core::runtime::trace::domain::{
-    AppliedAction, BackendTrace, MeshHopTrace, MeshPassTrace, TickOutcome, TickTrace,
+use v3_core::runtime::trace::domain::{BackendTrace, MeshHopTrace, MeshPassTrace};
+use v3_core::runtime::traced_mesh::TruncationReason;
+use v3_core::simulation::recording::{
+    ActiveTrace, AppliedAction, RecordedTick, TickOutcome, TraceBudget,
 };
-use v3_core::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
 use v3_core::simulation::Simulation;
 
 use crate::queue::Signal;
@@ -447,7 +448,8 @@ fn event(name: &str, time: u64, attributes: Attributes) -> Event {
 }
 
 /// The tick span's sensed, decided, outcome and after-state attributes.
-fn tick_attributes(a: &mut Attributes, record: &TickTrace) {
+fn tick_attributes(a: &mut Attributes, recorded: &RecordedTick) {
+    let record = &recorded.trace;
     let sensed = &record.static_inputs;
     a.double("petri.food_here", sensed.food_here);
     a.doubles("petri.neighbor_food", &sensed.neighbor_food);
@@ -455,7 +457,7 @@ fn tick_attributes(a: &mut Attributes, record: &TickTrace) {
     a.doubles("petri.neighbor_occupied", &sensed.neighbor_occupied);
     a.double("petri.age_ticks", sensed.age_ticks);
     a.doubles("petri.previous_outcome", &sensed.previous_outcome);
-    let outcome = record.outcome.as_ref();
+    let outcome = recorded.outcome.as_ref();
     let perceived = outcome.is_some_and(|outcome| outcome.uses_extended_perception);
     if let Some(p) = record.debug_perception.as_ref().filter(|_| perceived) {
         a.doubles("petri.area_food", &p.area_food);
@@ -527,12 +529,16 @@ fn outcome_attributes(a: &mut Attributes, outcome: &TickOutcome) {
 /// The recorded tick's events, at most `left` of them, taken from `left`;
 /// returns whether any were cut. Events past the allowance are never built.
 fn tick_events(
-    record: &TickTrace,
+    recorded: &RecordedTick,
     cognition: u64,
     actions: u64,
     left: &mut u32,
 ) -> (Vec<Event>, bool) {
-    let applied = record.outcome.as_ref().map_or(&[][..], |o| &o.applied[..]);
+    let record = &recorded.trace;
+    let applied = recorded
+        .outcome
+        .as_ref()
+        .map_or(&[][..], |o| &o.applied[..]);
     let total = record.hops.len() + record.passes.len() + applied.len();
     let kept = total.min(*left as usize);
     let events: Vec<Event> = record
@@ -554,7 +560,7 @@ fn tick_events(
 
 /// The recorded tick's start and end, and its cognition and actions phase
 /// starts, in Unix nanoseconds.
-fn tick_times(run: &RunHandle, record: &TickTrace) -> Option<[u64; 4]> {
+fn tick_times(run: &RunHandle, record: &RecordedTick) -> Option<[u64; 4]> {
     let seam = record.outcome.as_ref()?.phases?;
     let start = at(run, seam.started);
     Some([
@@ -581,7 +587,7 @@ pub(crate) fn encode(
     let mut cut: Option<u64> = None;
     let mut end = ending.tick_end.map_or(start, |instant| at(run, instant));
     for (i, record) in trace.ticks.iter().enumerate() {
-        let tick = record.tick_number + 1;
+        let tick = record.trace.tick_number + 1;
         let [tick_start, tick_end, cognition, actions] =
             tick_times(run, record).unwrap_or([start; 4]);
         end = end.max(tick_end);
@@ -608,11 +614,11 @@ pub(crate) fn encode(
     let first = trace
         .ticks
         .first()
-        .map_or(ending.tick, |t| t.tick_number + 1);
+        .map_or(ending.tick, |t| t.trace.tick_number + 1);
     let last = trace
         .ticks
         .last()
-        .map_or(ending.tick, |t| t.tick_number + 1);
+        .map_or(ending.tick, |t| t.trace.tick_number + 1);
     let events = MAX_EVENTS_PER_SAMPLE - left;
     let mut a = identity(run, meta, &meta.digest, first, "cognition");
     a.int("petri.tick_end", last);

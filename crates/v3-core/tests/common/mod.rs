@@ -15,7 +15,7 @@ use v3_core::creature::phenotype::Phenotype;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::domain::{BackendTrace, GraphTrace, TickTrace};
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::simulation::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
 
 /// A tiny, zero-growth, zero-mutation world config for deterministic fixtures.
@@ -73,7 +73,12 @@ pub(crate) fn run_one_traced_tick(sim: &mut Simulation, target: CreatureId) -> T
     let trace = trace.expect("trace should remain present");
     assert!(trace.is_complete(), "single tick trace should complete");
     assert_eq!(trace.ticks.len(), 1, "expected exactly one traced tick");
-    trace.ticks.into_iter().next().expect("missing traced tick")
+    trace
+        .ticks
+        .into_iter()
+        .next()
+        .expect("missing traced tick")
+        .trace
 }
 
 /// Extract the graph trace for a mesh hop, panicking if that hop was a VM

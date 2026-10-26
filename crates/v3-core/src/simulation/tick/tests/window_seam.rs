@@ -17,9 +17,9 @@ use crate::creature::genome::{
 use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::ledger::DeathCause;
-use crate::runtime::trace::domain::TickTrace;
-use crate::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
-use crate::runtime::trace::size::TickReserve;
+use crate::runtime::traced_mesh::TruncationReason;
+use crate::simulation::recording::TickReserve;
+use crate::simulation::recording::{ActiveTrace, RecordedTick, TraceBudget};
 use crate::simulation::seeding::seed_simulation;
 use crate::simulation::Simulation;
 
@@ -137,12 +137,12 @@ fn tick_both(
         .collect();
     assert_eq!(traced_queue, plain_queue, "decision queue at tick {tick}");
     if let Some(active) = trace.as_ref() {
-        if let Some(record) = active.ticks.last().filter(|r| r.tick_number == tick) {
+        if let Some(record) = active.ticks.last().filter(|r| r.trace.tick_number == tick) {
             let decided = plain_queue
                 .iter()
                 .find(|entry| entry.id == active.creature_id)
                 .expect("the traced creature decided");
-            assert_eq!(record.final_actions, decided.actions, "tick {tick}");
+            assert_eq!(record.trace.final_actions, decided.actions, "tick {tick}");
         }
     }
     PlainTick {
@@ -263,7 +263,7 @@ fn budget_sim() -> (Simulation, CreatureId) {
     (sim, id)
 }
 
-fn unbudgeted_first_tick() -> TickTrace {
+fn unbudgeted_first_tick() -> RecordedTick {
     let (mut probe, id) = budget_sim();
     let mut trace = Some(ActiveTrace::new(id, 1));
     run_tick(&mut probe, &mut trace);
@@ -277,7 +277,7 @@ fn an_event_cap_truncates_at_the_predicted_record_and_ends_the_window() {
     let reserve = TickReserve::for_config(&sim.config);
     assert_eq!(reserve.events, 1);
     assert!(
-        reference.hops.len() + reference.passes.len() > 2,
+        reference.trace.hops.len() + reference.trace.passes.len() > 2,
         "the fixture records more than the cap allows"
     );
 
@@ -294,10 +294,10 @@ fn an_event_cap_truncates_at_the_predicted_record_and_ends_the_window() {
     let active = trace.as_ref().unwrap();
     // The first two mesh records fit; the third does not and nothing after it
     // is stored.
-    let kept = active.ticks[0].hops.len() + active.ticks[0].passes.len();
+    let kept = active.ticks[0].trace.hops.len() + active.ticks[0].trace.passes.len();
     assert_eq!(kept, 2);
     assert_eq!(
-        active.ticks[0].hops[0].node_id, reference.hops[0].node_id,
+        active.ticks[0].trace.hops[0].node_id, reference.trace.hops[0].node_id,
         "the kept hop is the tick's first"
     );
     let truncation = active.truncated.expect("the window truncated");
@@ -311,7 +311,7 @@ fn an_event_cap_truncates_at_the_predicted_record_and_ends_the_window() {
 /// What a first tick needs before its first hop: the tick buffer's first
 /// slot and the tick reserve.
 fn tick_start_bytes(config: &SimulationConfig) -> u64 {
-    std::mem::size_of::<TickTrace>() as u64 + TickReserve::for_config(config).bytes
+    std::mem::size_of::<RecordedTick>() as u64 + TickReserve::for_config(config).bytes
 }
 
 /// One budgeted first tick of `budget_sim` under `max_bytes`, with the
@@ -336,13 +336,13 @@ fn a_byte_cap_below_one_hop_truncates_at_the_first_hop() {
     let reference = unbudgeted_first_tick();
     // The first hop goes into the reserved preallocation: it takes only the
     // buffers it owns.
-    let first_hop = reference.hops[0].heap_bytes();
+    let first_hop = reference.trace.hops[0].heap_bytes();
     let fits = tick_start_bytes(&sim.config) + first_hop;
 
     let active = first_tick_under(fits - 1);
     assert_eq!(active.ticks.len(), 1, "the reserved tick record is kept");
-    assert!(active.ticks[0].hops.is_empty());
-    assert!(active.ticks[0].passes.is_empty());
+    assert!(active.ticks[0].trace.hops.is_empty());
+    assert!(active.ticks[0].trace.passes.is_empty());
     assert!(active.ticks[0].outcome.is_some());
     let truncation = active.truncated.expect("the window truncated");
     assert_eq!(truncation.reason, TruncationReason::Bytes);
@@ -352,8 +352,8 @@ fn a_byte_cap_below_one_hop_truncates_at_the_first_hop() {
     // At exactly its bytes the first hop is kept and the next record, which
     // owns buffers or needs a new slot, does not fit.
     let active = first_tick_under(fits);
-    assert_eq!(active.ticks[0].hops.len(), 1);
-    assert!(active.ticks[0].passes.is_empty());
+    assert_eq!(active.ticks[0].trace.hops.len(), 1);
+    assert!(active.ticks[0].trace.passes.is_empty());
     assert_eq!(active.truncated.unwrap().reason, TruncationReason::Bytes);
     assert!(active.bytes <= fits);
 }
@@ -411,13 +411,15 @@ fn retained_counts_match_the_records_kept() {
     let events: usize = active
         .ticks
         .iter()
-        .map(|t| t.hops.len() + t.passes.len() + t.outcome.as_ref().unwrap().applied.len())
+        .map(|t| {
+            t.trace.hops.len() + t.trace.passes.len() + t.outcome.as_ref().unwrap().applied.len()
+        })
         .sum();
     assert_eq!(active.events as usize, events);
     // The tick buffer holds no spare slot, so the records' own sizes are all
     // the recording retains.
     assert_eq!(active.ticks.capacity(), active.ticks.len());
-    let bytes: u64 = active.ticks.iter().map(TickTrace::retained_bytes).sum();
+    let bytes: u64 = active.ticks.iter().map(RecordedTick::retained_bytes).sum();
     assert_eq!(active.bytes, bytes);
 }
 
@@ -429,17 +431,21 @@ fn a_none_budget_records_every_hop() {
     let mut trace = Some(ActiveTrace::budgeted(id, 1, WINDOW_BUDGET));
     run_tick(&mut traced, &mut trace);
     let budgeted = &trace.as_ref().unwrap().ticks[0];
-    assert_eq!(budgeted.hops.len(), reference.hops.len());
-    assert_eq!(budgeted.passes.len(), reference.passes.len());
-    assert!(!reference.hops.is_empty());
+    assert_eq!(budgeted.trace.hops.len(), reference.trace.hops.len());
+    assert_eq!(budgeted.trace.passes.len(), reference.trace.passes.len());
+    assert!(!reference.trace.hops.is_empty());
 }
 
 /// What `active` keeps allocated, measured at capacity at every level: its
 /// tick buffer, spare slots included, and each record's own buffers.
 fn measured_bytes(active: &ActiveTrace) -> u64 {
-    let slot = std::mem::size_of::<TickTrace>() as u64;
+    let slot = std::mem::size_of::<RecordedTick>() as u64;
     active.ticks.capacity() as u64 * slot
-        + active.ticks.iter().map(TickTrace::heap_bytes).sum::<u64>()
+        + active
+            .ticks
+            .iter()
+            .map(RecordedTick::heap_bytes)
+            .sum::<u64>()
 }
 
 proptest::proptest! {
@@ -525,7 +531,7 @@ fn an_action_heavy_tick_records_every_applied_action() {
     let trace = traced_tick(&mut sim, id).unwrap();
     let record = &trace.ticks[0];
     let outcome = record.outcome.as_ref().unwrap();
-    assert_eq!(outcome.applied.len(), record.final_actions.len());
+    assert_eq!(outcome.applied.len(), record.trace.final_actions.len());
 }
 
 #[test]

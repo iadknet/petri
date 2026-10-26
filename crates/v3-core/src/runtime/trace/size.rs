@@ -6,15 +6,12 @@
 
 use std::mem::size_of;
 
-use crate::config::SimulationConfig;
-use crate::contracts::WorldAction;
 use crate::runtime::trace::domain::{
-    AppliedAction, BackendTrace, GraphTrace, MeshHopTrace, MeshPassTrace, TickOutcome, TickTrace,
-    VmTrace,
+    BackendTrace, GraphTrace, MeshHopTrace, MeshPassTrace, TickTrace, VmTrace,
 };
 
 /// `capacity × size_of::<T>()` of `v`'s buffer.
-fn buffer<T>(v: &Vec<T>) -> u64 {
+pub(crate) fn buffer<T>(v: &Vec<T>) -> u64 {
     (v.capacity() * size_of::<T>()) as u64
 }
 
@@ -96,27 +93,15 @@ impl MeshPassTrace {
     }
 }
 
-impl TickOutcome {
-    /// Bytes the outcome owns beyond its own `size_of`.
-    #[must_use]
-    pub fn heap_bytes(&self) -> u64 {
-        buffer(&self.typed_local_food.food_here_by_type)
-            + buffer(&self.typed_local_food.neighbor_food_by_type)
-            + buffer(&self.typed_area_food)
-            + buffer(&self.applied)
-    }
-}
-
 impl TickTrace {
-    /// The tick record's bytes: its fixed part, its selected actions, every
-    /// hop and pass record and its outcome.
+    /// The tick record's bytes: its fixed part, its selected actions and
+    /// every hop and pass record.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {
         size_of::<Self>() as u64 + self.heap_bytes()
     }
 
-    /// Bytes the tick record owns beyond its own `size_of`, which lives in
-    /// the recording's tick buffer.
+    /// Bytes the tick record owns beyond its own `size_of`.
     #[must_use]
     pub fn heap_bytes(&self) -> u64 {
         buffer(&self.final_actions)
@@ -132,36 +117,6 @@ impl TickTrace {
                 .iter()
                 .map(MeshPassTrace::retained_bytes)
                 .sum::<u64>()
-            + self.outcome.as_ref().map_or(0, TickOutcome::heap_bytes)
-    }
-}
-
-/// What a recorded tick reserves against the caps before its first hop.
-/// The tick record's fixed part is not in it: that is a slot of the
-/// recording's tick buffer, charged when the buffer grows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TickReserve {
-    /// `max_actions_per_turn` applied-action events.
-    pub events: u32,
-    /// `max_actions_per_turn` selected and applied action records, the
-    /// outcome's food banks at the configured type count, and the
-    /// recorder's hop preallocation (`max_mesh_hops`).
-    pub bytes: u64,
-}
-
-impl TickReserve {
-    #[must_use]
-    pub fn for_config(config: &SimulationConfig) -> Self {
-        let actions = config.runtime.max_actions_per_turn;
-        let types = config.world.food.types.len();
-        let hops = config.runtime.max_mesh_hops.max(1) as usize;
-        let bytes = actions * (size_of::<WorldAction>() + size_of::<AppliedAction>())
-            + types * (size_of::<f32>() + size_of::<[f32; 8]>() + size_of::<[f32; 7]>())
-            + hops * size_of::<MeshHopTrace>();
-        Self {
-            events: u32::try_from(actions).unwrap_or(u32::MAX),
-            bytes: bytes as u64,
-        }
     }
 }
 

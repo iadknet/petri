@@ -22,7 +22,7 @@ use v3_core::creature::phenotype::Phenotype;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, VmTrace};
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::simulation::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
 
 fn sample_vm_program() -> Vec<VmInstruction> {
@@ -360,7 +360,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     assert!(emit_trace.is_complete());
     assert_eq!(emit_trace.ticks.len(), 1);
     assert_eq!(
-        emit_trace.ticks[0].final_actions[0],
+        emit_trace.ticks[0].trace.final_actions[0],
         WorldAction::eat(v3_core::config::OrdinaryFoodTypeId::default())
     );
     assert!(
@@ -368,9 +368,9 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         "Eat path should consume food"
     );
     // No targets on this single-node genome, so route is None.
-    assert!(emit_trace.ticks[0].hops[0].route.is_none());
-    let emit_seen = collect_vm_discriminants(&emit_trace.ticks[0]);
-    let emit_vm_trace = vm_trace(&emit_trace.ticks[0]);
+    assert!(emit_trace.ticks[0].trace.hops[0].route.is_none());
+    let emit_seen = collect_vm_discriminants(&emit_trace.ticks[0].trace);
+    let emit_vm_trace = vm_trace(&emit_trace.ticks[0].trace);
 
     // Scenario B: no food -> Halt path.
     let (mut sim_halt, halt_id, halt_pos) = build_simulation(0.0);
@@ -379,15 +379,18 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     let halt_trace = halt_trace.expect("trace should remain available");
     assert!(halt_trace.is_complete());
     assert_eq!(halt_trace.ticks.len(), 1);
-    assert_eq!(halt_trace.ticks[0].final_actions[0], WorldAction::NoOp);
+    assert_eq!(
+        halt_trace.ticks[0].trace.final_actions[0],
+        WorldAction::NoOp
+    );
     assert!(
         (sim_halt.world.food_at(halt_pos) - 0.0).abs() < 1e-6,
         "Halt path should leave no food on an empty cell"
     );
     // No targets on this single-node genome, so route is None.
-    assert!(halt_trace.ticks[0].hops[0].route.is_none());
-    let halt_seen = collect_vm_discriminants(&halt_trace.ticks[0]);
-    let halt_vm_trace = vm_trace(&halt_trace.ticks[0]);
+    assert!(halt_trace.ticks[0].trace.hops[0].route.is_none());
+    let halt_seen = collect_vm_discriminants(&halt_trace.ticks[0].trace);
+    let halt_vm_trace = vm_trace(&halt_trace.ticks[0].trace);
 
     let observed: HashSet<Discriminant<VmInstruction>> =
         emit_seen.union(&halt_seen).copied().collect();

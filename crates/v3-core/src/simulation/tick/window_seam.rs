@@ -8,11 +8,11 @@ use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 use crate::creature::action_log::ActionLogEntry;
 use crate::ledger::EnergyFlows;
-use crate::runtime::trace::domain::{AppliedAction, StateAfter, TickTrace};
-use crate::runtime::trace::recording::{ActiveTrace, Truncation, TruncationReason};
-use crate::runtime::trace::size::TickReserve;
-use crate::runtime::traced_mesh::RecordLimit;
+use crate::runtime::traced_mesh::{RecordLimit, TruncationReason};
 use crate::simulation::outcomes::OutcomeAccumulator;
+use crate::simulation::recording::{
+    ActiveTrace, AppliedAction, RecordedTick, StateAfter, TickReserve, Truncation,
+};
 use crate::simulation::simulation::Simulation;
 
 /// One creature's entry in a tick's sorted decision queue, as the action
@@ -106,7 +106,7 @@ pub(super) fn reserve_tick(trace: &mut Option<ActiveTrace>, config: &SimulationC
         active.ticks.capacity() <= active.ticks.len() + 1,
         "a budgeted recording starts from `ActiveTrace::budgeted`"
     );
-    let slot = size_of::<TickTrace>() as u64;
+    let slot = size_of::<RecordedTick>() as u64;
     let growth = if active.ticks.len() == active.ticks.capacity() {
         slot
     } else {
@@ -192,7 +192,7 @@ pub(super) fn finish_tick(
     let Some(record) = active
         .ticks
         .last_mut()
-        .filter(|record| record.tick_number == tick)
+        .filter(|record| record.trace.tick_number == tick)
     else {
         return;
     };
@@ -215,7 +215,7 @@ pub(super) fn finish_tick(
     if active.budget.is_none() {
         return;
     }
-    let events = record.hops.len() + record.passes.len() + outcome.applied.len();
+    let events = record.trace.hops.len() + record.trace.passes.len() + outcome.applied.len();
     let bytes = record.heap_bytes();
     active.events = active
         .events

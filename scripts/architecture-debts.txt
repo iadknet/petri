@@ -13,5 +13,3 @@ G2 sensors/static_inputs.rs creature::genome
 G5 mutation/phenotype.rs creature::phenotype
 G12 mutation/engine/mod.rs creature::parseability
 G14 simulation/actions/reproduction.rs creature::drives
-G16 runtime/trace/domain.rs creature::action_log
-G16 runtime/trace/domain.rs simulation::stats

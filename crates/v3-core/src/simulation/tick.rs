@@ -18,7 +18,6 @@ use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::trace::domain::{
     PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
 };
-use crate::runtime::trace::recording::ActiveTrace;
 #[cfg(not(feature = "telemetry-seams"))]
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
@@ -36,6 +35,7 @@ use crate::simulation::actions::{
     ReproductionInvalidTargetCause,
 };
 use crate::simulation::outcomes::OutcomeAccumulator;
+use crate::simulation::recording::{ActiveTrace, RecordedTick};
 use crate::simulation::simulation::Simulation;
 use crate::simulation::stats::SimStats;
 
@@ -51,11 +51,11 @@ mod window_seam;
 #[cfg(feature = "telemetry-seams")]
 use self::window_seam::{record_limit, FlowMarks};
 #[cfg(feature = "telemetry-seams")]
-use crate::runtime::trace::domain::TickOutcome;
-#[cfg(feature = "telemetry-seams")]
-use crate::runtime::trace::recording::Truncation;
-#[cfg(feature = "telemetry-seams")]
 use crate::runtime::traced_mesh::{execute_creature_mesh_budgeted, RecordedMesh};
+#[cfg(feature = "telemetry-seams")]
+use crate::simulation::recording::TickOutcome;
+#[cfg(feature = "telemetry-seams")]
+use crate::simulation::recording::Truncation;
 
 #[cfg(test)]
 #[path = "tick/tests/mod.rs"]
@@ -635,19 +635,21 @@ fn run_cognition(
                 } else {
                     None
                 };
-                active.ticks.push(TickTrace {
-                    tick_number,
-                    heading: heading_before,
-                    energy_before,
-                    energy_after: creature.energy,
-                    static_inputs: si_snapshot,
-                    debug_perception,
-                    hops,
-                    passes,
-                    final_actions: output.actions.clone(),
-                    termination_reason: output.termination_reason,
-                    priority_bid: output.priority_bid,
-                    commit_counts: output.commit_counts,
+                active.ticks.push(RecordedTick {
+                    trace: TickTrace {
+                        tick_number,
+                        heading: heading_before,
+                        energy_before,
+                        energy_after: creature.energy,
+                        static_inputs: si_snapshot,
+                        debug_perception,
+                        hops,
+                        passes,
+                        final_actions: output.actions.clone(),
+                        termination_reason: output.termination_reason,
+                        priority_bid: output.priority_bid,
+                        commit_counts: output.commit_counts,
+                    },
                     #[cfg(feature = "telemetry-seams")]
                     outcome: Some(TickOutcome {
                         position,
@@ -670,9 +672,9 @@ fn run_cognition(
                 #[cfg(feature = "telemetry-seams")]
                 if active.budget.is_some() {
                     if let Some(record) = active.ticks.last_mut() {
-                        record.hops.shrink_to_fit();
-                        record.passes.shrink_to_fit();
-                        record.final_actions.shrink_to_fit();
+                        record.trace.hops.shrink_to_fit();
+                        record.trace.passes.shrink_to_fit();
+                        record.trace.final_actions.shrink_to_fit();
                     }
                     if let Some(reason) = truncated {
                         active.truncated = Some(Truncation {

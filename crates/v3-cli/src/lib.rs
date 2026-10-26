@@ -129,7 +129,7 @@ pub fn run_simulation<W: std::io::Write>(
     let mut last_sampled_tick: Option<u64> = None;
 
     // The creature window slot (T21.F04); telemetry off leaves it empty.
-    let mut window: Option<v3_core::runtime::trace::recording::ActiveTrace> = None;
+    let mut window: Option<v3_core::simulation::recording::ActiveTrace> = None;
     for _ in 0..ticks {
         #[cfg(feature = "telemetry")]
         telemetry::before_tick(telemetry_run.as_mut(), &sim, &mut window);

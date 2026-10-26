@@ -16,7 +16,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use v3_core::config::SimulationConfig;
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::simulation::recording::ActiveTrace;
 use v3_core::simulation::Simulation;
 use v3_telemetry::{
     EndStatus, Flush, RunHandle, RunStart, RunState, Telemetry, TickSample, Trigger,

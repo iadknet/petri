@@ -12,9 +12,9 @@ use v3_core::creature::genome::mesh_annotations::{
     MeshWriteClass,
 };
 use v3_core::creature::genome::{BackendDef, VmInstruction};
-use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::runtime::OUTPUT_SLOT_COUNT;
 use v3_core::sensors::static_inputs::assemble_static_inputs;
+use v3_core::simulation::recording::ActiveTrace;
 
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};

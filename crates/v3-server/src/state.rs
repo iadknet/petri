@@ -26,11 +26,11 @@ pub enum SimulationStatus {
 pub struct SimHandle {
     pub sim: Simulation,
     pub status: SimulationStatus,
-    pub active_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
+    pub active_trace: Option<v3_core::simulation::recording::ActiveTrace>,
     /// The creature window recording (T21.F04), used while `active_trace`
     /// is empty.
     #[cfg(feature = "telemetry")]
-    pub window_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
+    pub window_trace: Option<v3_core::simulation::recording::ActiveTrace>,
     /// Cached quantized fertility grid. Computed once at startup/restart; fertility
     /// is static and does not change between resets.
     pub cached_fertility_u8: Arc<[u8]>,

@@ -1,8 +1,7 @@
-//! Runtime trace module split by responsibility:
-//! - `domain`: passive sampler data records
-//! - `recording`: active recording lifecycle state
+//! Runtime's brain-execution trace:
+//! - `domain`: the passive sampler records of one tick's execution
+//! - `size`: those records' in-memory sizes, for recording budgets
 
 pub mod domain;
-pub mod recording;
 #[cfg(feature = "telemetry-seams")]
 pub mod size;

@@ -191,7 +191,7 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
         );
         assert_eq!(
             span.attribute("petri.tick"),
-            Some((record.tick_number + 1).to_string().as_str())
+            Some((record.trace.tick_number + 1).to_string().as_str())
         );
         assert_eq!(
             span.attribute("petri.config_digest"),
@@ -222,8 +222,8 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
             .starts_with('['));
         let cognition = ns(&run, seam.started + seam.phases[3].offset);
         let actions = ns(&run, seam.started + seam.phases[4].offset);
-        assert_eq!(span.events_named("hop").count(), record.hops.len());
-        assert_eq!(span.events_named("pass").count(), record.passes.len());
+        assert_eq!(span.events_named("hop").count(), record.trace.hops.len());
+        assert_eq!(span.events_named("pass").count(), record.trace.passes.len());
         let applied = record.outcome.as_ref().unwrap().applied.len();
         assert_eq!(span.events_named("action").count(), applied);
         assert!(span
@@ -232,7 +232,7 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
         assert!(span
             .events_named("action")
             .all(|e| e.time_unix_nano == actions && e.attribute("petri.phase") == Some("actions")));
-        events += record.hops.len() + record.passes.len() + applied;
+        events += record.trace.hops.len() + record.trace.passes.len() + applied;
     }
     let last = &received.spans[3];
     assert_eq!(root.end_time_unix_nano, last.end_time_unix_nano);
@@ -323,8 +323,8 @@ fn a_manual_sample_past_2048_events_is_cut_at_encoding_and_marked_truncated() {
     let started = Instant::now();
     let (mut trace, creature_id) = recorded(2);
     trace.budget = None;
-    let hop = trace.ticks[1].hops[0].clone();
-    trace.ticks[1].hops = vec![hop; 2_100];
+    let hop = trace.ticks[1].trace.hops[0].clone();
+    trace.ticks[1].trace.hops = vec![hop; 2_100];
     let run = run(started);
     let meta = meta(0, Policy::Manual, creature_id, started);
     let ending = Ending {
@@ -346,8 +346,8 @@ fn a_manual_sample_past_2048_events_is_cut_at_encoding_and_marked_truncated() {
 #[test]
 fn a_tick_allocates_no_more_events_than_the_allowance_left() {
     let (mut trace, _) = recorded(1);
-    let hop = trace.ticks[0].hops[0].clone();
-    trace.ticks[0].hops = vec![hop; 100];
+    let hop = trace.ticks[0].trace.hops[0].clone();
+    trace.ticks[0].trace.hops = vec![hop; 100];
     let record = &trace.ticks[0];
     for allowance in [0, 1, 5, 99] {
         let mut left = allowance;
@@ -357,7 +357,7 @@ fn a_tick_allocates_no_more_events_than_the_allowance_left() {
         assert!(cut);
         assert_eq!(left, 0);
     }
-    let total = record.hops.len() + record.passes.len();
+    let total = record.trace.hops.len() + record.trace.passes.len();
     let mut left = 2_048;
     let (events, cut) = tick_events(record, 0, 0, &mut left);
     assert!(!cut);
@@ -405,7 +405,7 @@ fn record_of(meta: &SampleMeta, trace: &ActiveTrace, ending: &Ending) -> serde_j
 fn a_window_record_holds_every_body_field_with_exact_values() {
     let started = Instant::now();
     let (mut trace, creature_id) = recorded(2);
-    let graph = trace.ticks[0].hops[0].clone();
+    let graph = trace.ticks[0].trace.hops[0].clone();
     assert!(matches!(graph.backend_trace, BackendTrace::Graph(_)));
     let mut first = graph.clone();
     first.node_id = v3_core::contracts::NodeId(7);
@@ -423,9 +423,9 @@ fn a_window_record_holds_every_body_field_with_exact_values() {
         final_payload: vm.output_slots,
         slot_writes: Vec::new(),
     });
-    trace.ticks[0].hops = vec![first, vm];
-    trace.ticks[0].energy_before = 0.1;
-    trace.ticks[0].static_inputs.food_here = 0.3;
+    trace.ticks[0].trace.hops = vec![first, vm];
+    trace.ticks[0].trace.energy_before = 0.1;
+    trace.ticks[0].trace.static_inputs.food_here = 0.3;
     trace.ticks[0]
         .outcome
         .as_mut()
@@ -462,17 +462,17 @@ fn a_window_record_holds_every_body_field_with_exact_values() {
         .iter()
         .map(|record| {
             let outcome = record.outcome.as_ref().unwrap();
-            let sensed = &record.static_inputs;
+            let sensed = &record.trace.static_inputs;
             let mut tick = serde_json::json!({
-                "t": record.tick_number + 1,
-                "e0": f(record.energy_before),
+                "t": record.trace.tick_number + 1,
+                "e0": f(record.trace.energy_before),
                 "here": f(sensed.food_here),
                 "food": ring(&sensed.neighbor_food),
                 "barrier": ring(&sensed.neighbor_barrier),
                 "occupied": ring(&sensed.neighbor_occupied),
-                "sel": record.final_actions.iter().map(action_label).collect::<Vec<_>>(),
+                "sel": record.trace.final_actions.iter().map(action_label).collect::<Vec<_>>(),
                 "res": outcome.applied.iter().map(|a| a.entry.result.as_key()).collect::<Vec<_>>(),
-                "hops": record.hops.iter().map(|hop| serde_json::json!([
+                "hops": record.trace.hops.iter().map(|hop| serde_json::json!([
                     hop.node_id.0,
                     if matches!(hop.backend_trace, BackendTrace::Vm(_)) { "v" } else { "g" },
                     f(hop.vote_contribution.iter().map(|v| v.abs()).sum()),
@@ -539,8 +539,8 @@ fn a_manual_record_past_2048_hops_cuts_only_hops_and_is_truncated() {
     let started = Instant::now();
     let (mut trace, creature_id) = recorded(3);
     trace.budget = None;
-    let hop = trace.ticks[1].hops[0].clone();
-    trace.ticks[1].hops = vec![hop; 2_100];
+    let hop = trace.ticks[1].trace.hops[0].clone();
+    trace.ticks[1].trace.hops = vec![hop; 2_100];
     let meta = meta(0, Policy::Manual, creature_id, started);
     let ending = Ending {
         reason: EndReason::Complete,
@@ -556,13 +556,13 @@ fn a_manual_record_past_2048_hops_cuts_only_hops_and_is_truncated() {
     assert_eq!(hops, record::MAX_RECORD_HOPS);
     assert_eq!(
         ticks[0]["hops"].as_array().unwrap().len(),
-        trace.ticks[0].hops.len()
+        trace.ticks[0].trace.hops.len()
     );
     assert_eq!(ticks[2]["hops"], serde_json::json!([]));
     for (tick, recorded) in ticks.iter().zip(&trace.ticks) {
         assert_eq!(
             tick["sel"].as_array().unwrap().len(),
-            recorded.final_actions.len()
+            recorded.trace.final_actions.len()
         );
         assert_eq!(
             tick["res"].as_array().unwrap().len(),

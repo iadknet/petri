@@ -13,8 +13,6 @@ use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{
     BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
-#[cfg(feature = "telemetry-seams")]
-use crate::runtime::trace::recording::TruncationReason;
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
@@ -90,7 +88,15 @@ pub(crate) struct RecordedMesh {
     pub(crate) passes: Vec<MeshPassTrace>,
     /// The cap the first record that did not fit met.
     #[cfg(feature = "telemetry-seams")]
-    pub(crate) truncated: Option<crate::runtime::trace::recording::TruncationReason>,
+    pub(crate) truncated: Option<TruncationReason>,
+}
+
+/// Which cap ended a recording.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TruncationReason {
+    Events,
+    Bytes,
 }
 
 /// The events and bytes a tick's mesh records may still take.
@@ -111,7 +117,7 @@ pub(crate) struct RecordingMeshExecution {
     #[cfg(feature = "telemetry-seams")]
     limit: Option<RecordLimit>,
     #[cfg(feature = "telemetry-seams")]
-    truncated: Option<crate::runtime::trace::recording::TruncationReason>,
+    truncated: Option<TruncationReason>,
 }
 
 impl RecordingMeshExecution {

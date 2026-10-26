@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod birth_age;
 pub(crate) mod outcomes;
+pub mod recording;
 pub mod reproductive_success;
 pub mod seeding;
 #[allow(clippy::module_inception)]

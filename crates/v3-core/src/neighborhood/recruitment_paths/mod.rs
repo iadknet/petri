@@ -20,7 +20,7 @@ use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::runtime::trace::recording::ActiveTrace;
+use crate::simulation::recording::ActiveTrace;
 use crate::simulation::{run_tick, Simulation};
 use slotmap::SlotMap;
 
@@ -86,7 +86,7 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
         run_tick(&mut sim, &mut trace);
         let tick = trace.as_ref().and_then(|trace| trace.ticks.first());
         let creature = sim.creatures.get(id);
-        let actions = tick.map_or_else(Vec::new, |tick| tick.final_actions.clone());
+        let actions = tick.map_or_else(Vec::new, |tick| tick.trace.final_actions.clone());
         let position = creature.map(|creature| creature.position);
         let correct = |cue| {
             let expected = if cue {
@@ -113,10 +113,11 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                 plasticity: sim.stats.plasticity_updates_total,
             },
             dispatched: tick.map_or_else(Vec::new, |tick| {
-                tick.hops.iter().map(|hop| hop.node_id).collect()
+                tick.trace.hops.iter().map(|hop| hop.node_id).collect()
             }),
             routing: tick.map_or_else(Vec::new, |tick| {
-                tick.hops
+                tick.trace
+                    .hops
                     .iter()
                     .filter_map(|hop| {
                         hop.route.as_ref().map(|route| {
@@ -130,7 +131,8 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                     .collect()
             }),
             output_slots: tick.map_or_else(Vec::new, |tick| {
-                tick.hops
+                tick.trace
+                    .hops
                     .iter()
                     .map(|hop| (hop.node_id, hop.output_slots))
                     .collect()

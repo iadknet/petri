@@ -15,7 +15,7 @@
 use std::sync::OnceLock;
 
 use v3_core::config::SimulationConfig;
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::simulation::recording::ActiveTrace;
 use v3_core::simulation::Simulation;
 use v3_telemetry::{
     EndStatus, Flush, MeasurementEnd, MeasurementHandle, MeasurementStart, RunHandle, RunStart,

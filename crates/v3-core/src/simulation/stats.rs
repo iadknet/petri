@@ -429,7 +429,7 @@ pub struct SimStats {
     /// The observed creature's applied actions this tick, in order, captured
     /// where each action-log entry is built; at most `max_actions_per_turn`.
     #[cfg(feature = "telemetry-seams")]
-    pub observed_actions: Vec<crate::runtime::trace::domain::AppliedAction>,
+    pub observed_actions: Vec<crate::simulation::recording::AppliedAction>,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,

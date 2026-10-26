@@ -253,7 +253,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
 
 #[test]
 fn production_learning_splits_accumulate_and_observations_leave_them_unchanged() {
-    use crate::runtime::trace::recording::ActiveTrace;
+    use crate::simulation::recording::ActiveTrace;
     for traced in [false, true] {
         let (mut sim, id) = make_sim_with_custom_genome(1000.0, mixed_learning_genome(1, 2));
         let mut trace = traced.then(|| ActiveTrace::new(id, 4));
@@ -303,7 +303,7 @@ fn production_memory_events_accumulate_without_counting_decay_or_snapshots() {
         let (mut sim, id) = make_sim_with_custom_genome(1000.0, genome);
         sim.creatures[id].shared_memory[1] = 1.0;
         sim.config.shared_memory.decay_rate = 0.1;
-        let mut trace = traced.then(|| crate::runtime::trace::recording::ActiveTrace::new(id, 2));
+        let mut trace = traced.then(|| crate::simulation::recording::ActiveTrace::new(id, 2));
         for tick in 1..=2 {
             run_tick(&mut sim, &mut trace);
             assert_eq!(sim.stats.shared_memory_writes_changed_total, tick * 2);

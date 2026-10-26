@@ -141,7 +141,7 @@ fn a_charge_rounded_away_records_no_debit() {
 #[test]
 fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit() {
     use crate::creature::genome::VmInstruction;
-    use crate::runtime::trace::recording::ActiveTrace;
+    use crate::simulation::recording::ActiveTrace;
     for traced in [false, true] {
         let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 0.01);
         sim.creatures[attacker].genome = vm_raw_program_genome(vec![]);

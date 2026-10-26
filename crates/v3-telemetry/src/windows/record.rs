@@ -6,8 +6,8 @@
 //! shortest round-trip form; a value that was not captured is omitted.
 
 use serde::Serialize;
-use v3_core::runtime::trace::domain::{BackendTrace, MeshHopTrace, TickTrace};
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::runtime::trace::domain::{BackendTrace, MeshHopTrace};
+use v3_core::simulation::recording::{ActiveTrace, RecordedTick};
 
 use super::{action_label, died, truncation, Ending, SampleMeta};
 
@@ -91,8 +91,9 @@ fn hop(hop: &MeshHopTrace) -> Hop {
 
 /// The tick's entry with at most `left` of its hops, taken from `left`;
 /// returns whether any were cut.
-fn tick<'a>(record: &'a TickTrace, left: &mut usize) -> (Tick<'a>, bool) {
-    let outcome = record.outcome.as_ref();
+fn tick<'a>(recorded: &'a RecordedTick, left: &mut usize) -> (Tick<'a>, bool) {
+    let record = &recorded.trace;
+    let outcome = recorded.outcome.as_ref();
     let sensed = &record.static_inputs;
     let kept = record.hops.len().min(*left);
     *left -= kept;

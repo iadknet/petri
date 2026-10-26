@@ -60,7 +60,7 @@ pub use crate::windows::{
     WindowSettings, CREATURE_WINDOWS_ENV, MAX_EVENTS_PER_SAMPLE, MAX_SAMPLES_PER_RUN,
     MAX_SAMPLE_BYTES_PER_RUN, WINDOW_BUDGET, WINDOW_INTERVAL_ENV, WINDOW_TICKS_ENV,
 };
-use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::simulation::recording::ActiveTrace;
 
 /// The environment variable that switches telemetry when no flag is given.
 pub const SWITCH_ENV: &str = "PETRI_TELEMETRY";

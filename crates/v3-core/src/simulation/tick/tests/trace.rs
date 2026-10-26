@@ -2,7 +2,7 @@ use super::super::run_tick;
 use super::support::*;
 use crate::config::SimulationConfig;
 use crate::creature::genome::vote::DirectedVoteKind;
-use crate::runtime::trace::recording::ActiveTrace;
+use crate::simulation::recording::ActiveTrace;
 use crate::simulation::seeding::seed_simulation;
 
 #[test]
@@ -19,7 +19,7 @@ fn trace_populated_after_tick() {
         "trace should be complete after 1 tick"
     );
 
-    let tick_trace = &active.ticks[0];
+    let tick_trace = &active.ticks[0].trace;
     assert_eq!(
         tick_trace.tick_number, 0,
         "tick_number should be 0 (pre-increment)"
@@ -133,7 +133,7 @@ fn a_committed_move_sets_the_stored_heading_and_the_trace_keeps_the_start() {
         assert_eq!(sim.creatures[id].position, Position::new(5, 5));
         assert_eq!(sim.creatures[id].heading, Direction::W);
         if let Some(active) = trace {
-            assert_eq!(active.ticks[0].heading, Direction::SW);
+            assert_eq!(active.ticks[0].trace.heading, Direction::SW);
         }
     }
 }
