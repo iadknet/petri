@@ -11,32 +11,30 @@ A creature perceives exactly what it perceived before, from explicit views
 of the world and of each body: `sensors` reads `WorldState` and a `BodyView`
 per creature that the creature record builds and the scheduler collects once
 per tick, never a `CreatureState`, a `SlotMap` of them, the genome or the
-colour helper. What a brain needs assembled is a
-`PerceptionRequirements` value the genome's own analysis computes once per
-birth, and the same analysis computes the declared and wired key sets the
-sensor-census gauges read. Debts G9, G14 (the caches)
-and G20 of [`docs/architecture.md`](../../architecture.md) are paid, and
-every trajectory, population and draw stream is unchanged.
+colour helper. What a brain needs assembled is a `PerceptionRequirements`
+value the genome's own analysis computes once per birth, beside the declared
+and wired key sets the sensor-census gauges read. Debts G9, G14 (the caches)
+and G20 of [`docs/architecture.md`](../../architecture.md) are paid; every
+trajectory, population and draw stream is unchanged.
 
 ## Non-Goals
 
-- Any new sensed state: T27.F02 (held signals) and T29.F02 (body genes) put
-  theirs on the views afterwards.
+- Any new sensed state: T27.F02 and T29.F02 put theirs on the views
+  afterwards.
 - A change to which creatures get typed food or extended perception
   assembled, or to any sensor value or rule.
 - The outcome-channel vocabulary (G2: T25.F11), the genome directory and
   the readers' home (G24, G26: T30.F07), the runtime state in the creature
   record (G8: T30.F02), the birth constructor (G4: T29.F01).
-- Moving `WorldKeySet` to `contracts`: once sensors stop importing the
-  creature record, `creature → sensors::reads` points down.
+- Moving `WorldKeySet` to `contracts`: `creature → sensors::reads` points
+  down once sensors stop importing the creature record.
 - Parallel sensor assembly, the frontend.
 
 ## Inputs and Invariants
 
 Inputs: the row and the track's F03 notes; `docs/architecture.md` section 3
-(sensors' prohibition and its views) and debts G2, G9, G14, G20; the code
-named below; the [readings file](../../progress/readings/t30-f03.md)
-(options, the preparatory audit R1–R7).
+and debts G2, G9, G14, G20; the code named below; the
+[readings file](../../progress/readings/t30-f03.md) (options, audit R1–R7).
 
 The invariants state the closing state.
 
@@ -47,7 +45,7 @@ The invariants state the closing state.
    OUTCOME_CHANNEL_COUNT}` in `static_inputs.rs` alone, the one site G2
    names, marked `WORKAROUND(G2): OutcomeChannel moves to contracts
    (T25.F11)`. No `CreatureState`, no `creature::colour`. The debts file
-   gains no line; its G9 lines (four) and G20 lines (two) leave;
+   gains no line and loses its G9 and G20 lines;
    `scripts/architecture-check.mjs` passes.
 2. **The body view.** `sensors::static_inputs::BodyView` (in the module G2
    already names, so the import footprint is unchanged), `Copy`: `position:
@@ -67,69 +65,60 @@ The invariants state the closing state.
    when absent, as `creatures.get` skips today. Every field reads the same
    value as today: `age_fraction`, `previous_outcome_read`, kin affinity, the
    reproduce-ready test and the energy ratio are unchanged sensor rules.
+   `PerceptionConfig` (sensors' narrow view of the run config, not a config
+   field) carries no `energy_capacity`: a target's `energy_scale` arrives on
+   its view, and tests take the capacity config from `SimulationConfig`.
 4. **The scheduler builds the views.** `assemble_sensor_inputs_with` fills
-   one `BodyViews` over every living creature (`sim.creatures`) before the
-   queue is walked, once per call, and passes it to both assemblers; the
-   server's creature diagnostics (`v3-server/src/http/creature.rs`) build the
-   one view they need with `sensed_body`.
+   one `BodyViews` over every living creature before the queue is walked,
+   once per call, and passes it to both assemblers; the server's creature
+   diagnostics build the one view they need with `sensed_body`.
 5. **Perception requirements.** `contracts::PerceptionRequirements {
    typed_local_food: bool, extended_perception: bool }` with `of_key`
    (`FoodHere`, `NeighborFoodRing` → `typed_local_food`; `AreaFoodSummary`,
    `AreaBarrierSummary`, `AreaOccupancySummary`, `NearbyCreature` →
    `extended_perception`; the barrier and occupied rings → neither), a
-   union, and `ALL`. `genome::sensor_analysis::perception_requirements
-   (&CreatureGenome)` folds `of_key` over every node's `input_refs`, every
-   node, exactly the set `genome_uses_extended_perception` and
-   `genome_uses_typed_local_food` walk today; those two and
+   union, and `ALL`. `genome::sensor_analysis::perception_requirements`
+   folds `of_key` over every node's `input_refs`, the set the two
+   `genome_uses_*` predicates walk today; those two and
    `PerceptionSnapshot::is_extended_key` are deleted.
 6. **Cached at birth.** `CreatureState::cached_perception_requirements`,
    computed in `new_with_cached_fields` beside the other genome-derived
-   caches. The tick's assembly reads it (`|creature|
-   creature.cached_perception_requirements`), `assemble_full_sensor_inputs`
-   passes `PerceptionRequirements::ALL`, and the traced tick's
-   `TickOutcome.{uses_typed_local_food, uses_extended_perception}` read the
-   cache. A creature is assembled typed food exactly when
+   caches. The tick's assembly and the traced tick's `TickOutcome.uses_*`
+   flags read it; `assemble_full_sensor_inputs` passes
+   `PerceptionRequirements::ALL`. Typed food is assembled exactly when
    `typed_local_food`, visibility and perception exactly when
    `extended_perception`, as today.
 7. **Genome sensor analysis.** `creature/genome/sensor_analysis.rs` holds
-   `SensorCensus` (today's `CreatureSensorCensus`, fields unchanged:
-   `world_inputs: BTreeSet<WorldInputKey>`, `decision_inputs`,
-   `reads_shared_memory`, `holds_stateful_node`), `DecisionInputKey`,
-   `sensor_census(genome, reachable)`, `declared_world_keys(genome,
-   reachable) -> BTreeSet<WorldInputKey>`, `perception_requirements`,
-   `has_barrier_reader(genome, reachable)` and `live_vm_world_reads(genome,
-   reachable)`, each returning what today's function returns on every input
-   (their tests move with them). `creature::sensor_census` keeps
+   `SensorCensus` (today's `CreatureSensorCensus`, fields unchanged),
+   `DecisionInputKey`, `sensor_census(genome, reachable)`,
+   `declared_world_keys(genome, reachable) -> BTreeSet<WorldInputKey>`,
+   `perception_requirements`, `has_barrier_reader` and
+   `live_vm_world_reads`, each returning what today's function returns on
+   every input (tests move with them). `creature::sensor_census` keeps
    `sensor_use_census`, `SensorUseRow` and `world_input_key_label` only.
-   `v3-cli/src/bench/tracking.rs` and `v3-lab/src/readings.rs` import the
-   new path.
 8. **The creature record computes nothing.** `new_with_cached_fields`
-   calls the analysis module for `cached_has_barrier_reader`,
-   `cached_live_vm_world_inputs`, `cached_declared_world_inputs`,
-   `cached_wired_world_inputs` (collected into `WorldKeySet`, which stays in
-   `sensors::reads` beside `WorldReads`) and the requirements;
-   `compute_has_barrier_reader`, `compute_live_vm_world_inputs`,
-   `sensor_caches` and `refresh_sensor_caches` are deleted.
+   calls the analysis module for every genome-derived cache (the key sets
+   collected into `WorldKeySet`, which stays in `sensors::reads` beside
+   `WorldReads`); `compute_has_barrier_reader`,
+   `compute_live_vm_world_inputs`, `sensor_caches` and
+   `refresh_sensor_caches` are deleted.
 9. **Perception-mix seeding.** `seed_simulation_with_perception_mix` edits
    the first `n` founder genomes before construction through a per-founder
-   genome hook on `seed_simulation`'s path; the hook draws nothing, so
-   `seed_simulation`'s positions, headings and bodies are byte-identical to
-   today's. Every cache of a mixed founder derives from the built genome
-   (today four other caches stay stale after the edit; audit R5). The
-   fixture feeds `benches/tick.rs` and seeding tests only; no benchmark
-   profile uses it.
+   genome hook on `seed_simulation`'s path; the hook draws nothing, so the
+   positions, headings and bodies are byte-identical to today's, and every
+   cache of a mixed founder derives from the built genome (audit R5). The
+   fixture feeds `benches/tick.rs` and tests only; no profile uses it.
 10. **Dead arm.** `StaticInputs::resolve_world` is deleted;
     `SensorSnapshot::resolve_world` resolves `FoodHere` through the typed
     snapshot and returns `0.0` for any other key, as today.
-11. **No behavior change.** No config field, catalog key, RNG draw, wire
-    type or frontend file changes. Every `deterministic` value of the gate
+11. **No behavior change.** No `SimulationConfig` field, catalog key, RNG
+    draw, wire type or frontend file changes. Every `deterministic` value of the gate
     summary equals the reference's. The sensor-census gauges,
     `last_mesh_world_reads` and the window records' `uses_*` flags carry the
     same values. The four snapshot types keep their fields, so runtime, trace
     and server code that reads them is untouched.
-12. **Overlap.** T29.F01 and T30.F02 also change `creature/state.rs`; at plan
-    time neither has a spec; concurrent sessions reconcile that file at
-    integration (track note).
+12. **Overlap.** T29.F01 and T30.F02 also change `creature/state.rs`;
+    concurrent sessions reconcile it at integration (track note).
 
 ## Architecture
 
@@ -138,19 +127,17 @@ the key family classification, beside `compound_width`), genome (one new
 analysis module), `sensors` (the views it defines), `creature` (builds one
 view; its birth caches call genome analysis), the scheduler (collects the
 views once per tick; seeding's fixture hook), readers and outer crates
-(import paths only). Debts paid at
-closure: G9 and G20 deleted from section 5 and the debts file; G14 reduced
-to its inheritance-witness half (T25.F11). Debts used and left: G2, used in
+(import paths only). Debts paid: G9 and G20 (section 5 rows at closure, the
+debts-file lines in the build); G14 reduced to its witness half (T25.F11). Debts used and left: G2, used in
 place and not widened (invariant 2) because the outcome-channel vocabulary
 is T25.F11's move; G7 and G8 in `creature/state.rs`, untouched; G24 and
 G26, so the analysis module and the reader stay under `creature/` until
 T30.F07 moves them. Shared rules read, not changed: the body's sensor denominator
 (`HeritableBody::energy_scale`, `creature/body.rs:113`) and the seen colour
 (`creature::colour::unit_rgb`, `colour.rs:85`), resolved into the view by
-the creature record, their owner; sensors reuse the resolved values. The
-desired state in `docs/architecture.md` already describes this feature's
-shape (section 3's sensors prohibition, section 1 rule 5 on derived data), so
-the plan commit does not edit it.
+the creature record, their owner; sensors reuse the resolved values.
+`docs/architecture.md` already describes this shape (section 3's sensors
+prohibition, rule 5 on derived data), so the plan commit does not edit it.
 
 ## Telemetry
 
@@ -161,9 +148,8 @@ sources (the birth caches and `last_mesh_world_reads`) and values.
 ## Verification Plan
 
 **Question.** This feature claims every creature perceives and acts exactly
-as before while sensors read views and the genome analysis computes the
-caches; a gate `deterministic` value differing from the reference, or a
-moved sensor test value, would show it wrong.
+as before while sensors read views; a gate `deterministic` value differing
+from the reference, or a moved sensor test value, would show it wrong.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -184,10 +170,8 @@ moved sensor test value, would show it wrong.
       import marked `WORKAROUND(G2)`;
       `assemble_static_inputs` and `assemble_perception` on views; the genome
       predicates, `is_extended_key` and `StaticInputs::resolve_world` deleted;
-      sensors tests build views, the equality tests
-      (`assemble_perception_matches_reference_reducers`,
-      `own_colour_equals_what_a_neighbour_sees`, the nearby vitals cases)
-      kept on views (R1, R6; invariants 1–3, 10).
+      sensors tests build views and keep the equality cases (R1, R6;
+      invariants 1–3, 10).
 - [x] `creature/state.rs`: `cached_perception_requirements`, `sensed_body`,
       caches through the analysis module, the four helpers deleted
       (invariants 2, 6, 8).
@@ -203,18 +187,20 @@ moved sensor test value, would show it wrong.
 - [x] `scripts/architecture-debts.txt`: G9 and G20 lines and the G14
       `creature/state.rs` line removed; `make check-docs` architecture check
       green (invariant 1).
+- [ ] `PerceptionConfig::energy_capacity` removed with its `Default` and
+      `from_sim_config` lines and the two tests asserting it;
+      `runtime/cgp/neutral_connection_tests/group.rs` builds its views from
+      `sim.config.energy.capacity` (invariant 3).
 - [ ] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
       reduced to the witness; the gate run and its summary recorded.
 
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` -> 30 passed (run first).
-- [x] Focused tests: the views equality tests in `sensors/reducers.rs` and
-      `sensors/static_inputs.rs`, the contracts classification test, the
-      moved analysis tests, `perception_mix_*` in `simulation/seeding.rs`
-      (the caches-consistent case replacing
-      `perception_mix_refreshes_the_birth_sensor_caches`),
-      `tick/tests/full_sensor_inputs.rs` -> 96 passed.
+- [x] Focused tests: the views equality tests in `sensors/`, the contracts
+      classification test, the moved analysis tests, `perception_mix_*` in
+      `simulation/seeding.rs`, `tick/tests/full_sensor_inputs.rs` -> 96
+      passed.
 - [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` at Close ->
       `<result>`.
@@ -258,13 +244,14 @@ move; nothing is re-pinned.
 ## Notes for AI Agents
 
 - Decision: in-feature refactors R1–R6 of the preparatory audit in
-  `docs/progress/readings/t30-f03.md` are this feature's scope (the views,
-  the requirements value and cache, the analysis module, the creature record's
-  helpers, the seeding hook, the dead arm).
+  `docs/progress/readings/t30-f03.md` are this feature's scope.
 - Deferred: R7, the `OutcomeChannel` import the body view needs, stays at
   G2's one sensors site (`static_inputs.rs`), marked `WORKAROUND(G2)`;
   T25.F11 pays it.
 - Decision: the requirements are computed over every node, as today's
   predicates are; deriving them from the reachable set is a later row's
   behavior question.
+- Decision: `PerceptionConfig::energy_capacity`, left unread by the views,
+  is removed (build-pass escalation, 2026-10-26); invariant 11 guards the
+  run configuration, not sensors' narrow view of it.
 - Cost: see the readings file at closure.
