@@ -105,7 +105,8 @@ Invariants:
    companions parity test are rewritten, not dropped), and the only new
    tests are the harness's own. The frontend's sha256 fingerprint of
    `cgp/group.rs` (`petriVizDrift.test.ts:21,73`) is a source-review
-   marker, not a simulation value; it takes the new path and hash.
+   marker, not a simulation value; it takes the new path and hash, and
+   the `runtime/cgp/eval.rs` one (`:20`, import line only) its new hash.
 
 ## Architecture
 
@@ -192,7 +193,7 @@ moved deterministic block or a changed test value would show it wrong.
 - [x] Checker: delete the three special cases and their comments from
       `scripts/architecture-check.mjs`; rewrite the fixture paths in
       `scripts/architecture-check.test.mjs` (invariant 4).
-- [ ] Debts and docs: delete the G24, G25 and G26 rows and update the paths
+- [x] Debts and docs: delete the G24, G25 and G26 rows and update the paths
       in G1–G4, G14 and G15 in `docs/architecture.md`; re-key the G2 and G14
       lines in `scripts/architecture-debts.txt` (invariant 5).
 - [ ] `make check`; the gate profile; `make rust-test-slow` at Close.
@@ -202,9 +203,10 @@ moved deterministic block or a changed test value would show it wrong.
 - [x] Paths: the two greps of invariants 1 and 2 -> empty;
       `ls crates/v3-core/src/creature/genome crates/v3-core/src/bin` -> no
       such directory; `grep -n "dhat" crates/v3-core/Cargo.toml` -> empty.
-- [ ] Architecture: `make architecture-check architecture-check-test` ->
-      exit 0 with no G24, G25 or G26 entry; `grep -n "WORKAROUND(G2[456])"
-      scripts/architecture-check.mjs` -> empty.
+- [x] Architecture: `make architecture-check architecture-check-test` ->
+      exit 0 with no G24, G25 or G26 entry (20/20 tests); `grep -n
+      "WORKAROUND(G2[456])" scripts/architecture-check.mjs` -> empty;
+      `npx vitest run src/components/inspector/petriVizDrift.test.ts` -> 91/91.
 - [x] Harness: `cargo run -p v3-cli -- profile-ticks --ticks 2 --creatures
       10 --world-size 20 --telemetry off` -> two stderr lines, exit 0;
       `cargo check -p v3-cli --features dhat-heap` -> exit 0; `cargo test
