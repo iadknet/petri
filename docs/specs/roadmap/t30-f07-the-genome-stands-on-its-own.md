@@ -217,7 +217,7 @@ moved deterministic block or a changed test value would show it wrong.
       exit 0 on the final code (Verification Plan).
 - [ ] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
       -> inconclusive twice, no ratio (readings); user decision pending.
-- [ ] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
+- [x] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
       local raw hash and byte count and verification time checked, series
       entry points to the summary, deterministic blocks identical to the
       epoch, no new full report staged.
@@ -239,6 +239,9 @@ record pair sits outside the timed loop.
 300 s used (the script reuses the `run` workload's T 6908: 15.1 s runs,
 n 24; the permitted rerun at T 1800: 3.7 s runs, 16.5% spread, n 32).
 Reported to the user under the time-cap rule; not rounded, not rerun.
+
+Gate at `d5ffb1a1`: exits 0/0, `severe=false`, counters `ok`, deterministic
+block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
 
 - Summary of the declared profile:
   [gate](../../progress/features/t30-f07.json).
