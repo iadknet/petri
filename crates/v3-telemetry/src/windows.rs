@@ -30,11 +30,11 @@ use slotmap::Key as _;
 use v3_core::contracts::{splitmix64, CreatureId, WorldAction};
 use v3_core::creature::action_log::NO_DIRECTION;
 use v3_core::creature::genome::CreatureGenome;
+use v3_core::ledger::DeathCause;
 use v3_core::runtime::trace::domain::{
     AppliedAction, BackendTrace, MeshHopTrace, MeshPassTrace, TickOutcome, TickTrace,
 };
 use v3_core::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
-use v3_core::ledger::DeathCause;
 use v3_core::simulation::Simulation;
 
 use crate::queue::Signal;

@@ -7,11 +7,11 @@ use std::mem::size_of;
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 use crate::creature::action_log::ActionLogEntry;
+use crate::ledger::EnergyFlows;
 use crate::runtime::trace::domain::{AppliedAction, StateAfter, TickTrace};
 use crate::runtime::trace::recording::{ActiveTrace, Truncation, TruncationReason};
 use crate::runtime::trace::size::TickReserve;
 use crate::runtime::traced_mesh::RecordLimit;
-use crate::ledger::EnergyFlows;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::simulation::Simulation;
 

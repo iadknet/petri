@@ -4,9 +4,9 @@ use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdg
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction,
 };
+use crate::ledger::DeathCause;
 use crate::mutation::MutationOperator;
 use crate::simulation::actions::{apply_reproduce, apply_steal_energy, ReproductionActionResult};
-use crate::ledger::DeathCause;
 use crate::simulation::reproductive_success::{
     CognitiveClass, ReproductiveSuccessByCognitiveClass, ReproductiveSuccessTotals,
 };

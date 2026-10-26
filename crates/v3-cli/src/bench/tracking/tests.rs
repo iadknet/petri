@@ -1083,9 +1083,7 @@ fn gestation_block_counts_and_sums_carried_litters() {
 
 #[test]
 fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
-    use v3_core::ledger::{
-        ActionCharges, DeathCause, EnergyFlows, FailedActionEffort,
-    };
+    use v3_core::ledger::{ActionCharges, DeathCause, EnergyFlows, FailedActionEffort};
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
     sim.stats.mortality.record(DeathCause::MeshRamp);
     sim.stats.mortality.record(DeathCause::CapacityUpkeep);

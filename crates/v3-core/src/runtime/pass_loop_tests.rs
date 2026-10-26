@@ -12,11 +12,11 @@ use crate::creature::genome::vote::{
     ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
 };
 use crate::creature::genome::{CreatureGenome, VmInstruction};
+use crate::ledger::DeathCause;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
     genome, leaf, run_tick, vm_node, vm_voter, GraphBuilder, Senses,
 };
-use crate::ledger::DeathCause;
 
 const N: u8 = 0;
 const E: u8 = 2;

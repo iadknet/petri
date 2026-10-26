@@ -7,11 +7,11 @@ use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::state::{CreatureState, PendingBirth};
+use crate::ledger::DeathCause;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
 use crate::simulation::birth_age::BirthOrder;
-use crate::ledger::DeathCause;
 use crate::simulation::simulation::Simulation;
 
 /// Genome replication cost multiplier on the parent's reproduce charge:

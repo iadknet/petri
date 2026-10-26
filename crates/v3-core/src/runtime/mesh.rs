@@ -14,6 +14,7 @@ use crate::contracts::{Direction, NodeId, WorldAction};
 use crate::creature::genome::vote::{VoteKind, VoteSink, VoteVector};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
+use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::action_decode::decode_commit;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::routing::resolve_gated_route;
@@ -22,7 +23,6 @@ use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTP
 use crate::runtime::vm::execute_vm_node;
 use crate::runtime::vote_select::select;
 use crate::sensors::perception::SensorSnapshot;
-use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 
 /// Energy charged for the `k`-th mesh hop of a world tick (`k` from 1): zero
 /// while the tick stays within `allowance`, then rising linearly with the hop

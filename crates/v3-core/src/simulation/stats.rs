@@ -422,10 +422,7 @@ pub struct SimStats {
     /// tick or between ticks; kept across ticks and read by key
     /// ([`Self::removal_of`]).
     #[cfg(feature = "telemetry-seams")]
-    pub observed_removal: Option<(
-        crate::contracts::CreatureId,
-        crate::ledger::DeathCause,
-    )>,
+    pub observed_removal: Option<(crate::contracts::CreatureId, crate::ledger::DeathCause)>,
     /// Energy predators stole from the observed creature this tick.
     #[cfg(feature = "telemetry-seams")]
     pub observed_damage: f32,

@@ -2,6 +2,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::creature::state::GraphRuntimeState;
+use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
 use crate::runtime::cgp::sources::{collect_cgp_weighted_inputs, resolve_source};
@@ -11,7 +12,6 @@ use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
-use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 
 /// Collect a learning graph's weighted inputs of compute node `current_idx`
 /// into `buf`: each edge's ordered read times its applied weight, the read

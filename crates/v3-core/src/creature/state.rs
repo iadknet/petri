@@ -314,11 +314,7 @@ impl CreatureState {
     }
 
     /// Observe the already-applied arithmetic without changing the stored energy.
-    pub(crate) fn observe_energy(
-        &mut self,
-        before: f32,
-        sink: crate::ledger::DeathCause,
-    ) -> f64 {
+    pub(crate) fn observe_energy(&mut self, before: f32, sink: crate::ledger::DeathCause) -> f64 {
         use crate::ledger::{applied_debit, observe_energy_change};
         observe_energy_change(
             &mut self.pending_death_cause,

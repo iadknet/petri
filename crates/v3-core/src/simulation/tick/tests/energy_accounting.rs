@@ -1,9 +1,9 @@
 use super::support::*;
 use crate::contracts::Direction;
 use crate::contracts::{OrdinaryFoodTypeId, WorldAction};
+use crate::ledger::DeathCause;
 use crate::runtime::types::ComputeCostReport;
 use crate::simulation::actions::apply_steal_energy;
-use crate::ledger::DeathCause;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::run_phase_0;
 use crate::simulation::tick::ActionType;

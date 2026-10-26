@@ -2,13 +2,13 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{
     sanitize_f32, shared_memory_write_changed, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT,
 };
 use crate::sensors::perception::SensorSnapshot;
-use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 
 /// Execute a VM backend node.
 ///
