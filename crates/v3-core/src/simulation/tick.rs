@@ -297,7 +297,7 @@ fn assemble_sensor_inputs(
     sim: &Simulation,
     queue: &[CreatureId],
 ) -> Vec<(CreatureId, SensorSnapshot)> {
-    assemble_sensor_inputs_with(sim, queue, |creature| creature.perception_requirements())
+    assemble_sensor_inputs_with(sim, queue, CreatureState::perception_requirements)
 }
 
 /// The body view of every living creature, as sensors read it this tick.

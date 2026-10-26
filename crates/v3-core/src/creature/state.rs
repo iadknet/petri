@@ -196,9 +196,8 @@ pub struct CreatureState {
     pub cached_has_barrier_reader: bool,
     /// Exact world-input keys read by live VM `ReadInput` instructions on reachable nodes.
     pub cached_live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
-    /// The snapshots the brain needs assembled each turn, cached at birth;
-    /// private because genome analysis owns the value (read it through
-    /// [`Creature::perception_requirements`]).
+    /// Cached at birth from genome analysis; read through
+    /// [`CreatureState::perception_requirements`].
     cached_perception_requirements: PerceptionRequirements,
     /// Mutation operators applied when this creature was born.
     pub birth_mutation_operators: Box<[MutationOperator]>,
