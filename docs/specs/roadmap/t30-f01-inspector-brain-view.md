@@ -151,7 +151,7 @@ would show it wrong.
       `grep -rn "compassX\|compassY\|learnerInitialized\|memberPattern\|parseWorldInputRef\|PAIR_BIRTH" frontend/src` -> none.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` and
       `cargo fmt --all --check` -> 0.
-- [x] `make check` -> 0 at tested commit dacb94d3; the gate summary stored at
+- [x] `make check` -> 0 at tested commit 878ded28 (rebased onto main df56caea; first run 0 at pre-rebase dacb94d3); the gate summary stored at
       `docs/progress/features/t30-f01.json` with the series entry pointing to
       it and no full report staged.
 
@@ -165,7 +165,7 @@ identical, with no indicator moving in any direction. A moved pin is a defect
 `learning` payload costs the inspector one merge-walk per poll, as
 `graph_weights` does today, and is not benchmarked.
 
-**Measured verdict.** Gate, 2026-10-26, HEAD 1038e63d: no pin moved and
+**Measured verdict.** Gate, 2026-10-26, HEAD 1038e63d (pre-rebase; rebased as 4662ec88 onto T30.F03 and T30.F04, whose deterministic blocks equal the epoch, so the reading stands): no pin moved and
 compute cost is zero, as predeclared. `make bench PROFILE=gate
 FEATURE=t30-f01`: outer `make` exit 0, CLI exit 0 (the recipe passed and the
 CLI wrote both files). `severe=false`; threshold verdict `ok` on all nine
