@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { annotation } from "../../../test/brainFixtures.ts";
+import { annotation, withAnnotations } from "../../../test/brainFixtures.ts";
 import type { BrainView } from "../../../types/generated/BrainView.ts";
-import { analyzeMesh, collectMeshClosure, matchesBackendFilter } from "./meshAnalysis.ts";
+import {
+	type MeshAnalysis,
+	analyzeMesh,
+	collectMeshClosure,
+	matchesBackendFilter,
+} from "./meshAnalysis.ts";
+
+function reachableIds(analysis: MeshAnalysis): number[] {
+	return analysis.nodes.filter((node) => node.reachable).map((node) => node.id);
+}
 
 function makeGenome(): BrainView {
 	return {
@@ -65,7 +74,7 @@ function makeGenome(): BrainView {
 			},
 			{
 				node_id: 8,
-				annotation: annotation(),
+				annotation: annotation({ reachable: false }),
 				input_refs: [{ family: "static", key: "AgeTicks" }],
 				targets: [],
 				backend: {
@@ -81,16 +90,24 @@ function makeGenome(): BrainView {
 }
 
 describe("analyzeMesh", () => {
-	it("separates reachable and unreachable nodes and preserves dangling edges", () => {
+	it("classifies nodes by their annotation and preserves dangling edges", () => {
 		const analysis = analyzeMesh(makeGenome());
 
 		expect(analysis.entryNodeId).toBe(1);
-		expect(analysis.reachableNodeIds).toEqual(new Set([1, 2, 3]));
-		expect(analysis.unreachableNodeIds).toEqual(new Set([8]));
+		expect(reachableIds(analysis)).toEqual([1, 2, 3]);
 		expect(analysis.danglingTargetIds).toEqual(new Set([99]));
 		expect(analysis.edges.find((edge) => edge.fromId === 3 && edge.toId === 99)?.isDangling).toBe(
 			true,
 		);
+	});
+
+	it("reads reachability from the brain view's annotation, not from the routes", () => {
+		const analysis = analyzeMesh(
+			withAnnotations(makeGenome(), { 3: { reachable: false }, 8: { reachable: true } }),
+		);
+
+		expect(analysis.nodesById.get(3)?.reachable).toBe(false);
+		expect(reachableIds(analysis)).toEqual([1, 2, 8]);
 	});
 
 	it("computes upstream and downstream closures from the selected node", () => {

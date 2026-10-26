@@ -29,8 +29,6 @@ export interface MeshAnalysis {
 	nodes: MeshAnalyzedNode[];
 	nodesById: Map<number, MeshAnalyzedNode>;
 	edges: MeshAnalyzedEdge[];
-	reachableNodeIds: Set<number>;
-	unreachableNodeIds: Set<number>;
 	danglingTargetIds: Set<number>;
 }
 
@@ -56,7 +54,6 @@ export function formatMeshEdgeId(fromId: number, toId: number, occurrenceIndex =
 export function analyzeMesh(genome: BrainView): MeshAnalysis {
 	const sortedNodes = [...genome.nodes].toSorted((left, right) => left.node_id - right.node_id);
 	const nodesById = new Map<number, MeshAnalyzedNode>();
-	const reachableNodeIds = collectReachableNodeIds(genome);
 	const incomingMap = new Map<number, number[]>();
 	const danglingTargetIds = new Set<number>();
 	const edges: MeshAnalyzedEdge[] = [];
@@ -67,7 +64,7 @@ export function analyzeMesh(genome: BrainView): MeshAnalysis {
 			node,
 			backendKind: getBackendKind(node),
 			isEntry: node.node_id === genome.entry_node_id,
-			reachable: reachableNodeIds.has(node.node_id),
+			reachable: node.annotation.reachable,
 			incomingIds: [],
 			outgoingIds: node.targets.map((t) => t.target_id),
 		});
@@ -116,10 +113,6 @@ export function analyzeMesh(genome: BrainView): MeshAnalysis {
 		nodes,
 		nodesById,
 		edges,
-		reachableNodeIds,
-		unreachableNodeIds: new Set(
-			nodes.filter((node) => !reachableNodeIds.has(node.id)).map((node) => node.id),
-		),
 		danglingTargetIds,
 	};
 }
@@ -164,31 +157,6 @@ export function matchesBackendFilter(
 	filter: MeshBackendFilter,
 ): boolean {
 	return filter === "all" ? true : node.backendKind === filter;
-}
-
-function collectReachableNodeIds(genome: BrainView): Set<number> {
-	const nodeMap = new Map(genome.nodes.map((node) => [node.node_id, node] as const));
-	const visited = new Set<number>();
-	const queue = [genome.entry_node_id];
-
-	while (queue.length > 0) {
-		const nodeId = queue.shift();
-		if (nodeId === undefined || visited.has(nodeId)) {
-			continue;
-		}
-		visited.add(nodeId);
-		const node = nodeMap.get(nodeId);
-		if (!node) {
-			continue;
-		}
-		for (const routeTarget of node.targets) {
-			if (nodeMap.has(routeTarget.target_id) && !visited.has(routeTarget.target_id)) {
-				queue.push(routeTarget.target_id);
-			}
-		}
-	}
-
-	return visited;
 }
 
 function buildTopologyKey(nodes: BrainNode[]): string {

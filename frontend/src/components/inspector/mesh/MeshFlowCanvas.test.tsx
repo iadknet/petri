@@ -85,8 +85,6 @@ function makeAnalysis(): MeshAnalysis {
 		nodes: [analyzedNode],
 		nodesById: new Map([[1, analyzedNode]]),
 		edges: [],
-		reachableNodeIds: new Set([1]),
-		unreachableNodeIds: new Set(),
 		danglingTargetIds: new Set(),
 	};
 }

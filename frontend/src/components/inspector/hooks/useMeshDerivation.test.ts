@@ -100,7 +100,7 @@ function makeGenome(): BrainView {
 			},
 			{
 				node_id: 9,
-				annotation: annotation(),
+				annotation: annotation({ reachable: false }),
 				input_refs: [{ family: "static", key: "AgeTicks" }],
 				targets: [],
 				backend: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
@@ -165,7 +165,7 @@ describe("useMeshDerivation", () => {
 		// dimUnreachable defaults to true in the store
 		const { result } = renderHook(() => useMeshDerivation(genome, null));
 
-		// Node 9 is unreachable (not in the entry node's forward closure)
+		// Node 9 is annotated unreachable
 		expect(result.current.dimmedNodeIds.has(9)).toBe(true);
 		// Node 1 (entry) should not be dimmed
 		expect(result.current.dimmedNodeIds.has(1)).toBe(false);

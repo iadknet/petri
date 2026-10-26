@@ -36,7 +36,7 @@ function makeCyclicGenome(): BrainView {
 			},
 			{
 				node_id: 9,
-				annotation: annotation(),
+				annotation: annotation({ reachable: false }),
 				input_refs: [],
 				targets: [{ target_id: 42, slot: 0, gate_bias: 0.0 }],
 				backend: {
