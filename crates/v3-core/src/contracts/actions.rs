@@ -4,7 +4,6 @@ use crate::contracts::OrdinaryFoodTypeId;
 /// Action type discriminant: the action-queue code `ReadActionQueueType`
 /// reads, the action-log type, and the index of the per-type charge ledger.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
-#[non_exhaustive]
 #[repr(u8)]
 pub enum ActionType {
     NoOp = 0,

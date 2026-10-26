@@ -27,9 +27,6 @@ impl From<CoreActionType> for ActionType {
             CoreActionType::Reproduce => Self::Reproduce,
             CoreActionType::StealEnergy => Self::StealEnergy,
             CoreActionType::GiveEnergy => Self::GiveEnergy,
-            // The core enum is `#[non_exhaustive]`; the pin test below
-            // fails on a variant this match lacks.
-            _ => unreachable!("an ActionType variant without a wire variant"),
         }
     }
 }
@@ -63,9 +60,6 @@ impl From<CoreResult> for ActionResult {
             CoreResult::NoVictim => Self::NoVictim,
             CoreResult::AgeConstraints => Self::AgeConstraints,
             CoreResult::NoRecipient => Self::NoRecipient,
-            // The core enum is `#[non_exhaustive]`; the pin test below
-            // fails on a variant this match lacks.
-            _ => unreachable!("an ActionResult variant without a wire variant"),
         }
     }
 }
@@ -126,19 +120,7 @@ mod tests {
                 / 2,
             CoreActionType::ALL.len()
         );
-        let results = [
-            CoreResult::Success,
-            CoreResult::NoFood,
-            CoreResult::Blocked,
-            CoreResult::InvalidTarget,
-            CoreResult::EnergyConstraints,
-            CoreResult::PopulationCap,
-            CoreResult::TransferredAndKilled,
-            CoreResult::NoVictim,
-            CoreResult::AgeConstraints,
-            CoreResult::NoRecipient,
-        ];
-        for result in results {
+        for result in CoreResult::ALL {
             assert_eq!(
                 result.as_key(),
                 serde_json::to_value(ActionResult::from(result)).unwrap()
@@ -149,7 +131,7 @@ mod tests {
                 .matches('"')
                 .count()
                 / 2,
-            results.len()
+            CoreResult::ALL.len()
         );
     }
 }

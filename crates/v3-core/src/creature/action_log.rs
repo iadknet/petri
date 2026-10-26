@@ -10,7 +10,6 @@ pub const NO_DIRECTION: u8 = 255;
 
 /// Outcome of an action for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[non_exhaustive]
 #[repr(u8)]
 pub enum ActionResult {
     Success = 0,
@@ -26,7 +25,33 @@ pub enum ActionResult {
     NoRecipient = 9,
 }
 
+/// Number of action results (Success..NoRecipient).
+const ACTION_RESULT_COUNT: usize = 10;
+const _: () = {
+    assert!(ActionResult::NoRecipient as usize + 1 == ACTION_RESULT_COUNT);
+    // `ALL[i]` has discriminant `i`, so the list is complete and ordered.
+    let mut i = 0;
+    while i < ACTION_RESULT_COUNT {
+        assert!(ActionResult::ALL[i] as usize == i);
+        i += 1;
+    }
+};
+
 impl ActionResult {
+    /// Every action result in discriminant order, for fixed-order reports.
+    pub const ALL: [Self; ACTION_RESULT_COUNT] = [
+        Self::Success,
+        Self::NoFood,
+        Self::Blocked,
+        Self::InvalidTarget,
+        Self::EnergyConstraints,
+        Self::PopulationCap,
+        Self::TransferredAndKilled,
+        Self::NoVictim,
+        Self::AgeConstraints,
+        Self::NoRecipient,
+    ];
+
     /// Stable diagnostics key for this action result.
     ///
     /// Matches the variant name emitted by the derived `Serialize` impl.
