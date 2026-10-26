@@ -184,7 +184,7 @@ changed food-stream or pattern test value, would show it wrong.
 - [x] Frontend comments: `npx biome check src/types/pattern.ts
       src/types/config.ts` (in `frontend/`) -> no diagnostics.
 - [ ] `make check` -> exit 0.
-- [ ] Gate profile: summary at `docs/progress/features/t30-f04.json`, local
+- [x] Gate profile: summary at `docs/progress/features/t30-f04.json`, local
       raw hash and byte count and verification time checked, series entry
       points to the summary, deterministic blocks identical to the epoch,
       no new full report staged.
@@ -199,7 +199,12 @@ against the current epoch with the standard thresholds and no re-pin. Every
 deterministic block is expected identical to the epoch; a differing block
 is a defect, not a cost to accept. No indicator can move.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Matches the predeclaration. `make bench PROFILE=gate
+FEATURE=t30-f04` at `c4874ee1`: outer exit 0, CLI exit 0 (v3-cli status),
+`severe=false`; all nine work counters `ok` at 0.000000% against the epoch
+(`t27-f03-giving-energy.json`); the `deterministic` block is identical to the
+epoch. Raw 132,624 bytes (SHA-256 `5f645975...1ab77`, local), summary 27,475
+bytes; readings in the file below.
 
 - Summary of the declared profile:
   [gate](../../progress/features/t30-f04.json).
