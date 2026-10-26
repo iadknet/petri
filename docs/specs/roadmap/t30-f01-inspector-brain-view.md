@@ -125,8 +125,10 @@ would show it wrong.
 
 - [x] Core: `cargo test -p v3-core` -> 2305 lib tests and every
       integration target pass, the learned-view and coordinates tests among
-      them, the viability target first; `ActionResult::ALL` is checked
-      complete and in discriminant order at compile time;
+      them, the viability target first; `ActionResult::ALL` and
+      `OutcomeChannel::ALL` are checked complete and in discriminant order at
+      compile time (mutation draws rules and channels from `HebbianRule::ALL`
+      and `OutcomeChannel::ALL`);
       `cargo build -p v3-core --no-default-features` and
       `cargo build -p v3-core --features ts` both succeed; `cargo tree -e
       normal,build -i ts-rs` finds no `ts-rs` under `v3-server` or `v3-cli`.
@@ -134,13 +136,18 @@ would show it wrong.
       `telemetry` tests pass (generator parity, the five preservation cases,
       the `exclude` tokens, paint and pattern round trips, sampler shapes, the
       `ActionType`/`ActionResult` pin over both core `ALL` lists, whose
-      conversions have no wildcard arm); test builds print no ts-rs serde
+      conversions have no wildcard arm, and the mirror parity test: every
+      core-mirroring enum of `genome_wire.rs` and `brain.rs` has the core
+      enum's serialized variant names, read from both derived `Deserialize`
+      impls, and every value of a core `ALL` list or the fixed sink catalog
+      serializes identically); test builds print no ts-rs serde
       warning (`no-serde-warnings`, the skipped attributes listed in the
       readings); deleting two generated files, then
       `PETRI_WRITE_TS_TYPES=1 cargo test -p v3-server --lib generated_types`
       and `npm run lint:fix` -> `git status` clean.
 - [x] Frontend: `npm run lint` (0, four pre-existing warnings),
-      `npm run test` (672 tests), `npm run build` in `frontend/` -> 0;
+      `npm run test` (673 tests, among them a node the routes reach but the
+      annotation marks unreachable classifying as unreachable), `npm run build` in `frontend/` -> 0;
       `grep -rn "compassX\|compassY\|learnerInitialized\|memberPattern\|parseWorldInputRef\|PAIR_BIRTH" frontend/src` -> none.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` and
       `cargo fmt --all --check` -> 0.

@@ -22,6 +22,20 @@ pub enum MeshReadClass {
     Decision,
 }
 
+impl MeshReadClass {
+    /// Every read class, in declaration order.
+    pub const ALL: [Self; 8] = [
+        Self::Food,
+        Self::Neighbor,
+        Self::Barrier,
+        Self::Occupancy,
+        Self::Introspection,
+        Self::Upstream,
+        Self::ActionQueue,
+        Self::Decision,
+    ];
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
@@ -31,6 +45,11 @@ pub enum MeshWriteClass {
     Action,
     Memory,
     Payload,
+}
+
+impl MeshWriteClass {
+    /// Every write class, in declaration order.
+    pub const ALL: [Self; 4] = [Self::Route, Self::Action, Self::Memory, Self::Payload];
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

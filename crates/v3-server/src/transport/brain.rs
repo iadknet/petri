@@ -168,7 +168,7 @@ pub struct EdgeMember {
 
 /// A member's learning scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum Scope {
     Edge,
     Group,
@@ -280,7 +280,7 @@ pub struct BrainGroup {
 
 /// The geometry a group's members fit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum GroupShape {
     Ring { ring_ref: u16 },
     DirectionPair { ref_idx: u16, pair: u8 },

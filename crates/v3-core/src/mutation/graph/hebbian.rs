@@ -35,20 +35,6 @@ use crate::creature::genome::{
 };
 use crate::mutation::types::MutationSkipReason;
 
-const ALL_RULES: [HebbianRule; 4] = [
-    HebbianRule::Classic,
-    HebbianRule::Oja,
-    HebbianRule::AntiHebb,
-    HebbianRule::Covariance,
-];
-
-const ALL_CHANNELS: [OutcomeChannel; 4] = [
-    OutcomeChannel::EnergyDelta,
-    OutcomeChannel::ActionSuccess,
-    OutcomeChannel::DamageDelta,
-    OutcomeChannel::OffspringSuccess,
-];
-
 // ─── Applicability predicates ───────────────────────────────────────────────
 //
 // The per-edge predicates the plasticity operators draw their target from.
@@ -187,7 +173,7 @@ fn mutate_scoped<V, R: Rng>(
 /// `EnableHebbian`'s value law: a fresh pure-Hebbian config, in draw order
 /// rule, rate, clamp, inheritance.
 pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> PlasticityConfig {
-    let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
+    let rule = HebbianRule::ALL[rng.gen_range(0..HebbianRule::ALL.len())];
     PlasticityConfig {
         rule,
         learning_rate: rng.gen_range(0.01f32..0.2),
@@ -201,7 +187,7 @@ pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> PlasticityConfig {
 /// `EnableRewardModulation`'s value law: a fresh modulation, in draw order
 /// channel, decay.
 pub(super) fn draw_modulation(rng: &mut dyn RngCore) -> RewardModulationConfig {
-    let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
+    let channel = OutcomeChannel::ALL[rng.gen_range(0..OutcomeChannel::ALL.len())];
     RewardModulationConfig {
         reward_source: channel,
         trace_decay: rng.gen_range(0.5f32..0.99),
@@ -298,7 +284,9 @@ pub(crate) fn mutate_hebbian_rule_in_def(
         is_plastic,
         rng,
         Law {
-            draw: |picked, rng| draw_other(&ALL_RULES, picked.map(|picked| picked.rule), rng),
+            draw: |picked, rng| {
+                draw_other(&HebbianRule::ALL, picked.map(|picked| picked.rule), rng)
+            },
             apply: |config, &rule| config.map(|config| PlasticityConfig { rule, ..config }),
         },
     )
@@ -408,7 +396,7 @@ pub(crate) fn mutate_reward_source_in_def(
                 let current = picked
                     .and_then(|picked| picked.modulation)
                     .map(|m| m.reward_source);
-                draw_other(&ALL_CHANNELS, current, rng)
+                draw_other(&OutcomeChannel::ALL, current, rng)
             },
             apply: |config, &reward_source| {
                 config.map(|config| PlasticityConfig {

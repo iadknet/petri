@@ -161,7 +161,7 @@ impl From<&InputReference> for InputRef {
 
 /// A directed vote kind (a group's kind, a directed sink's kind).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum DirectedVoteKind {
     Move,
     Reproduce,
@@ -182,7 +182,7 @@ impl From<core_vote::DirectedVoteKind> for DirectedVoteKind {
 
 /// One vote sink of the catalog; the number is a `Direction::ALL` index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum VoteSink {
     Eat,
     Directed(DirectedVoteKind, u8),
@@ -205,7 +205,7 @@ impl From<core_vote::VoteSink> for VoteSink {
 
 /// One action-parameter field the commit decoder reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum ActionParamField {
     EatFoodType,
     EatLeaveShare,
@@ -230,7 +230,7 @@ impl From<core_vote::ActionParamField> for ActionParamField {
 
 /// The action a creature commits.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum WorldAction {
     NoOp,
     Eat {
@@ -279,7 +279,7 @@ impl From<CoreWorldAction> for WorldAction {
 
 /// A compute node's kind.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum ComputeNodeKind {
     Add,
     Multiply,
@@ -331,7 +331,7 @@ impl From<core_cgp::ComputeNodeKind> for ComputeNodeKind {
 
 /// An output sink's kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum OutputSinkKind {
     CustomOutput(u8),
     RouterGate(u8),
@@ -357,7 +357,7 @@ impl From<core_cgp::OutputSinkKind> for OutputSinkKind {
 
 /// Where a graph edge reads from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum GraphSource {
     /// `input_refs[ref_idx]`, sub-value `sub_idx`.
     InputLeaf { ref_idx: u16, sub_idx: u16 },
@@ -383,7 +383,7 @@ impl From<core_cgp::GraphSource> for GraphSource {
 
 /// A Hebbian rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum HebbianRule {
     Classic,
     Oja,
@@ -404,7 +404,7 @@ impl From<CoreHebbianRule> for HebbianRule {
 
 /// An outcome channel a reward-modulated learner reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum OutcomeChannel {
     EnergyDelta,
     ActionSuccess,
@@ -427,7 +427,7 @@ impl From<CoreOutcomeChannel> for OutcomeChannel {
 
 /// A class of input a node reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 #[serde(rename_all = "snake_case")]
 pub enum MeshReadClass {
     Food,
@@ -458,7 +458,7 @@ impl From<core_mesh::MeshReadClass> for MeshReadClass {
 
 /// A class of output a node writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 #[serde(rename_all = "snake_case")]
 pub enum MeshWriteClass {
     Route,
@@ -502,7 +502,7 @@ impl From<&v3_core::contracts::RouteTarget> for RouteTarget {
 
 /// One VM instruction, one variant per opcode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum VmInstruction {
     Noop,
     LoadConst {
@@ -737,30 +737,138 @@ impl From<&CoreVmInstruction> for VmInstruction {
 mod tests {
     use super::*;
 
-    /// Every mirror keeps the core type's JSON (the input reference aside).
+    /// A deserializer that answers nothing but records the serialized variant
+    /// names a derived `Deserialize` declares for an enum.
+    struct VariantNames<'a>(&'a mut &'static [&'static str]);
+
+    impl<'de> serde::Deserializer<'de> for VariantNames<'_> {
+        type Error = serde::de::value::Error;
+
+        fn deserialize_any<V: serde::de::Visitor<'de>>(
+            self,
+            _: V,
+        ) -> Result<V::Value, Self::Error> {
+            Err(serde::de::Error::custom("not an enum"))
+        }
+
+        fn deserialize_enum<V: serde::de::Visitor<'de>>(
+            self,
+            _name: &'static str,
+            variants: &'static [&'static str],
+            _: V,
+        ) -> Result<V::Value, Self::Error> {
+            *self.0 = variants;
+            Err(serde::de::Error::custom("variant names read"))
+        }
+
+        serde::forward_to_deserialize_any! {
+            bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string bytes
+            byte_buf option unit unit_struct newtype_struct seq tuple tuple_struct map
+            struct identifier ignored_any
+        }
+    }
+
+    /// `T`'s serialized variant names, in declaration order.
+    fn variant_names<T: serde::de::DeserializeOwned>() -> &'static [&'static str] {
+        let mut names: &'static [&'static str] = &[];
+        let _ = T::deserialize(VariantNames(&mut names));
+        assert!(
+            !names.is_empty(),
+            "{} is not an enum",
+            std::any::type_name::<T>()
+        );
+        names
+    }
+
+    /// The wire mirror has exactly the core enum's variants under the core
+    /// enum's serialized names, so neither a renamed nor a surplus wire
+    /// variant passes (a missing one fails the exhaustive `From`). The
+    /// declaration order is pinned too: a mirror lists its variants as the
+    /// core enum does.
+    fn assert_same_variants<C, W>()
+    where
+        C: serde::de::DeserializeOwned,
+        W: serde::de::DeserializeOwned,
+    {
+        assert_eq!(
+            variant_names::<C>(),
+            variant_names::<W>(),
+            "{} mirrors {}",
+            std::any::type_name::<W>(),
+            std::any::type_name::<C>()
+        );
+    }
+
+    /// The mirror of `core` serializes as `core` does.
+    fn assert_same_json<C: Serialize, W: Serialize>(core: &C, wire: &W) {
+        assert_eq!(
+            serde_json::to_value(core).unwrap(),
+            serde_json::to_value(wire).unwrap()
+        );
+    }
+
+    /// `all` names every variant of `C` once, and each serializes
+    /// identically through its mirror `W`.
+    fn assert_mirrors_all<C, W>(all: &[C])
+    where
+        C: Copy + Serialize + serde::de::DeserializeOwned,
+        W: From<C> + Serialize,
+    {
+        assert_eq!(all.len(), variant_names::<C>().len());
+        for &core in all {
+            assert_same_json(&core, &W::from(core));
+        }
+    }
+
+    /// Every enum this module and `brain` mirror has the core enum's variant
+    /// set and serialized names, and every core value an `ALL` list or the
+    /// fixed sink catalog enumerates serializes identically through its
+    /// mirror. `MemberSite`, `WeightSurface` and `LearnerScope` are
+    /// wire-named (their core sources carry no serde form), as are
+    /// `InputFamily` and `InputKey` (the flat reference, tested below); their
+    /// exhaustive `From` is their pin.
     #[test]
     fn mirrors_serialize_as_the_core_types_do() {
-        fn same<C: Serialize, W: Serialize>(core: &C, wire: &W) {
-            assert_eq!(
-                serde_json::to_value(core).unwrap(),
-                serde_json::to_value(wire).unwrap()
-            );
+        use crate::transport::brain::{GroupShape, Scope};
+
+        assert_same_variants::<core_vote::DirectedVoteKind, DirectedVoteKind>();
+        assert_same_variants::<core_vote::VoteSink, VoteSink>();
+        assert_same_variants::<core_vote::ActionParamField, ActionParamField>();
+        assert_same_variants::<CoreWorldAction, WorldAction>();
+        assert_same_variants::<core_cgp::ComputeNodeKind, ComputeNodeKind>();
+        assert_same_variants::<core_cgp::OutputSinkKind, OutputSinkKind>();
+        assert_same_variants::<core_cgp::GraphSource, GraphSource>();
+        assert_same_variants::<CoreHebbianRule, HebbianRule>();
+        assert_same_variants::<CoreOutcomeChannel, OutcomeChannel>();
+        assert_same_variants::<core_mesh::MeshReadClass, MeshReadClass>();
+        assert_same_variants::<core_mesh::MeshWriteClass, MeshWriteClass>();
+        assert_same_variants::<CoreVmInstruction, VmInstruction>();
+        assert_same_variants::<core_cgp::Scope, Scope>();
+        assert_same_variants::<core_cgp::Shape, GroupShape>();
+
+        assert_mirrors_all::<_, DirectedVoteKind>(&core_vote::DirectedVoteKind::ALL);
+        assert_mirrors_all::<_, ActionParamField>(&core_vote::ActionParamField::ALL);
+        assert_mirrors_all::<_, HebbianRule>(&CoreHebbianRule::ALL);
+        assert_mirrors_all::<_, OutcomeChannel>(&CoreOutcomeChannel::ALL);
+        assert_mirrors_all::<_, MeshReadClass>(&core_mesh::MeshReadClass::ALL);
+        assert_mirrors_all::<_, MeshWriteClass>(&core_mesh::MeshWriteClass::ALL);
+        assert_mirrors_all::<_, Scope>(&core_cgp::Scope::ALL);
+        // The fixed sink catalog holds every sink kind and every vote sink.
+        for sink in core_cgp::CgpGraphBackendDef::new_with_fixed_outputs()
+            .output_sinks()
+            .iter()
+        {
+            assert_same_json(&sink.kind, &OutputSinkKind::from(sink.kind));
         }
-        for sink in (0..core_vote::VOTE_SINK_COUNT).filter_map(core_vote::VoteSink::from_index) {
-            same(&sink, &VoteSink::from(sink));
-        }
-        for field in core_vote::ActionParamField::ALL {
-            same(
-                &core_cgp::OutputSinkKind::ActionParam(field),
-                &OutputSinkKind::from(core_cgp::OutputSinkKind::ActionParam(field)),
-            );
-        }
+
+        // The payload-carrying enums have no catalog: their names are pinned
+        // above, and these samples pin some payload shapes.
         for kind in [
             core_cgp::ComputeNodeKind::Threshold(0.5),
             core_cgp::ComputeNodeKind::Add,
             core_cgp::ComputeNodeKind::Constant(-1.0),
         ] {
-            same(&kind, &ComputeNodeKind::from(kind));
+            assert_same_json(&kind, &ComputeNodeKind::from(kind));
         }
         for instruction in [
             CoreVmInstruction::Noop,
@@ -774,13 +882,13 @@ mod tests {
                 dst: 3,
             },
         ] {
-            same(&instruction, &VmInstruction::from(&instruction));
+            assert_same_json(&instruction, &VmInstruction::from(&instruction));
         }
         let source = core_cgp::GraphSource::SharedMemory {
             slot: 2,
             previous: true,
         };
-        same(&source, &GraphSource::from(source));
+        assert_same_json(&source, &GraphSource::from(source));
     }
 
     #[test]

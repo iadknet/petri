@@ -162,6 +162,30 @@ pub enum OutcomeChannel {
 
 /// Number of outcome channels.
 pub const OUTCOME_CHANNEL_COUNT: usize = 4;
+const _: () = {
+    assert!(OutcomeChannel::OffspringSuccess as usize + 1 == OUTCOME_CHANNEL_COUNT);
+    // `ALL[i]` has discriminant `i`, so the list is complete and ordered.
+    let mut i = 0;
+    while i < OUTCOME_CHANNEL_COUNT {
+        assert!(OutcomeChannel::ALL[i] as usize == i);
+        i += 1;
+    }
+};
+
+impl HebbianRule {
+    /// Every rule, in declaration order.
+    pub const ALL: [Self; 4] = [Self::Classic, Self::Oja, Self::AntiHebb, Self::Covariance];
+}
+
+impl OutcomeChannel {
+    /// Every channel, in discriminant order.
+    pub const ALL: [Self; OUTCOME_CHANNEL_COUNT] = [
+        Self::EnergyDelta,
+        Self::ActionSuccess,
+        Self::DamageDelta,
+        Self::OffspringSuccess,
+    ];
+}
 
 /// Reward modulation config for three-factor plasticity.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
