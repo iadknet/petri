@@ -187,13 +187,9 @@ export function buildFullGraphModel(
 	const inputNodeIds = new Set<string>();
 
 	// Phase 1: Discover all unique input sources across the entire graph
-	const allGraphEdges: BrainEdge[] = [];
-	for (const cn of graphDef.compute_nodes) {
-		for (const edge of cn.edges) allGraphEdges.push(edge);
-	}
-	for (const sink of graphDef.output_sinks) {
-		for (const edge of sink.edges) allGraphEdges.push(edge);
-	}
+	const allGraphEdges = [...graphDef.compute_nodes, ...graphDef.output_sinks].flatMap(
+		(container) => container.edges,
+	);
 
 	for (const edge of allGraphEdges) {
 		const inId = inputNodeId(edge.source);

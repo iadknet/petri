@@ -201,6 +201,11 @@ export interface InputDescription {
 	description: string;
 }
 
+/** A typed food sensor's description suffix; empty for any other input. */
+function foodNote(ref: InputRef): string {
+	return ref.food_type === undefined ? "" : ` Food type ${ref.food_type} only.`;
+}
+
 /** Describe a whole input reference (no sub-value selected). */
 export function describeWholeInputRef(ref: InputRef): InputDescription {
 	switch (ref.family) {
@@ -210,7 +215,7 @@ export function describeWholeInputRef(ref: InputRef): InputDescription {
 			if (ref.food_type !== undefined) {
 				return {
 					label: `${base}[t${ref.food_type}]`,
-					description: `${description} Food type ${ref.food_type} only.`,
+					description: `${description}${foodNote(ref)}`,
 				};
 			}
 			return { label: base, description };
@@ -284,10 +289,9 @@ export function describeInputRef(ref: InputRef, subIdx: number): InputDescriptio
 
 	if (isRingSensor(ref.key)) {
 		const cell = `the cell to the ${directionWord(subIdx)}`;
-		const food = ref.food_type !== undefined ? ` Food type ${ref.food_type} only.` : "";
 		const description =
 			ref.key === "NeighborFoodRing"
-				? `Food on ${cell} (0 to 1).${food}`
+				? `Food on ${cell} (0 to 1).${foodNote(ref)}`
 				: ref.key === "NeighborBarrierRing"
 					? `1 when ${cell} is a barrier, 0 when open.`
 					: `1 when another creature stands on ${cell}.`;
@@ -298,8 +302,7 @@ export function describeInputRef(ref: InputRef, subIdx: number): InputDescriptio
 	if (area) {
 		const described = field(whole.label, area[subIdx]);
 		if (!described) return raw();
-		const food = ref.food_type !== undefined ? ` Food type ${ref.food_type} only.` : "";
-		return { ...described, description: `${described.description}${food}` };
+		return { ...described, description: `${described.description}${foodNote(ref)}` };
 	}
 
 	if (ref.key === "NearbyCreature") {

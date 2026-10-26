@@ -29,6 +29,16 @@ export interface LearningJoin {
 	learnedScale(index: number, group: BrainGroup | undefined): number | undefined;
 }
 
+/** An edge's state from its weight in force and its learner facts, if any. */
+function edgeState(applied: number, learner: Omit<EdgeState, "applied"> | undefined): EdgeState {
+	return {
+		applied,
+		...(learner?.learned === undefined ? {} : { learned: learner.learned }),
+		...(learner?.trace === undefined ? {} : { trace: learner.trace }),
+		...(learner?.initialized === undefined ? {} : { initialized: learner.initialized }),
+	};
+}
+
 export function joinLearning(learning: NodeLearning | null): LearningJoin {
 	const entries = new Map<string, LearningEdge>(
 		(learning?.edges ?? []).map((entry) => [
@@ -40,21 +50,9 @@ export function joinLearning(learning: NodeLearning | null): LearningJoin {
 	return {
 		edge(surface, container, index, edge) {
 			const entry = entries.get(`${surface}:${container}:${index}`);
-			if (entry === undefined) {
-				const learner = edge.learner;
-				return {
-					applied: edge.applied,
-					...(learner?.learned === undefined ? {} : { learned: learner.learned }),
-					...(learner?.trace === undefined ? {} : { trace: learner.trace }),
-					...(learner === undefined ? {} : { initialized: learner.initialized }),
-				};
-			}
-			return {
-				applied: entry.applied,
-				...(entry.learned === undefined ? {} : { learned: entry.learned }),
-				...(entry.trace === undefined ? {} : { trace: entry.trace }),
-				...(entry.initialized === undefined ? {} : { initialized: entry.initialized }),
-			};
+			return entry === undefined
+				? edgeState(edge.applied, edge.learner)
+				: edgeState(entry.applied, entry);
 		},
 		learnedScale(index, group) {
 			const scale = scales.get(index);

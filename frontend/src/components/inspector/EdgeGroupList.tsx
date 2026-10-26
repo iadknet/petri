@@ -80,10 +80,9 @@ function atCoordinate(member: GroupMember, coordinates: readonly GroupCoordinate
 }
 
 /** A coordinate list's presence: `count/total ●○…`. */
-function presence(present: readonly boolean[]): string {
-	return `${present.filter(Boolean).length}/${present.length} ${present
-		.map((here) => (here ? "●" : "○"))
-		.join("")}`;
+function presence(list: readonly { present: boolean }[]): string {
+	const marks = list.map(({ present }) => (present ? "●" : "○")).join("");
+	return `${list.filter(({ present }) => present).length}/${list.length} ${marks}`;
 }
 
 /** A member's weights, its composition from the group in a tooltip. */
@@ -219,7 +218,7 @@ function RingRow({
 						data-testid="edge-group-members"
 						content="Members present, by ring cell from N clockwise (● present, ○ hole)."
 					>
-						{presence(group.coordinates.map((coordinate) => coordinate.present))}
+						{presence(group.coordinates)}
 					</Tip>
 				</>
 			}
@@ -289,7 +288,7 @@ function PairRow({
 							extra.length > 0 ? `; +${extra.length} outside them, zero pattern` : ""
 						}).`}
 					>
-						{presence(group.coordinates.map((coordinate) => coordinate.present))}
+						{presence(group.coordinates)}
 						{extra.length > 0 ? ` +${extra.length}` : ""}
 					</Tip>
 					{factMembers.length > 0 ? (
@@ -297,7 +296,7 @@ function PairRow({
 							data-testid="edge-group-facts"
 							content="Fact members present over the pair's declared facts, wired into the kind's drive; each weighs its own weight alone (● present, ○ hole)."
 						>
-							facts {presence(group.facts.map((fact) => fact.present))}
+							facts {presence(group.facts)}
 						</Tip>
 					) : null}
 				</>
