@@ -218,8 +218,7 @@ moved deterministic block or a changed test value would show it wrong.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0 on the final code (Verification Plan).
 - [ ] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
-      -> pass (upper bound below 1.10); median ratio and interval in the
-      readings.
+      -> pass (upper bound below 1.10); readings hold the ratio.
 - [ ] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
       local raw hash and byte count and verification time checked, series
       entry points to the summary, deterministic blocks identical to the
@@ -239,7 +238,9 @@ Overhead check: `scripts/telemetry-overhead`'s method on the harness
 for `bench`), ceiling 1.10; expected well under it, since the record pair
 sits outside the timed loop.
 
-**Measured verdict.** Not yet run.
+**Measured verdict.** Overhead inconclusive, 89.6 s used: T 6908 runs
+15.1 s, so n 24 exceeds the cap; at T 1800, spread 16.5% sets n 32, also
+too many.
 
 - Summary of the declared profile:
   [gate](../../progress/features/t30-f07.json).
