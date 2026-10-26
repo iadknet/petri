@@ -229,11 +229,11 @@ bytes; readings in the file below.
   into `config/terrain.rs` with no re-export from `patterns`, `splitmix64`
   moves to `contracts` and `v3-telemetry`'s copy is deleted, and the bounds
   intersection becomes `PatternBounds::clipped_to`.
-- Deferred: unpaid accept, `frontend/src/types/pattern.ts` and
+- Deferred: `frontend/src/types/pattern.ts` and
   `frontend/src/types/config.ts:131` hand-copy the config-schema types
-  `PatternParams`, `PatternBounds` and `TerrainLayer` (audit R5); payer
-  proposed to the user at closure (T30.F01's generator extended to the
-  config schema, or a new T30 row).
+  `PatternParams`, `PatternBounds` and `TerrainLayer` (audit R5); paid by
+  T30.F01, whose `ts-rs` generator covers the config schema and replaces
+  both files (user, 2026-10-26).
 - Deferred: final review (three Codex Sol high lenses on 63cdc027):
   correctness and design raised no findings; code health raised two P3s —
   the PINNED/RECIPES sync (fixed in this pass) and the frontend schema-copy

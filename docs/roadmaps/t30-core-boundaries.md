@@ -34,6 +34,8 @@ behavior.
   - Goal: Creatures act exactly as before, each action resolved as one transaction whose single outcome the creature's history, its learning reward and the run's totals all read, with no behavior change.
 - [ ] **T30.F07 — The Genome Stands on Its Own** — Depends on: None
   - Goal: Offspring inherit and brains run exactly as before, with the genome a domain of its own beside the creature record rather than inside it, with no behavior change.
+- [ ] **T30.F08 — A Creature's Genome and Its Derived State Agree** — Depends on: None
+  - Goal: A creature's genome and everything computed from it at birth are set together by construction and cannot drift apart, so tests build the creature they need instead of swapping genomes and resyncing caches by hand, with no behavior change.
 
 ## Notes for AI Agents
 
@@ -43,7 +45,7 @@ behavior.
   [design review](../progress/readings/t30-design-review.md) records the
   challenges. Debts each row pays: F01 G17, G22 (paint); F02 G7, G8, G16;
   F03 G9, G14 (sensor caches), G20; F04 G10, G11; F05 G2 (routes and jumps),
-  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25, G26. Every row is
+  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25, G26; F08 G27. Every row is
   behavior-preserving in the T25.F01 shape. On 2026-10-25 an architecture
   review added G22–G25 and F07 (user decisions: F07 moves the genome; paint's
   wire types join F01; F06 stays one row in two halves), and on 2026-10-26
@@ -145,7 +147,28 @@ behavior.
   hand list of them (G26, user, 2026-10-26). It touches the import lines
   of every row that edits genome code, so it lands while no such row is in
   flight.
+- F08 comes from the T30.F03 design-lens step-back (user, 2026-10-26:
+  "encapsulate finalized genomes and their derived state behind
+  construction operations, so fixtures stop swapping genomes and resyncing
+  caches by hand"). `CreatureState`'s genome and its birth-derived state
+  (the `cached_*` fields and the learned runtime built from birth seeds)
+  become private behind read accessors, so the record's documented "genome
+  is immutable after creation" is enforced rather than stated (G27). Tests
+  that swap a genome today (about 50 writes in 13 files across `v3-core`,
+  `v3-cli` and `v3-server`, among them `final_action_observation_*` in
+  `simulation/tick.rs`, whose swap leaves the perception cache stale) build
+  the creature through a construction operation instead, and tests that set
+  a cache no genome has (`cached_genome_size = 4` in
+  `simulation/tick/tests/{energy_accounting,phase0}.rs`) build a genome
+  with that property. Whether the no-mutation reproduction fast path keeps
+  passing its parent's caches into `new_with_cached_fields` is the spec
+  owner's to decide, with the gate's counters unchanged. F08 changes no
+  birth path: T29.F01 later replaces the constructors F08 routes through
+  with one birth transaction (G4), and T30.F02 moves `GraphRuntimeState`
+  out of the record (G8); both edit `creature/state.rs`, and concurrent
+  sessions reconcile it at integration.
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
-  T25.F11, and F02 and F06 before T28, as preferences, not prerequisites.
+  T25.F11, F08 after F07 (assistant proposal), and F02 and F06 before
+  T28, as preferences, not prerequisites.
 - Verification (assistant proposal): each row gate with pins unchanged; F01
   adds the frontend's own tests and the type-parity test.

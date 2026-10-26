@@ -77,7 +77,7 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   steals (2026-10-12 probe) are owned by T27.F03.
 
 Priority order for new starts: T30.F03, T26.F01, T25.F10, T27.F01, T26.F02,
-T27.F03, T30.F01, T30.F07, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03,
+T27.F03, T30.F01, T30.F07, T30.F08, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03,
 T30.F02, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
 
 - T30 (core boundaries) was placed on 2026-10-22 at the user's direction
@@ -88,7 +88,10 @@ T30.F02, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
   ordered before T25.F11 so the genome refactors change a core read API
   rather than the frontend's copy of genome types, and T30.F07 (added
   2026-10-25 by user decision) moves the genome to its own module before the
-  genome rows build on its old path. T30.F03 comes first (user, 2026-10-25):
+  genome rows build on its old path; T30.F08 follows it, so the rows that
+  extend creature construction (T25.F11, T25.F12, T29.F01) build on a
+  record whose genome and birth caches are already private (assistant
+  proposal, 2026-10-26). T30.F03 comes first (user, 2026-10-25):
   it refactors sensors onto explicit views now, rather than guarding the
   whole-creature and genome reads (G9, G20) until it lands, and T27.F02 and
   T29.F02 then put their new sensed state on those views; a row still ordered before its debt's

@@ -181,3 +181,4 @@ field access through another type. Design notes:
 | G24 | The genome lives under the creature record (`creature/genome/`), and the import checker special-cases that path | T30.F07 |
 | G25 | A profiling binary with file I/O in the core crate (`v3-core/src/bin/profile_ticks.rs`), which the import checker skips | T30.F07 |
 | G26 | Four readers live under the creature record (`creature::{plasticity_census, sensor_census, drives, ring_rules}`), and the import checker keeps a hand list of them | T30.F07 |
+| G27 | The creature record exposes its genome and birth-derived state as public fields (`creature::state`), so tests in `v3-core`, `v3-cli` and `v3-server` swap genomes and resync caches by hand, and a swap can leave a cache stale | T30.F08 |
