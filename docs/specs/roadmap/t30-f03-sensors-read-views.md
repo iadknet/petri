@@ -172,15 +172,15 @@ moved sensor test value, would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] `contracts`: `PerceptionRequirements` (`of_key`, union, `ALL`) and the
+- [x] `contracts`: `PerceptionRequirements` (`of_key`, union, `ALL`) and the
       `WorldInputKey` family classification, with `is_extended_key`'s test
       moved and a typed-food case added (invariant 5).
-- [ ] `creature/genome/sensor_analysis.rs`: move the census, the declared
+- [x] `creature/genome/sensor_analysis.rs`: move the census, the declared
       keys and `DecisionInputKey` from `creature::sensor_census`, the barrier
       reader and live VM reads from `creature::state`, add
       `perception_requirements`; tests move with them; `v3-cli`, `v3-lab`
       and in-crate tests follow the path (R2, R3, R4; invariant 7).
-- [ ] `BodyView` and `BodyViews` in `sensors/static_inputs.rs`, its genome
+- [x] `BodyView` and `BodyViews` in `sensors/static_inputs.rs`, its genome
       import marked `WORKAROUND(G2)`;
       `assemble_static_inputs` and `assemble_perception` on views; the genome
       predicates, `is_extended_key` and `StaticInputs::resolve_world` deleted;
@@ -188,19 +188,19 @@ moved sensor test value, would show it wrong.
       (`assemble_perception_matches_reference_reducers`,
       `own_colour_equals_what_a_neighbour_sees`, the nearby vitals cases)
       kept on views (R1, R6; invariants 1–3, 10).
-- [ ] `creature/state.rs`: `cached_perception_requirements`, `sensed_body`,
+- [x] `creature/state.rs`: `cached_perception_requirements`, `sensed_body`,
       caches through the analysis module, the four helpers deleted
       (invariants 2, 6, 8).
-- [ ] `simulation/seeding.rs`: the per-founder genome hook; the perception
+- [x] `simulation/seeding.rs`: the per-founder genome hook; the perception
       mix edits before construction; `refresh_sensor_caches` deleted; the
       `world_with` fixture of `tick/tests/full_sensor_inputs.rs`, which today
       assigns `creature.genome` after seeding, gives its genome through the
       hook so the caches match it (R5; invariant 9).
-- [ ] `simulation/tick.rs`: the views built once per assembly call, one
+- [x] `simulation/tick.rs`: the views built once per assembly call, one
       requirements closure, trace flags from the cache; `benches/tick.rs`,
       `neighborhood/opportunity/discovery.rs`, `v3-server/src/http/creature.rs`
       and `v3-telemetry` on the new APIs (invariants 4, 6).
-- [ ] `scripts/architecture-debts.txt`: G9 and G20 lines and the G14
+- [x] `scripts/architecture-debts.txt`: G9 and G20 lines and the G14
       `creature/state.rs` line removed; `make check-docs` architecture check
       green (invariant 1).
 - [ ] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
@@ -208,13 +208,13 @@ moved sensor test value, would show it wrong.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> `<result>` (run first).
-- [ ] Focused tests: the views equality tests in `sensors/reducers.rs` and
+- [x] `cargo test -p v3-core --test viability` -> 30 passed (run first).
+- [x] Focused tests: the views equality tests in `sensors/reducers.rs` and
       `sensors/static_inputs.rs`, the contracts classification test, the
       moved analysis tests, `perception_mix_*` in `simulation/seeding.rs`
       (the caches-consistent case replacing
       `perception_mix_refreshes_the_birth_sensor_caches`),
-      `tick/tests/full_sensor_inputs.rs` -> `<result>`.
+      `tick/tests/full_sensor_inputs.rs` -> 96 passed.
 - [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` at Close ->
       `<result>`.
