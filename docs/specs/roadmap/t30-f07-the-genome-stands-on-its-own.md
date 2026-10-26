@@ -26,10 +26,9 @@ to main's; any that moves is a defect.
   G27 T30.F08's); `neighborhood/` keeps its name (section 3).
 - No change to the checker's rules or the debt list's form beyond
   invariants 4 and 5.
-- No new `profile-ticks` option beyond today's three, and no stored summary
-  or report: its telemetry is invariant 3's record pair, nothing more.
-- No rewrite of old paths in closed specs, strategy notes, readings or
-  archived documents: they record the state at their closure.
+- No new `profile-ticks` option, summary or report: its telemetry is
+  invariant 3's record pair, nothing more.
+- No rewrite of old paths in closed specs, notes, readings or archives.
 
 ## Inputs and Invariants
 
@@ -92,9 +91,8 @@ Invariants:
    re-keys, and neither pays nor adds, the two lines whose owner moves: G2
    `sensors/static_inputs.rs` to the checker's form for
    `crate::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT}` (one line per
-   root item, as `runtime::OUTPUT_SLOT_COUNT` is keyed), and G14
-   `simulation/actions/reproduction.rs` to `neighborhood::drives`. Sections
-   1–4 are not edited.
+   root item), and G14 `simulation/actions/reproduction.rs` to
+   `neighborhood::drives`. Sections 1–4 are not edited.
 6. The proptest regression files follow their modules
    (`proptest-regressions/genome/cgp/container_tests.txt`,
    `proptest-regressions/neighborhood/sensor_census.txt`); neither remains
@@ -218,7 +216,7 @@ moved deterministic block or a changed test value would show it wrong.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0 on the final code (Verification Plan).
 - [ ] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
-      -> pass (upper bound below 1.10); readings hold the ratio.
+      -> inconclusive twice, no ratio (readings); user decision pending.
 - [ ] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
       local raw hash and byte count and verification time checked, series
       entry points to the summary, deterministic blocks identical to the
@@ -233,14 +231,14 @@ the gate's path. Expected compute cost: none; the gate is compared against the c
 epoch (`t27-f03-giving-energy.json`) with the standard thresholds and no
 re-pin. Every deterministic block is expected identical to the epoch; a
 differing block is a defect, not a cost to accept. No indicator can move.
-Overhead check: `scripts/telemetry-overhead`'s method on the harness
-(telemetry build against the same commit's reference build, as T21.F06 did
-for `bench`), ceiling 1.10; expected well under it, since the record pair
-sits outside the timed loop.
+Overhead check: `scripts/telemetry-overhead`'s method on the harness (as
+T21.F06 did for `bench`), ceiling 1.10; expected well under it, since the
+record pair sits outside the timed loop.
 
-**Measured verdict.** Overhead inconclusive, 89.6 s used: T 6908 runs
-15.1 s, so n 24 exceeds the cap; at T 1800, spread 16.5% sets n 32, also
-too many.
+**Measured verdict.** Overhead: inconclusive twice, no ratio, 89.6 s of
+300 s used (the script reuses the `run` workload's T 6908: 15.1 s runs,
+n 24; the permitted rerun at T 1800: 3.7 s runs, 16.5% spread, n 32).
+Reported to the user under the time-cap rule; not rounded, not rerun.
 
 - Summary of the declared profile:
   [gate](../../progress/features/t30-f07.json).
@@ -265,7 +263,6 @@ too many.
   becomes `v3-cli profile-ticks`, the `neighborhood/mod.rs` doc describes
   the readers domain, and the `neighborhood/companions.rs` shim is deleted.
 - Decision: `profile-ticks` is a measurement command under the T21.F06
-  rule: one `measurement.started` and `measurement.ended` pair, exported
-  after the timed loop, nothing inside it; run telemetry (`run`'s snapshots
-  and traces) is not installed, because it would add work to the loop being
-  profiled.
+  rule: one record pair exported after the timed loop, nothing inside it;
+  run telemetry is not installed, since it would add work to the profiled
+  loop.
