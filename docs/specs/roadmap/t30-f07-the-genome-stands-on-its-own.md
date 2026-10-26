@@ -132,7 +132,7 @@ No counter, config value, switch or work is added to a run; each
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
-| `measurement.started` | log record | `v3-cli profile-ticks` beginning its timed loop, through `v3_cli::telemetry::Measurement` (T21.F06) | `petri.command` `profile-ticks`, `petri.config_digest` of the effective config, the resource set and the measurement's own `petri.run_id` |
+| `measurement.started` | log record | `v3-cli profile-ticks` beginning its timed loop, through `v3_cli::telemetry::Measurement` (T21.F06) | `petri.command` `profile-ticks`, `petri.seed` (`profile::SEED`), `petri.config_digest` of the effective config, the resource set and the measurement's own `petri.run_id` |
 | `measurement.ended` | log record | the loop's end, exported after the last timed region | `petri.exit_code`, `petri.wall_seconds`, body `{"creatures_remaining":N,"ticks":N}`; no summary path, raw hash or byte count (none applies) |
 
 ## Verification Plan

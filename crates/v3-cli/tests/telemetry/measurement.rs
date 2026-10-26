@@ -605,6 +605,10 @@ fn profile_ticks_records_one_measurement_with_its_workload() {
     };
     assert_eq!(started.attribute("petri.command"), Some("profile-ticks"));
     assert_eq!(
+        started.attribute("petri.seed"),
+        Some(v3_cli::profile::SEED.to_string().as_str())
+    );
+    assert_eq!(
         started.attribute("petri.config_digest"),
         Some(v3_core::config::config_digest(&options.config()).as_str())
     );

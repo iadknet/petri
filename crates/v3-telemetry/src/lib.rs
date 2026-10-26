@@ -338,7 +338,7 @@ pub struct MeasurementStart<'a> {
     /// The lab's assay.
     pub assay: Option<&'a str>,
     pub pilot: Option<bool>,
-    /// The lab's `--seed`.
+    /// The lab's `--seed`, or the profiling harness's fixed seed.
     pub seed: Option<u64>,
     /// A benchmark's seeds, recorded comma-joined.
     pub seeds: Option<&'a [u64]>,

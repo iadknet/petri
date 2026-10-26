@@ -1095,6 +1095,7 @@ mod measure {
             switch,
             MeasurementStart {
                 command: "profile-ticks",
+                seed: Some(v3_cli::profile::SEED),
                 config_digest: digest.as_deref(),
                 ..MeasurementStart::default()
             },
