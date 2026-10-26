@@ -181,41 +181,42 @@ wrong.
 
 ## Implementation Tasks
 
-- [ ] `git mv crates/v3-core/src/simulation/energy_accounting.rs
+- [x] `git mv crates/v3-core/src/simulation/energy_accounting.rs
       crates/v3-core/src/ledger/mod.rs`; `pub mod ledger;` in `lib.rs`;
       the module declaration removed from `simulation/mod.rs`; every
       importer in the five crates on the new path (R1; invariant 1).
-- [ ] `contracts::SHARED_MEMORY_SLOTS`; the genome's constant derived from
+- [x] `contracts::SHARED_MEMORY_SLOTS`; the genome's constant derived from
       it; the creature-side constant deleted; the array types on the
       constant (R5; invariant 3).
-- [ ] `runtime/state.rs` with the two types and their tests moved from
+- [x] `runtime/state.rs` with the two types and their tests moved from
       `creature/state.rs`; `creature/state.rs` and the readers, the lab and
       runtime's own files import it (R2; invariant 2).
-- [ ] `ParentExecuted::Query`; `Record` deleted; `spawn_child`, the engine
+- [x] `ParentExecuted::Query`; `Record` deleted; `spawn_child`, the engine
       test and the lab sites on the closure (R3; invariant 4).
-- [ ] `simulation/recording.rs` with the recording, the outcome types, the
+- [x] `simulation/recording.rs` with the recording, the outcome types, the
       reserve and the outcome sizes; `TickTrace` without `outcome`;
       `TruncationReason` in `traced_mesh.rs`; `runtime/trace/recording.rs`
       deleted; `tick.rs`, `window_seam.rs`, `stats.rs`, the readers and the
       outer crates on the new types (R4; invariants 5–7).
-- [ ] `v3-server/src/transport/sample_assembler.rs` tests: `recorded_tick()`,
+- [x] `v3-server/src/transport/sample_assembler.rs` tests: `recorded_tick()`,
       the struct updates, the allowances and their comments deleted; each
       fixture names its `heading` (R6; invariant 7).
-- [ ] `scripts/architecture-debts.txt`: the fourteen G7, G8 and G16 lines
+- [x] `scripts/architecture-debts.txt`: the fourteen G7, G8 and G16 lines
       removed; `scripts/architecture-check.mjs` green (invariant 8).
 - [ ] At closure: G7, G8 and G16 rows deleted from `docs/architecture.md`;
       the gate run and its summary recorded.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> result (run first).
-- [ ] Focused tests: the ledger's property tests, the moved
+- [x] `cargo test -p v3-core --test viability` -> 30 passed (run first).
+- [x] Focused tests: the ledger's property tests, the moved
       `runtime::state` tests, `mutation::engine::tests::a_zero_event_birth_never_resolves_the_parent_dispatch_record`,
       `simulation/tick/tests/{dispatch_record,window_seam,energy_accounting}.rs`,
       the v3-telemetry `windows` tests and the v3-server sampler tests ->
-      result.
-- [ ] Workspace tests, clippy, fmt, `cargo check --all-targets`, the
-      architecture and roadmap checkers -> result.
+      69, 21 and 2 passed.
+- [x] Workspace tests, clippy, fmt, `cargo check --all-targets`, the
+      architecture and roadmap checkers -> pass (v3-core with and without
+      `telemetry-seams`; clippy `-D warnings`).
 - [ ] `make check` -> exit code and commit; `make rust-test-slow` -> exit
       code.
 - [ ] Gate: summary at `docs/progress/features/t30-f02.json`, local raw
@@ -243,11 +244,11 @@ attributed before closure. No indicator can move; nothing is re-pinned.
 
 ## Success Criteria
 
-- [ ] `crates/v3-core/src/ledger/mod.rs`, `runtime/state.rs` and
+- [x] `crates/v3-core/src/ledger/mod.rs`, `runtime/state.rs` and
       `simulation/recording.rs` exist with the contents of invariants 1, 2
       and 6; `simulation/energy_accounting.rs` and
       `runtime/trace/recording.rs` do not.
-- [ ] No production file under `runtime/` or `mutation/` imports
+- [x] No production file under `runtime/` or `mutation/` imports
       `creature::state`, `creature::action_log` or `simulation`, and
       `scripts/architecture-debts.txt` holds no G7, G8 or G16 line.
 - [ ] The tests of the Verification section pass, and `make check` and
