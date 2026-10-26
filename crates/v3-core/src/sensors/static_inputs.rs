@@ -1,9 +1,31 @@
-use crate::config::{EnergyConfig, OrdinaryFoodTypeId};
-use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
-use crate::creature::colour::unit_rgb;
+use slotmap::SecondaryMap;
+
+use crate::config::EnergyConfig;
+use crate::contracts::{CreatureId, Direction, Position, StaticIntrospectionKey};
+// WORKAROUND(G2): OutcomeChannel moves to contracts (T25.F11)
 use crate::creature::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
-use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
+
+/// What sensors read of one body: the creature record builds it
+/// (`CreatureState::sensed_body`) with every body rule already applied, so
+/// sensors compute none.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BodyView {
+    pub position: Position,
+    pub age: u64,
+    pub energy: f32,
+    /// The body's energy sensor denominator (`HeritableBody::energy_scale`).
+    pub energy_scale: f32,
+    /// The seen colour on the unit scale (`creature::colour::unit_rgb`).
+    pub colour: [f32; 3],
+    pub kin_tag: u32,
+    /// The stored outcome bank, indexed by `OutcomeChannel` discriminant.
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
+}
+
+/// One tick's body views of every living creature, which the scheduler
+/// fills once per assembly call.
+pub type BodyViews = SecondaryMap<CreatureId, BodyView>;
 
 /// Snapshot of world and static-introspection sensor values for one creature's turn.
 ///
@@ -77,21 +99,6 @@ pub fn age_fraction(age: u64, age_reference_ticks: u64) -> f32 {
 }
 
 impl StaticInputs {
-    /// Look up a resolved f32 value by WorldInputKey.
-    ///
-    /// Only handles `FoodHere` (scalar). Ring and extended perception compound
-    /// keys are resolved through `SensorSnapshot::resolve_compound()`.
-    pub fn resolve_world(&self, key: &WorldInputKey) -> f32 {
-        match key {
-            WorldInputKey::FoodHere { type_idx } if *type_idx == OrdinaryFoodTypeId::default() => {
-                self.food_here
-            }
-            WorldInputKey::FoodHere { .. } => 0.0,
-            // Ring + compound keys are resolved via SensorSnapshot::resolve_compound(), not here.
-            _ => 0.0,
-        }
-    }
-
     /// Look up a resolved f32 value by StaticIntrospectionKey.
     pub fn resolve_static(&self, key: &StaticIntrospectionKey) -> f32 {
         match key {
@@ -113,12 +120,12 @@ impl StaticInputs {
 ///   (no food, no barrier signal, not occupied).
 pub fn assemble_static_inputs(
     world: &WorldState,
-    creature: &CreatureState,
+    body: &BodyView,
     energy: &EnergyConfig,
 ) -> StaticInputs {
-    let pos = creature.position;
+    let pos = body.position;
     let food_here = world.food_at(pos).clamp(0.0, 1.0);
-    let energy_scale = creature.body.energy_scale(&energy.capacity);
+    let energy_scale = body.energy_scale;
 
     let mut neighbor_food = [0.0f32; 8];
     let mut neighbor_barrier = [0.0f32; 8];
@@ -147,10 +154,10 @@ pub fn assemble_static_inputs(
         neighbor_food,
         neighbor_barrier,
         neighbor_occupied,
-        age_ticks: age_fraction(creature.age, energy.lifecycle.age_reference_ticks),
-        own_colour: unit_rgb(creature.body.phenotype.channels),
+        age_ticks: age_fraction(body.age, energy.lifecycle.age_reference_ticks),
+        own_colour: body.colour,
         energy_scale,
-        previous_outcome: previous_outcome_read(&creature.previous_outcome, energy_scale),
+        previous_outcome: previous_outcome_read(&body.previous_outcome, energy_scale),
     }
 }
 
@@ -158,14 +165,7 @@ pub fn assemble_static_inputs(
 mod tests {
     use super::*;
     use crate::config::{SimulationConfig, WorldEdgeMode};
-    use crate::contracts::{CreatureId, NodeId, Position};
-    use crate::creature::body::HeritableBody;
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
-    use crate::creature::state::CreatureState;
+    use crate::contracts::CreatureId;
     use crate::kernel::WorldState;
     use proptest::prelude::*;
     use slotmap::SlotMap;
@@ -174,86 +174,52 @@ mod tests {
         WorldState::new(w, h, WorldEdgeMode::Wrap)
     }
 
-    fn make_creature(id: CreatureId, pos: Position) -> CreatureState {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
-        };
-        CreatureState::new(
-            id,
-            genome,
-            pos,
-            20.0,
-            0,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [128, 64, 32, 10, 20, 30],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-            [0.0; 16],
-        )
+    fn view_at(position: Position) -> BodyView {
+        BodyView {
+            position,
+            age: 0,
+            energy: 20.0,
+            energy_scale: 200.0,
+            colour: [0.5, 0.25, 0.125],
+            kin_tag: 0,
+            previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
+        }
     }
 
-    fn get_id() -> CreatureId {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        sm.insert(())
+    fn assemble(world: &WorldState, view: &BodyView) -> StaticInputs {
+        assemble_static_inputs(world, view, &EnergyConfig::default())
     }
 
     #[test]
     fn food_here_zero_when_no_food() {
         let world = make_world(4, 4);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+        let si = assemble(&world, &view_at(Position::new(2, 2)));
         assert_eq!(si.food_here, 0.0);
     }
 
-    #[test]
-    fn food_here_normalized_to_one_when_max() {
-        let mut world = make_world(4, 4);
+    fn full_food_world(seed: u64) -> WorldState {
         use rand::rngs::SmallRng;
         use rand::SeedableRng;
+        let mut world = make_world(4, 4);
         let mut food_cfg = SimulationConfig::default().world.food;
         food_cfg.types[0].initial_coverage = 1.0;
         food_cfg.types[0].initial_density = 1.0;
         world.reconfigure_food(food_cfg);
-        let mut rng = SmallRng::seed_from_u64(42);
-        world.seed_food(&mut rng);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+        world.seed_food(&mut SmallRng::seed_from_u64(seed));
+        world
+    }
+
+    #[test]
+    fn food_here_normalized_to_one_when_max() {
+        let world = full_food_world(42);
+        let si = assemble(&world, &view_at(Position::new(1, 1)));
         assert!((si.food_here - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn neighbor_food_all_one_when_all_cells_max_food() {
-        let mut world = make_world(4, 4);
-        use rand::rngs::SmallRng;
-        use rand::SeedableRng;
-        let mut food_cfg = SimulationConfig::default().world.food;
-        food_cfg.types[0].initial_coverage = 1.0;
-        food_cfg.types[0].initial_density = 1.0;
-        world.reconfigure_food(food_cfg);
-        let mut rng = SmallRng::seed_from_u64(0);
-        world.seed_food(&mut rng);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+        let world = full_food_world(0);
+        let si = assemble(&world, &view_at(Position::new(2, 2)));
         for i in 0..8 {
             assert!(
                 (si.neighbor_food[i] - 1.0).abs() < 1e-6,
@@ -266,9 +232,7 @@ mod tests {
     fn neighbor_barrier_detected_north() {
         let mut world = make_world(5, 5);
         world.set_barrier(Position::new(2, 1), true);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+        let si = assemble(&world, &view_at(Position::new(2, 2)));
         assert_eq!(si.neighbor_barrier[Direction::N.to_index()], 1.0);
         assert_eq!(si.neighbor_barrier[Direction::S.to_index()], 0.0);
     }
@@ -276,63 +240,38 @@ mod tests {
     #[test]
     fn neighbor_occupied_detected_east() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id1 = sm.insert(());
-        let id2 = sm.insert(());
+        let neighbour = sm.insert(());
         let mut world = make_world(5, 5);
-        world.place_creature(Position::new(3, 2), id2);
-        let creature = make_creature(id1, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+        world.place_creature(Position::new(3, 2), neighbour);
+        let si = assemble(&world, &view_at(Position::new(2, 2)));
         assert_eq!(si.neighbor_occupied[Direction::E.to_index()], 1.0);
         assert_eq!(si.neighbor_occupied[Direction::W.to_index()], 0.0);
     }
 
+    /// The view's age, colour and energy scale reach the snapshot through
+    /// the sensor rules alone: age as a fraction of the reference span, the
+    /// colour and the scale as resolved by the creature record.
     #[test]
-    fn static_introspection_age_is_a_fraction_of_the_reference_span() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
+    fn static_introspection_reads_the_body_view() {
         let world = make_world(4, 4);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
+        let view = BodyView {
+            age: 42,
+            energy_scale: 150.0,
+            ..view_at(Position::new(1, 1))
         };
-        let mut creature = CreatureState::new(
-            id,
-            genome,
-            Position::new(1, 1),
-            20.0,
-            5,
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-            [0.0; 16],
-        );
-        creature.age = 42;
         let mut energy = EnergyConfig::default();
         energy.lifecycle.age_reference_ticks = 400;
-        energy.capacity.reference = 150.0;
-        let si = assemble_static_inputs(&world, &creature, &energy);
+        let si = assemble_static_inputs(&world, &view, &energy);
         assert!((si.age_ticks - 0.105).abs() < 1e-6);
         assert_eq!(si.energy_scale, 150.0);
+        assert_eq!(si.own_colour, view.colour);
         assert_eq!(
             si.resolve_static(&StaticIntrospectionKey::AgeTicks),
             si.age_ticks
+        );
+        assert_eq!(
+            si.resolve_static(&StaticIntrospectionKey::OwnGreen),
+            view.colour[1]
         );
     }
 
@@ -383,18 +322,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn resolve_world_food_here_zero() {
-        let world = make_world(4, 4);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
-        let result = si.resolve_world(&WorldInputKey::FoodHere {
-            type_idx: OrdinaryFoodTypeId::default(),
-        });
-        assert_eq!(result, 0.0);
-    }
-
     /// The `PreviousOutcome` read scales the two energy channels by
     /// `energy_scale` into their clamps and passes the other two through.
     #[test]
@@ -414,45 +341,35 @@ mod tests {
     }
 
     #[test]
-    fn assembly_reads_the_creature_outcome_store() {
+    fn assembly_reads_the_viewed_outcome_store() {
         let world = make_world(8, 8);
-        let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let mut creature = make_creature(ids.insert(()), Position::new(2, 2));
-        let energy = SimulationConfig::default().energy;
+        let mut view = view_at(Position::new(2, 2));
         assert_eq!(
-            assemble_static_inputs(&world, &creature, &energy).previous_outcome,
+            assemble(&world, &view).previous_outcome,
             [0.0; OUTCOME_CHANNEL_COUNT]
         );
-        creature.previous_outcome = [energy.capacity.reference / 4.0, 1.0, 0.0, 1.0];
+        view.previous_outcome = [view.energy_scale / 4.0, 1.0, 0.0, 1.0];
         assert_eq!(
-            assemble_static_inputs(&world, &creature, &energy).previous_outcome,
+            assemble(&world, &view).previous_outcome,
             [0.25, 1.0, 0.0, 1.0]
         );
     }
 
-    /// Under `Reference` every creature's energy reads divide by the
-    /// reference capacity; under `Own` by its own (T26.F02 invariant 6):
-    /// the same 32 energy and outcome reads 0.16 at every capacity, or
-    /// 0.64 at a capacity of 50.
+    /// The energy and outcome reads divide by the view's scale: the same 32
+    /// reads 0.16 at a scale of 200 and 0.64 at a scale of 50.
     #[test]
-    fn the_energy_scale_follows_the_sensor_scale() {
-        use crate::config::SensorScale;
+    fn the_outcome_reads_divide_by_the_viewed_energy_scale() {
         let world = make_world(8, 8);
-        let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let mut energy = SimulationConfig::default().energy;
-        for capacity in [50.0, 200.0, 800.0] {
-            let mut creature = make_creature(ids.insert(()), Position::new(2, 2));
-            creature.body.capacity = capacity;
-            creature.previous_outcome = [32.0, 0.0, -32.0, 0.0];
-            energy.capacity.sensor_scale = SensorScale::Reference;
-            let si = assemble_static_inputs(&world, &creature, &energy);
-            assert_eq!(si.energy_scale, 200.0);
-            assert_eq!(energy_fraction(32.0, si.energy_scale), 0.16);
-            assert_eq!(si.previous_outcome, [0.16, 0.0, -0.16, 0.0]);
-            energy.capacity.sensor_scale = SensorScale::Own;
-            let si = assemble_static_inputs(&world, &creature, &energy);
-            assert_eq!(si.energy_scale, capacity);
-            assert_eq!(si.previous_outcome[0], (32.0 / capacity).min(1.0));
+        for scale in [50.0, 200.0, 800.0] {
+            let view = BodyView {
+                energy_scale: scale,
+                previous_outcome: [32.0, 0.0, -32.0, 0.0],
+                ..view_at(Position::new(2, 2))
+            };
+            let si = assemble(&world, &view);
+            assert_eq!(si.energy_scale, scale);
+            assert_eq!(si.previous_outcome[0], (32.0 / scale).min(1.0));
+            assert_eq!(si.previous_outcome[2], (-32.0 / scale).max(-1.0));
         }
     }
 }

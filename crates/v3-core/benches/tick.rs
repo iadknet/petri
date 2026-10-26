@@ -1,8 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use v3_core::config::SimulationConfig;
-use v3_core::sensors::perception::{
-    genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
-};
+use v3_core::sensors::perception::{PerceptionConfig, PerceptionSnapshot, SensorSnapshot};
 use v3_core::sensors::reducers::assemble_perception;
 use v3_core::sensors::static_inputs::assemble_static_inputs;
 use v3_core::sensors::typed_food::assemble_typed_food_local_snapshot;
@@ -10,7 +8,7 @@ use v3_core::sensors::visibility::{
     compute_visible_cells_into, get_visibility_table, VisibilityScratch,
 };
 use v3_core::simulation::seeding::{seed_simulation, seed_simulation_with_perception_mix};
-use v3_core::simulation::tick::{run_phase_0, run_tick};
+use v3_core::simulation::tick::{body_views, run_phase_0, run_tick};
 use v3_core::simulation::Simulation;
 
 const RUNTIME_STRESS_PERCEPTION_CREATURES: usize = 200;
@@ -81,8 +79,11 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                 let config = sim.config.runtime.clone();
                 let ids: Vec<_> = sim.creatures.keys().collect();
                 for id in ids {
-                    let local =
-                        assemble_static_inputs(&sim.world, &sim.creatures[id], &sim.config.energy);
+                    let local = assemble_static_inputs(
+                        &sim.world,
+                        &sim.creatures[id].sensed_body(&sim.config.energy.capacity),
+                        &sim.config.energy,
+                    );
                     let typed_local_food =
                         assemble_typed_food_local_snapshot(&sim.world, sim.creatures[id].position);
                     let ss = SensorSnapshot {
@@ -129,7 +130,7 @@ fn bench_perception_assembly_stress(c: &mut Criterion) {
                 let extended_count = sim
                     .creatures
                     .values()
-                    .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                    .filter(|creature| creature.cached_perception_requirements.extended_perception)
                     .count();
                 assert_eq!(
                     extended_count, RUNTIME_STRESS_PERCEPTION_CREATURES,
@@ -141,8 +142,9 @@ fn bench_perception_assembly_stress(c: &mut Criterion) {
                 let config = PerceptionConfig::from_sim_config(&sim.config);
                 let table = get_visibility_table(config.vision_radius);
                 let mut visible_scratch = VisibilityScratch::default();
+                let views = body_views(&sim);
                 for (id, creature) in sim.creatures.iter() {
-                    if !genome_uses_extended_perception(&creature.genome) {
+                    if !creature.cached_perception_requirements.extended_perception {
                         continue;
                     }
                     let visible = compute_visible_cells_into(
@@ -151,14 +153,7 @@ fn bench_perception_assembly_stress(c: &mut Criterion) {
                         table,
                         &mut visible_scratch,
                     );
-                    let perception = assemble_perception(
-                        id,
-                        creature,
-                        visible,
-                        &sim.world,
-                        &sim.creatures,
-                        &config,
-                    );
+                    let perception = assemble_perception(id, visible, &sim.world, &views, &config);
                     black_box(perception);
                 }
             },
@@ -194,7 +189,7 @@ fn bench_full_tick_large_population(c: &mut Criterion) {
                 let extended_count = sim
                     .creatures
                     .values()
-                    .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                    .filter(|creature| creature.cached_perception_requirements.extended_perception)
                     .count();
                 assert_eq!(
                     extended_count, LARGE_TICK_PERCEPTION_CREATURES,

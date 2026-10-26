@@ -7,7 +7,7 @@ use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 
 use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::{CreatureId, Direction, Position, WorldAction};
+use crate::contracts::{CreatureId, Direction, PerceptionRequirements, Position, WorldAction};
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
 use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::creature::state::CreatureState;
@@ -20,14 +20,10 @@ use crate::runtime::trace::recording::ActiveTrace;
 #[cfg(not(feature = "telemetry-seams"))]
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
-use crate::sensors::perception::{
-    genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
-};
+use crate::sensors::perception::{PerceptionConfig, PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::reducers::assemble_perception;
-use crate::sensors::static_inputs::assemble_static_inputs;
-use crate::sensors::typed_food::{
-    assemble_typed_food_local_snapshot, genome_uses_typed_local_food, TypedFoodLocalSnapshot,
-};
+use crate::sensors::static_inputs::{assemble_static_inputs, BodyViews};
+use crate::sensors::typed_food::{assemble_typed_food_local_snapshot, TypedFoodLocalSnapshot};
 use crate::sensors::visibility::{
     compute_visible_cells_into, get_visibility_table, VisibilityScratch,
 };
@@ -294,18 +290,26 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
 
 /// Phase 1a: assemble sensor inputs sequentially over the post-Phase-0 world.
 ///
-/// Conditional perception: only assemble full visibility + area reduction for
-/// genomes that reference extended perception keys. Others use `zero()` fallback.
+/// Conditional perception: typed local food and full visibility + area
+/// reduction only for creatures whose cached perception requirements ask for
+/// them. Others use the `zero()` fallbacks.
 fn assemble_sensor_inputs(
     sim: &Simulation,
     queue: &[CreatureId],
 ) -> Vec<(CreatureId, SensorSnapshot)> {
-    assemble_sensor_inputs_with(
-        sim,
-        queue,
-        genome_uses_typed_local_food,
-        genome_uses_extended_perception,
-    )
+    assemble_sensor_inputs_with(sim, queue, |creature| {
+        creature.cached_perception_requirements
+    })
+}
+
+/// The body view of every living creature, as sensors read it this tick.
+#[must_use]
+pub fn body_views(sim: &Simulation) -> BodyViews {
+    let capacity = &sim.config.energy.capacity;
+    sim.creatures
+        .iter()
+        .map(|(id, creature)| (id, creature.sensed_body(capacity)))
+        .collect()
 }
 
 /// The production sensor assemblers with typed local food and extended
@@ -318,45 +322,39 @@ pub fn assemble_full_sensor_inputs(
     sim: &Simulation,
     queue: &[CreatureId],
 ) -> Vec<(CreatureId, SensorSnapshot)> {
-    assemble_sensor_inputs_with(sim, queue, |_| true, |_| true)
+    assemble_sensor_inputs_with(sim, queue, |_| PerceptionRequirements::ALL)
 }
 
 #[inline]
 fn assemble_sensor_inputs_with(
     sim: &Simulation,
     queue: &[CreatureId],
-    uses_typed_local_food: impl Fn(&crate::creature::genome::CreatureGenome) -> bool,
-    uses_extended_perception: impl Fn(&crate::creature::genome::CreatureGenome) -> bool,
+    requirements: impl Fn(&CreatureState) -> PerceptionRequirements,
 ) -> Vec<(CreatureId, SensorSnapshot)> {
     let perception_config = PerceptionConfig::from_sim_config(&sim.config);
     let vis_table = get_visibility_table(perception_config.vision_radius);
     let mut visible_scratch = VisibilityScratch::default();
+    let views = body_views(sim);
     queue
         .iter()
         .filter(|&&id| sim.creatures.contains_key(id))
         .map(|&id| {
             let creature = &sim.creatures[id];
-            let local = assemble_static_inputs(&sim.world, creature, &sim.config.energy);
-            let typed_local_food = if uses_typed_local_food(&creature.genome) {
+            let needs = requirements(creature);
+            let local = assemble_static_inputs(&sim.world, &views[id], &sim.config.energy);
+            let typed_local_food = if needs.typed_local_food {
                 assemble_typed_food_local_snapshot(&sim.world, creature.position)
             } else {
                 TypedFoodLocalSnapshot::zero()
             };
-            let perception = if uses_extended_perception(&creature.genome) {
+            let perception = if needs.extended_perception {
                 let visible = compute_visible_cells_into(
                     creature.position,
                     &sim.world,
                     vis_table,
                     &mut visible_scratch,
                 );
-                assemble_perception(
-                    id,
-                    creature,
-                    visible,
-                    &sim.world,
-                    &sim.creatures,
-                    &perception_config,
-                )
+                assemble_perception(id, visible, &sim.world, &views, &perception_config)
             } else {
                 PerceptionSnapshot::zero()
             };
@@ -651,8 +649,12 @@ fn run_cognition(
                         age,
                         typed_local_food: ss.typed_local_food.clone(),
                         typed_area_food: ss.perception.typed_area_food.clone(),
-                        uses_typed_local_food: genome_uses_typed_local_food(&creature.genome),
-                        uses_extended_perception: genome_uses_extended_perception(&creature.genome),
+                        uses_typed_local_food: creature
+                            .cached_perception_requirements
+                            .typed_local_food,
+                        uses_extended_perception: creature
+                            .cached_perception_requirements
+                            .extended_perception,
                         applied: Vec::with_capacity(runtime_config.max_actions_per_turn),
                         damage_received: 0.0,
                         offspring_spawned: 0,

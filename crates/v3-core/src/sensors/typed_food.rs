@@ -1,6 +1,5 @@
 use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::{Direction, InputReference, Position, WorldInputKey};
-use crate::creature::genome::CreatureGenome;
+use crate::contracts::{Direction, Position};
 use crate::kernel::WorldState;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -66,70 +65,9 @@ pub fn assemble_typed_food_local_snapshot(
     snapshot
 }
 
-/// Returns true when a genome references typed local-food keys that require
-/// per-creature local food snapshot assembly.
-#[must_use]
-pub fn genome_uses_typed_local_food(genome: &CreatureGenome) -> bool {
-    genome.nodes.iter().any(|node| {
-        node.input_refs.iter().any(|input_ref| {
-            matches!(
-                input_ref,
-                InputReference::World(
-                    WorldInputKey::FoodHere { .. } | WorldInputKey::NeighborFoodRing { .. }
-                )
-            )
-        })
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::NodeId;
-    use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-
-    #[test]
-    fn genome_uses_typed_local_food_true_for_food_here_or_neighbor_ring() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![
-                    InputReference::World(WorldInputKey::FoodHere {
-                        type_idx: OrdinaryFoodTypeId::default(),
-                    }),
-                    InputReference::World(WorldInputKey::NeighborFoodRing {
-                        type_idx: OrdinaryFoodTypeId::new(2),
-                    }),
-                ],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
-        };
-        assert!(genome_uses_typed_local_food(&genome));
-    }
-
-    #[test]
-    fn genome_uses_typed_local_food_false_for_non_food_inputs() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::AreaBarrierSummary)],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
-        };
-        assert!(!genome_uses_typed_local_food(&genome));
-    }
 
     #[test]
     fn zero_snapshot_soft_defaults_all_reads() {

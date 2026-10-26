@@ -4,6 +4,7 @@ pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod companions;
 pub mod mesh_annotations;
+pub mod sensor_analysis;
 pub mod vote;
 
 pub use companions::{structural_companions, StructuralCompanions};

@@ -5,13 +5,10 @@
 
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{barrier_idx, food_idx, nearby_idx, occupancy_idx, CreatureId};
-use crate::creature::colour::unit_rgb;
-use crate::creature::state::CreatureState;
-use crate::sensors::perception::{PerceptionConfig, PerceptionSnapshot};
-use crate::sensors::visibility::VisibleCell;
-
 use crate::kernel::WorldState;
-use slotmap::SlotMap;
+use crate::sensors::perception::{PerceptionConfig, PerceptionSnapshot};
+use crate::sensors::static_inputs::{BodyView, BodyViews};
+use crate::sensors::visibility::VisibleCell;
 
 /// Assemble a complete `PerceptionSnapshot` from visible cells.
 ///
@@ -19,12 +16,14 @@ use slotmap::SlotMap;
 /// - Area summaries use full candidate-window maxima as denominators
 /// - Self cell included for food, excluded for occupancy/creature ranking
 /// - All identity similarity values clamped to `[0.0, 1.0]`
+///
+/// The observer is `views[observer_id]`; a visible creature without a view
+/// is skipped.
 pub fn assemble_perception(
     observer_id: CreatureId,
-    observer: &CreatureState,
     visible: &[VisibleCell],
     world: &WorldState,
-    creatures: &SlotMap<CreatureId, CreatureState>,
+    views: &BodyViews,
     config: &PerceptionConfig,
 ) -> PerceptionSnapshot {
     let r = config.vision_radius as f32;
@@ -65,8 +64,8 @@ pub fn assemble_perception(
         visible,
         world,
         observer_id,
-        observer,
-        creatures,
+        &views[observer_id],
+        views,
         config,
         r,
         max_dist,
@@ -304,8 +303,8 @@ fn rank_nearby_creatures(
     visible: &[VisibleCell],
     world: &WorldState,
     observer_id: CreatureId,
-    observer: &CreatureState,
-    creatures: &SlotMap<CreatureId, CreatureState>,
+    observer: &BodyView,
+    views: &BodyViews,
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
@@ -344,13 +343,13 @@ fn rank_nearby_creatures(
             .then_with(|| a.creature_id.cmp(&b.creature_id))
     });
 
-    fill_nearby_banks(&candidates, observer, creatures, config, r, max_dist)
+    fill_nearby_banks(&candidates, observer, views, config, r, max_dist)
 }
 
 fn fill_nearby_banks(
     candidates: &[NearbyCandidate],
-    observer: &CreatureState,
-    creatures: &SlotMap<CreatureId, CreatureState>,
+    observer: &BodyView,
+    views: &BodyViews,
     config: &PerceptionConfig,
     r: f32,
     max_dist: f32,
@@ -358,7 +357,7 @@ fn fill_nearby_banks(
     let mut nearby = [0.0f32; nearby_idx::WIDTH];
 
     for (slot, candidate) in candidates.iter().take(nearby_idx::SLOTS).enumerate() {
-        let Some(target) = creatures.get(candidate.creature_id) else {
+        let Some(target) = views.get(candidate.creature_id) else {
             continue;
         };
         let fields = &mut nearby
@@ -383,7 +382,7 @@ fn fill_nearby_banks(
         };
 
         // Vitals
-        let energy_scale = target.body.energy_scale(&config.energy_capacity);
+        let energy_scale = target.energy_scale;
         fields[nearby_idx::ENERGY_RATIO] = if energy_scale > 0.0 {
             (target.energy / energy_scale).clamp(0.0, 1.0)
         } else {
@@ -398,10 +397,8 @@ fn fill_nearby_banks(
         };
 
         // Identity and colour
-        fields[nearby_idx::KIN_AFFINITY] =
-            compute_kin_affinity(observer.body.identity.kin_tag, target.body.identity.kin_tag);
-        fields[nearby_idx::RED..=nearby_idx::BLUE]
-            .copy_from_slice(&unit_rgb(target.body.phenotype.channels));
+        fields[nearby_idx::KIN_AFFINITY] = compute_kin_affinity(observer.kin_tag, target.kin_tag);
+        fields[nearby_idx::RED..=nearby_idx::BLUE].copy_from_slice(&target.colour);
     }
 
     nearby
@@ -416,12 +413,15 @@ fn compute_kin_affinity(a: u32, b: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::EnergyCapacityConfig;
     use crate::config::WorldEdgeMode;
     use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::phenotype::Phenotype;
+    use crate::creature::state::CreatureState;
     use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
+    use slotmap::SlotMap;
 
     fn make_world(w: u16, h: u16) -> WorldState {
         WorldState::new(w, h, WorldEdgeMode::Wrap)
@@ -433,7 +433,7 @@ mod tests {
         energy: f32,
         identity: CreatureIdentityState,
         phenotype: [u8; 6],
-    ) -> CreatureState {
+    ) -> BodyView {
         CreatureState::new(
             id,
             v3alpha1_founder_genome(),
@@ -453,6 +453,12 @@ mod tests {
             },
             [0.0; 16],
         )
+        .sensed_body(&EnergyCapacityConfig::default())
+    }
+
+    /// The views the scheduler would collect over these creatures.
+    fn views(creatures: &SlotMap<CreatureId, BodyView>) -> BodyViews {
+        creatures.iter().map(|(id, view)| (id, *view)).collect()
     }
 
     #[test]
@@ -569,7 +575,7 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
         let visible = compute_visible_cells(origin, &world, table);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -590,7 +596,7 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -628,7 +634,7 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -670,7 +676,7 @@ mod tests {
             &world,
             observer_id,
             observer,
-            &creatures,
+            &views(&creatures),
             &config,
             3.0,
             (18.0f32).sqrt(),
@@ -698,7 +704,7 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -729,7 +735,7 @@ mod tests {
             &world,
             observer_id,
             observer,
-            &creatures,
+            &views(&creatures),
             &config,
             3.0,
             (18.0f32).sqrt(),
@@ -756,7 +762,7 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
         world.set_food(origin, 0.5);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -768,10 +774,9 @@ mod tests {
 
         let snap = assemble_perception(
             observer_id,
-            &creatures[observer_id],
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &config,
         );
 
@@ -791,7 +796,7 @@ mod tests {
         world.set_food(crate::contracts::Position::new(11, 10), 1.0);
         world.set_barrier(crate::contracts::Position::new(10, 9), true);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(
                 id,
@@ -857,7 +862,7 @@ mod tests {
             &world,
             observer_id,
             observer,
-            &creatures,
+            &views(&creatures),
             &config,
             r,
             max_dist,
@@ -896,10 +901,9 @@ mod tests {
 
         let actual = assemble_perception(
             observer_id,
-            observer,
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &config,
         );
 
@@ -921,7 +925,7 @@ mod tests {
     fn merged_nearby_creature_equals_core_vitals_identity_per_slot() {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_identity = CreatureIdentityState {
             lineage_id: 42,
             kin_tag: 0xAAAA_AAAA,
@@ -957,10 +961,9 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, get_visibility_table(5));
         let snap = assemble_perception(
             observer_id,
-            &creatures[observer_id],
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &config,
         );
 
@@ -1015,7 +1018,7 @@ mod tests {
         use crate::sensors::static_inputs::assemble_static_inputs;
 
         let mut world = make_world(20, 20);
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let a_pos = crate::contracts::Position::new(10, 10);
         let b_pos = crate::contracts::Position::new(12, 9);
         let a_id = creatures.insert_with_key(|id| {
@@ -1036,10 +1039,9 @@ mod tests {
         let visible = compute_visible_cells(a_pos, &world, get_visibility_table(5));
         let seen = assemble_perception(
             a_id,
-            &creatures[a_id],
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &PerceptionConfig::default(),
         );
         let own = assemble_static_inputs(&world, &creatures[b_id], &EnergyConfig::default());
@@ -1064,7 +1066,7 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
 
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -1093,10 +1095,9 @@ mod tests {
 
         let snap_underage = assemble_perception(
             observer_id,
-            &creatures[observer_id],
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &config,
         );
         assert_eq!(
@@ -1108,10 +1109,9 @@ mod tests {
         creatures[neighbor_id].age = 20;
         let snap_of_age = assemble_perception(
             observer_id,
-            &creatures[observer_id],
             visible.cells(),
             &world,
-            &creatures,
+            &views(&creatures),
             &config,
         );
         assert_eq!(
@@ -1124,7 +1124,7 @@ mod tests {
     #[test]
     fn nearby_slot_reads_zero_for_a_non_positive_normalizer() {
         let origin = crate::contracts::Position::new(10, 10);
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -1144,13 +1144,13 @@ mod tests {
             euclidean_dist: 2.0f32.sqrt(),
             chebyshev_dist: 1,
         }];
-        let mut config = PerceptionConfig::default();
-        config.energy_capacity.reference = 0.0;
+        creatures[neighbor_id].energy_scale = 0.0;
+        let config = PerceptionConfig::default();
 
         let nearby = fill_nearby_banks(
             &candidates,
             &creatures[observer_id],
-            &creatures,
+            &views(&creatures),
             &config,
             0.0,
             0.0,
@@ -1167,14 +1167,12 @@ mod tests {
         }
     }
 
-    /// The nearby energy read divides by the target's energy scale
-    /// (T26.F02): the reference under `Reference`, the target's own capacity
-    /// under `Own`.
+    /// The nearby energy read divides by the target's viewed energy scale
+    /// (T26.F02), which the creature record resolves.
     #[test]
     fn nearby_energy_ratio_divides_by_the_targets_energy_scale() {
-        use crate::config::SensorScale;
         let origin = crate::contracts::Position::new(10, 10);
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
@@ -1187,7 +1185,6 @@ mod tests {
                 [0; 6],
             )
         });
-        creatures[neighbor_id].body.capacity = 50.0;
         let candidates = [NearbyCandidate {
             creature_id: neighbor_id,
             dx: 1,
@@ -1195,18 +1192,48 @@ mod tests {
             euclidean_dist: 2.0f32.sqrt(),
             chebyshev_dist: 1,
         }];
-        let mut config = PerceptionConfig::default();
-        for (scale, expected) in [(SensorScale::Reference, 0.2), (SensorScale::Own, 0.8)] {
-            config.energy_capacity.sensor_scale = scale;
+        let config = PerceptionConfig::default();
+        for (scale, expected) in [(200.0, 0.2), (50.0, 0.8), (20.0, 1.0)] {
+            creatures[neighbor_id].energy_scale = scale;
             let nearby = fill_nearby_banks(
                 &candidates,
                 &creatures[observer_id],
-                &creatures,
+                &views(&creatures),
                 &config,
                 2.0,
                 2.0,
             );
-            assert_eq!(nearby[nearby_idx::ENERGY_RATIO], expected, "{scale:?}");
+            assert_eq!(nearby[nearby_idx::ENERGY_RATIO], expected, "{scale}");
         }
+    }
+
+    /// A visible creature without a view (not alive this tick) leaves its
+    /// slot empty, as a missing creature did.
+    #[test]
+    fn a_visible_creature_without_a_view_is_skipped() {
+        let mut world = make_world(20, 20);
+        let origin = crate::contracts::Position::new(10, 10);
+        let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        world.place_creature(origin, observer_id);
+        let ghost = crate::contracts::Position::new(11, 10);
+        let ghost_id = creatures.insert_with_key(|id| {
+            make_creature(id, ghost, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        world.place_creature(ghost, ghost_id);
+        let mut views = views(&creatures);
+        views.remove(ghost_id);
+
+        let visible = compute_visible_cells(origin, &world, get_visibility_table(3));
+        let snap = assemble_perception(
+            observer_id,
+            visible.cells(),
+            &world,
+            &views,
+            &PerceptionConfig::default(),
+        );
+        assert_eq!(snap.nearby[nearby_idx::PRESENT], 0.0);
     }
 }

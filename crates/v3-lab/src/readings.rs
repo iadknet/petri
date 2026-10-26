@@ -18,8 +18,8 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::{InputReference, NodeId};
 use v3_core::creature::genome::analysis::{functional_complexity, mesh_reachable_nodes};
 use v3_core::creature::genome::cgp::GraphSource;
+use v3_core::creature::genome::sensor_analysis::{sensor_census, DecisionInputKey};
 use v3_core::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
-use v3_core::creature::sensor_census::{creature_sensor_census, DecisionInputKey};
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_core::neighborhood::input_use::catalog::Family;
@@ -523,7 +523,7 @@ fn shape(setup: &Setup, batteries: &Batteries, elite: &Observed<'_>, wiring: &Wi
     let genome = elite.genome;
     let reachable = &wiring.reachable;
     let executed = executed_union(elite.frozens);
-    let census = creature_sensor_census(genome, reachable);
+    let census = sensor_census(genome, reachable);
     let families = wiring
         .families
         .iter()

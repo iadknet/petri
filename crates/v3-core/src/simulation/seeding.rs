@@ -26,6 +26,18 @@ use crate::simulation::simulation::Simulation;
 ///    heading uniformly over `Direction::ALL` from the run RNG (T11.F30).
 /// 7. Return the assembled `Simulation`.
 pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
+    seed_simulation_with_founder_genomes(config, seed, |_, _| {})
+}
+
+/// [`seed_simulation`] with `edit` applied to founder `i`'s genome (in
+/// placement order) before that founder is constructed, so every birth cache
+/// derives from the edited genome. `edit` draws nothing: positions, headings
+/// and bodies are those of [`seed_simulation`]. For fixtures and benchmarks.
+pub fn seed_simulation_with_founder_genomes(
+    config: SimulationConfig,
+    seed: u64,
+    mut edit: impl FnMut(usize, &mut CreatureGenome),
+) -> Simulation {
     let mut rng = SmallRng::seed_from_u64(seed);
 
     let mut world = WorldState::new(
@@ -80,10 +92,11 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
-        let genome = founder_genome_with_age_gate(
+        let mut genome = founder_genome_with_age_gate(
             config.population.founder_profile,
             &config.energy.lifecycle,
         );
+        edit(founder_index, &mut genome);
         let energy = config.energy.lifecycle.initial_energy;
         // One draw per founder, in placement order (T11.F30).
         let heading = Direction::ALL[rng.gen_range(0..Direction::ALL.len())];
@@ -156,21 +169,20 @@ pub fn seed_simulation_with_perception_mix(
     seed: u64,
     perception_creatures: usize,
 ) -> Simulation {
-    let mut sim = seed_simulation(config, seed);
-    for (_, creature) in sim.creatures.iter_mut().take(perception_creatures) {
-        inject_extended_perception_input(&mut creature.genome);
-        creature.refresh_sensor_caches();
-    }
-    sim
+    seed_simulation_with_founder_genomes(config, seed, |founder_index, genome| {
+        if founder_index < perception_creatures {
+            inject_extended_perception_input(genome);
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
+    use crate::creature::genome::sensor_analysis::perception_requirements;
     use crate::creature::genome::BackendDef;
     use crate::creature::phenotype::Phenotype;
-    use crate::sensors::perception::genome_uses_extended_perception;
     use std::collections::HashSet;
 
     fn small_config() -> SimulationConfig {
@@ -303,11 +315,16 @@ mod tests {
 
     #[test]
     fn founder_baseline_does_not_use_extended_perception() {
+        let founder = founder_genome_with_age_gate(
+            small_config().population.founder_profile,
+            &small_config().energy.lifecycle,
+        );
+        assert!(!perception_requirements(&founder).extended_perception);
         let sim = seed_simulation(small_config(), 42);
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .filter(|creature| creature.cached_perception_requirements.extended_perception)
                 .count(),
             0
         );
@@ -319,7 +336,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .filter(|creature| creature.cached_perception_requirements.extended_perception)
                 .count(),
             2
         );
@@ -337,25 +354,65 @@ mod tests {
         );
     }
 
+    /// A mixed founder is built from its edited genome: every genome-derived
+    /// cache equals the analysis of the genome it carries.
     #[test]
-    fn perception_mix_refreshes_the_birth_sensor_caches() {
-        use crate::creature::sensor_census::{
-            creature_declared_world_inputs, creature_sensor_census,
+    fn perception_mix_caches_derive_from_the_edited_genome() {
+        use crate::creature::genome::analysis::mesh_reachable_nodes;
+        use crate::creature::genome::sensor_analysis::{
+            declared_world_keys, has_barrier_reader, live_vm_world_reads, sensor_census,
         };
+        use crate::creature::state::GraphRuntimeState;
         use crate::sensors::reads::WorldKeySet;
         let sim = seed_simulation_with_perception_mix(small_config(), 42, 2);
         for creature in sim.creatures.values() {
-            let reachable = &creature.cached_reachable_nodes;
-            let declared: WorldKeySet = creature_declared_world_inputs(&creature.genome, reachable)
+            let genome = &creature.genome;
+            let reachable = mesh_reachable_nodes(genome);
+            assert_eq!(*creature.cached_reachable_nodes, *reachable);
+            assert_eq!(creature.cached_complexity, genome.complexity());
+            assert_eq!(creature.cached_genome_size, genome.genome_size());
+            assert_eq!(
+                creature.cached_has_barrier_reader,
+                has_barrier_reader(genome, &reachable)
+            );
+            assert_eq!(
+                creature.cached_live_vm_world_inputs,
+                live_vm_world_reads(genome, &reachable)
+            );
+            assert_eq!(
+                creature.cached_perception_requirements,
+                perception_requirements(genome)
+            );
+            let declared: WorldKeySet = declared_world_keys(genome, &reachable)
                 .into_iter()
                 .collect();
-            let wired: WorldKeySet = creature_sensor_census(&creature.genome, reachable)
+            let wired: WorldKeySet = sensor_census(genome, &reachable)
                 .world_inputs
                 .into_iter()
                 .collect();
             assert_eq!(creature.cached_declared_world_inputs, declared);
             assert_eq!(creature.cached_wired_world_inputs, wired);
+            assert_eq!(
+                creature.graph_runtime.sink_weights,
+                GraphRuntimeState::for_genome(genome, Vec::new()).sink_weights
+            );
         }
+    }
+
+    /// The hook draws nothing: positions, headings and bodies are those of
+    /// the unedited seeding.
+    #[test]
+    fn the_founder_genome_hook_leaves_every_draw_unchanged() {
+        let plain = seed_simulation(small_config(), 42);
+        let mixed = seed_simulation_with_perception_mix(small_config(), 42, 3);
+        let draws = |sim: &Simulation| {
+            sim.creatures
+                .values()
+                .map(|c| (c.position, c.heading, c.body.identity, c.energy))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(draws(&plain), draws(&mixed));
+        assert_eq!(plain.world.total_food(), mixed.world.total_food());
     }
 
     #[test]
@@ -364,7 +421,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .filter(|creature| creature.cached_perception_requirements.extended_perception)
                 .count(),
             sim.creature_count()
         );
@@ -380,7 +437,7 @@ mod tests {
         assert_eq!(
             sim.creatures
                 .values()
-                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .filter(|creature| creature.cached_perception_requirements.extended_perception)
                 .count(),
             200
         );

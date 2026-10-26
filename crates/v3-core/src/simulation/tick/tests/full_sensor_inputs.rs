@@ -6,17 +6,25 @@ use super::super::{assemble_full_sensor_inputs, assemble_sensor_inputs};
 use super::support::{small_config, vm_raw_program_genome};
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{InputReference, WorldInputKey};
+use crate::creature::genome::sensor_analysis::perception_requirements;
 use crate::creature::genome::CreatureGenome;
-use crate::sensors::perception::genome_uses_extended_perception;
-use crate::sensors::typed_food::genome_uses_typed_local_food;
-use crate::simulation::{seed_simulation, Simulation};
+use crate::simulation::seeding::seed_simulation_with_founder_genomes;
+use crate::simulation::Simulation;
 
+/// A seeded world whose founders are all built from `genome`, so every
+/// birth cache (the perception requirements among them) matches it.
 fn world_with(genome: &CreatureGenome) -> Simulation {
-    let mut sim = seed_simulation(small_config(), 5);
-    for creature in sim.creatures.values_mut() {
-        creature.genome = genome.clone();
-    }
-    sim
+    seed_simulation_with_founder_genomes(small_config(), 5, |_, founder| {
+        *founder = genome.clone();
+    })
+}
+
+fn genome_uses_extended_perception(genome: &CreatureGenome) -> bool {
+    perception_requirements(genome).extended_perception
+}
+
+fn genome_uses_typed_local_food(genome: &CreatureGenome) -> bool {
+    perception_requirements(genome).typed_local_food
 }
 
 #[test]

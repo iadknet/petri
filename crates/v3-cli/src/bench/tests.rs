@@ -293,7 +293,8 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
             .collect();
         assert_eq!(
             decision_keys,
-            v3_core::creature::sensor_census::DecisionInputKey::ALL.map(|key| key.as_key()),
+            v3_core::creature::genome::sensor_analysis::DecisionInputKey::ALL
+                .map(|key| key.as_key()),
             "tick {}",
             sample.tick
         );

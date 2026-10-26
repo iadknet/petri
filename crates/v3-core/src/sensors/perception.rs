@@ -50,18 +50,6 @@ impl PerceptionSnapshot {
             ..Self::zero()
         }
     }
-
-    /// Returns true if this key is an extended perception compound key.
-    #[inline]
-    pub fn is_extended_key(key: &WorldInputKey) -> bool {
-        matches!(
-            key,
-            WorldInputKey::AreaFoodSummary { .. }
-                | WorldInputKey::AreaBarrierSummary
-                | WorldInputKey::AreaOccupancySummary
-                | WorldInputKey::NearbyCreature
-        )
-    }
 }
 
 /// Unified runtime-facing sensor bundle per v3-sensor-spec.md Section 2.
@@ -87,7 +75,7 @@ impl SensorSnapshot {
     pub fn resolve_world(&self, key: &WorldInputKey) -> f32 {
         match key {
             WorldInputKey::FoodHere { type_idx } => self.typed_local_food.food_here(*type_idx),
-            _ => self.local.resolve_world(key),
+            _ => 0.0,
         }
     }
 
@@ -175,18 +163,6 @@ impl PerceptionConfig {
     }
 }
 
-/// Check if a creature genome references any extended perception world keys.
-///
-/// Used for conditional assembly: only genomes that actually read extended
-/// perception inputs need full visibility computation and area reduction.
-pub fn genome_uses_extended_perception(genome: &crate::creature::genome::CreatureGenome) -> bool {
-    genome.nodes.iter().any(|node| {
-        node.input_refs
-            .iter()
-            .any(|r| matches!(r, crate::contracts::InputReference::World(key) if PerceptionSnapshot::is_extended_key(key)))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,28 +176,6 @@ mod tests {
         assert_eq!(snap.area_barrier, [0.0; 7]);
         assert_eq!(snap.area_occupancy, [0.0; 7]);
         assert_eq!(snap.nearby, [0.0; 40]);
-    }
-
-    #[test]
-    fn is_extended_key_classification() {
-        assert!(PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::AreaFoodSummary {
-                type_idx: OrdinaryFoodTypeId::default(),
-            }
-        ));
-        assert!(PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::NearbyCreature
-        ));
-        assert!(!PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::FoodHere {
-                type_idx: OrdinaryFoodTypeId::default(),
-            }
-        ));
-        assert!(!PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::NeighborFoodRing {
-                type_idx: OrdinaryFoodTypeId::default(),
-            }
-        ));
     }
 
     #[test]
@@ -301,58 +255,5 @@ mod tests {
             p.min_reproduce_age,
             sim_cfg.energy.lifecycle.min_reproduce_age
         );
-    }
-
-    #[test]
-    fn genome_uses_extended_perception_false_for_local_only() {
-        use crate::contracts::{InputReference, NodeId};
-        use crate::creature::genome::{
-            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-        };
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
-                    type_idx: OrdinaryFoodTypeId::default(),
-                })],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
-        };
-        assert!(!genome_uses_extended_perception(&genome));
-    }
-
-    #[test]
-    fn genome_uses_extended_perception_true_for_area_food() {
-        use crate::contracts::{InputReference, NodeId};
-        use crate::creature::genome::{
-            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-        };
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![
-                    InputReference::World(WorldInputKey::FoodHere {
-                        type_idx: OrdinaryFoodTypeId::default(),
-                    }),
-                    InputReference::World(WorldInputKey::AreaFoodSummary {
-                        type_idx: OrdinaryFoodTypeId::default(),
-                    }),
-                ],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }],
-        };
-        assert!(genome_uses_extended_perception(&genome));
     }
 }

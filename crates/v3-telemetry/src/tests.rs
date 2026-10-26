@@ -1273,34 +1273,44 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     use v3_core::creature::genome::cgp::Shape;
     use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::BackendDef;
-    use v3_core::creature::state::GraphRuntimeState;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
     let config = small_config();
-    let mut sim = simulation(&config);
-    let (id, creature) = sim.creatures.iter_mut().next().unwrap();
-    let entry = creature.cached_reachable_nodes[0];
-    let node = &mut creature.genome.nodes[entry];
-    let ring = node
-        .input_refs
-        .iter()
-        .position(|r| *r == InputReference::World(WorldInputKey::NeighborOccupiedRing))
-        .expect("the founder's entry node lists the occupied ring");
-    let BackendDef::Graph(def) = &mut node.backend_def else {
-        panic!("the default founder's entry node is a Graph node");
-    };
-    let group = def.add_group(
-        Shape::Ring {
-            ring_ref: u16::try_from(ring).unwrap(),
+    // The first founder is built with the group, so its declared and wired
+    // sets and its weight table derive from the edited genome.
+    let mut sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+        config.clone(),
+        7,
+        |founder_index, genome| {
+            if founder_index != 0 {
+                return;
+            }
+            let entry = genome
+                .nodes
+                .iter()
+                .position(|node| node.node_id == genome.entry_node_id)
+                .expect("the founder has its entry node");
+            let node = &mut genome.nodes[entry];
+            let ring = node
+                .input_refs
+                .iter()
+                .position(|r| *r == InputReference::World(WorldInputKey::NeighborOccupiedRing))
+                .expect("the founder's entry node lists the occupied ring");
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                panic!("the default founder's entry node is a Graph node");
+            };
+            let group = def.add_group(
+                Shape::Ring {
+                    ring_ref: u16::try_from(ring).unwrap(),
+                },
+                DirectedVoteKind::StealEnergy,
+                0,
+            );
+            def.group_mut(group).set_scale(0.5);
         },
-        DirectedVoteKind::StealEnergy,
-        0,
     );
-    def.group_mut(group).set_scale(0.5);
-    // The declared and wired sets and the weight table are built at birth.
-    creature.refresh_sensor_caches();
-    creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, Vec::new());
+    let id = sim.creatures.keys().next().unwrap();
     v3_core::simulation::run_tick(&mut sim, &mut None);
     assert!(
         sim.creatures.contains_key(id),

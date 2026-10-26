@@ -1,22 +1,24 @@
-use std::collections::BTreeMap;
 use std::mem::size_of;
 
-use crate::config::EnergyConfig;
-use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldInputKey};
+use crate::config::{EnergyCapacityConfig, EnergyConfig};
+use crate::contracts::{
+    CreatureId, Direction, OrdinaryFoodTypeId, PerceptionRequirements, Position, WorldInputKey,
+};
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::body::HeritableBody;
+use crate::creature::colour::unit_rgb;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::BirthSeeds;
-use crate::creature::genome::mesh_annotations::{
-    collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
-    MeshReadClass,
+use crate::creature::genome::sensor_analysis::{
+    declared_world_keys, has_barrier_reader, live_vm_world_reads, perception_requirements,
+    sensor_census,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction, OUTCOME_CHANNEL_COUNT};
+use crate::creature::genome::{BackendDef, CreatureGenome, OUTCOME_CHANNEL_COUNT};
 use crate::creature::newborn::take_birth_seeds;
-use crate::creature::sensor_census::{creature_declared_world_inputs, creature_sensor_census};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
 use crate::runtime::plasticity::LearnedState;
 use crate::sensors::reads::WorldKeySet;
+use crate::sensors::static_inputs::BodyView;
 
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
 pub const SHARED_MEMORY_SLOTS: usize = 16;
@@ -194,6 +196,8 @@ pub struct CreatureState {
     pub cached_has_barrier_reader: bool,
     /// Exact world-input keys read by live VM `ReadInput` instructions on reachable nodes.
     pub cached_live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
+    /// The snapshots the brain needs assembled each turn, cached at birth.
+    pub cached_perception_requirements: PerceptionRequirements,
     /// Mutation operators applied when this creature was born.
     pub birth_mutation_operators: Box<[MutationOperator]>,
     /// The class of the vote sink its birth's sole `AddGraphEdge` or
@@ -245,28 +249,21 @@ pub struct CreatureState {
     pub heading: Direction,
 }
 
-/// The declared and wired world-key sets the sensor census telemetry reads,
-/// cached at birth because the genome does not change after it.
-fn sensor_caches(genome: &CreatureGenome, reachable: &[usize]) -> (WorldKeySet, WorldKeySet) {
-    (
-        creature_declared_world_inputs(genome, reachable)
-            .into_iter()
-            .collect(),
-        creature_sensor_census(genome, reachable)
-            .world_inputs
-            .into_iter()
-            .collect(),
-    )
-}
-
 impl CreatureState {
-    /// Recompute the birth-time sensor caches after the genome was edited in
-    /// place (seeding fixtures only; production genomes never change).
-    pub fn refresh_sensor_caches(&mut self) {
-        (
-            self.cached_declared_world_inputs,
-            self.cached_wired_world_inputs,
-        ) = sensor_caches(&self.genome, &self.cached_reachable_nodes);
+    /// What sensors read of this body this tick, every body rule applied:
+    /// the energy sensor denominator ([`HeritableBody::energy_scale`]) and
+    /// the seen colour ([`unit_rgb`]).
+    #[must_use]
+    pub fn sensed_body(&self, capacity: &EnergyCapacityConfig) -> BodyView {
+        BodyView {
+            position: self.position,
+            age: self.age,
+            energy: self.energy,
+            energy_scale: self.body.energy_scale(capacity),
+            colour: unit_rgb(self.body.phenotype.channels),
+            kin_tag: self.body.identity.kin_tag,
+            previous_outcome: self.previous_outcome,
+        }
     }
 
     /// Count one Phase 2 action attempt in both the lifetime total and its
@@ -376,12 +373,17 @@ impl CreatureState {
     ) -> Self {
         let seeds = take_birth_seeds(&mut genome);
         let graph_runtime = GraphRuntimeState::for_genome(&genome, seeds);
-        let cached_has_barrier_reader =
-            compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
-        let cached_live_vm_world_inputs =
-            compute_live_vm_world_inputs(&genome, cached_reachable_nodes.as_ref());
-        let (cached_declared_world_inputs, cached_wired_world_inputs) =
-            sensor_caches(&genome, cached_reachable_nodes.as_ref());
+        let reachable = cached_reachable_nodes.as_ref();
+        let cached_has_barrier_reader = has_barrier_reader(&genome, reachable);
+        let cached_live_vm_world_inputs = live_vm_world_reads(&genome, reachable);
+        let cached_perception_requirements = perception_requirements(&genome);
+        let cached_declared_world_inputs: WorldKeySet = declared_world_keys(&genome, reachable)
+            .into_iter()
+            .collect();
+        let cached_wired_world_inputs: WorldKeySet = sensor_census(&genome, reachable)
+            .world_inputs
+            .into_iter()
+            .collect();
         Self {
             id,
             genome,
@@ -399,6 +401,7 @@ impl CreatureState {
             cached_reachable_nodes,
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
+            cached_perception_requirements,
             last_mesh_world_reads: WorldKeySet::default(),
             cached_declared_world_inputs,
             cached_wired_world_inputs,
@@ -419,46 +422,6 @@ impl CreatureState {
             heading: Direction::N,
         }
     }
-}
-
-fn compute_has_barrier_reader(genome: &CreatureGenome, reachable_indices: &[usize]) -> bool {
-    derive_mesh_annotations_with_reachable_indices(genome, reachable_indices)
-        .iter()
-        .any(|node| {
-            node.reachable
-                && node
-                    .read_classes
-                    .iter()
-                    .any(|class| matches!(class, MeshReadClass::Barrier))
-        })
-}
-
-fn compute_live_vm_world_inputs(
-    genome: &CreatureGenome,
-    reachable_indices: &[usize],
-) -> Box<[(WorldInputKey, u16)]> {
-    let mut counts = BTreeMap::<WorldInputKey, u16>::new();
-    for &node_idx in reachable_indices {
-        let Some(node) = genome.nodes.get(node_idx) else {
-            continue;
-        };
-        let BackendDef::Vm(vm) = &node.backend_def else {
-            continue;
-        };
-        for instruction_idx in collect_live_vm_instruction_indices(vm) {
-            let Some(VmInstruction::ReadInput { ref_idx, .. }) = vm.program.get(instruction_idx)
-            else {
-                continue;
-            };
-            let Some(crate::contracts::InputReference::World(key)) =
-                node.input_refs.get(*ref_idx as usize)
-            else {
-                continue;
-            };
-            *counts.entry(*key).or_insert(0) += 1;
-        }
-    }
-    counts.into_iter().collect::<Vec<_>>().into_boxed_slice()
 }
 
 // Compile-time size assertion: shared_memory is 2x16x4=128 bytes vs old 1024-byte memory.
@@ -833,6 +796,49 @@ mod tests {
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);
+    }
+
+    /// The body view carries the record's world-facing state and resolves the
+    /// two body rules: the seen colour and the energy sensor denominator,
+    /// the reference capacity under `Reference` and the body's own under
+    /// `Own` (T26.F02 invariant 6).
+    #[test]
+    fn the_sensed_body_resolves_colour_and_energy_scale() {
+        use crate::config::SensorScale;
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let mut state = CreatureState::new(
+            sm.insert(()),
+            minimal_genome(),
+            Position::new(3, 7),
+            50.0,
+            0,
+            body([150, 0, 200, 200, 60, 60]),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        state.age = 9;
+        state.body.capacity = 50.0;
+        state.body.identity.kin_tag = 0xABCD;
+        state.previous_outcome = [1.0, 0.0, -2.0, 1.0];
+        let mut capacity = EnergyCapacityConfig {
+            reference: 150.0,
+            ..EnergyCapacityConfig::default()
+        };
+        for (scale, expected) in [(SensorScale::Reference, 150.0), (SensorScale::Own, 50.0)] {
+            capacity.sensor_scale = scale;
+            assert_eq!(
+                state.sensed_body(&capacity),
+                BodyView {
+                    position: Position::new(3, 7),
+                    age: 9,
+                    energy: 50.0,
+                    energy_scale: expected,
+                    colour: [13.0 / 255.0, 89.0 / 255.0, 174.0 / 255.0],
+                    kin_tag: 0xABCD,
+                    previous_outcome: [1.0, 0.0, -2.0, 1.0],
+                },
+                "{scale:?}"
+            );
+        }
     }
 
     #[test]

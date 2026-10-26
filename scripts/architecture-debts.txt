@@ -23,14 +23,7 @@ G8 runtime/cgp/execute.rs creature::state
 G8 runtime/cgp/traced.rs creature::state
 G8 runtime/mesh.rs creature::state
 G8 runtime/traced_mesh.rs creature::state
-G9 sensors/reducers.rs creature::colour
-G9 sensors/reducers.rs creature::state
-G9 sensors/static_inputs.rs creature::colour
-G9 sensors/static_inputs.rs creature::state
 G12 mutation/engine/mod.rs creature::parseability
-G14 creature/state.rs creature::sensor_census
 G14 simulation/actions/reproduction.rs creature::drives
 G16 runtime/trace/domain.rs creature::action_log
 G16 runtime/trace/domain.rs simulation::stats
-G20 sensors/perception.rs creature::genome
-G20 sensors/typed_food.rs creature::genome

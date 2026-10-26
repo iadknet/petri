@@ -2186,7 +2186,7 @@ mod tests {
         use crate::creature::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
-        use crate::creature::sensor_census::creature_sensor_census;
+        use crate::creature::genome::sensor_analysis::sensor_census;
         let key = WorldInputKey::NearbyCreature;
         let vm = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -2232,7 +2232,7 @@ mod tests {
         };
         for genome in [vm, graph] {
             let reachable = mesh_reachable_nodes(&genome);
-            assert!(!creature_sensor_census(&genome, &reachable)
+            assert!(!sensor_census(&genome, &reachable)
                 .world_inputs
                 .contains(&key));
             assert!(reads_after_run(&genome).contains(key));

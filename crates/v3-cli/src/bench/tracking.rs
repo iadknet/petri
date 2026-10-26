@@ -11,9 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use v3_core::creature::sensor_census::{
-    creature_sensor_census, world_input_key_label, DecisionInputKey,
-};
+use v3_core::creature::genome::sensor_analysis::{sensor_census, DecisionInputKey};
+use v3_core::creature::sensor_census::world_input_key_label;
 use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 
 /// The applied-behavior integer sums of
@@ -1117,7 +1116,7 @@ impl SensorCensus {
         let mut creatures_with_any_stateful_read = 0;
 
         for creature in sim.creatures.values() {
-            let census = creature_sensor_census(&creature.genome, &creature.cached_reachable_nodes);
+            let census = sensor_census(&creature.genome, &creature.cached_reachable_nodes);
             creatures_reading_shared_memory += u64::from(census.reads_shared_memory);
             creatures_with_stateful_node += u64::from(census.holds_stateful_node);
             creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());

@@ -289,7 +289,11 @@ fn build_creature_diagnostics(
     mesh_annotations: &[MeshNodeAnnotation],
     action_log_entries: &[&ActionLogEntry],
 ) -> CreatureDiagnosticsResponse {
-    let static_inputs = assemble_static_inputs(&sim.world, creature, &sim.config.energy);
+    let static_inputs = assemble_static_inputs(
+        &sim.world,
+        &creature.sensed_body(&sim.config.energy.capacity),
+        &sim.config.energy,
+    );
     let current_inputs = CreatureCurrentInputsDiagnostics {
         food_here: static_inputs.food_here,
         neighbor_food: static_inputs.neighbor_food,

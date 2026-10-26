@@ -112,7 +112,8 @@ fn an_eat_on_food_is_read_next_tick_as_its_scaled_outcome() {
         "{stored:?}"
     );
     assert_eq!(
-        assemble_static_inputs(&sim.world, creature, energy).previous_outcome,
+        assemble_static_inputs(&sim.world, &creature.sensed_body(&energy.capacity), energy)
+            .previous_outcome,
         [
             stored[OutcomeChannel::EnergyDelta as usize] / energy.capacity.reference,
             1.0,
@@ -163,7 +164,8 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
     assert_eq!(child.previous_outcome, [0.0; 4]);
     let energy = &sim.config.energy;
     assert_eq!(
-        assemble_static_inputs(&sim.world, child, energy).previous_outcome,
+        assemble_static_inputs(&sim.world, &child.sensed_body(&energy.capacity), energy)
+            .previous_outcome,
         [0.0; 4]
     );
 }

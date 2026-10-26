@@ -513,7 +513,10 @@ proptest! {
 fn recorded_contexts_assemble_perception_whatever_the_donor_reads() {
     let sim = small_sim(6);
     let founder = founder_genome(FounderProfile::V3Alpha1);
-    assert!(!crate::sensors::perception::genome_uses_extended_perception(&founder));
+    assert!(
+        !crate::creature::genome::sensor_analysis::perception_requirements(&founder)
+            .extended_perception
+    );
     let contexts = contexts::recorded_contexts(&sim, 11, 4);
     assert_eq!(contexts.len(), 4);
     let food_types = sim.config.world.food.types.len();

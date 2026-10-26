@@ -548,7 +548,11 @@ fn vm_eats_when_food_here() {
         [0.0; 16],
     );
 
-    let local = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+    let local = assemble_static_inputs(
+        &world,
+        &creature.sensed_body(&EnergyConfig::default().capacity),
+        &EnergyConfig::default(),
+    );
     // food_here should be > 0.0
     assert!(local.food_here > 0.0);
     let ss = SensorSnapshot {
@@ -647,7 +651,11 @@ fn vm_noop_when_no_food() {
         },
         [0.0; 16],
     );
-    let local = assemble_static_inputs(&world, &creature, &EnergyConfig::default());
+    let local = assemble_static_inputs(
+        &world,
+        &creature.sensed_body(&EnergyConfig::default().capacity),
+        &EnergyConfig::default(),
+    );
     assert_eq!(local.food_here, 0.0);
     let ss = SensorSnapshot {
         world_reads: Default::default(),

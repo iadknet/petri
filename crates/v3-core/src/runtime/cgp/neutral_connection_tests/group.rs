@@ -599,14 +599,12 @@ mod pair {
         let visible =
             compute_visible_cells(origin, &world, get_visibility_table(config.vision_radius));
         let mut sensors = sensors();
-        sensors.perception = assemble_perception(
-            observer,
-            &creatures[observer],
-            visible.cells(),
-            &world,
-            &creatures,
-            &config,
-        );
+        let views: crate::sensors::static_inputs::BodyViews = creatures
+            .iter()
+            .map(|(id, c)| (id, c.sensed_body(&config.energy_capacity)))
+            .collect();
+        sensors.perception =
+            assemble_perception(observer, visible.cells(), &world, &views, &config);
         sensors
     }
 

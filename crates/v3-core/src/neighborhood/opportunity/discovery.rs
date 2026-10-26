@@ -15,13 +15,13 @@ use crate::contracts::NodeId;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::analysis::{mesh_reachable_nodes, vm_backward_slice};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::creature::genome::sensor_analysis::perception_requirements;
 use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::vm::{opcode_base_cost, step_charge};
-use crate::sensors::perception::genome_uses_extended_perception;
 
 use super::super::input_use::catalog::{addressed, Addressed, Channel, Family as CatalogFamily};
 use super::super::mesh_execution::indices_for_node_ids;
@@ -358,7 +358,7 @@ pub fn feasibility(
         added_genome_units: added,
         maintenance_per_tick: f64::from(added)
             * f64::from(config.energy.lifecycle.genome_carry_cost_per_unit),
-        extended_perception: genome_uses_extended_perception(&authored),
+        extended_perception: perception_requirements(&authored).extended_perception,
         founder_work: work_on_fixtures(founder, family, config),
         authored_work: work_on_fixtures(&authored, family, config),
         feasible: sinks_ok && authored.nodes.len() == founder.nodes.len(),
