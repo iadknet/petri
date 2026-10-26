@@ -23,8 +23,7 @@ to main's; any that moves is a defect.
   re-export (no `creature::genome` or `creature::<reader>` path survives
   under `crates/`, in code or comments).
 - No other module moves: the rest of `creature/` stays (G12 is T30.F05's,
-  G27 T30.F08's); `neighborhood/` keeps its name (section 3 names
-  `readers (neighborhood/)`).
+  G27 T30.F08's); `neighborhood/` keeps its name (section 3).
 - No change to the checker's rules or the debt list's form beyond
   invariants 4 and 5.
 - No new `profile-ticks` option beyond today's three, and no stored summary
@@ -57,17 +56,18 @@ Invariants:
    `neighborhood/mod.rs`, whose module doc describes the readers domain of
    section 3 rather than the T11.F01 indicator alone; `ring_rules` reaches
    `sensor_census` inside `neighborhood`. `neighborhood/companions.rs`, a
-   re-export of two genome items whose only user is its own parity test
-   (`creature/genome/companions.rs:144-156`), is deleted with its `pub mod` and
-   `pub use`; that test keeps its structural assertion (a `LoadSlotPrev`
-   genome reads shared memory) and loses the two re-export comparisons. `grep -rnE "creature::(drives|ring_rules|sensor_census|plasticity_census)" crates`
+   re-export of two genome items, is deleted with its `pub mod` and
+   `pub use`; its parity test (`creature/genome/companions.rs:144-156`)
+   keeps its structural assertion (a `LoadSlotPrev` genome reads shared
+   memory) and loses the two re-export comparisons, and its one production
+   caller, `v3-cli/src/bench/indicators.rs:32-33`, names `v3_core::genome`.
+   `grep -rnE "creature::(drives|ring_rules|sensor_census|plasticity_census)" crates`
    is empty.
 3. `v3-cli profile-ticks [--ticks N] [--creatures N] [--world-size N]`
-   (defaults 200, 200, 200) is today's harness: `SimulationConfig::default()`
-   with width and height set to the world size and `initial_creatures` to the
-   creature count, `normalize()`, `seed_simulation(cfg, 42)`,
-   `run_tick(&mut sim, &mut None)` per tick, the two stderr lines, and the
-   `dhat` global allocator and heap profiler under the `dhat-heap` feature.
+   (defaults 200, 200, 200) is today's harness: the default config sized
+   by the arguments and normalized, seed 42, `run_tick` per tick, the two
+   stderr lines, and the `dhat` allocator and heap profiler under the
+   `dhat-heap` feature.
    The feature and its optional `dhat` dependency move to
    `crates/v3-cli/Cargo.toml`; `crates/v3-core` keeps neither and has no
    `src/bin/`. The
@@ -100,10 +100,12 @@ Invariants:
    `proptest-regressions/neighborhood/sensor_census.txt`); neither remains
    under `proptest-regressions/creature/`.
 7. No behavior change: the gate's deterministic blocks are identical to the
-   epoch, every existing test value is unchanged, no test is ignored or
-   deleted (the checker's readers fixture and the companions parity test
-   are rewritten, not dropped), and the only new tests are the harness's
-   own.
+   epoch, every existing test value that a simulation produces is unchanged,
+   no test is ignored or deleted (the checker's readers fixture and the
+   companions parity test are rewritten, not dropped), and the only new
+   tests are the harness's own. The frontend's sha256 fingerprint of
+   `cgp/group.rs` (`petriVizDrift.test.ts:21,73`) is a source-review
+   marker, not a simulation value; it takes the new path and hash.
 
 ## Architecture
 
@@ -112,14 +114,13 @@ Owners touched: genome (gains its home at level 5), the creature record
 (`neighborhood/`, gains the four censuses and loses a re-export shim),
 `v3-cli` (gains the harness under "commands, benchmarks, measurements") and
 `v3-core` (loses the binary section 2 forbids it). Debts paid: G24, G25,
-G26; their rows and the checker's three special cases are deleted at
-closure. No boundary changes and no desired-state edit: section 3 already
+G26; their rows and the checker's three special cases are deleted in this
+feature (task 5), since the checker fails on a stale debt line once the
+imports move. No boundary changes and no desired-state edit: section 3 already
 names `genome (genome/)` and `readers (neighborhood/)`, section 2 already
 places binaries outside the library crate, and section 5's remaining rows
-only change the paths they cite. No shared rule changes owner or
-interpretation: the import checker loses the cases that stood in for the
-moved paths, and its debt list re-keys two lines whose debts stay with
-their payer (G2 and G14, T25.F11), used exactly as today.
+only change the paths they cite. No shared rule changes owner: the checker
+loses its path special cases, and G2 and G14 stay with T25.F11, re-keyed.
 The row touches the import lines of every feature that edits genome code,
 so it lands while no such row is in flight (track Notes).
 
@@ -155,11 +156,13 @@ moved deterministic block or a changed test value would show it wrong.
       `crates/v3-core/tests/baseline_worlds.rs:746`; shorten the
       `include_str!` path at `creature/genome/vote.rs:434` by one `../` so it still
       reaches `frontend/src/types/vote-sinks.json`; `git mv` the
-      `container_tests.txt` regression file (invariants 1, 6; audit R1).
+      `container_tests.txt` regression file; in `frontend/`, the path and
+      sha256 in `petriVizDrift.test.ts:21,73` and the path in the
+      `vote-sinks.ts:10` comment (invariants 1, 6, 7; audit R1).
 - [x] Readers: `git mv` the seven files to `crates/v3-core/src/neighborhood/`;
       declare the four modules in `neighborhood/mod.rs` and delete them from
-      `creature/mod.rs`; rewrite the 15 external paths, `ring_rules.rs:29`
-      and `simulation/actions/reproduction.rs:128`; `git mv` the
+      `creature/mod.rs`; rewrite every path to them (sites in the
+      readings); `git mv` the
       `sensor_census.txt` regression file; rewrite the `neighborhood/mod.rs`
       module doc (audit R4); delete `neighborhood/companions.rs` with its
       `pub mod` and `pub use`, and rewrite the parity test at
@@ -168,9 +171,10 @@ moved deterministic block or a changed test value would show it wrong.
 - [x] Harness: `crates/v3-cli/src/profile.rs` with an options struct
       (ticks, creatures, world size) and a run function returning the
       elapsed time and remaining population; `Commands::ProfileTicks` in
-      `main.rs` with clap arguments defaulting to 200, printing today's two
-      stderr lines; the `dhat` allocator and profiler in `main.rs` under
-      `#[cfg(feature = "dhat-heap")]`; the feature and dependency moved from
+      `main.rs` with clap arguments defaulting to 200; under
+      `#[cfg(feature = "dhat-heap")]`, the `dhat` global allocator in
+      `main.rs` and the heap profiler scoped to the subcommand, as the
+      binary scoped it; the feature and dependency moved from
       `crates/v3-core/Cargo.toml` to `crates/v3-cli/Cargo.toml`; `git rm
       crates/v3-core/src/bin/profile_ticks.rs`; the doc comment carries
       today's two workflows (samply on the `profiling` build, `dhat` through
@@ -242,8 +246,7 @@ sits outside the timed loop.
 ## Success Criteria
 
 - [ ] `crates/v3-core/src/genome/` is the genome's one home and the four
-      readers live in `neighborhood/`; no `creature::genome` or
-      `creature::<reader>` path remains under `crates/`.
+      readers live in `neighborhood/`; no old path remains under `crates/`.
 - [ ] `v3-cli profile-ticks` runs today's harness as a measurement command
       under the binary's `--telemetry` switch and `dhat-heap` feature;
       `v3-core` has no binary, feature or `dhat` dependency for it.
