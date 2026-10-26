@@ -242,9 +242,17 @@ template names the file.
 so the feature fixes a deficiency instead of working around it. Each
 `in-feature` refactor becomes a `Decision:` note, part of the feature's scope,
 and an Implementation Task the implementer's brief carries. An `accept`
-workaround gets a `Deferred:` note naming the row or reason that pays it, and
-an Implementation Task to write its `WORKAROUND(TNN.FNN): <intended design>`
-comment at the site. A `prerequisite` refactor or a `re-plan` finding is a
+workaround gets a `Deferred:` note naming the roadmap row or the
+`docs/architecture.md` debt that pays it, and an Implementation Task to write
+its `WORKAROUND(TNN.FNN): <intended design>` comment at the site. Every row of
+the audit table is a deficiency with a class; a row that is not a deficiency
+is deleted, never kept as an unmarked `accept` ("a convention", "the
+design"). When no row or debt pays an accepted workaround, the spec owner
+proposes one to the user at closure. A deficiency an earlier feature already
+accepted cannot be accepted again by a later feature that hits it: it becomes
+`in-feature` or a `prerequisite`. During implementation, a deficiency the audit
+missed is a requirement question for the spec owner, who classifies it the same
+way; the implementer never writes the workaround on its own. A `prerequisite` refactor or a `re-plan` finding is a
 blocker: the spec owner reports it, and the user decides. When the user approves
 a prerequisite row, the orchestrator adds it and the feature's dependency on it
 to the track roadmap on main, runs `make roadmap-check`, commits that planning
@@ -314,7 +322,10 @@ adopting it costs nothing, as a wording or factual correction does; adopting
 one that adds a requirement, invariant, test, option or mechanism needs a
 one-line reason in the dispositions table naming the failure it prevents in
 this feature. Review findings are not free: each adoption is carried by every
-later feature that reads the spec or the code. Round 1's coverage section is copied into
+later feature that reads the spec or the code. A refactor of code the feature
+touches is the exception: one that removes a workaround, a duplicate or a
+hand-kept parallel list is adopted when it names the deficiency it removes,
+because it takes complexity away rather than adding capability. Round 1's coverage section is copied into
 `docs/progress/readings/<id>.md` as a six-row table (check, verdict, what was
 examined, finding references or why it is clear). The findings and dispositions of every round go
 in one table in `docs/progress/readings/<id>.md`, never in the spec; the spec

@@ -367,6 +367,16 @@ finding is now dropped unless it costs nothing, as Google's optional "Nit:"
 comments are, and an adoption that adds a requirement, test or mechanism names
 the failure it prevents. Reviewers name that failure for any fix that adds one,
 and readiness rounds report fixes larger than their findings as over-fixes.
+Those brakes target added capability, not refactoring: Fowler's Yagni excludes
+work that makes software easier to change. Since T25.F05 the refactor audits
+placed 62 refactors inside features but kept 10 accepted workarounds, six with
+no marker, four of them called "a convention" or "the design". Adding a death
+cause still takes hand edits in three places; T26.F02 and T27.F03 both accepted
+that, and no row pays for it. A refactor that removes a deficiency in touched code
+is now adopted when it names that deficiency. Every audit row is a classed
+deficiency. An `accept` names the row or debt that pays it, and the same
+deficiency cannot be accepted twice. A deficiency found mid-build goes to the
+spec owner instead of becoming a silent workaround.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
