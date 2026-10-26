@@ -487,7 +487,7 @@ fn census_covers(family: Family) -> bool {
 pub fn executed_union(frozens: &[Frozen]) -> BTreeSet<usize> {
     frozens
         .iter()
-        .flat_map(|frozen| frozen.record.executed_indices(frozen.age, u64::MAX))
+        .flat_map(|frozen| frozen.executed_indices(u64::MAX))
         .collect()
 }
 
@@ -769,7 +769,7 @@ fn mutants(
                 &mut child,
                 &config.mutation,
                 reachable,
-                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
+                ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut seed.rng(k),
                 config.world.food.types.len(),
             );

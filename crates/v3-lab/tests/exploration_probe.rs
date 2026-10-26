@@ -117,9 +117,7 @@ fn e3_fixed_pool_selection_audit() {
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
-                    ParentExecuted::Query(&|window| {
-                        frozen.record.executed_indices(frozen.age, window)
-                    }),
+                    ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
                     food_types,
                 );
@@ -278,9 +276,7 @@ fn e4_elite_neighbourhood_audit() {
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
-                    ParentExecuted::Query(&|window| {
-                        frozen.record.executed_indices(frozen.age, window)
-                    }),
+                    ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
                     food_types,
                 );
@@ -352,7 +348,7 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
         &mut child,
         &setup.config.mutation,
         &mesh_reachable_nodes(parent),
-        ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
+        ParentExecuted::Query(&|window| frozen.executed_indices(window)),
         &mut rng,
         setup.config.world.food.types.len(),
     );

@@ -80,8 +80,9 @@ behavior.
   (`simulation/actions/reproduction.rs:392` already passes it explicitly),
   whose type is a contracts- or mutation-owned view of executed nodes: once
   `DispatchRecord` is runtime's, `mutation::reachability` cannot import it.
-  F02 and F06 both change `simulation/energy_accounting.rs` and the action
-  energy flooring in `simulation/tick.rs`, and F02 and F03 both change
+  F02 and F06 both change `ledger/mod.rs` (formerly
+  `simulation/energy_accounting.rs`) and the action energy flooring in
+  `simulation/tick.rs`, and F02 and F03 both change
   `creature/state.rs`; concurrent sessions reconcile those files at
   integration.
 - F03 keeps the sensor caches computed once per birth (`163a68b0` added them

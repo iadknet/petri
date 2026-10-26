@@ -53,9 +53,7 @@ use self::window_seam::{record_limit, FlowMarks};
 #[cfg(feature = "telemetry-seams")]
 use crate::runtime::traced_mesh::{execute_creature_mesh_budgeted, RecordedMesh};
 #[cfg(feature = "telemetry-seams")]
-use crate::simulation::recording::TickOutcome;
-#[cfg(feature = "telemetry-seams")]
-use crate::simulation::recording::Truncation;
+use crate::simulation::recording::{TickOutcome, Truncation};
 
 #[cfg(test)]
 #[path = "tick/tests/mod.rs"]

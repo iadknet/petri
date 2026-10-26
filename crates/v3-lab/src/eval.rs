@@ -236,6 +236,15 @@ pub struct Frozen {
     pub age: u64,
 }
 
+impl Frozen {
+    /// The sorted ascending node indices dispatched less than `window` ticks
+    /// before the frozen age.
+    #[must_use]
+    pub fn executed_indices(&self, window: u64) -> Vec<usize> {
+        self.record.executed_indices(self.age, window)
+    }
+}
+
 /// Interval progress toward the nearest remaining food along the shortest
 /// passable path, observed at tick boundaries only. The distance field is
 /// recomputed when an interval opens and read once per tick.
@@ -734,7 +743,7 @@ mod tests {
             score.food_eaten >= alive.food_eaten,
             "bites never decrease; a_bite_in_the_death_tick_counts_exactly pins the death-tick bite"
         );
-        assert!(!frozen.record.executed_indices(frozen.age, 100).is_empty());
+        assert!(!frozen.executed_indices(100).is_empty());
     }
 
     #[test]
@@ -766,7 +775,7 @@ mod tests {
         let (score, frozen) = evaluate_genome(&setup, &founder(&setup), &scene(3));
         assert_eq!(score.death_tick, None);
         assert_eq!(frozen.age, 1);
-        assert!(!frozen.record.executed_indices(frozen.age, 100).is_empty());
+        assert!(!frozen.executed_indices(100).is_empty());
     }
 
     #[test]

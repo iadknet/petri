@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{NodeId, WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::genome::CreatureGenome;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::state::GraphRuntimeState;
@@ -141,7 +141,7 @@ fn trimmed(mut rows: Vec<Vec<u32>>) -> Vec<Vec<u32>> {
 /// side only differs exactly when it stores some scalar, zeros included.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct StateRecord {
-    shared_memory: [u32; 16],
+    shared_memory: [u32; SHARED_MEMORY_SLOTS],
     energy: u32,
     work: WorkCounters,
     priority_bid: u32,

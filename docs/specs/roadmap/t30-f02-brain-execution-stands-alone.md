@@ -214,9 +214,10 @@ wrong.
       `simulation/tick/tests/{dispatch_record,window_seam,energy_accounting}.rs`,
       the v3-telemetry `windows` tests and the v3-server sampler tests ->
       69, 21 and 2 passed.
-- [x] Workspace tests, clippy, fmt, `cargo check --all-targets`, the
-      architecture and roadmap checkers -> pass (v3-core with and without
-      `telemetry-seams`; clippy `-D warnings`).
+- [x] `cargo check --workspace --all-targets`, `cargo fmt --all --check`,
+      clippy `-D warnings`, architecture and roadmap checkers -> clean;
+      v3-lab 212, v3-core 2,407 (2,440 with `telemetry-seams`) passed;
+      v3-telemetry, v3-server, v3-cli pass.
 - [ ] `make check` -> exit code and commit; `make rust-test-slow` -> exit
       code.
 - [ ] Gate: summary at `docs/progress/features/t30-f02.json`, local raw

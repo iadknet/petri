@@ -756,11 +756,7 @@ fn advance(
             reachable_nodes: mesh_reachable_nodes(genome).len(),
             executed_nodes: best
                 .frozen()
-                .record
-                .executed_indices(
-                    best.frozen().age,
-                    arm.setup.config.mutation.executed_window_ticks,
-                )
+                .executed_indices(arm.setup.config.mutation.executed_window_ticks)
                 .len(),
         }),
         validation_mean,
@@ -900,7 +896,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
                 &mut child,
                 &config.mutation,
                 &reachable[pick],
-                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
+                ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
                 config.world.food.types.len(),
             );
@@ -1303,7 +1299,7 @@ mod tests {
                 &mut genome,
                 &arm.setup.config.mutation,
                 &reachable,
-                ParentExecuted::Query(&|window| frozen.record.executed_indices(frozen.age, window)),
+                ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
                 arm.setup.config.world.food.types.len(),
             );
