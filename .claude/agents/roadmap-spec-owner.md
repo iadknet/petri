@@ -50,10 +50,8 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   `_feature-template.md`, and run your one `spec-review` readiness review
   after the Codex design round and before the readiness rounds. Apply `refactor-audit` in preparatory mode
   as the workflow's "Preparatory refactoring" paragraph defines, so the
-  feature does not work around a deficiency it could fix. Every audit row is a
-  deficiency with a class; delete a row that is not one rather than accept it
-  unmarked. An `accept` names the row or debt that pays it, and a deficiency an
-  earlier feature already accepted is `in-feature` or `prerequisite` this time. Declare the spec's
+  feature does not work around a deficiency it could fix; that paragraph
+  holds the class rules for every audit row and `accept`. Declare the spec's
   Verification Plan: the
   cheapest benchmark profiles and slow-test line that answer the
   feature's question, each with a one-sentence reason. Your self-review is not
@@ -69,13 +67,9 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   never into its prompt. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the
   requirement, or the code — not in your own authorship — except the
-  workflow's user-owned findings, which you report instead. Drop an advisory
-  finding unless adopting it costs nothing (a wording or factual correction);
-  adopt one that adds a requirement, invariant, test, option or mechanism only
-  with a one-line reason naming the failure it prevents in this feature. A
-  refactor of code the feature touches that removes a workaround, duplicate or
-  hand-kept parallel list is adopted when it names the deficiency it removes.
-  Record every round's
+  workflow's user-owned findings, which you report instead. Disposition
+  advisory findings and write rebuttals as the workflow's "Codex challenge
+  loop" says. Record every round's
   findings and dispositions in one table in `docs/progress/readings/<id>.md`.
   A new blocking finding first raised in round 3 is not fixed silently: report
   it as unresolved.

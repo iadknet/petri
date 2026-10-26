@@ -12,12 +12,12 @@ Usage: scripts/codex-review <kind> --worktree DIR --out FILE [slots] [--render-o
   lens1 | lens2 | lens3        --feature ID --spec PATH (base: merge base with main)
   spec-round1                  --feature ID --spec PATH
   spec-round2 | spec-round3    --feature ID --spec PATH --prior FILE...
-  track-design                 --doc PATH... [--base REF] [--intent-export FILE]
+  track-design                 --doc PATH... --intent-export FILE [--base REF]
   adhoc-plan                   --doc PATH... [--base REF] [--user-focus TEXT]
   adhoc-diff                   --skill NAME --base REF [--user-focus TEXT]
 
 The brief is written to FILE.brief.md and Codex's report to FILE, which must
-lie outside the worktree. --render-only writes the brief, prints its path and
+lie outside the repository and must not be symlinks. --render-only writes the brief, prints its path and
 does not start Codex. --user-focus is only for focus the user asked for in
 their own words.
 EOF
@@ -88,7 +88,13 @@ done
 [ -n "$out" ] || fail '--out is required'
 worktree=$(git -C "$worktree" rev-parse --show-toplevel 2>/dev/null) || fail "--worktree is not a git checkout"
 worktree=$(CDPATH='' cd -- "$worktree" && pwd -P)
-inside_worktree() { case "$1" in "$worktree"|"$worktree"/*) return 0 ;; esac; return 1; }
+# A linked worktree lives inside the main checkout, so test against both.
+common_dir=$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)
+repo_root=$(CDPATH='' cd -- "$(dirname -- "$common_dir")" && pwd -P)
+inside_repo() {
+  case "$1" in "$worktree"|"$worktree"/*|"$repo_root"|"$repo_root"/*) return 0 ;; esac
+  return 1
+}
 absolute_file() {
   [ -f "$1" ] || fail "$2 does not exist: $1"
   printf '%s/%s\n' "$(CDPATH='' cd -- "$(dirname -- "$1")" && pwd -P)" "$(basename -- "$1")"
@@ -96,8 +102,10 @@ absolute_file() {
 out_dir=$(dirname -- "$out")
 [ -d "$out_dir" ] || fail "--out directory does not exist: $out_dir"
 out=$(CDPATH='' cd -- "$out_dir" && pwd -P)/$(basename -- "$out")
-! inside_worktree "$out" || fail '--out must lie outside the worktree so the brief and report never enter the diff'
+! inside_repo "$out" || fail '--out must lie outside the repository so the brief and report never enter a checkout'
 brief=$out.brief.md
+# Writing through a symlink could overwrite a tracked file.
+[ ! -L "$out" ] && [ ! -L "$brief" ] || fail '--out and its brief must not be symlinks'
 
 case " $allowed " in
   *' feature '*)
@@ -144,25 +152,44 @@ EOF
 fi
 case " $allowed " in *' doc '*) [ -n "$doc_list" ] || fail "$kind needs at least one --doc" ;; esac
 
-prior_list=''
+prior_list='' prior_rounds=''
+case "$kind" in spec-round*) round=${kind#spec-round} ;; *) round=0 ;; esac
 if [ -n "$priors" ]; then
   while IFS= read -r prior; do
     [ -n "$prior" ] || continue
     prior=$(absolute_file "$prior" --prior)
-    # Only a report this script produced has its brief beside it, so a
-    # requester cannot pass its own prose off as an earlier round.
+    # A report this script produced has its brief beside it, and the brief's
+    # header names the feature and round; this refuses a wrong path, another
+    # feature's report and a skipped round. A forged brief is refused by rule.
     [ -f "$prior.brief.md" ] || fail "--prior is not a codex-review report (no $prior.brief.md beside it)"
+    header=$(sed -n 1p "$prior.brief.md")
+    case "$header" in
+      "# Spec challenge, round "[1-9]" ("*"): $feature") ;;
+      *) fail "--prior is not a $feature spec challenge report: $prior" ;;
+    esac
+    prior_round=$(printf '%s\n' "$header" | sed 's/^# Spec challenge, round \([1-9]\).*/\1/')
+    [ "$prior_round" -lt "$round" ] || fail "--prior is round $prior_round, not an earlier round: $prior"
+    prior_rounds="$prior_rounds $prior_round"
     prior_list="$prior_list  - \`$prior\`$nl"
   done <<EOF
 $priors
 EOF
 fi
-case " $allowed " in *' prior '*) [ -n "$prior_list" ] || fail "$kind needs at least one --prior report" ;; esac
+case " $allowed " in
+  *' prior '*)
+    i=1
+    while [ "$i" -lt "$round" ]; do
+      case " $prior_rounds " in *" $i "*) ;; *) fail "$kind needs the round $i report as --prior" ;; esac
+      i=$((i + 1))
+    done
+    ;;
+esac
 
 if [ -n "$intent" ]; then
   intent=$(absolute_file "$intent" --intent-export)
-  ! inside_worktree "$intent" || fail '--intent-export must lie outside the repository'
+  ! inside_repo "$intent" || fail '--intent-export must lie outside the repository'
 fi
+[ "$kind" != track-design ] || [ -n "$intent" ] || fail 'track-design needs --intent-export: the intent review is required'
 if [ -n "$skill" ]; then
   case "$skill" in
     adversarial-code-review|architecture-review|code-health-review) ;;
@@ -196,6 +223,7 @@ render() {
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       '{{RULES}}') cat "$prompts/_rules.md" ;;
+      '{{LENS}}') cat "$prompts/_lens.md" ;;
       '{{DOCS}}') printf '%s' "$doc_list" ;;
       '{{PRIORS}}') printf '%s' "$prior_list" ;;
       '{{EXTENDERS}}') printf '%s\n' "$extenders" ;;

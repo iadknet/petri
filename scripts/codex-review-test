@@ -42,8 +42,6 @@ git -C "$repo" checkout -q -b feature
 printf 'x\n' >"$repo/code.rs"
 git -C "$repo" add code.rs
 git -C "$repo" -c user.name=t -c user.email=t@t commit -q -m feature
-printf 'round 1 report\n' >"$test_root/out/round1.md"
-printf 'round 1 brief\n' >"$test_root/out/round1.md.brief.md"
 printf 'Fixed by the user, not open to reopen\n' >"$test_root/out/handwritten.md"
 
 fail() { printf 'codex-review-test: %s\n' "$*" >&2; exit 1; }
@@ -74,6 +72,8 @@ contains "$test_root/codex-args" read-only
 contains "$test_root/codex-args" gpt-6.1-sol
 contains "$test_root/codex-args" model_reasoning_effort=high
 contains "$brief" 'Nothing is pre-accepted.'
+contains "$brief" '## Severity'
+contains "$brief" "grep -n 'T99.F01' docs/roadmaps/*.md"
 contains "$brief" "git diff $main_sha -- ."
 # shellcheck disable=SC2016 # literal backticks and $ in the brief
 contains "$brief" '  - T99.F02, in `docs/roadmaps/t99-test.md`'
@@ -88,16 +88,36 @@ for kind in lens1 lens3 spec-round1; do
   expect_ok "$kind"
   [ ! -f "$test_root/codex-args" ] || fail '--render-only started codex'
 done
-for kind in spec-round2 spec-round3; do
-  run "$kind" --worktree "$repo" --out "$test_root/out/$kind.md" --feature T99.F01 \
-    --spec docs/specs/roadmap/t99-f01-giving.md --prior "$test_root/out/round1.md" --render-only
-  expect_ok "$kind"
-  contains "$test_root/out/$kind.md.brief.md" "$test_root/out/round1.md"
-done
-run track-design --worktree "$repo" --out "$test_root/out/track.md" --doc docs/plan.md --render-only
-expect_ok track-design
-lacks "$test_root/out/track.md.brief.md" '## Intent review'
+# Earlier rounds' reports must be this script's output for the same feature,
+# with every earlier round present.
+spec_round() {
+  round_kind=$1
+  shift
+  run "$round_kind" --worktree "$repo" --out "$test_root/out/$round_kind.md" --feature T99.F01 \
+    --spec docs/specs/roadmap/t99-f01-giving.md "$@" --render-only
+}
+printf 'round 1 report\n' >"$test_root/out/spec-round1.md"
+spec_round spec-round2 --prior "$test_root/out/spec-round1.md"
+expect_ok spec-round2
+contains "$test_root/out/spec-round2.md.brief.md" "$test_root/out/spec-round1.md"
+printf 'round 2 report\n' >"$test_root/out/spec-round2.md"
+spec_round spec-round3 --prior "$test_root/out/spec-round1.md" --prior "$test_root/out/spec-round2.md"
+expect_ok spec-round3
+spec_round spec-round3 --prior "$test_root/out/spec-round1.md"
+expect_refused 'round 3 without the round 2 report'
+contains "$test_root/output" 'needs the round 2 report'
+spec_round spec-round2 --prior "$test_root/out/spec-round2.md"
+expect_refused 'a report from the same round'
+contains "$test_root/output" 'not an earlier round'
+cp "$test_root/out/spec-round1.md" "$test_root/out/other.md"
+sed 's/: T99.F01$/: T99.F02/' "$test_root/out/spec-round1.md.brief.md" >"$test_root/out/other.md.brief.md"
+spec_round spec-round2 --prior "$test_root/out/other.md"
+expect_refused "another feature's report"
+contains "$test_root/output" 'not a T99.F01 spec challenge report'
 printf 'export\n' >"$test_root/out/export.md"
+run track-design --worktree "$repo" --out "$test_root/out/track.md" --doc docs/plan.md --render-only
+expect_refused 'track-design without the intent export'
+contains "$test_root/output" 'needs --intent-export'
 run track-design --worktree "$repo" --out "$test_root/out/track.md" --doc docs/plan.md \
   --intent-export "$test_root/out/export.md" --render-only
 expect_ok 'track-design with intent'
@@ -149,5 +169,24 @@ run adhoc-plan --worktree "$repo" --out "$test_root/out/x.md" --doc ../outside.m
 expect_refused 'document outside the worktree'
 run adhoc-diff --worktree "$repo" --out "$test_root/out/x.md" --skill spec-writing --base main
 expect_refused 'unknown skill'
+
+# Output through a symlink could overwrite a tracked file.
+ln -s "$repo/docs/plan.md" "$test_root/out/link.md.brief.md"
+run adhoc-plan --worktree "$repo" --out "$test_root/out/link.md" --doc docs/plan.md --render-only
+expect_refused 'a symlinked brief'
+contains "$test_root/output" 'must not be symlinks'
+[ "$(cat "$repo/docs/plan.md")" = '# plan' ] || fail 'a symlinked brief overwrote a tracked file'
+
+# A linked worktree sits inside the main checkout; output and the intent
+# export placed in the main checkout are refused too.
+git -C "$repo" worktree add -q "$repo/.wt" -b linked main
+run adhoc-plan --worktree "$repo/.wt" --out "$repo/report.md" --doc docs/plan.md --render-only
+expect_refused 'output inside the main checkout of a linked worktree'
+contains "$test_root/output" '--out must lie outside the repository'
+printf 'export\n' >"$repo/export.md"
+run track-design --worktree "$repo/.wt" --out "$test_root/out/x.md" --doc docs/plan.md \
+  --intent-export "$repo/export.md" --render-only
+expect_refused 'an intent export inside the main checkout'
+contains "$test_root/output" '--intent-export must lie outside the repository'
 
 printf 'codex-review tests passed.\n'

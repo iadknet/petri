@@ -43,10 +43,11 @@ row, report the contradiction with the evidence instead of choosing a reading.
   report, not a choice to make.
 - When the spec's route would need a workaround in code the feature touches (a
   special case, a parallel path, a flag or a copied pattern that routes around
-  a deficiency) and the spec does not already declare it, stop and report the
-  deficiency with its site as a requirement question. Do not write the
-  workaround on your own: the spec owner decides whether it becomes an
-  in-feature refactor, a marked `accept` or a prerequisite.
+  a deficiency) and the spec does not already declare it, finish the tasks
+  that do not depend on it, then report the deficiency with its site as a
+  requirement question. Do not write the workaround on your own: the spec owner
+  decides whether it becomes an in-feature refactor, a marked `accept` or a
+  prerequisite.
 - Use `$rust-skills` (via the Skill tool) for every Rust change, loading only the
   rule files relevant to the code you touch.
 - Use TDD for behavior changes and bug fixes. Test determinism is required only

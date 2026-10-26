@@ -219,9 +219,10 @@ sandbox, and do not bypass `scripts/bench-wait` when permission is unavailable.
 
 ### Final review
 
-For final review, spawn three `roadmap_reviewer` agents together, each using
+For final review, spawn three fresh subagents together, each using
 `gpt-6-astra`, `high`, and `fork_turns: none`, one per lens of the shared
-Review contract's table. Render each lens's fixed brief with
+Review contract's table. The lens template is the whole checklist; there is
+no reviewer agent definition. Render each lens's fixed brief with
 `scripts/codex-review <lens> ... --render-only`, which writes the brief and
 prints its path without starting a Codex job. The spawn message is exactly
 `Read <brief path> and follow it; your final answer is the report.` and

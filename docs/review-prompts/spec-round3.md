@@ -24,16 +24,17 @@ cites.
 
 Apply `$spec-review`. Confirm the fixes made since the last round and judge
 each rebuttal: the dispositions and rebuttals are the spec owner's arguments
-for its own spec, so accept one only when the spec, the row or the code
-supports it. Check that each fix is the smallest change that resolves its
+for its own spec, so accept one only when the spec section or code it cites
+supports it, and reject one that cites nothing checkable. Check that each fix is the smallest change that resolves its
 finding: a fix that adds more than the finding needed (a requirement,
 invariant, test, option or mechanism beyond it) is an `advisory:` over-fix.
 Report only new blocking findings and over-fixes beyond those.
 
 ## Output
 
-First one line per disposition: `disposition <ref>: confirmed`, `disposition
-<ref>: rejected — <why>` or `disposition <ref>: accepted rebuttal`. Then any
+First one line per disposition, keyed by the readings table's round and row
+number: `disposition <round>.<#>: confirmed`, `disposition <round>.<#>:
+rejected — <why>` or `disposition <round>.<#>: accepted rebuttal`. Then any
 new finding the skill would grade P1, one per line starting `blocking:`, and
 any over-fix, one per line starting `advisory:`. Each cites the spec section
 and the evidence, proposes a concrete change, and ends with `[verified]` when

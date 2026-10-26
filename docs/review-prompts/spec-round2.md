@@ -27,27 +27,29 @@ the code the spec names.
 
 ## Method
 
-Apply `$spec-review`. Two jobs:
+Apply `$spec-review`. Two jobs, in this order:
 
-1. Judge each disposition in the readings file against the spec as it now
-   stands. The dispositions and rebuttals are the spec owner's arguments for
-   its own spec: accept one only when the spec, the row or the code supports
-   it. Check that each fix is the smallest change that resolves its finding:
-   a fix that adds more than the finding needed (a requirement, invariant,
-   test, option or mechanism beyond it) is an `advisory:` over-fix.
-2. Break confidence that the spec is ready to implement. Attack: contradiction
-   with the row or the requirement; a source-quoted requirement the spec drops
-   or covers on fewer routes than it names; scope widened or narrowed;
-   acceptance criteria that cannot be tested; claims about current code the
-   code does not support; missing invariants and edge cases; determinism; the
-   natural-analog rule; an unrealistic Performance predeclaration; a
-   Verification Plan the change does not fit; requirements that steer toward
-   needless complexity.
+1. Break confidence that the spec is ready to implement, reading the spec
+   itself before the dispositions. Attack: contradiction with the row or the
+   requirement; a source-quoted requirement the spec drops or covers on fewer
+   routes than it names; scope widened or narrowed; acceptance criteria that
+   cannot be tested; claims about current code the code does not support;
+   missing invariants and edge cases; determinism; the natural-analog rule; an
+   unrealistic Performance predeclaration; a Verification Plan the change does
+   not fit; requirements that steer toward needless complexity.
+2. Then judge each disposition in the readings file against the spec as it
+   now stands. The dispositions and rebuttals are the spec owner's arguments
+   for its own spec: accept one only when the spec section or code it cites
+   supports it, and reject one that cites nothing checkable. Check that each
+   fix is the smallest change that resolves its finding: a fix that adds more
+   than the finding needed (a requirement, invariant, test, option or
+   mechanism beyond it) is an `advisory:` over-fix.
 
 ## Output
 
-First one line per disposition: `disposition <ref>: confirmed`, `disposition
-<ref>: rejected — <why>` or `disposition <ref>: accepted rebuttal`. Then one
+First one line per disposition, keyed by the readings table's round and row
+number: `disposition <round>.<#>: confirmed`, `disposition <round>.<#>:
+rejected — <why>` or `disposition <round>.<#>: accepted rebuttal`. Then one
 finding per line starting `blocking:` where the skill would grade it P1 or
 `advisory:` where it would grade it P2 or P3, citing the spec section and the
 evidence, proposing a concrete change, and ending with `[verified]` when you

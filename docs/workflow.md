@@ -191,7 +191,7 @@ the main checkout — a worktree session cannot merge into the main checkout.
 Load `SendMessage` with `ToolSearch select:SendMessage`; the spec owner is
 resumed through it. If the tool is absent in this build, continue, and apply the
 fallback in "Plan" below.
-Run the Codex channel's `setup --json` and confirm `"ready": true`. If Codex is
+Run `codex --version` (0.159.1 or later) and `codex login status`. If Codex is
 not installed or not logged in, stop and report it; both independent reviews
 depend on it, and there is no Claude fallback.
 
@@ -247,8 +247,10 @@ workaround gets a `Deferred:` note naming the roadmap row or the
 its `WORKAROUND(TNN.FNN): <intended design>` comment at the site. Every row of
 the audit table is a deficiency with a class; a row that is not a deficiency
 is deleted, never kept as an unmarked `accept` ("a convention", "the
-design"). When no row or debt pays an accepted workaround, the spec owner
-proposes one to the user at closure. A deficiency an earlier feature already
+design"). When no row or debt pays an accepted workaround yet, its note reads
+`Deferred: unpaid accept, <site>; payer proposed to the user at closure`, the
+workflow's form for that case rather than a gap in the spec, and the spec owner
+proposes the row to the user at closure. A deficiency an earlier feature already
 accepted cannot be accepted again by a later feature that hits it: it becomes
 `in-feature` or a `prerequisite`. During implementation, a deficiency the audit
 missed is a requirement question for the spec owner, who classifies it the same
@@ -262,51 +264,29 @@ one resumes.
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
 job through the Codex channel: `scripts/codex-review spec-round1`,
 `spec-round2` and `spec-round3`, with the feature ID, the worktree and the
-spec, and from round 2 on the earlier rounds' reports as `--prior`. The
-templates name the inputs: the original requirement, the roadmap contract,
-the feature's track row, dependency rows, matching Notes entries, and the
-feature's source-quoted requirements from its row and cited design note. Round 1 is the design round: it
-applies `$plan-design-review` only and runs all six of its checks, namely code
-decomposition, task decomposition, domain boundaries and separation of concerns,
-outdated or never-correct premises, a larger design flaw (step back), and
-workarounds that should be refactors. Checks 3 and 5 run against
-`docs/architecture.md`: the round reports a leaky abstraction, coupling the
-file forbids, a design decision that means it should change, and a missing
-edit to it. Before round 1 the spec owner writes its
-`$refactor-audit` table to `docs/progress/readings/<id>.md`, which round 1
-tests for check 6 rather than trusts. Round 1 returns the skill's full report:
-the coverage section, with one line per check naming what was examined, any
-`step-back:` lines, the assumptions and workaround tables, and the
-`Could not verify:` list, with `blocking:` and `advisory:` in place of the
-skill's severity labels and a verdict line. A round-1 output that
-lacks a check's coverage line is incomplete: the spec owner replaces it with a
-fresh round-1 job, which does not count as a round, rather than dispositioning
-it.
-Round 2 is the readiness round: it applies `$spec-review`, confirms the round-1
-dispositions, and asks Codex to break confidence that the spec is ready to
-implement. Its attack surface is contradiction with the roadmap row or
-requirement, a source-quoted requirement the spec drops or covers on fewer
-routes than it names, scope widened or narrowed, acceptance criteria that cannot be
-tested, claims about current code that the code does not support, missing
-invariants and edge cases, determinism, the natural-analog rule, an unrealistic
-Performance predeclaration, a Verification Plan the change does not fit, and
-requirements that steer toward needless complexity. Round 3 confirms round 2's
-fixes. Each finding is `blocking`, where the round's skill would grade it P1,
-or `advisory`, where it would grade it P2 or P3. It cites the spec section and
-the evidence, proposes a concrete change, and ends `[verified]` when the
-reviewer checked it against the code, the documents or stored output, or
-`[plausible]` when it is reasoned but not confirmed. A `[plausible]` finding is
-open to a rebuttal that shows the code or documents say otherwise. The templates
-fix the output format: one line per finding starting `blocking:` or
-`advisory:`, then a final line `verdict: ready` or `verdict: not-ready`; round 1
-adds the skill's assumptions table. The verdict follows from the findings, not
+spec, and from round 2 on every earlier round's report as `--prior`. The
+templates in [`docs/review-prompts/`](review-prompts/) hold each round's
+inputs, attack surface and output format; this paragraph holds what the loop
+does with them. Round 1 is the design round: `$plan-design-review` with all six
+checks, checks 3 and 5 against `docs/architecture.md`. Before it, the spec owner
+writes its `$refactor-audit` table to `docs/progress/readings/<id>.md`, which
+round 1 tests for check 6 rather than trusts. A round-1 report that lacks a
+check's coverage line is incomplete: the spec owner replaces it with a fresh
+round-1 job, which does not count as a round, rather than dispositioning it.
+Round 2 is the readiness round (`$spec-review`) and round 3 confirms round 2's
+fixes. A finding is `blocking` where the round's skill would grade it P1 and
+`advisory` where it would grade it P2 or P3, and it ends `[verified]` or
+`[plausible]`; a `[plausible]` finding is open to a rebuttal that shows the
+code or documents say otherwise. The verdict follows from the findings, not
 from a separate judgment: `ready` exactly when the round reports no blocking
 finding and rejects no disposition of a blocking one. A report with no findings
 is valid when its coverage shows the work.
 
 The spec owner answers every blocking finding by editing the spec or writing a
-one-sentence rebuttal grounded in the roadmap row, the requirement, or the
-code, except for the user-owned findings below. Rounds 2 and 3 read the
+rebuttal grounded in the roadmap row, the requirement, or the code, except for
+the user-owned findings below. A rebuttal in the dispositions table cites the
+spec section, row or code it rests on and adds one sentence; free prose is not
+a rebuttal. Rounds 2 and 3 read the
 previous findings and their dispositions from the readings file, which the
 spec owner updates before each round, and the earlier reports; they confirm the
 fixes, accept or reject each rebuttal as the spec owner's argument rather than
@@ -438,35 +418,25 @@ host without them cannot run this step:
 
 | Lens | Skill | Template |
 | --- | --- | --- |
-| Correctness | `$adversarial-code-review` | `lens1`: the spec sections Goal, Inputs and Invariants, Architecture, Telemetry, Verification, and the Performance predeclaration when the feature is subject to it; the Review section of this file |
-| Design | `$architecture-review` | `lens2`: the spec's Goal, Inputs and Invariants, and Architecture sections; `docs/architecture.md` |
-| Code health | `$code-health-review` | `lens3`: the spec's Goal section and its `Decision:` and `Deferred:` notes |
+| Correctness | `$adversarial-code-review` | `lens1` |
+| Design | `$architecture-review` | `lens2` |
+| Code health | `$code-health-review` | `lens3` |
 
 Run each as `scripts/codex-review <template> --worktree <worktree> --out <file>
---feature <id> --spec <spec>`. The templates diff against the merge base with
-`main`, name `.claude/agents/roadmap-reviewer.md` and its lens section as the
-project checklist, and fix the report format: one finding per line starting
-`P1:`, `P2:`, or `P3:` with file, line, issue, and smallest fix, then what the
-reviewer could not verify. The design and code-health reports list their
-skill's coverage section first, one line per check with what was examined, and
-the design report may add ungraded `step-back:` and `architecture:` lines after
-it. A report missing a coverage line is incomplete and that lens is rerun.
-Their templates also list the later features whose rows depend on this one,
-derived from the roadmap, since their P2 test depends on them; they start from
-the diff's code hunks and do not read the touched `docs/` files other than
-`docs/architecture.md`, the workflow documents, the roadmap row or the
-telemetry template, which are the correctness lens's inputs. No reviewer edits,
-runs builds or tests, or consults the spec owner. Do not reuse a spec challenge
+--feature <id> --spec <spec>`. The templates in
+[`docs/review-prompts/`](review-prompts/) are the one home of each lens's
+inputs, checklist and report format; this section holds who runs them and what
+their findings mean for closure. A design or code-health report missing a
+coverage line is incomplete and that lens is rerun. No reviewer edits, runs
+builds or tests, or consults the spec owner. Do not reuse a spec challenge
 thread for a review. Quote each output file path, the findings and the
 design and code-health coverage lines in your own message.
 
-Only a P1 finding blocks progress. The design lens raises P1 only for
-coupling the diff introduces or widens that `AGENTS.md` or
-`docs/architecture.md` forbids, a new import cycle among it, unless the
-spec's Architecture paragraph explains it and names the row that removes
-it; unchanged existing debt is not reported. The correctness lens raises P1
-when the diff changes the desired architecture without the matching edit to
-that file. The code-health lens raises P1 only for an unmarked workaround. A design-lens
+Only a P1 finding blocks progress; each lens template states what its lens
+raises as P1. A design-lens P1 for forbidden coupling that the spec's
+Architecture paragraph explains and pays with a named row is judged here, at
+triage: the orchestrator accepts it as that row's debt or sends it to
+remediation, and records the choice in the spec's "Notes for AI Agents". A design-lens
 `step-back:` finding, or an `architecture:` line proposing a change to the
 desired state, never blocks closure and is never remediated in the feature:
 record it as a `Deferred:` note and report it to the user at closure. P2 and P3 are advisory and are

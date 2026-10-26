@@ -377,6 +377,20 @@ is now adopted when it names that deficiency. Every audit row is a classed
 deficiency. An `accept` names the row or debt that pays it, and the same
 deficiency cannot be accepted twice. A deficiency found mid-build goes to the
 spec owner instead of becoming a silent workaround.
+Independent Astra and Fable reviews of these changes, run from the fixed
+templates, found the workflow repeating its own rule. Each final-review lens was
+defined in three places: the Review section, `.claude/agents/roadmap-reviewer.md`
+and the new templates, and they had already drifted twice. The lens checklists
+now live only in the templates. The agent file is gone, and the workflow
+sections keep who runs a review and what its findings mean. The same reviews
+also led to these fixes: earlier rounds' reports are checked for feature and
+round, the roadmap design review requires its intent export, a reviewer may not
+write output through a symlink, and round 2 attacks the spec before reading the
+spec owner's rebuttals. The design lens no longer downgrades forbidden coupling
+on its own when the spec explains it and names a paying row. The user removed
+that exemption, inherited from 6a1987d0, because it let the author set the
+severity before the review. The reviewer reports such coupling as P1, and the
+exception is judged at triage.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
