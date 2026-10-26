@@ -2,10 +2,11 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha13";
+pub const PROTOCOL_VERSION: &str = "v3alpha14";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct StepRequest {
     #[serde(default = "default_one")]
     pub steps: u32,
@@ -55,13 +56,13 @@ mod tests {
         }
     }
 
-    /// T27.F03 serializes a directed vote sink as `{"Directed":[kind,d]}`,
-    /// retires the steal amount, adds the body shares to the creature
-    /// detail and adds the `GiveEnergy` action and its counters: breaking
-    /// payload changes.
+    /// T30.F01 replaces the creature's `genome`, `mesh_annotations` and
+    /// `graph_weights` with `brain` and `learning`, makes a sampler hop's
+    /// `input_refs` flat records and types every response: breaking payload
+    /// changes.
     #[test]
-    fn protocol_version_is_v3alpha13() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha13");
+    fn protocol_version_is_v3alpha14() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha14");
     }
 
     #[test]

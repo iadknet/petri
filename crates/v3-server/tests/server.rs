@@ -2155,13 +2155,13 @@ async fn get_creature_returns_full_detail() {
         "phenotype.rgb must have 3 elements"
     );
 
-    // Genome
-    assert!(body["genome"].is_object(), "missing genome");
+    // Brain
+    assert!(body["brain"].is_object(), "missing brain");
     assert!(
-        body["genome"]["entry_node_id"].is_number(),
-        "missing genome.entry_node_id"
+        body["brain"]["entry_node_id"].is_number(),
+        "missing brain.entry_node_id"
     );
-    assert!(body["genome"]["nodes"].is_array(), "missing genome.nodes");
+    assert!(body["brain"]["nodes"].is_array(), "missing brain.nodes");
 
     // Shared memory
     assert!(body["shared_memory"].is_array(), "missing shared_memory");
@@ -2436,11 +2436,7 @@ async fn get_creature_exclude_omits_fields() {
     let uri = format!("/v3/simulation/creature/{creature_id}");
     let (status, body) = do_request(a.clone(), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body.get("genome").is_some(), "genome should be present");
-    assert!(
-        body.get("mesh_annotations").is_some(),
-        "mesh_annotations should be present when genome is present"
-    );
+    assert!(body.get("brain").is_some(), "brain should be present");
     assert!(
         body.get("shared_memory").is_some(),
         "shared_memory should be present"
@@ -2477,15 +2473,11 @@ async fn get_creature_exclude_omits_fields() {
         "diagnostics.recent_actions.by_action_result should be an object"
     );
 
-    // exclude=genome — genome omitted, others present.
-    let uri_excl_genome = format!("/v3/simulation/creature/{creature_id}?exclude=genome");
+    // exclude=brain — brain omitted, others present.
+    let uri_excl_genome = format!("/v3/simulation/creature/{creature_id}?exclude=brain");
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_genome)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body.get("genome").is_none(), "genome should be omitted");
-    assert!(
-        body.get("mesh_annotations").is_none(),
-        "mesh_annotations should be omitted when genome is omitted"
-    );
+    assert!(body.get("brain").is_none(), "brain should be omitted");
     assert!(
         body.get("shared_memory").is_some(),
         "shared_memory should be present"
@@ -2505,15 +2497,11 @@ async fn get_creature_exclude_omits_fields() {
         "latest_tick should be present"
     );
 
-    // exclude=genome,action_log — both omitted.
-    let uri_excl_both = format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log");
+    // exclude=brain,action_log — both omitted.
+    let uri_excl_both = format!("/v3/simulation/creature/{creature_id}?exclude=brain,action_log");
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_both)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body.get("genome").is_none(), "genome should be omitted");
-    assert!(
-        body.get("mesh_annotations").is_none(),
-        "mesh_annotations should be omitted when genome is omitted"
-    );
+    assert!(body.get("brain").is_none(), "brain should be omitted");
     assert!(
         body.get("action_log").is_none(),
         "action_log should be omitted"
@@ -2523,16 +2511,12 @@ async fn get_creature_exclude_omits_fields() {
         "shared_memory should be present"
     );
 
-    // exclude=genome,action_log,shared_memory — all optional fields omitted.
+    // exclude=brain,action_log,shared_memory — all optional fields omitted.
     let uri_excl_all =
-        format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,shared_memory");
+        format!("/v3/simulation/creature/{creature_id}?exclude=brain,action_log,shared_memory");
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_all)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body.get("genome").is_none(), "genome should be omitted");
-    assert!(
-        body.get("mesh_annotations").is_none(),
-        "mesh_annotations should be omitted when genome is omitted"
-    );
+    assert!(body.get("brain").is_none(), "brain should be omitted");
     assert!(
         body.get("action_log").is_none(),
         "action_log should be omitted"
@@ -2550,7 +2534,7 @@ async fn get_creature_exclude_omits_fields() {
     assert!(body.get("id").is_some(), "id should be present");
 
     let uri_excl_diagnostics = format!(
-        "/v3/simulation/creature/{creature_id}?exclude=genome,action_log,shared_memory,diagnostics"
+        "/v3/simulation/creature/{creature_id}?exclude=brain,action_log,shared_memory,diagnostics"
     );
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_diagnostics)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
@@ -2561,7 +2545,7 @@ async fn get_creature_exclude_omits_fields() {
 }
 
 #[tokio::test]
-async fn get_creature_mesh_annotations_use_cached_reachable_nodes() {
+async fn get_creature_brain_annotations_use_cached_reachable_nodes() {
     let state = test_state();
     let creature_id = {
         let mut handle = state.sim.lock().await;
@@ -2584,22 +2568,69 @@ async fn get_creature_mesh_annotations_use_cached_reachable_nodes() {
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
 
-    let annotations = body["mesh_annotations"]
-        .as_array()
-        .expect("mesh_annotations array");
+    let nodes = body["brain"]["nodes"].as_array().expect("brain nodes");
     assert!(
-        annotations
+        nodes
             .iter()
-            .all(|annotation| annotation["reachable"].as_bool() == Some(false)),
+            .all(|node| node["annotation"]["reachable"].as_bool() == Some(false)),
         "handler should trust cached reachable indices, body: {body}"
     );
 }
 
-/// `graph_weights` (T25.F03): absent for a creature without a group member;
-/// for a member, every member's genomic weight beside the genome, computed
-/// with the genome excluded too, and dropped by its own token.
+// ── The brain view and the learning payload (T30.F01) ───────────────────────
+
+/// The Graph backend of brain node `node_id` in a creature detail body.
+fn brain_graph(body: &serde_json::Value, node_id: u32) -> &serde_json::Value {
+    let node = body["brain"]["nodes"]
+        .as_array()
+        .expect("brain nodes")
+        .iter()
+        .find(|node| node["node_id"] == node_id)
+        .expect("the brain node");
+    &node["backend"]["Graph"]
+}
+
+/// The brain edge at sink `occurrence`.
+fn brain_sink_edge(
+    graph: &serde_json::Value,
+    occurrence: v3_core::creature::genome::cgp::EdgeOccurrence,
+) -> &serde_json::Value {
+    use v3_core::creature::genome::cgp::EdgeSurface;
+    let (container, list) = match occurrence.surface {
+        EdgeSurface::SinkInput(sink) => (sink, "output_sinks"),
+        EdgeSurface::ComputeInput(node) => (node, "compute_nodes"),
+    };
+    &graph[list][container]["edges"][occurrence.index]
+}
+
+/// The learning entry of `occurrence` in the learning entry `entry`.
+fn learning_edge(
+    entry: &serde_json::Value,
+    occurrence: v3_core::creature::genome::cgp::EdgeOccurrence,
+) -> &serde_json::Value {
+    use v3_core::creature::genome::cgp::EdgeSurface;
+    let (surface, container) = match occurrence.surface {
+        EdgeSurface::SinkInput(sink) => ("sink", sink),
+        EdgeSurface::ComputeInput(node) => ("compute", node),
+    };
+    entry["edges"]
+        .as_array()
+        .expect("learning edges")
+        .iter()
+        .find(|edge| {
+            edge["surface"] == surface
+                && edge["container"] == container
+                && edge["edge"] == occurrence.index
+        })
+        .expect("a listed dynamic edge")
+}
+
+/// `brain` (invariants 2 and 3): a ring group's record, its eight birth
+/// coordinates present and each member's group facts, the composed weight
+/// read, not recomputed; no dynamic edge, so no `learning`. Each payload
+/// has its own `exclude` token.
 #[tokio::test]
-async fn get_creature_graph_weights_carry_member_genomic_weights() {
+async fn get_creature_brain_resolves_ring_members_and_their_group() {
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::creature::genome::cgp::Shape;
     use v3_core::creature::genome::vote::DirectedVoteKind;
@@ -2613,9 +2644,12 @@ async fn get_creature_graph_weights_carry_member_genomic_weights() {
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
     let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body.get("graph_weights").is_none(), "no member, no payload");
+    assert!(
+        body.get("learning").is_none(),
+        "no dynamic edge, no payload"
+    );
 
-    let node_id = {
+    let (node_id, ring_ref, group, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
         let node = creature
@@ -2632,49 +2666,62 @@ async fn get_creature_graph_weights_carry_member_genomic_weights() {
         };
         let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
         def.group_mut(group).set_scale(0.5);
-        let member = def.members(group).next().unwrap();
-        def.edge_mut(member).set_weight(0.25);
-        node.node_id
+        let members: Vec<_> = def.members(group).collect();
+        def.edge_mut(members[0]).set_weight(0.25);
+        (node.node_id.0, ring_ref, group.index(), members)
     };
 
-    for query in ["", "?exclude=genome"] {
+    for query in ["", "?exclude=learning"] {
         let (status, body) =
             do_request(router(state.clone()), get_req(&format!("{uri}{query}"))).await;
         assert_eq!(status, StatusCode::OK, "body: {body}");
-        let weights = body["graph_weights"]
-            .as_array()
-            .expect("graph_weights array");
-        assert_eq!(weights.len(), 1, "{body}");
-        assert_eq!(weights[0]["node_id"], serde_json::json!(node_id));
+        assert!(body.get("learning").is_none(), "{body}");
+        let graph = brain_graph(&body, node_id);
+        let record = &graph["groups"][group];
         assert_eq!(
-            weights[0]["scales"],
-            serde_json::json!([{"group": 0, "genomic": 0.5}])
+            record["shape"],
+            serde_json::json!({"Ring": {"ring_ref": ring_ref}})
         );
-        let edges = weights[0]["edges"].as_array().unwrap();
-        assert_eq!(edges.len(), 8);
-        assert!(edges.iter().all(|edge| edge["surface"] == "sink"));
-        let mut genomic: Vec<f64> = edges
-            .iter()
-            .map(|edge| edge["genomic"].as_f64().unwrap())
+        assert_eq!(record["kind"], "Move");
+        assert_eq!(record["offset"], 0);
+        assert_eq!(record["scale"], 0.5);
+        assert!(record.get("learned_scale").is_none());
+        let coordinates: Vec<_> = (0..8)
+            .map(|c| serde_json::json!({"field": c, "direction": c, "present": true}))
             .collect();
-        genomic.sort_by(f64::total_cmp);
-        assert_eq!(genomic, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75]);
+        assert_eq!(record["coordinates"], serde_json::json!(coordinates));
+        assert_eq!(record["facts"], serde_json::json!([]));
+        for (index, &member) in members.iter().enumerate() {
+            let edge = brain_sink_edge(graph, member);
+            let own = if index == 0 { 0.25 } else { 0.0 };
+            assert_eq!(edge["own"], own, "{edge}");
+            assert_eq!(edge["genomic"], 0.5 + own);
+            assert_eq!(edge["applied"], edge["genomic"]);
+            assert!(edge.get("learner").is_none());
+            let field = edge["source"]["InputLeaf"]["sub_idx"].clone();
+            assert_eq!(
+                edge["member"],
+                serde_json::json!({
+                    "group": group,
+                    "scope": "Edge",
+                    "site": {"Direction": field},
+                    "field": field,
+                    "pattern": 1.0,
+                    "scale": 0.5,
+                })
+            );
+        }
     }
-    let (_, body) = do_request(
-        router(state),
-        get_req(&format!("{uri}?exclude=graph_weights")),
-    )
-    .await;
-    assert!(body.get("graph_weights").is_none(), "excluded by its token");
-    assert!(body.get("genome").is_some());
+    let (_, body) = do_request(router(state), get_req(&format!("{uri}?exclude=brain"))).await;
+    assert!(body.get("brain").is_none(), "excluded by its token");
 }
 
-/// `graph_weights` (T25.F06): a plastic edge carries `applied` (the weight
-/// in force) and, once initialized, `learned`; a static member carries
-/// neither. A seeded Lamarckian vote edge is initialized at birth; an
-/// unseeded compute edge is not.
+/// `learning` and `brain` learners (invariants 4 and 5): a seeded Lamarckian
+/// vote edge is initialized at birth; an unseeded ungrouped learner is not,
+/// and its applied weight is its genomic own weight clamped to its bound, as
+/// the runtime resolves it (preservation case: the uninitialized learner).
 #[tokio::test]
-async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge() {
+async fn get_creature_learning_and_learners_follow_the_runtime() {
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::creature::genome::cgp::{
         BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
@@ -2697,7 +2744,8 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
         modulation: None,
         retention: 1.0,
     };
-    let (vote, vote_index) = {
+    let compute = EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0);
+    let (node_id, vote, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
         let node_idx = creature
@@ -2710,15 +2758,17 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
         let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
         node.input_refs
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let node_id = node.node_id.0;
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!()
         };
-        def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-        let vote = def
+        let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+        let members: Vec<_> = def.members(group).collect();
+        let vote_sink = def
             .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
             .unwrap();
         def.push_edge(
-            vote,
+            vote_sink,
             GraphEdge::new(
                 GraphSource::SharedMemory {
                     slot: 0,
@@ -2727,20 +2777,19 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
                 0.5,
             ),
         );
-        let vote_index = def.surface_edges(vote).len() - 1;
-        def.edge_mut(EdgeOccurrence::new(vote, vote_index))
-            .set_plasticity(Some(config));
-        def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
-            .set_plasticity(Some(config));
+        let vote = EdgeOccurrence::new(vote_sink, def.surface_edges(vote_sink).len() - 1);
+        def.edge_mut(vote).set_plasticity(Some(config));
+        def.edge_mut(compute).set_weight(3.0);
+        def.edge_mut(compute).set_plasticity(Some(config));
         let mut sinks: Vec<Vec<Option<f32>>> = def
             .output_sinks()
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect();
-        let EdgeSurface::SinkInput(vote_sink) = vote else {
+        let EdgeSurface::SinkInput(sink) = vote.surface else {
             unreachable!()
         };
-        sinks[vote_sink][vote_index] = Some(1.25);
+        sinks[sink][vote.index] = Some(1.25);
         let seeds = BirthSeeds::Rows {
             compute: def
                 .compute_nodes()
@@ -2753,51 +2802,89 @@ async fn get_creature_graph_weights_carry_applied_and_learned_for_a_plastic_edge
         let mut node_seeds = vec![None; creature.genome.nodes.len()];
         node_seeds[node_idx] = Some(seeds);
         creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
-        (vote_sink, vote_index)
+        (node_id, vote, members)
     };
 
-    let (status, body) = do_request(router(state), get_req(&format!("{uri}?exclude=genome"))).await;
+    let (_, body) = do_request(
+        router(state.clone()),
+        get_req(&format!("{uri}?exclude=learning")),
+    )
+    .await;
+    assert!(body.get("learning").is_none(), "excluded by its token");
+    assert!(body.get("brain").is_some());
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
-    let members: Vec<_> = edges
-        .iter()
-        .filter(|edge| edge["surface"] == "sink" && edge["container"] != vote)
-        .collect();
-    assert_eq!(members.len(), 8);
-    // Every listed edge carries `applied` (T25.F07): a static member of a
-    // group without a scale slot weighs at its genomic weight.
-    assert!(members
-        .iter()
-        .all(|edge| edge["applied"] == edge["genomic"] && edge.get("learned").is_none()));
-    assert!(body["graph_weights"][0]["scales"][0]
-        .get("learned")
-        .is_none());
-    let compute = edges
-        .iter()
-        .find(|edge| edge["surface"] == "compute")
-        .expect("the plastic compute edge");
-    assert_eq!(compute["container"], 0);
-    assert!(compute.get("learned").is_none(), "uninitialized: {compute}");
-    assert_eq!(compute["applied"], compute["genomic"]);
-    let voted = edges
-        .iter()
-        .find(|edge| edge["container"] == vote && edge["edge"] == vote_index)
-        .expect("the plastic vote edge");
-    assert_eq!(voted["genomic"], 0.5);
-    assert_eq!(voted["applied"], 1.25);
-    assert_eq!(voted["learned"], 1.25);
+    let entry = &body["learning"][0];
+    assert_eq!(entry["node_id"], node_id);
+    assert_eq!(entry["scales"], serde_json::json!([]));
+    // Static members of a group without a scale slot are not dynamic.
+    assert_eq!(entry["edges"].as_array().unwrap().len(), 2, "{entry}");
+    assert_eq!(
+        *learning_edge(entry, compute),
+        serde_json::json!({
+            "surface": "compute", "container": 0, "edge": 0,
+            "applied": 2.0, "initialized": false,
+        })
+    );
+    assert_eq!(
+        *learning_edge(entry, vote),
+        serde_json::json!({
+            "surface": "sink", "container": match vote.surface {
+                EdgeSurface::SinkInput(sink) => sink,
+                EdgeSurface::ComputeInput(_) => unreachable!(),
+            },
+            "edge": vote.index, "applied": 1.25, "learned": 1.25, "initialized": true,
+        })
+    );
+
+    let graph = brain_graph(&body, node_id);
+    let unseeded = brain_sink_edge(graph, compute);
+    assert_eq!(
+        (&unseeded["own"], &unseeded["genomic"]),
+        (&serde_json::json!(3.0), &serde_json::json!(3.0))
+    );
+    assert_eq!(
+        unseeded["applied"], 2.0,
+        "the runtime's clamped birth value"
+    );
+    assert_eq!(
+        unseeded["learner"],
+        serde_json::json!({
+            "rule": "Classic",
+            "learning_rate": 0.1_f32,
+            "weight_clamp": 2.0,
+            "retention": 1.0,
+            "scope": "ungrouped",
+            "initialized": false,
+            "inherits": true,
+        })
+    );
+    let seeded = brain_sink_edge(graph, vote);
+    assert_eq!(seeded["genomic"], 0.5);
+    assert_eq!(seeded["applied"], 1.25);
+    assert_eq!(seeded["learner"]["initialized"], true);
+    assert_eq!(seeded["learner"]["learned"], 1.25);
+    for &member in &members {
+        let edge = brain_sink_edge(graph, member);
+        assert_eq!(edge["applied"], edge["genomic"]);
+        assert!(edge.get("learner").is_none());
+    }
 }
 
-/// `graph_weights` (T25.F07 invariant 12): a group with a group-scope
-/// learner lists its learned scale; every member, the passive ones
-/// included, carries `applied` through the learned scale, and only an
-/// edge-scope learner's initialized correction is `learned`.
+/// A group-scope scale (invariants 4 and 5): contributors that differ in
+/// rule, rate, reward source and trace are shown as their learners with one
+/// learned scale on the group (preservation case: heterogeneous
+/// contributors); a passive member's applied weight follows the learned
+/// scale and is listed in `learning` (preservation case: genomic 0.5,
+/// applied 1.5); only an edge-scope learner's correction is `learned`.
 #[tokio::test]
-async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
+async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::creature::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
     use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::{BackendDef, HebbianRule, PlasticityConfig};
+    use v3_core::creature::genome::{
+        BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
+    };
     use v3_core::creature::state::GraphRuntimeState;
 
     let state = test_state();
@@ -2814,7 +2901,18 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
         modulation: None,
         retention: 1.0,
     };
-    let members: Vec<EdgeOccurrence> = {
+    let other = PlasticityConfig {
+        rule: HebbianRule::Oja,
+        learning_rate: 0.25,
+        weight_clamp: 3.0,
+        lamarckian: false,
+        modulation: Some(RewardModulationConfig {
+            reward_source: OutcomeChannel::DamageDelta,
+            trace_decay: 0.5,
+        }),
+        retention: 1.0,
+    };
+    let (node_id, group, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
         let node_idx = creature
@@ -2827,6 +2925,7 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
         let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
         node.input_refs
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+        let node_id = node.node_id.0;
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!()
         };
@@ -2838,6 +2937,8 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
         def.edge_mut(members[0]).set_plasticity(Some(config));
         def.edge_mut(members[1]).set_plasticity(Some(config));
         def.edge_mut(members[1]).set_scope(Scope::Group);
+        def.edge_mut(members[3]).set_plasticity(Some(other));
+        def.edge_mut(members[3]).set_scope(Scope::Group);
         let mut sinks: Vec<Vec<Option<f32>>> = def
             .output_sinks()
             .iter()
@@ -2861,49 +2962,79 @@ async fn get_creature_graph_weights_carry_learned_scales_and_applied_members() {
         let mut node_seeds = vec![None; creature.genome.nodes.len()];
         node_seeds[node_idx] = Some(seeds);
         creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
-        members
+        (node_id, id.index(), members)
     };
 
-    let (status, body) = do_request(router(state), get_req(&format!("{uri}?exclude=genome"))).await;
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    let entry = &body["graph_weights"][0];
-    let scales = entry["scales"].as_array().unwrap();
-    let scale = scales.last().expect("the new group's scale");
-    assert_eq!(scale["genomic"], 0.5);
-    assert_eq!(scale["learned"], 1.5);
-    let find = |at: EdgeOccurrence| {
-        let EdgeSurface::SinkInput(sink) = at.surface else {
-            unreachable!()
-        };
-        entry["edges"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|edge| {
-                edge["surface"] == "sink" && edge["container"] == sink && edge["edge"] == at.index
-            })
-            .cloned()
-            .expect("a listed member")
-    };
-    let edge_learner = find(members[0]);
-    assert_eq!(edge_learner["genomic"], 0.75);
+    let entry = body["learning"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["node_id"] == node_id)
+        .expect("the node's learning entry");
+    assert_eq!(
+        *entry["scales"].as_array().unwrap().last().unwrap(),
+        serde_json::json!({"group": group, "learned": 1.5, "initialized": true})
+    );
+    let edge_learner = learning_edge(entry, members[0]);
     assert_eq!(edge_learner["applied"], 2.25);
     assert_eq!(edge_learner["learned"], 0.75);
-    let group_learner = find(members[1]);
-    assert_eq!(group_learner["applied"], 1.5);
-    assert!(group_learner.get("learned").is_none());
-    let passive = find(members[2]);
-    assert_eq!(passive["genomic"], 0.5);
+    assert_eq!(edge_learner["initialized"], true);
+    for at in [members[1], members[3]] {
+        let group_learner = learning_edge(entry, at);
+        assert_eq!(group_learner["applied"], 1.5);
+        assert!(group_learner.get("learned").is_none());
+        assert_eq!(
+            group_learner["initialized"], true,
+            "its scale slot is seeded"
+        );
+    }
+    let passive = learning_edge(entry, members[2]);
     assert_eq!(passive["applied"], 1.5);
-    assert!(passive.get("learned").is_none());
+    assert!(passive.get("learned").is_none() && passive.get("initialized").is_none());
+
+    let graph = brain_graph(&body, node_id);
+    let record = &graph["groups"][group];
+    assert_eq!(
+        (&record["scale"], &record["learned_scale"]),
+        (&serde_json::json!(0.5), &serde_json::json!(1.5))
+    );
+    let passive = brain_sink_edge(graph, members[2]);
+    assert_eq!(
+        (&passive["genomic"], &passive["applied"]),
+        (&serde_json::json!(0.5), &serde_json::json!(1.5))
+    );
+    assert!(passive.get("learner").is_none());
+    assert_eq!(
+        brain_sink_edge(graph, members[1])["learner"],
+        serde_json::json!({
+            "rule": "Classic", "learning_rate": 0.1_f32, "weight_clamp": 4.0, "retention": 1.0,
+            "scope": "group", "initialized": true, "inherits": true,
+        })
+    );
+    assert_eq!(
+        brain_sink_edge(graph, members[3])["learner"],
+        serde_json::json!({
+            "rule": "Oja", "learning_rate": 0.25, "weight_clamp": 3.0,
+            "modulation": {"reward_source": "DamageDelta", "trace_decay": 0.5},
+            "retention": 1.0, "scope": "group", "initialized": true, "inherits": true,
+        })
+    );
+    let edge = brain_sink_edge(graph, members[0]);
+    assert_eq!(edge["learner"]["scope"], "edge");
+    assert_eq!(edge["learner"]["learned"], 0.75);
 }
 
-/// `graph_weights` (T25.F04): one entry per actual member of a
-/// `DirectionPair` group — twelve at birth, eleven after a removal — at its
-/// genomic weight `scale × compass + own`; the genome names the shape.
+/// `brain` for `DirectionPair` genes (invariants 3 and 4): twelve birth
+/// coordinates with presence and the declared facts with presence; a fact
+/// member sits on the drive at pattern 0 with `genomic == own`
+/// (preservation case); a zero-pattern direction member is listed as present
+/// outside the coordinates (preservation case).
 #[tokio::test]
-async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
+async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_members() {
     use v3_core::contracts::{InputReference, WorldInputKey};
+    use v3_core::creature::genome::cgp::CgpGraphBackendDef;
     use v3_core::creature::genome::vote::DirectedVoteKind;
     use v3_core::creature::genome::BackendDef;
 
@@ -2913,8 +3044,11 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
         handle.sim.creatures.keys().next().expect("a creature")
     };
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
-    let edit = |remove_one: bool| {
+    let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
+    let layout = area.direction_pairs()[0];
+    let edit = |with_facts: bool| {
         let state = state.clone();
+        let area = area.clone();
         async move {
             let mut handle = state.sim.lock().await;
             let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
@@ -2924,33 +3058,123 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
                 .iter_mut()
                 .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
                 .expect("a Graph node");
-            let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
             let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs.push(area.clone());
+            node.input_refs.push(area);
+            let node_id = node.node_id.0;
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            // The second gene carries its fact members (T25.F10).
-            let layout = area.direction_pairs()[0];
-            let facts = if remove_one { layout.facts } else { &[] };
+            let facts = if with_facts { layout.facts } else { &[] };
             let group = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
             def.group_mut(group).set_scale(2.0);
-            if remove_one {
+            if with_facts {
                 let member = def.members(group).next().unwrap();
                 def.remove_edge(member);
                 let fact = def.members(group).find(|&m| def.is_fact_member(m)).unwrap();
                 def.edge_mut(fact).set_weight(0.375);
+            } else {
+                // A member on a direction where its pattern is 0: `x` at
+                // relative N, which no birth places (a hand-built genome).
+                let mut json = serde_json::to_value(&*def).unwrap();
+                let sinks = json["output_sinks"].as_array_mut().unwrap();
+                let north = sinks
+                    .iter_mut()
+                    .find(|sink| {
+                        sink["kind"] == serde_json::json!({"ActionVote": {"Directed": ["Move", 0]}})
+                    })
+                    .unwrap();
+                let inputs = north["inputs"].as_array_mut().unwrap();
+                inputs.push(serde_json::json!({
+                    "source": {"InputLeaf": {"ref_idx": ref_idx, "sub_idx": layout.x}},
+                    "own_weight": 0.25,
+                    "membership": {"group": group.index(), "scope": "Edge"},
+                }));
+                // The I10 order: independent edges, then members by
+                // (group, field).
+                inputs.sort_by_key(|edge| {
+                    edge.get("membership").map(|m| {
+                        (
+                            m["group"].as_u64().unwrap(),
+                            edge["source"]["InputLeaf"]["sub_idx"].as_u64().unwrap(),
+                        )
+                    })
+                });
+                *def = serde_json::from_value::<CgpGraphBackendDef>(json).unwrap();
             }
+            (node_id, group.index())
         }
     };
-    edit(false).await;
-    let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
+    let (node_id, first) = edit(false).await;
+    let (_, second) = edit(true).await;
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha13");
-    let edges = body["graph_weights"][0]["edges"].as_array().unwrap();
-    assert_eq!(edges.len(), 12, "{body}");
-    let mut genomic: Vec<f64> = edges
+    assert_eq!(body["protocol_version"], "v3alpha14");
+    let graph = brain_graph(&body, node_id);
+
+    let present = |record: &serde_json::Value, list: &str| {
+        record[list]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|c| c["present"] == true)
+            .count()
+    };
+    let gene = &graph["groups"][first];
+    assert_eq!(gene["shape"]["DirectionPair"]["pair"], 0);
+    assert_eq!(gene["coordinates"].as_array().unwrap().len(), 12);
+    assert_eq!(present(gene, "coordinates"), 12);
+    assert_eq!(gene["facts"].as_array().unwrap().len(), layout.facts.len());
+    assert_eq!(present(gene, "facts"), 0, "born without its facts");
+    assert!(
+        gene["coordinates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| !(c["field"] == layout.x && c["direction"] == 0)),
+        "x at relative N is no birth coordinate"
+    );
+
+    let gene = &graph["groups"][second];
+    assert_eq!(present(gene, "coordinates"), 11, "one member removed");
+    assert_eq!(present(gene, "facts"), layout.facts.len());
+
+    let edges: Vec<&serde_json::Value> = graph["output_sinks"]
+        .as_array()
+        .unwrap()
         .iter()
+        .flat_map(|sink| sink["edges"].as_array().unwrap())
+        .collect();
+    let member_of = |group: usize| {
+        edges
+            .iter()
+            .copied()
+            .filter(move |edge| edge["member"]["group"] == group)
+    };
+    let zero: Vec<_> = member_of(first)
+        .filter(|edge| edge["member"]["site"] == serde_json::json!({"Direction": 0}))
+        .filter(|edge| edge["member"]["field"] == layout.x)
+        .collect();
+    assert_eq!(zero.len(), 1, "the zero-pattern member is listed");
+    assert_eq!(zero[0]["member"]["pattern"], 0.0);
+    assert_eq!(
+        (&zero[0]["genomic"], &zero[0]["own"]),
+        (&serde_json::json!(0.25), &serde_json::json!(0.25))
+    );
+
+    let facts: Vec<_> = member_of(second)
+        .filter(|edge| edge["member"]["site"] == "Drive")
+        .collect();
+    assert_eq!(facts.len(), layout.facts.len());
+    assert!(facts
+        .iter()
+        .all(|edge| edge["member"]["pattern"] == 0.0 && edge["genomic"] == edge["own"]));
+    assert_eq!(
+        facts.iter().filter(|edge| edge["own"] == 0.375).count(),
+        1,
+        "{body}"
+    );
+    let mut genomic: Vec<f64> = member_of(first)
+        .filter(|edge| edge["member"]["pattern"] != 0.0)
         .map(|edge| edge["genomic"].as_f64().unwrap())
         .collect();
     genomic.sort_by(f64::total_cmp);
@@ -2961,35 +3185,6 @@ async fn get_creature_graph_weights_carry_pair_member_genomic_weights() {
             -2.0, -2.0, -diagonal, -diagonal, -diagonal, -diagonal, diagonal, diagonal, diagonal,
             diagonal, 2.0, 2.0
         ]
-    );
-    let shapes: Vec<&serde_json::Value> = body["genome"]["nodes"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|node| node["backend_def"]["Graph"]["groups"].as_array())
-        .flatten()
-        .map(|group| &group["shape"]["DirectionPair"])
-        .collect();
-    assert_eq!(shapes.len(), 1, "{body}");
-    assert_eq!(shapes[0]["pair"], 0);
-
-    edit(true).await;
-    let (_, body) = do_request(router(state), get_req(&uri)).await;
-    let nodes = body["graph_weights"].as_array().unwrap();
-    let edges = nodes[0]["edges"].as_array().unwrap();
-    assert_eq!(
-        edges.len(),
-        12 + 11 + 3,
-        "two groups: twelve, then eleven direction members and three facts"
-    );
-    // A fact member's genomic weight is its own weight: pattern 0 by role.
-    assert_eq!(
-        edges
-            .iter()
-            .filter(|edge| edge["genomic"].as_f64() == Some(0.375))
-            .count(),
-        1,
-        "{body}"
     );
 }
 

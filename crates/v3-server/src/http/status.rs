@@ -5,8 +5,8 @@ use v3_core::config::SimulationConfig;
 
 use crate::error::{AppError, FieldError};
 use crate::http::config_patch::{attribute_patch_rejection, CanonicalizedPatch};
-use crate::state::TransportPerfSnapshot;
-use crate::transport::protocol::build_status_event_payload;
+use crate::state::{SimulationStatus, TransportPerfSnapshot};
+use crate::transport::protocol::{build_status_event_payload, StatusEventPayload};
 use crate::types::{deep_merge, PROTOCOL_VERSION};
 use crate::{query::projection::ProjectionSnapshot, state::AppState};
 
@@ -95,12 +95,36 @@ pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
     Json(payload)
 }
 
+/// The response of `GET /v3/simulation/status`: the status event payload
+/// with its revisions.
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct StatusResponse {
+    protocol_version: &'static str,
+    projection_revision: u64,
+    world_static_revision: u64,
+    tick: u64,
+    #[serde(flatten)]
+    payload: StatusEventPayload,
+}
+
+/// The response of `GET` and `PATCH /v3/simulation/config`.
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct ConfigResponse {
+    protocol_version: &'static str,
+    state: SimulationStatus,
+    config: SimulationConfig,
+}
+
 #[derive(Default, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ConfigQuery {
     format: Option<ConfigFormat>,
 }
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 enum ConfigFormat {
     Recipe,
@@ -112,15 +136,17 @@ pub async fn get_config(
 ) -> impl IntoResponse {
     let handle = app.sim.lock().await;
     if matches!(query.format, Some(ConfigFormat::Recipe)) {
-        return Json(
-            serde_json::to_value(&handle.sim.config).expect("config must be serializable"),
-        );
+        // The recipe is the config's `serde_json::Value` form, as
+        // `resolve_config` and the digest read it.
+        return Json(serde_json::to_value(&handle.sim.config).expect("config must serialize"))
+            .into_response();
     }
-    Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": handle.status,
-        "config": handle.sim.config,
-    }))
+    Json(ConfigResponse {
+        protocol_version: PROTOCOL_VERSION,
+        state: handle.status,
+        config: handle.sim.config.clone(),
+    })
+    .into_response()
 }
 
 pub async fn patch_config(
@@ -239,39 +265,23 @@ pub async fn patch_config(
     drop(handle);
     app.publish_ws_frame(frame);
 
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": state,
-        "config": normalized_config,
-    })))
+    Ok(Json(ConfigResponse {
+        protocol_version: PROTOCOL_VERSION,
+        state,
+        config: normalized_config,
+    }))
 }
 
 fn status_payload(
     snapshot: &ProjectionSnapshot,
     perf: &TransportPerfSnapshot,
     subscriber_count: usize,
-) -> serde_json::Value {
-    let mut body =
-        serde_json::to_value(build_status_event_payload(snapshot, perf, subscriber_count))
-            .expect("status payload must serialize");
-    let object = body
-        .as_object_mut()
-        .expect("status payload must serialize to an object");
-    object.insert(
-        "protocol_version".into(),
-        serde_json::Value::String(PROTOCOL_VERSION.to_string()),
-    );
-    object.insert(
-        "projection_revision".into(),
-        serde_json::Value::from(snapshot.projection_revision),
-    );
-    object.insert(
-        "world_static_revision".into(),
-        serde_json::Value::from(snapshot.world_static_revision),
-    );
-    object.insert(
-        "tick".into(),
-        serde_json::Value::from(snapshot.ws_frame.tick),
-    );
-    body
+) -> StatusResponse {
+    StatusResponse {
+        protocol_version: PROTOCOL_VERSION,
+        projection_revision: snapshot.projection_revision,
+        world_static_revision: snapshot.world_static_revision,
+        tick: snapshot.ws_frame.tick,
+        payload: build_status_event_payload(snapshot, perf, subscriber_count),
+    }
 }

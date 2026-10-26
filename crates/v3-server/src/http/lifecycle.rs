@@ -12,6 +12,44 @@ use crate::types::{config_digest, StepRequest, PROTOCOL_VERSION};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
 
+/// The response of `start` and `pause`: the simulation's state and tick.
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct LifecycleResponse {
+    protocol_version: &'static str,
+    state: SimulationStatus,
+    tick: u64,
+}
+
+impl LifecycleResponse {
+    fn new(state: SimulationStatus, tick: u64) -> Self {
+        Self {
+            protocol_version: PROTOCOL_VERSION,
+            state,
+            tick,
+        }
+    }
+}
+
+/// The response of `startup`.
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct StartupResponse {
+    #[serde(flatten)]
+    lifecycle: LifecycleResponse,
+    config_digest: String,
+    seeded_creatures: usize,
+}
+
+/// The response of `step`.
+#[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct StepResponse {
+    #[serde(flatten)]
+    lifecycle: LifecycleResponse,
+    steps_applied: u32,
+}
+
 pub async fn startup(
     State(app): State<AppState>,
     body: axum::body::Bytes,
@@ -69,13 +107,11 @@ pub async fn startup(
     drop(handle);
     app.publish_startup_ws_frame(frame);
 
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": "idle",
-        "tick": 0,
-        "config_digest": digest,
-        "seeded_creatures": seeded_creatures,
-    })))
+    Ok(Json(StartupResponse {
+        lifecycle: LifecycleResponse::new(SimulationStatus::Idle, 0),
+        config_digest: digest,
+        seeded_creatures,
+    }))
 }
 
 pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, AppError> {
@@ -84,11 +120,10 @@ pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, App
         if handle.status == SimulationStatus::Running {
             // Idempotent return.
             let tick = handle.sim.tick;
-            return Ok(Json(serde_json::json!({
-                "protocol_version": PROTOCOL_VERSION,
-                "state": "running",
-                "tick": tick,
-            })));
+            return Ok(Json(LifecycleResponse::new(
+                SimulationStatus::Running,
+                tick,
+            )));
         }
         handle.status = SimulationStatus::Running;
         let frame = build_ws_frame(&handle);
@@ -104,11 +139,10 @@ pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, App
     // Spawn run loop.
     tokio::spawn(run_loop(app));
 
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": "running",
-        "tick": tick,
-    })))
+    Ok(Json(LifecycleResponse::new(
+        SimulationStatus::Running,
+        tick,
+    )))
 }
 
 pub async fn pause_sim(State(app): State<AppState>) -> Result<impl IntoResponse, AppError> {
@@ -131,11 +165,7 @@ pub async fn pause_sim(State(app): State<AppState>) -> Result<impl IntoResponse,
     }
     drop(handle);
     app.publish_ws_frame(frame);
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": "paused",
-        "tick": tick,
-    })))
+    Ok(Json(LifecycleResponse::new(SimulationStatus::Paused, tick)))
 }
 
 pub async fn step(
@@ -178,12 +208,10 @@ pub async fn step(
     drop(handle);
     app.publish_ws_frame(frame);
 
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": "paused",
-        "tick": tick,
-        "steps_applied": req.steps,
-    })))
+    Ok(Json(StepResponse {
+        lifecycle: LifecycleResponse::new(SimulationStatus::Paused, tick),
+        steps_applied: req.steps,
+    }))
 }
 
 pub(crate) async fn run_loop(app: AppState) {

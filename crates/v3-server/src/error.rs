@@ -4,6 +4,7 @@ use axum::response::{IntoResponse, Response};
 use crate::types::PROTOCOL_VERSION;
 
 #[derive(Debug, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FieldError {
     pub field: String,
     pub reason: String,
@@ -24,40 +25,52 @@ pub enum AppError {
     Internal(String),
 }
 
+/// The error envelope's machine-readable code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ErrorCode {
+    InvalidRequest,
+    InvalidStateTransition,
+    ValidationRejected,
+    NotFound,
+    InternalError,
+}
+
 /// Context block of the normative error envelope
 /// (`docs/reference/v3-server-api-protocol-spec.md` §6). Every field is
 /// optional, and the whole block is omitted when no field applies.
 #[derive(Debug, Default, serde::Serialize)]
-struct ErrorDetails {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct ErrorDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     endpoint: Option<&'static str>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    field_errors: Vec<FieldError>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    field_errors: Option<Vec<FieldError>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     expected_state: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     current_state: Option<String>,
 }
 
-impl ErrorDetails {
-    fn is_empty(&self) -> bool {
-        self.endpoint.is_none()
-            && self.field_errors.is_empty()
-            && self.expected_state.is_none()
-            && self.current_state.is_none()
-    }
-}
-
 #[derive(Debug, serde::Serialize)]
-struct ErrorPayload {
-    code: &'static str,
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct ErrorPayload {
+    code: ErrorCode,
     message: String,
-    #[serde(skip_serializing_if = "ErrorDetails::is_empty")]
-    details: ErrorDetails,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    details: Option<ErrorDetails>,
 }
 
+/// The body of every error response.
 #[derive(Debug, serde::Serialize)]
-struct ErrorEnvelope {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct ErrorEnvelope {
     protocol_version: &'static str,
     error: ErrorPayload,
 }
@@ -67,44 +80,39 @@ impl IntoResponse for AppError {
         let (status, code, message, details) = match self {
             AppError::InvalidRequest(msg) => (
                 StatusCode::BAD_REQUEST,
-                "invalid_request",
+                ErrorCode::InvalidRequest,
                 msg,
-                ErrorDetails::default(),
+                None,
             ),
             AppError::InvalidStateTransition { expected, current } => (
                 StatusCode::CONFLICT,
-                "invalid_state_transition",
+                ErrorCode::InvalidStateTransition,
                 format!("current state is '{current}'"),
-                ErrorDetails {
+                Some(ErrorDetails {
                     expected_state: expected,
                     current_state: Some(current),
                     ..ErrorDetails::default()
-                },
+                }),
             ),
             AppError::ValidationRejected {
                 field_errors,
                 endpoint,
             } => (
                 StatusCode::UNPROCESSABLE_ENTITY,
-                "validation_rejected",
+                ErrorCode::ValidationRejected,
                 format!("validation failed for {endpoint}"),
-                ErrorDetails {
+                Some(ErrorDetails {
                     endpoint: Some(endpoint),
-                    field_errors,
+                    field_errors: (!field_errors.is_empty()).then_some(field_errors),
                     ..ErrorDetails::default()
-                },
+                }),
             ),
-            AppError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                "not_found",
-                msg,
-                ErrorDetails::default(),
-            ),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, ErrorCode::NotFound, msg, None),
             AppError::Internal(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
+                ErrorCode::InternalError,
                 msg,
-                ErrorDetails::default(),
+                None,
             ),
         };
 

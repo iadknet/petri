@@ -5,10 +5,11 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use v3_core::config::{PatternBounds, PatternParams};
-use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
+use v3_core::kernel::paint::{PaintPoint, PaintTool};
 use v3_core::patterns::generate_pattern_seeded;
 
 use crate::error::{AppError, FieldError};
+use crate::http::paint::PaintStatsResponse;
 use crate::query::cache::{world_static_changed, DirtyRect};
 use crate::state::build_ws_frame;
 use crate::state::{AppState, SimulationStatus};
@@ -17,6 +18,7 @@ use crate::types::PROTOCOL_VERSION;
 const MAX_PATTERN_AREA: u32 = 1_000_000;
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PatternRequest {
     pub params: PatternParams,
     pub bounds: PatternBounds,
@@ -24,6 +26,7 @@ pub struct PatternRequest {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PreviewResponse {
     pub protocol_version: &'static str,
     pub bounds: PatternBounds,
@@ -32,9 +35,10 @@ pub struct PreviewResponse {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ApplyResponse {
     pub protocol_version: &'static str,
-    pub stats: PaintStats,
+    pub stats: PaintStatsResponse,
     pub dirty_rect: DirtyRect,
     pub world_static_changed: bool,
 }
@@ -140,7 +144,7 @@ pub async fn apply(
     if points.is_empty() {
         return Ok(Json(ApplyResponse {
             protocol_version: PROTOCOL_VERSION,
-            stats: PaintStats::default(),
+            stats: PaintStatsResponse::default(),
             dirty_rect: DirtyRect::empty(),
             world_static_changed: false,
         }));
@@ -165,7 +169,7 @@ pub async fn apply(
 
     Ok(Json(ApplyResponse {
         protocol_version: PROTOCOL_VERSION,
-        stats,
+        stats: PaintStatsResponse::from(&stats),
         dirty_rect,
         world_static_changed: static_changed,
     }))

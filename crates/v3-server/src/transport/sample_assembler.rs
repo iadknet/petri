@@ -2,6 +2,8 @@
 
 use v3_core::runtime::trace::domain as core_trace;
 
+use crate::transport::genome_wire::{InputRef, VmInstruction, VoteSink, WorldAction};
+
 use crate::transport::sample_protocol::{
     BackendTracePayload, DecisionInputsPayload, ExecutionSamplePayload, GateScorePayload,
     GraphNodeEvalTracePayload, GraphOutputSinkTracePayload, GraphPassTracePayload,
@@ -11,31 +13,19 @@ use crate::transport::sample_protocol::{
     VmTracePayload,
 };
 
-#[inline]
-fn serialize_core_shape<T: serde::Serialize>(
-    value: T,
-) -> Result<serde_json::Value, serde_json::Error> {
-    serde_json::to_value(value)
-}
-
-pub fn assemble_execution_sample(
-    sample: core_trace::ExecutionSample,
-) -> Result<ExecutionSamplePayload, serde_json::Error> {
-    Ok(ExecutionSamplePayload {
+#[must_use]
+pub fn assemble_execution_sample(sample: core_trace::ExecutionSample) -> ExecutionSamplePayload {
+    ExecutionSamplePayload {
         creature_id: sample.creature_id,
-        ticks: sample
-            .ticks
-            .into_iter()
-            .map(assemble_tick)
-            .collect::<Result<Vec<_>, _>>()?,
-    })
+        ticks: sample.ticks.into_iter().map(assemble_tick).collect(),
+    }
 }
 
 #[inline]
-fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_json::Error> {
-    Ok(TickTracePayload {
+fn assemble_tick(tick: core_trace::TickTrace) -> TickTracePayload {
+    TickTracePayload {
         tick_number: tick.tick_number,
-        heading: serialize_core_shape(tick.heading)?,
+        heading: tick.heading,
         energy_before: tick.energy_before,
         energy_after: tick.energy_after,
         static_inputs: StaticInputsSnapshotPayload {
@@ -54,21 +44,13 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
                 area_occupancy: p.area_occupancy,
                 nearby: p.nearby,
             }),
-        hops: tick
-            .hops
-            .into_iter()
-            .map(assemble_hop)
-            .collect::<Result<Vec<_>, _>>()?,
-        passes: tick
-            .passes
-            .into_iter()
-            .map(assemble_pass)
-            .collect::<Result<Vec<_>, _>>()?,
+        hops: tick.hops.into_iter().map(assemble_hop).collect(),
+        passes: tick.passes.into_iter().map(assemble_pass).collect(),
         final_actions: tick
             .final_actions
             .into_iter()
-            .map(serialize_core_shape)
-            .collect::<Result<Vec<_>, _>>()?,
+            .map(WorldAction::from)
+            .collect(),
         termination_reason: match tick.termination_reason {
             core_trace::TerminationReason::NoDecision => TerminationReasonPayload::NoDecision,
             core_trace::TerminationReason::TerminateVoted => {
@@ -83,14 +65,12 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
         },
         priority_bid: tick.priority_bid,
         commit_counts: tick.commit_counts,
-    })
+    }
 }
 
 #[inline]
-fn assemble_pass(
-    pass: core_trace::MeshPassTrace,
-) -> Result<MeshPassTracePayload, serde_json::Error> {
-    Ok(MeshPassTracePayload {
+fn assemble_pass(pass: core_trace::MeshPassTrace) -> MeshPassTracePayload {
+    MeshPassTracePayload {
         pass_index: pass.pass_index,
         end_reason: match pass.end_reason {
             core_trace::PassEndReason::Decided => PassEndReasonPayload::Decided,
@@ -100,29 +80,21 @@ fn assemble_pass(
             core_trace::PassEndReason::EnergyExhausted => PassEndReasonPayload::EnergyExhausted,
         },
         votes: pass.votes,
-        best: pass
-            .best
-            .into_iter()
-            .map(serialize_core_shape)
-            .collect::<Result<Vec<_>, _>>()?,
+        best: pass.best.into_iter().map(VoteSink::from).collect(),
         bars: pass.bars,
         effective_votes: pass.effective_votes,
-        committed: pass.committed.map(serialize_core_shape).transpose()?,
+        committed: pass.committed.map(WorldAction::from),
         hops: pass.hops,
-    })
+    }
 }
 
 #[inline]
-fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, serde_json::Error> {
-    Ok(MeshHopTracePayload {
+fn assemble_hop(hop: core_trace::MeshHopTrace) -> MeshHopTracePayload {
+    MeshHopTracePayload {
         hop_index: hop.hop_index,
         pass_index: hop.pass_index,
         node_id: hop.node_id.0 as u64,
-        input_refs: hop
-            .input_refs
-            .into_iter()
-            .map(serialize_core_shape)
-            .collect::<Result<Vec<_>, _>>()?,
+        input_refs: hop.input_refs.iter().map(InputRef::from).collect(),
         upstream_slots: hop.upstream_slots,
         energy_before: hop.energy_before,
         energy_after: hop.energy_after,
@@ -156,16 +128,14 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                 steps: vm
                     .steps
                     .into_iter()
-                    .map(|s| {
-                        Ok(VmStepTracePayload {
-                            pc: s.pc,
-                            instruction: serialize_core_shape(s.instruction)?,
-                            energy_cost: s.energy_cost,
-                            energy_after: s.energy_after,
-                            register_changes: s.register_changes,
-                        })
+                    .map(|s| VmStepTracePayload {
+                        pc: s.pc,
+                        instruction: VmInstruction::from(&s.instruction),
+                        energy_cost: s.energy_cost,
+                        energy_after: s.energy_after,
+                        register_changes: s.register_changes,
                     })
-                    .collect::<Result<Vec<_>, _>>()?,
+                    .collect(),
                 final_registers: vm.final_registers,
                 final_payload: vm.final_payload,
                 slot_writes: vm
@@ -218,7 +188,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                 })
             }
         },
-    })
+    }
 }
 
 #[cfg(test)]
@@ -322,8 +292,7 @@ mod tests {
             }],
         };
 
-        let assembled =
-            assemble_execution_sample(sample).expect("valid core trace sample should assemble");
+        let assembled = assemble_execution_sample(sample);
         let route = assembled.ticks[0].hops[0]
             .route
             .as_ref()
@@ -358,7 +327,10 @@ mod tests {
                     hop_index: 0,
                     pass_index: 0,
                     node_id: v3_core::contracts::NodeId::new(2),
-                    input_refs: vec![],
+                    input_refs: vec![
+                        v3_core::contracts::InputReference::UpstreamSlot(3),
+                        v3_core::contracts::InputReference::ActionVotes,
+                    ],
                     upstream_slots: [0.0; OUTPUT_SLOT_COUNT],
                     energy_before: 5.0,
                     energy_after: 4.5,
@@ -435,8 +407,7 @@ mod tests {
             }],
         };
 
-        let assembled =
-            assemble_execution_sample(sample).expect("valid core trace sample should assemble");
+        let assembled = assemble_execution_sample(sample);
 
         let graph = match &assembled.ticks[0].hops[0].backend_trace {
             BackendTracePayload::Graph(graph) => graph,
@@ -486,6 +457,14 @@ mod tests {
             serde_json::json!([1.0, 0.0, 0.0, 2.0, 0.0])
         );
         assert_eq!(hop["decision_inputs"]["hops_this_tick"], 3.0);
+        // A hop's input references are flat records (T30.F01 invariant 7).
+        assert_eq!(
+            hop["input_refs"],
+            serde_json::json!([
+                {"family": "upstream", "key": "UpstreamSlot", "slot": 3},
+                {"family": "decision", "key": "ActionVotes"},
+            ])
+        );
         let graph_json = &hop["backend_trace"]["Graph"];
         assert!(graph_json.get("converged").is_none());
         assert!(graph_json.get("stable_passes_count").is_none());

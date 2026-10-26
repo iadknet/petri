@@ -10,23 +10,74 @@ use crate::state::build_ws_frame;
 use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
 
+/// The tool a paint stroke applies (G22: the wire form of `PaintTool`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PaintToolRequest {
+    Food,
+    Barrier,
+    EraseFood,
+    EraseBarrier,
+}
+
+impl From<PaintToolRequest> for PaintTool {
+    fn from(tool: PaintToolRequest) -> Self {
+        match tool {
+            PaintToolRequest::Food => Self::Food,
+            PaintToolRequest::Barrier => Self::Barrier,
+            PaintToolRequest::EraseFood => Self::EraseFood,
+            PaintToolRequest::EraseBarrier => Self::EraseBarrier,
+        }
+    }
+}
+
+/// What a paint stroke or a pattern apply changed (G22: the wire form of
+/// `PaintStats`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct PaintStatsResponse {
+    pub affected_cells: usize,
+    pub food_set_cells: usize,
+    pub food_cleared_cells: usize,
+    pub barrier_set_cells: usize,
+    pub barrier_cleared_cells: usize,
+    pub creatures_removed: usize,
+}
+
+impl From<&PaintStats> for PaintStatsResponse {
+    fn from(stats: &PaintStats) -> Self {
+        Self {
+            affected_cells: stats.affected_cells,
+            food_set_cells: stats.food_set_cells,
+            food_cleared_cells: stats.food_cleared_cells,
+            barrier_set_cells: stats.barrier_set_cells,
+            barrier_cleared_cells: stats.barrier_cleared_cells,
+            creatures_removed: stats.creatures_removed,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PaintRequest {
-    pub tool: PaintTool,
+    pub tool: PaintToolRequest,
     pub brush_half_extent: u8,
     pub points: Vec<PaintPointDto>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct PaintPointDto {
     pub x: u16,
     pub y: u16,
 }
 
 #[derive(Debug, Serialize)]
-struct PaintResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct PaintResponse {
     protocol_version: &'static str,
-    stats: PaintStats,
+    stats: PaintStatsResponse,
     dirty_rect: DirtyRect,
     world_static_changed: bool,
 }
@@ -89,7 +140,7 @@ pub async fn paint(
     if points.is_empty() {
         return Ok(Json(PaintResponse {
             protocol_version: PROTOCOL_VERSION,
-            stats: PaintStats::default(),
+            stats: PaintStatsResponse::default(),
             dirty_rect: DirtyRect::empty(),
             world_static_changed: false,
         }));
@@ -97,10 +148,9 @@ pub async fn paint(
 
     let dirty_rect =
         paint_dirty_rect(w, h, req.brush_half_extent, &points).unwrap_or_else(DirtyRect::empty);
-    let stats = handle
-        .sim
-        .apply_paint(req.tool, req.brush_half_extent, &points);
-    let static_changed = world_static_changed(req.tool, &stats);
+    let tool = PaintTool::from(req.tool);
+    let stats = handle.sim.apply_paint(tool, req.brush_half_extent, &points);
+    let static_changed = world_static_changed(tool, &stats);
 
     let frame = build_ws_frame(&handle);
     drop(handle);
@@ -108,7 +158,7 @@ pub async fn paint(
 
     Ok(Json(PaintResponse {
         protocol_version: PROTOCOL_VERSION,
-        stats,
+        stats: PaintStatsResponse::from(&stats),
         dirty_rect,
         world_static_changed: static_changed,
     }))

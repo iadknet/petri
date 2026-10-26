@@ -52,25 +52,49 @@ impl TypeVisitor for Render<'_> {
 fn render_roots(render: &mut Render<'_>) {
     render.visit::<crate::transport::protocol::ServerMessage>();
     render.visit::<crate::transport::protocol::ClientMessage>();
+    render.visit::<crate::http::creature::CreatureQuery>();
+    render.visit::<crate::http::creature::CreatureDetailResponse<'static>>();
+    render.visit::<crate::http::creature::StartSampleRequest>();
+    render.visit::<crate::http::creature::StartSampleResponse>();
+    render.visit::<crate::http::creature::SampleIdleResponse>();
+    render.visit::<crate::http::creature::SampleRecordingResponse>();
+    render.visit::<crate::http::creature::SampleCompleteResponse>();
+    render.visit::<crate::http::lifecycle::LifecycleResponse>();
+    render.visit::<crate::http::lifecycle::StartupResponse>();
+    render.visit::<crate::http::lifecycle::StepResponse>();
+    render.visit::<crate::types::StepRequest>();
+    render.visit::<crate::http::status::StatusResponse>();
+    render.visit::<crate::http::status::ConfigQuery>();
+    render.visit::<crate::http::status::ConfigResponse>();
+    render.visit::<crate::http::snapshot::SnapshotQuery>();
+    render.visit::<crate::http::snapshot::SnapshotResponse>();
+    render.visit::<crate::http::paint::PaintRequest>();
+    render.visit::<crate::http::paint::PaintResponse>();
+    render.visit::<crate::http::pattern::PatternRequest>();
+    render.visit::<crate::http::pattern::PreviewResponse>();
+    render.visit::<crate::http::pattern::ApplyResponse>();
+    render.visit::<crate::error::ErrorEnvelope>();
 }
 
 /// A declaration with formatting removed: import lines dropped, whitespace
-/// removed, `;` member separators read as `,`, trailing separators and
-/// leading union bars dropped.
+/// and grouping parentheses removed (ts-rs emits no type whose meaning
+/// depends on them; Biome wraps intersections inside unions), `;` member
+/// separators read as `,`, trailing separators and leading union bars
+/// dropped.
 fn normalize(text: &str) -> String {
     let body: String = text
         .lines()
         .filter(|line| !line.trim_start().starts_with("import "))
         .flat_map(str::chars)
-        .filter(|c| !c.is_whitespace())
+        .filter(|c| !c.is_whitespace() && !matches!(c, '(' | ')'))
         .map(|c| if c == ';' { ',' } else { c })
         .collect();
     let mut out = String::with_capacity(body.len());
     let mut chars = body.chars().peekable();
     while let Some(c) = chars.next() {
         match (c, chars.peek()) {
-            (',', Some('}' | ')' | ']' | '>')) => {}
-            ('|', _) if matches!(out.chars().last(), Some('=' | ':' | '(' | '<' | ',' | '[')) => {}
+            (',', Some('}' | ']' | '>')) => {}
+            ('|', _) if matches!(out.chars().last(), Some('=' | ':' | '<' | ',' | '[')) => {}
             ('"', _) if matches!(out.chars().last(), Some('{' | ',')) => {
                 // A quoted property key, which Biome unquotes when it is an
                 // identifier.
@@ -158,10 +182,10 @@ fn generated_types_match_the_wire_types() {
 #[test]
 fn normalize_ignores_biome_formatting_but_not_types() {
     let raw = "import type { A } from \"./A.ts\";\n\nexport type T = { \"type\": \"t\", b: A, };\n\
-               export type U = \"X\" | \"Y\";\n";
+               export type U = \"X\" | { k: \"y\" } & A;\n";
     let biome =
         "import type { A } from \"./A.ts\";\n\nexport type T = {\n\ttype: \"t\";\n\tb: A;\n};\n\
-                 export type U =\n\t| \"X\"\n\t| \"Y\";\n";
+                 export type U =\n\t| \"X\"\n\t| ({ k: \"y\" } & A);\n";
     assert_eq!(normalize(raw), normalize(biome));
     assert_ne!(normalize(raw), normalize(&raw.replace("\"t\"", "\"u\"")));
     assert_ne!(normalize(raw), normalize(&raw.replace("b: A", "c: A")));

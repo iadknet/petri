@@ -7,6 +7,7 @@ use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use v3_core::kernel::FoodResource;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct DirtyRect {
     pub x: u16,
     pub y: u16,

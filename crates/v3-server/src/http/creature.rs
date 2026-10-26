@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use v3_core::contracts::{CreatureId, InputReference};
 use v3_core::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
 use v3_core::creature::colour::channels_to_rgb;
-use v3_core::creature::genome::cgp::{EdgeSurface, OutputSinkKind};
+use v3_core::creature::genome::cgp::OutputSinkKind;
 use v3_core::creature::genome::mesh_annotations::{
     derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
     MeshWriteClass,
@@ -18,24 +18,29 @@ use v3_core::sensors::static_inputs::assemble_static_inputs;
 
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
+use crate::transport::action_log::ActionLogEntry as WireActionLogEntry;
+use crate::transport::brain::{brain_view, learning_view, BrainView, NodeLearning};
 use crate::transport::sample_assembler::assemble_execution_sample;
 use crate::transport::sample_protocol::ExecutionSamplePayload;
 use crate::types::PROTOCOL_VERSION;
 
 #[derive(Debug, Default, serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CreatureQuery {
     pub since_tick: Option<u64>,
     pub exclude: Option<String>,
 }
 
 #[derive(serde::Serialize)]
-struct CreaturePositionResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreaturePositionResponse {
     x: u16,
     y: u16,
 }
 
 #[derive(serde::Serialize)]
-struct CreaturePhenotypeResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreaturePhenotypeResponse {
     channels: [u8; 6],
     active_channel: usize,
     polarity: [bool; 6],
@@ -43,7 +48,8 @@ struct CreaturePhenotypeResponse {
 }
 
 #[derive(serde::Serialize)]
-struct CreatureDetailResponse<'a> {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreatureDetailResponse<'a> {
     protocol_version: &'static str,
     id: u64,
     position: CreaturePositionResponse,
@@ -62,145 +68,41 @@ struct CreatureDetailResponse<'a> {
     complexity: u32,
     genome_size: u32,
     phenotype: CreaturePhenotypeResponse,
+    /// Tick of the most recent action-log entry, 0 for an empty log.
     latest_tick: u64,
+    /// The brain as the simulation applies it (T30.F01); excluded by the
+    /// `brain` token.
     #[serde(skip_serializing_if = "Option::is_none")]
-    genome: Option<&'a v3_core::creature::genome::CreatureGenome>,
+    #[cfg_attr(test, ts(optional))]
+    brain: Option<BrainView>,
+    /// The weights in force of every dynamic edge and the learned scales,
+    /// refreshed on every poll; excluded by the `learning` token and omitted
+    /// when no node carries a dynamic edge.
     #[serde(skip_serializing_if = "Option::is_none")]
-    mesh_annotations: Option<Vec<MeshNodeAnnotation>>,
-    /// The weights of edge groups, their members (T25.F03) and every plastic
-    /// edge (T25.F06), per Graph node carrying either, in genome order.
-    /// Computed on every poll, whether or not the genome is included;
-    /// excluded by the `graph_weights` token and omitted when the creature
-    /// carries neither.
+    #[cfg_attr(test, ts(optional))]
+    learning: Option<Vec<NodeLearning>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    graph_weights: Option<Vec<NodeGraphWeights>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     shared_memory: Option<&'a [f32]>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    action_log: Option<Vec<&'a ActionLogEntry>>,
+    #[cfg_attr(test, ts(optional))]
+    action_log: Option<Vec<WireActionLogEntry>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     diagnostics: Option<CreatureDiagnosticsResponse>,
 }
 
-/// One Graph node's group scales and member genomic weights.
-#[derive(Debug, PartialEq, serde::Serialize)]
-struct NodeGraphWeights {
-    node_id: v3_core::contracts::NodeId,
-    scales: Vec<GroupScaleWeight>,
-    edges: Vec<EdgeGenomicWeight>,
-}
-
-/// One group's shared scale, by `GroupId` index: its genomic value and,
-/// for an initialized scale slot, its learned value (T25.F07).
-#[derive(Debug, PartialEq, serde::Serialize)]
-struct GroupScaleWeight {
-    group: usize,
-    genomic: f32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    learned: Option<f32>,
-}
-
-/// Which edge-bearing surface an edge sits on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-enum WeightSurface {
-    Compute,
-    Sink,
-}
-
-/// One edge's weights, keyed by surface, container index (compute node or
-/// sink) and index within that container's inputs: its genomic weight, the
-/// weight in force (`applied`) and, for an initialized own quantity, its
-/// learned value (T25.F06, T25.F07).
-#[derive(Debug, PartialEq, serde::Serialize)]
-struct EdgeGenomicWeight {
-    surface: WeightSurface,
-    container: usize,
-    edge: usize,
-    genomic: f32,
-    applied: f32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    learned: Option<f32>,
-}
-
-/// The `graph_weights` payload: one entry per Graph node with a group member
-/// or a plastic edge, its group scales and those edges' weights in canonical
-/// order; `None` when no node carries either. Built by one merge-walk over
-/// `edge_sites()`, the learned state's `applied_weights` and its edge and
-/// scale views, all in canonical order (R4).
-fn graph_weights(
-    genome: &v3_core::creature::genome::CreatureGenome,
-    learned: &v3_core::runtime::plasticity::LearnedState,
-) -> Option<Vec<NodeGraphWeights>> {
-    let nodes: Vec<NodeGraphWeights> = genome
-        .nodes
-        .iter()
-        .enumerate()
-        .filter_map(|(node_idx, node)| {
-            let BackendDef::Graph(def) = &node.backend_def else {
-                return None;
-            };
-            let mut applied = learned.applied_weights(node_idx).peekable();
-            let mut views = learned.edges(node_idx).peekable();
-            let edges: Vec<EdgeGenomicWeight> = def
-                .edge_sites()
-                .filter_map(|occurrence| {
-                    let edge = def.edge_at(occurrence);
-                    if edge.plasticity().is_none() && edge.membership().is_none() {
-                        return None;
-                    }
-                    let genomic = def.genomic_weight(occurrence, &node.input_refs);
-                    let applied = applied
-                        .next_if(|&(at, _)| at == occurrence)
-                        .map_or(genomic, |(_, weight)| weight);
-                    let learned = views
-                        .next_if(|view| view.occurrence == occurrence)
-                        .and_then(|view| view.learned);
-                    let (surface, container) = match occurrence.surface {
-                        EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
-                        EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
-                    };
-                    Some(EdgeGenomicWeight {
-                        surface,
-                        container,
-                        edge: occurrence.index,
-                        genomic,
-                        applied,
-                        learned,
-                    })
-                })
-                .collect();
-            let mut scales = learned.scales(node_idx).peekable();
-            (!edges.is_empty()).then(|| NodeGraphWeights {
-                node_id: node.node_id,
-                scales: def
-                    .groups()
-                    .iter()
-                    .enumerate()
-                    .map(|(group, record)| GroupScaleWeight {
-                        group,
-                        genomic: record.scale(),
-                        learned: scales
-                            .next_if(|scale| scale.group.index() == group)
-                            .and_then(|scale| scale.learned),
-                    })
-                    .collect(),
-                edges,
-            })
-        })
-        .collect();
-    (!nodes.is_empty()).then_some(nodes)
-}
-
 #[derive(serde::Serialize)]
-struct CreatureDiagnosticsResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreatureDiagnosticsResponse {
     current_inputs: CreatureCurrentInputsDiagnostics,
     live_circuit: CreatureLiveCircuitDiagnostics,
     recent_actions: CreatureRecentActionsDiagnostics,
 }
 
 #[derive(serde::Serialize)]
-struct CreatureCurrentInputsDiagnostics {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreatureCurrentInputsDiagnostics {
     food_here: f32,
     neighbor_food: [f32; 8],
     neighbor_barrier: [f32; 8],
@@ -208,7 +110,8 @@ struct CreatureCurrentInputsDiagnostics {
 }
 
 #[derive(serde::Serialize)]
-struct CreatureLiveCircuitDiagnostics {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreatureLiveCircuitDiagnostics {
     reachable_node_count: usize,
     stateful_reachable_node_count: usize,
     barrier_reader_reachable_node_count: usize,
@@ -222,7 +125,8 @@ struct CreatureLiveCircuitDiagnostics {
 }
 
 #[derive(serde::Serialize)]
-struct CreatureRecentActionsDiagnostics {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct CreatureRecentActionsDiagnostics {
     sampled_entries: usize,
     blocked_move_count: u32,
     invalid_target_reproduce_count: u32,
@@ -230,7 +134,8 @@ struct CreatureRecentActionsDiagnostics {
 }
 
 #[derive(serde::Serialize)]
-struct StartSampleResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct StartSampleResponse {
     protocol_version: &'static str,
     status: &'static str,
     ticks_requested: u32,
@@ -238,13 +143,15 @@ struct StartSampleResponse {
 }
 
 #[derive(serde::Serialize)]
-struct SampleIdleResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct SampleIdleResponse {
     protocol_version: &'static str,
     status: &'static str,
 }
 
 #[derive(serde::Serialize)]
-struct SampleRecordingResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct SampleRecordingResponse {
     protocol_version: &'static str,
     status: &'static str,
     ticks_completed: usize,
@@ -252,7 +159,8 @@ struct SampleRecordingResponse {
 }
 
 #[derive(serde::Serialize)]
-struct SampleCompleteResponse {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct SampleCompleteResponse {
     protocol_version: &'static str,
     status: &'static str,
     sample: ExecutionSamplePayload,
@@ -468,9 +376,9 @@ pub async fn get_creature(
         .and_then(|log| log.entries().back().map(|entry| entry.tick))
         .unwrap_or(0);
 
-    let include_genome = !exclude.contains("genome");
+    let include_brain = !exclude.contains("brain");
     let include_diagnostics = !exclude.contains("diagnostics");
-    let mesh_annotations = if include_genome || include_diagnostics {
+    let mesh_annotations = if include_brain || include_diagnostics {
         derive_mesh_annotations_with_reachable_indices(
             &creature.genome,
             &creature.cached_reachable_nodes,
@@ -506,15 +414,25 @@ pub async fn get_creature(
             rgb,
         },
         latest_tick,
-        genome: include_genome.then_some(&creature.genome),
-        mesh_annotations: include_genome.then_some(mesh_annotations),
-        graph_weights: if exclude.contains("graph_weights") {
+        brain: include_brain.then(|| {
+            brain_view(
+                &creature.genome,
+                creature.graph_runtime.learned(),
+                &mesh_annotations,
+            )
+        }),
+        learning: if exclude.contains("learning") {
             None
         } else {
-            graph_weights(&creature.genome, creature.graph_runtime.learned())
+            learning_view(&creature.genome, creature.graph_runtime.learned())
         },
         shared_memory: (!exclude.contains("shared_memory")).then(|| &creature.shared_memory[..]),
-        action_log: (!exclude.contains("action_log")).then_some(action_log_entries),
+        action_log: (!exclude.contains("action_log")).then(|| {
+            action_log_entries
+                .into_iter()
+                .map(WireActionLogEntry::from)
+                .collect()
+        }),
         diagnostics,
     };
 
@@ -522,7 +440,8 @@ pub async fn get_creature(
 }
 
 #[derive(serde::Deserialize)]
-struct StartSampleRequest {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(crate) struct StartSampleRequest {
     #[serde(default = "default_sample_ticks")]
     ticks: u32,
     #[serde(default)]
@@ -624,8 +543,7 @@ pub async fn get_sample(
             .expect("active_trace confirmed Some above");
         #[cfg(feature = "telemetry")]
         app.telemetry.hand_over(&handle.sim, &trace);
-        let sample = assemble_execution_sample(trace.into_sample(ffi_id))
-            .map_err(|error| AppError::Internal(format!("failed to assemble sample: {error}")))?;
+        let sample = assemble_execution_sample(trace.into_sample(ffi_id));
 
         return to_json_value(SampleCompleteResponse {
             protocol_version: PROTOCOL_VERSION,
