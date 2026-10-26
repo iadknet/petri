@@ -125,7 +125,7 @@ pub(crate) fn inherits_nonzero_pair_group(
         && child.nodes.iter().any(|node| match &node.backend_def {
             BackendDef::Graph(def) => def.groups().iter().any(|group| {
                 matches!(group.shape(), Shape::DirectionPair { .. })
-                    && group.scale().abs() > crate::creature::drives::PATH_WEIGHT_FLOOR
+                    && group.scale().abs() > crate::neighborhood::drives::PATH_WEIGHT_FLOOR
             }),
             BackendDef::Vm(_) => false,
         })

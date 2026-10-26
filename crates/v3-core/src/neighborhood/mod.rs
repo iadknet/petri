@@ -1,40 +1,46 @@
-//! Mutational-neighborhood indicator (T11.F01): how often a single mutation
-//! leaves a brain acting like its parent (silent), acting differently
-//! (changed), or not acting at all (dead), per operator at one event and per
-//! birth through the production mutation engine, on the fixed `neighborhood-v2`
-//! sensor battery.
+//! Readers (`docs/architecture.md` section 3, level 10): the censuses and
+//! indicators computed over applied simulation behavior. The census of the
+//! sensors creatures wire and read (`sensor_census`), of plastic edges
+//! (`plasticity_census`), of ring-rule wiring (`ring_rules`) and of drive
+//! paths (`drives`) sit beside the mutational-neighborhood indicator
+//! (T11.F01: how often a single mutation leaves a brain acting like its parent
+//! (silent), acting differently (changed), or not acting at all (dead), per
+//! operator at one event and per birth through the production mutation
+//! engine, on the fixed `neighborhood-v2` sensor battery) and its
+//! descendants.
 //!
-//! This module is a top-level sibling of `mutation`, `runtime`, and
-//! `simulation` rather than nested inside any of them: it depends on all
-//! three (a subject's cognition path from `runtime`, mutation operators from
-//! `mutation`, and the shared-memory bookkeeping seam from `simulation`), and
-//! none of those three may depend back on it.
+//! Readers sit above every simulation domain: they may import the genome,
+//! `runtime`, `mutation`, the creature record and `simulation`, and none of
+//! those may depend back on them, so simulation behavior never depends on a
+//! reading.
 //!
 //! Observation only: nothing here changes a genome, mutation probability, or
 //! runtime semantics. Every function is pure over its explicit inputs (a
-//! genome, a battery, a config, a seed) so the whole module is unit- and
+//! genome, a battery, a config, a seed, a creature) so the module is unit- and
 //! property-testable without a `Simulation`.
 
 pub mod battery;
 pub mod births;
 pub mod census;
 pub mod classify;
-pub mod companions;
 pub mod drift;
+pub mod drives;
 pub mod input_use;
 pub mod mesh_execution;
 pub mod mutation_effects;
 pub mod operators;
 pub mod opportunity;
+pub mod plasticity_census;
 pub mod recruitment;
 pub mod recruitment_paths;
+pub mod ring_rules;
 pub mod sample;
+pub mod sensor_census;
 pub mod steering;
 
 pub use battery::{Battery, Signature};
 pub use births::{BirthExposure, BirthResult};
 pub use classify::{classify, Class, Classification, Tally};
-pub use companions::{structural_companions, StructuralCompanions};
 pub use operators::{operator_catalog, OperatorRow};
 pub use sample::{
     evolved_sample_ranks, read_sample_ranks, READ_GENOME_MULTIPLIER, READ_SEED_BASE, SAMPLE_SIZE,

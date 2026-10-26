@@ -21,10 +21,10 @@
 use std::collections::BTreeMap;
 
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::sensor_census::world_input_key_label;
 use crate::genome::cgp::{ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape};
 use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::genome::{BackendDef, CreatureGenome};
+use crate::neighborhood::sensor_census::world_input_key_label;
 
 /// The census version the goal summary records.
 pub const RING_RULES_VERSION: &str = "ring-rules-v2";

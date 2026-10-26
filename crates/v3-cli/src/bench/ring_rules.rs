@@ -1,10 +1,10 @@
 //! The per-world `ring_rules` block (T11.F31, T25.F03, `ring-rules-v2`): the
 //! ring-rule census of the terminal population, projected from
-//! `v3_core::creature::ring_rules`. Rows are space-separated strings, as in
+//! `v3_core::neighborhood::ring_rules`. Rows are space-separated strings, as in
 //! `input_use`, so the committed summary stays inside its budget.
 
 use serde::{Deserialize, Serialize};
-use v3_core::creature::ring_rules::{RingRuleCensus, RING_RULES_VERSION};
+use v3_core::neighborhood::ring_rules::{RingRuleCensus, RING_RULES_VERSION};
 
 use super::schema::Indicator;
 use crate::UNDEFINED;

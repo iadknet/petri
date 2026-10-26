@@ -18,7 +18,7 @@ pub const PAIR_GROUPS_VERSION: &str = "pair-groups-v2";
 
 /// A scale or own correction off zero: `|w| > 1e-3`, the census weight
 /// floor.
-const NONZERO_FLOOR: f32 = v3_core::creature::drives::PATH_WEIGHT_FLOOR;
+const NONZERO_FLOOR: f32 = v3_core::neighborhood::drives::PATH_WEIGHT_FLOOR;
 
 /// One `(family, kind, offset)` row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -9,9 +9,9 @@ use super::schema::Report;
 use super::tracking::{OccupancyGrid, PopulationReadings, SensorCensus, WorldTracking};
 use crate::six;
 use v3_core::contracts::WorldInputKey;
-use v3_core::creature::sensor_census::world_input_key_label;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELLS_PER_AXIS;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
+use v3_core::neighborhood::sensor_census::world_input_key_label;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 #[test]

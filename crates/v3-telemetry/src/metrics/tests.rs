@@ -5,11 +5,11 @@ use proptest::prelude::*;
 use prost::Message as _;
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::WorldInputKey;
-use v3_core::creature::sensor_census::{world_input_key_label, SensorUseRow};
 use v3_core::mutation::{
     BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
     MutationOperatorFunnel, MutationSkipReason,
 };
+use v3_core::neighborhood::sensor_census::{world_input_key_label, SensorUseRow};
 use v3_core::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, PredationActionResult, ReproductionActionResult,
     ReproductionInvalidTargetCause,

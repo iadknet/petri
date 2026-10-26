@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use v3_core::creature::sensor_census::world_input_key_label;
 use v3_core::genome::sensor_analysis::{sensor_census, DecisionInputKey};
 use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
+use v3_core::neighborhood::sensor_census::world_input_key_label;
 
 /// The applied-behavior integer sums of
 /// `v3_core::simulation::stats::MutationValueTotals`: what the carriers of an
@@ -904,7 +904,7 @@ impl RetentionRow {
         cells: impl Iterator<
             Item = (
                 &'static str,
-                v3_core::creature::plasticity_census::RetentionCell,
+                v3_core::neighborhood::plasticity_census::RetentionCell,
             ),
         >,
     ) -> Vec<Self> {
@@ -979,7 +979,7 @@ impl PlasticityCensusBlock {
     /// Census the living population from post-tick state through the
     /// learned state's view; executes no brain.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        use v3_core::creature::plasticity_census::PlasticityCensus;
+        use v3_core::neighborhood::plasticity_census::PlasticityCensus;
         let census = PlasticityCensus::observe(sim.creatures.values().map(|creature| {
             (
                 &*creature.cached_reachable_nodes,

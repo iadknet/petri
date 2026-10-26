@@ -139,19 +139,13 @@ mod tests {
     }
 
     #[test]
-    fn genome_and_both_neighborhood_paths_share_structural_companions() {
+    fn load_slot_prev_genome_reads_shared_memory_through_the_genome_api() {
         let genome = vm_genome(vec![VmInstruction::LoadSlotPrev {
             dst: 0,
             slot_idx: 2,
         }]);
-        let expected = crate::genome::structural_companions(&genome);
-        let from_module: crate::neighborhood::companions::StructuralCompanions =
-            crate::neighborhood::companions::structural_companions(&genome);
-        let from_root: crate::neighborhood::StructuralCompanions =
-            crate::neighborhood::structural_companions(&genome);
-        assert_eq!(expected, from_module);
-        assert_eq!(expected, from_root);
-        assert!(expected.reads_shared_memory);
+        let companions = crate::genome::structural_companions(&genome);
+        assert!(companions.reads_shared_memory);
     }
 
     #[test]

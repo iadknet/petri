@@ -2,7 +2,7 @@
 //! source is an input leaf or a shared-memory slot, and every VM instruction
 //! that reads an input reference or a shared-memory slot, each with the
 //! channel it addresses and whether it lies on the sensor census's live walk
-//! (`creature::sensor_census`). Also the ablation genome rewrite.
+//! (`neighborhood::sensor_census`). Also the ablation genome rewrite.
 
 use std::collections::BTreeSet;
 

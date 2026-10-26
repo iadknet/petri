@@ -27,11 +27,12 @@ use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
 use v3_core::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::{structural_companions, StructuralCompanions};
 use v3_core::neighborhood::steering::{self, SteeringBattery};
 use v3_core::neighborhood::{
-    self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, structural_companions, Battery,
-    BirthResult, EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally,
-    BATTERY_VERSION, READ_GENOME_MULTIPLIER, READ_SEED_BASE,
+    self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, Battery, BirthResult,
+    EvalContext, GenomeEvaluation, OperatorRow, Tally, BATTERY_VERSION, READ_GENOME_MULTIPLIER,
+    READ_SEED_BASE,
 };
 use v3_core::simulation::FinalActionObservation;
 
