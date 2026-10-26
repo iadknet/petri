@@ -12,7 +12,10 @@ use std::ops::Deref;
 
 use super::edge::{GraphEdge, GraphSource};
 use super::edge::{Membership, Scope};
-use super::group::{compose, pair_birth_members, Group, GroupId, MemberSite, Shape};
+use super::group::{
+    compose, pair_birth_members, ring_birth_members, BirthCoordinate, Group, GroupId, MemberSite,
+    Shape,
+};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
@@ -1142,6 +1145,55 @@ impl CgpGraphBackendDef {
             })
     }
 
+    /// The birth coordinates of `group` with presence (T30.F01): a `Ring`
+    /// group's eight [`ring_birth_members`]; a `DirectionPair` group's
+    /// twelve [`super::pair_birth_members`] then one drive coordinate per
+    /// declared fact of its pair, none when the pair no longer resolves. A
+    /// coordinate is present when a member of `group` reads its field of
+    /// the shape's reference on its site.
+    #[must_use]
+    pub fn birth_coordinates(
+        &self,
+        group: GroupId,
+        input_refs: &[InputReference],
+    ) -> Vec<BirthCoordinate> {
+        let record = &self.groups[group.index()];
+        let ref_idx = record.shape.ref_idx();
+        let births: Vec<(u16, MemberSite)> = match record.shape {
+            Shape::Ring { .. } => ring_birth_members(record.offset)
+                .map(|(field, d)| (field, MemberSite::Direction(d)))
+                .collect(),
+            Shape::DirectionPair { .. } => record
+                .shape
+                .resolve_pair(input_refs)
+                .map(|pair| {
+                    pair_birth_members(pair, record.offset)
+                        .map(|(field, d)| (field, MemberSite::Direction(d)))
+                        .chain(pair.facts.iter().map(|&field| (field, MemberSite::Drive)))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        };
+        let members: Vec<(u16, MemberSite)> = self
+            .members(group)
+            .filter_map(|member| match self.edge_at(member).source {
+                GraphSource::InputLeaf {
+                    ref_idx: at,
+                    sub_idx,
+                } if at == ref_idx => Some((sub_idx, self.member_site(member)?)),
+                _ => None,
+            })
+            .collect();
+        births
+            .into_iter()
+            .map(|(field, site)| BirthCoordinate {
+                field,
+                site,
+                present: members.contains(&(field, site)),
+            })
+            .collect()
+    }
+
     /// Create a `Ring` group reading `input_refs[ring_ref]` into `kind` at
     /// `offset`: one record at scale 0 and eight members at own weight 0,
     /// channel `c` on sink `kind[(c + offset) mod 8]`. A new group is silent.
@@ -1156,10 +1208,9 @@ impl CgpGraphBackendDef {
             panic!("add_group: a DirectionPair group is created by add_pair_group");
         };
         let id = self.push_group_record(shape, kind, offset);
-        for channel in 0..VOTE_DIRECTION_COUNT {
-            let direction = (channel + offset) % VOTE_DIRECTION_COUNT;
+        for (channel, direction) in ring_birth_members(offset) {
             self.insert_member(
-                Self::new_member(id, ring_ref, u16::from(channel)),
+                Self::new_member(id, ring_ref, channel),
                 MemberSite::Direction(direction),
                 None,
             );

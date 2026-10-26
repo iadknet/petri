@@ -537,6 +537,13 @@ pub struct LearnedEdge {
     pub kind: PlasticityKind,
     /// The member's scope, `None` for an ungrouped edge.
     pub scope: Option<Scope>,
+    /// Whether the learner is initialized: its own slot for an ungrouped
+    /// or edge learner, its group's scale slot for a group learner.
+    pub initialized: bool,
+    /// Whether a child inherits what it learns: its `lamarckian` flag for
+    /// an ungrouped or edge learner, its group's `inherit_scale` for a
+    /// group learner, as `capture` reads them.
+    pub inherits: bool,
 }
 
 /// One group's learned scale as the readers see it, in `GroupId` order.
@@ -652,6 +659,13 @@ impl LearnedState {
             let mut modulated = 0;
             backend.slots.iter().enumerate().map(move |(index, slot)| {
                 let initialized = backend.initialized(index);
+                let (initialized_at_scope, inherits) = match slot.credited_scale() {
+                    Some((scale, _)) => (
+                        backend.scale_initialized(scale),
+                        backend.scales[scale].inherit_scale,
+                    ),
+                    None => (initialized, slot.config.lamarckian),
+                };
                 let trace = slot.config.modulation.map(|_| {
                     let trace = backend.traces[modulated];
                     modulated += 1;
@@ -669,6 +683,8 @@ impl LearnedState {
                     bound: slot.config.weight_clamp,
                     kind: PlasticityKind::of(&slot.config),
                     scope: slot.scope,
+                    initialized: initialized_at_scope,
+                    inherits,
                 }
             })
         })

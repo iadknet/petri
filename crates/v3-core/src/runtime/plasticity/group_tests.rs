@@ -563,6 +563,64 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     assert!(failed.capture(0, &def).is_some());
 }
 
+/// The view resolves each learner's initialization and inheritance by its
+/// scope (T30.F01 R3): an ungrouped or edge learner reads its own slot and
+/// its `lamarckian` flag; a group learner reads its scale slot and its
+/// group's `inherit_scale`, as `capture()` applies them.
+#[test]
+fn the_view_resolves_initialization_and_inheritance_by_scope() {
+    let (mut def, id) = ring_def(0.5);
+    let all = members(&def, id);
+    def.group_mut(id).set_inherit_scale(true);
+    learn(
+        &mut def,
+        all[0],
+        hebbian(HebbianRule::Classic, 0.5, 4.0),
+        Scope::Group,
+    );
+    let lamarckian = PlasticityConfig {
+        lamarckian: true,
+        ..hebbian(HebbianRule::Classic, 0.5, 4.0)
+    };
+    learn(&mut def, all[1], lamarckian, Scope::Edge);
+
+    let unborn = state(&def, None);
+    let (group, edge) = (view_edge(&unborn, all[0]), view_edge(&unborn, all[1]));
+    assert_eq!((group.initialized, group.inherits), (false, true));
+    assert_eq!((edge.initialized, edge.inherits), (false, true));
+
+    // A seeded scale initializes the group learner, not the edge learner.
+    let scale_seeded = state(&def, Some(seeds(&def, |seeds| seed_group(seeds, id, 1.25))));
+    assert!(view_edge(&scale_seeded, all[0]).initialized);
+    assert!(!view_edge(&scale_seeded, all[1]).initialized);
+
+    // A seeded edge learner initializes itself, not the group learner.
+    let edge_seeded = state(
+        &def,
+        Some(seeds(&def, |seeds| seed_edge(seeds, all[1], 0.75))),
+    );
+    assert!(!view_edge(&edge_seeded, all[0]).initialized);
+    assert!(view_edge(&edge_seeded, all[1]).initialized);
+
+    // A visit initializes both.
+    let mut visited = state(&def, None);
+    visited.learner(0).expect("a learning backend").enter();
+    assert!(visited.edges(0).all(|edge| edge.initialized));
+
+    // A Lamarckian group learner inherits through its group alone.
+    def.group_mut(id).set_inherit_scale(false);
+    learn(&mut def, all[0], lamarckian, Scope::Group);
+    learn(
+        &mut def,
+        all[1],
+        hebbian(HebbianRule::Classic, 0.5, 4.0),
+        Scope::Edge,
+    );
+    let darwinian = state(&def, None);
+    assert!(!view_edge(&darwinian, all[0]).inherits);
+    assert!(!view_edge(&darwinian, all[1]).inherits);
+}
+
 /// Counters (invariant 9): a group of two contributors whose scale moves
 /// counts two updates and two changes; a scale held at its bound counts
 /// two updates and no change.

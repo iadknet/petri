@@ -9,6 +9,7 @@ new_key_type! {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct NodeId(pub u32);
 
 impl NodeId {

@@ -1,5 +1,6 @@
 /// Eight-directional compass rose, canonical per v3-world-grid-spec Section 3.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub enum Direction {
     N,
     NE,

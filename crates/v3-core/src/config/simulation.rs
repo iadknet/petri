@@ -4,6 +4,7 @@ use crate::contracts::OrdinaryFoodTypeId;
 /// Edge mode for the world grid.
 /// Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub enum WorldEdgeMode {
     #[default]
@@ -13,6 +14,7 @@ pub enum WorldEdgeMode {
 
 /// Shared ordinary-food substrate config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct FoodResourceConfig {
     pub growth_rate: f32,
@@ -44,6 +46,7 @@ impl Default for FoodResourceConfig {
 
 /// Metadata for one configured ordinary-food type.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct FoodTypeConfig {
     pub name: String,
@@ -88,6 +91,7 @@ const fn default_growth_inhibitor() -> f32 {
 
 /// Occupancy depletion configuration governing occupancy-driven food suppression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct OccupancyDepletionConfig {
     /// Whether occupancy depletion is applied during food growth.
@@ -110,6 +114,7 @@ impl Default for OccupancyDepletionConfig {
 /// and that recovers linearly toward 1.0 by `1 / recovery_ticks` per tick.
 /// Every field is serde-defaulted so stored recipes without the block load.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(default, deny_unknown_fields)]
 pub struct GrazingConfig {
     /// Whether bites lower the modifier and growth reads it.
@@ -142,6 +147,7 @@ pub(crate) const MAX_GRAZING_RECOVERY_TICKS: u32 = 10_000;
 /// Fertility layer algorithm variants.
 #[non_exhaustive]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub enum FertilityAlgorithm {
     Uniform {
@@ -183,6 +189,7 @@ pub(crate) const MAX_FBM_OCTAVES: u32 = noise::Fbm::<noise::Perlin>::MAX_OCTAVES
 
 /// How a fertility layer combines with the others targeting the same food.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub enum FertilityBlend {
     /// Contributes `weight` to the weighted average of all such layers.
     #[default]
@@ -211,6 +218,7 @@ impl Default for FertilityAlgorithm {
 
 /// A single weighted fertility layer.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct FertilityLayer {
     pub algorithm: FertilityAlgorithm,
@@ -237,6 +245,7 @@ impl Default for FertilityLayer {
 
 /// Target selector for a fertility layer.
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub enum FertilityLayerTarget {
     #[default]
@@ -248,6 +257,7 @@ pub enum FertilityLayerTarget {
 
 /// Fertility map configuration governing per-cell food growth multipliers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct FertilityConfig {
     /// Whether the fertility map is applied during food growth. Default: true.
@@ -273,6 +283,7 @@ impl Default for FertilityConfig {
 
 /// Full food config: shared substrate settings plus configured food types and fertility settings.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct FoodConfig {
     #[serde(default)]
@@ -331,6 +342,7 @@ impl std::ops::DerefMut for FoodConfig {
 
 /// Annealing configuration that ramps fertility bounds over time.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct AnnealingConfig {
     /// Whether annealing is active. Default: false.
@@ -356,6 +368,7 @@ impl Default for AnnealingConfig {
 
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct WorldConfig {
     pub width: u16,
@@ -383,6 +396,7 @@ impl Default for WorldConfig {
 
 /// Founder genome profile used when seeding startup creatures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FounderProfile {
     /// Canonical v3alpha1 founder genome.
@@ -400,6 +414,7 @@ pub enum FounderProfile {
 
 /// Energy lifecycle config. Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct EnergyLifecycleConfig {
     pub initial_energy: f32,
@@ -472,6 +487,7 @@ impl Default for EnergyLifecycleConfig {
 
 /// Energy action costs config. Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct EnergyCostsConfig {
     pub move_cost: f32,
@@ -508,6 +524,7 @@ impl Default for EnergyCostsConfig {
 /// Operates on functional complexity (reachability-aware), not total genome size.
 /// Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct ComplexityEnergyCostConfig {
     /// Whether the complexity energy cost multiplier is active.
@@ -546,6 +563,7 @@ impl ComplexityEnergyCostConfig {
 /// Age-based energy cost multiplier config.
 /// Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct AgeEnergyCostConfig {
     /// Whether the age energy cost multiplier is active.
@@ -615,6 +633,7 @@ const DEFAULT_FOUNDER_SHARE: f32 = 0.2;
 
 /// Which denominator the energy sensor reads divide by (T26.F02).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum SensorScale {
     /// `energy.capacity.reference` for every creature: the trait changes
@@ -640,6 +659,7 @@ impl SensorScale {
 /// `[min, lifecycle.max_energy]`; at `reference` the move factor is 1 and the
 /// upkeep 0, so a body at the reference pays today's costs.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(default, deny_unknown_fields)]
 pub struct EnergyCapacityConfig {
     /// The neutral capacity, in `[1, max_energy]`.
@@ -675,6 +695,7 @@ impl Default for EnergyCapacityConfig {
 /// v3-runtime-config-spec.md Section 3. The capacity and the shares share
 /// the default `(0.1, 0.25)`.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(default, deny_unknown_fields)]
 pub struct LogStepMutationConfig {
     /// Chance per birth that the child's trait mutates, in `[0, 1]`.
@@ -710,6 +731,7 @@ impl LogStepMutationConfig {
 
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct EnergyConfig {
     pub lifecycle: EnergyLifecycleConfig,
@@ -756,6 +778,7 @@ impl EnergyConfig {
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct VmRuntimeConfig {
     pub opcode_cost_multiplier: f32,
@@ -789,6 +812,7 @@ impl Default for VmRuntimeConfig {
 
 /// Perception runtime config. Canonical owner: v3-runtime-config-spec.md.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PerceptionRuntimeConfig {
     /// Vision radius for extended perception area summaries. Default 5, valid 1..=8.
@@ -810,6 +834,7 @@ impl Default for PerceptionRuntimeConfig {
 
 /// Mesh/VM/graph execution limits. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
     /// Per-pass hop cap (T19.F02): a pass dispatches at most this many mesh
@@ -864,6 +889,7 @@ impl Default for RuntimeConfig {
 
 /// Phenotype mutation tuning config. Canonical owner: v3-phenotype-spec.md Section 6.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PhenotypeConfig {
     /// Internal HSL channel step magnitude (wrapping u8). Default: 1. Falls back to 1 if 0.
@@ -889,6 +915,7 @@ impl Default for PhenotypeConfig {
 /// Each field is a probability in [0.0, 1.0]. At 0.0, selection is uniform over all eligible
 /// nodes (current behavior). At 1.0, mutations always target reachable nodes when possible.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct ReachableBiasConfig {
     pub topology: f64,
@@ -912,6 +939,7 @@ impl Default for ReachableBiasConfig {
 /// input-to-vote links that start silent. `WholeFamily`, a whole sensor family
 /// per event, is the production default (user decision, 2026-10-12).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub enum NeutralInputRecruitment {
     Off,
     SingleChannel,
@@ -921,6 +949,7 @@ pub enum NeutralInputRecruitment {
 
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
     /// Initially silent input-to-vote growth (T20.F04). `WholeFamily` by
@@ -1008,6 +1037,7 @@ impl Default for MutationConfig {
 
 /// Action log configuration.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct ActionLogConfig {
     /// Maximum entries per creature. Default: 500.
@@ -1022,6 +1052,7 @@ impl Default for ActionLogConfig {
 
 /// Predation config for the StealEnergy action's kill.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PredationConfig {
     /// Energy bonus per unit of victim genome complexity on kill.
@@ -1040,6 +1071,7 @@ impl Default for PredationConfig {
 /// `StealEnergy` and `GiveEnergy` pay and the range of the heritable shares
 /// that size them. Canonical owner: v3-runtime-config-spec.md.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(default, deny_unknown_fields)]
 pub struct ExchangeConfig {
     /// The effort base's rate: an attempt's base is `effort_rate ×
@@ -1064,6 +1096,7 @@ impl Default for ExchangeConfig {
 
 /// Shared memory config for creature-level persistent f32 slot memory.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct SharedMemoryConfig {
     /// Global decay rate applied to all shared memory slots at tick start.
@@ -1079,6 +1112,7 @@ impl Default for SharedMemoryConfig {
 
 /// Population caps. Canonical owner: v3-runtime-config-spec.md Section 5.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PopulationConfig {
     pub initial_creatures: u32,
@@ -1102,6 +1136,7 @@ impl Default for PopulationConfig {
 /// Call `normalize()` after deserialization or programmatic construction to
 /// apply fallback rules for out-of-range values.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct SimulationConfig {
     pub world: WorldConfig,

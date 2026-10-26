@@ -246,6 +246,23 @@ pub const fn pair_relative(d: u8, offset: u8) -> u8 {
     ring_offset(d, offset)
 }
 
+/// The `(channel, direction)` members a new `Ring` group at `offset`
+/// materializes: channel `c` on direction `(c + offset) mod 8` — eight.
+pub fn ring_birth_members(offset: u8) -> impl Iterator<Item = (u16, u8)> {
+    let n = VOTE_DIRECTION_COUNT;
+    (0..n).map(move |channel| (u16::from(channel), (channel + offset % n) % n))
+}
+
+/// One birth coordinate of a group (T30.F01): the field a member born with
+/// the group reads, the site it is born on, and whether a member of the
+/// group reading that field of the shape's reference sits there now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BirthCoordinate {
+    pub field: u16,
+    pub site: MemberSite,
+    pub present: bool,
+}
+
 /// The `(field, direction)` members a new `DirectionPair` group on `pair` at
 /// `offset` materializes: every one whose pattern is non-zero, `x` at the
 /// relative directions NE, E, SE, SW, W, NW and `y` at N, NE, SE, S, SW, NW —

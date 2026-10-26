@@ -2246,3 +2246,97 @@ fn a_fact_member_detaches_own_only() {
     assert!(def.groups().is_empty());
     assert!(def.birth_seeds().unwrap().group_slots().is_empty());
 }
+
+// ── Birth coordinates (T30.F01) ─────────────────────────────────────────────
+
+/// The `(field, site)` of every member of `id`.
+fn member_sites(def: &CgpGraphBackendDef, id: GroupId) -> Vec<(u16, MemberSite)> {
+    def.members(id)
+        .map(|member| {
+            let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(member).source() else {
+                unreachable!("members read leaves")
+            };
+            (
+                sub_idx,
+                def.member_site(member).expect("a member on its kind"),
+            )
+        })
+        .collect()
+}
+
+/// The `(field, site)` of every coordinate, in the API's order.
+fn coordinate_sites(coordinates: &[BirthCoordinate]) -> Vec<(u16, MemberSite)> {
+    coordinates.iter().map(|c| (c.field, c.site)).collect()
+}
+
+proptest! {
+    /// A new group's birth coordinates are exactly its members, each
+    /// present: a ring's eight channels on `(channel + offset) mod 8`, a
+    /// pair's twelve direction members, then its declared facts on the
+    /// drive.
+    #[test]
+    fn a_new_groups_coordinates_are_its_members_all_present(
+        kind in 0usize..4,
+        offset in 0u8..8,
+        pair in any::<bool>(),
+    ) {
+        let kind = DirectedVoteKind::ALL[kind];
+        let (def, id, refs) = if pair {
+            let (def, id) = fact_gene(kind, offset);
+            (def, id, pair_refs())
+        } else {
+            let (def, id) = grouped(kind, offset);
+            (def, id, ring_refs())
+        };
+        let coordinates = def.birth_coordinates(id, &refs);
+        prop_assert!(coordinates.iter().all(|c| c.present));
+        let mut sites = coordinate_sites(&coordinates);
+        let expected = if pair { 12 + facts().len() } else { 8 };
+        prop_assert_eq!(sites.len(), expected);
+        if !pair {
+            for c in &coordinates {
+                let channel = u8::try_from(c.field).expect("a ring channel");
+                prop_assert_eq!(c.site, MemberSite::Direction((channel + offset) % 8));
+            }
+        }
+        let mut members = member_sites(&def, id);
+        sites.sort_unstable();
+        members.sort_unstable();
+        prop_assert_eq!(sites, members);
+    }
+
+    /// Removing one member marks exactly its coordinate absent.
+    #[test]
+    fn a_removed_member_is_its_coordinate_absent(offset in 0u8..8, pick in 0usize..15) {
+        let (mut def, id) = fact_gene(DirectedVoteKind::Move, offset);
+        let refs = pair_refs();
+        let members: Vec<_> = def.members(id).collect();
+        let pick = pick % members.len();
+        let site = member_sites(&def, id)[pick];
+        def.remove_edge(members[pick]);
+        let absent: Vec<_> = def
+            .birth_coordinates(id, &refs)
+            .into_iter()
+            .filter(|c| !c.present)
+            .map(|c| (c.field, c.site))
+            .collect();
+        prop_assert_eq!(absent, vec![site]);
+    }
+}
+
+/// A pair gene born without facts lists its declared facts absent; a pair
+/// whose reference no longer declares it has no coordinates.
+#[test]
+fn an_unresolvable_pair_has_no_coordinates() {
+    let (def, id) = paired(DirectedVoteKind::Move, 0);
+    let coordinates = def.birth_coordinates(id, &pair_refs());
+    let (directions, drives): (Vec<&BirthCoordinate>, Vec<_>) = coordinates
+        .iter()
+        .partition(|c| matches!(c.site, MemberSite::Direction(_)));
+    assert_eq!(directions.len(), 12);
+    assert!(directions.iter().all(|c| c.present));
+    let fields: Vec<u16> = drives.iter().map(|c| c.field).collect();
+    assert_eq!(fields, facts());
+    assert!(drives.iter().all(|c| !c.present));
+    assert!(def.birth_coordinates(id, &ring_refs()).is_empty());
+}

@@ -13,6 +13,7 @@
     serde::Deserialize,
 )]
 #[serde(transparent)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct OrdinaryFoodTypeId(pub u16);
 
 impl OrdinaryFoodTypeId {

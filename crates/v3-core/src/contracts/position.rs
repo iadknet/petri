@@ -2,6 +2,7 @@
 /// Origin (0,0) is top-left. x increases rightward, y increases downward.
 /// Valid range: x in [0, width-1], y in [0, height-1].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Position {
     pub x: u16,
     pub y: u16,

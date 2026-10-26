@@ -18,12 +18,17 @@ rand = { workspace = true }
 rayon = { workspace = true }
 slotmap = { workspace = true }
 noise = "0.9"
+ts-rs = { workspace = true, optional = true }
 
 [features]
 dhat-heap = ["dep:dhat"]
 # Empty at T21.F01: the observation seams later T21 features add sit behind it,
 # and only the binaries' `telemetry` feature enables it.
 telemetry-seams = []
+# TypeScript derives on the wire-exempt types (`Direction`, `Position`, the id
+# types, the config schema) for `v3-server`'s generator test (T30.F01); only
+# `v3-server`'s dev-dependency enables it, so no binary carries it.
+ts = ["dep:ts-rs"]
 
 [dependencies.dhat]
 version = "0.3"

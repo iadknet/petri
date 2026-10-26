@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Axis-aligned bounding rectangle in world coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PatternBounds {
     pub x: u16,
     pub y: u16,
@@ -31,6 +32,7 @@ impl PatternBounds {
 /// No separate PatternType enum — the variant IS the type, avoiding mismatched
 /// type+params pairs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[non_exhaustive]
 #[serde(tag = "pattern_type")]
 pub enum PatternParams {
@@ -101,6 +103,7 @@ impl PatternParams {
 
 /// One additive startup barrier layer, using the existing pattern schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct TerrainLayer {
     pub params: PatternParams,
