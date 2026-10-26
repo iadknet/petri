@@ -215,3 +215,37 @@ A confirming `track-design` job (`gpt-6.1-sol`, `high`) on the round's changes:
 | --- | --- | --- | --- |
 | 43 | track-design P1 | Row 31 gave T29.F01 route composition, which calls the VM repair T30.F05 moves later | Route composition moved to G23 and T30.F05; T29.F01 keeps the backend copies in `mutation::topology::structural`, which do not call that repair |
 | 44 | track-design P2 | The heredity and bundle-learning notes still required the mutation gate | Removed from both notes |
+
+## T30.F08 row (2026-10-26)
+
+Codex `track-design` review of the T30.F08 row, its G27 debt and its
+master priority slot, from the T30.F03 design-lens step-back the user asked
+to plan. Report:
+`/tmp/claude-501/-Users-<user>-projects-petri/5bcf9a1e-202a-467e-b894-d98c6b69516f/scratchpad/t30-f08-track-design.md`.
+The draft was swept, uncommitted, into another session's commit `078ca324`
+before this review ran, so the review read it at HEAD with an empty diff;
+the fix below lands in its own commit.
+
+| Check | Verdict | What was examined | Findings or why clear |
+| --- | --- | --- | --- |
+| C1 Code decomposition | clear | `CreatureState`, `GraphRuntimeState`, genome analysis, newborn seed extraction, fixture callers | encapsulation fits the existing owners |
+| C2 Task decomposition | clear | F08 against F07, F02, T25.F11–F12, T29.F01, dependencies and master notes | F08 stands apart from module moves and the birth transaction; overlaps recorded |
+| C3 Domain boundaries | clear | architecture rules 1 and 5, the domain order, G4, G8, G27 | follows the desired architecture; no further change |
+| C4 Premises | finding | immutability, cache reuse, constructor behavior, deferred birth work, with blame and history | 1 |
+| C5 Larger design flaw | clear | `163a68b0`, `98ca76d0`, `d443547a`, tick and CLI tracking fixtures | F08 addresses the repeated synchronization itself |
+| C6 Workarounds | finding | manual genome and runtime resets, fabricated cache values, the cached constructor, the founder-edit hook | 1 |
+
+| # | Severity | Finding | Disposition |
+| --- | --- | --- | --- |
+| 1 | blocking | F08 left caller-supplied caches discretionary: `new_with_cached_fields` takes complexity, size and reachability apart from the genome, and its unit test keeps values no genome has, so private fields would still allow disagreement at construction | Fixed: no constructor accepts derived state apart from its genome; an owner operation establishes the correspondence, the fast path may still reuse its parent's analyses, and the test is replaced. This applies the user's quote below, so it is not a scope change |
+
+| Source quote | Owning requirement |
+| --- | --- |
+| User: "encapsulate finalized genomes and their derived state behind construction operations" | F08 goal and note; G27 |
+| User: "so fixtures stop swapping genomes and resyncing caches by hand" | F08 note: fixtures in `v3-core`, `v3-cli` and `v3-server` build creatures through construction |
+| Reviewer (adopted by the user's request): "continued additions require fixtures to discover and synchronize more parallel state" | F08 note |
+| Assistant proposals: T30 placement, no dependency, priority after F07, G27 | recorded as assistant proposals in the track and master notes |
+
+Could not verify (reviewer): the "about 50 writes in 13 files" count
+exhaustively (representative sites in all three crates verified); that no
+current test fails on the stale perception cache (tests not run).

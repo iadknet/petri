@@ -160,9 +160,13 @@ behavior.
   the creature through a construction operation instead, and tests that set
   a cache no genome has (`cached_genome_size = 4` in
   `simulation/tick/tests/{energy_accounting,phase0}.rs`) build a genome
-  with that property. Whether the no-mutation reproduction fast path keeps
-  passing its parent's caches into `new_with_cached_fields` is the spec
-  owner's to decide, with the gate's counters unchanged. F08 changes no
+  with that property. No constructor accepts derived state apart from the
+  genome it derives from: `new_with_cached_fields` (`creature/state.rs`),
+  which takes complexity, size and reachability as independent arguments
+  and whose unit test keeps values no genome has, is replaced by an owner
+  operation that establishes the correspondence, so the no-mutation
+  reproduction fast path may still reuse its parent's analyses, and that
+  test is replaced. F08 changes no
   birth path: T29.F01 later replaces the constructors F08 routes through
   with one birth transaction (G4), and T30.F02 moves `GraphRuntimeState`
   out of the record (G8); both edit `creature/state.rs`, and concurrent
