@@ -7,11 +7,11 @@
 use rand::Rng;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
     GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::types::{BirthEdgeClass, MutationSkipReason};
 
@@ -889,8 +889,8 @@ mod tests {
     use super::*;
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
-    use crate::creature::genome::vote::{ActionParamField, VoteSink};
+    use crate::genome::cgp::{OutputSink, OutputSinkKind};
+    use crate::genome::vote::{ActionParamField, VoteSink};
     use rand::SeedableRng;
 
     fn test_rng() -> rand::rngs::SmallRng {
@@ -1582,7 +1582,7 @@ mod tests {
     #[test]
     fn add_graph_edge_wrapper_increases_edge_count() {
         use crate::contracts::NodeId;
-        use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+        use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
         let def = minimal_def();
         let before = total_edge_count(&def);

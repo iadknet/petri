@@ -17,7 +17,7 @@ use rand::Rng;
 
 use super::types::TargetReachability;
 use crate::contracts::NodeId;
-use crate::creature::genome::NodeGenome;
+use crate::genome::NodeGenome;
 
 /// Where a birth's executed node set comes from.
 ///
@@ -582,13 +582,11 @@ mod tests {
         NodeGenome {
             node_id,
             input_refs: Vec::new(),
-            backend_def: crate::creature::genome::BackendDef::Vm(
-                crate::creature::genome::VmBackendDef {
-                    register_count: 1,
-                    constants: Vec::new(),
-                    program: vec![crate::creature::genome::VmInstruction::Halt],
-                },
-            ),
+            backend_def: crate::genome::BackendDef::Vm(crate::genome::VmBackendDef {
+                register_count: 1,
+                constants: Vec::new(),
+                program: vec![crate::genome::VmInstruction::Halt],
+            }),
             targets: Vec::new(),
         }
     }

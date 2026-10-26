@@ -5,11 +5,11 @@ use super::fixtures::{cue, move_sink, stage_for, EAST};
 use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::VoteSink;
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
@@ -914,7 +914,7 @@ pub fn qualified_paths() -> Vec<QualifiedPath> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeMut, EdgeOccurrence, EdgeSurface};
+    use crate::genome::cgp::{CgpGraphBackendDef, EdgeMut, EdgeOccurrence, EdgeSurface};
 
     /// `form`'s step specs and the genome before each step, then the last
     /// step's result, replayed with the pinned seeds.

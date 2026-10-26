@@ -6,9 +6,9 @@ use super::super::run_tick;
 use super::support::*;
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, InputReference, NodeId};
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::VoteSink;
+use crate::genome::{
     BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, VmBackendDef, VmInstruction,
 };
 use crate::sensors::static_inputs::assemble_static_inputs;
@@ -133,8 +133,8 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
             const_idx: 0,
         },
         VmInstruction::WriteActionParam {
-            field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction
-                .index() as u8,
+            field_idx: crate::genome::vote::ActionParamField::ReproduceTransferFraction.index()
+                as u8,
             src: 0,
         },
         VmInstruction::AddVote {

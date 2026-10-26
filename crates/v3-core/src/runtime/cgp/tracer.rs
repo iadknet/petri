@@ -1,7 +1,7 @@
 //! The tracing contract of the ordered graph evaluation and its effects
 //! pass: the callbacks a tracer receives, and the zero-cost production one.
 
-use crate::creature::genome::cgp::ComputeNodeKind;
+use crate::genome::cgp::ComputeNodeKind;
 
 /// Callback trait for instrumenting the ordered graph evaluation.
 #[allow(clippy::too_many_arguments)]

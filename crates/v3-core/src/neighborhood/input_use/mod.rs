@@ -29,8 +29,8 @@ use rayon::prelude::*;
 
 use crate::config::MutationConfig;
 use crate::contracts::WorldAction;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::CreatureGenome;
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::CreatureGenome;
 use crate::mutation::compound::sub_value_count;
 
 use super::battery::{first_action_difference, run_panel, Scenario};

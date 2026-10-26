@@ -112,11 +112,11 @@ impl ReproductionInvalidTargetCause {
 /// or `Graph.RecruitNeutralInput`), so every pair group it carries came from
 /// the parent's genome.
 pub(crate) fn inherits_nonzero_pair_group(
-    child: &crate::creature::genome::CreatureGenome,
+    child: &crate::genome::CreatureGenome,
     summary: &crate::mutation::types::MutationSummary,
 ) -> bool {
-    use crate::creature::genome::cgp::Shape;
-    use crate::creature::genome::BackendDef;
+    use crate::genome::cgp::Shape;
+    use crate::genome::BackendDef;
     use crate::mutation::types::MutationOperator as Op;
     let created = [Op::GraphAddDirectionPairGroup, Op::GraphRecruitNeutralInput]
         .iter()
@@ -592,11 +592,11 @@ mod tests {
     use super::*;
     use crate::config::MutationConfig;
     use crate::creature::action_log::ActionType;
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
     };
-    use crate::creature::genome::{BackendDef, CreatureGenome};
-    use crate::creature::genome::{HebbianRule, PlasticityConfig};
+    use crate::genome::{BackendDef, CreatureGenome};
+    use crate::genome::{HebbianRule, PlasticityConfig};
 
     /// A parent state on `genome` whose plastic slots of mesh node `n`
     /// learned `parent[n]`, in canonical order (each backend visited).
@@ -646,9 +646,9 @@ mod tests {
     /// Helper: builds a genome with a single Graph mesh node containing the given compute nodes.
     fn genome_with_cgp_compute_nodes(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
         use crate::contracts::NodeId;
-        use crate::creature::genome::NodeGenome;
+        use crate::genome::NodeGenome;
 
-        let mut def = crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
+        let mut def = crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
         def = def.with_compute_nodes(compute_nodes);
 
         CreatureGenome {
@@ -852,7 +852,7 @@ mod tests {
     fn lamarckian_copies_parent_learned_weights() {
         let genome = genome_with_cgp_compute_nodes(vec![
             ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
-            crate::creature::genome::cgp::test_support::plastic_node(
+            crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
                 Some(PlasticityConfig {
@@ -876,7 +876,7 @@ mod tests {
     fn darwinian_resets_to_empty() {
         let genome = genome_with_cgp_compute_nodes(vec![
             ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
-            crate::creature::genome::cgp::test_support::plastic_node(
+            crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
                 Some(PlasticityConfig {
@@ -898,8 +898,8 @@ mod tests {
 
     #[test]
     fn lamarckian_with_no_parent_weights_returns_empty() {
-        let genome = genome_with_cgp_compute_nodes(vec![
-            crate::creature::genome::cgp::test_support::plastic_node(
+        let genome =
+            genome_with_cgp_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
                 Some(PlasticityConfig {
@@ -910,8 +910,7 @@ mod tests {
                     modulation: None,
                     retention: 1.0,
                 }),
-            ),
-        ]);
+            )]);
 
         // Parent never ran graph execution: nothing initialized, no seeds.
         let child = build_child_learned(&genome, &[]);
@@ -921,7 +920,7 @@ mod tests {
     #[test]
     fn vm_nodes_skipped() {
         use crate::contracts::NodeId;
-        use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+        use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -947,7 +946,7 @@ mod tests {
     #[test]
     fn birth_graph_created_on_a_vm_only_draft_has_no_learned_state() {
         use crate::contracts::{NodeId, RouteTarget};
-        use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+        use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
         use crate::mutation::reachability::TargetSelector;
         use crate::mutation::topology::{TopologyMutator, TopologyOperator};
         use rand::SeedableRng;
@@ -1003,7 +1002,7 @@ mod tests {
         use crate::mutation::reachability::TargetSelector;
         use crate::mutation::topology::{TopologyMutator, TopologyOperator};
         use rand::SeedableRng;
-        let compute = crate::creature::genome::cgp::test_support::plastic_node(
+        let compute = crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(
                 GraphSource::SharedMemory {
@@ -1104,8 +1103,8 @@ mod tests {
             .graph_runtime
             .learned()
             .has_learning());
-        let genome = genome_with_cgp_compute_nodes(vec![
-            crate::creature::genome::cgp::test_support::plastic_node(
+        let genome =
+            genome_with_cgp_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(
                     GraphSource::SharedMemory {
@@ -1122,8 +1121,7 @@ mod tests {
                     modulation: None,
                     retention: 1.0,
                 }),
-            ),
-        ]);
+            )]);
         let parent = &mut sim.creatures[parent_id];
         parent.genome = genome.clone();
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
@@ -1233,8 +1231,8 @@ mod tests {
         use crate::config::SimulationConfig;
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::creature::founder::v3alpha1_founder_genome;
-        use crate::creature::genome::cgp::Shape;
-        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::genome::cgp::Shape;
+        use crate::genome::vote::DirectedVoteKind;
         use crate::simulation::seed_simulation;
         use rand::SeedableRng;
 
@@ -1306,10 +1304,10 @@ mod tests {
 
     /// The founder with an area-barrier reference and one `DirectionPair`
     /// group at `scale` on its Graph node.
-    fn pair_grouped_founder(scale: f32) -> crate::creature::genome::CreatureGenome {
+    fn pair_grouped_founder(scale: f32) -> crate::genome::CreatureGenome {
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::creature::founder::v3alpha1_founder_genome;
-        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::genome::vote::DirectedVoteKind;
 
         let mut genome = v3alpha1_founder_genome();
         let node = genome

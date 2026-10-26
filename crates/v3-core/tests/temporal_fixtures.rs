@@ -50,15 +50,15 @@ use v3_core::contracts::{
     CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
     WorldAction, WorldInputKey,
 };
-use v3_core::creature::genome::cgp::{
+use v3_core::creature::state::CreatureState;
+use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use v3_core::creature::genome::vote::VoteSink;
-use v3_core::creature::genome::{
+use v3_core::genome::vote::VoteSink;
+use v3_core::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
 };
-use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::runtime::mesh::execute_creature_mesh;
 use v3_core::runtime::state::GraphRuntimeState;
@@ -460,8 +460,8 @@ fn reward_modulated_node_genome_impl(
         ComputeNodeKind::Add,
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
     ));
-    def.edge_mut(v3_core::creature::genome::cgp::EdgeOccurrence::new(
-        v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(1),
+    def.edge_mut(v3_core::genome::cgp::EdgeOccurrence::new(
+        v3_core::genome::cgp::EdgeSurface::ComputeInput(1),
         0,
     ))
     .set_plasticity(Some(PlasticityConfig {

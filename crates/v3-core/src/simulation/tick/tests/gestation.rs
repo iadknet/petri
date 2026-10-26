@@ -4,7 +4,7 @@ use super::support::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
 use crate::creature::action_log::{ActionLog, ActionResult};
-use crate::creature::genome::OutcomeChannel;
+use crate::genome::OutcomeChannel;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::{run_phase_0, run_phase_2, run_tick};
 use crate::simulation::{seed_simulation, Simulation};

@@ -2,8 +2,8 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::analysis::{vm_is_output_instruction, vm_register_write};
-use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef};
+use crate::genome::analysis::{vm_is_output_instruction, vm_register_write};
+use crate::genome::{BackendDef, CreatureGenome, VmBackendDef};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 

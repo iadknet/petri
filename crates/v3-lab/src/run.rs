@@ -8,7 +8,7 @@ use std::time::Instant;
 use serde_json::{json, Value};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 
 use crate::arena::{classify, resolve_arm, Role};
 use crate::calibration::{run_gate, GridInput};

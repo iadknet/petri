@@ -23,10 +23,10 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::{ActionType, WorldInputKey};
 use v3_core::creature::drives::DriveCensus;
-use v3_core::creature::genome::cgp::Scope;
-use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
+use v3_core::genome::cgp::Scope;
+use v3_core::genome::vote::DirectedVoteKind;
 use v3_core::ledger::DeathCause;
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};

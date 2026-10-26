@@ -7,7 +7,7 @@
 //! All types and methods are wired into `tick.rs` in Stage 2.
 
 use crate::contracts::CreatureId;
-use crate::creature::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
+use crate::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
 use crate::runtime::plasticity::OutcomeSignalBank;
 use slotmap::SecondaryMap;
 

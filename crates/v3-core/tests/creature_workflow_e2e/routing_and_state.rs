@@ -1,13 +1,11 @@
 use slotmap::SlotMap;
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::{CreatureId, NodeId, Position, RouteTarget, WorldAction};
-use v3_core::creature::genome::cgp::{
+use v3_core::creature::state::CreatureState;
+use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
-use v3_core::creature::state::CreatureState;
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::kernel::WorldState;
 use v3_core::simulation::Simulation;
 

@@ -195,8 +195,8 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> MeshHopTracePayload {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::vote::{VoteSink, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+    use v3_core::genome::vote::DirectedVoteKind;
+    use v3_core::genome::vote::{VoteSink, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphOutputSinkTrace, GraphTrace, MeshHopTrace,
         MeshPassTrace, PassEndReason, TickTrace, TraceGateScore, TraceRouteDecision, VmTrace,

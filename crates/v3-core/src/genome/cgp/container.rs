@@ -21,10 +21,10 @@ use super::{
 };
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::contracts::{DirectionPair, InputReference};
-use crate::creature::genome::vote::{
+use crate::genome::vote::{
     ActionParamField, DirectedVoteKind as Kind, VoteSink, VOTE_DIRECTION_COUNT,
 };
-use crate::creature::genome::{BackendDef, NodeGenome, PlasticityConfig};
+use crate::genome::{BackendDef, NodeGenome, PlasticityConfig};
 
 // ── Read-only list newtypes ─────────────────────────────────────────────────
 

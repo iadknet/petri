@@ -8,12 +8,12 @@ use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, RouteTarget,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
 };
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
-use crate::creature::genome::{
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
 };
@@ -287,7 +287,7 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
                 assert_ne!(*expected, 0.0, "authored channels are excited");
                 let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
                 // Rotate the catalog: eligibility comes from identity, never position.
-                crate::creature::genome::cgp::test_support::edit_sinks(&mut base, |sinks| {
+                crate::genome::cgp::test_support::edit_sinks(&mut base, |sinks| {
                     sinks.rotate_left(vote.index());
                 });
                 if wired {
@@ -320,8 +320,7 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
                     &inputs[..inputs.len() - 1],
                     &base.sink(kind).unwrap().inputs[..]
                 );
-                let last =
-                    crate::creature::genome::cgp::EdgeOccurrence::new(sink, inputs.len() - 1);
+                let last = crate::genome::cgp::EdgeOccurrence::new(sink, inputs.len() - 1);
                 silent.edge_mut(last).set_weight(0.5);
                 let refined = effects(&silent, refs, ramp::<16>(0.0)[15]);
                 let mut expected_votes = before.side.dispatch_effects().0;
@@ -364,7 +363,7 @@ fn active_graph() -> CgpGraphBackendDef {
             trace_decay: 0.5,
         }),
     ] {
-        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![edge(memory(0, false), 0.5)],
             Some(PlasticityConfig {

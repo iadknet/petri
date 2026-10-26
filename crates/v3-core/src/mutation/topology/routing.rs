@@ -2,9 +2,9 @@ use rand::Rng;
 
 use super::{birth, structural::next_node_id};
 use crate::contracts::{InputReference, NodeId, RouteTarget, MAX_GATE_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
-use crate::creature::genome::CreatureGenome;
-use crate::creature::genome::{BackendDef, NodeGenome, VmInstruction};
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
+use crate::genome::CreatureGenome;
+use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::mutation::graph::operators::random_graph_source;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};

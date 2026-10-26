@@ -13,7 +13,7 @@ use crate::contracts::{Position, WorldAction, SHARED_MEMORY_SLOTS};
 #[cfg(feature = "telemetry-seams")]
 use crate::creature::action_log::ActionLogEntry;
 #[cfg(feature = "telemetry-seams")]
-use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
+use crate::genome::OUTCOME_CHANNEL_COUNT;
 #[cfg(feature = "telemetry-seams")]
 use crate::ledger::DeathCause;
 #[cfg(feature = "telemetry-seams")]

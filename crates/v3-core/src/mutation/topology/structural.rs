@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use rand::Rng;
 
 use crate::contracts::{NodeId, RouteTarget};
-use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
@@ -50,7 +50,7 @@ pub(super) fn apply_remove_node(
     if genome.nodes.len() <= 1 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let currently_reachable = crate::creature::genome::analysis::mesh_reachable_nodes(genome);
+    let currently_reachable = crate::genome::analysis::mesh_reachable_nodes(genome);
     let unreachable: Vec<_> = (0..genome.nodes.len())
         .filter(|&i| {
             genome.nodes[i].node_id != genome.entry_node_id

@@ -6,9 +6,9 @@
 use rand::Rng;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{self, CgpGraphBackendDef, GroupId, Scope, Shape};
-use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
-use crate::creature::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
+use crate::genome::cgp::{self, CgpGraphBackendDef, GroupId, Scope, Shape};
+use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
+use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::MutationSkipReason;
 
 use super::hebbian::{

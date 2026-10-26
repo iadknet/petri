@@ -6,7 +6,7 @@ use super::{births, Battery, BirthExposure, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
-use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use crate::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn checkpoint_reads_preserve_lineage_genomes_and_do_not_restart_dead_parents() {
         use crate::contracts::WorldAction;
-        use crate::creature::genome::BackendDef;
+        use crate::genome::BackendDef;
         let config = replay_config();
         let context = EvalContext::from_config(&config);
         let battery = Battery::generate(context.food_type_count);
@@ -390,12 +390,12 @@ mod tests {
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
         for node in &mut dead.nodes {
             if let BackendDef::Graph(graph) = &mut node.backend_def {
-                crate::creature::genome::cgp::test_support::edit_sinks(graph, |sinks| {
+                crate::genome::cgp::test_support::edit_sinks(graph, |sinks| {
                     for sink in sinks {
                         if matches!(
                             sink.kind,
-                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(_)
-                                | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_)
+                            crate::genome::cgp::OutputSinkKind::ActionVote(_)
+                                | crate::genome::cgp::OutputSinkKind::ActionParam(_)
                         ) {
                             sink.inputs.clear();
                         }

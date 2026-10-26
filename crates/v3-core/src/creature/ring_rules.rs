@@ -21,12 +21,10 @@
 use std::collections::BTreeMap;
 
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{
-    ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape,
-};
-use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
-use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::sensor_census::world_input_key_label;
+use crate::genome::cgp::{ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape};
+use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
+use crate::genome::{BackendDef, CreatureGenome};
 
 /// The census version the goal summary records.
 pub const RING_RULES_VERSION: &str = "ring-rules-v2";
@@ -230,7 +228,7 @@ impl RingRuleCensus {
                     continue;
                 };
                 let members = def
-                    .members(crate::creature::genome::cgp::GroupId::new(
+                    .members(crate::genome::cgp::GroupId::new(
                         u16::try_from(index).expect("groups below u16::MAX"),
                     ))
                     .count() as u64;

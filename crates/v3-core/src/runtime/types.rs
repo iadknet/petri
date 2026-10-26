@@ -1,8 +1,6 @@
 use crate::contracts::{ActionQueue, WorldAction};
-use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
-use crate::creature::genome::vote::{
-    VoteVector, ACTION_PARAM_FIELD_COUNT, VOTE_KIND_COUNT, VOTE_SINK_COUNT,
-};
+use crate::genome::cgp::CUSTOM_OUTPUT_COUNT;
+use crate::genome::vote::{VoteVector, ACTION_PARAM_FIELD_COUNT, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::TerminationReason;

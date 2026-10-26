@@ -5,7 +5,7 @@
 //! which includes the action-vote and parameter sinks (T19.F03, T19.F04).
 
 use crate::contracts::MAX_GATE_SLOTS;
-use crate::creature::genome::vote::{
+use crate::genome::vote::{
     ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
 

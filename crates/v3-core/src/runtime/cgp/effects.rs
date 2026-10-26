@@ -1,8 +1,8 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
 use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
-use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
+use crate::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::cgp::tracer::GraphTracer;

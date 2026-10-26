@@ -2,8 +2,8 @@
 //! ordinary sink edges at their genomic weight, so equality with the
 //! equivalent ungrouped edges is bitwise.
 use super::*;
-use crate::creature::genome::cgp::{EdgeSurface, GroupId, Shape};
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::cgp::{EdgeSurface, GroupId, Shape};
+use crate::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::group;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::types::sanitize_f32;
@@ -334,15 +334,15 @@ fn an_unresolvable_ring_ref_reads_pattern_zero() {
             votes(&def, &sensors).iter().all(|&v| v == 0.0),
             "{ring_ref}"
         );
-        let node = crate::creature::genome::NodeGenome {
+        let node = crate::genome::NodeGenome {
             node_id: crate::contracts::NodeId(0),
             input_refs: rings(),
-            backend_def: crate::creature::genome::BackendDef::Graph(def),
+            backend_def: crate::genome::BackendDef::Graph(def),
             targets: Vec::new(),
         };
         assert_eq!(
-            crate::creature::genome::cgp::validate_graph(&node),
-            Err(crate::creature::genome::cgp::GraphInvariantViolation::ShapeReference)
+            crate::genome::cgp::validate_graph(&node),
+            Err(crate::genome::cgp::GraphInvariantViolation::ShapeReference)
         );
     }
 }
@@ -407,12 +407,12 @@ fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
 fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutputs, f32, Vec<f32>) {
     let mut energy = energy;
     let refs = rings();
-    let genome = crate::creature::genome::CreatureGenome {
+    let genome = crate::genome::CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![crate::creature::genome::NodeGenome {
+        nodes: vec![crate::genome::NodeGenome {
             node_id: crate::contracts::NodeId(0),
             input_refs: refs.clone(),
-            backend_def: crate::creature::genome::BackendDef::Graph(def.clone()),
+            backend_def: crate::genome::BackendDef::Graph(def.clone()),
             targets: Vec::new(),
         }],
     };

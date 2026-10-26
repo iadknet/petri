@@ -84,7 +84,7 @@ proptest! {
                             BackendDef::Graph(g) => {
                                 let gate = g.sink_surface(OutputSinkKind::RouterGate(added_slot)).unwrap();
                                 let last = g.surface_edges(gate).len() - 1;
-                                g.remove_edge(crate::creature::genome::cgp::EdgeOccurrence::new(gate, last));
+                                g.remove_edge(crate::genome::cgp::EdgeOccurrence::new(gate, last));
                             }
                         }
                         prop_assert_eq!(&restored,&base.nodes[0].backend_def);
@@ -107,7 +107,7 @@ proptest! {
 }
 
 fn stateful_fixture(source_graph: bool) -> CreatureGenome {
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind};
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind};
     let mut base = conditional_fixture(source_graph);
     // Keep a stateful surviving graph downstream of the attachment.
     let mut temporal = node(9, &[1]);

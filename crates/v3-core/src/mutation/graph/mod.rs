@@ -7,8 +7,8 @@ use rand::Rng;
 
 use crate::config::{MutationConfig, NeutralInputRecruitment};
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, Scope};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::cgp::{CgpGraphBackendDef, Scope};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
     BirthEdgeClass, MutationOperator, MutationSkipReason, TargetReachability,

@@ -6,12 +6,12 @@ use super::learned::LearningCounts;
 use super::{LearnedState, OutcomeSignalBank};
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::{
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
 };

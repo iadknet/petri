@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::creature::genome::CreatureGenome;
+use crate::genome::CreatureGenome;
 
 /// Errors detected by the parseability gate.
 #[derive(Debug, PartialEq)]
@@ -37,7 +37,7 @@ impl ParseabilityGate {
 mod tests {
     use super::*;
     use crate::contracts::NodeId;
-    use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+    use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
     fn make_minimal_node(id: u32) -> NodeGenome {
         NodeGenome {

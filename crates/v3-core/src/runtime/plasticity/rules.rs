@@ -4,7 +4,7 @@
 //! Learning parameters are read as stored: I1 keeps them in range by
 //! construction and the load boundary checks it, so no law clamps them.
 
-use crate::creature::genome::HebbianRule;
+use crate::genome::HebbianRule;
 
 /// A pure-Hebbian edge's weight change for one committed visit, from the
 /// edge's recorded `pre` and `post` samples and its visit-start weight `w`.

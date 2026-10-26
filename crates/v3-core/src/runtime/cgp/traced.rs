@@ -1,6 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
+use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::state::GraphRuntimeState;

@@ -1,7 +1,7 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::config::SimulationConfig;
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::vote::DirectedVoteKind;
 use crate::simulation::recording::ActiveTrace;
 use crate::simulation::seeding::seed_simulation;
 
@@ -116,8 +116,8 @@ fn run_tick_with_none_trace_identical_behavior() {
 #[test]
 fn a_committed_move_sets_the_stored_heading_and_the_trace_keeps_the_start() {
     use crate::contracts::{Direction, Position};
-    use crate::creature::genome::vote::VoteSink;
-    use crate::creature::genome::VmInstruction;
+    use crate::genome::vote::VoteSink;
+    use crate::genome::VmInstruction;
 
     let genome = vm_program_genome(vec![VmInstruction::AddVote {
         sink: VoteSink::Directed(DirectedVoteKind::Move, 6).index() as u8,

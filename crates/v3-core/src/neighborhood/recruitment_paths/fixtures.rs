@@ -1,14 +1,14 @@
 use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, RouteTarget, WorldInputKey};
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::{
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::VoteSink;
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::graph::operators::split_existing_edge;
 use crate::mutation::reachability::TargetSets;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};

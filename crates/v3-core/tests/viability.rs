@@ -674,7 +674,7 @@ fn mutation_reachability_telemetry_accumulates() {
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
     use v3_core::creature::founder::v3alpha1_founder_genome;
-    use v3_core::creature::genome::analysis::mesh_reachable_nodes;
+    use v3_core::genome::analysis::mesh_reachable_nodes;
 
     let mut cfg = SimulationConfig::default().mutation;
     // About five requested events per founder birth (0.05 per unit).

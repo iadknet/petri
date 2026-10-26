@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 use v3_lab::arena::{resolve_arm, Policy, Role};
 use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};

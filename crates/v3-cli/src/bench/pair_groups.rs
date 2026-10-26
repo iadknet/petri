@@ -8,9 +8,9 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use v3_core::creature::genome::cgp::{GroupId, Shape};
-use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::genome::{BackendDef, CreatureGenome};
+use v3_core::genome::cgp::{GroupId, Shape};
+use v3_core::genome::vote::DirectedVoteKind;
+use v3_core::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::types::MutationOperator;
 
 /// The block's definition version.

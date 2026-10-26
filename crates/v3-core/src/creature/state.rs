@@ -8,13 +8,13 @@ use crate::contracts::{
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::body::HeritableBody;
 use crate::creature::colour::unit_rgb;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::sensor_analysis::{
+use crate::creature::newborn::take_birth_seeds;
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::sensor_analysis::{
     declared_world_keys, has_barrier_reader, live_vm_world_reads, perception_requirements,
     sensor_census,
 };
-use crate::creature::genome::{CreatureGenome, OUTCOME_CHANNEL_COUNT};
-use crate::creature::newborn::take_birth_seeds;
+use crate::genome::{CreatureGenome, OUTCOME_CHANNEL_COUNT};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
 use crate::runtime::state::GraphRuntimeState;
 use crate::sensors::reads::WorldKeySet;
@@ -307,11 +307,9 @@ const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
 mod tests {
     use super::*;
     use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::phenotype::Phenotype;
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use slotmap::SlotMap;
 
     /// A body with `channels`, the founder's active channel and polarity, and

@@ -1,7 +1,7 @@
 use super::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -966,7 +966,8 @@ fn result_equivalence_all_41_opcodes() {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction.index() as u8,
+                        field_idx: crate::genome::vote::ActionParamField::ReproduceTransferFraction
+                            .index() as u8,
                         src: 0,
                     },
                     VmInstruction::AddVote { sink: 1, src: 0 },

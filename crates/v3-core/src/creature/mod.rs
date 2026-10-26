@@ -4,7 +4,6 @@ pub(crate) mod cgp_founder;
 pub mod colour;
 pub mod drives;
 pub mod founder;
-pub mod genome;
 pub mod identity;
 pub(crate) mod newborn;
 pub mod parseability;

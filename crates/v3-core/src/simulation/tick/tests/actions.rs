@@ -3,9 +3,7 @@ use super::support::*;
 use crate::contracts::{Direction, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionResult, ActionType};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::simulation::actions::{
     apply_reproduce, apply_steal_energy, BarrierReaderState, MoveBlockedCause,
     ReproductionActionResult, ReproductionInvalidTargetCause,
@@ -76,9 +74,9 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
 fn queued_actions_stop_once_action_exhausts_creature_energy() {
     // Eat and Move N tie at one unit: pass 1 commits Eat, pass 2 Move.
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::AddVote { sink: 0, src: 0 }, // Eat
-        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 }, // Move N
-        crate::creature::genome::VmInstruction::Halt,
+        crate::genome::VmInstruction::AddVote { sink: 0, src: 0 }, // Eat
+        crate::genome::VmInstruction::AddVote { sink: 1, src: 0 }, // Move N
+        crate::genome::VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
@@ -198,8 +196,8 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
 #[test]
 fn failed_move_records_blocked_barrier_cause_in_tick() {
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
-        crate::creature::genome::VmInstruction::Halt,
+        crate::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::genome::VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -219,8 +217,8 @@ fn failed_move_records_blocked_barrier_cause_in_tick() {
 #[test]
 fn reproduce_invalid_target_records_barrier_cause_in_tick() {
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::AddVote { sink: 9, src: 0 },
-        crate::creature::genome::VmInstruction::Halt,
+        crate::genome::VmInstruction::AddVote { sink: 9, src: 0 },
+        crate::genome::VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -583,9 +581,9 @@ fn energy_floor_at_zero_after_action_execution() {
     // runs — confirming the floor + death check works correctly.
     let genome = vm_program_genome(vec![
         // Queue two Move(N) actions. Both will fail against the barrier.
-        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
-        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
-        crate::creature::genome::VmInstruction::Halt,
+        crate::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::genome::VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(3.0, genome);
 
@@ -623,15 +621,11 @@ fn energy_floor_at_zero_after_action_execution() {
 
 #[test]
 fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
-    use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
-    };
-    use crate::creature::genome::{
-        HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
-    };
+    use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::genome::{HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig};
     for lamarckian in [false, true] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Constant(1.0),
             vec![GraphEdge::new(
                 GraphSource::SharedMemory {
@@ -946,7 +940,7 @@ fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
 /// A one-node VM genome that eats food type 0 leaving the share `leave` on
 /// the cell (T02.F08): write `EatLeaveShare`, then vote one `Eat`.
 fn eat_leave_genome(leave: f32) -> CreatureGenome {
-    use crate::creature::genome::vote::{ActionParamField, VoteSink};
+    use crate::genome::vote::{ActionParamField, VoteSink};
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -1133,7 +1127,7 @@ fn per_type_standing_density_matches_the_applied_growth_summary() {
 #[test]
 fn neutral_recruitment_costs_follow_applied_genome_growth() {
     use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
-    use crate::creature::genome::vote::VoteSink;
+    use crate::genome::vote::VoteSink;
     use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     use crate::simulation::tick::Phase0Charge;
     let config = crate::config::SimulationConfig::default();

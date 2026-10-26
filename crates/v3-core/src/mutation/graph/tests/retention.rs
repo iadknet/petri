@@ -7,12 +7,12 @@ use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     validate_graph, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, GroupId, Scope,
     Shape,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
 use crate::mutation::graph::hebbian::{
     disable_retention_in_def, draw_retention, enable_retention_in_def, mutate_retention_in_def,
     step_retention, RETENTION_DEFICIT_MIN,
@@ -60,9 +60,7 @@ fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOc
             .set_plasticity(Some(plastic(retention)));
     }
     let surface = def
-        .sink_surface(crate::creature::genome::cgp::OutputSinkKind::CustomOutput(
-            0,
-        ))
+        .sink_surface(crate::genome::cgp::OutputSinkKind::CustomOutput(0))
         .unwrap();
     def.push_edge(
         surface,
@@ -151,7 +149,7 @@ fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
 #[test]
 fn the_retention_operators_apply_exactly_where_their_predicate_admits() {
     let applies = |def: &CgpGraphBackendDef| -> Vec<bool> {
-        let genome = crate::creature::genome::CreatureGenome {
+        let genome = crate::genome::CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![node(def.clone())],
         };
@@ -357,7 +355,7 @@ fn the_dispatch_reports_edge_scopes_and_keeps_the_graph_valid() {
     def.group_mut(GroupId::new(0)).set_retention(0.5);
     // A second, retaining record, so every group operator has a site.
     def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
-    let genome = crate::creature::genome::CreatureGenome {
+    let genome = crate::genome::CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(def)],
     };

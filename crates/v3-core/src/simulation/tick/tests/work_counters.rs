@@ -1,10 +1,10 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::contracts::NodeId;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
-use crate::creature::genome::{
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmInstruction,
 };
@@ -94,29 +94,27 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
             input_refs: vec![],
             backend_def: BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(vec![
-                        crate::creature::genome::cgp::test_support::plastic_node(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![GraphEdge::new(
-                                GraphSource::SharedMemory {
-                                    slot: 0,
-                                    previous: false,
-                                },
-                                1.0,
-                            )],
-                            Some(PlasticityConfig {
-                                rule: HebbianRule::Classic,
-                                learning_rate: 0.5,
-                                weight_clamp: 1.0,
-                                lamarckian: false,
-                                modulation: Some(RewardModulationConfig {
-                                    reward_source: OutcomeChannel::EnergyDelta,
-                                    trace_decay: 0.9,
-                                }),
-                                retention: 1.0,
+                    .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                        ComputeNodeKind::Constant(1.0),
+                        vec![GraphEdge::new(
+                            GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            1.0,
+                        )],
+                        Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 1.0,
+                            lamarckian: false,
+                            modulation: Some(RewardModulationConfig {
+                                reward_source: OutcomeChannel::EnergyDelta,
+                                trace_decay: 0.9,
                             }),
-                        ),
-                    ])
+                            retention: 1.0,
+                        }),
+                    )])
                     .with_output_sinks(vec![]),
             ),
             targets: vec![],
@@ -210,10 +208,10 @@ fn cognition_totals(stats: &crate::simulation::stats::SimStats) -> [u64; 7] {
 }
 
 fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureGenome {
-    use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
+    use crate::genome::cgp::{OutputSink, OutputSinkKind};
     let edge = GraphEdge::new(GraphSource::ComputeNode(0), 0.5);
     let node = |edges, modulated: bool| {
-        crate::creature::genome::cgp::test_support::plastic_node(
+        crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Constant(1.0),
             vec![edge; edges],
             Some(PlasticityConfig {

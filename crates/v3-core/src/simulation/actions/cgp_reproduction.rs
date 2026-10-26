@@ -1,11 +1,11 @@
 //! CGP graph backend reproduction helpers: the birth payload's capture.
 //!
 //! Reproduction captures a parent's learned weights as the child draft's
-//! [`BirthSeeds`](crate::creature::genome::cgp::BirthSeeds) before mutation
+//! [`BirthSeeds`](crate::genome::cgp::BirthSeeds) before mutation
 //! and writes no runtime field; the creature constructors consume the seeds
 //! (`creature::newborn`, `runtime::plasticity::LearnedState`).
 
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::runtime::plasticity::LearnedState;
 
 /// Seed every graph node of a reproduction draft, a copy of the parent's
@@ -29,12 +29,12 @@ pub(crate) fn capture_birth_seeds(genome: &mut CreatureGenome, parent: &LearnedS
 mod tests {
     use super::*;
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
         GraphSource, FIRST_ACTION_VOTE_SINK, FIXED_SINK_COUNT,
     };
-    use crate::creature::genome::{HebbianRule, NodeGenome, PlasticityConfig};
+    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig};
     use crate::runtime::state::GraphRuntimeState;
 
     /// The compute seed rows a draft carries.

@@ -1,7 +1,7 @@
 //! The plastic-edge kind descriptor (T25.F06): an edge's rule, learning
 //! pathway and inheritance, read by the learned-state view and the census.
 
-use crate::creature::genome::{HebbianRule, PlasticityConfig};
+use crate::genome::{HebbianRule, PlasticityConfig};
 
 /// One plastic edge kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

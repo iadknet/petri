@@ -17,13 +17,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, PerceptionRequirements, WorldInputKey,
 };
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
-use crate::creature::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
-use crate::creature::genome::mesh_annotations::{
+use crate::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
+use crate::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
+use crate::genome::mesh_annotations::{
     collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
     MeshReadClass,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// One decision-state input (T19.F05), in catalog order: the census key of
 /// the four decision references and `DynamicIntrospection(HopsThisTick)`.
@@ -259,15 +259,11 @@ mod tests {
     use crate::contracts::world_key_strategy;
     use crate::contracts::{DynamicIntrospectionKey, NodeId, OrdinaryFoodTypeId};
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::genome::analysis::mesh_reachable_nodes;
-    use crate::creature::genome::cgp::test_support::push_sink;
-    use crate::creature::genome::cgp::{
-        ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
-    };
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::{
-        HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::analysis::mesh_reachable_nodes;
+    use crate::genome::cgp::test_support::push_sink;
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction};
     use proptest::prelude::*;
 
     const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
@@ -563,7 +559,7 @@ mod tests {
         }
 
         let mut graph = empty_graph();
-        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        graph.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
             vec![leaf(0)],
             Some(PlasticityConfig {
@@ -611,8 +607,8 @@ mod tests {
 
     #[test]
     fn world_inputs_reach_vote_and_terminate_sink_edges() {
-        use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
-        use crate::creature::genome::vote::VoteSink;
+        use crate::genome::cgp::{OutputSink, OutputSinkKind};
+        use crate::genome::vote::VoteSink;
         let mut graph = empty_graph();
         push_sink(
             &mut graph,
@@ -734,8 +730,8 @@ mod tests {
     /// its ring (T25.F03).
     #[test]
     fn a_ring_group_is_a_live_consumer_of_its_ring() {
-        use crate::creature::genome::cgp::Shape;
-        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::genome::cgp::Shape;
+        use crate::genome::vote::DirectedVoteKind;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
         let refs = vec![

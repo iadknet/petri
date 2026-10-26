@@ -4,10 +4,8 @@
 use super::mesh::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, RouteTarget};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use crate::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
@@ -56,7 +54,7 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
                 // A `Terminate` vote commits nothing, so every tick is one
                 // pass and the cycle fixtures read the pass directly.
                 VmInstruction::AddVote {
-                    sink: crate::creature::genome::vote::VoteSink::Terminate.index() as u8,
+                    sink: crate::genome::vote::VoteSink::Terminate.index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,

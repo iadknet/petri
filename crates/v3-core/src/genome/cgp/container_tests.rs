@@ -2,12 +2,12 @@ use proptest::prelude::*;
 
 use super::*;
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
+use crate::genome::cgp::{
     compose, detach, GroupId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
 };
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::HebbianRule;
+use crate::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::genome::HebbianRule;
 
 /// A new def field is a compile error here until it is placed inside or
 /// outside genome identity on purpose (I9).
@@ -686,7 +686,7 @@ fn can_host_group_needs_every_direction_sink_and_capacity() {
     def.exhaust_group_capacity();
     assert!(!def.can_host_group());
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
-    crate::creature::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
+    crate::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| {
             sink.kind
                 != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 7))
@@ -1040,10 +1040,8 @@ fn pair_creation_materializes_12_members_not_16() {
 fn pair_birth_members_reduce_every_offset_mod_8() {
     let layout = pair_layout();
     for offset in 0..=u8::MAX {
-        let got: Vec<_> =
-            crate::creature::genome::cgp::pair_birth_members(layout, offset).collect();
-        let want: Vec<_> =
-            crate::creature::genome::cgp::pair_birth_members(layout, offset % 8).collect();
+        let got: Vec<_> = crate::genome::cgp::pair_birth_members(layout, offset).collect();
+        let want: Vec<_> = crate::genome::cgp::pair_birth_members(layout, offset % 8).collect();
         assert_eq!(got, want, "offset {offset}");
     }
 }
@@ -1304,7 +1302,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
 #[test]
 fn a_pair_gene_adds_one_unit() {
     let base = CgpGraphBackendDef::new_with_fixed_outputs();
-    let genome = |def| crate::creature::genome::CreatureGenome {
+    let genome = |def| crate::genome::CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
         nodes: vec![pair_node(def, pair_refs())],
     };

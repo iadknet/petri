@@ -14,12 +14,12 @@ use rayon::prelude::*;
 use serde_json::json;
 use v3_core::contracts::InputReference;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::analysis::mesh_reachable_nodes;
-use v3_core::creature::genome::cgp::{
+use v3_core::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use v3_core::creature::genome::{BackendDef, CreatureGenome};
+use v3_core::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_lab::arena::arena_config;

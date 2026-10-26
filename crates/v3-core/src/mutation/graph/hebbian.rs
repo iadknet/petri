@@ -29,8 +29,8 @@
 
 use rand::{Rng, RngCore};
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
-use crate::creature::genome::{
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
+use crate::genome::{
     retention_decays, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
 };
 use crate::mutation::types::MutationSkipReason;
@@ -527,13 +527,13 @@ pub(crate) fn set_scope_in_def(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::cgp::test_support::plastic_node;
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::test_support::plastic_node;
+    use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::creature::genome::vote::VoteSink;
-    use crate::creature::genome::BackendDef;
+    use crate::genome::vote::VoteSink;
+    use crate::genome::BackendDef;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
@@ -884,14 +884,12 @@ mod tests {
                         true;
                 }
                 assert_eq!(
-                    crate::creature::genome::cgp::validate_graph(
-                        &crate::creature::genome::NodeGenome {
-                            node_id: crate::contracts::NodeId::new(0),
-                            input_refs: Vec::new(),
-                            backend_def: BackendDef::Graph(def),
-                            targets: Vec::new(),
-                        }
-                    ),
+                    crate::genome::cgp::validate_graph(&crate::genome::NodeGenome {
+                        node_id: crate::contracts::NodeId::new(0),
+                        input_refs: Vec::new(),
+                        backend_def: BackendDef::Graph(def),
+                        targets: Vec::new(),
+                    }),
                     Ok(()),
                     "{name} seed {seed}"
                 );
@@ -902,8 +900,8 @@ mod tests {
 
     // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
 
-    use crate::creature::genome::cgp::{GroupId, Scope, Shape};
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::{GroupId, Scope, Shape};
+    use crate::genome::vote::DirectedVoteKind;
 
     /// A full catalog with one ring group of eight members on `Move`, member
     /// `k` carrying `configs[k]` (static past the list's end).

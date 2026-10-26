@@ -3,11 +3,11 @@ use v3_core::contracts::{
     CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
 };
-use v3_core::creature::genome::cgp::{
+use v3_core::creature::state::CreatureState;
+use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use v3_core::creature::state::CreatureState;
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
 use v3_core::kernel::WorldState;
 use v3_core::simulation::Simulation;
 

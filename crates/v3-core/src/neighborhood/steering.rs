@@ -23,9 +23,9 @@ use std::collections::BTreeSet;
 use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
-use crate::creature::genome::cgp::OutputSinkKind;
-use crate::creature::genome::vote::{VoteKind, VoteSink};
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::genome::cgp::OutputSinkKind;
+use crate::genome::vote::{VoteKind, VoteSink};
+use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
 pub const STEERING_VERSION: &str = "steering-v1";
@@ -208,11 +208,11 @@ mod tests {
     use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::founder::founder_genome;
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::NodeGenome;
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::NodeGenome;
     use crate::neighborhood::Battery;
 
     fn config() -> SimulationConfig {
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn a_move_group_votes_move_through_its_members_and_another_kind_does_not() {
-        use crate::creature::genome::cgp::Shape;
+        use crate::genome::cgp::Shape;
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -289,8 +289,8 @@ mod tests {
 
     #[test]
     fn an_edge_or_add_vote_into_the_move_drive_votes_move() {
-        use crate::creature::genome::cgp::{GraphEdge, GraphSource};
-        use crate::creature::genome::{VmBackendDef, VmInstruction};
+        use crate::genome::cgp::{GraphEdge, GraphSource};
+        use crate::genome::{VmBackendDef, VmInstruction};
         let node = |backend_def| CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
@@ -589,7 +589,7 @@ mod tests {
         };
         let mover = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2));
         let edges = graph.sink(mover).unwrap().inputs.to_vec();
-        crate::creature::genome::cgp::test_support::set_sink_inputs(graph, mover, Vec::new());
+        crate::genome::cgp::test_support::set_sink_inputs(graph, mover, Vec::new());
         wire(graph, VoteSink::Eat, edges[0]);
         assert!(!votes_move(&eater, &node0));
         // A VM `AddVote` on a `Move` sink does; one on `Eat` or past the
@@ -599,7 +599,7 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
-                backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::AddVote { sink, src: 0 }],

@@ -186,7 +186,7 @@ pub(crate) struct StructureMeans {
 }
 
 pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> StructureMeans {
-    use v3_core::creature::genome::BackendDef;
+    use v3_core::genome::BackendDef;
 
     let population = sim.creatures.len();
     if population == 0 {
@@ -210,7 +210,7 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
                 let ring = |id: usize| {
                     matches!(
                         graph.groups()[id].shape(),
-                        v3_core::creature::genome::cgp::Shape::Ring { .. }
+                        v3_core::genome::cgp::Shape::Ring { .. }
                     )
                 };
                 groups += (0..graph.groups().len()).filter(|&id| ring(id)).count() as u64;
@@ -350,9 +350,9 @@ mod tests {
     #[test]
     fn structure_means_count_ring_groups_and_their_members_across_the_population() {
         use v3_core::contracts::{InputReference, WorldInputKey};
-        use v3_core::creature::genome::cgp::{EdgeSurface, Shape};
-        use v3_core::creature::genome::vote::DirectedVoteKind;
-        use v3_core::creature::genome::BackendDef;
+        use v3_core::genome::cgp::{EdgeSurface, Shape};
+        use v3_core::genome::vote::DirectedVoteKind;
+        use v3_core::genome::BackendDef;
 
         let mut cfg = SimulationConfig::default();
         cfg.world.width = 32;

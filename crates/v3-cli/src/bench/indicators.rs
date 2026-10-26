@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
-use v3_core::creature::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::analysis::mesh_reachable_nodes;
 use v3_core::neighborhood::steering::{self, SteeringBattery};
 use v3_core::neighborhood::{
     self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, structural_companions, Battery,
@@ -371,7 +371,7 @@ pub(super) fn generation_distribution(
 pub(super) fn mesh_execution_and_steering(
     battery: &Battery,
     steering_battery: &SteeringBattery,
-    genome: &v3_core::creature::genome::CreatureGenome,
+    genome: &v3_core::genome::CreatureGenome,
     context: &EvalContext,
 ) -> (MeshExecution, Steering) {
     use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
@@ -462,7 +462,7 @@ pub(super) fn lineage_diversity(
 
 pub(super) fn structural_companions_census<'a>(
     seed: u64,
-    genomes: impl Iterator<Item = &'a v3_core::creature::genome::CreatureGenome>,
+    genomes: impl Iterator<Item = &'a v3_core::genome::CreatureGenome>,
 ) -> StructuralCompanionsSeed {
     let mut census = StructuralCompanionsSeed {
         seed,

@@ -1,6 +1,6 @@
 //! Fixed lifetime totals for removed creatures, classified by carried structure.
 
-use crate::creature::genome::StructuralCompanions;
+use crate::genome::StructuralCompanions;
 
 /// Exhaustive accounting classes in precedence order, not an ability ranking.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

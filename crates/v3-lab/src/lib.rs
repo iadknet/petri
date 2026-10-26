@@ -26,7 +26,7 @@ use std::fmt;
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 
 /// The lab's genome file (`--genome`, `--comparator`, `--arm …:genome.json`
 /// and `elites/*.json`). `v3_core_version` is the workspace version the
@@ -73,7 +73,7 @@ impl GenomeFile {
                 .iter()
                 .enumerate()
                 .find_map(|(index, node)| {
-                    v3_core::creature::genome::cgp::validate_graph(node)
+                    v3_core::genome::cgp::validate_graph(node)
                         .err()
                         .map(|violation| (index, violation))
                 })

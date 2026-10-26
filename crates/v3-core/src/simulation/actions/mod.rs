@@ -304,7 +304,7 @@ mod tests {
     /// Create a minimal Simulation with one creature of the given founder
     /// genome at the given position, on default economics.
     fn make_sim_one_founder(
-        genome: crate::creature::genome::CreatureGenome,
+        genome: crate::genome::CreatureGenome,
         pos: Position,
         energy: f32,
     ) -> (Simulation, CreatureId) {
@@ -1064,7 +1064,7 @@ mod tests {
     #[test]
     fn skipped_only_mutation_event_does_not_trigger_phenotype_mutation() {
         use crate::contracts::NodeId;
-        use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+        use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
         let pos = Position::new(5, 5);
         let mut observed = false;
@@ -1466,11 +1466,9 @@ mod tests {
 
     /// Build a genome with a specific minimum complexity by adding VM nodes
     /// with enough instructions.
-    fn genome_with_complexity(min_complexity: u32) -> crate::creature::genome::CreatureGenome {
+    fn genome_with_complexity(min_complexity: u32) -> crate::genome::CreatureGenome {
         use crate::contracts::NodeId;
-        use crate::creature::genome::{
-            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-        };
+        use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
         // Each AddVote is an output instruction → counts as live for functional complexity.
         // Node itself = 1, each AddVote = 1 live instruction. Sink 25 is
@@ -1496,7 +1494,7 @@ mod tests {
     fn make_sim_with_genome(
         pos: Position,
         energy: f32,
-        genome: crate::creature::genome::CreatureGenome,
+        genome: crate::genome::CreatureGenome,
     ) -> (Simulation, CreatureId) {
         let mut cfg = small_config();
         cfg.energy.complexity_cost.enabled = true;

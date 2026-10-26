@@ -25,8 +25,8 @@ use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
-use crate::creature::genome::{
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
 };
@@ -115,7 +115,7 @@ fn plasticity(rng: &mut SmallRng) -> Option<PlasticityConfig> {
 fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // The first `sinks` value sinks and the first `vote_sinks` vote sinks.
-    let first_vote = crate::creature::genome::cgp::FIRST_ACTION_VOTE_SINK;
+    let first_vote = crate::genome::cgp::FIRST_ACTION_VOTE_SINK;
     let catalog = def.output_sinks().to_vec();
     def = def.with_output_sinks(
         catalog
@@ -129,7 +129,7 @@ fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> C
     );
     let vote_start = def.output_sinks().len() - size.vote_sinks;
     for _ in 0..size.compute_nodes {
-        def.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             random_compute_node_kind(rng),
             Vec::new(),
             plasticity(rng),

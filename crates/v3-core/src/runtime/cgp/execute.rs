@@ -1,6 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::cgp::effects::apply_cgp_graph_effects;
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
@@ -324,12 +324,10 @@ fn restore_scratch(
 mod work_counter_tests {
     use crate::config::RuntimeConfig;
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
-    };
+    use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -411,29 +409,27 @@ mod work_counter_tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![
-                            crate::creature::genome::cgp::test_support::plastic_node(
-                                ComputeNodeKind::Constant(1.0),
-                                vec![GraphEdge::new(
-                                    GraphSource::SharedMemory {
-                                        slot: 0,
-                                        previous: false,
-                                    },
-                                    1.0,
-                                )],
-                                Some(PlasticityConfig {
-                                    rule: HebbianRule::Classic,
-                                    learning_rate: 0.5,
-                                    weight_clamp: 1.0,
-                                    lamarckian: false,
-                                    modulation: None,
-                                    retention: 1.0,
-                                }),
-                            ),
-                        ])
-                        .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
-                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                                crate::creature::genome::vote::VoteSink::Terminate,
+                        .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![GraphEdge::new(
+                                GraphSource::SharedMemory {
+                                    slot: 0,
+                                    previous: false,
+                                },
+                                1.0,
+                            )],
+                            Some(PlasticityConfig {
+                                rule: HebbianRule::Classic,
+                                learning_rate: 0.5,
+                                weight_clamp: 1.0,
+                                lamarckian: false,
+                                modulation: None,
+                                retention: 1.0,
+                            }),
+                        )])
+                        .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
+                            crate::genome::cgp::OutputSinkKind::ActionVote(
+                                crate::genome::vote::VoteSink::Terminate,
                             ),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                         )]),
@@ -473,10 +469,10 @@ mod work_counter_tests {
 #[cfg(test)]
 mod clock_tests {
     use super::*;
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
     };
-    use crate::creature::genome::{HebbianRule, PlasticityConfig};
+    use crate::genome::{HebbianRule, PlasticityConfig};
     use proptest::prelude::*;
 
     fn graph(kind: ComputeNodeKind, disconnected: usize) -> CgpGraphBackendDef {
@@ -536,7 +532,7 @@ mod clock_tests {
     #[test]
     fn repeated_visits_advance_from_the_last_commit_and_skipped_ticks_hold() {
         let def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
+        let mut state = crate::genome::cgp::test_support::runtime_for(&def);
         let config = RuntimeConfig {
             graph_node_base_cost: 0.25,
             ..RuntimeConfig::default()
@@ -556,9 +552,9 @@ mod clock_tests {
     #[test]
     fn failed_revisits_preserve_temporal_commit_and_emit_no_effects() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+        crate::genome::cgp::test_support::set_surface_plasticity(
             &mut def,
-            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+            crate::genome::cgp::EdgeSurface::ComputeInput(0),
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -572,7 +568,7 @@ mod clock_tests {
             graph_node_base_cost: 1.0,
             ..RuntimeConfig::default()
         };
-        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
+        let mut state = crate::genome::cgp::test_support::runtime_for(&def);
         state.begin_tick(0);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         let committed_state = state.node_state.clone();
@@ -594,9 +590,9 @@ mod clock_tests {
     #[test]
     fn exhausted_trace_reports_committed_outputs_and_candidate_status() {
         let mut def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
-        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+        crate::genome::cgp::test_support::set_surface_plasticity(
             &mut def,
-            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+            crate::genome::cgp::EdgeSurface::ComputeInput(0),
             Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
@@ -610,7 +606,7 @@ mod clock_tests {
             graph_node_base_cost: 1.0,
             ..RuntimeConfig::default()
         };
-        let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
+        let mut state = crate::genome::cgp::test_support::runtime_for(&def);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         // The pass cost is the only exhaustion point (T25.F02: learning is
         // free).
@@ -648,12 +644,12 @@ mod clock_tests {
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
         ));
-        def.edge_mut(crate::creature::genome::cgp::EdgeOccurrence::new(
-            crate::creature::genome::cgp::EdgeSurface::SinkInput(0),
+        def.edge_mut(crate::genome::cgp::EdgeOccurrence::new(
+            crate::genome::cgp::EdgeSurface::SinkInput(0),
             0,
         ))
         .set_source(GraphSource::ComputeNode(1));
-        let mut ordinary = crate::creature::genome::cgp::test_support::runtime_for(&def);
+        let mut ordinary = crate::genome::cgp::test_support::runtime_for(&def);
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {
             ordinary.begin_tick(0);
@@ -716,7 +712,7 @@ mod clock_tests {
                 2 => (old + 0.125).fract(),
                 _ => (old + 0.01 * input).clamp(0.1, 2.0),
             };
-            let mut state = crate::creature::genome::cgp::test_support::runtime_for(&graph(kind, extra)); state.node_state = vec![vec![old]];
+            let mut state = crate::genome::cgp::test_support::runtime_for(&graph(kind, extra)); state.node_state = vec![vec![old]];
             state.begin_tick(0);
             let config = RuntimeConfig::default();
             let def = graph(kind, extra);

@@ -9,12 +9,12 @@ use rand::SeedableRng;
 use super::*;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::{
+use crate::creature::parseability::ParseabilityGate;
+use crate::genome::cgp::{
     test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
-use crate::creature::parseability::ParseabilityGate;
+use crate::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
 fn graph_index(genome: &CreatureGenome) -> usize {
     genome
@@ -302,7 +302,7 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
     let def = graph_mut(&mut genome.nodes[idx]);
     while def.members(GroupId::new(0)).count() > 1 {
         let member = def.members(GroupId::new(0)).next().unwrap();
-        crate::creature::genome::cgp::detach(def, member, &refs);
+        crate::genome::cgp::detach(def, member, &refs);
     }
     let all = every_node(&genome);
     let mut detached = genome.clone();

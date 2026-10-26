@@ -3,6 +3,7 @@
 pub mod config;
 pub mod contracts;
 pub mod creature;
+pub mod genome;
 pub mod kernel;
 pub mod ledger;
 pub mod mutation;

@@ -1,12 +1,10 @@
 use super::*;
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::NodeId;
-use crate::creature::genome::cgp::test_support::{edit_sinks, push_sink};
-use crate::creature::genome::cgp::{
-    EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
-};
-use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
-use crate::creature::genome::NodeGenome;
+use crate::genome::cgp::test_support::{edit_sinks, push_sink};
+use crate::genome::cgp::{EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind};
+use crate::genome::vote::{VoteSink, VOTE_SINK_COUNT};
+use crate::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
@@ -246,13 +244,13 @@ proptest! {
             prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {
             prop_assert_eq!(grouped, 1);
-            let id = crate::creature::genome::cgp::GroupId::new(0);
+            let id = crate::genome::cgp::GroupId::new(0);
             match after_graph.groups()[0].shape() {
-                crate::creature::genome::cgp::Shape::Ring { .. } => {
+                crate::genome::cgp::Shape::Ring { .. } => {
                     prop_assert_eq!((changed, added), (8, 8));
                     prop_assert_eq!(after_graph.members(id).count(), 8);
                 }
-                crate::creature::genome::cgp::Shape::DirectionPair { .. } => {
+                crate::genome::cgp::Shape::DirectionPair { .. } => {
                     prop_assert!(whole);
                     prop_assert_eq!(changed, 9);
                     prop_assert!(added == 15 || added == 20, "{}", added);
@@ -409,8 +407,8 @@ proptest! {
 
 #[test]
 fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
-    use crate::creature::genome::cgp::{GroupId, Shape};
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::{GroupId, Shape};
+    use crate::genome::vote::DirectedVoteKind;
     let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
     let family = SourceFamily::Input(ring.clone());
     // SingleChannel: channel 5 into Move(3) is offset (3 - 5) mod 8 = 6.
@@ -469,8 +467,8 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
 
 #[test]
 fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
-    use crate::creature::genome::cgp::Shape;
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::Shape;
+    use crate::genome::vote::DirectedVoteKind;
     let mut fixture = node();
     graph_mut(&mut fixture).add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     let admission = Admission::new(&fixture.input_refs, graph(&fixture));
@@ -539,7 +537,7 @@ fn nearby() -> InputReference {
 /// The edges of `kind`'s drive sink.
 fn drive_edges(
     def: &CgpGraphBackendDef,
-    kind: crate::creature::genome::vote::DirectedVoteKind,
+    kind: crate::genome::vote::DirectedVoteKind,
 ) -> Vec<GraphEdge> {
     def.sink(OutputSinkKind::ActionVote(kind.drive()))
         .unwrap()
@@ -549,8 +547,8 @@ fn drive_edges(
 
 #[test]
 fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive() {
-    use crate::creature::genome::cgp::{GroupId, Membership, Scope, Shape};
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::{GroupId, Membership, Scope, Shape};
+    use crate::genome::vote::DirectedVoteKind;
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
         (nearby(), 2, vec![20, 23, 24, 25, 26, 27, 28, 29]),
@@ -606,10 +604,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
         assert_eq!(def.edges().count(), 12 + facts.len());
         assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
         let node_genome = fixture.clone();
-        assert_eq!(
-            crate::creature::genome::cgp::validate_graph(&node_genome),
-            Ok(())
-        );
+        assert_eq!(crate::genome::cgp::validate_graph(&node_genome), Ok(()));
     }
 }
 
@@ -678,7 +673,7 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
             .collect();
         assert_eq!(eat, want, "slot {slot}");
         assert_eq!(def.edges().count(), 10);
-        assert_eq!(crate::creature::genome::cgp::validate_graph(&whole), Ok(()));
+        assert_eq!(crate::genome::cgp::validate_graph(&whole), Ok(()));
     }
     let mut single = node();
     recruit_source(
@@ -697,7 +692,7 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
 /// landing anywhere (T25.F05), one pair `gen_range(0..pairs)`; nothing after.
 #[test]
 fn the_pair_case_draws_family_then_destination_then_pair() {
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::vote::DirectedVoteKind;
     let mut paired = 0;
     let mut undirected_slots = 0;
     for seed in 0..512 {
@@ -779,7 +774,7 @@ fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
 /// group table alike (T25.F05).
 #[test]
 fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::vote::DirectedVoteKind;
     let declares = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty());
     let full = node();
     let hosting = Admission::new(&full.input_refs, graph(&full)).families(Arm::WholeFamily, 2);
@@ -839,7 +834,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
 /// included.
 #[test]
 fn ring_admission_is_unchanged_by_the_pair_case() {
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::vote::DirectedVoteKind;
     let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
         let mut no_drive = node();

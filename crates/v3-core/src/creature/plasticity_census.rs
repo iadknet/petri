@@ -18,8 +18,8 @@
 //! Pure structure and state: it reads genomes, cached reachability and
 //! learned state and executes no brain.
 
-use crate::creature::genome::cgp::{EdgeSurface, Scope};
-use crate::creature::genome::HebbianRule;
+use crate::genome::cgp::{EdgeSurface, Scope};
+use crate::genome::HebbianRule;
 use crate::runtime::plasticity::{LearnedState, RULES};
 
 /// The `petri.plasticity_rule` key of `rule`.

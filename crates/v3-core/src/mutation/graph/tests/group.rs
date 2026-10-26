@@ -7,13 +7,13 @@ use rand::{Rng, SeedableRng};
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::test_support::edit_sinks;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::test_support::edit_sinks;
+use crate::genome::cgp::{
     compose, detach, validate_graph, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
     GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::{
+use crate::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef,
 };
@@ -869,8 +869,7 @@ fn randomized_members_differ_within_one_group() {
             let edges: Vec<_> = def.members(id(0)).map(|at| def.edge_at(at)).collect();
             mixed[0] |= edges.iter().any(|e| e.plasticity().is_some())
                 && edges.iter().any(|e| e.plasticity().is_none());
-            let scope =
-                |e: &&crate::creature::genome::cgp::GraphEdge| e.membership().unwrap().scope;
+            let scope = |e: &&crate::genome::cgp::GraphEdge| e.membership().unwrap().scope;
             mixed[1] |= edges.iter().any(|e| scope(e) == Scope::Group)
                 && edges.iter().any(|e| scope(e) == Scope::Edge);
         }

@@ -2,13 +2,13 @@ use super::controls::graph_genome;
 use super::*;
 use crate::config::{FounderProfile, SimulationConfig};
 use crate::creature::founder::founder_genome;
-use crate::creature::genome::cgp::test_support::set_sink_inputs;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::test_support::set_sink_inputs;
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::ActionParamField;
-use crate::creature::genome::{BackendDef, NodeGenome};
+use crate::genome::vote::ActionParamField;
+use crate::genome::{BackendDef, NodeGenome};
 use proptest::prelude::*;
 
 fn fixture() -> (SimulationConfig, Battery) {
@@ -185,13 +185,13 @@ fn a_dispatched_edit_nothing_records_is_unresolved() {
     };
     set_sink_inputs(
         graph_def(&mut parent, 0),
-        OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
+        OutputSinkKind::ActionVote(crate::genome::vote::VoteSink::Eat),
         vec![barrier(1.0)],
     );
     let mut child = parent.clone();
     set_sink_inputs(
         graph_def(&mut child, 0),
-        OutputSinkKind::ActionVote(crate::creature::genome::vote::VoteSink::Eat),
+        OutputSinkKind::ActionVote(crate::genome::vote::VoteSink::Eat),
         vec![barrier(2.0)],
     );
     let result = attribution(&parent, &child);
@@ -513,10 +513,7 @@ proptest! {
 fn recorded_contexts_assemble_perception_whatever_the_donor_reads() {
     let sim = small_sim(6);
     let founder = founder_genome(FounderProfile::V3Alpha1);
-    assert!(
-        !crate::creature::genome::sensor_analysis::perception_requirements(&founder)
-            .extended_perception
-    );
+    assert!(!crate::genome::sensor_analysis::perception_requirements(&founder).extended_perception);
     let contexts = contexts::recorded_contexts(&sim, 11, 4);
     assert_eq!(contexts.len(), 4);
     let food_types = sim.config.world.food.types.len();

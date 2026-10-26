@@ -1,11 +1,9 @@
 use super::*;
 use crate::config::EnergyConfig;
 use crate::creature::body::HeritableBody;
-use crate::creature::genome::vote::{
-    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
-};
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::phenotype::Phenotype;
+use crate::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT};
 
 // ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
 
@@ -105,7 +103,7 @@ fn write_action_param_ignores_and_charges_an_invalid_field() {
 
 #[test]
 fn write_action_param_overwrites_and_ignores_an_invalid_field() {
-    use crate::creature::genome::vote::{ActionParamField, ACTION_PARAM_FIELD_COUNT};
+    use crate::genome::vote::{ActionParamField, ACTION_PARAM_FIELD_COUNT};
     const REPRODUCE: u8 = ActionParamField::ReproduceTransferFraction.index() as u8;
     let (_, _, side) = run_vm(
         vec![
@@ -473,10 +471,8 @@ fn slot_address_wraps_via_rem_euclid() {
 fn vm_eats_when_food_here() {
     use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
     use crate::creature::state::CreatureState;
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
@@ -588,10 +584,8 @@ fn vm_eats_when_food_here() {
 fn vm_noop_when_no_food() {
     use crate::config::WorldEdgeMode;
     use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
     use crate::creature::state::CreatureState;
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;

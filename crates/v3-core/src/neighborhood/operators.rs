@@ -8,8 +8,8 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::config::{MutationConfig, ReachableBiasConfig};
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::CreatureGenome;
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::CreatureGenome;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSets;

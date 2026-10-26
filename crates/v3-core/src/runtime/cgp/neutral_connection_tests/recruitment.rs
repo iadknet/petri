@@ -1,7 +1,7 @@
 //! F04 access through the actual preflight/append path and native evaluator.
 use super::*;
 use crate::config::{MutationConfig, NeutralInputRecruitment as Arm};
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::group;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
@@ -210,8 +210,7 @@ fn neutral_recruitment_native_work_charges_activation_but_no_per_edge_price() {
                     let mut readings = Vec::new();
                     for node in [&original, &recruited] {
                         let mut energy = 10.0;
-                        let mut state =
-                            crate::creature::genome::cgp::test_support::runtime_for(graph(node));
+                        let mut state = crate::genome::cgp::test_support::runtime_for(graph(node));
                         let mut side = side();
                         let mut memory = ramp(0.5);
                         let result = execute_graph_node(

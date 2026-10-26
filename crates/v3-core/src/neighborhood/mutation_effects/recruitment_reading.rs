@@ -2,8 +2,8 @@
 use super::*;
 use crate::config::{FounderProfile, NeutralInputRecruitment as Arm, SimulationConfig};
 use crate::creature::founder::founder_genome;
-use crate::creature::genome::cgp::{GraphSource, OutputSinkKind};
-use crate::creature::genome::BackendDef;
+use crate::genome::cgp::{GraphSource, OutputSinkKind};
+use crate::genome::BackendDef;
 use crate::neighborhood::input_use::catalog::{addressed, shared_memory, Addressed};
 use std::time::Instant;
 

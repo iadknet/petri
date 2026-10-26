@@ -1,8 +1,8 @@
 //! Existing mutation, copy, serde and reference-repair seams for zero edges.
 use super::*;
 use crate::config::MutationConfig;
-use crate::creature::genome::cgp::test_support::{edit_sinks, reweighted};
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::cgp::test_support::{edit_sinks, reweighted};
+use crate::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;

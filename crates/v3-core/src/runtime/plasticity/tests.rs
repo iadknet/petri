@@ -1,14 +1,14 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
-use crate::creature::genome::cgp::test_support::{
+use crate::genome::cgp::test_support::{
     plastic_node, push_sink, set_compute_inputs, set_surface_plasticity,
 };
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     validate_graph, BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence,
     EdgeSurface, GraphEdge, GraphInvariantViolation, GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{
+use crate::genome::vote::VoteSink;
+use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig,
 };
@@ -968,7 +968,7 @@ fn a_sink_energy_current_edge_samples_its_evaluation_read() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     push_plastic_sink_edge(
         &mut def,
-        OutputSinkKind::ActionParam(crate::creature::genome::vote::ActionParamField::ALL[0]),
+        OutputSinkKind::ActionParam(crate::genome::vote::ActionParamField::ALL[0]),
         GraphEdge::new(
             GraphSource::InputLeaf {
                 ref_idx: 0,

@@ -1,5 +1,5 @@
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
-use crate::creature::genome::vote::{VoteVector, VOTE_KIND_COUNT};
+use crate::genome::vote::{VoteVector, VOTE_KIND_COUNT};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::SensorSnapshot;
 use crate::sensors::static_inputs::energy_fraction;
@@ -536,8 +536,8 @@ mod tests {
         }
     }
 
-    use crate::creature::genome::vote::VOTE_SINK_COUNT;
-    use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
+    use crate::genome::vote::VOTE_SINK_COUNT;
+    use crate::genome::OUTCOME_CHANNEL_COUNT;
     use proptest::prelude::*;
 
     proptest! {
@@ -545,14 +545,14 @@ mod tests {
         /// its width and `0.0` at or past it, never wrapping.
         #[test]
         fn decision_compounds_read_their_vector_and_zero_past_the_width(
-            votes in prop::collection::vec(-1e6f32..1e6, crate::creature::genome::vote::VOTE_SINK_COUNT),
-            previous in prop::collection::vec(-1e6f32..1e6, crate::creature::genome::vote::VOTE_SINK_COUNT),
+            votes in prop::collection::vec(-1e6f32..1e6, crate::genome::vote::VOTE_SINK_COUNT),
+            previous in prop::collection::vec(-1e6f32..1e6, crate::genome::vote::VOTE_SINK_COUNT),
             counts in prop::array::uniform5(0u32..100),
             outcome in prop::array::uniform4(-1f32..1.0),
             sub in any::<u16>(),
         ) {
-            let votes: crate::creature::genome::vote::VoteVector = votes.try_into().unwrap();
-            let previous: crate::creature::genome::vote::VoteVector = previous.try_into().unwrap();
+            let votes: crate::genome::vote::VoteVector = votes.try_into().unwrap();
+            let previous: crate::genome::vote::VoteVector = previous.try_into().unwrap();
             let mut ss = make_sensor_snapshot(0.0);
             ss.local.previous_outcome = outcome;
             let upstream = [0.0f32; OUTPUT_SLOT_COUNT];

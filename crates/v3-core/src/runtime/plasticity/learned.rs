@@ -22,10 +22,10 @@
 use super::rules::{activity, hebbian_delta, relax, three_factor};
 use super::{OutcomeSignalBank, PlasticityKind};
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     compose, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GroupId, Scope,
 };
-use crate::creature::genome::{retention_decays, BackendDef, CreatureGenome, PlasticityConfig};
+use crate::genome::{retention_decays, BackendDef, CreatureGenome, PlasticityConfig};
 
 /// Where a member's group term reads its scale.
 #[derive(Debug, Clone, Copy, PartialEq)]

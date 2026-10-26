@@ -1,6 +1,6 @@
 use super::*;
 use crate::contracts::{InputReference, RouteTarget};
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::{VmBackendDef, VmInstruction};
 use crate::mutation::TargetReachability;
 use proptest::prelude::*;
 
@@ -22,7 +22,7 @@ fn graph_node(id: u32) -> NodeGenome {
         node_id: NodeId::new(id),
         input_refs: vec![InputReference::ActionQueue],
         backend_def: BackendDef::Graph(
-            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
+            crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
                 .with_compute_nodes(Vec::new())
                 .with_output_sinks(Vec::new()),
         ),

@@ -6,12 +6,10 @@ use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey,
 };
-use crate::creature::genome::cgp::{ComputeNodeKind, GraphSource};
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{
-    ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
-};
-use crate::creature::genome::{CreatureGenome, VmInstruction};
+use crate::genome::cgp::{ComputeNodeKind, GraphSource};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::{ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT};
+use crate::genome::{CreatureGenome, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
@@ -727,7 +725,7 @@ fn graph_param_writer(
     fields: &[(ActionParamField, f32)],
     votes: &[VoteSink],
     target_ids: &[u32],
-) -> crate::creature::genome::NodeGenome {
+) -> crate::genome::NodeGenome {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     for &(field, value) in fields {
@@ -747,7 +745,7 @@ fn vm_param_writer(
     fields: &[(ActionParamField, f32)],
     votes: &[VoteSink],
     target_ids: &[u32],
-) -> crate::creature::genome::NodeGenome {
+) -> crate::genome::NodeGenome {
     let mut constants = vec![1.0];
     let mut program = Vec::new();
     for &(field, value) in fields {
@@ -968,7 +966,7 @@ fn exhaustion_keeps_the_actions_committed_before_it() {
 }
 
 /// A VM voter that also bids `bid`.
-fn bidding_voter(bid: f32) -> crate::creature::genome::NodeGenome {
+fn bidding_voter(bid: f32) -> crate::genome::NodeGenome {
     vm_node(
         0,
         1,

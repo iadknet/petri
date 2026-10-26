@@ -7,7 +7,7 @@
 
 use super::{CgpGraphBackendDef, EdgeOccurrence, OutputSinkKind};
 use crate::contracts::{compass_x, compass_y, DirectionPair, InputReference};
-use crate::creature::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
+use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 
 /// Where a member sits relative to its group's kind `K` (T25.F10): a
 /// **direction member** on a direction sink `K(d)`, or a **fact member** of

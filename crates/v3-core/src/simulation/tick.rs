@@ -11,8 +11,8 @@ use crate::contracts::{
     CreatureId, Direction, PerceptionRequirements, Position, WorldAction, SHARED_MEMORY_SLOTS,
 };
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
-use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::creature::state::CreatureState;
+use crate::genome::OUTCOME_CHANNEL_COUNT;
 use crate::kernel::WorldState;
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::trace::domain::{
@@ -1530,12 +1530,10 @@ mod final_action_observation_tests {
     use super::*;
     use crate::config::SimulationConfig;
     use crate::contracts::{Direction, NodeId, OrdinaryFoodTypeId, WorldAction};
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::simulation::seed_simulation;
     use proptest::prelude::*;
     use rand::RngCore;
@@ -1562,7 +1560,9 @@ mod final_action_observation_tests {
                         },
                         VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                         VmInstruction::WriteActionParam {
-                            field_idx: crate::creature::genome::vote::ActionParamField::ReproduceTransferFraction.index() as u8,
+                            field_idx:
+                                crate::genome::vote::ActionParamField::ReproduceTransferFraction
+                                    .index() as u8,
                             src: 0,
                         },
                         VmInstruction::AddVote { sink: 10, src: 2 },
@@ -1593,9 +1593,9 @@ mod final_action_observation_tests {
                             ComputeNodeKind::DecayIntegrator(0.0),
                             vec![],
                         )])
-                        .with_output_sinks(vec![crate::creature::genome::cgp::OutputSink::new(
-                            crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-                                crate::creature::genome::vote::VoteSink::Eat,
+                        .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
+                            crate::genome::cgp::OutputSinkKind::ActionVote(
+                                crate::genome::vote::VoteSink::Eat,
                             ),
                             vec![runtime_output],
                         )]),
@@ -1771,16 +1771,16 @@ mod final_action_observation_tests {
                 ComputeNode::new(kind, vec![edge]),
                 ComputeNode::new(ComputeNodeKind::Constant(0.0), vec![]),
             ]);
-            crate::creature::genome::cgp::test_support::set_surface_plasticity(
+            crate::genome::cgp::test_support::set_surface_plasticity(
                 def,
-                crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
-                Some(crate::creature::genome::PlasticityConfig {
-                    rule: crate::creature::genome::HebbianRule::Classic,
+                crate::genome::cgp::EdgeSurface::ComputeInput(0),
+                Some(crate::genome::PlasticityConfig {
+                    rule: crate::genome::HebbianRule::Classic,
                     learning_rate: 0.5,
                     weight_clamp: 2.0,
                     lamarckian: false,
-                    modulation: Some(crate::creature::genome::RewardModulationConfig {
-                        reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
+                    modulation: Some(crate::genome::RewardModulationConfig {
+                        reward_source: crate::genome::OutcomeChannel::EnergyDelta,
                         trace_decay: 0.5,
                     }),
                     retention: 1.0,

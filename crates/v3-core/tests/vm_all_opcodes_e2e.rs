@@ -14,12 +14,10 @@ use v3_core::contracts::{
     CreatureId, InputReference, NodeId, Position, WorldAction, WorldInputKey,
 };
 use v3_core::creature::body::HeritableBody;
-use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::phenotype::Phenotype;
 use v3_core::creature::state::CreatureState;
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, VmTrace};
 use v3_core::simulation::recording::ActiveTrace;

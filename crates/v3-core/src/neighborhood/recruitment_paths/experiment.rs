@@ -7,7 +7,7 @@ use super::super::recruitment::{
 use super::super::{Battery, Signature};
 use super::*;
 use crate::contracts::NodeId;
-use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use crate::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationDomain, MutationEngine, MutationSummary};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};

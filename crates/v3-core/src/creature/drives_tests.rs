@@ -2,9 +2,9 @@ use super::*;
 use crate::config::FounderProfile;
 use crate::contracts::NodeId;
 use crate::creature::founder::founder_genome;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::GraphEdge;
-use crate::creature::genome::{NodeGenome, VmBackendDef};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::cgp::GraphEdge;
+use crate::genome::{NodeGenome, VmBackendDef};
 
 fn census_of(genomes: &[CreatureGenome]) -> DriveCensus {
     let reachable: Vec<Vec<usize>> = genomes.iter().map(mesh_reachable_nodes).collect();
@@ -214,7 +214,7 @@ fn a_weight_exactly_at_the_floor_carries_no_path() {
 #[test]
 fn a_group_is_not_a_fanout() {
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::creature::genome::cgp::Shape;
+    use crate::genome::cgp::Shape;
     let mut grouped = CgpGraphBackendDef::new_with_fixed_outputs();
     for offset in [0, 3] {
         let id = grouped.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);

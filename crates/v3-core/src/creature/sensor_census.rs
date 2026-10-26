@@ -1,6 +1,6 @@
 //! The live sensor-use census: per catalog key, how many creatures declare,
 //! wire and read it, from the birth caches the genome's sensor analysis
-//! computes (`creature::genome::sensor_analysis`) and each creature's most
+//! computes (`genome::sensor_analysis`) and each creature's most
 //! recent mesh reads; and the report label of a world input key.
 
 use std::collections::BTreeSet;
@@ -18,7 +18,7 @@ pub struct SensorUseRow {
     /// The genome's [`sensor_census`] reaches the key: structurally wired,
     /// which a zero-weight or never-routed wire still is.
     ///
-    /// [`sensor_census`]: crate::creature::genome::sensor_analysis::sensor_census
+    /// [`sensor_census`]: crate::genome::sensor_analysis::sensor_census
     pub wired: u64,
     /// The creature's most recent mesh run resolved the key.
     pub read: u64,

@@ -9,9 +9,9 @@ use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, OutputSinkKind};
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::VmInstruction;
+use crate::genome::cgp::{CgpGraphBackendDef, OutputSinkKind};
+use crate::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::genome::VmInstruction;
 use crate::mutation::graph::operators::add_edge;
 use crate::mutation::input_ref::connect_declared_input;
 use crate::mutation::types::{BirthEdgeClass, MutationDomain, MutationOperator, MutationSummary};
@@ -68,7 +68,7 @@ fn add_graph_edge_and_input_ref_add_reach_every_drive() {
 fn a_dispatched_add_graph_edge_reports_its_vote_sink_class() {
     use crate::config::MutationConfig;
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::genome::BackendDef;
+    use crate::genome::BackendDef;
     use crate::mutation::graph::{GraphMutator, GraphOperator};
     use crate::mutation::reachability::TargetSelector;
 
@@ -114,7 +114,7 @@ fn vm_add_vote_reaches_every_drive() {
     let mut reached = BTreeSet::new();
     for _ in 0..20_000 {
         if let VmInstruction::AddVote { sink, .. } = random_vm_instruction(&mut rng, 4, 1, 1) {
-            assert!(usize::from(sink) < crate::creature::genome::vote::VOTE_SINK_COUNT);
+            assert!(usize::from(sink) < crate::genome::vote::VOTE_SINK_COUNT);
             if let Some(VoteSink::Drive(kind)) = VoteSink::from_index(usize::from(sink)) {
                 reached.insert(kind.drive().index());
             }

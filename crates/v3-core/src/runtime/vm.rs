@@ -1,7 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
+use crate::genome::{VmBackendDef, VmInstruction};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
@@ -590,8 +590,8 @@ pub(crate) fn jump_target(pc: usize, offset: i32, program_len: usize) -> usize {
 }
 
 /// Base energy cost per opcode per v3-vm-isa-spec.md Section 6.
-pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -> f32 {
-    use crate::creature::genome::VmInstruction;
+pub(crate) fn opcode_base_cost(instr: &crate::genome::VmInstruction) -> f32 {
+    use crate::genome::VmInstruction;
     match instr {
         VmInstruction::Noop => 0.05,
         VmInstruction::LoadConst { .. } => 0.08,

@@ -15,9 +15,9 @@
 
 use rayon::prelude::*;
 
-use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::vote::VoteSink;
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::neighborhood::battery::Battery;
 use crate::neighborhood::classify::{classify, Tally};
@@ -118,8 +118,8 @@ mod tests {
     use crate::config::FounderProfile;
     use crate::config::SimulationConfig;
     use crate::creature::founder::founder_genome;
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::vote::VOTE_SINK_COUNT;
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::vote::VOTE_SINK_COUNT;
 
     fn founder_census() -> OneEdgeCensus {
         let config = SimulationConfig::default();

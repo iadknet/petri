@@ -1,7 +1,7 @@
 use super::*;
 use crate::contracts::NodeId;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationEngine, MutationOperator};
 use crate::neighborhood::mesh_execution::indices_for_node_ids;
@@ -167,9 +167,9 @@ proptest! {
         before_ids in prop::collection::btree_set(0u32..10, 1..8),
         after_ids in prop::collection::btree_set(0u32..10, 1..8), reverse in any::<bool>(), value in -100f32..100f32
     ) {
-        let template = crate::creature::genome::NodeGenome {
+        let template = crate::genome::NodeGenome {
             node_id: NodeId::new(0), input_refs: vec![], targets: vec![],
-            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1, constants: vec![], program: vec![VmInstruction::Halt],
             }),
         };
@@ -1525,9 +1525,7 @@ fn synthetic_module_use(score_loss: i16) -> ModuleUse {
 
 #[test]
 fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
-    use crate::creature::genome::cgp::{
-        ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
-    };
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource};
     let starts = starting_forms();
     let scaffold = |name: &str| {
         let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1622,11 +1620,11 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
         DestinationKind::GraphPureWithEffect
     );
     let mut plastic = pure;
-    crate::creature::genome::cgp::test_support::set_surface_plasticity(
+    crate::genome::cgp::test_support::set_surface_plasticity(
         &mut plastic,
         EdgeSurface::ComputeInput(0),
-        Some(crate::creature::genome::PlasticityConfig {
-            rule: crate::creature::genome::HebbianRule::Classic,
+        Some(crate::genome::PlasticityConfig {
+            rule: crate::genome::HebbianRule::Classic,
             learning_rate: 0.1,
             weight_clamp: 1.0,
             lamarckian: false,
@@ -2589,7 +2587,7 @@ fn recruitment_paths_destination_kind_reads_a_wired_vote_sink_alone_as_an_effect
         .inputs
         .is_empty());
     let mut inert = prepared.clone();
-    crate::creature::genome::cgp::test_support::edit_sinks(&mut inert, |sinks| {
+    crate::genome::cgp::test_support::edit_sinks(&mut inert, |sinks| {
         sinks.iter_mut().for_each(|sink| sink.inputs.clear());
     });
     assert_eq!(
@@ -2598,16 +2596,13 @@ fn recruitment_paths_destination_kind_reads_a_wired_vote_sink_alone_as_an_effect
     );
     let mut vote_only = inert;
     let terminate = vote_only
-        .sink_surface(crate::creature::genome::cgp::OutputSinkKind::ActionVote(
-            crate::creature::genome::vote::VoteSink::Terminate,
+        .sink_surface(crate::genome::cgp::OutputSinkKind::ActionVote(
+            crate::genome::vote::VoteSink::Terminate,
         ))
         .unwrap();
     vote_only.push_edge(
         terminate,
-        crate::creature::genome::cgp::GraphEdge::new(
-            crate::creature::genome::cgp::GraphSource::ComputeNode(0),
-            1.0,
-        ),
+        crate::genome::cgp::GraphEdge::new(crate::genome::cgp::GraphSource::ComputeNode(0), 1.0),
     );
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(vote_only)),

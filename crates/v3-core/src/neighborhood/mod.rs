@@ -89,7 +89,7 @@ pub struct GenomeEvaluation {
 /// genome, so founder and evolved readings never draw the same seeds.
 #[must_use]
 pub fn evaluate_genome(
-    genome: &crate::creature::genome::CreatureGenome,
+    genome: &crate::genome::CreatureGenome,
     battery: &Battery,
     mutation_config: &crate::config::MutationConfig,
     context: &EvalContext,

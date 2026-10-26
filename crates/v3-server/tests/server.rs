@@ -2593,9 +2593,9 @@ fn brain_graph(body: &serde_json::Value, node_id: u32) -> &serde_json::Value {
 /// The brain edge at sink `occurrence`.
 fn brain_sink_edge(
     graph: &serde_json::Value,
-    occurrence: v3_core::creature::genome::cgp::EdgeOccurrence,
+    occurrence: v3_core::genome::cgp::EdgeOccurrence,
 ) -> &serde_json::Value {
-    use v3_core::creature::genome::cgp::EdgeSurface;
+    use v3_core::genome::cgp::EdgeSurface;
     let (container, list) = match occurrence.surface {
         EdgeSurface::SinkInput(sink) => (sink, "output_sinks"),
         EdgeSurface::ComputeInput(node) => (node, "compute_nodes"),
@@ -2606,9 +2606,9 @@ fn brain_sink_edge(
 /// The learning entry of `occurrence` in the learning entry `entry`.
 fn learning_edge(
     entry: &serde_json::Value,
-    occurrence: v3_core::creature::genome::cgp::EdgeOccurrence,
+    occurrence: v3_core::genome::cgp::EdgeOccurrence,
 ) -> &serde_json::Value {
-    use v3_core::creature::genome::cgp::EdgeSurface;
+    use v3_core::genome::cgp::EdgeSurface;
     let (surface, container) = match occurrence.surface {
         EdgeSurface::SinkInput(sink) => ("sink", sink),
         EdgeSurface::ComputeInput(node) => ("compute", node),
@@ -2632,9 +2632,9 @@ fn learning_edge(
 #[tokio::test]
 async fn get_creature_brain_resolves_ring_members_and_their_group() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::Shape;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::BackendDef;
+    use v3_core::genome::cgp::Shape;
+    use v3_core::genome::vote::DirectedVoteKind;
+    use v3_core::genome::BackendDef;
 
     let state = test_state();
     let creature_id = {
@@ -2723,11 +2723,11 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
 #[tokio::test]
 async fn get_creature_learning_and_learners_follow_the_runtime() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::{
+    use v3_core::genome::cgp::{
         BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
     };
-    use v3_core::creature::genome::vote::{DirectedVoteKind, VoteSink};
-    use v3_core::creature::genome::{BackendDef, HebbianRule, PlasticityConfig};
+    use v3_core::genome::vote::{DirectedVoteKind, VoteSink};
+    use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig};
     use v3_core::runtime::state::GraphRuntimeState;
 
     let state = test_state();
@@ -2880,9 +2880,9 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
 #[tokio::test]
 async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
-    use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::{
+    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
+    use v3_core::genome::vote::DirectedVoteKind;
+    use v3_core::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
     use v3_core::runtime::state::GraphRuntimeState;
@@ -3034,9 +3034,9 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
 #[tokio::test]
 async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_members() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::CgpGraphBackendDef;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::BackendDef;
+    use v3_core::genome::cgp::CgpGraphBackendDef;
+    use v3_core::genome::vote::DirectedVoteKind;
+    use v3_core::genome::BackendDef;
 
     let state = test_state();
     let creature_id = {

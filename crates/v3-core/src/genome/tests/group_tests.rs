@@ -6,13 +6,11 @@ use rand::{rngs::SmallRng, SeedableRng};
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
-use crate::creature::genome::cgp::{
-    ring_offset, validate_graph, CgpGraphBackendDef, GroupId, Shape,
-};
-use crate::creature::genome::cgp_mesh_annotations::derive_cgp_annotations;
-use crate::creature::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::cgp::{ring_offset, validate_graph, CgpGraphBackendDef, GroupId, Shape};
+use crate::genome::cgp_mesh_annotations::derive_cgp_annotations;
+use crate::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::neighborhood::mutation_effects::genome_identity;
 
@@ -207,13 +205,13 @@ fn a_group_is_a_live_component_reading_its_ring_and_writing_action() {
     let ring = InputReference::World(WorldInputKey::NeighborOccupiedRing);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     assert!(!def.enters_visit());
-    let empty = crate::creature::genome::cgp_analysis::cgp_functional_complexity(&def);
+    let empty = crate::genome::cgp_analysis::cgp_functional_complexity(&def);
     let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Reproduce, 3);
     assert_eq!(id, GroupId::new(0));
     assert!(def.enters_visit());
     // One record, eight wired sinks and one consumed reference.
     assert_eq!(
-        crate::creature::genome::cgp_analysis::cgp_functional_complexity(&def),
+        crate::genome::cgp_analysis::cgp_functional_complexity(&def),
         empty + 1 + 8 + 1
     );
     let (reads, writes, stateful, _) = derive_cgp_annotations(&def, &[ring]);

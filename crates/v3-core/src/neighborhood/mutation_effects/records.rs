@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::CreatureGenome;
+use crate::genome::CreatureGenome;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{BackendTrace, MeshHopTrace, MeshPassTrace};
@@ -327,7 +327,7 @@ mod tests {
             entry_node_id: NodeId::new(ids[0]),
             nodes: ids
                 .iter()
-                .map(|&id| crate::creature::genome::NodeGenome {
+                .map(|&id| crate::genome::NodeGenome {
                     node_id: NodeId::new(id),
                     ..node.clone()
                 })

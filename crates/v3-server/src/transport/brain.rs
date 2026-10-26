@@ -8,11 +8,9 @@
 
 use serde::Serialize;
 use v3_core::contracts::{InputReference, NodeId};
-use v3_core::creature::genome::cgp::{
-    self as core_cgp, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
-};
-use v3_core::creature::genome::mesh_annotations::MeshNodeAnnotation;
-use v3_core::creature::genome::{BackendDef, CreatureGenome, VmBackendDef};
+use v3_core::genome::cgp::{self as core_cgp, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
+use v3_core::genome::mesh_annotations::MeshNodeAnnotation;
+use v3_core::genome::{BackendDef, CreatureGenome, VmBackendDef};
 use v3_core::runtime::plasticity::{LearnedEdge, LearnedState};
 
 use crate::transport::genome_wire::{

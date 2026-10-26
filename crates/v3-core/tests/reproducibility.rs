@@ -25,9 +25,7 @@
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{NodeId, Position, RouteTarget};
 use v3_core::creature::action_log::ActionType;
-use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::mutation::MutationOperator;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 

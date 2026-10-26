@@ -1,9 +1,9 @@
 //! Structural facts about a genome's reachable mesh, shared by neighborhood
 //! observations and removal-time reproductive-success accounting.
 
-use crate::creature::genome::analysis::{functional_complexity, mesh_reachable_nodes};
-use crate::creature::genome::cgp::{GraphSource, NodeClass, OutputSinkKind};
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::genome::analysis::{functional_complexity, mesh_reachable_nodes};
+use crate::genome::cgp::{GraphSource, NodeClass, OutputSinkKind};
+use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// Structural facts about a genome's reachable mesh, independent of any
 /// battery execution.
@@ -97,10 +97,8 @@ mod tests {
     use super::*;
 
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge,
-    };
-    use crate::creature::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef};
+    use crate::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge};
+    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef};
 
     fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
         CreatureGenome {
@@ -146,7 +144,7 @@ mod tests {
             dst: 0,
             slot_idx: 2,
         }]);
-        let expected = crate::creature::genome::structural_companions(&genome);
+        let expected = crate::genome::structural_companions(&genome);
         let from_module: crate::neighborhood::companions::StructuralCompanions =
             crate::neighborhood::companions::structural_companions(&genome);
         let from_root: crate::neighborhood::StructuralCompanions =
@@ -262,7 +260,7 @@ mod tests {
     #[test]
     fn a_plastic_compute_node_is_reported() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        graph.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(
                 GraphSource::InputLeaf {

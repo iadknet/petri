@@ -432,7 +432,7 @@ mod tests {
     fn the_frontend_fixture_equals_the_declared_catalog() {
         use crate::contracts::ActionType;
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../../frontend/src/types/vote-sinks.json"
+            "../../../../frontend/src/types/vote-sinks.json"
         ))
         .expect("fixture parses");
         let action_types: Vec<_> = ActionType::ALL

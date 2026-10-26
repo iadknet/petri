@@ -19,8 +19,8 @@ use rand::{Rng, SeedableRng};
 use crate::config::{EnergyLifecycleConfig, RuntimeConfig};
 use crate::contracts::{WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::colour::unit_rgb;
-use crate::creature::genome::CreatureGenome;
 use crate::creature::phenotype::Phenotype;
+use crate::genome::CreatureGenome;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::MeshOutput;
@@ -627,7 +627,7 @@ mod tests {
 #[cfg(test)]
 mod drift_characterization {
     use super::*;
-    use crate::creature::genome::analysis::mesh_reachable_nodes;
+    use crate::genome::analysis::mesh_reachable_nodes;
     use crate::mutation::engine::MutationEngine;
     use crate::mutation::reachability::ParentExecuted;
     use crate::runtime::mesh::ObservedMeshExecution;

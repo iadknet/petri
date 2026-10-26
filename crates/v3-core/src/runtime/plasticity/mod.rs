@@ -14,7 +14,7 @@ pub use kind::{PlasticityKind, RULES};
 pub(crate) use learned::Learner;
 pub use learned::{LearnedEdge, LearnedScale, LearnedState};
 
-use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
+use crate::genome::OUTCOME_CHANNEL_COUNT;
 
 /// Outcome signals computed per-creature per-tick for reward-modulated plasticity.
 ///

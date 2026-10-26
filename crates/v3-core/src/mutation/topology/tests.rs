@@ -2,9 +2,9 @@ use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::RouteTarget;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::OutputSinkKind;
-use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::creature::parseability::ParseabilityGate;
+use crate::genome::cgp::OutputSinkKind;
+use crate::genome::{VmBackendDef, VmInstruction};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -281,7 +281,7 @@ fn copy_node_deep_copies_vm_backend() {
 fn copy_node_deep_copies_graph_backend() {
     // Swap one founder node to Graph first, then copy.
 
-    use crate::creature::genome::cgp::CgpGraphBackendDef;
+    use crate::genome::cgp::CgpGraphBackendDef;
     let mut found = false;
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
@@ -1034,10 +1034,10 @@ fn mutate_gate_bias_changes_bias() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![crate::creature::genome::VmInstruction::Halt],
+                program: vec![crate::genome::VmInstruction::Halt],
             }),
             targets: vec![RouteTarget {
                 target_id: NodeId::new(0),
@@ -1069,10 +1069,10 @@ fn mutate_gate_bias_noop_on_empty_targets() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![crate::creature::genome::VmInstruction::Halt],
+                program: vec![crate::genome::VmInstruction::Halt],
             }),
             targets: vec![],
         }],
@@ -1096,10 +1096,10 @@ fn mutate_gate_bias_clamps_to_range() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![crate::creature::genome::VmInstruction::Halt],
+                program: vec![crate::genome::VmInstruction::Halt],
             }),
             targets: vec![RouteTarget {
                 target_id: NodeId::new(0),

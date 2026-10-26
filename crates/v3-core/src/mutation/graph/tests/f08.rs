@@ -4,7 +4,7 @@
 //! `split_existing_edge` splits every introspection edge function-preservingly
 //! (T25.F02 retired the T11.F08 exclusion with the learning charge).
 
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::vote::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -15,12 +15,12 @@ use super::operators::{
 };
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
-use crate::creature::genome::PlasticityConfig;
+use crate::genome::vote::{ActionParamField, VoteSink};
+use crate::genome::PlasticityConfig;
 use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
 };
@@ -49,7 +49,7 @@ fn run_tick_sequences(
         .iter()
         .map(|sensors| {
             let mut shared_memory = [0.0f32; 16];
-            let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
+            let mut graph_runtime = crate::genome::cgp::test_support::runtime_for(def);
             (0..SEQUENCE_TICKS)
                 .map(|_| {
                     let prev_shared_memory = shared_memory;
@@ -434,24 +434,22 @@ fn introspection_edge_def(
         1.0,
     );
     CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![
-            crate::creature::genome::cgp::test_support::plastic_node(
-                ComputeNodeKind::WeightedSum,
-                if on_compute_input {
-                    vec![edge]
-                } else {
-                    Vec::new()
-                },
-                plasticity.then_some(PlasticityConfig {
-                    rule: crate::creature::genome::HebbianRule::Classic,
-                    learning_rate: 0.1,
-                    weight_clamp: 5.0,
-                    lamarckian: false,
-                    modulation: None,
-                    retention: 1.0,
-                }),
-            ),
-        ])
+        .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+            ComputeNodeKind::WeightedSum,
+            if on_compute_input {
+                vec![edge]
+            } else {
+                Vec::new()
+            },
+            plasticity.then_some(PlasticityConfig {
+                rule: crate::genome::HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: false,
+                modulation: None,
+                retention: 1.0,
+            }),
+        )])
         .with_output_sinks(vec![OutputSink::new(
             sink,
             if on_compute_input {
@@ -522,7 +520,7 @@ fn committed_at_energy(
     config: &RuntimeConfig,
     mut energy: f32,
 ) -> f32 {
-    let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
+    let mut graph_runtime = crate::genome::cgp::test_support::runtime_for(def);
     graph_runtime.begin_tick(0);
     let mut shared_memory = [0.0f32; 16];
     execute_graph_node(

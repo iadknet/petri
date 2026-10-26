@@ -4,12 +4,12 @@ use proptest::prelude::*;
 use v3_core::contracts::{Direction, WorldAction};
 use v3_core::simulation::seed_simulation;
 
-fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
+fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
     use v3_core::contracts::NodeId;
-    use v3_core::creature::genome::cgp::{
+    use v3_core::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use v3_core::creature::genome::{
+    use v3_core::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,
     };
@@ -49,8 +49,8 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
     ));
     let mut stateful_plastic = stateful_plastic;
     if let BackendDef::Graph(def) = &mut stateful_plastic.nodes[0].backend_def {
-        def.edge_mut(v3_core::creature::genome::cgp::EdgeOccurrence::new(
-            v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(0),
+        def.edge_mut(v3_core::genome::cgp::EdgeOccurrence::new(
+            v3_core::genome::cgp::EdgeSurface::ComputeInput(0),
             0,
         ))
         .set_plasticity(Some(PlasticityConfig {
@@ -442,10 +442,10 @@ fn lineage_diversity_handles_empty_one_balanced_and_unequal_populations() {
 #[test]
 fn temporal_report_keeps_substrate_counts_separate() {
     use v3_core::contracts::NodeId;
-    use v3_core::creature::genome::cgp::{
+    use v3_core::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+    use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 1;
     let mut sim = seed_simulation(config, 11);
@@ -469,9 +469,9 @@ fn temporal_report_keeps_substrate_counts_separate() {
                         ComputeNodeKind::Constant(0.0),
                         vec![],
                     )])
-                    .with_output_sinks(vec![v3_core::creature::genome::cgp::OutputSink::new(
-                        v3_core::creature::genome::cgp::OutputSinkKind::ActionVote(
-                            v3_core::creature::genome::vote::VoteSink::Eat,
+                    .with_output_sinks(vec![v3_core::genome::cgp::OutputSink::new(
+                        v3_core::genome::cgp::OutputSinkKind::ActionVote(
+                            v3_core::genome::vote::VoteSink::Eat,
                         ),
                         vec![edge],
                     )]),
@@ -1093,10 +1093,8 @@ fn neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions(
 #[test]
 fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
     use v3_core::contracts::{InputReference, NodeId, RouteTarget};
-    use v3_core::creature::genome::vote::VoteSink;
-    use v3_core::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use v3_core::genome::vote::VoteSink;
+    use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     let vm_node = |id: u32, targets: &[u32], program: Vec<VmInstruction>| NodeGenome {
         node_id: NodeId::new(id),
         input_refs: vec![],

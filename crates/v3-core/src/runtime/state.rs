@@ -1,8 +1,8 @@
 //! A creature brain's execution state: what the mesh loop reads and writes
 //! across ticks, and the record of which mesh nodes it dispatched.
 
-use crate::creature::genome::cgp::BirthSeeds;
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::cgp::BirthSeeds;
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::runtime::plasticity::LearnedState;
 
 /// Which mesh nodes a creature's brain dispatched, and how recently.

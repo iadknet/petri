@@ -11,8 +11,8 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::vote::{VoteKind, VoteSink, VoteVector};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::vote::{VoteKind, VoteSink, VoteVector};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::action_decode::decode_commit;
 use crate::runtime::cgp::execute_graph_node;
@@ -592,10 +592,8 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction, WorldInputKey};
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
@@ -655,8 +653,8 @@ mod tests {
         genome.nodes[0] = crate::runtime::vote_test_support::vm_voter(
             0,
             &[
-                (crate::creature::genome::vote::VoteSink::Eat, 1.0),
-                (crate::creature::genome::vote::VoteSink::Decide, 1.0),
+                (crate::genome::vote::VoteSink::Eat, 1.0),
+                (crate::genome::vote::VoteSink::Decide, 1.0),
             ],
             &[0],
         );
@@ -762,11 +760,9 @@ mod tests {
 
     #[test]
     fn compact_observation_preserves_complete_applied_outcomes_and_graph_state() {
-        use crate::creature::genome::cgp::{
-            CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
-        };
+        use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.append_compute_node(crate::creature::genome::cgp::test_support::plastic_node(
+        graph.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(
                 GraphSource::SharedMemory {
@@ -775,13 +771,13 @@ mod tests {
                 },
                 1.0,
             )],
-            Some(crate::creature::genome::PlasticityConfig {
-                rule: crate::creature::genome::HebbianRule::Classic,
+            Some(crate::genome::PlasticityConfig {
+                rule: crate::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 2.0,
                 lamarckian: false,
-                modulation: Some(crate::creature::genome::RewardModulationConfig {
-                    reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
+                modulation: Some(crate::genome::RewardModulationConfig {
+                    reward_source: crate::genome::OutcomeChannel::EnergyDelta,
                     trace_decay: 0.9,
                 }),
                 retention: 1.0,
@@ -798,7 +794,7 @@ mod tests {
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
                     VmInstruction::AddVote {
-                        sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                        sink: crate::genome::vote::VoteSink::Eat.index() as u8,
                         src: 0,
                     },
                 ],
@@ -953,7 +949,7 @@ mod tests {
     /// `action_type` (1 Eat, 2 to 4 the directed kinds toward N; 0 votes
     /// nothing), so a tick commits that action once.
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
-        use crate::creature::genome::vote::VoteSink;
+        use crate::genome::vote::VoteSink;
         let sink = match action_type {
             1 => Some(VoteSink::Eat),
             2 => Some(VoteSink::Directed(DirectedVoteKind::Move, 0)),
@@ -1360,7 +1356,7 @@ mod tests {
                             const_idx: 1,
                         },
                         VmInstruction::AddVote {
-                            sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                            sink: crate::genome::vote::VoteSink::Eat.index() as u8,
                             src: 0,
                         },
                         VmInstruction::Halt,
@@ -1408,7 +1404,7 @@ mod tests {
                 const_idx: 1,
             },
             VmInstruction::AddVote {
-                sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                sink: crate::genome::vote::VoteSink::Eat.index() as u8,
                 src: 0,
             },
             VmInstruction::Halt,
@@ -1583,7 +1579,7 @@ mod tests {
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
                     VmInstruction::AddVote {
-                        sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                        sink: crate::genome::vote::VoteSink::Eat.index() as u8,
                         src: 0,
                     },
                     VmInstruction::Halt,
@@ -2068,7 +2064,7 @@ mod tests {
     }
 
     fn graph_reading(node_id: NodeId, key: WorldInputKey) -> NodeGenome {
-        use crate::creature::genome::cgp::{
+        use crate::genome::cgp::{
             CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
         };
         NodeGenome {
@@ -2153,8 +2149,8 @@ mod tests {
 
     #[test]
     fn a_ring_group_records_its_ring() {
-        use crate::creature::genome::cgp::{CgpGraphBackendDef, Shape};
-        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::genome::cgp::{CgpGraphBackendDef, Shape};
+        use crate::genome::vote::DirectedVoteKind;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let id = def.add_group(
             Shape::Ring { ring_ref: 0 },
@@ -2182,11 +2178,11 @@ mod tests {
     /// nodes too, so both resolve a key the structural census calls unwired.
     #[test]
     fn a_dead_read_still_executes_so_read_can_exceed_wired() {
-        use crate::creature::genome::analysis::mesh_reachable_nodes;
-        use crate::creature::genome::cgp::{
+        use crate::genome::analysis::mesh_reachable_nodes;
+        use crate::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
-        use crate::creature::genome::sensor_analysis::sensor_census;
+        use crate::genome::sensor_analysis::sensor_census;
         let key = WorldInputKey::NearbyCreature;
         let vm = CreatureGenome {
             entry_node_id: NodeId::new(0),

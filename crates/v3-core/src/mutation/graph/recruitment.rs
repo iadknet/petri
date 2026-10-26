@@ -5,11 +5,11 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::config::NeutralInputRecruitment as Arm;
 use crate::contracts::{DirectionPair, InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     ring_offset, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
 };
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
-use crate::creature::genome::{BackendDef, NodeGenome};
+use crate::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
+use crate::genome::{BackendDef, NodeGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::input_ref::input_reference_universe;
 use crate::mutation::types::MutationSkipReason;

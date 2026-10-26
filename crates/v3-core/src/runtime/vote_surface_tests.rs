@@ -4,16 +4,14 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, RouteTarget};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::VoteVector;
-use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::VoteVector;
+use crate::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::mesh::{execute_creature_mesh_impl, ObservedMeshExecution};
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
@@ -404,7 +402,7 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
     let mut side_outputs = crate::runtime::types::MeshSideOutputs::new(4);
     assert_eq!(
         side_outputs.action_params,
-        [0.0; crate::creature::genome::vote::ACTION_PARAM_FIELD_COUNT]
+        [0.0; crate::genome::vote::ACTION_PARAM_FIELD_COUNT]
     );
 
     let param_sink = OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction);
@@ -415,7 +413,7 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
         let mut energy = 100.0;
         let mut memory = [0.0; 16];
         let mut state =
-            crate::creature::genome::cgp::test_support::runtime_for_defs(&vec![&def; node_idx + 1]);
+            crate::genome::cgp::test_support::runtime_for_defs(&vec![&def; node_idx + 1]);
         let _ = crate::runtime::cgp::execute_graph_node(
             &def,
             &[],
@@ -436,7 +434,7 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
     // A visit with no parameter sink leaves the last written value standing.
     visit(9.0, &[OutputSinkKind::ActionVote(VoteSink::Eat)], 2);
 
-    let mut expected = [0.0; crate::creature::genome::vote::ACTION_PARAM_FIELD_COUNT];
+    let mut expected = [0.0; crate::genome::vote::ACTION_PARAM_FIELD_COUNT];
     expected[ActionParamField::ReproduceTransferFraction.index()] = -1.0;
     assert_eq!(side_outputs.action_params, expected);
 }
@@ -576,7 +574,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
 /// node's latest sanitized contribution.
 mod sum_rule_property {
     use super::VOTE_SINK_COUNT;
-    use crate::creature::genome::vote::VoteVector;
+    use crate::genome::vote::VoteVector;
     use crate::runtime::types::{sanitize_f32, MeshSideOutputs};
     use proptest::prelude::*;
 

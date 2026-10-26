@@ -8,8 +8,8 @@
 use super::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::RouteTarget;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::{VmBackendDef, VmInstruction};
 use crate::mutation::vm::mutate_one_instruction_field;
 use crate::neighborhood::battery::{Battery, Signature};
 use rand::{rngs::SmallRng, SeedableRng};

@@ -31,7 +31,7 @@ use super::tracking::{PersistenceAccumulator, PopulationReadings, WorldTracking}
 use std::num::NonZeroUsize;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use v3_core::config::SimulationConfig;
-use v3_core::creature::genome::analysis::functional_complexity;
+use v3_core::genome::analysis::functional_complexity;
 use v3_core::neighborhood::{Battery, EvalContext};
 use v3_core::simulation::{observe_final_actions, run_tick, seed_simulation};
 

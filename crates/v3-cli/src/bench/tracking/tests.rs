@@ -376,11 +376,11 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
 #[test]
 fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
     use v3_core::contracts::NodeId;
-    use v3_core::creature::genome::cgp::{
+    use v3_core::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+    use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
 
     // Arrange: three creatures — one reads a shared-memory slot, one holds
     // a live stateful compute node, one reads neither.
@@ -1871,8 +1871,8 @@ fn extinction_yields_an_empty_profile_table_not_an_absent_one() {
 #[test]
 fn decision_input_rows_count_each_referencing_creature_once() {
     use v3_core::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
-    use v3_core::creature::genome::VmInstruction;
-    use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
+    use v3_core::genome::VmInstruction;
+    use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
 
     fn reading(refs: Vec<InputReference>) -> CreatureGenome {
         let mut program = Vec::new();

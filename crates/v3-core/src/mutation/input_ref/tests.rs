@@ -2,15 +2,13 @@ use super::*;
 use crate::config::{MutationConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{DynamicIntrospectionKey, NodeId, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::{
+use crate::creature::parseability::ParseabilityGate;
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
-use crate::creature::parseability::ParseabilityGate;
+use crate::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::applicability_tests::{genome as generated_genome, module_size};
 use crate::mutation::sampling::{random_input_reference, random_input_reference_for_food_types};
 use crate::neighborhood::{Battery, Signature};
@@ -844,11 +842,11 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
             panic!("the founder decision node is a Graph node");
         };
-        crate::creature::genome::cgp::test_support::set_surface_plasticity(
+        crate::genome::cgp::test_support::set_surface_plasticity(
             def,
-            crate::creature::genome::cgp::EdgeSurface::ComputeInput(0),
-            Some(crate::creature::genome::PlasticityConfig {
-                rule: crate::creature::genome::HebbianRule::Classic,
+            crate::genome::cgp::EdgeSurface::ComputeInput(0),
+            Some(crate::genome::PlasticityConfig {
+                rule: crate::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: false,
@@ -999,7 +997,7 @@ fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
         let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
             unreachable!()
         };
-        crate::creature::genome::cgp::test_support::edit_sinks(def, |sinks| {
+        crate::genome::cgp::test_support::edit_sinks(def, |sinks| {
             sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
         });
         let before = genome.clone();

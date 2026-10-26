@@ -1,8 +1,8 @@
 use super::super::recruitment::{Module, ModuleBackend, Opportunities, RecruitmentCheckpoint};
 use super::super::Signature;
 use crate::contracts::{NodeId, Position, WorldAction, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::cgp::{GraphSource, NodeClass};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::cgp::{GraphSource, NodeClass};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{MutationDomain, MutationEventRecord, MutationOperator};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -107,7 +107,7 @@ pub enum Supply {
 impl Supply {
     /// The unit count a proposal from `parent` draws its supply on.
     #[must_use]
-    pub fn units(self, parent: &crate::creature::genome::CreatureGenome) -> u32 {
+    pub fn units(self, parent: &crate::genome::CreatureGenome) -> u32 {
         match self {
             Self::FounderUnits => crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS,
             Self::Production => parent.genome_size(),

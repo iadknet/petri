@@ -6,8 +6,8 @@ use super::super::{assemble_full_sensor_inputs, assemble_sensor_inputs};
 use super::support::{small_config, vm_raw_program_genome};
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::sensor_analysis::perception_requirements;
-use crate::creature::genome::CreatureGenome;
+use crate::genome::sensor_analysis::perception_requirements;
+use crate::genome::CreatureGenome;
 use crate::simulation::seeding::seed_simulation_with_founder_genomes;
 use crate::simulation::Simulation;
 
@@ -55,9 +55,9 @@ fn full_assembly_matches_production_for_a_genome_reading_every_input() {
 fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
     use crate::config::NeutralInputRecruitment as Arm;
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::CgpGraphBackendDef;
-    use crate::creature::genome::vote::VoteSink;
-    use crate::creature::genome::{BackendDef, NodeGenome};
+    use crate::genome::cgp::CgpGraphBackendDef;
+    use crate::genome::vote::VoteSink;
+    use crate::genome::{BackendDef, NodeGenome};
     use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     let parent = CreatureGenome {
         entry_node_id: NodeId::new(0),

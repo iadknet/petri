@@ -11,8 +11,8 @@ use rand::SeedableRng;
 
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
-use crate::creature::genome::CreatureGenome;
 use crate::creature::state::CreatureState;
+use crate::genome::CreatureGenome;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::simulation::{assemble_full_sensor_inputs, run_tick, seed_simulation, Simulation};
 
@@ -244,9 +244,9 @@ fn expose(sim: &Simulation, family: Family, ids: &[CreatureId]) -> Exposure {
             energy: creature.energy,
             energy_consumed: 0.0,
             action_queue: &crate::contracts::ActionQueue::new(1),
-            votes: &[0.0; crate::creature::genome::vote::VOTE_SINK_COUNT],
-            previous_pass_votes: &[0.0; crate::creature::genome::vote::VOTE_SINK_COUNT],
-            commit_counts: &[0; crate::creature::genome::vote::VOTE_KIND_COUNT],
+            votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
+            previous_pass_votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
+            commit_counts: &[0; crate::genome::vote::VOTE_KIND_COUNT],
             mesh_hops: 0,
         };
         let exposed = family.authored_sub_indices().iter().any(|&sub| {

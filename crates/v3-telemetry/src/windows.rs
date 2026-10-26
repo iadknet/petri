@@ -29,7 +29,7 @@ use sha2::{Digest as _, Sha256};
 use slotmap::Key as _;
 use v3_core::contracts::{splitmix64, CreatureId, WorldAction};
 use v3_core::creature::action_log::NO_DIRECTION;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 use v3_core::ledger::DeathCause;
 use v3_core::runtime::trace::domain::{BackendTrace, MeshHopTrace, MeshPassTrace};
 use v3_core::runtime::traced_mesh::TruncationReason;

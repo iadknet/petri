@@ -5,10 +5,10 @@
 
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, WorldAction};
-use crate::creature::genome::cgp::GraphSource;
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{VoteKind, VoteSink};
-use crate::creature::genome::VmInstruction;
+use crate::genome::cgp::GraphSource;
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::{VoteKind, VoteSink};
+use crate::genome::VmInstruction;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
     genome, leaf, run_tick, vm_node, vm_voter, GraphBuilder, Senses,
@@ -61,7 +61,7 @@ fn eat_sub() -> u16 {
 
 /// V1: A votes `Eat 1` and routes to B; B votes `Move N = 1 -
 /// ActionVotes[Eat]`, so A's committed vote inhibits B's.
-fn v1_lateral_inhibition(read: bool) -> crate::creature::genome::CreatureGenome {
+fn v1_lateral_inhibition(read: bool) -> crate::genome::CreatureGenome {
     let a = vm_voter(0, &[(VoteSink::Eat, 1.0)], &[1]);
     let b = vm_node(
         1,
@@ -119,7 +119,7 @@ fn v1_action_votes_let_a_committed_vote_inhibit_a_later_node() {
 }
 
 /// V2: one graph node votes `Eat 1` and `Move N = PreviousPassVotes[Eat]`.
-fn v2_decision_history(read: bool) -> crate::creature::genome::CreatureGenome {
+fn v2_decision_history(read: bool) -> crate::genome::CreatureGenome {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     let previous_eat = leaf_or_zero(&mut graph, read, eat_sub());
@@ -171,7 +171,7 @@ fn v2_previous_pass_votes_carry_the_last_pass_decision_into_the_next() {
 }
 
 /// V3: one graph node votes `Eat = 2 - CommitCounts[Eat]`.
-fn v3_bar_aware_plan(read: bool) -> crate::creature::genome::CreatureGenome {
+fn v3_bar_aware_plan(read: bool) -> crate::genome::CreatureGenome {
     let mut graph = GraphBuilder::new();
     let one = graph.constant(1.0);
     let eat_bar = leaf_or_zero(&mut graph, read, VoteKind::Eat.index() as u16);
@@ -210,7 +210,7 @@ fn v3_commit_counts_let_a_plan_stop_after_one_commit() {
 
 /// V4: a self-routing VM node, no `Decide`, votes `Move N 2` and
 /// `Terminate = HopsThisTick - 64`.
-fn v4_deliberation_cost(read: bool) -> crate::creature::genome::CreatureGenome {
+fn v4_deliberation_cost(read: bool) -> crate::genome::CreatureGenome {
     genome(vec![vm_node(
         0,
         3,
@@ -290,7 +290,7 @@ fn v4_hops_this_tick_lets_deliberation_end_the_tick() {
 /// before and after its own `AddVote Eat 1`, writes the two reads to bus
 /// slots 0 and 1, and sums them into shared-memory slots 0 and 1 so every
 /// execution mode's reads are compared.
-fn v6_staging_boundary() -> crate::creature::genome::CreatureGenome {
+fn v6_staging_boundary() -> crate::genome::CreatureGenome {
     let mut program = Vec::new();
     for (step, slot) in [(0u8, 0u8), (1, 1)] {
         if step == 1 {

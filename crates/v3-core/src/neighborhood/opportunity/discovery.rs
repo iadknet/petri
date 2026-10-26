@@ -4,7 +4,7 @@
 //! parameter sink, the Graph cost of the authored controller, and the VM
 //! instructions a hand translation would take (counted, not run).
 
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::vote::DirectedVoteKind;
 use std::collections::BTreeSet;
 
 use rand::rngs::SmallRng;
@@ -13,11 +13,11 @@ use rand::SeedableRng;
 use crate::config::{MutationConfig, SimulationConfig};
 use crate::contracts::{NodeId, SHARED_MEMORY_SLOTS};
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
-use crate::creature::genome::analysis::{mesh_reachable_nodes, vm_backward_slice};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::sensor_analysis::perception_requirements;
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
+use crate::genome::analysis::{mesh_reachable_nodes, vm_backward_slice};
+use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::sensor_analysis::perception_requirements;
+use crate::genome::vote::{ActionParamField, VoteSink};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::mesh::UntracedMeshExecution;
@@ -541,8 +541,8 @@ pub fn vm_concern(family: Family, config: &SimulationConfig, after_steps: u32) -
 mod tests {
     use super::*;
     use crate::contracts::{InputReference, NodeId, WorldInputKey};
-    use crate::creature::genome::cgp::Shape;
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::Shape;
+    use crate::genome::vote::DirectedVoteKind;
 
     /// A group's members are vote edges (T25.F03): every channel of the ring
     /// a member reads is on the node's vote surface.

@@ -5,10 +5,10 @@ use rand::Rng;
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
-use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
+use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
+use crate::genome::vote::{VoteSink, VOTE_SINK_COUNT};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;

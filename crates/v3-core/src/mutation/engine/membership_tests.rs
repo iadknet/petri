@@ -12,8 +12,8 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::MutationEventRecord;
 
 fn rng(seed: u64) -> SmallRng {

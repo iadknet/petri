@@ -7,7 +7,7 @@ use crate::config::{FounderProfile, SimulationConfig};
 use crate::creature::founder::{founder_genome, vm_decision_founder_genome};
 use crate::neighborhood::Battery;
 
-fn founder() -> crate::creature::genome::CreatureGenome {
+fn founder() -> crate::genome::CreatureGenome {
     founder_genome(FounderProfile::V3Alpha1)
 }
 
@@ -105,8 +105,8 @@ fn authored_and_inert_pairs_match_in_size_and_differ_only_in_weights() {
 #[test]
 fn authored_structure_counts_the_edges_and_nodes_the_controller_adds() {
     use super::controllers::VOTE_NODE;
-    use crate::creature::genome::BackendDef;
-    let vote_graph = |genome: &crate::creature::genome::CreatureGenome| {
+    use crate::genome::BackendDef;
+    let vote_graph = |genome: &crate::genome::CreatureGenome| {
         let BackendDef::Graph(graph) = &genome.nodes[VOTE_NODE].backend_def else {
             panic!("the vote node is a Graph node");
         };
@@ -307,8 +307,7 @@ fn feasibility_and_vm_concerns_are_recorded() {
         assert!(vm.instructions > 0);
         assert!(vm.charge_after_founder >= vm.charge_standalone);
     }
-    let crate::creature::genome::BackendDef::Vm(vm) =
-        &vm_decision_founder_genome().nodes[1].backend_def
+    let crate::genome::BackendDef::Vm(vm) = &vm_decision_founder_genome().nodes[1].backend_def
     else {
         panic!("the VM founder's vote node is a VM node");
     };

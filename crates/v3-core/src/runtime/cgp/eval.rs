@@ -1,4 +1,4 @@
-use crate::creature::genome::cgp::ComputeNodeKind;
+use crate::genome::cgp::ComputeNodeKind;
 use crate::runtime::types::sanitize_f32;
 
 /// Evaluate one compute node kind, returning the scalar output.

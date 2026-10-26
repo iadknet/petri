@@ -10,12 +10,12 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::food_idx;
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::{ActionParamField, VoteSink};
+use crate::genome::{BackendDef, CreatureGenome};
 
 use super::super::input_use::catalog::{addressed, Addressed, Channel};
 

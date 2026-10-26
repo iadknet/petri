@@ -28,8 +28,8 @@ use rayon::prelude::*;
 
 use crate::config::MutationConfig;
 use crate::contracts::{NodeId, WorldAction};
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::CreatureGenome;
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::CreatureGenome;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationDomain, MutationEngine, MutationOperator, MutationSummary};
 use crate::simulation::Simulation;

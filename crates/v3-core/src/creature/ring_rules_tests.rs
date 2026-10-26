@@ -2,10 +2,10 @@ use super::*;
 use crate::config::{FounderProfile, OrdinaryFoodTypeId};
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::founder::founder_genome;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::{GraphEdge, GroupId};
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::NodeGenome;
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::cgp::{GraphEdge, GroupId};
+use crate::genome::vote::VoteSink;
+use crate::genome::NodeGenome;
 
 fn barrier() -> InputReference {
     InputReference::World(WorldInputKey::NeighborBarrierRing)

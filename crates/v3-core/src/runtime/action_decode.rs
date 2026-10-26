@@ -1,8 +1,6 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
-use crate::creature::genome::vote::{
-    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT,
-};
+use crate::genome::vote::{ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT};
 
 /// The parameter surface a commit reads, indexed by `ActionParamField::index`.
 pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];

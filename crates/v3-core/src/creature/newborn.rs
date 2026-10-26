@@ -5,8 +5,8 @@
 //! (`runtime::plasticity::LearnedState`), so reproduction writes no runtime
 //! field and a built creature's genome carries no seeds.
 
-use crate::creature::genome::cgp::BirthSeeds;
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::genome::cgp::BirthSeeds;
+use crate::genome::{BackendDef, CreatureGenome};
 
 /// Take every graph node's seeds out of `genome`, indexed by mesh node.
 /// A genome with no seeds at all (seeding, the lab, instruments, observation

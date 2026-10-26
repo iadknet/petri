@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hash::Hash;
 
 use crate::contracts::NodeId;
-use crate::creature::genome::{BackendDef, NodeGenome};
+use crate::genome::{BackendDef, NodeGenome};
 use crate::mutation::{
     MutationDomain, MutationEventOutcome, MutationEventRecord, MutationOperator,
     MutationSkipReason, MutationSummary,

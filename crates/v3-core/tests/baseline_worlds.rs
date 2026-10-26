@@ -743,7 +743,8 @@ fn food_choice_mutation_diagnostic() {
     use rand::{rngs::SmallRng, SeedableRng};
     use v3_core::{
         contracts::WorldAction,
-        creature::{founder::founder_genome, genome::analysis::mesh_reachable_nodes},
+        creature::founder::founder_genome,
+        genome::analysis::mesh_reachable_nodes,
         mutation::{reachability::ParentExecuted, MutationEngine},
         neighborhood::Battery,
     };

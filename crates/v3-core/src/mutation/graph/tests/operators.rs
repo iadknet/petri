@@ -6,18 +6,18 @@
 //! compound reference, and the graph raw-field operator changes exactly one
 //! field by one unit.
 
-use crate::creature::genome::vote::DirectedVoteKind;
+use crate::genome::vote::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, WorldAction, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
+use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
     raw_field_mutation, split_existing_edge,
@@ -81,7 +81,7 @@ pub(super) fn run_scenarios(
             let mut energy = 1.0e6f32;
             let mut shared_memory = [0.0f32; 16];
             let prev_shared_memory = [0.0f32; 16];
-            let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
+            let mut graph_runtime = crate::genome::cgp::test_support::runtime_for(def);
             let mut side_outputs = MeshSideOutputs::new(8);
             let result = execute_graph_node(
                 def,
@@ -210,7 +210,7 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![
-            crate::creature::genome::cgp::test_support::plastic_node(
+            crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::WeightedSum,
                 vec![GraphEdge::new(
                     GraphSource::InputLeaf {
@@ -219,8 +219,8 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                     },
                     0.5,
                 )],
-                Some(crate::creature::genome::PlasticityConfig {
-                    rule: crate::creature::genome::HebbianRule::Classic,
+                Some(crate::genome::PlasticityConfig {
+                    rule: crate::genome::HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
                     lamarckian: false,
@@ -404,7 +404,7 @@ proptest! {
 /// exist before the push.
 #[test]
 fn unwired_input_ref_add_is_neutral_on_vm_node() {
-    use crate::creature::genome::{VmBackendDef, VmInstruction};
+    use crate::genome::{VmBackendDef, VmInstruction};
     use crate::runtime::vm::execute_vm_node;
 
     let def = VmBackendDef {
@@ -520,7 +520,7 @@ fn record(
     let mut energy = 1.0e6f32;
     let mut shared_memory = [0.0f32; 16];
     let prev_shared_memory = [0.0f32; 16];
-    let mut graph_runtime = crate::creature::genome::cgp::test_support::runtime_for(def);
+    let mut graph_runtime = crate::genome::cgp::test_support::runtime_for(def);
     let mut side_outputs = MeshSideOutputs::new(8);
     let _: NodeResult = execute_graph_impl(
         &mut tracer,

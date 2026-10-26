@@ -1,8 +1,8 @@
 use rand::Rng;
 
 use crate::contracts::{NodeId, RouteTarget};
-use crate::creature::genome::cgp::CgpGraphBackendDef;
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::cgp::CgpGraphBackendDef;
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
 pub(super) fn minimal_vm_backend() -> BackendDef {
     BackendDef::Vm(VmBackendDef {

@@ -3,11 +3,11 @@
 //! on every report.
 
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::vote::VoteSink;
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
 /// A one-node Graph genome with `compute_nodes` and the given `Eat` vote
 /// edges.

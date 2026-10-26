@@ -9,8 +9,8 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use serde::Serialize;
-use v3_core::creature::genome::analysis::mesh_reachable_nodes;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::CreatureGenome;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::{MutationEngine, MutationSummary};
 

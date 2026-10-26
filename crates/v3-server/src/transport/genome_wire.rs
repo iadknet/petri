@@ -9,10 +9,10 @@ use v3_core::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, OrdinaryFoodTypeId,
     StaticIntrospectionKey, WorldAction as CoreWorldAction, WorldInputKey,
 };
-use v3_core::creature::genome::cgp as core_cgp;
-use v3_core::creature::genome::mesh_annotations as core_mesh;
-use v3_core::creature::genome::vote as core_vote;
-use v3_core::creature::genome::{
+use v3_core::genome::cgp as core_cgp;
+use v3_core::genome::mesh_annotations as core_mesh;
+use v3_core::genome::vote as core_vote;
+use v3_core::genome::{
     HebbianRule as CoreHebbianRule, OutcomeChannel as CoreOutcomeChannel,
     VmInstruction as CoreVmInstruction,
 };

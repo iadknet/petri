@@ -13,9 +13,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, OutputSinkKind};
-use crate::creature::genome::vote::{DirectedVoteKind, VoteSink};
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::genome::cgp::{CgpGraphBackendDef, GraphSource, OutputSinkKind};
+use crate::genome::vote::{DirectedVoteKind, VoteSink};
+use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// The census version the goal summary records.
 pub const DRIVES_VERSION: &str = "drives-v2";

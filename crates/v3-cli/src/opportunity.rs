@@ -20,7 +20,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 use v3_core::neighborhood::opportunity::assay::{draw_incumbents, run_replicate};
 use v3_core::neighborhood::opportunity::controllers::{self, controller, AuthoredStructure};
 use v3_core::neighborhood::opportunity::discovery::{

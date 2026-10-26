@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 
 use crate::config::RuntimeConfig;
 use crate::contracts::SHARED_MEMORY_SLOTS;
-use crate::creature::genome::cgp::ComputeNodeKind;
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::cgp::ComputeNodeKind;
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::mesh::MeshExecutionMode;

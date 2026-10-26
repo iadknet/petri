@@ -7,8 +7,8 @@ use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::food_idx;
 use crate::contracts::{Direction, WorldAction};
 use crate::creature::colour::unit_rgb;
-use crate::creature::genome::CreatureGenome;
 use crate::creature::phenotype::Phenotype;
+use crate::genome::CreatureGenome;
 use crate::runtime::mesh::UntracedMeshExecution;
 use crate::runtime::MeshOutput;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -324,9 +324,9 @@ pub fn competence(
                     energy: scenario.energy,
                     energy_consumed: 0.0,
                     action_queue: &crate::contracts::ActionQueue::new(1),
-                    votes: &[0.0; crate::creature::genome::vote::VOTE_SINK_COUNT],
-                    previous_pass_votes: &[0.0; crate::creature::genome::vote::VOTE_SINK_COUNT],
-                    commit_counts: &[0; crate::creature::genome::vote::VOTE_KIND_COUNT],
+                    votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
+                    previous_pass_votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
+                    commit_counts: &[0; crate::genome::vote::VOTE_KIND_COUNT],
                     mesh_hops: 0,
                 },
             ) == 0.0

@@ -1,5 +1,5 @@
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
-use crate::creature::genome::cgp::{GraphEdge, GraphSource};
+use crate::genome::cgp::{GraphEdge, GraphSource};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 
 /// Resolve a `GraphSource` to its scalar value during ordered graph evaluation.

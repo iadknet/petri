@@ -8,8 +8,8 @@ use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInp
 use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::founder_genome_with_age_gate;
-use crate::creature::genome::CreatureGenome;
 use crate::creature::state::CreatureState;
+use crate::genome::CreatureGenome;
 use crate::kernel::WorldState;
 use crate::patterns::generate_pattern_seeded;
 use crate::simulation::simulation::Simulation;
@@ -180,9 +180,9 @@ pub fn seed_simulation_with_perception_mix(
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
-    use crate::creature::genome::sensor_analysis::perception_requirements;
-    use crate::creature::genome::BackendDef;
     use crate::creature::phenotype::Phenotype;
+    use crate::genome::sensor_analysis::perception_requirements;
+    use crate::genome::BackendDef;
     use std::collections::HashSet;
 
     fn small_config() -> SimulationConfig {
@@ -358,8 +358,8 @@ mod tests {
     /// cache equals the analysis of the genome it carries.
     #[test]
     fn perception_mix_caches_derive_from_the_edited_genome() {
-        use crate::creature::genome::analysis::mesh_reachable_nodes;
-        use crate::creature::genome::sensor_analysis::{
+        use crate::genome::analysis::mesh_reachable_nodes;
+        use crate::genome::sensor_analysis::{
             declared_world_keys, has_barrier_reader, live_vm_world_reads, sensor_census,
         };
         use crate::runtime::state::GraphRuntimeState;
@@ -475,7 +475,7 @@ mod tests {
         };
         assert_eq!(
             graph.compute_nodes()[1].kind,
-            crate::creature::genome::cgp::ComputeNodeKind::Threshold(24.5 / 1_000.0)
+            crate::genome::cgp::ComputeNodeKind::Threshold(24.5 / 1_000.0)
         );
     }
 }

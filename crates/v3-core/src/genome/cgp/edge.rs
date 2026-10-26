@@ -7,7 +7,7 @@
 //! with every write.
 
 use super::group::GroupId;
-use crate::creature::genome::PlasticityConfig;
+use crate::genome::PlasticityConfig;
 
 /// Tagged source for edge addressing. Replaces bare `source_idx: u16`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

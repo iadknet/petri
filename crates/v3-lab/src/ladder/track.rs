@@ -4,14 +4,14 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
-use v3_core::creature::genome::vote::DirectedVoteKind;
+use v3_core::genome::vote::DirectedVoteKind;
 
 use rayon::prelude::*;
 use serde::Serialize;
 use v3_core::contracts::NodeId;
-use v3_core::creature::genome::analysis::mesh_reachable_nodes;
-use v3_core::creature::genome::cgp::OutputSinkKind;
-use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction, VoteSink};
+use v3_core::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::cgp::OutputSinkKind;
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction, VoteSink};
 use v3_core::mutation::{MutationEventOutcome, MutationSummary};
 use v3_core::neighborhood::input_use::catalog::Family;
 use v3_core::neighborhood::{classify, Class, Signature as BatterySignature};

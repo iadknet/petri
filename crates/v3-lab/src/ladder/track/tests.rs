@@ -7,9 +7,9 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use v3_core::contracts::{InputReference, Position, WorldInputKey};
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
-use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::genome::VmBackendDef;
+use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
+use v3_core::genome::vote::DirectedVoteKind;
+use v3_core::genome::VmBackendDef;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::{
     MutationDomain, MutationEngine, MutationEventRecord, MutationOperator, MutationSkipReason,
@@ -82,8 +82,8 @@ fn the_founder_has_a_sensor_site_and_a_motor_site() {
 /// (T25.F03): a `Move` group makes it a motor node, a `Reproduce` one not.
 #[test]
 fn a_node_voting_only_through_group_members_is_a_motor_node() {
-    use v3_core::creature::genome::cgp::Shape;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::genome::cgp::Shape;
+    use v3_core::genome::vote::DirectedVoteKind;
     for (kind, motor) in [
         (DirectedVoteKind::Move, true),
         (DirectedVoteKind::Reproduce, false),
@@ -870,7 +870,7 @@ fn a_touching_selection_is_censored_or_resolved_in_the_touching_counts() {
 /// them (T25.F04): a `Move` pair group makes it a motor node.
 #[test]
 fn a_node_voting_only_through_pair_members_is_a_motor_node() {
-    use v3_core::creature::genome::vote::DirectedVoteKind;
+    use v3_core::genome::vote::DirectedVoteKind;
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     for (kind, motor) in [
         (DirectedVoteKind::Move, true),

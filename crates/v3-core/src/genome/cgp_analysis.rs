@@ -143,8 +143,8 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, OutputSink, OutputSinkKind};
-    use crate::creature::genome::vote::VoteSink;
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, OutputSink, OutputSinkKind};
+    use crate::genome::vote::VoteSink;
 
     fn empty_def() -> CgpGraphBackendDef {
         CgpGraphBackendDef::new_with_fixed_outputs()

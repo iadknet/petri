@@ -1,6 +1,6 @@
 use crate::contracts::InputReference;
-use crate::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
-use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
+use crate::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+use crate::genome::OUTCOME_CHANNEL_COUNT;
 
 /// Input slots the `ActionQueue` reference exposes: the first four queued
 /// actions, three sub-values each.

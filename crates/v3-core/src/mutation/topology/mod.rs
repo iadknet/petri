@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::creature::genome::CreatureGenome;
+use crate::genome::CreatureGenome;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
@@ -9,7 +9,7 @@ use crate::mutation::types::{MutationSkipReason, TargetReachability};
 #[cfg(test)]
 use crate::contracts::NodeId;
 #[cfg(test)]
-use crate::creature::genome::{BackendDef, NodeGenome};
+use crate::genome::{BackendDef, NodeGenome};
 
 mod birth;
 mod routing;

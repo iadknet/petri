@@ -3,7 +3,7 @@
 use super::*;
 use crate::config::{RuntimeConfig, SimulationConfig};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::analysis::mesh_cycle_nodes;
+use crate::genome::analysis::mesh_cycle_nodes;
 use crate::mutation::reachability::TargetSets;
 use crate::neighborhood::Battery;
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
@@ -296,7 +296,7 @@ fn ineligible_sources_skip_atomically() {
     cases.push(("zero-register VM", zero_registers));
     let mut no_sink = base();
     let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
-    crate::creature::genome::cgp::test_support::edit_sinks(&mut backend, |sinks| {
+    crate::genome::cgp::test_support::edit_sinks(&mut backend, |sinks| {
         sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
     });
     no_sink.nodes[0].backend_def = BackendDef::Graph(backend);

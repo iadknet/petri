@@ -4,8 +4,8 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, SHARED_MEMORY_SLOTS,
 };
-use crate::creature::genome::vote::VoteVector;
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::vote::VoteVector;
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
@@ -406,12 +406,12 @@ mod tests {
     use crate::contracts::{
         DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldAction,
     };
-    use crate::creature::genome::cgp::{
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::creature::genome::vote::{ActionParamField, VoteKind, VoteSink};
-    use crate::creature::genome::{
+    use crate::genome::vote::{ActionParamField, VoteKind, VoteSink};
+    use crate::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,
     };
@@ -842,26 +842,24 @@ mod tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![
-                            crate::creature::genome::cgp::test_support::plastic_node(
-                                ComputeNodeKind::Constant(1.0),
-                                vec![GraphEdge::new(
-                                    GraphSource::SharedMemory {
-                                        slot: 0,
-                                        previous: false,
-                                    },
-                                    1.0,
-                                )],
-                                Some(PlasticityConfig {
-                                    rule: HebbianRule::Classic,
-                                    learning_rate: 0.5,
-                                    weight_clamp: 1.0,
-                                    lamarckian: false,
-                                    modulation: None,
-                                    retention: 1.0,
-                                }),
-                            ),
-                        ])
+                        .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                            ComputeNodeKind::Constant(1.0),
+                            vec![GraphEdge::new(
+                                GraphSource::SharedMemory {
+                                    slot: 0,
+                                    previous: false,
+                                },
+                                1.0,
+                            )],
+                            Some(PlasticityConfig {
+                                rule: HebbianRule::Classic,
+                                learning_rate: 0.5,
+                                weight_clamp: 1.0,
+                                lamarckian: false,
+                                modulation: None,
+                                retention: 1.0,
+                            }),
+                        )])
                         .with_output_sinks(vec![OutputSink::new(
                             OutputSinkKind::ActionVote(VoteSink::Eat),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],

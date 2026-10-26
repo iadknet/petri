@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
-use crate::creature::genome::cgp::Scope;
-use crate::creature::genome::vote::VoteSink;
+use crate::genome::cgp::Scope;
+use crate::genome::vote::VoteSink;
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -651,10 +651,8 @@ pub struct MutationSummary {
     /// Applied native event snapshots for the bounded engineering test panel.
     /// Absent from production builds and transports; recording draws no RNG.
     #[cfg(test)]
-    pub(crate) recruitment_deltas: Vec<(
-        crate::creature::genome::CreatureGenome,
-        crate::creature::genome::CreatureGenome,
-    )>,
+    pub(crate) recruitment_deltas:
+        Vec<(crate::genome::CreatureGenome, crate::genome::CreatureGenome)>,
     pub attempted_events: u32,
     pub applied_events: u32,
     pub skipped_events: u32,

@@ -22,8 +22,8 @@ use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
 use v3_core::creature::body::HeritableBody;
-use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::creature::state::CreatureState;
+use v3_core::genome::{BackendDef, CreatureGenome};
 use v3_core::kernel::WorldState;
 use v3_core::ledger::EnergyFlows;
 use v3_core::runtime::state::DispatchRecord;
@@ -1400,21 +1400,21 @@ mod tests {
                     .filter(|site| {
                         matches!(
                             site.surface,
-                            v3_core::creature::genome::cgp::EdgeSurface::ComputeInput(_)
+                            v3_core::genome::cgp::EdgeSurface::ComputeInput(_)
                         )
                     })
                     .collect();
                 for site in compute {
-                    graph.edge_mut(site).set_plasticity(Some(
-                        v3_core::creature::genome::PlasticityConfig {
-                            rule: v3_core::creature::genome::HebbianRule::Classic,
+                    graph
+                        .edge_mut(site)
+                        .set_plasticity(Some(v3_core::genome::PlasticityConfig {
+                            rule: v3_core::genome::HebbianRule::Classic,
                             learning_rate: 0.5,
                             weight_clamp: 5.0,
                             lamarckian: false,
                             modulation: None,
                             retention: 1.0,
-                        },
-                    ));
+                        }));
                 }
             }
         }

@@ -1,7 +1,5 @@
 use v3_core::contracts::NodeId;
-use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, VmTrace};
 
 // Shared across test binaries; single source of truth in `tests/common/mod.rs`.

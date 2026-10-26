@@ -1206,9 +1206,9 @@ fn run_ended_with_totals_encodes_each_as_petri_total() {
 
 #[test]
 fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
-    use v3_core::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-    use v3_core::creature::genome::vote::{DirectedVoteKind, VoteSink};
-    use v3_core::creature::genome::BackendDef;
+    use v3_core::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+    use v3_core::genome::vote::{DirectedVoteKind, VoteSink};
+    use v3_core::genome::BackendDef;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1270,9 +1270,9 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
 #[test]
 fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::creature::genome::cgp::Shape;
-    use v3_core::creature::genome::vote::DirectedVoteKind;
-    use v3_core::creature::genome::BackendDef;
+    use v3_core::genome::cgp::Shape;
+    use v3_core::genome::vote::DirectedVoteKind;
+    use v3_core::genome::BackendDef;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1391,11 +1391,11 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
 
 #[test]
 fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
-    use v3_core::creature::genome::cgp::{
+    use v3_core::genome::cgp::{
         BirthSeeds, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
         GraphSource,
     };
-    use v3_core::creature::genome::{
+    use v3_core::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
     use v3_core::runtime::state::GraphRuntimeState;

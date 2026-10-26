@@ -6,10 +6,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
-use crate::creature::genome::cgp_analysis::cgp_live_compute_indices;
-use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
+use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
+use crate::genome::cgp_analysis::cgp_live_compute_indices;
+use crate::genome::mesh_annotations::collect_live_vm_instruction_indices;
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 
 use super::catalog::{addressed, shared_memory, Addressed, Channel, Declaration};
 

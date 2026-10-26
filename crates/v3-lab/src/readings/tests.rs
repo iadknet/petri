@@ -5,12 +5,12 @@ use crate::scene::SceneSpec;
 use proptest::prelude::*;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::cgp::{
+use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GroupId, OutputSink,
     Shape as GroupShape,
 };
-use v3_core::creature::genome::vote::DirectedVoteKind;
-use v3_core::creature::genome::VmBackendDef;
+use v3_core::genome::vote::DirectedVoteKind;
+use v3_core::genome::VmBackendDef;
 
 fn setup(lifetime: u32, start_energy: f32) -> Setup {
     Setup::new(arena_config(48), start_energy, lifetime)

@@ -5,12 +5,10 @@ use super::operators::{
 use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_genome;
-use crate::creature::genome::analysis::vm_forward_slice;
-use crate::creature::genome::vote::{ActionParamField, VOTE_SINK_COUNT};
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
 use crate::creature::parseability::ParseabilityGate;
+use crate::genome::analysis::vm_forward_slice;
+use crate::genome::vote::{ActionParamField, VOTE_SINK_COUNT};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
@@ -407,7 +405,7 @@ fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
         node_id: NodeId::new(0),
         input_refs: vec![],
         backend_def: BackendDef::Graph(
-            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(),
+            crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(),
         ),
         targets: vec![],
     }];

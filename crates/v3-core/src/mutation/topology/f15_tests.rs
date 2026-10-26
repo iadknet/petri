@@ -1,9 +1,9 @@
 //! Connection invariants and nonvacuous production operator fixtures.
 use super::*;
 use crate::contracts::{InputReference, RouteTarget, MAX_GATE_SLOTS};
-use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::{VmBackendDef, VmInstruction};
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
@@ -125,7 +125,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
             }
             _ => {
                 let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-                crate::creature::genome::cgp::test_support::edit_sinks(&mut graph, |sinks| {
+                crate::genome::cgp::test_support::edit_sinks(&mut graph, |sinks| {
                     sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
                 });
                 g.nodes[0].backend_def = BackendDef::Graph(graph);
@@ -312,8 +312,8 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
     })];
     if graph {
         let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
-        backend.append_compute_node(crate::creature::genome::cgp::ComputeNode::new(
-            crate::creature::genome::cgp::ComputeNodeKind::WeightedSum,
+        backend.append_compute_node(crate::genome::cgp::ComputeNode::new(
+            crate::genome::cgp::ComputeNodeKind::WeightedSum,
             vec![GraphEdge::new(
                 GraphSource::InputLeaf {
                     ref_idx: 0,

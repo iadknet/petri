@@ -4,9 +4,9 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
-use crate::creature::genome::cgp::{validate_graph, Scope};
-use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::parseability::ParseabilityGate;
+use crate::genome::cgp::{validate_graph, Scope};
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::pressure;

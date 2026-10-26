@@ -12,8 +12,8 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::config::MutationConfig;
-use crate::creature::genome::analysis::{mesh_cycle_nodes, mesh_reachable_nodes};
-use crate::creature::genome::CreatureGenome;
+use crate::genome::analysis::{mesh_cycle_nodes, mesh_reachable_nodes};
+use crate::genome::CreatureGenome;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::neighborhood::battery::{Battery, Signature};

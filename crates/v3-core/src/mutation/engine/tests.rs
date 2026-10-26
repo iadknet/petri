@@ -2,10 +2,10 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
     MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationOperator,
     MutationSkipReason, MutationSummary,
@@ -372,8 +372,8 @@ fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_gra
     let BackendDef::Graph(grown) = &mut after.nodes[1].backend_def else {
         unreachable!("node 1 is a Graph node");
     };
-    grown.append_compute_node(crate::creature::genome::cgp::ComputeNode::new(
-        crate::creature::genome::cgp::ComputeNodeKind::Add,
+    grown.append_compute_node(crate::genome::cgp::ComputeNode::new(
+        crate::genome::cgp::ComputeNodeKind::Add,
         Vec::new(),
     ));
     let operator = MutationOperator::GraphAddInternalGraphNode;
@@ -461,7 +461,7 @@ fn diversity_test_mutated_clones_differ_from_original() {
 
 #[test]
 fn vm_variety_test_non_noop_instructions_after_mutations() {
-    use crate::creature::genome::{BackendDef, VmInstruction};
+    use crate::genome::{BackendDef, VmInstruction};
     // After 1000 mutation passes on the same genome, non-Noop instructions must exist.
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;
@@ -673,7 +673,7 @@ fn engine_mesh_layer_probability_one_always_selects_topology() {
 
 #[test]
 fn apply_topology_event_adds_pass_through_detour() {
-    use crate::creature::genome::BackendDef;
+    use crate::genome::BackendDef;
     use crate::mutation::topology::TopologyOperator;
     use crate::mutation::types::TargetReachability;
 
@@ -697,13 +697,10 @@ fn apply_topology_event_adds_pass_through_detour() {
 
     let newborn = genome.nodes.last().expect("newborn node must exist");
     match &newborn.backend_def {
-        BackendDef::Vm(vm) => assert_eq!(
-            vm.program,
-            vec![crate::creature::genome::VmInstruction::Halt]
-        ),
+        BackendDef::Vm(vm) => assert_eq!(vm.program, vec![crate::genome::VmInstruction::Halt]),
         BackendDef::Graph(graph) => assert_eq!(
             graph,
-            &crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
+            &crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
         ),
     }
     assert!(newborn.input_refs.is_empty());
@@ -925,9 +922,7 @@ fn engine_pressure_preserves_parseability_when_restricted() {
 #[test]
 fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
     use crate::contracts::NodeId;
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
     // Build a 3-node genome: entry=0 -> 1, node 2 is unreachable.
     // All three are VM backends so VM domain mutations can target any.
@@ -1005,9 +1000,7 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
 #[test]
 fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
     use crate::contracts::NodeId;
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
     // Build a 3-node VM genome: entry=0 -> 1, node 2 is unreachable.
     // Each node has 2 instructions so VmDeleteInstruction is always applicable.
@@ -1226,15 +1219,15 @@ fn core_and_junk_genome() -> CreatureGenome {
         input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: crate::config::OrdinaryFoodTypeId::default(),
         })],
-        backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+        backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
             register_count: 4,
             constants: vec![constant],
             program: vec![
-                crate::creature::genome::VmInstruction::LoadConst {
+                crate::genome::VmInstruction::LoadConst {
                     dst: 0,
                     const_idx: 0,
                 },
-                crate::creature::genome::VmInstruction::Halt,
+                crate::genome::VmInstruction::Halt,
             ],
         }),
         targets: target.map_or_else(Vec::new, |id| {
@@ -1348,7 +1341,7 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
 #[test]
 fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() {
     let founder = v3alpha1_founder_genome();
-    let reachable = crate::creature::genome::analysis::mesh_reachable_nodes(&founder);
+    let reachable = crate::genome::analysis::mesh_reachable_nodes(&founder);
     let all_nodes: Vec<usize> = (0..founder.nodes.len()).collect();
     assert_eq!(
         reachable, all_nodes,
@@ -1685,10 +1678,10 @@ fn an_event_with_no_eligible_node_records_no_target() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: Vec::new(),
-            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: Vec::new(),
-                program: vec![crate::creature::genome::VmInstruction::Halt],
+                program: vec![crate::genome::VmInstruction::Halt],
             }),
             targets: Vec::new(),
         }],
@@ -1855,7 +1848,7 @@ proptest::proptest! {
 
 #[test]
 fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind};
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind};
     use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);
     let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {

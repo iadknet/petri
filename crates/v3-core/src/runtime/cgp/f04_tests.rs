@@ -9,12 +9,12 @@ use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{
     Direction, InputReference, NodeId, RouteTarget, StaticIntrospectionKey, WorldAction,
 };
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::DirectedVoteKind;
-use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::vote::DirectedVoteKind;
+use crate::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::cgp::traced::execute_graph_node_traced;
 use crate::runtime::mesh::execute_creature_mesh;
@@ -109,7 +109,7 @@ fn visit_with(
     let mut memory = memory_in;
     let mut energy = energy_in;
     let mut side = MeshSideOutputs::new(4);
-    let mut state = crate::creature::genome::cgp::test_support::runtime_for(def);
+    let mut state = crate::genome::cgp::test_support::runtime_for(def);
     state.begin_tick(0);
     let result = execute_graph_node(
         def,
@@ -427,7 +427,7 @@ fn traced_zero_compute_visit_reports_its_wired_sinks() {
     let mut memory_in = [0.0; 16];
     let mut energy = 100.0;
     let mut side = MeshSideOutputs::new(4);
-    let mut state = crate::creature::genome::cgp::test_support::runtime_for(&def);
+    let mut state = crate::genome::cgp::test_support::runtime_for(&def);
     state.begin_tick(0);
     let (result, trace) = execute_graph_node_traced(
         &def,
@@ -606,7 +606,7 @@ proptest! {
 
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
-        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; crate::creature::genome::vote::VOTE_SINK_COUNT]);
+        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; crate::genome::vote::VOTE_SINK_COUNT]);
         prop_assert_eq!(visited.side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);

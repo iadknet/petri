@@ -6,7 +6,7 @@
 //! for the `Decide` guard and once at every pass end for the commit.
 
 use crate::contracts::Direction;
-use crate::creature::genome::vote::{
+use crate::genome::vote::{
     DirectedVoteKind, VoteKind, VoteSink, VoteVector, VOTE_DIRECTION_COUNT, VOTE_KIND_COUNT,
 };
 
@@ -98,7 +98,7 @@ pub fn select(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::vote::VOTE_SINK_COUNT;
+    use crate::genome::vote::VOTE_SINK_COUNT;
     use proptest::prelude::*;
 
     const N: Direction = Direction::N;

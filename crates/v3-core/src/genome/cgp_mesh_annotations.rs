@@ -9,12 +9,10 @@
 use std::collections::BTreeSet;
 
 use crate::contracts::InputReference;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNodeKind, EdgeSurface, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::mesh_annotations::{
-    classify_input_ref, MeshReadClass, MeshWriteClass,
-};
+use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass, MeshWriteClass};
 
 use super::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 
@@ -104,18 +102,16 @@ mod tests {
     use super::*;
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::WorldInputKey;
-    use crate::creature::genome::cgp::{
-        ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
-    };
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::vote::{ActionParamField, VoteSink};
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::vote::{ActionParamField, VoteSink};
 
     /// A node wired only through a group's members writes the action
     /// channel and reads its ring (T25.F03).
     #[test]
     fn a_member_only_node_is_an_action_writer() {
-        use crate::creature::genome::cgp::Shape;
-        use crate::creature::genome::vote::DirectedVoteKind;
+        use crate::genome::cgp::Shape;
+        use crate::genome::vote::DirectedVoteKind;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 5);
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);

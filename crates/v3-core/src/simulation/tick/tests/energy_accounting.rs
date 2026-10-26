@@ -140,7 +140,7 @@ fn a_charge_rounded_away_records_no_debit() {
 
 #[test]
 fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit() {
-    use crate::creature::genome::VmInstruction;
+    use crate::genome::VmInstruction;
     use crate::simulation::recording::ActiveTrace;
     for traced in [false, true] {
         let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 0.01);
@@ -255,7 +255,7 @@ fn zero_carrying_rate_keeps_exposure_and_food_lower_floor_is_observed() {
 
 #[test]
 fn rounded_compute_exhaustion_preserves_the_queued_eat_recovery() {
-    use crate::creature::genome::VmInstruction;
+    use crate::genome::VmInstruction;
     // `LoadConst`, `AddVote`, `Halt` at 0.1x cost 0.027 in `f64`, whose `f32`
     // rounds up to exactly the starting energy: the settled energy is 0.0
     // with a positive effective remainder. One action per tick, so the
@@ -363,12 +363,10 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
 
 /// One Graph node whose single compute node carries plasticity; with
 /// `reward` it is reward-modulated on `EnergyDelta`.
-fn learning_genome(reward: bool) -> crate::creature::genome::CreatureGenome {
+fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
-    };
-    use crate::creature::genome::{
+    use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
         RewardModulationConfig,
     };
@@ -380,29 +378,27 @@ fn learning_genome(reward: bool) -> crate::creature::genome::CreatureGenome {
             targets: vec![],
             backend_def: BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(vec![
-                        crate::creature::genome::cgp::test_support::plastic_node(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![GraphEdge::new(
-                                GraphSource::SharedMemory {
-                                    slot: 0,
-                                    previous: false,
-                                },
-                                0.5,
-                            )],
-                            Some(PlasticityConfig {
-                                rule: HebbianRule::Classic,
-                                learning_rate: 0.5,
-                                weight_clamp: 2.0,
-                                lamarckian: false,
-                                modulation: reward.then_some(RewardModulationConfig {
-                                    reward_source: OutcomeChannel::EnergyDelta,
-                                    trace_decay: 0.5,
-                                }),
-                                retention: 1.0,
+                    .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                        ComputeNodeKind::Constant(1.0),
+                        vec![GraphEdge::new(
+                            GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            0.5,
+                        )],
+                        Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 2.0,
+                            lamarckian: false,
+                            modulation: reward.then_some(RewardModulationConfig {
+                                reward_source: OutcomeChannel::EnergyDelta,
+                                trace_decay: 0.5,
                             }),
-                        ),
-                    ])
+                            retention: 1.0,
+                        }),
+                    )])
                     .with_output_sinks(vec![]),
             ),
         }],
@@ -451,12 +447,12 @@ fn reward_phase_zero_floor_reaches_only_reward_learners_with_an_outcome_bank() {
 
 /// One Graph node with no compute node whose one `Eat` vote edge reads
 /// shared memory and is reward-modulated on `EnergyDelta` (T25.F06).
-fn sink_learning_genome() -> crate::creature::genome::CreatureGenome {
-    use crate::creature::genome::cgp::{
+fn sink_learning_genome() -> crate::genome::CreatureGenome {
+    use crate::genome::cgp::{
         CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, OutputSinkKind,
     };
-    use crate::creature::genome::vote::VoteSink;
-    use crate::creature::genome::{
+    use crate::genome::vote::VoteSink;
+    use crate::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
     let mut genome = learning_genome(true);

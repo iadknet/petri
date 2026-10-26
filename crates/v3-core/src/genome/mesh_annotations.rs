@@ -206,12 +206,12 @@ mod tests {
     use super::*;
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{DynamicIntrospectionKey, InputReference, RouteTarget};
-    use crate::creature::genome::analysis::mesh_reachable_nodes;
-    use crate::creature::genome::cgp::{
+    use crate::genome::analysis::mesh_reachable_nodes;
+    use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::creature::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+    use crate::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
     fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
         ids.into_iter()

@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn genome_size_single_graph_node() {
-        use crate::creature::genome::cgp::{
+        use crate::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         // 1 node + 1 input_ref + 0 targets + 2 compute_nodes + (1 + 2) compute edges = 7
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn genome_size_multi_node_mixed() {
-        use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
+        use crate::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
         // Node 0 (VM): 1 + 0 inputs + 1 target + 1 program + 0 constants = 3
         // Node 1 (Graph): 1 + 1 input + 0 targets + 1 compute_node + 0 edges = 3
         // Total = 6
@@ -873,10 +873,8 @@ mod tests {
     /// A two-node genome with all three action-parameter fields wired by a
     /// Graph node and written by a VM node (T11.F27).
     fn all_param_fields_genome() -> CreatureGenome {
-        use crate::creature::genome::cgp::{
-            CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind,
-        };
-        use crate::creature::genome::vote::ActionParamField;
+        use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+        use crate::genome::vote::ActionParamField;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         for (i, field) in ActionParamField::ALL.into_iter().enumerate() {
             let surface = graph
@@ -1047,7 +1045,7 @@ mod tests {
         // - ref_idx 2 → 1 (decremented)
         // - no edge is removed
 
-        use crate::creature::genome::cgp::{
+        use crate::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         let leaf = |ref_idx, sub_idx| GraphSource::InputLeaf { ref_idx, sub_idx };

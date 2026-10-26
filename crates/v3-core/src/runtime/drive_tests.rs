@@ -4,7 +4,7 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, WorldAction};
-use crate::creature::genome::vote::{DirectedVoteKind, VoteKind, VoteSink};
+use crate::genome::vote::{DirectedVoteKind, VoteKind, VoteSink};
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::vote_test_support::{genome, run_tick_heading, vm_voter, GraphBuilder, Senses};
 

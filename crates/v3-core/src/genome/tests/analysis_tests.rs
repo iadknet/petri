@@ -3,11 +3,11 @@ use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
     WorldInputKey,
 };
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef};
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef};
 use rand::SeedableRng;
 use std::collections::BTreeSet;
 

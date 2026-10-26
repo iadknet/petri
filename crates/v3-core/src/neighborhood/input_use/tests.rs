@@ -7,11 +7,11 @@ use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldInputKey,
 };
 use crate::creature::founder::founder_genome;
-use crate::creature::genome::cgp::{
+use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::VoteSink;
-use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::genome::vote::VoteSink;
+use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
 const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
 
@@ -44,7 +44,7 @@ fn graph_node(
 ) -> NodeGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def = def.with_compute_nodes(compute);
-    crate::creature::genome::cgp::test_support::set_sink_inputs(&mut def, sink, edges);
+    crate::genome::cgp::test_support::set_sink_inputs(&mut def, sink, edges);
     NodeGenome {
         node_id: NodeId::new(id),
         input_refs: refs,
@@ -633,8 +633,8 @@ proptest! {
 /// read whenever its node's effects pass runs (T25.F03).
 #[test]
 fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
-    use crate::creature::genome::cgp::Shape;
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::Shape;
+    use crate::genome::vote::DirectedVoteKind;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
@@ -655,8 +655,8 @@ fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
 /// from its group's ring (T25.F03).
 #[test]
 fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() {
-    use crate::creature::genome::cgp::{GraphSource, Shape};
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::{GraphSource, Shape};
+    use crate::genome::vote::DirectedVoteKind;
     let refs = vec![barriers(), food_here(), barriers()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
     let BackendDef::Graph(def) = &mut node.backend_def else {
@@ -715,8 +715,8 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
 /// bitwise: the pattern resolves from the group's reference (T25.F04).
 #[test]
 fn masking_a_pair_reference_zeroes_every_member_read() {
-    use crate::creature::genome::cgp::GraphSource;
-    use crate::creature::genome::vote::DirectedVoteKind;
+    use crate::genome::cgp::GraphSource;
+    use crate::genome::vote::DirectedVoteKind;
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let refs = vec![area.clone(), food_here()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);

@@ -5,8 +5,8 @@
 use serde::{Deserialize, Serialize};
 use v3_core::creature::drives::{DriveCensus, KindDrives, DRIVES_VERSION};
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::creature::genome::analysis::mesh_reachable_nodes;
-use v3_core::creature::genome::vote::DirectedVoteKind;
+use v3_core::genome::analysis::mesh_reachable_nodes;
+use v3_core::genome::vote::DirectedVoteKind;
 
 use super::schema::Indicator;
 use crate::UNDEFINED;

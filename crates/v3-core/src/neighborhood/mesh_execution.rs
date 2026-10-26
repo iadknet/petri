@@ -4,7 +4,7 @@ use super::{Battery, Signature};
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
 use crate::contracts::WorldAction;
-use crate::creature::genome::{
+use crate::genome::{
     analysis::{mesh_cycle_nodes, mesh_reachable_nodes},
     BackendDef, CreatureGenome,
 };
@@ -418,17 +418,15 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{NodeId, RouteTarget};
-    use crate::creature::genome::vote::DirectedVoteKind;
-    use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-    };
+    use crate::genome::vote::DirectedVoteKind;
+    use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::neighborhood::Battery;
     use proptest::prelude::*;
 
     /// A halting node; with `action`, it votes `Eat` 1.0 and `Decide` 1.0,
     /// so the pass that commits the `Eat` ends at it.
     fn node(id: u32, targets: &[u32], action: bool) -> NodeGenome {
-        use crate::creature::genome::vote::VoteSink;
+        use crate::genome::vote::VoteSink;
         NodeGenome {
             node_id: NodeId::new(id),
             input_refs: vec![],
@@ -482,8 +480,7 @@ mod tests {
             let mut silent = node(0, &[1], false);
             let mut unreachable = node(2, &[], false);
             if graph {
-                let blank =
-                    crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
+                let blank = crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
                 silent.backend_def = BackendDef::Graph(blank.clone());
                 unreachable.backend_def = BackendDef::Graph(blank);
             }
@@ -500,7 +497,7 @@ mod tests {
     #[test]
     fn graph_bus_producer_contributes_to_snapshot_actions() {
         use crate::contracts::{InputReference, WorldInputKey};
-        use crate::creature::genome::cgp::{
+        use crate::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
             OutputSinkKind,
         };
@@ -1047,7 +1044,7 @@ mod tests {
     #[test]
     fn graph_and_vm_memory_producers_and_sequence_only_effects_contribute() {
         use crate::contracts::{InputReference, WorldInputKey};
-        use crate::creature::genome::cgp::{
+        use crate::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
             OutputSinkKind,
         };
@@ -1161,8 +1158,7 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    field_idx: crate::creature::genome::vote::ActionParamField::StealEffort.index()
-                        as u8,
+                    field_idx: crate::genome::vote::ActionParamField::StealEffort.index() as u8,
                     src: 0,
                 },
                 VmInstruction::LoadConst {
@@ -1170,11 +1166,8 @@ mod tests {
                     const_idx: 0,
                 },
                 VmInstruction::AddVote {
-                    sink: crate::creature::genome::vote::VoteSink::Directed(
-                        DirectedVoteKind::StealEnergy,
-                        0,
-                    )
-                    .index() as u8,
+                    sink: crate::genome::vote::VoteSink::Directed(DirectedVoteKind::StealEnergy, 0)
+                        .index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,
@@ -1210,7 +1203,7 @@ mod tests {
             for graph_parity in [0, 1] {
             let g = genome(targets.iter().enumerate().map(|(i,t)| {
                 let mut n = node(i as u32,t,false);
-                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()); }
+                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()); }
                 n
             }).collect());
             let before = g.clone();

@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::RuntimeConfig;
-use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;

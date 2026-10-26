@@ -1,9 +1,9 @@
 //! Passive trace-domain data structures for the Execution Sampler.
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
-use crate::creature::genome::cgp::ComputeNodeKind;
-use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_KIND_COUNT};
-use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
+use crate::genome::cgp::ComputeNodeKind;
+use crate::genome::vote::{VoteSink, VoteVector, VOTE_KIND_COUNT};
+use crate::genome::OUTCOME_CHANNEL_COUNT;
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
@@ -236,7 +236,7 @@ pub struct VmTrace {
 #[derive(Debug, Clone, Serialize)]
 pub struct VmStepTrace {
     pub pc: usize,
-    pub instruction: crate::creature::genome::VmInstruction,
+    pub instruction: crate::genome::VmInstruction,
     pub energy_cost: f32,
     pub energy_after: f32,
     pub register_changes: Vec<(u8, f32)>,
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn kind_label_covers_all_variants() {
-        use crate::creature::genome::cgp::ComputeNodeKind;
+        use crate::genome::cgp::ComputeNodeKind;
 
         assert_eq!(kind_label(&ComputeNodeKind::Constant(1.0)), "Constant");
         assert_eq!(kind_label(&ComputeNodeKind::Add), "Add");

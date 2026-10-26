@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use v3_core::creature::genome::sensor_analysis::{sensor_census, DecisionInputKey};
 use v3_core::creature::sensor_census::world_input_key_label;
+use v3_core::genome::sensor_analysis::{sensor_census, DecisionInputKey};
 use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 
 /// The applied-behavior integer sums of

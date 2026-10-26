@@ -6,7 +6,7 @@
 
 use rayon::prelude::*;
 use v3_core::config::SimulationConfig;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::genome::CreatureGenome;
 
 use crate::eval::{evaluate_genome, evaluate_scripted, SceneScore, Scoring, Scripted, Setup};
 use crate::rng::{hash, stream, Part};

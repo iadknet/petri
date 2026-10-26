@@ -11,11 +11,11 @@ use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputK
 use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::vm_decision_founder_genome;
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction, VoteSink,
-};
 use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
+use crate::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction, VoteSink,
+};
 use crate::ledger::DeathCause;
 use crate::runtime::traced_mesh::TruncationReason;
 use crate::simulation::recording::TickReserve;
@@ -582,8 +582,7 @@ fn steal_north_genome() -> CreatureGenome {
                         const_idx: 1,
                     },
                     VmInstruction::WriteActionParam {
-                        field_idx: crate::creature::genome::vote::ActionParamField::StealEffort
-                            .index() as u8,
+                        field_idx: crate::genome::vote::ActionParamField::StealEffort.index() as u8,
                         src: 1,
                     },
                     VmInstruction::AddVote { sink: 17, src: 0 },
@@ -597,7 +596,7 @@ fn steal_north_genome() -> CreatureGenome {
 
 /// Gives to the north neighbour at the unwired effort modifier 1 (T27.F03).
 fn give_north_genome() -> CreatureGenome {
-    let sink = crate::creature::genome::vote::DirectedVoteKind::GiveEnergy
+    let sink = crate::genome::vote::DirectedVoteKind::GiveEnergy
         .sink(0)
         .index() as u8;
     vm_program_genome(vec![
