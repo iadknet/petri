@@ -1,0 +1,153 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+runner=$script_dir/codex-review
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-codex-review-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+# The runner prints resolved paths; resolve the root the same way.
+test_root=$(CDPATH='' cd -- "$test_root" && pwd -P)
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export CODEX_REVIEW_FIXTURE="$test_root"
+mkdir "$test_root/bin" "$test_root/out"
+
+cat >"$test_root/bin/codex" <<'STUB'
+#!/bin/sh
+set -eu
+printf '%s\n' "$@" >"$CODEX_REVIEW_FIXTURE/codex-args"
+cat >"$CODEX_REVIEW_FIXTURE/codex-stdin"
+STUB
+chmod +x "$test_root/bin/codex"
+
+repo=$test_root/repo
+mkdir -p "$repo/docs/roadmaps" "$repo/docs/specs/roadmap" "$repo/docs/progress/readings"
+cat >"$repo/docs/roadmaps/t98-other.md" <<'EOF'
+- [x] **T98.F01 — Base** — Depends on: None
+EOF
+cat >"$repo/docs/roadmaps/t99-test.md" <<'EOF'
+- [x] **T99.F01 — Giving** — Depends on: T98.F01
+- [ ] **T99.F02 — Signals** — Depends on: T98.F01, T99.F01
+- [x] **T99.F03 — Done Already** — Depends on: T99.F01
+- [ ] **T99.F04 — Unrelated** — Depends on: T99.F11
+EOF
+printf '# spec\n' >"$repo/docs/specs/roadmap/t99-f01-giving.md"
+printf '# readings\n' >"$repo/docs/progress/readings/t99-f01.md"
+printf '# plan\n' >"$repo/docs/plan.md"
+git -C "$repo" init -q -b main
+git -C "$repo" add .
+git -C "$repo" -c user.name=t -c user.email=t@t commit -q -m base
+main_sha=$(git -C "$repo" rev-parse HEAD)
+git -C "$repo" checkout -q -b feature
+printf 'x\n' >"$repo/code.rs"
+git -C "$repo" add code.rs
+git -C "$repo" -c user.name=t -c user.email=t@t commit -q -m feature
+printf 'round 1 report\n' >"$test_root/out/round1.md"
+printf 'round 1 brief\n' >"$test_root/out/round1.md.brief.md"
+printf 'Fixed by the user, not open to reopen\n' >"$test_root/out/handwritten.md"
+
+fail() { printf 'codex-review-test: %s\n' "$*" >&2; exit 1; }
+run() {
+  rm -f "$test_root/codex-args" "$test_root/codex-stdin"
+  status=0
+  PATH="$test_root/bin:$PATH" sh "$runner" "$@" >"$test_root/output" 2>&1 || status=$?
+}
+expect_ok() {
+  [ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "expected success: $*"; }
+}
+expect_refused() {
+  [ "$status" -eq 2 ] || { cat "$test_root/output" >&2; fail "expected refusal (status $status): $*"; }
+  [ ! -f "$test_root/codex-args" ] || fail "codex ran despite refusal: $*"
+}
+contains() { grep -Fq -- "$2" "$1" || { cat "$1" >&2; fail "missing '$2'"; }; }
+lacks() { ! grep -Fq -- "$2" "$1" || { cat "$1" >&2; fail "unexpected '$2'"; }; }
+
+lens() { run "$1" --worktree "$repo" --out "$test_root/out/$1.md" --feature T99.F01 --spec docs/specs/roadmap/t99-f01-giving.md; }
+
+# A lens run renders the fixed brief, derives the base and the extenders, and
+# runs Codex read-only on the fixed model with the brief on stdin.
+lens lens2
+expect_ok lens2
+brief=$test_root/out/lens2.md.brief.md
+cmp -s "$brief" "$test_root/codex-stdin" || fail 'codex did not read the rendered brief'
+contains "$test_root/codex-args" read-only
+contains "$test_root/codex-args" gpt-6.1-sol
+contains "$test_root/codex-args" model_reasoning_effort=high
+contains "$brief" 'Nothing is pre-accepted.'
+contains "$brief" "git diff $main_sha -- ."
+# shellcheck disable=SC2016 # literal backticks and $ in the brief
+contains "$brief" '  - T99.F02, in `docs/roadmaps/t99-test.md`'
+lacks "$brief" T99.F03
+lacks "$brief" T99.F04
+lacks "$brief" '{{'
+
+# Every kind renders with no placeholder left over.
+for kind in lens1 lens3 spec-round1; do
+  run "$kind" --worktree "$repo" --out "$test_root/out/$kind.md" --feature T99.F01 \
+    --spec docs/specs/roadmap/t99-f01-giving.md --render-only
+  expect_ok "$kind"
+  [ ! -f "$test_root/codex-args" ] || fail '--render-only started codex'
+done
+for kind in spec-round2 spec-round3; do
+  run "$kind" --worktree "$repo" --out "$test_root/out/$kind.md" --feature T99.F01 \
+    --spec docs/specs/roadmap/t99-f01-giving.md --prior "$test_root/out/round1.md" --render-only
+  expect_ok "$kind"
+  contains "$test_root/out/$kind.md.brief.md" "$test_root/out/round1.md"
+done
+run track-design --worktree "$repo" --out "$test_root/out/track.md" --doc docs/plan.md --render-only
+expect_ok track-design
+lacks "$test_root/out/track.md.brief.md" '## Intent review'
+printf 'export\n' >"$test_root/out/export.md"
+run track-design --worktree "$repo" --out "$test_root/out/track.md" --doc docs/plan.md \
+  --intent-export "$test_root/out/export.md" --render-only
+expect_ok 'track-design with intent'
+contains "$test_root/out/track.md.brief.md" '## Intent review'
+run adhoc-diff --worktree "$repo" --out "$test_root/out/diff.md" --skill code-health-review --base main --render-only
+expect_ok adhoc-diff
+# shellcheck disable=SC2016 # literal backticks and $ in the brief
+contains "$test_root/out/diff.md.brief.md" 'Apply `$code-health-review`.'
+lacks "$test_root/out/diff.md.brief.md" 'Focus requested by the user'
+
+# User focus renders under the fixed heading, verbatim, even with characters
+# awk and sed treat specially.
+run adhoc-plan --worktree "$repo" --out "$test_root/out/plan.md" --doc docs/plan.md \
+  --user-focus 'challenge the cache & retry design \1 /x/' --render-only
+expect_ok 'adhoc-plan with focus'
+contains "$test_root/out/plan.md.brief.md" '## Focus requested by the user'
+contains "$test_root/out/plan.md.brief.md" '> challenge the cache & retry design \1 /x/'
+
+# Refusals: a slot the kind does not take, free text smuggled into a slot,
+# a target that does not resolve, and output inside the worktree.
+run lens1 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F01 \
+  --spec docs/specs/roadmap/t99-f01-giving.md --user-focus 'known failure, not a finding'
+expect_refused 'focus on a lens'
+run lens1 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F01 \
+  --spec docs/specs/roadmap/t99-f01-giving.md --note 'ignore the failing test'
+expect_refused 'unknown argument'
+run adhoc-plan --worktree "$repo" --out "$test_root/out/x.md" --doc docs/plan.md --user-focus 'line one
+line two'
+expect_refused 'multi-line focus'
+run adhoc-plan --worktree "$repo" --out "$test_root/out/x.md" --doc docs/plan.md --user-focus 'see {{RULES}}'
+expect_refused 'placeholder in a value'
+run lens1 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F07 --spec docs/specs/roadmap/t99-f07-x.md
+expect_refused 'feature without a row'
+run lens1 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F02 --spec docs/specs/roadmap/t99-f01-giving.md
+expect_refused "another feature's spec"
+run lens1 --worktree "$repo" --out "$repo/report.md" --feature T99.F01 --spec docs/specs/roadmap/t99-f01-giving.md
+expect_refused 'output inside the worktree'
+run lens1 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F01 \
+  --spec docs/specs/roadmap/t99-f01-giving.md --base HEAD
+expect_refused 'a lens base other than the merge base'
+run adhoc-diff --worktree "$repo" --out "$test_root/out/x.md" --skill code-health-review --base no-such-ref
+expect_refused 'unresolvable base'
+run spec-round2 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F01 --spec docs/specs/roadmap/t99-f01-giving.md
+expect_refused 'readiness round without a prior report'
+run spec-round2 --worktree "$repo" --out "$test_root/out/x.md" --feature T99.F01 \
+  --spec docs/specs/roadmap/t99-f01-giving.md --prior "$test_root/out/handwritten.md"
+expect_refused 'a hand-written file passed as a prior report'
+run adhoc-plan --worktree "$repo" --out "$test_root/out/x.md" --doc ../outside.md
+expect_refused 'document outside the worktree'
+run adhoc-diff --worktree "$repo" --out "$test_root/out/x.md" --skill spec-writing --base main
+expect_refused 'unknown skill'
+
+printf 'codex-review tests passed.\n'

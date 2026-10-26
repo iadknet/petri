@@ -41,7 +41,7 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
 - Read `docs/architecture.md`, the desired state, and fill the spec's
   Architecture paragraph as the workflow's "Architecture" paragraph defines,
   edit `docs/architecture.md` when the feature changes the desired
-  architecture, and name that file in every Codex challenge brief.
+  architecture; every challenge template names that file.
 - Read each document once and work from what you read. When a Bash result is
   spilled to a `tool-results/*.txt` file, re-run the command narrowed rather
   than reading the saved file, and never read the same spilled file twice.
@@ -57,11 +57,13 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   independent validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
   defines it: a `plan-design-review` design round (all six checks, its
-  coverage section required, your `refactor-audit` table supplied for check 6
-  to test), then `spec-review`
-  readiness rounds, up to three rounds in all, each a fresh read-only Codex Sol `high`
-  `codex exec` job started in the background, with the
-  brief written outside the worktree. Answer every blocking finding with a
+  coverage section required, your `refactor-audit` table written to the
+  readings file first for check 6 to test), then `spec-review`
+  readiness rounds, up to three rounds in all, each a fresh job started in the
+  background with `scripts/codex-review spec-round<N>`. You fill only its
+  target slots and write no brief text: what you know or believe about your
+  spec goes into the spec or the readings file, where the challenger tests it,
+  never into its prompt. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the
   requirement, or the code — not in your own authorship — except the
   workflow's user-owned findings, which you report instead. Record every round's

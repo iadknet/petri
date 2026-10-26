@@ -46,25 +46,38 @@ is caught by `make check`.
 The benchmark specialist never runs alongside competing builds, tests,
 servers, or measurements.
 
-**Codex channel.** Both Codex roles run as read-only `codex exec` jobs on
-CLI 0.159.1 or later, called directly: the `openai-codex` plugin's companion
-script goes through a broker shared with other sessions that may run an older
-CLI which rejects `gpt-6.1-sol`, and that broker must not be killed. Write each
-brief to a file outside the worktree (the session scratchpad or `mktemp`) so it
-never appears in the diff, and name an output file beside it. A Codex job can
-outlast the 600-second Bash limit, so start it with the Bash tool's
-`run_in_background` and read the output file when it completes:
+**Codex channel.** Every Codex review, whether a spec challenge round, a final
+lens, a track design review or an ad hoc review, runs through
+`scripts/codex-review`. The script renders a fixed brief from
+[`docs/review-prompts/`](review-prompts/) and runs it as a fresh read-only
+`codex exec` job on `gpt-6.1-sol` at `high`. It calls CLI 0.159.1 or later
+directly, because the `openai-codex` plugin's companion script goes through a
+broker shared with other sessions that may run an older CLI which rejects
+`gpt-6.1-sol`, and that broker must not be killed. The requester names only the
+review kind and its targets (feature ID, worktree, spec, documents, earlier
+reports) and writes no brief text. A reviewer is only independent if the
+requester's assumptions never reach it. The requester judges findings after
+the review, never before it: a known failure, an accepted exception or a
+decision it thinks is settled is never mentioned to the reviewer, and is
+dispositioned against the report instead. A user decision reaches the reviewer
+only through the source quotes the rows and design notes record. To change
+what a review checks, edit its template in a commit of its own, never per run.
+`--user-focus`, on ad hoc reviews only, carries focus the user asked for in
+their own words and nothing else. The script writes the brief to
+`<out>.brief.md` and the report to `<out>`, both outside the worktree so they
+never appear in the diff. A Codex job can outlast the 600-second Bash limit,
+so start it with the Bash tool's `run_in_background` and read the report when
+it completes:
 
 ```sh
-codex exec --skip-git-repo-check -s read-only -m gpt-6.1-sol \
-  -c model_reasoning_effort=high -C "$WORKTREE" -o "$OUT" - < "$BRIEF"
+scripts/codex-review lens1 --worktree "$WORKTREE" --out "$OUT" \
+  --feature TNN.FNN --spec docs/specs/roadmap/tnn-fnn-<slug>.md
 ```
 
 Report the output file's path, so another session can read the verdict. If a
 job fails with a usage limit, mark the review pending and retry later.
-Every brief states that the sandbox is read-only and that Codex must not edit
-files or run `cargo`, `make`, or benchmarks. Every round is a fresh `codex exec`; never
-resume a previous session, which carries a stale spec or diff forward. The plugin's optional
+Every round is a fresh job; never resume a previous session, which carries a
+stale spec or diff forward. The plugin's optional
 stop-time review gate is independent of this workflow; when enabled it adds a
 Codex review at every orchestrator stop and can block the stop. Route any
 finding it raises on feature code through the implementer or the spec owner as
@@ -96,24 +109,24 @@ file records no current answer.
 
 **Plan a track or master change.** Before committing new, re-scoped or
 reordered rows in a track roadmap or `docs/roadmap.md`, or a change to a
-feature's dependencies or to the master's priority order, run one fresh read-only
-Codex Sol `high` job through the Codex channel applying `$plan-design-review` to
-the changed rows and any design note they cite, with all six of the skill's
-checks and its coverage section, and with
-[`docs/architecture.md`](architecture.md) named in the brief as the desired
-state the rows are checked against. Rows that change the desired
+feature's dependencies or to the master's priority order, run
+`scripts/codex-review track-design` with each changed roadmap file and any
+design note the rows cite as a `--doc`. Its template applies
+`$plan-design-review` with all six of the skill's checks and its coverage
+section, against [`docs/architecture.md`](architecture.md) as the desired
+state. Rows that change the desired
 architecture edit that file in the same commit; a known debt no row pays is
 proposed to the user, never added as a row silently. Changes to the
 requirements in a cited design note also trigger this review. The same job
-reviews intent: give it an export, outside the repository, of the
-conversations that established or changed the affected requirements,
+reviews intent: pass `--intent-export` an export, outside the repository, of
+the conversations that established or changed the affected requirements,
 keeping speakers, session and turn locators, answered option text and the
-proposal each answer accepted, without routine tool output. In an Intent
-section of the readings file it reconciles each distinct user goal, premise
-and decision with its owning row or design-note requirement by a short
-source quote, checks that the planned behavior reaches the code routes the
-requirement covers, verifies material assistant claims about the code, and
-separates user choices from planner or reviewer proposals. Record the coverage table, findings and
+proposal each answer accepted, without routine tool output. Its Intent
+section reconciles each distinct user goal, premise and decision with its
+owning row or design-note requirement by a short source quote, checks that
+the planned behavior reaches the code routes the requirement covers,
+verifies material assistant claims about the code, and separates user
+choices from planner or reviewer proposals. Record the Intent section, the coverage table, findings and
 dispositions in `docs/progress/readings/<track>-design-review.md`, as T25 did. Upheld
 `step-back:` and premise findings, missing or contradicted goals, ambiguous
 intent and proposed tradeoffs go to the user before the rows are committed;
@@ -210,8 +223,7 @@ the spec to `In Progress`, promotes a `Planned` track and a `Planning` master,
 and runs `make roadmap-check`. Verify its report against the files — the spec
 exists, the statuses moved, the checker passed — read the final challenge
 round's output file, and commit the plan
-only when round 2 or later has run and its verdict is `ready` or every open
-blocking finding carries a rebuttal that round accepted.
+only when round 2 or later has run and its verdict is `ready`.
 
 **Architecture.** [`docs/architecture.md`](architecture.md) is the desired
 state of the system. The spec owner reads it and writes the spec's short
@@ -223,7 +235,7 @@ view, explaining any separate policy or retained debt. A feature that changes th
 architecture edits that file in the plan commit. A feature may leave a debt
 another row owns in place without taking on that row's scope; when it must
 use that debt anyway, the paragraph says so and why. Every challenge round's
-brief names the file.
+template names the file.
 
 **Preparatory refactoring.** While writing the spec, the spec owner applies
 `$refactor-audit` in preparatory mode to the modules the feature will change,
@@ -240,22 +252,25 @@ change, and stops; the prerequisite then runs as its own feature before this
 one resumes.
 
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
-Codex Sol `high` job through the Codex channel, whose brief names the spec
-path, the original requirement, the roadmap contract, the feature's track row,
-dependency rows, matching Notes entries, and the feature's source-quoted
-requirements from its row and cited design note. Round 1 is the design round: it
+job through the Codex channel: `scripts/codex-review spec-round1`,
+`spec-round2` and `spec-round3`, with the feature ID, the worktree and the
+spec, and from round 2 on the earlier rounds' reports as `--prior`. The
+templates name the inputs: the original requirement, the roadmap contract,
+the feature's track row, dependency rows, matching Notes entries, and the
+feature's source-quoted requirements from its row and cited design note. Round 1 is the design round: it
 applies `$plan-design-review` only and runs all six of its checks, namely code
 decomposition, task decomposition, domain boundaries and separation of concerns,
 outdated or never-correct premises, a larger design flaw (step back), and
 workarounds that should be refactors. Checks 3 and 5 run against
 `docs/architecture.md`: the round reports a leaky abstraction, coupling the
 file forbids, a design decision that means it should change, and a missing
-edit to it. The brief supplies the spec owner's
-`$refactor-audit` table for check 6 to test, not to trust, and requires the
-skill's full report: the coverage section, with one line per check naming what
-was examined, any `step-back:` lines, the assumptions and workaround tables, and
-the `Could not verify:` list; the brief overrides only the severity labels
-(`blocking:` and `advisory:`) and adds the verdict line. A round-1 output that
+edit to it. Before round 1 the spec owner writes its
+`$refactor-audit` table to `docs/progress/readings/<id>.md`, which round 1
+tests for check 6 rather than trusts. Round 1 returns the skill's full report:
+the coverage section, with one line per check naming what was examined, any
+`step-back:` lines, the assumptions and workaround tables, and the
+`Could not verify:` list, with `blocking:` and `advisory:` in place of the
+skill's severity labels and a verdict line. A round-1 output that
 lacks a check's coverage line is incomplete: the spec owner replaces it with a
 fresh round-1 job, which does not count as a round, rather than dispositioning
 it.
@@ -268,18 +283,27 @@ tested, claims about current code that the code does not support, missing
 invariants and edge cases, determinism, the natural-analog rule, an unrealistic
 Performance predeclaration, a Verification Plan the change does not fit, and
 requirements that steer toward needless complexity. Round 3 confirms round 2's
-fixes. Each finding is `blocking` or `advisory`, cites the spec section and the
-evidence, and proposes a concrete change. The brief dictates the output format:
-one line per finding starting `blocking:` or `advisory:`, then a final line
-`verdict: ready` or `verdict: not-ready`; round 1 adds the skill's assumptions
-table.
+fixes. Each finding is `blocking`, where the round's skill would grade it P1,
+or `advisory`, where it would grade it P2 or P3. It cites the spec section and
+the evidence, proposes a concrete change, and ends `[verified]` when the
+reviewer checked it against the code, the documents or stored output, or
+`[plausible]` when it is reasoned but not confirmed. A `[plausible]` finding is
+open to a rebuttal that shows the code or documents say otherwise. The templates
+fix the output format: one line per finding starting `blocking:` or
+`advisory:`, then a final line `verdict: ready` or `verdict: not-ready`; round 1
+adds the skill's assumptions table. The verdict follows from the findings, not
+from a separate judgment: `ready` exactly when the round reports no blocking
+finding and rejects no disposition of a blocking one. A report with no findings
+is valid when its coverage shows the work.
 
 The spec owner answers every blocking finding by editing the spec or writing a
 one-sentence rebuttal grounded in the roadmap row, the requirement, or the
-code, except for the user-owned findings below. Rounds 2 and 3 carry the
-previous findings and their dispositions and ask Codex to confirm the fixes,
-accept or reject each rebuttal, and, in round 3, report only new blocking
-findings. The loop ends, from round 2 on, at a `ready` verdict or when no
+code, except for the user-owned findings below. Rounds 2 and 3 read the
+previous findings and their dispositions from the readings file, which the
+spec owner updates before each round, and the earlier reports; they confirm the
+fixes, accept or reject each rebuttal as the spec owner's argument rather than
+a settled fact, and, in round 3, report only new blocking findings. The loop
+ends, from round 2 on, at a `ready` verdict, which by its definition means no
 blocking finding remains that Codex upholds. A blocking finding Codex
 still upholds after round 3, or a new one first raised in round 3, is an
 unresolved requirement: the spec owner reports it, and it follows the blocker
@@ -395,31 +419,27 @@ Codex channel, started together, one lens skill each. The skills live in
 `~/.agents/skills/`, where Codex loads them by name; they are user-level, so a
 host without them cannot run this step:
 
-| Lens | Skill | The brief adds |
+| Lens | Skill | Template |
 | --- | --- | --- |
-| Correctness | `$adversarial-code-review` | lens 1; the spec sections Goal, Inputs and Invariants, Architecture, Telemetry, Verification, and the Performance predeclaration when the feature is subject to it; the Review section of this file |
-| Design | `$architecture-review` | lens 2; the spec's Goal, Inputs and Invariants, and Architecture sections; `docs/architecture.md` |
-| Code health | `$code-health-review` | lens 3; the spec's Goal section and its `Decision:` and `Deferred:` notes |
+| Correctness | `$adversarial-code-review` | `lens1`: the spec sections Goal, Inputs and Invariants, Architecture, Telemetry, Verification, and the Performance predeclaration when the feature is subject to it; the Review section of this file |
+| Design | `$architecture-review` | `lens2`: the spec's Goal, Inputs and Invariants, and Architecture sections; `docs/architecture.md` |
+| Code health | `$code-health-review` | `lens3`: the spec's Goal section and its `Decision:` and `Deferred:` notes |
 
-Each brief also names `.claude/agents/roadmap-reviewer.md` as the project
-checklist, ignoring its front matter, and its lens section there. The design
-and code-health briefs name any later roadmap feature expected to extend the
-touched code, since their P2 test depends on it and they do not read the
-roadmap.
-
-Every brief gives the worktree path, the feature ID and the spec path, and
-asks for one finding per line starting `P1:`, `P2:`, or `P3:` with file, line,
-issue, and smallest fix, followed by what it could not verify. The design and
-code-health briefs also require their skill's coverage section, one line per
-check with what was examined, listed first; the design brief also allows
-ungraded `step-back:` and `architecture:` lines after it. A report missing a coverage line is
-incomplete and that lens is rerun. The design and
-code-health briefs tell Codex to start from the diff's code hunks and not to
-read the touched `docs/` files other than `docs/architecture.md` (the design
-lens reads its worktree copy), the workflow documents, the roadmap row or the
-telemetry template: those are the correctness lens's inputs,
-and reading them in every job multiplies the cost. No reviewer edits, runs
-builds or tests, or consults the spec owner. Do not reuse a spec challenge
+Run each as `scripts/codex-review <template> --worktree <worktree> --out <file>
+--feature <id> --spec <spec>`. The templates diff against the merge base with
+`main`, name `.claude/agents/roadmap-reviewer.md` and its lens section as the
+project checklist, and fix the report format: one finding per line starting
+`P1:`, `P2:`, or `P3:` with file, line, issue, and smallest fix, then what the
+reviewer could not verify. The design and code-health reports list their
+skill's coverage section first, one line per check with what was examined, and
+the design report may add ungraded `step-back:` and `architecture:` lines after
+it. A report missing a coverage line is incomplete and that lens is rerun.
+Their templates also list the later features whose rows depend on this one,
+derived from the roadmap, since their P2 test depends on them; they start from
+the diff's code hunks and do not read the touched `docs/` files other than
+`docs/architecture.md`, the workflow documents, the roadmap row or the
+telemetry template, which are the correctness lens's inputs. No reviewer edits,
+runs builds or tests, or consults the spec owner. Do not reuse a spec challenge
 thread for a review. Quote each output file path, the findings and the
 design and code-health coverage lines in your own message.
 

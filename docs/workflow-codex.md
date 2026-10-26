@@ -221,13 +221,16 @@ sandbox, and do not bypass `scripts/bench-wait` when permission is unavailable.
 
 For final review, spawn three `roadmap_reviewer` agents together, each using
 `gpt-6-astra`, `high`, and `fork_turns: none`, one per lens of the shared
-Review contract's table. Give each the worktree/spec paths, feature ID, its
-lens skill and the inputs that table lists, and point it at
-`.claude/agents/roadmap-reviewer.md` as a checklist, ignoring its Claude
-model/tool front matter. None may edit,
+Review contract's table. Render each lens's fixed brief with
+`scripts/codex-review <lens> ... --render-only`, which writes the brief and
+prints its path without starting a Codex job. The spawn message is exactly
+`Read <brief path> and follow it; your final answer is the report.` and
+nothing else: no context, known state or excuse, as the shared "Codex channel"
+paragraph requires. No hook enforces this on spawned agents; the rule does.
+None may edit,
 run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer.
-Save each returned report to its own file outside the worktree, named for its
-lens, and quote that path in place of the shared contract's output file. Apply
+Save each returned report to the `--out` path you rendered with, outside the
+worktree, and quote that path in place of the shared contract's output file. Apply
 the existing severity rules and route remediation to the same implementer agent.
 
 Never run the benchmark specialist while another agent is running builds,

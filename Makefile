@@ -163,6 +163,7 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/quality-check
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/benchmark-artifacts.test.mjs scripts/historical-benchmarks.test.mjs scripts/telemetry-stats.test.mjs
 	@scripts/bench-wait-test
+	@sh scripts/codex-review-test
 	@sh scripts/rust-mutants-test
 	@sh scripts/rust-mutants-merge-test
 	@sh scripts/rust-mutants-ci-test

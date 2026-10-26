@@ -4,6 +4,7 @@
 - [Program roadmap](roadmap.md) (program 2 master: success definition, standing rules, priority order)
 - [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
 - [Codex adapter](workflow-codex.md) (Codex model, tool, and worktree substitutions for that contract)
+- [Review prompts](review-prompts/) (the fixed Codex review briefs `scripts/codex-review` renders; requesters fill only target slots)
 - [Roadmap contract](roadmaps/README.md)
 - [Capability lab contract](lab.md) (standing rules for `crates/v3-lab` and lab exploration runs)
 - [Roadmap templates](roadmaps/)

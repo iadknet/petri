@@ -1,0 +1,238 @@
+#!/bin/sh
+# Render a fixed review brief from docs/review-prompts/ and run it as a fresh
+# read-only Codex Sol job. The requester fills only validated target slots
+# (IDs, paths, commits); the brief text is fixed, so no assumption, excuse or
+# pre-accepted finding of the requester's can reach the reviewer.
+set -eu
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: scripts/codex-review <kind> --worktree DIR --out FILE [slots] [--render-only]
+
+  lens1 | lens2 | lens3        --feature ID --spec PATH (base: merge base with main)
+  spec-round1                  --feature ID --spec PATH
+  spec-round2 | spec-round3    --feature ID --spec PATH --prior FILE...
+  track-design                 --doc PATH... [--base REF] [--intent-export FILE]
+  adhoc-plan                   --doc PATH... [--base REF] [--user-focus TEXT]
+  adhoc-diff                   --skill NAME --base REF [--user-focus TEXT]
+
+The brief is written to FILE.brief.md and Codex's report to FILE, which must
+lie outside the worktree. --render-only writes the brief, prints its path and
+does not start Codex. --user-focus is only for focus the user asked for in
+their own words.
+EOF
+  exit 2
+}
+fail() { printf 'codex-review: %s\n' "$*" >&2; exit 2; }
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+prompts=$script_dir/../docs/review-prompts
+
+[ "$#" -gt 0 ] || usage
+kind=$1
+shift
+case "$kind" in
+  lens1|lens2|lens3) allowed='feature spec' ;;
+  spec-round1) allowed='feature spec' ;;
+  spec-round2|spec-round3) allowed='feature spec prior' ;;
+  track-design) allowed='doc base intent-export' ;;
+  adhoc-plan) allowed='doc base user-focus' ;;
+  adhoc-diff) allowed='skill base user-focus' ;;
+  *) usage ;;
+esac
+
+nl='
+'
+worktree='' out='' feature='' spec='' base='' skill='' intent='' focus=''
+docs='' priors='' given='' render_only=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --render-only) render_only=1; shift; continue ;;
+    --worktree|--out|--feature|--spec|--base|--skill|--doc|--prior|--intent-export|--user-focus) ;;
+    *) fail "unknown argument '$1'" ;;
+  esac
+  [ "$#" -ge 2 ] || fail "$1 needs a value"
+  slot=${1#--}
+  value=$2
+  shift 2
+  case "$value" in
+    '') fail "--$slot is empty" ;;
+    *"$nl"*) fail "--$slot must be one line" ;;
+    *'{{'*) fail "--$slot must not contain '{{'" ;;
+  esac
+  case " worktree out $allowed " in
+    *" $slot "*) ;;
+    *) fail "$kind does not take --$slot" ;;
+  esac
+  case "$slot" in
+    doc) docs=$docs$value$nl ;;
+    prior) priors=$priors$value$nl ;;
+    *)
+      case " $given " in *" $slot "*) fail "--$slot given twice" ;; esac
+      given="$given $slot"
+      case "$slot" in
+        worktree) worktree=$value ;;
+        out) out=$value ;;
+        feature) feature=$value ;;
+        spec) spec=$value ;;
+        base) base=$value ;;
+        skill) skill=$value ;;
+        intent-export) intent=$value ;;
+        user-focus) focus=$value ;;
+      esac
+      ;;
+  esac
+done
+
+[ -n "$worktree" ] || fail '--worktree is required'
+[ -n "$out" ] || fail '--out is required'
+worktree=$(git -C "$worktree" rev-parse --show-toplevel 2>/dev/null) || fail "--worktree is not a git checkout"
+worktree=$(CDPATH='' cd -- "$worktree" && pwd -P)
+inside_worktree() { case "$1" in "$worktree"|"$worktree"/*) return 0 ;; esac; return 1; }
+absolute_file() {
+  [ -f "$1" ] || fail "$2 does not exist: $1"
+  printf '%s/%s\n' "$(CDPATH='' cd -- "$(dirname -- "$1")" && pwd -P)" "$(basename -- "$1")"
+}
+out_dir=$(dirname -- "$out")
+[ -d "$out_dir" ] || fail "--out directory does not exist: $out_dir"
+out=$(CDPATH='' cd -- "$out_dir" && pwd -P)/$(basename -- "$out")
+! inside_worktree "$out" || fail '--out must lie outside the worktree so the brief and report never enter the diff'
+brief=$out.brief.md
+
+case " $allowed " in
+  *' feature '*)
+    [ -n "$feature" ] || fail "$kind needs --feature"
+    printf '%s\n' "$feature" | grep -Eq '^T[0-9]{2}\.F[0-9]{2}$' || fail "--feature must look like T27.F03"
+    pattern="^- \\[[ xX]\\] \\*\\*$(printf '%s' "$feature" | sed 's/\./\\./') — "
+    tracks=$(cd "$worktree" && grep -l -E "$pattern" docs/roadmaps/*.md 2>/dev/null) || true
+    [ -n "$tracks" ] || fail "$feature has no row under docs/roadmaps/"
+    case "$tracks" in *"$nl"*) fail "$feature has rows in several tracks" ;; esac
+    track=$tracks
+    stem=$(printf '%s' "$feature" | tr 'TF.' 'tf-')
+    [ -n "$spec" ] || fail "$kind needs --spec"
+    case "$spec" in
+      docs/specs/roadmap/"$stem"-*.md) ;;
+      *) fail "--spec must be docs/specs/roadmap/$stem-<slug>.md, relative to the worktree" ;;
+    esac
+    [ -f "$worktree/$spec" ] || fail "--spec does not exist in the worktree: $spec"
+    readings=docs/progress/readings/$stem.md
+    ;;
+esac
+case "$kind" in
+  spec-round*) [ -f "$worktree/$readings" ] || fail "$kind needs the readings file $readings in the worktree" ;;
+esac
+
+case "$kind" in
+  lens*) base=$(git -C "$worktree" merge-base HEAD main) || fail 'no merge base with main' ;;
+  track-design|adhoc-plan) [ -n "$base" ] || base=HEAD ;;
+  adhoc-diff) [ -n "$base" ] || fail 'adhoc-diff needs --base' ;;
+esac
+if [ -n "$base" ]; then
+  base=$(git -C "$worktree" rev-parse --verify --quiet "$base^{commit}") || fail "--base does not name a commit"
+fi
+
+doc_list=''
+if [ -n "$docs" ]; then
+  while IFS= read -r doc; do
+    [ -n "$doc" ] || continue
+    case "$doc" in /*|../*|*/../*) fail "--doc must be a path inside the worktree: $doc" ;; esac
+    [ -f "$worktree/$doc" ] || fail "--doc does not exist in the worktree: $doc"
+    doc_list="$doc_list  - \`$doc\`$nl"
+  done <<EOF
+$docs
+EOF
+fi
+case " $allowed " in *' doc '*) [ -n "$doc_list" ] || fail "$kind needs at least one --doc" ;; esac
+
+prior_list=''
+if [ -n "$priors" ]; then
+  while IFS= read -r prior; do
+    [ -n "$prior" ] || continue
+    prior=$(absolute_file "$prior" --prior)
+    # Only a report this script produced has its brief beside it, so a
+    # requester cannot pass its own prose off as an earlier round.
+    [ -f "$prior.brief.md" ] || fail "--prior is not a codex-review report (no $prior.brief.md beside it)"
+    prior_list="$prior_list  - \`$prior\`$nl"
+  done <<EOF
+$priors
+EOF
+fi
+case " $allowed " in *' prior '*) [ -n "$prior_list" ] || fail "$kind needs at least one --prior report" ;; esac
+
+if [ -n "$intent" ]; then
+  intent=$(absolute_file "$intent" --intent-export)
+  ! inside_worktree "$intent" || fail '--intent-export must lie outside the repository'
+fi
+if [ -n "$skill" ]; then
+  case "$skill" in
+    adversarial-code-review|architecture-review|code-health-review) ;;
+    *) fail '--skill must be adversarial-code-review, architecture-review or code-health-review' ;;
+  esac
+fi
+[ "${#focus}" -le 600 ] || fail '--user-focus is longer than 600 characters'
+
+# Later features whose rows depend on this one are the code's expected
+# extenders; derive them rather than let the requester choose them.
+extenders=''
+if [ -n "$feature" ]; then
+  extenders=$(cd "$worktree" && awk -v id="$feature" '
+    /^- \[ \] \*\*T[0-9][0-9]\.F[0-9][0-9] — .* — Depends on: / {
+      deps = $0
+      sub(/^.* — Depends on: /, "", deps)
+      n = split(deps, list, /, */)
+      for (i = 1; i <= n; i++) if (list[i] == id) {
+        row = $0
+        sub(/^- \[ \] \*\*/, "", row)
+        sub(/ — .*$/, "", row)
+        printf "  - %s, in `%s`\n", row, FILENAME
+      }
+    }
+  ' docs/roadmaps/*.md)
+fi
+[ -n "$extenders" ] || extenders='  - none'
+
+template=$prompts/$kind.md
+render() {
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      '{{RULES}}') cat "$prompts/_rules.md" ;;
+      '{{DOCS}}') printf '%s' "$doc_list" ;;
+      '{{PRIORS}}') printf '%s' "$prior_list" ;;
+      '{{EXTENDERS}}') printf '%s\n' "$extenders" ;;
+      '{{INTENT}}') [ -z "$intent" ] || cat "$prompts/_intent.md" ;;
+      '{{FOCUS}}') [ -z "$focus" ] || cat "$prompts/_focus.md" ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done <"$template"
+}
+render | CR_FEATURE=$feature CR_TRACK=${track-} CR_WORKTREE=$worktree CR_SPEC=$spec \
+  CR_BASE=$base CR_READINGS=${readings-} CR_SKILL=$skill CR_INTENT_EXPORT=$intent \
+  CR_USER_FOCUS=$focus awk '
+  function replace_all(text, key, value,   result, at) {
+    result = ""
+    while ((at = index(text, key)) > 0) {
+      result = result substr(text, 1, at - 1) value
+      text = substr(text, at + length(key))
+    }
+    return result text
+  }
+  BEGIN { count = split("FEATURE TRACK WORKTREE SPEC BASE READINGS SKILL INTENT_EXPORT USER_FOCUS", keys, " ") }
+  {
+    for (k = 1; k <= count; k++)
+      if (ENVIRON["CR_" keys[k]] != "") $0 = replace_all($0, "{{" keys[k] "}}", ENVIRON["CR_" keys[k]])
+    if ($0 == "") { if (blank) next; blank = 1 } else blank = 0
+    print
+  }
+' >"$brief"
+if grep -n '{{' "$brief" >&2; then
+  rm -f "$brief"
+  fail "$kind template uses a slot this run did not fill"
+fi
+
+if [ "$render_only" -eq 1 ]; then
+  printf '%s\n' "$brief"
+  exit 0
+fi
+codex exec --skip-git-repo-check -s read-only -m gpt-6.1-sol \
+  -c model_reasoning_effort=high -C "$worktree" -o "$out" - <"$brief"
+printf 'codex-review: report at %s\n' "$out"

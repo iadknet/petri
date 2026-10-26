@@ -339,6 +339,28 @@ survivors per change in review rather than resolving all of them. The mutation
 specialist role and the spec's mutation line are gone; `make rust-mutants` and
 `make rust-mutants-ci` stay for runs the user asks for.
 
+On 2026-10-25 the user made every Codex review prompt fixed text. Requesters
+had been leaking their own assumptions into the reviews meant to challenge
+them. Of 13 hand-written briefs still on disk, 7 did so: four final-review
+briefs excused a failing test in advance ("Known state, not a finding by
+itself"), and three T27.F03 challenge briefs fenced off decisions the spec
+owner itself asserted ("Fixed by the user, not open to reopen"). LLM judges
+shift with framing (Hwang et al., arXiv 2601.13537) and with context hints,
+and a "disregard this" warning did not remove the effect (Kapetanovic et al.,
+arXiv 2608.25869), so the fix keeps that text out of the prompt instead of
+warning against it. `scripts/codex-review` renders briefs from
+`docs/review-prompts/`, and requesters fill only validated target slots. The
+lens skills no longer let a caller's brief override their scope. Ad hoc reviews
+take a `--user-focus` slot for focus the user asked for in their own words.
+The intent review's conversation export is still the planner's selection.
+The same review tightened the wording. Of about 640 spec-challenge findings
+with a recorded disposition, the spec owners acted on 623, and 58% were
+labelled `blocking` with no definition. `blocking` now means the skill's P1, the
+verdict is derived from the findings, each finding is tagged `[verified]` or
+`[plausible]`, and an empty report is valid. Codex's built-in review rubric was
+not adopted: it excludes intentional changes and unstated intent, the findings
+this workflow exists to produce.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
