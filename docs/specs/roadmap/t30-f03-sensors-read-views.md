@@ -23,9 +23,7 @@ trajectory, population and draw stream is unchanged.
   afterwards.
 - A change to which creatures get typed food or extended perception
   assembled, or to any sensor value or rule.
-- The outcome-channel vocabulary (G2: T25.F11), the genome directory and
-  the readers' home (G24, G26: T30.F07), the runtime state in the creature
-  record (G8: T30.F02), the birth constructor (G4: T29.F01).
+- G2 (T25.F11), G24 and G26 (T30.F07), G8 (T30.F02), G4 (T29.F01).
 - Moving `WorldKeySet` to `contracts`: `creature → sensors::reads` points
   down once sensors stop importing the creature record.
 - Parallel sensor assembly, the frontend.
@@ -47,27 +45,23 @@ The invariants state the closing state.
    (T25.F11)`. No `CreatureState`, no `creature::colour`. The debts file
    gains no line and loses its G9 and G20 lines;
    `scripts/architecture-check.mjs` passes.
-2. **The body view.** `sensors::static_inputs::BodyView` (in the module G2
-   already names, so the import footprint is unchanged), `Copy`: `position:
-   Position`, `age: u64`, `energy: f32`, `energy_scale: f32` (the body's
-   sensor denominator, `HeritableBody::energy_scale`), `colour: [f32; 3]`
-   (the seen colour, `creature::colour::unit_rgb`), `kin_tag: u32`,
-   `previous_outcome: [f32; OUTCOME_CHANNEL_COUNT]` (the stored bank).
-   `BodyViews = SecondaryMap<CreatureId, BodyView>` beside it. The one
-   builder is `CreatureState::sensed_body(&self, &EnergyCapacityConfig) ->
-   BodyView`; sensors compute no body rule (no colour mapping, no capacity
-   rule).
+2. **The body view.** `sensors::static_inputs::BodyView` (the module G2
+   names), `Copy`: `position`, `age`, `energy`, `energy_scale`
+   (`HeritableBody::energy_scale`), `colour: [f32; 3]`
+   (`creature::colour::unit_rgb`), `kin_tag`, `previous_outcome: [f32;
+   OUTCOME_CHANNEL_COUNT]` (the stored bank). `BodyViews =
+   SecondaryMap<CreatureId, BodyView>` beside it. The one builder is
+   `CreatureState::sensed_body(&self, &EnergyCapacityConfig)`; sensors
+   compute no body rule.
 3. **Assembly signatures.** `assemble_static_inputs(&WorldState, &BodyView,
    &EnergyConfig) -> StaticInputs` and `assemble_perception(observer:
    CreatureId, &[VisibleCell], &WorldState, &BodyViews, &PerceptionConfig)
    -> PerceptionSnapshot`. The observer is `views[observer]`; a nearby
    candidate is `world.creature_at(cell)` looked up in the views, skipped
-   when absent, as `creatures.get` skips today. Every field reads the same
-   value as today: `age_fraction`, `previous_outcome_read`, kin affinity, the
-   reproduce-ready test and the energy ratio are unchanged sensor rules.
-   `PerceptionConfig` (sensors' narrow view of the run config, not a config
-   field) carries no `energy_capacity`: a target's `energy_scale` arrives on
-   its view, and tests take the capacity config from `SimulationConfig`.
+   when absent, as today. Every field reads the same value as today; the
+   normalization and reproduce-ready rules are unchanged. `PerceptionConfig`
+   (sensors' narrow view of the run config, not a config field) carries no
+   `energy_capacity`: a target's `energy_scale` arrives on its view.
 4. **The scheduler builds the views.** `assemble_sensor_inputs_with` fills
    one `BodyViews` over every living creature before the queue is walked,
    once per call, and passes it to both assemblers; the server's creature
@@ -115,8 +109,7 @@ The invariants state the closing state.
     draw, wire type or frontend file changes. Every `deterministic` value of the gate
     summary equals the reference's. The sensor-census gauges,
     `last_mesh_world_reads` and the window records' `uses_*` flags carry the
-    same values. The four snapshot types keep their fields, so runtime, trace
-    and server code that reads them is untouched.
+    same values. The four snapshot types keep their fields.
 12. **Overlap.** T29.F01 and T30.F02 also change `creature/state.rs`;
     concurrent sessions reconcile it at integration (track note).
 
@@ -128,11 +121,11 @@ analysis module), `sensors` (the views it defines), `creature` (builds one
 view; its birth caches call genome analysis), the scheduler (collects the
 views once per tick; seeding's fixture hook), readers and outer crates
 (import paths only). Debts paid: G9 and G20 (section 5 rows at closure, the
-debts-file lines in the build); G14 reduced to its witness half (T25.F11). Debts used and left: G2, used in
-place and not widened (invariant 2) because the outcome-channel vocabulary
-is T25.F11's move; G7 and G8 in `creature/state.rs`, untouched; G24 and
-G26, so the analysis module and the reader stay under `creature/` until
-T30.F07 moves them. Shared rules read, not changed: the body's sensor denominator
+debts-file lines in the build); G14 reduced to its witness half (T25.F11).
+Debts used and left: G2, in place and not widened (invariant 2); G7 and G8
+in `creature/state.rs`; G24 and G26, so the analysis module and the reader
+stay under `creature/` until T30.F07 moves them. Shared rules read, not
+changed: the body's sensor denominator
 (`HeritableBody::energy_scale`, `creature/body.rs:113`) and the seen colour
 (`creature::colour::unit_rgb`, `colour.rs:85`), resolved into the view by
 the creature record, their owner; sensors reuse the resolved values.
@@ -141,9 +134,9 @@ prohibition, rule 5 on derived data), so the plan commit does not edit it.
 
 ## Telemetry
 
-Not applicable: the feature changes nothing a run does. The three sensor
-census gauges and the window records' perception flags keep their names,
-sources (the birth caches and `last_mesh_world_reads`) and values.
+Not applicable: the feature changes nothing a run does; the sensor census
+gauges and the window records' perception flags keep their names, sources
+and values.
 
 ## Verification Plan
 
@@ -161,11 +154,10 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [x] `contracts`: `PerceptionRequirements` (`of_key`, union, `ALL`) and the
       `WorldInputKey` family classification, with `is_extended_key`'s test
       moved and a typed-food case added (invariant 5).
-- [x] `creature/genome/sensor_analysis.rs`: move the census, the declared
-      keys and `DecisionInputKey` from `creature::sensor_census`, the barrier
-      reader and live VM reads from `creature::state`, add
-      `perception_requirements`; tests move with them; `v3-cli`, `v3-lab`
-      and in-crate tests follow the path (R2, R3, R4; invariant 7).
+- [x] `creature/genome/sensor_analysis.rs`: the census, declared keys and
+      `DecisionInputKey` from `creature::sensor_census`, the barrier reader
+      and live VM reads from `creature::state`, `perception_requirements`
+      added; tests and `v3-cli`, `v3-lab` follow (R2–R4; invariant 7).
 - [x] `BodyView` and `BodyViews` in `sensors/static_inputs.rs`, its genome
       import marked `WORKAROUND(G2)`;
       `assemble_static_inputs` and `assemble_perception` on views; the genome
@@ -177,19 +169,16 @@ from the reference, or a moved sensor test value, would show it wrong.
       (invariants 2, 6, 8).
 - [x] `simulation/seeding.rs`: the per-founder genome hook; the perception
       mix edits before construction; `refresh_sensor_caches` deleted; the
-      `world_with` fixture of `tick/tests/full_sensor_inputs.rs`, which today
-      assigns `creature.genome` after seeding, gives its genome through the
-      hook so the caches match it (R5; invariant 9).
+      `world_with` fixture of `tick/tests/full_sensor_inputs.rs` gives its
+      genome through the hook so the caches match it (R5; invariant 9).
 - [x] `simulation/tick.rs`: the views built once per assembly call, one
-      requirements closure, trace flags from the cache; `benches/tick.rs`,
-      `neighborhood/opportunity/discovery.rs`, `v3-server/src/http/creature.rs`
-      and `v3-telemetry` on the new APIs (invariants 4, 6).
+      requirements closure, trace flags from the cache; benches, readers,
+      `v3-server` and `v3-telemetry` on the new APIs (invariants 4, 6).
 - [x] `scripts/architecture-debts.txt`: G9 and G20 lines and the G14
       `creature/state.rs` line removed; `make check-docs` architecture check
       green (invariant 1).
-- [x] `PerceptionConfig::energy_capacity` removed with its `Default` and
-      `from_sim_config` lines and the two test assertions on it;
-      `runtime/cgp/neutral_connection_tests/group.rs` builds its views from
+- [x] `PerceptionConfig::energy_capacity` removed with its two test
+      assertions; the group test builds its views from
       `SimulationConfig::default().energy.capacity` (invariant 3).
 - [ ] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
       reduced to the witness; the gate run and its summary recorded.
@@ -201,18 +190,16 @@ from the reference, or a moved sensor test value, would show it wrong.
       classification test, the moved analysis tests, `perception_mix_*` in
       `simulation/seeding.rs`, `tick/tests/full_sensor_inputs.rs` -> 96
       passed.
-- [x] `cargo test -p v3-core -p v3-lab -p v3-cli -p v3-server -p
-      v3-telemetry` -> 3163 passed; `make rust-clippy`, `cargo fmt --all --
-      --check`, `cargo check --workspace --all-targets`,
-      `node scripts/architecture-check.mjs` and `make roadmap-check` pass.
+- [x] Workspace tests (`cargo test` on the five crates) -> 3163 passed;
+      clippy, fmt, `cargo check --all-targets`, the architecture and roadmap
+      checkers pass.
 - [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` at Close ->
       `<result>`.
-- [x] Gate: summary stored at
-      `docs/progress/features/t30-f03.json`, local raw
-      hash and byte count and verification time checked, series entry points
-      to the summary, no new full report staged; every `deterministic` value
-      equal to the reference's. Goal: `Not run: Verification Plan`.
+- [x] Gate: summary at `docs/progress/features/t30-f03.json`, local raw
+      hash, byte count and verification time checked, series entry points to
+      it, no full report staged; every `deterministic` value equal to the
+      reference's. Goal: `Not run: Verification Plan`.
 
 ## Performance and Goal Impact
 
@@ -230,6 +217,14 @@ move; nothing is re-pinned.
 
 **Measured verdict.** `severe=false`; `deterministic` and all nine work
 counters equal the reference's. Wall clock +122.7%, unattributed.
+
+**Attribution (spec owner decision, 2026-10-26).** The predeclaration binds:
+a paired, interleaved wall-clock comparison of merge base `44e53179` and the
+feature head on the same gate workload, quiet host, two pairs A-B-B-A,
+nothing stored (method and result in the readings). Host state when the
+feature's wall per creature-tick lies within the gate's `ok` wall band of
+the base's in each pair; otherwise the cost is real and closure stops for
+the user.
 
 | Item | Value |
 | --- | --- |
