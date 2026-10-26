@@ -201,6 +201,10 @@ from the reference, or a moved sensor test value, would show it wrong.
       classification test, the moved analysis tests, `perception_mix_*` in
       `simulation/seeding.rs`, `tick/tests/full_sensor_inputs.rs` -> 96
       passed.
+- [x] `cargo test -p v3-core -p v3-lab -p v3-cli -p v3-server -p
+      v3-telemetry` -> 3163 passed; `make rust-clippy`, `cargo fmt --all --
+      --check`, `cargo check --workspace --all-targets`,
+      `node scripts/architecture-check.mjs` and `make roadmap-check` pass.
 - [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` at Close ->
       `<result>`.
