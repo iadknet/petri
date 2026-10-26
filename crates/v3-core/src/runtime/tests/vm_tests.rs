@@ -132,7 +132,7 @@ fn applied_vm_settlement_observation_survives_every_exit() {
 
 #[test]
 fn applied_vm_exhaustion_distinguishes_unexecuted_bid_and_settlement_rounding() {
-    use crate::simulation::energy_accounting::DeathCause;
+    use crate::ledger::DeathCause;
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     cfg.vm.step_ramp_cost = 0.0;

@@ -11,7 +11,7 @@ use crate::runtime::trace::domain::{AppliedAction, StateAfter, TickTrace};
 use crate::runtime::trace::recording::{ActiveTrace, Truncation, TruncationReason};
 use crate::runtime::trace::size::TickReserve;
 use crate::runtime::traced_mesh::RecordLimit;
-use crate::simulation::energy_accounting::EnergyFlows;
+use crate::ledger::EnergyFlows;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::simulation::Simulation;
 

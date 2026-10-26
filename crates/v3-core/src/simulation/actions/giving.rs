@@ -3,7 +3,7 @@
 
 use super::TransferOutcome;
 use crate::contracts::{ActionType, CreatureId, Direction};
-use crate::simulation::energy_accounting::DeathCause;
+use crate::ledger::DeathCause;
 use crate::simulation::simulation::Simulation;
 
 /// Result of an attempted `GiveEnergy` action.

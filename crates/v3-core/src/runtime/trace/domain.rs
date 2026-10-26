@@ -102,7 +102,7 @@ pub struct TickOutcome {
     /// `None` when the creature was removed.
     pub after: Option<StateAfter>,
     /// The removal cause when the creature was removed this tick.
-    pub died: Option<crate::simulation::energy_accounting::DeathCause>,
+    pub died: Option<crate::ledger::DeathCause>,
     /// The tick's phase timings.
     pub phases: Option<crate::simulation::stats::TickPhaseTimings>,
 }

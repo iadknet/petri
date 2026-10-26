@@ -101,7 +101,7 @@ impl Simulation {
     /// Remove one creature and record mortality and exit-time lifetime aggregates.
     pub fn remove_creature(&mut self, id: CreatureId) {
         if let Some(creature) = self.creatures.remove(id) {
-            use super::energy_accounting::DeathCause;
+            use crate::ledger::DeathCause;
             let cause = if creature.energy > 0.0 {
                 self.stats.energy_flows.external_removal_loss += f64::from(creature.energy);
                 DeathCause::ExternalRemoval

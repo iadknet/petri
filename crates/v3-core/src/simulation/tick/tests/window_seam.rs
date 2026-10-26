@@ -19,7 +19,7 @@ use crate::creature::state::CreatureState;
 use crate::runtime::trace::domain::TickTrace;
 use crate::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
 use crate::runtime::trace::size::TickReserve;
-use crate::simulation::energy_accounting::DeathCause;
+use crate::ledger::DeathCause;
 use crate::simulation::seeding::seed_simulation;
 use crate::simulation::Simulation;
 

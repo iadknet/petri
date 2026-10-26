@@ -267,8 +267,8 @@ pub struct EnergyFlowTracking {
     pub gestation_lost: String,
 }
 
-impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
-    fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
+impl From<&v3_core::ledger::EnergyFlows> for EnergyFlowTracking {
+    fn from(flows: &v3_core::ledger::EnergyFlows) -> Self {
         Self {
             definition: "applied-energy-flows-v4".into(),
             food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
@@ -658,7 +658,7 @@ impl WorldTracking {
             mortality: Some(MortalityTracking {
                 definition: "applied-mortality-v3".into(),
                 deaths_total: stats.mortality.deaths_total,
-                by_cause: v3_core::simulation::energy_accounting::DeathCause::ALL
+                by_cause: v3_core::ledger::DeathCause::ALL
                     .into_iter()
                     .map(|cause| (cause.as_key().to_string(), stats.mortality.count(cause)))
                     .collect(),

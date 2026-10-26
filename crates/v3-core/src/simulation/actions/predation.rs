@@ -74,7 +74,7 @@ pub fn apply_steal_energy(
     dir: Direction,
     effort: f32,
 ) -> TransferOutcome<PredationActionResult> {
-    use crate::simulation::energy_accounting::DeathCause;
+    use crate::ledger::DeathCause;
 
     // Step 1: Stats — count attempt and per-tick.
     sim.stats.predation_actions_attempted_total += 1;

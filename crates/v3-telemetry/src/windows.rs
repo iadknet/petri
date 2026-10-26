@@ -34,7 +34,7 @@ use v3_core::runtime::trace::domain::{
     AppliedAction, BackendTrace, MeshHopTrace, MeshPassTrace, TickOutcome, TickTrace,
 };
 use v3_core::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
-use v3_core::simulation::energy_accounting::DeathCause;
+use v3_core::ledger::DeathCause;
 use v3_core::simulation::Simulation;
 
 use crate::queue::Signal;

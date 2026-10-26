@@ -22,7 +22,7 @@ use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTP
 use crate::runtime::vm::execute_vm_node;
 use crate::runtime::vote_select::select;
 use crate::sensors::perception::SensorSnapshot;
-use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
+use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 
 /// Energy charged for the `k`-th mesh hop of a world tick (`k` from 1): zero
 /// while the tick stays within `allowance`, then rising linearly with the hop
@@ -1983,7 +1983,7 @@ mod tests {
         ));
         assert_eq!(
             output.energy_observation.pending_cause,
-            Some(crate::simulation::energy_accounting::DeathCause::MeshRamp)
+            Some(crate::ledger::DeathCause::MeshRamp)
         );
         assert_eq!(
             output.work_counters.mesh_hops, 1,

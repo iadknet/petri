@@ -160,7 +160,7 @@ pub(crate) struct Phase0Settlement {
     pub(crate) decay: f64,
     pub(crate) carrying: f64,
     pub(crate) upkeep: f64,
-    pub(crate) cause: super::energy_accounting::DeathCause,
+    pub(crate) cause: crate::ledger::DeathCause,
 }
 
 impl Phase0Charge {
@@ -187,7 +187,7 @@ impl Phase0Charge {
     /// intermediates: `LifecycleDecay` when `before − decay ≤ 0`, else
     /// `GenomeCarrying` when `before − base ≤ 0`, else `CapacityUpkeep`.
     pub(crate) fn settle(self, before: f32) -> Phase0Settlement {
-        use super::energy_accounting::{applied_debit, decay_partition, DeathCause};
+        use crate::ledger::{applied_debit, decay_partition, DeathCause};
         let after = before - self.applied();
         let (decay_share, carrying) = decay_partition(before, before - self.base, self.decay);
         let cause = if before - self.decay <= 0.0 {
@@ -1304,7 +1304,7 @@ fn run_phase_2(
             if let Some(creature) = sim.creatures.get_mut(id) {
                 let before = creature.energy;
                 creature.energy = creature.energy.max(0.0);
-                let overshoot = super::energy_accounting::applied_debit(creature.energy, before);
+                let overshoot = crate::ledger::applied_debit(creature.energy, before);
                 let flows = &mut sim.stats.energy_flows;
                 flows.zero_floor_credit += flows.net_action_overdraft(charged_before, overshoot);
             }
@@ -1339,7 +1339,7 @@ fn run_phase_2(
 /// the same bank then drives the three-factor update of every initialized
 /// reward-modulated edge from its eligibility trace (T25.F06).
 fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
-    use super::energy_accounting::applied_debit;
+    use crate::ledger::applied_debit;
 
     for (id, creature) in sim.creatures.iter_mut() {
         // Newborns spawned this tick have no outcome record.

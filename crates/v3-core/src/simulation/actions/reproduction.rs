@@ -11,7 +11,7 @@ use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
 use crate::simulation::birth_age::BirthOrder;
-use crate::simulation::energy_accounting::DeathCause;
+use crate::ledger::DeathCause;
 use crate::simulation::simulation::Simulation;
 
 /// Genome replication cost multiplier on the parent's reproduce charge:

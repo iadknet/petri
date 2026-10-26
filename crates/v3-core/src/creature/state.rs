@@ -170,7 +170,7 @@ pub struct CreatureState {
     pub position: Position,
     pub energy: f32,
     /// Observation only: first exhausting sink since the last positive recovery.
-    pub(crate) pending_death_cause: Option<crate::simulation::energy_accounting::DeathCause>,
+    pub(crate) pending_death_cause: Option<crate::ledger::DeathCause>,
     pub age: u64,
     pub generation: u64,
     /// Shared f32 memory slots, accessible by both VM and Graph backends.
@@ -317,9 +317,9 @@ impl CreatureState {
     pub(crate) fn observe_energy(
         &mut self,
         before: f32,
-        sink: crate::simulation::energy_accounting::DeathCause,
+        sink: crate::ledger::DeathCause,
     ) -> f64 {
-        use crate::simulation::energy_accounting::{applied_debit, observe_energy_change};
+        use crate::ledger::{applied_debit, observe_energy_change};
         observe_energy_change(
             &mut self.pending_death_cause,
             f64::from(before),

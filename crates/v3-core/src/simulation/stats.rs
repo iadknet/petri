@@ -232,10 +232,10 @@ pub struct FoodPassSpan {
 /// of each call to `run_tick`.
 #[derive(Debug, Clone, Default)]
 pub struct SimStats {
-    pub mortality: super::energy_accounting::MortalityTotals,
+    pub mortality: crate::ledger::MortalityTotals,
     pub reproductive_success_by_cognitive_class:
         super::reproductive_success::ReproductiveSuccessByCognitiveClass,
-    pub energy_flows: super::energy_accounting::EnergyFlows,
+    pub energy_flows: crate::ledger::EnergyFlows,
     /// Parent age at every delivered birth, by birth order.
     pub birth_parent_age: super::birth_age::BirthParentAge,
     // ── Cumulative (never reset) ─────────────────────────────────────────────
@@ -424,7 +424,7 @@ pub struct SimStats {
     #[cfg(feature = "telemetry-seams")]
     pub observed_removal: Option<(
         crate::contracts::CreatureId,
-        super::energy_accounting::DeathCause,
+        crate::ledger::DeathCause,
     )>,
     /// Energy predators stole from the observed creature this tick.
     #[cfg(feature = "telemetry-seams")]
@@ -549,7 +549,7 @@ impl SimStats {
     pub fn removal_of(
         &self,
         id: crate::contracts::CreatureId,
-    ) -> Option<super::energy_accounting::DeathCause> {
+    ) -> Option<crate::ledger::DeathCause> {
         self.observed_removal
             .filter(|&(removed, _)| removed == id)
             .map(|(_, cause)| cause)

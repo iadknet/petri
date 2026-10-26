@@ -16,7 +16,7 @@ use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
     genome, leaf, run_tick, vm_node, vm_voter, GraphBuilder, Senses,
 };
-use crate::simulation::energy_accounting::DeathCause;
+use crate::ledger::DeathCause;
 
 const N: u8 = 0;
 const E: u8 = 2;

@@ -73,7 +73,7 @@ pub struct MeshSideOutputs {
     /// Deterministic integer work counters accumulated during this mesh evaluation.
     pub work_counters: WorkCounters,
     /// Applied cognition debits and exhausting sink; never used to control execution.
-    pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
+    pub energy_observation: crate::ledger::CognitionEnergyObservation,
     /// The current pass's vote vector: the sanitized sum of the latest
     /// committed contribution of every node visited this pass. Cleared at
     /// every pass start.
@@ -212,7 +212,7 @@ pub struct MeshOutput {
     /// Deterministic integer work counters accumulated during this evaluation.
     pub work_counters: WorkCounters,
     /// Dispatch-local applied energy observations, committed sequentially by Phase 2.
-    pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
+    pub energy_observation: crate::ledger::CognitionEnergyObservation,
     /// Why the tick's pass loop stopped. Carried on every execution mode's
     /// output so the untraced production path can count reasons without a
     /// trace.

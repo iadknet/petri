@@ -6,7 +6,7 @@ use crate::creature::genome::{
 };
 use crate::mutation::MutationOperator;
 use crate::simulation::actions::{apply_reproduce, apply_steal_energy, ReproductionActionResult};
-use crate::simulation::energy_accounting::DeathCause;
+use crate::ledger::DeathCause;
 use crate::simulation::reproductive_success::{
     CognitiveClass, ReproductiveSuccessByCognitiveClass, ReproductiveSuccessTotals,
 };

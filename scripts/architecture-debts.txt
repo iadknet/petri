@@ -11,13 +11,6 @@ G2 mutation/topology/routing.rs runtime::routing
 G2 mutation/vm/operators.rs runtime::vm
 G2 sensors/static_inputs.rs creature::genome
 G5 mutation/phenotype.rs creature::phenotype
-G7 creature/state.rs simulation::energy_accounting
-G7 runtime/cgp/execute.rs simulation::energy_accounting
-G7 runtime/mesh.rs simulation::energy_accounting
-G7 runtime/trace/domain.rs simulation::energy_accounting
-G7 runtime/trace/recording.rs simulation::energy_accounting
-G7 runtime/types.rs simulation::energy_accounting
-G7 runtime/vm.rs simulation::energy_accounting
 G8 mutation/reachability.rs creature::state
 G8 runtime/cgp/execute.rs creature::state
 G8 runtime/cgp/traced.rs creature::state

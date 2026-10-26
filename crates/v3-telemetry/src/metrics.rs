@@ -28,7 +28,7 @@ use v3_core::creature::genome::vote::DirectedVoteKind;
 use v3_core::creature::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::creature::sensor_census::{sensor_use_census, world_input_key_label, SensorUseRow};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
-use v3_core::simulation::energy_accounting::DeathCause;
+use v3_core::ledger::DeathCause;
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
 use v3_core::simulation::stats::MutationValueTotals;
 use v3_core::simulation::{SimStats, Simulation};

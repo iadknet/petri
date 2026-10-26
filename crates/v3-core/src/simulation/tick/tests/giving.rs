@@ -9,7 +9,7 @@ use crate::creature::action_log::{ActionLog, ActionLogEntry, ActionResult};
 use crate::creature::genome::vote::DirectedVoteKind;
 use crate::creature::genome::{CreatureGenome, OutcomeChannel, VmInstruction};
 use crate::simulation::actions::{apply_give_energy, GiveActionResult};
-use crate::simulation::energy_accounting::{applied_debit, DeathCause};
+use crate::ledger::{applied_debit, DeathCause};
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::Simulation;
 use rand::SeedableRng;

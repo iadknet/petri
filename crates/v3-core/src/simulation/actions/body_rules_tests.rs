@@ -17,7 +17,7 @@ use crate::creature::identity::CreatureIdentityState;
 use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::simulation::energy_accounting::{DeathCause, EnergyFlows};
+use crate::ledger::{DeathCause, EnergyFlows};
 use crate::simulation::simulation::Simulation;
 
 fn config() -> SimulationConfig {

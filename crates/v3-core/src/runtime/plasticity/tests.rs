@@ -41,7 +41,7 @@ fn sensors() -> SensorSnapshot {
 /// alone, and the pass cost is the only exhaustion it can cause.
 #[test]
 fn applied_graph_accounting_charges_only_the_pass_under_hebbian_learning() {
-    use crate::simulation::energy_accounting::DeathCause;
+    use crate::ledger::DeathCause;
     let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
     edit_config(&mut def, 0, |config| config.modulation = None);
     let runtime = RuntimeConfig {

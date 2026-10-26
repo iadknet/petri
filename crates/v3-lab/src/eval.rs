@@ -26,7 +26,7 @@ use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::creature::state::{CreatureState, DispatchRecord, SHARED_MEMORY_SLOTS};
 use v3_core::kernel::WorldState;
 use v3_core::simulation::actions::{apply_move, apply_typed_eat};
-use v3_core::simulation::energy_accounting::EnergyFlows;
+use v3_core::ledger::EnergyFlows;
 use v3_core::simulation::{run_tick, SimStats, Simulation};
 
 use crate::geodesic::{step_toward, Field, Terrain};

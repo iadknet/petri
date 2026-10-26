@@ -13,7 +13,7 @@ use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
+use crate::ledger::{applied_debit, DeathCause, EnergyFlows};
 
 // ─── Action application functions ─────────────────────────────────────────────
 

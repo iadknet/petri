@@ -384,7 +384,7 @@ proptest! {
         rate in 0.0f32..1.0,
         size in 0u32..20_000,
     ) {
-        use crate::simulation::energy_accounting::{decay_partition, DeathCause};
+        use crate::ledger::{decay_partition, DeathCause};
         let charge = Phase0Charge::new(decay, rate, size, 0.0);
         let settled = charge.settle(before);
         prop_assert_eq!(settled.after.to_bits(), (before - charge.base).to_bits());
@@ -424,7 +424,7 @@ proptest! {
 /// `capacity_upkeep`; a death it causes is attributed to `CapacityUpkeep`.
 #[test]
 fn phase_0_charges_and_attributes_a_large_bodys_upkeep() {
-    use crate::simulation::energy_accounting::DeathCause;
+    use crate::ledger::DeathCause;
     let (mut sim, id) = make_sim_with_one_creature(1.0);
     let lifecycle = &mut sim.config.energy.lifecycle;
     lifecycle.energy_decay_per_tick = 0.25;
@@ -464,7 +464,7 @@ fn a_small_bodys_negative_upkeep_is_floored_at_zero_charge() {
 /// attributed to upkeep.
 #[test]
 fn a_reference_death_on_the_rounded_base_is_attributed_to_carrying() {
-    use crate::simulation::energy_accounting::DeathCause;
+    use crate::ledger::DeathCause;
     let decay = 2.0f32.powi(-25);
     let charge = Phase0Charge::new(decay, 1.0 - 2.0f32.powi(-24), 1, 0.0);
     assert_eq!(charge.base, 1.0);

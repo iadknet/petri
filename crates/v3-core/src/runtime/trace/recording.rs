@@ -58,7 +58,7 @@ pub struct ActiveTrace {
     /// that tick: a phase-0 death, a removal between ticks, or one in an
     /// earlier tick of a recording still running.
     #[cfg(feature = "telemetry-seams")]
-    pub removed: Option<crate::simulation::energy_accounting::DeathCause>,
+    pub removed: Option<crate::ledger::DeathCause>,
 }
 
 impl ActiveTrace {

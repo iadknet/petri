@@ -1,6 +1,5 @@
 pub mod actions;
 pub mod birth_age;
-pub mod energy_accounting;
 pub(crate) mod outcomes;
 pub mod reproductive_success;
 pub mod seeding;
