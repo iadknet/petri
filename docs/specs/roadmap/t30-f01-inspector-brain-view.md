@@ -1,6 +1,6 @@
 # T30.F01 — Inspector Brain View
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F01
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -151,7 +151,7 @@ would show it wrong.
       `grep -rn "compassX\|compassY\|learnerInitialized\|memberPattern\|parseWorldInputRef\|PAIR_BIRTH" frontend/src` -> none.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` and
       `cargo fmt --all --check` -> 0.
-- [ ] `make check` -> 0; the gate summary stored at
+- [x] `make check` -> 0 at tested commit dacb94d3; the gate summary stored at
       `docs/progress/features/t30-f01.json` with the series entry pointing to
       it and no full report staged.
 
@@ -191,7 +191,7 @@ summary either).
       hand-copied Rust type left under `frontend/src/types/`.
 - [x] Paint and the pattern routes use server-owned tool and stats types;
       the sampler has no `serde_json::Value` field.
-- [ ] The gate's pins are unchanged; `make check` passes; G17 is deleted from
+- [x] The gate's pins are unchanged; `make check` passes; G17 is deleted from
       `docs/architecture.md` and G22 keeps only the derivation T30.F06 pays.
 
 ## Notes for AI Agents
@@ -204,3 +204,8 @@ summary either).
   mirror; every other core type stays underived.
 - Deferred: the action log entry's derivation from the applied result is
   T30.F06's (G18); this feature's entry mirrors today's fields.
+- Cost: closure 2026-10-26; `/usage` totals not collected (unattended goal
+  run); 3 implementer passes (build, self-review, post-review remediation)
+  with 2, 2 and 2 advisor consults; 2 spec-owner resumes after Plan; 2 Codex
+  challenge rounds, final verdict `ready`; final review lens1 1 P1, lens2 0,
+  lens3 1 P2, both remediated.
