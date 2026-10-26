@@ -193,8 +193,8 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [x] Workspace tests (`cargo test` on the five crates) -> 3163 passed;
       clippy, fmt, `cargo check --all-targets`, the architecture and roadmap
       checkers pass.
-- [x] `make check` -> exit 0 at `fd239f37` (first run: one host-load
-      telemetry timing flake); `scripts/architecture-check.mjs` passes
+- [x] `make check` -> exit 0 at `25f97d34`, rebased onto T30.F04 (a
+      pre-rebase run hit one host-load telemetry timing flake); `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` -> exit 0.
 - [x] Gate: summary at `docs/progress/features/t30-f03.json`, local raw
       hash, byte count and verification time checked, series entry points to
