@@ -828,3 +828,57 @@ fn seed_baseline_map(mut cfg: SimulationConfig) -> v3_core::simulation::Simulati
     cfg.population.initial_creatures = 1;
     seed_simulation(cfg, 11)
 }
+
+/// FNV-1a over the seeded map: the grid size, every cell's barrier flag in
+/// row-major order, then every food type's base fertility bits. Hand-rolled so
+/// the pin does not depend on a std hasher whose algorithm may change.
+fn seeded_map_digest(sim: &v3_core::simulation::Simulation) -> u64 {
+    let mut digest = 0xcbf2_9ce4_8422_2325u64;
+    let mut feed = |bytes: &[u8]| {
+        for byte in bytes {
+            digest = (digest ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    let (width, height) = (sim.world.width, sim.world.height);
+    feed(&width.to_le_bytes());
+    feed(&height.to_le_bytes());
+    for y in 0..height {
+        for x in 0..width {
+            feed(&[u8::from(sim.world.is_barrier(Position::new(x, y)))]);
+        }
+    }
+    for index in 0..sim.config.world.food.types.len() {
+        let index = u16::try_from(index).expect("food type index fits u16");
+        let grid = sim
+            .world
+            .food()
+            .fertility_for_type(OrdinaryFoodTypeId::new(index))
+            .unwrap_or_else(|| panic!("food type {index} has no fertility grid"));
+        for y in 0..height {
+            for x in 0..width {
+                feed(&grid.get(x, y).to_bits().to_le_bytes());
+            }
+        }
+    }
+    digest
+}
+
+/// T30.F04: each checked-in world's seed-time map (barriers and fertility),
+/// pinned on the code before the terrain schema moved into `config`. A moved
+/// value is a changed world.
+#[test]
+fn recipe_seed_time_maps_are_pinned() {
+    const PINNED: [(&str, u64); 4] = [
+        ("plains", 14_775_210_727_583_933_416),
+        ("orchards-in-grassland", 3_471_738_112_455_463_929),
+        ("canyon-country", 7_111_894_697_302_656_956),
+        ("confluence", 13_834_098_584_569_698_020),
+    ];
+    let actual = PINNED.map(|(name, _)| {
+        (
+            name,
+            seeded_map_digest(&seed_baseline_map(baseline_config(name))),
+        )
+    });
+    assert_eq!(actual, PINNED);
+}
