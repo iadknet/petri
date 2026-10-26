@@ -3,9 +3,8 @@ use std::f64::consts::PI;
 
 use rand::Rng;
 
+use crate::config::PatternBounds;
 use crate::kernel::paint::PaintPoint;
-
-use super::PatternBounds;
 
 /// Generate an Archimedean spiral pattern.
 pub(super) fn generate(

@@ -114,8 +114,8 @@ mod tests {
     use proptest::prelude::*;
 
     proptest! {
-        /// The clipped bounds lie inside the world and inside the input,
-        /// at the same origin.
+        /// The clip keeps the origin and exactly the part of the input that
+        /// lies inside the world.
         #[test]
         fn clipped_to_lies_inside_world_and_input(
             x in any::<u16>(),
@@ -128,10 +128,6 @@ mod tests {
             let input = PatternBounds { x, y, width, height };
             let clipped = input.clipped_to(world_width, world_height);
             prop_assert_eq!((clipped.x, clipped.y), (x, y));
-            prop_assert!(clipped.width <= width && clipped.height <= height);
-            prop_assert!(clipped.width == 0 || u32::from(x) + u32::from(clipped.width) <= u32::from(world_width));
-            prop_assert!(clipped.height == 0 || u32::from(y) + u32::from(clipped.height) <= u32::from(world_height));
-            // Maximal: whatever of the input lies inside the world is kept.
             let fit_width = (u32::from(x) + u32::from(width)).min(u32::from(world_width)).saturating_sub(u32::from(x));
             let fit_height = (u32::from(y) + u32::from(height)).min(u32::from(world_height)).saturating_sub(u32::from(y));
             prop_assert_eq!((u32::from(clipped.width), u32::from(clipped.height)), (fit_width, fit_height));

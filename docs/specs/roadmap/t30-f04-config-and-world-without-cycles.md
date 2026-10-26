@@ -164,7 +164,8 @@ changed food-stream or pattern test value, would show it wrong.
 
 - [x] Architecture: `node scripts/architecture-check.mjs` -> exit 0 with no
       G10 or G11 entry; `grep -rn "fn splitmix64" crates/` -> one definition
-      (`contracts/hash.rs`).
+      (`contracts/hash.rs`); the pattern generators import `PatternBounds`
+      from `crate::config`.
 - [x] Map digests: pinned at `44e53179` in commit `59832f7b` before any move
       (values in the readings); `cargo test -p v3-core --test
       baseline_worlds` -> 20 passed after the move.
@@ -178,6 +179,8 @@ changed food-stream or pattern test value, would show it wrong.
 - [x] Crate suites: `cargo test -p v3-core` -> 2400 passed; `cargo test -p
       v3-server -p v3-telemetry` -> 249 passed; `cargo check --workspace
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
+- [x] Frontend comments: `npx biome check src/types/pattern.ts
+      src/types/config.ts` (in `frontend/`) -> no diagnostics.
 - [ ] `make check` -> exit 0.
 - [ ] Gate profile: summary at `docs/progress/features/t30-f04.json`, local
       raw hash and byte count and verification time checked, series entry

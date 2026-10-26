@@ -2,9 +2,8 @@ use std::collections::HashSet;
 
 use rand::Rng;
 
+use crate::config::PatternBounds;
 use crate::kernel::paint::PaintPoint;
-
-use super::PatternBounds;
 
 /// Generate a maze pattern using recursive backtracker (depth-first).
 pub(super) fn generate(

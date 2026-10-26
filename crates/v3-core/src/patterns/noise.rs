@@ -3,9 +3,8 @@ use std::collections::HashSet;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
+use crate::config::PatternBounds;
 use crate::kernel::paint::PaintPoint;
-
-use super::PatternBounds;
 
 /// Generate a clustered random noise pattern.
 pub(super) fn generate(
