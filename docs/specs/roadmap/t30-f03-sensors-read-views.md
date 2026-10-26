@@ -208,8 +208,8 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
       with the debts file of invariant 1; `make rust-test-slow` at Close ->
       `<result>`.
-- [ ] Gate: summary stored at
-      `docs/progress/features/t30-f03-sensors-read-views.json`, local raw
+- [x] Gate: summary stored at
+      `docs/progress/features/t30-f03.json`, local raw
       hash and byte count and verification time checked, series entry points
       to the summary, no new full report staged; every `deterministic` value
       equal to the reference's. Goal: `Not run: Verification Plan`.
@@ -228,11 +228,20 @@ identical, since no sensor work is counted; wall-clock neutral within the
 gate's noise, a regression there attributed before closure. No indicator can
 move; nothing is re-pinned.
 
-**Measured verdict.** `<pending>`
+**Measured verdict.** `severe=false`; `deterministic` and all nine work
+counters equal the reference's. Wall clock +122.7%, unattributed.
 
-- Summary of the declared profile:
-  [gate](../../progress/features/t30-f03-sensors-read-views.json).
-- Full readings: [`docs/progress/readings/t30-f03.md`](../../progress/readings/t30-f03.md).
+| Item | Value |
+| --- | --- |
+| Command | `make bench PROFILE=gate FEATURE=t30-f03` |
+| CLI exit | 0 (summary `cli_exit`: successful artifact-pair completion) |
+| Outer exit | 0 (the shell's `make` status; summary `outer_exit` is null) |
+| Reference | `t27-f03-giving-energy.json` |
+| Raw | 132627 bytes, sha256 `f46356d1571ab0359f6d25a7be29e7e4aabb8531a5bce99ffd3410eacb57c475`, verified 2026-10-26T18:19:12Z |
+| Summary | 27478 bytes |
+
+- Summary: [gate](../../progress/features/t30-f03.json).
+- Readings: [`t30-f03.md`](../../progress/readings/t30-f03.md).
 
 ## Success Criteria
 
