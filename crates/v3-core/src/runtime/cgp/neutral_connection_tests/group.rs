@@ -524,7 +524,7 @@ fn an_exhausted_visit_stages_no_member_term() {
 
 mod pair {
     use super::*;
-    use crate::config::WorldEdgeMode;
+    use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, Position};
     use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
@@ -599,9 +599,10 @@ mod pair {
         let visible =
             compute_visible_cells(origin, &world, get_visibility_table(config.vision_radius));
         let mut sensors = sensors();
+        let capacity = SimulationConfig::default().energy.capacity;
         let views: crate::sensors::static_inputs::BodyViews = creatures
             .iter()
-            .map(|(id, c)| (id, c.sensed_body(&config.energy_capacity)))
+            .map(|(id, c)| (id, c.sensed_body(&capacity)))
             .collect();
         sensors.perception =
             assemble_perception(observer, visible.cells(), &world, &views, &config);

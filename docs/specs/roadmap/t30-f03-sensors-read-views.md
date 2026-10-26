@@ -187,10 +187,10 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [x] `scripts/architecture-debts.txt`: G9 and G20 lines and the G14
       `creature/state.rs` line removed; `make check-docs` architecture check
       green (invariant 1).
-- [ ] `PerceptionConfig::energy_capacity` removed with its `Default` and
-      `from_sim_config` lines and the two tests asserting it;
+- [x] `PerceptionConfig::energy_capacity` removed with its `Default` and
+      `from_sim_config` lines and the two test assertions on it;
       `runtime/cgp/neutral_connection_tests/group.rs` builds its views from
-      `sim.config.energy.capacity` (invariant 3).
+      `SimulationConfig::default().energy.capacity` (invariant 3).
 - [ ] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
       reduced to the witness; the gate run and its summary recorded.
 

@@ -125,12 +125,6 @@ pub struct PerceptionConfig {
     pub vision_radius: u8,
     /// Maximum food density for normalization.
     pub max_food_density: f32,
-    /// The capacity config whose sensor scale normalizes a nearby
-    /// creature's energy ([`HeritableBody::energy_scale`] of the target,
-    /// T26.F02).
-    ///
-    /// [`HeritableBody::energy_scale`]: crate::creature::body::HeritableBody::energy_scale
-    pub energy_capacity: crate::config::EnergyCapacityConfig,
     /// Minimum energy to reproduce (for reproduce_ready signal).
     pub min_reproduce_energy: f32,
     /// Minimum age in ticks to reproduce (for reproduce_ready signal).
@@ -142,7 +136,6 @@ impl Default for PerceptionConfig {
         Self {
             vision_radius: 5,
             max_food_density: 1.0,
-            energy_capacity: crate::config::EnergyCapacityConfig::default(),
             min_reproduce_energy: 1.0,
             min_reproduce_age: 20,
         }
@@ -156,7 +149,6 @@ impl PerceptionConfig {
         Self {
             vision_radius: config.runtime.perception.vision_radius,
             max_food_density: config.world.food.max_density,
-            energy_capacity: config.energy.capacity,
             min_reproduce_energy: config.energy.lifecycle.min_reproduce_energy,
             min_reproduce_age: config.energy.lifecycle.min_reproduce_age,
         }
@@ -235,7 +227,6 @@ mod tests {
         let cfg = PerceptionConfig::default();
         assert_eq!(cfg.vision_radius, 5);
         assert!((cfg.max_food_density - 1.0).abs() < f32::EPSILON);
-        assert_eq!(cfg.energy_capacity.reference, 200.0);
         assert!((cfg.min_reproduce_energy - 1.0).abs() < f32::EPSILON);
         assert_eq!(cfg.min_reproduce_age, 20);
     }
@@ -246,7 +237,6 @@ mod tests {
         let p = PerceptionConfig::from_sim_config(&sim_cfg);
         assert_eq!(p.vision_radius, 5);
         assert!((p.max_food_density - sim_cfg.world.food.max_density).abs() < f32::EPSILON);
-        assert_eq!(p.energy_capacity, sim_cfg.energy.capacity);
         assert!(
             (p.min_reproduce_energy - sim_cfg.energy.lifecycle.min_reproduce_energy).abs()
                 < f32::EPSILON
