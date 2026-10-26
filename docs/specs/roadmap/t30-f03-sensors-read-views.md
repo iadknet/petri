@@ -1,6 +1,6 @@
 # T30.F03 — Sensors Read Views
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F03
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -180,7 +180,7 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [x] `PerceptionConfig::energy_capacity` removed with its two test
       assertions; the group test builds its views from
       `SimulationConfig::default().energy.capacity` (invariant 3).
-- [ ] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
+- [x] At closure: G9 and G20 rows deleted from `docs/architecture.md`, G14
       reduced to the witness; the gate run and its summary recorded.
 
 ## Verification
@@ -193,9 +193,9 @@ from the reference, or a moved sensor test value, would show it wrong.
 - [x] Workspace tests (`cargo test` on the five crates) -> 3163 passed;
       clippy, fmt, `cargo check --all-targets`, the architecture and roadmap
       checkers pass.
-- [ ] `make check` -> `<result>`; `scripts/architecture-check.mjs` passes
-      with the debts file of invariant 1; `make rust-test-slow` at Close ->
-      `<result>`.
+- [x] `make check` -> exit 0 at `fd239f37` (first run: one host-load
+      telemetry timing flake); `scripts/architecture-check.mjs` passes
+      with the debts file of invariant 1; `make rust-test-slow` -> exit 0.
 - [x] Gate: summary at `docs/progress/features/t30-f03.json`, local raw
       hash, byte count and verification time checked, series entry points to
       it, no full report staged; every `deterministic` value equal to the
@@ -243,13 +243,13 @@ was host state ([readings](../../progress/readings/t30-f03.md)).
 
 ## Success Criteria
 
-- [ ] Sensors' production imports are those of invariant 1, and
+- [x] Sensors' production imports are those of invariant 1, and
       `scripts/architecture-debts.txt` holds no G9 or G20 line and no G14
       `creature/state.rs` line.
-- [ ] The sensors, analysis and seeding tests of the Verification section
+- [x] The sensors, analysis and seeding tests of the Verification section
       pass, and `make check` exits 0.
-- [ ] The gate's `deterministic` values equal the reference's.
-- [ ] `docs/architecture.md` section 5 no longer lists G9 or G20, and G14
+- [x] The gate's `deterministic` values equal the reference's.
+- [x] `docs/architecture.md` section 5 no longer lists G9 or G20, and G14
       names the witness only.
 
 ## Notes for AI Agents
@@ -271,4 +271,6 @@ was host state ([readings](../../progress/readings/t30-f03.md)).
   (`simulation/tick.rs`) and `each_stateful_split_*` (v3-cli tracking)
   swap genomes and resync derived state by hand; encapsulating both behind
   construction is proposed at closure.
-- Cost: see the readings file at closure.
+- Cost: `/usage` not captured; 3 implementer passes, 2 advisor consults
+  each; 2 spec-owner resumes; 2 Codex rounds, `ready`; review lens1 0,
+  lens2 1 P1 + step-back, lens3 1 P3.

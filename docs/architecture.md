@@ -168,16 +168,14 @@ field access through another type. Design notes:
 | G6 | Every memory slot passes to the child (`simulation::actions::reproduction`) | T29.F03 |
 | G7 | Energy primitives (`DeathCause`, debits, cognition energy) in `simulation::energy_accounting`, imported by runtime (`runtime::{mesh, vm, cgp::execute, types, trace}`) and the creature record (`creature::state`) | T30.F02 |
 | G8 | Runtime state types in the creature record (`creature::state`), imported by runtime (`runtime::{mesh, cgp::execute, cgp::traced, traced_mesh}`) and mutation (`mutation::reachability`, through `DispatchRecord`) | T30.F02 |
-| G9 | Sensors read the whole creature and its colour helper (`sensors::{reducers, static_inputs}`) while the creature record imports `sensors::reads` (`WorldKeySet`) | T30.F03 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
 | G13 | The InputRef mutations edit declarations and Graph edges by hand (`mutation::input_ref`) | T25.F11 |
-| G14 | Production reads readers: sensor caches computed by a census at construction (`creature::state`); the inheritance witness reads `creature::drives::PATH_WEIGHT_FLOOR` (`simulation::actions::reproduction`) | caches: T30.F03; witness: T25.F11 |
+| G14 | Production reads readers: the inheritance witness reads `creature::drives::PATH_WEIGHT_FLOOR` (`simulation::actions::reproduction`) | T25.F11 |
 | G15 | Genome analysis draws randomness (`creature::genome::analysis`, called by `mutation::vm::operators`) | T30.F05 |
 | G16 | A runtime trace carries simulation and creature records (`runtime::trace::domain`) | T30.F02 |
 | G17 | The genome's internal layout is the frontend's API (`v3-server`'s creature response, `transport::sample_assembler`); `frontend/src/types/genome.ts` copies genome types by hand and inspector files recompute genome rules | T30.F01 |
 | G18 | Two result vocabularies: `ActionResult` (`creature::action_log`) and a success boolean for rewards (`simulation::outcomes`) | T30.F06 |
 | G19 | Action resolution mixed with scheduling: per-action executors, action flooring and removal in `simulation::tick` beside `run_tick`; mechanics taking the whole `Simulation` (`simulation::actions::{giving, predation}`); move effort composed on the creature record (`creature::state`) | T30.F06 |
-| G20 | Sensors read the genome to decide what to assemble (`sensors::{perception, typed_food}`) | T30.F03 |
 | G22 | Core structs on the wire outside section 2's exemption: the action log (`ActionLogEntry`, `ActionResult` in `v3-server`'s creature response; `ActionType` is already a contracts type the catalog test pins) and paint (`PaintTool`, `PaintStats` in its paint API); `frontend/src/types/action-log.ts` and `paint.ts` copy them by hand | action log: T30.F06; paint: T30.F01 |
 | G23 | Program edits applied in mutation: splice and insertion with jump-reference repair (`mutation::vm::operators::splice_program_with_reference_repair`, also used by `mutation::topology::routing`) the register-count resize with its width predicate (`register_count_moves`, `apply_register_count_mutation`), the dormant-tail copy with its terminal classification and conditional `Halt` (`copy_span_to_dormant_tail`), and route composition through gate writes (`mutation::topology::routing`: `add_gate_write`, `apply_add_route_target`, `apply_add_feedback_route`) | T30.F05 |
 | G24 | The genome lives under the creature record (`creature/genome/`), and the import checker special-cases that path | T30.F07 |
