@@ -95,43 +95,50 @@ would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Core read APIs, tests first: `LearnedEdge.initialized` and `.inherits`
+- [x] Core read APIs, tests first: `LearnedEdge.initialized` and `.inherits`
       (R3); the group birth-coordinates API (invariant 3); the `ts` feature with
       optional `ts-rs` and `cfg_attr` derives on `Direction`, `Position`,
       `NodeId`, `CreatureId` if it is ever rendered, and the config schema
       (`config/`, `PatternParams`, `PatternBounds`).
-- [ ] Proof of concept (invariant 9): `ts-rs` in `v3-server`, `ServerMessage`,
+- [x] Proof of concept (invariant 9): `ts-rs` in `v3-server`, `ServerMessage`,
       the `serialize_with` arrays and the `skip_serializing_if` fields rendered,
       the generator test and `frontend/src/types/generated/` with the write flag
       (invariant 10), `TS_RS_LARGE_INT=number` set in `.cargo/config.toml`
       `[env]` so it holds at build and at test time.
-- [ ] The brain view and learning payload (invariants 2–6, R1–R3, R10) with
+- [x] The brain view and learning payload (invariants 2–6, R1–R3, R10) with
       server tests for the five preservation cases and the `exclude` tokens;
       `graph_weights` tests replaced.
-- [ ] The sampler types (invariant 7, R4), paint and action-log types
+- [x] The sampler types (invariant 7, R4), paint and action-log types
       (invariant 8, R5, R6), the remaining response, request and error types
       (R8, R9); `v3alpha14`.
-- [ ] Frontend: adopt the generated types, delete the copies and the recomputed
+- [x] Frontend: adopt the generated types, delete the copies and the recomputed
       rules (invariant 11), the inspector reads `brain` and `learning`, the
       paint store reads the generated types; component and store tests updated
       with view fixtures, one per preservation case.
-- [ ] `frontend/AGENTS.md` gains one line pointing at `src/types/generated/`
+- [x] `frontend/AGENTS.md` gains one line pointing at `src/types/generated/`
       and the write flag (edit under `.agents/skills/agents-md`).
-- [ ] At close: delete G17 from `docs/architecture.md` and reduce G22 to the
+- [x] At close: delete G17 from `docs/architecture.md` and reduce G22 to the
       action-log derivation T30.F06 pays; fill the readings file's
       review-items table.
 
 ## Verification
 
-- [ ] Core: `cargo test -p v3-core` -> the learned-view and coordinates tests
-      pass; `cargo build -p v3-core --no-default-features` and
-      `cargo build -p v3-core --features ts` both succeed.
-- [ ] Server: `cargo test -p v3-server` -> generator parity, the
-      five preservation cases, paint and pattern round trips, sampler shapes, the
-      `ActionType`/`ActionResult` pin; `PETRI_WRITE_TS_TYPES=1 cargo test -p v3-server <parity test>`
-      then `git status` clean after `npm run lint:fix`.
-- [ ] Frontend: `npm run lint`, `npm run test`, `npm run build` in `frontend/`
-      -> 0; `grep -rn "compassX\|compassY\|learnerInitialized\|memberPattern\|parseWorldInputRef\|PAIR_BIRTH" frontend/src` -> none.
+- [x] Core: `cargo test -p v3-core` -> 2305 lib tests and every
+      integration target pass, the learned-view and coordinates tests among
+      them; `cargo build -p v3-core --no-default-features` and
+      `cargo build -p v3-core --features ts` both succeed; `cargo tree -e
+      normal,build` shows no `ts-rs` under `v3-server` or `v3-cli`.
+- [x] Server: `cargo test -p v3-server` -> 53 unit, 106 `server`, 11
+      `telemetry` tests pass (generator parity, the five preservation cases,
+      the `exclude` tokens, paint and pattern round trips, sampler shapes, the
+      `ActionType`/`ActionResult` pin); deleting two generated files, then
+      `PETRI_WRITE_TS_TYPES=1 cargo test -p v3-server --lib generated_types`
+      and `npm run lint:fix` -> `git status` clean.
+- [x] Frontend: `npm run lint` (0, four pre-existing warnings),
+      `npm run test` (672 tests), `npm run build` in `frontend/` -> 0;
+      `grep -rn "compassX\|compassY\|learnerInitialized\|memberPattern\|parseWorldInputRef\|PAIR_BIRTH" frontend/src` -> none.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` and
+      `cargo fmt --all --check` -> 0.
 - [ ] `make check` -> 0; the gate summary stored at
       `docs/progress/features/t30-f01.json` with the series entry pointing to
       it and no full report staged.
@@ -153,14 +160,14 @@ identical, with no indicator moving in any direction. A moved pin is a defect
 
 ## Success Criteria
 
-- [ ] The inspector renders the five preservation cases from `brain` and
+- [x] The inspector renders the five preservation cases from `brain` and
       `learning` with every number from a core read API, and no frontend
       file computes a composition, pattern, coordinate, initialization or
       inheritance.
-- [ ] Every `v3-server` wire type derives `TS`, the committed generated types
+- [x] Every `v3-server` wire type derives `TS`, the committed generated types
       match the test's rendering, and the frontend builds against them with no
       hand-copied Rust type left under `frontend/src/types/`.
-- [ ] Paint and the pattern routes use server-owned tool and stats types;
+- [x] Paint and the pattern routes use server-owned tool and stats types;
       the sampler has no `serde_json::Value` field.
 - [ ] The gate's pins are unchanged; `make check` passes; G17 is deleted from
       `docs/architecture.md` and G22 keeps only the derivation T30.F06 pays.
