@@ -1,6 +1,6 @@
 # T30.F02 — Brain Execution Stands Alone
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F02
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -203,7 +203,7 @@ wrong.
       fixture names its `heading` (R6; invariant 7).
 - [x] `scripts/architecture-debts.txt`: the fourteen G7, G8 and G16 lines
       removed; `scripts/architecture-check.mjs` green (invariant 8).
-- [ ] At closure: G7, G8 and G16 rows deleted from `docs/architecture.md`;
+- [x] At closure: G7, G8 and G16 rows deleted from `docs/architecture.md`;
       the gate run and its summary recorded.
 
 ## Verification
@@ -216,8 +216,8 @@ wrong.
       clippy `-D warnings`, architecture and roadmap checkers -> clean;
       v3-lab 212, v3-core 2,407 (2,440 with `telemetry-seams`) passed;
       v3-telemetry, v3-server, v3-cli pass.
-- [ ] `make check` -> exit code and commit; `make rust-test-slow` -> exit
-      code.
+- [x] `make check` -> exit 0 at tested commit b451e04a; `make rust-test-slow` -> exit
+      0 (3 and 6 passed).
 - [x] Gate: summary `docs/progress/features/t30-f02.json`, raw hash and
       byte counts, series entry, no raw staged; every `deterministic` value
       and work counter equal. Goal: `Not run: Verification Plan`.
@@ -252,11 +252,11 @@ predeclared. Exit 0 (`make`) and 0 (CLI). Raw 134942 bytes, sha256
 - [x] No production file under `runtime/` or `mutation/` imports
       `creature::state`, `creature::action_log` or `simulation`, and
       `scripts/architecture-debts.txt` holds no G7, G8 or G16 line.
-- [ ] The tests of the Verification section pass, and `make check` and
+- [x] The tests of the Verification section pass, and `make check` and
       `make rust-test-slow` exit 0.
-- [ ] The gate's `deterministic` values and work counters equal the
+- [x] The gate's `deterministic` values and work counters equal the
       reference's.
-- [ ] `docs/architecture.md` section 5 no longer lists G7, G8 or G16.
+- [x] `docs/architecture.md` section 5 no longer lists G7, G8 or G16.
 
 ## Notes for AI Agents
 

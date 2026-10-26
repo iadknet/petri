@@ -22,7 +22,7 @@ behavior.
 
 - [x] **T30.F01 — Inspector Brain View** — Depends on: None
   - Goal: A person inspecting a creature sees its brain as the simulation applies it, every weight and learner resolved by the core, and the inspector and the paint tools read types the server owns, with no behavior change.
-- [ ] **T30.F02 — Brain Execution Stands Alone** — Depends on: None
+- [x] **T30.F02 — Brain Execution Stands Alone** — Depends on: None
   - Goal: A creature thinks, spends energy and dies exactly as before, its brain's execution owning its own state and drawing on one shared energy accounting, with no behavior change.
 - [x] **T30.F03 — Sensors Read Views** — Depends on: None
   - Goal: A creature perceives exactly what it perceived before, from explicit views of the world and of each body, with no behavior change.

@@ -166,13 +166,10 @@ field access through another type. Design notes:
 | G4 | No birth constructor: `spawn_child` (`simulation::actions::reproduction`) and `simulation::seeding` build creatures separately; learned seeds ride in the genome (`creature::genome::cgp::container`); `cap_energy` runs after construction; traits draw their own RNG (`creature::identity`, `creature::body`); mesh copy and slice cloning are assembled by mutation callers (`mutation::topology::structural`) rather than genome operations that return their inherited-value effects | T29.F01 |
 | G5 | Body outside the genome (`creature::body`), per-birth trait chances, colour and kin tag gated on brain mutation (`simulation::actions::reproduction`), `lineage_id` in the body (`creature::identity`), mutation importing creature's `Phenotype` (`mutation::phenotype`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`simulation::actions::reproduction`) | T29.F03 |
-| G7 | Energy primitives (`DeathCause`, debits, cognition energy) in `simulation::energy_accounting`, imported by runtime (`runtime::{mesh, vm, cgp::execute, types, trace}`) and the creature record (`creature::state`) | T30.F02 |
-| G8 | Runtime state types in the creature record (`creature::state`), imported by runtime (`runtime::{mesh, cgp::execute, cgp::traced, traced_mesh}`) and mutation (`mutation::reachability`, through `DispatchRecord`) | T30.F02 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
 | G13 | The InputRef mutations edit declarations and Graph edges by hand (`mutation::input_ref`) | T25.F11 |
 | G14 | Production reads readers: the inheritance witness reads `creature::drives::PATH_WEIGHT_FLOOR` (`simulation::actions::reproduction`) | T25.F11 |
 | G15 | Genome analysis draws randomness (`creature::genome::analysis`, called by `mutation::vm::operators`) | T30.F05 |
-| G16 | A runtime trace carries simulation and creature records (`runtime::trace::domain`) | T30.F02 |
 | G18 | Two result vocabularies: `ActionResult` (`creature::action_log`) and a success boolean for rewards (`simulation::outcomes`) | T30.F06 |
 | G19 | Action resolution mixed with scheduling: per-action executors, action flooring and removal in `simulation::tick` beside `run_tick`; mechanics taking the whole `Simulation` (`simulation::actions::{giving, predation}`); move effort composed on the creature record (`creature::state`) | T30.F06 |
 | G22 | The action log's wire entry (`v3-server`'s `transport::action_log`) is built from the stored `ActionLogEntry`, not from the applied action result | T30.F06 |
