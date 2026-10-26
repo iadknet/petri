@@ -2,76 +2,51 @@
 
 use crate::contracts::{ActionType, ACTION_TYPE_COUNT};
 
-/// The sink that first exhausted a creature since its last positive recovery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeathCause {
-    LifecycleDecay,
-    GenomeCarrying,
-    /// The Phase 0 capacity upkeep of a body above the reference (T26.F02).
-    CapacityUpkeep,
-    VmCompute,
-    GraphCompute,
-    MeshRamp,
-    PriorityBid,
-    ActionNoop,
-    ActionEat,
-    ActionMove,
-    ActionReproduce,
-    ActionStealEnergy,
-    ActionGiveEnergy,
-    ParentalTransfer,
-    Predation,
-    /// A giver exhausted by its own gift (T27.F03).
-    Gift,
-    ExternalRemoval,
-    Unattributed,
+/// One row per cause: the variant and its report key. The enum, `ALL` and
+/// `as_key` are all generated from this list, so a new cause is one row.
+macro_rules! death_causes {
+    ($($(#[$doc:meta])* $variant:ident => $key:literal,)+) => {
+        /// The sink that first exhausted a creature since its last positive recovery.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum DeathCause {
+            $($(#[$doc])* $variant,)+
+        }
+
+        impl DeathCause {
+            /// Every cause in declaration order, so `ALL[cause as usize] == cause`.
+            pub const ALL: [Self; [$(Self::$variant),+].len()] = [$(Self::$variant),+];
+
+            #[must_use]
+            pub const fn as_key(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $key,)+
+                }
+            }
+        }
+    };
 }
 
-impl DeathCause {
-    pub const ALL: [Self; 18] = [
-        Self::LifecycleDecay,
-        Self::GenomeCarrying,
-        Self::CapacityUpkeep,
-        Self::VmCompute,
-        Self::GraphCompute,
-        Self::MeshRamp,
-        Self::PriorityBid,
-        Self::ActionNoop,
-        Self::ActionEat,
-        Self::ActionMove,
-        Self::ActionReproduce,
-        Self::ActionStealEnergy,
-        Self::ActionGiveEnergy,
-        Self::ParentalTransfer,
-        Self::Predation,
-        Self::Gift,
-        Self::ExternalRemoval,
-        Self::Unattributed,
-    ];
-
-    #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        match self {
-            Self::LifecycleDecay => "lifecycle_decay",
-            Self::GenomeCarrying => "genome_carrying",
-            Self::CapacityUpkeep => "capacity_upkeep",
-            Self::VmCompute => "vm_compute",
-            Self::GraphCompute => "graph_compute",
-            Self::MeshRamp => "mesh_ramp",
-            Self::PriorityBid => "priority_bid",
-            Self::ActionNoop => "action_noop",
-            Self::ActionEat => "action_eat",
-            Self::ActionMove => "action_move",
-            Self::ActionReproduce => "action_reproduce",
-            Self::ActionStealEnergy => "action_steal_energy",
-            Self::ActionGiveEnergy => "action_give_energy",
-            Self::ParentalTransfer => "parental_transfer",
-            Self::Predation => "predation",
-            Self::Gift => "gift",
-            Self::ExternalRemoval => "external_removal",
-            Self::Unattributed => "unattributed",
-        }
-    }
+death_causes! {
+    LifecycleDecay => "lifecycle_decay",
+    GenomeCarrying => "genome_carrying",
+    /// The Phase 0 capacity upkeep of a body above the reference (T26.F02).
+    CapacityUpkeep => "capacity_upkeep",
+    VmCompute => "vm_compute",
+    GraphCompute => "graph_compute",
+    MeshRamp => "mesh_ramp",
+    PriorityBid => "priority_bid",
+    ActionNoop => "action_noop",
+    ActionEat => "action_eat",
+    ActionMove => "action_move",
+    ActionReproduce => "action_reproduce",
+    ActionStealEnergy => "action_steal_energy",
+    ActionGiveEnergy => "action_give_energy",
+    ParentalTransfer => "parental_transfer",
+    Predation => "predation",
+    /// A giver exhausted by its own gift (T27.F03).
+    Gift => "gift",
+    ExternalRemoval => "external_removal",
+    Unattributed => "unattributed",
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -258,15 +233,13 @@ mod tests {
 
     proptest! {
         #[test]
-        fn cause_keys_follow_the_stable_report_schema(index in 0usize..DeathCause::ALL.len()) {
-            let expected = [
-                "lifecycle_decay", "genome_carrying", "capacity_upkeep", "vm_compute", "graph_compute",
-                "mesh_ramp", "priority_bid", "action_noop",
-                "action_eat", "action_move", "action_reproduce", "action_steal_energy",
-                "action_give_energy", "parental_transfer", "predation", "gift",
-                "external_removal", "unattributed",
-            ];
-            prop_assert_eq!(DeathCause::ALL[index].as_key(), expected[index]);
+        fn every_cause_sits_at_its_discriminant_with_a_unique_key(index in 0usize..DeathCause::ALL.len()) {
+            // `MortalityTotals` indexes by discriminant and reports by key.
+            let cause = DeathCause::ALL[index];
+            prop_assert_eq!(cause as usize, index);
+            let key = cause.as_key();
+            prop_assert!(!key.is_empty() && key.bytes().all(|b| b.is_ascii_lowercase() || b == b'_'));
+            prop_assert_eq!(DeathCause::ALL.iter().filter(|other| other.as_key() == key).count(), 1);
         }
 
         #[test]
