@@ -1,6 +1,6 @@
 # T30.F04 — Config and World Without Cycles
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F04
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -158,7 +158,7 @@ changed food-stream or pattern test value, would show it wrong.
 - [x] `WORKAROUND(T30.F04): generated from or tested against the server's
       config schema` comments on the hand-copied types in
       `frontend/src/types/pattern.ts` and `config.ts` (audit R5).
-- [ ] `make check`; the gate profile.
+- [x] `make check`; the gate profile.
 
 ## Verification
 
@@ -183,7 +183,7 @@ changed food-stream or pattern test value, would show it wrong.
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
 - [x] Frontend comments: `npx biome check src/types/pattern.ts
       src/types/config.ts` (in `frontend/`) -> no diagnostics.
-- [ ] `make check` -> exit 0.
+- [x] `make check` -> exit 0 at tested commit `af5e3ca5`.
 - [x] Gate profile: summary at `docs/progress/features/t30-f04.json`, local
       raw hash and byte count and verification time checked, series entry
       points to the summary, deterministic blocks identical to the epoch,
@@ -212,15 +212,15 @@ bytes; readings in the file below.
 
 ## Success Criteria
 
-- [ ] `config` imports only `contracts`, `kernel` imports nothing from
+- [x] `config` imports only `contracts`, `kernel` imports nothing from
       `creature`, and `make check-docs` passes with G10 and G11 deleted from
       both `docs/architecture.md` and `scripts/architecture-debts.txt`.
-- [ ] One `splitmix64` in the workspace, in `contracts`, called by the kin
+- [x] One `splitmix64` in the workspace, in `contracts`, called by the kin
       tag, the food stream and telemetry's window selection, with every
       output unchanged.
-- [ ] `PatternBounds`, `PatternParams` and `TerrainLayer` have one home in
+- [x] `PatternBounds`, `PatternParams` and `TerrainLayer` have one home in
       `config`; the bounds intersection has one owner operation.
-- [ ] The gate's deterministic blocks, the pinned map digest of every
+- [x] The gate's deterministic blocks, the pinned map digest of every
       `RECIPES` world and every existing test value are unchanged.
 
 ## Notes for AI Agents
@@ -239,3 +239,4 @@ bytes; readings in the file below.
   the PINNED/RECIPES sync (fixed in this pass) and the frontend schema-copy
   note having no named payer, which stays the workflow's unpaid-accept form
   with the payer proposed to the user at closure.
+- Cost: `/usage` totals not collected (unattended goal run); implementer passes 3 (build, simplify, review remediation) with advisor consults 2, 2, 1; spec-owner resumes after Plan 0; Codex challenge rounds 2, final verdict `ready`; final review findings: correctness 0, design 0, code health 2 P3.

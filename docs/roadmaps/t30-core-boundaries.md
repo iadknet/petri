@@ -26,7 +26,7 @@ behavior.
   - Goal: A creature thinks, spends energy and dies exactly as before, its brain's execution owning its own state and drawing on one shared energy accounting, with no behavior change.
 - [ ] **T30.F03 — Sensors Read Views** — Depends on: None
   - Goal: A creature perceives exactly what it perceived before, from explicit views of the world and of each body, with no behavior change.
-- [ ] **T30.F04 — Config and World Without Cycles** — Depends on: None
+- [x] **T30.F04 — Config and World Without Cycles** — Depends on: None
   - Goal: Worlds are configured, painted and stocked with food exactly as before, by layers that build on each other in one direction, with no behavior change.
 - [ ] **T30.F05 — Genome Owns Its Analysis** — Depends on: None
   - Goal: Offspring mutate exactly as before, with every random choice drawn by mutation and every structural fact read from the genome's own analysis, with no behavior change.
