@@ -204,7 +204,7 @@ pin. On the feature head:
 - [ ] Gate and goal summaries at `docs/progress/features/t25-f11.json` and
       `t25-f11-goal.json`; series entries point at them; no full report
       staged; raw hashes and byte counts in the readings file.
-- [ ] Goal readings in the readings file: per world, `bundles` by wiring with
+- [x] Goal readings in the readings file: per world, `bundles` by wiring with
       `nonzero` share, `created` by wiring, `mean_genome_size`,
       `mutation_events_attempted_total` per birth, compute per tick.
 
@@ -244,7 +244,19 @@ reading that blocks closure until the user accepts it or remediation removes
 it. The `pair_groups` → `bundles` and `structure_means` definition changes
 are marked in the series, so those columns are not like-for-like.
 
-**Measured verdict.** Pending.
+**Measured verdict (`96da8a1ae`).** Both profiles `severe`, exit 3 (`make` 2).
+
+| Reading | Measured | Predeclared |
+| --- | --- | --- |
+| Gate `plasticity_updates` | 0.577232, +374 % (severe) | accepted by decision "A" |
+| Gate `pass_cap_hits` | 0.003046, +274 % (severe) | not predeclared or accepted |
+| Gate wall per creature-tick | 0.005202 ms: +102.6 % (severe) vs epoch, +26.0 % (flag) vs `t30-f06` | within 25 %, +-10 % hypothesis: missed |
+| Goal `plasticity_updates` | 12.36, +300 % (severe); `decided_passes` +44 % (flag) | accepted by decision "A" (plasticity) |
+| Goal other counters | within -13 % to +4 % | n/a |
+| Persistence | all three worlds survive; Canyon minimum 11 | n/a |
+| `Plain` bundles | 2,532 to 10,769 per world | held |
+| `learned_nonzero` vs genomic | above only for pair in Orchards and Confluence | not held as stated |
+| Genome size, events per birth vs T27.F03 | up in Orchards and Confluence, down in Canyon | mixed |
 
 - Summaries: [gate](../../progress/features/t25-f11.json),
   [goal](../../progress/features/t25-f11-goal.json).
