@@ -218,7 +218,7 @@ value, or a gate compute regression past its threshold would show it wrong.
       matches only in `crates/v3-core/src/creature/state.rs`.
 - [x] Invariant 3: `cargo test -p v3-core creature::state` -> the record
       test passes; `grep -rn new_with_cached_fields crates` is empty.
-- [ ] Invariant 4: `grep -rn "runtime_mut" crates` -> one `#[cfg(test)]`
+- [x] Invariant 4: `grep -rn "runtime_mut" crates` -> one `#[cfg(test)]`
       definition in `creature/state.rs` and uses in test code only;
       `grep -rnE "\*[^=;]*runtime_mut\(\)\s*=" crates` is empty (no whole-state
       assignment); `grep -rnE "&mut [a-z_.\[\]]*\.graph_runtime\b" crates`

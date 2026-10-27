@@ -1,7 +1,6 @@
 use std::mem::size_of;
 
-use crate::config::RuntimeConfig;
-use crate::config::{EnergyCapacityConfig, EnergyConfig};
+use crate::config::{EnergyCapacityConfig, EnergyConfig, RuntimeConfig};
 use crate::contracts::{
     CreatureId, Direction, OrdinaryFoodTypeId, PerceptionRequirements, Position, WorldInputKey,
     SHARED_MEMORY_SLOTS,
@@ -346,8 +345,9 @@ impl CreatureState {
         )
     }
 
-    /// [`Self::think_traced`] under a record budget
-    /// (`execute_creature_mesh_budgeted`).
+    /// [`Self::think`] with trace recording under a record budget
+    /// ([`execute_creature_mesh_budgeted`]), the `telemetry-seams` build's
+    /// form of `think_traced`.
     #[cfg(feature = "telemetry-seams")]
     pub(crate) fn think_budgeted(
         &mut self,
