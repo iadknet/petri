@@ -160,14 +160,11 @@ field access through another type. Design notes:
 
 | Debt | Today | Paid by |
 | --- | --- | --- |
-| G1 | Three routes wire a sensor with three rule sets (`mutation::input_ref`, `mutation::graph::recruitment`, `mutation::graph::group`); fact-only branches and split hosting in `genome::cgp::container`; non-world sensor widths in `mutation::compound` | T25.F11 |
-| G2 | Brain I/O vocabulary outside `contracts` (`genome::vote`, outcome channels read by `sensors::static_inputs`, `OUTPUT_SLOT_COUNT` in `runtime::types` imported by `mutation::sampling`); route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | vocabulary: T25.F11; routes and jumps: T30.F05 |
+| G2 | Route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | T30.F05 |
 | G3 | Learning configured on edges only (the genome's edge type), group flags beside it (`genome::cgp::group`), `Scope::Group` branches in `runtime::plasticity::learned`, learners found from plastic edges (`genome::companions`) | T25.F12 |
 | G4 | No birth constructor: `spawn_child` (`simulation::actions::reproduction`) and `simulation::seeding` build creatures separately; learned seeds ride in the genome (`genome::cgp::container`); `cap_energy` runs after construction; traits draw their own RNG (`creature::identity`, `creature::body`); mesh copy and slice cloning are assembled by mutation callers (`mutation::topology::structural`) rather than genome operations that return their inherited-value effects | T29.F01 |
 | G5 | Body outside the genome (`creature::body`), per-birth trait chances, colour and kin tag gated on brain mutation (`simulation::actions::reproduction`), `lineage_id` in the body (`creature::identity`), mutation importing creature's `Phenotype` (`mutation::phenotype`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`simulation::actions::reproduction`) | T29.F03 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
-| G13 | The InputRef mutations edit declarations and Graph edges by hand (`mutation::input_ref`) | T25.F11 |
-| G14 | Production reads readers: the inheritance witness reads `neighborhood::drives::PATH_WEIGHT_FLOOR` (`simulation::actions::reproduction`) | T25.F11 |
 | G15 | Genome analysis draws randomness (`genome::analysis`, called by `mutation::vm::operators`) | T30.F05 |
 | G23 | Program edits applied in mutation: splice and insertion with jump-reference repair (`mutation::vm::operators::splice_program_with_reference_repair`, also used by `mutation::topology::routing`) the register-count resize with its width predicate (`register_count_moves`, `apply_register_count_mutation`), the dormant-tail copy with its terminal classification and conditional `Halt` (`copy_span_to_dormant_tail`), and route composition through gate writes (`mutation::topology::routing`: `add_gate_write`, `apply_add_route_target`, `apply_add_feedback_route`) | T30.F05 |

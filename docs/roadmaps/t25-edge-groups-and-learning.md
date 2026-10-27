@@ -187,8 +187,12 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   4.7×, compute only) is accepted as the feature's justified cost rather
   than changing the birth law. Asked "(a) accept as T25.F11's justified
   cost, re-pinning the gate epoch at closure, or (b) change the birth law",
-  the user answered "A". The final-code gate summary becomes the gate epoch
-  in the closing commit; no threshold or stored baseline is edited.
+  the user answered "A". Extended the same day after the final-code runs,
+  in the user's words: "Accept: pass_cap_hits, the gate wall-clock flag,
+  and the goal plasticity reading are part of T25.F11's justified cost;
+  re-pin gate and goal epochs." The final-code gate and goal summaries
+  become both epochs in the closing commit; no threshold or stored
+  baseline is edited.
 - Decided (user, 2026-10-22): F12 follows F11, after the user asked whether
   sensors, sinks, edges and bundles keep clean layers around learning. The
   [bundle learning note](../strategy/bundle-learning-ownership-2026-10-22.md)

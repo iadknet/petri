@@ -149,7 +149,7 @@ mechanics change).
       witness retired, `bundles-v1`, the server bundle view, the reference
       specs, the series `counter_definition_changes` entries, and every
       code-side re-pin of invariant 10 (tests, fixtures, the slow tier).
-- [ ] Epoch re-pins (benchmark step; the orchestrator checks this at
+- [x] Epoch re-pins (benchmark step; the orchestrator checks this at
       closure): the final-code gate and goal summaries become both epochs
       in the closing commit (Notes, decision "A"); until then the gate
       regression test fails on the accepted `plasticity_updates` rise.
@@ -201,7 +201,7 @@ pin. On the feature head:
       in every commit.
 - [ ] `make check` -> 0 on the final commit; `make rust-test-slow` -> re-pinned
       readings recorded in the readings file.
-- [ ] Gate and goal summaries at `docs/progress/features/t25-f11.json` and
+- [x] Gate and goal summaries at `docs/progress/features/t25-f11.json` and
       `t25-f11-goal.json`; series entries point at them; no full report
       staged; raw hashes and byte counts in the readings file.
 - [x] Goal readings in the readings file: per world, `bundles` by wiring with
@@ -264,10 +264,10 @@ are marked in the series, so those columns are not like-for-like.
 
 ## Success Criteria
 
-- [ ] The catalog carries `AddSensorLive`, `AddSensorSilent`, `AddBundleLive`,
+- [x] The catalog carries `AddSensorLive`, `AddSensorSilent`, `AddBundleLive`,
       `AddBundleSilent` and none of the six retired operators or the config;
       each creation operator applies at least once on an applicable fixture.
-- [ ] A sensor added to a Graph node is wired whole, one bundle per field
+- [x] A sensor added to a Graph node is wired whole, one bundle per field
       set, live or silent as the operator says; the one member law holds for
       every wiring and both sources (property tests).
 - [ ] G1, G13, G14 and G2's vocabulary lines are deleted from
@@ -278,32 +278,31 @@ are marked in the series, so those columns are not like-for-like.
 
 ## Notes for AI Agents
 
-- Decision: live and silent are separate operators in both domains, never
-  a draw inside one (user, 2026-10-22); a single-field sensor is a `Plain`
-  bundle of one; a sensor arrives whole, one bundle per field set.
+- Decision: (user, 2026-10-22) live and silent are separate operators in
+  both domains; a single-field sensor is a `Plain` bundle of one; a sensor
+  arrives whole, one bundle per field set.
 - Decision: weights `AddSensorLive` 1, `AddSensorSilent` 1,
   `AddBundleLive` 4, `AddBundleSilent` 4: each pair splits its
-  predecessors' weight evenly; recruitment's 1 is retired with it.
+  predecessors' weight; recruitment's 1 is retired.
 - Decision: the inheritance witness is retired, not moved (readings file,
   options table); the upstream bus is the compound sensor `UpstreamBus`; the
   memory banks are bundle sources without a declaration; creations are read
   by operator, wiring and form from applied reports, and surviving bundles
   carry no birth tag.
-- Decision: (user, 2026-10-27, "B") `ActionQueue`'s width follows
-  `max_actions_per_turn` (`3 ×` the normalized value), reversing T19.F06's
-  constant-width premise (`d0ddcd205`, "a constant 12 whatever
-  `max_actions_per_turn`"); the queue size reaches every width reader
-  through the `SensorContext`; no config cap is added.
-- Decision: a field set with no admissible plan skips after its draws
-  under the engine's gated restore; no sensor redraw and no filtered
-  universe.
+- Decision: (user, 2026-10-27, "B"; track Notes) `ActionQueue`'s width
+  follows `max_actions_per_turn`, reversing T19.F06's constant-width
+  premise (`d0ddcd205`); the `SensorContext` carries it; no config cap.
+- Decision: a field set with no admissible plan skips under the engine's
+  gated restore; no sensor redraw and no filtered universe.
 - Decision: (user, 2026-10-27, "A"; track Notes) the gate's
   `plasticity_updates` rise (0.577 per tick against T27.F03's 0.122, about
-  4.7×, compute only, energy cost 0) is this feature's justified cost:
-  every bundle draws F08's learning mode (two in three learn) and
-  whole-sensor arrivals wire many more edges than `InputRef.Add`'s one
-  static edge. The final-code gate summary becomes the gate epoch in the
-  closing commit; no threshold or stored baseline is edited.
+  4.7×, compute only) is this feature's justified cost: every bundle draws
+  F08's learning mode and whole-sensor arrivals wire many more edges than
+  `InputRef.Add`'s one static edge. Extended the same day, in the user's
+  words: "Accept: pass_cap_hits, the gate wall-clock flag, and the goal
+  plasticity reading are part of T25.F11's justified cost; re-pin gate and
+  goal epochs." The final-code gate and goal summaries become both epochs
+  in the closing commit; no threshold or stored baseline is edited.
 - Deferred: unpaid accept, `neighborhood/recruitment_paths` (a reachability
   assay in `v3-core`, placed 2026-09-12 before the T22 lab rule; F11 only
   re-expressed one plan step); payer proposed to the user at closure: a row
