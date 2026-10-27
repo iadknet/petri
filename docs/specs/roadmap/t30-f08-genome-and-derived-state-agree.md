@@ -245,9 +245,7 @@ indicator can move.
 
 **Measured verdict.** Gate, exit 0, `severe=false`: all 9 work counters
 0.000000% and deterministic blocks equal to the epoch, as predeclared. Wall
-clock flagged (+44.9%; severe is 100%) under host load 85–114, untouched
-phases doubling alike; not rerun. The wall-clock reading is not attributed to
-this feature; the next closure's gate on an idle host re-reads it.
+clock flagged (+44.9%) under host load; not attributed to this feature.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f08.json).
 - Full readings: [`docs/progress/readings/t30-f08.md`](../../progress/readings/t30-f08.md).
