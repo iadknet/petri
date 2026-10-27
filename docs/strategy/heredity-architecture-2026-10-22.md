@@ -23,7 +23,7 @@ mutation laws:
 |---|---|
 | L1 | The heritable body (`HeritableBody`: colour, kin identity, capacity, two exchange shares) sits on `CreatureState` outside `CreatureGenome`. It costs 0 genome units and is not part of genome equality. |
 | L2 | Three mutation laws. Genome: `Binomial(genome_size, 0.0060625)`. Capacity and both shares: chance 0.1 per birth each. Colour and kin tag mutate only on births where a genome event was applied (`applied_events > 0`, about 39% of founder births), which couples body heredity to brain heredity. |
-| L3 | The birth transaction is implicit. `spawn_child` (simulation layer) clones and mutates the genome, calls `HeritableBody::inherit` (which draws its own randomness, `identity.rs` `mutate_kin_tag`), copies `shared_memory`, smuggles learned seeds through the genome draft and advances `generation`; the constructors rebuild caches and runtime, or copy the caches on an unchanged-genome birth; `cap_energy` runs after construction; seeding (`simulation/seeding.rs`) is a second builder. |
+| L3 | The birth transaction is implicit. `spawn_child` (simulation layer) clones and mutates the genome, calls `HeritableBody::inherit` (which draws its own randomness, `identity.rs` `mutate_kin_tag`), copies `shared_memory`, smuggles learned seeds through the genome draft and advances `generation`; the constructors rebuild caches and runtime, or copy the caches on an unchanged-genome birth (removed by T30.F08 at `7fc60133f`: one constructor now rebuilds them on every birth); `cap_energy` runs after construction; seeding (`simulation/seeding.rs`) is a second builder. |
 | L4 | Each inherited store has its own policy, which is legitimate, but only learning's is heritable. Learned weights pass by each edge's `lamarckian` flag; `shared_memory` passes always; stateful operator state, `prev_shared_memory`, `previous_outcome`, the dispatch record and T27.F02's planned signals start at zero. |
 | L5 | The parent's dispatch record (`ParentExecuted::Record`, T11.F17) biases where the child's mutations land. That is runtime state feeding heredity, and the code does not name it as such. |
 | L6 | Learned seeds ride inside the genome type: `CgpGraphBackendDef.birth_seeds`, `#[serde(skip)]`, outside equality. They are there so the container's edit primitives keep them aligned with edge indices (T25.F01). |
@@ -103,8 +103,9 @@ it with world context (position, litter energy, birth direction).
    stays the record of applied events.
 2. **Finalize.** Resolve the learning layout from the child's mutated
    genome (T25.F12), apply the child's inheritance settings to the payload
-   (table below), build caches, sink weights and runtime (or reuse the
-   parent's caches when no event applied, as the fast path does today),
+   (table below), build caches, sink weights and runtime through the one
+   creature constructor (T30.F08 removed the unchanged-genome cache reuse
+   at `7fc60133f`, so every birth rebuilds them),
    reset per-life state (`prev_shared_memory`, `previous_outcome`,
    operator state, dispatch history, signals), set the heading from the
    birth direction, and provision energy.
@@ -166,8 +167,9 @@ semantics (user, after the architecture review).
   size.
 - **Body genes have a carrying cost**: each pays carry, replication and
   gestation like any unit.
-- **Genome equality and serialization include the body**, so the
-  no-mutation fast path, mutation-effect screens and genome digests move.
+- **Genome equality and serialization include the body**, so
+  mutation-effect screens and genome digests move (the no-mutation fast
+  path is gone since T30.F08, `7fc60133f`).
 - **Two memory masks with every bit set match today's behavior.** Selection
   can now clear bits.
 - No backward compatibility: genomes, draws and pins move, predeclared.

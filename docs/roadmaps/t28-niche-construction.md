@@ -1,7 +1,7 @@
 # T28 — Niche Construction
 
 **Status**: Planned
-**Last updated**: 2026-10-22
+**Last updated**: 2026-10-27
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -20,7 +20,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Executable Features
 
-- [ ] **T28.F01 — Carrying and Food Caching** — Depends on: T26.F02, T27.F03
+- [ ] **T28.F01 — Carrying and Food Caching** — Depends on: T26.F02, T27.F03, T29.F03, T30.F05
   - Goal: Caching and seed dispersal: a creature picks food into one of four slots, carries it at a cost and sets it down elsewhere, where it can be eaten later or grow.
 - [ ] **T28.F02 — Digging and Building** — Depends on: T28.F01
   - Goal: Burrows and walls: a creature digs a barrier out of the ground into a slot and builds it elsewhere, so walls outlast their makers and shape who comes after.
@@ -70,7 +70,9 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   contract. It adds no sinks or parameters; its expected pin changes come
   from applied barrier behavior.
 - F01 depends on T26.F02 because both change the move-effort function, and
-  on T27.F03 because both add directed kinds to the same catalog.
+  on T27.F03 because both add directed kinds to the same catalog; it
+  depends on T29.F03 and T30.F05 so every architecture debt is paid before
+  carrying lands (user, 2026-10-27), and F02 inherits that through F01.
 - Both are creature-authored pressures under the
   [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline).
 - Verification: F01 viability first, gate + goal; F02 viability first,

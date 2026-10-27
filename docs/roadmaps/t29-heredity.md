@@ -1,7 +1,7 @@
 # T29 — Heredity
 
 **Status**: Planned
-**Last updated**: 2026-10-22
+**Last updated**: 2026-10-27
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -76,13 +76,15 @@ user decisions and review:
   their effects retire the `WORKAROUND(T25.F08)` group-edit tallies in
   `mutation/engine/mod.rs` (the operator-kind list and the before/after
   scans go; required, 2026-10-25 architecture review);
-  finalization owns cache reuse on an unchanged genome, resets of per-life
-  state, heading and the energy cap; `mutate_kin_tag` and
+  finalization builds the child's derived state through the one creature
+  constructor T30.F08 left (`7fc60133f` removed the unchanged-genome cache
+  reuse; no birth reintroduces it), and owns resets of per-life state,
+  heading and the energy cap; `mutate_kin_tag` and
   `mutate_phenotype` randomness moves into mutation policies with today's
   draw order kept. The parent's dispatch record stays a named input to
   mutation.
-- F02 predeclares its re-pins: genome format and equality (the fast path,
-  mutation-effect screens and digests include the body), draw streams,
+- F02 predeclares its re-pins: genome format and equality (mutation-effect
+  screens and digests include the body), draw streams,
   trajectories, both epochs. The founder grows from 80 to 85 units (F03's
   two masks make 87); each of F02 and F03 re-pins `per_unit_rate` so the
   founder's supply stays 0.485 events per birth, as T25.F02 did, and moves

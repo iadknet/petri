@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-10-25
+**Last updated**: 2026-10-27
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
 closed, what made evolution start working and the findings it carried
@@ -21,8 +21,8 @@ attributed to the feature whose closure moved it.
 
 - [ ] **T25 — Edge Groups and Per-Edge Learning** — [Roadmap](roadmaps/t25-edge-groups-and-learning.md) — Depends on: None
 - [x] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
-- [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26
-- [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27
+- [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26, T29, T30
+- [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27, T29, T30
 - [ ] **T29 — Heredity** — [Roadmap](roadmaps/t29-heredity.md) — Depends on: T25
 - [ ] **T30 — Core Boundaries** — [Roadmap](roadmaps/t30-core-boundaries.md) — Depends on: None
 
@@ -77,8 +77,18 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
   steals (2026-10-12 probe) are owned by T27.F03.
 
 Priority order for new starts: T30.F03, T26.F01, T25.F10, T27.F01, T26.F02,
-T27.F03, T30.F01, T30.F07, T30.F08, T25.F11, T25.F12, T27.F02, T29.F01, T29.F02, T29.F03,
-T30.F02, T30.F04, T30.F05, T30.F06, T28.F01, T28.F02.
+T27.F03, T30.F01, T30.F07, T30.F08, T25.F11, T25.F12, T29.F01, T29.F02, T29.F03,
+T30.F02, T30.F04, T30.F05, T30.F06, T27.F02, T28.F01, T28.F02.
+
+- T27.F02 was moved after T29.F03 and T30.F05 on 2026-10-27 at the user's
+  direction: "Move T27.F02 after T29.F03 and T30.F05 so all architecture
+  debt is paid first". The review found that a priority position alone does
+  not enforce this under the concurrent-start rule, so the user made it a
+  dependency: T27.F02 and T28.F01 depend on T29.F03 and T30.F05, whose
+  chains cover every debt payer in `docs/architecture.md` section 5, and
+  T28.F02 follows through T28.F01. No remaining new mechanism can start
+  before that debt is paid
+  ([T27.F02 reorder review](progress/readings/t27-f02-reorder-design-review.md)).
 
 - T30 (core boundaries) was placed on 2026-10-22 at the user's direction
   from the known debts in [`docs/architecture.md`](architecture.md) that no

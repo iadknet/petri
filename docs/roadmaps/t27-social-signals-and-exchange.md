@@ -1,7 +1,7 @@
 # T27 — Social Signals and Exchange
 
 **Status**: In Progress
-**Last updated**: 2026-10-22
+**Last updated**: 2026-10-27
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -25,7 +25,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 - [x] **T27.F01 — Colour Vision** — Depends on: None
   - Goal: Colour vision: a creature sees the red, green and blue of each nearby creature and knows its own, so a visible marking can come to mean kin, rival or prey.
-- [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F11, T27.F03
+- [ ] **T27.F02 — Held Signals** — Depends on: T27.F01, T25.F11, T27.F03, T29.F03, T30.F05
   - Goal: Song and scent: a creature writes eight held signal channels and its neighbours read them, so meaning can arise from who sends what.
 - [x] **T27.F03 — Giving Energy** — Depends on: T26.F01
   - Goal: Trophallaxis and parental feeding: a creature can pass part of its store to a neighbour, and stealing takes part of the victim's the same way; how much is inherited and pushed by effort, so care and exploitation are both possible.
@@ -141,6 +141,9 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
   decoder and do not establish onset under F03. The graded steal effort has
   been live since predation landed; T16.F02 retired only the separate
   failed-action penalty.
+- F02 depends on T29.F03 and T30.F05 (user, 2026-10-27: "so all
+  architecture debt is paid first"); with their chains that covers every
+  debt payer in `docs/architecture.md` section 5.
 - F02 depends on F03 (review round 5 finding 8), so the track's goal-long
   run on F02 includes giving. It reads colour, giving, stealing and
   slot-fact discovery together. A 2,000-tick goal reading is an early
