@@ -5,7 +5,7 @@ use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSo
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::mutation::MutationOperator;
-use crate::simulation::actions::{apply_reproduce, apply_steal_energy, ReproductionActionResult};
+use crate::simulation::actions::{reproduce_now, steal_now, ReproductionActionResult};
 use crate::simulation::reproductive_success::{
     CognitiveClass, ReproductiveSuccessByCognitiveClass, ReproductiveSuccessTotals,
 };
@@ -150,7 +150,7 @@ fn reproductive_success_preserves_phase_zero_and_predation_removal_ages() {
     sim.creatures[victim].offspring_spawned_count = 5;
     sim.config.exchange.effort_rate = 0.0;
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
-    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    steal_now(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
     assert!(sim.creatures.contains_key(attacker));
     assert_eq!(
@@ -173,11 +173,11 @@ fn reproductive_success_counts_successful_births_when_the_parent_is_removed() {
     sim.config.energy.lifecycle.min_reproduce_energy = 0.0;
     let mut rng = SmallRng::seed_from_u64(17);
     assert_eq!(
-        apply_reproduce(parent, &mut sim, Direction::N, 4.0, &mut rng),
+        reproduce_now(parent, &mut sim, Direction::N, 4.0, &mut rng),
         ReproductionActionResult::Conceived
     );
     assert_eq!(
-        apply_reproduce(parent, &mut sim, Direction::N, 4.0, &mut rng),
+        reproduce_now(parent, &mut sim, Direction::N, 4.0, &mut rng),
         ReproductionActionResult::RejectedInvalidTarget
     );
     assert_eq!(sim.creatures[parent].offspring_spawned_count, 1);

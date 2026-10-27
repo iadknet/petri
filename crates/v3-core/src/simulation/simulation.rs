@@ -8,6 +8,7 @@ use crate::creature::state::CreatureState;
 use crate::genome::structural_companions;
 use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use crate::kernel::{FoodStreamKey, WorldState};
+use crate::simulation::actions::ActionInputs;
 use crate::simulation::reproductive_success::CognitiveClass;
 use crate::simulation::stats::{MutationOutcomeObservation, SimStats};
 
@@ -96,6 +97,17 @@ impl Simulation {
     #[cfg(feature = "telemetry-seams")]
     pub fn observe_creature(&mut self, id: CreatureId) {
         self.stats.observed_creature = Some(id);
+    }
+
+    /// The narrow inputs one action resolves over (T30.F06).
+    pub(crate) fn action_inputs(&mut self) -> ActionInputs<'_> {
+        ActionInputs {
+            creatures: &mut self.creatures,
+            world: &mut self.world,
+            config: &self.config,
+            stats: &mut self.stats,
+            tick: self.tick,
+        }
     }
 
     /// Remove one creature and record mortality and exit-time lifetime aggregates.

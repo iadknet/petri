@@ -152,7 +152,7 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
 
 #[test]
 fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
-    use crate::simulation::actions::{apply_reproduce, ReproductionActionResult};
+    use crate::simulation::actions::{reproduce_now, ReproductionActionResult};
     let (mut sim, parent) = make_sim_with_one_creature(1000.0);
     sim.config.mutation.per_unit_rate = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
@@ -168,7 +168,7 @@ fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
     sim.creatures[parent].lifetime_predation_hits_taken_count = 2;
 
     let mut rng = SmallRng::seed_from_u64(42);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 10.0, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 10.0, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
 

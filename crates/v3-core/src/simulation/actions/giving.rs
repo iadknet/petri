@@ -1,10 +1,10 @@
 //! The `GiveEnergy` action (T27.F03): trophallaxis and parental feeding, part
 //! of the giver's own store passed to the neighbour in a chosen direction.
 
+use super::ActionInputs;
 use super::TransferOutcome;
 use crate::contracts::{ActionType, CreatureId, Direction};
 use crate::ledger::DeathCause;
-use crate::simulation::simulation::Simulation;
 
 /// Result of an attempted `GiveEnergy` action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -52,49 +52,54 @@ impl GiveActionResult {
 /// the excess booked as clamp loss, and a recipient at its cap still
 /// receives a `Transferred` gift. A giver left at or below zero is removed
 /// by the tick's post-action removal, with pending cause `Gift`.
-pub fn apply_give_energy(
+pub(crate) fn apply_give_energy(
+    inputs: &mut ActionInputs<'_>,
     giver_id: CreatureId,
-    sim: &mut Simulation,
     dir: Direction,
     effort: f32,
 ) -> TransferOutcome<GiveActionResult> {
-    sim.stats.give_actions_attempted_total += 1;
-    sim.stats.last_tick_give += 1;
+    inputs.stats.give_actions_attempted_total += 1;
+    inputs.stats.last_tick_give += 1;
 
-    let giver = &mut sim.creatures[giver_id];
+    let giver = &mut inputs.creatures[giver_id];
     let intensity = super::exchange_intensity(giver.body.give_share, effort);
-    let effort =
-        super::pay_exchange_effort(giver, &sim.config, intensity, DeathCause::ActionGiveEnergy);
-    sim.stats.energy_flows.action_charges[ActionType::GiveEnergy] += effort;
+    let effort = super::pay_exchange_effort(
+        giver,
+        inputs.config,
+        intensity,
+        DeathCause::ActionGiveEnergy,
+    );
+    inputs.stats.energy_flows.action_charges[ActionType::GiveEnergy] += effort;
 
-    let Some(recipient_id) = super::neighbour_creature(sim, giver_id, dir) else {
-        return reject(sim, GiveActionResult::RejectedNoRecipient, effort, None);
+    let Some(recipient_id) = super::neighbour_creature(inputs, giver_id, dir) else {
+        return reject(inputs, GiveActionResult::RejectedNoRecipient, effort, None);
     };
 
     // A gift moves only when the giver's stored energy falls.
-    let before = sim.creatures[giver_id].energy;
+    let before = inputs.creatures[giver_id].energy;
     let Some(amount) = super::exchange_amount(intensity, before) else {
         return reject(
-            sim,
+            inputs,
             GiveActionResult::RejectedNothingToGive,
             effort,
             Some(recipient_id),
         );
     };
 
-    let giver = &mut sim.creatures[giver_id];
+    let giver = &mut inputs.creatures[giver_id];
     giver.energy -= amount;
-    sim.stats.energy_flows.gift_debit += giver.observe_energy(before, DeathCause::Gift);
-    let recipient = &mut sim.creatures[recipient_id];
+    inputs.stats.energy_flows.gift_debit += giver.observe_energy(before, DeathCause::Gift);
+    let recipient = &mut inputs.creatures[recipient_id];
     let recipient_before = recipient.energy;
     recipient.energy += amount;
-    sim.stats.energy_flows.gift_credit -=
+    inputs.stats.energy_flows.gift_credit -=
         recipient.observe_energy(recipient_before, DeathCause::Gift);
-    sim.stats.energy_flows.maximum_energy_clamp_loss +=
-        super::cap_energy(&mut sim.creatures[recipient_id]);
+    inputs.stats.energy_flows.maximum_energy_clamp_loss +=
+        super::cap_energy(&mut inputs.creatures[recipient_id]);
 
-    sim.stats.give_actions_transferred_total += 1;
-    *sim.stats
+    inputs.stats.give_actions_transferred_total += 1;
+    *inputs
+        .stats
         .give_actions_by_result
         .entry(GiveActionResult::Transferred)
         .or_insert(0) += 1;
@@ -108,14 +113,18 @@ pub fn apply_give_energy(
 /// Books a give that moved nothing: one rejection by `result`, its effort as
 /// failed.
 fn reject(
-    sim: &mut Simulation,
+    inputs: &mut ActionInputs<'_>,
     result: GiveActionResult,
     effort: f64,
     counterpart: Option<CreatureId>,
 ) -> TransferOutcome<GiveActionResult> {
-    sim.stats.give_actions_rejected_total += 1;
-    *sim.stats.give_actions_by_result.entry(result).or_insert(0) += 1;
-    sim.stats.energy_flows.failed_action_effort[ActionType::GiveEnergy] += effort;
+    inputs.stats.give_actions_rejected_total += 1;
+    *inputs
+        .stats
+        .give_actions_by_result
+        .entry(result)
+        .or_insert(0) += 1;
+    inputs.stats.energy_flows.failed_action_effort[ActionType::GiveEnergy] += effort;
     TransferOutcome {
         result,
         amount: 0.0,

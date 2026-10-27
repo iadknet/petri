@@ -2,6 +2,7 @@ use crate::creature::action_log::ActionType;
 use rand::Rng;
 
 use super::cgp_reproduction;
+use super::{ActionInputs, Conception};
 use crate::contracts::{CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
@@ -142,115 +143,128 @@ pub(crate) fn inherits_nonzero_pair_group(
 /// attempt pays that effort and nothing more. Steps 1 to 8 then run at
 /// conception on the post-effort energy. When every gate passes the parent
 /// carries a pending birth delivered after `gestation_ticks` (T03.F12) by
-/// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) runs Steps 9 to 14
-/// at once, the pre-feature engine.
+/// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) returns the
+/// [`Conception`] for the caller to run Steps 9 to 14 at once, the
+/// pre-feature engine.
 ///
-/// Returns `Conceived` or why the attempt was rejected.
+/// Returns `Conceived` or why the attempt was rejected, and the span-0
+/// conception.
 #[must_use]
-pub fn apply_reproduce(
+pub(crate) fn apply_reproduce(
+    inputs: &mut ActionInputs<'_>,
     parent_id: CreatureId,
-    sim: &mut Simulation,
     dir: Direction,
     energy_transfer_fraction: f32,
-    rng: &mut impl Rng,
-) -> ReproductionActionResult {
+) -> (ReproductionActionResult, Option<Conception>) {
     // Stats: always count attempt and per-tick reproduce regardless of outcome.
-    sim.stats.reproduction_actions_attempted_total += 1;
-    sim.stats.last_tick_reproduce += 1;
+    inputs.stats.reproduction_actions_attempted_total += 1;
+    inputs.stats.last_tick_reproduce += 1;
 
     // Step 0 (T16.F02): the attempt effort, paid whatever the outcome.
     let effort = super::pay_effort(
-        &mut sim.creatures[parent_id],
-        &sim.config.energy,
-        sim.config.energy.costs.reproduce_attempt_cost,
+        &mut inputs.creatures[parent_id],
+        &inputs.config.energy,
+        inputs.config.energy.costs.reproduce_attempt_cost,
         DeathCause::ActionReproduce,
     );
-    sim.stats.energy_flows.action_charges[ActionType::Reproduce] += effort;
+    inputs.stats.energy_flows.action_charges[ActionType::Reproduce] += effort;
 
-    let result = conceive(parent_id, sim, dir, energy_transfer_fraction, rng);
-    if result != ReproductionActionResult::Conceived {
-        sim.stats.energy_flows.failed_action_effort[ActionType::Reproduce] += effort;
+    match conceive(inputs, parent_id, dir, energy_transfer_fraction) {
+        Ok(conception) => (ReproductionActionResult::Conceived, conception),
+        Err(rejection) => {
+            inputs.stats.energy_flows.failed_action_effort[ActionType::Reproduce] += effort;
+            (rejection, None)
+        }
     }
-    result
 }
 
 /// Steps 1 to 8 of the unified sequence on the post-effort energy (T16.F01
-/// order): gates first, then the replication cost and the litter.
+/// order): gates first, then the replication cost and the litter. A
+/// conception returns its span-0 birth, `None` for a carried litter; a
+/// rejection returns its result.
 fn conceive(
+    inputs: &mut ActionInputs<'_>,
     parent_id: CreatureId,
-    sim: &mut Simulation,
     dir: Direction,
     energy_transfer_fraction: f32,
-    rng: &mut impl Rng,
-) -> ReproductionActionResult {
-    let parent_pos = sim.creatures[parent_id].position;
+) -> Result<Option<Conception>, ReproductionActionResult> {
+    let parent_pos = inputs.creatures[parent_id].position;
 
     // Step 1: Resolve target cell.
-    let target = match sim.world.resolve_neighbor(parent_pos, dir) {
+    let target = match inputs.world.resolve_neighbor(parent_pos, dir) {
         Some(p) => p,
         None => {
-            sim.stats.reproduction_actions_rejected_total += 1;
-            *sim.stats
+            inputs.stats.reproduction_actions_rejected_total += 1;
+            *inputs
+                .stats
                 .reproduction_actions_rejected_by_reason
                 .entry(ReproductionActionResult::RejectedInvalidTarget)
                 .or_insert(0) += 1;
-            return ReproductionActionResult::RejectedInvalidTarget;
+            return Err(ReproductionActionResult::RejectedInvalidTarget);
         }
     };
 
     // Step 2: Validate target cell (no barrier, not occupied).
-    if !sim.world.is_valid_target_cell(target) {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
+    if !inputs.world.is_valid_target_cell(target) {
+        inputs.stats.reproduction_actions_rejected_total += 1;
+        *inputs
+            .stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedInvalidTarget)
             .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedInvalidTarget;
+        return Err(ReproductionActionResult::RejectedInvalidTarget);
     }
 
     // Step 3: Check population cap.
-    if sim.creatures.len() >= sim.config.population.max_creatures as usize {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
+    if inputs.creatures.len() >= inputs.config.population.max_creatures as usize {
+        inputs.stats.reproduction_actions_rejected_total += 1;
+        *inputs
+            .stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedPopulationCap)
             .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedPopulationCap;
+        return Err(ReproductionActionResult::RejectedPopulationCap);
     }
 
     // Step 4: Enforce minimum reproduction age gate.
-    if sim.creatures[parent_id].age < sim.config.energy.lifecycle.min_reproduce_age {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
+    if inputs.creatures[parent_id].age < inputs.config.energy.lifecycle.min_reproduce_age {
+        inputs.stats.reproduction_actions_rejected_total += 1;
+        *inputs
+            .stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedAgeConstraints)
             .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedAgeConstraints;
+        return Err(ReproductionActionResult::RejectedAgeConstraints);
     }
 
     // Step 5: Compute reproduce_cost (scaled by genome complexity, age, and
     // the genome replication cost on units above the founder's size) and the
     // parent's post-effort energy after it. Nothing more is deducted until
     // both gates pass (T16.F01): a rejected attempt pays only Step 0.
-    let cost = sim.config.energy.adjusted_action_cost(
-        sim.config.energy.costs.reproduce_cost,
-        sim.creatures[parent_id].complexity(),
-        sim.creatures[parent_id].age,
+    let cost = inputs.config.energy.adjusted_action_cost(
+        inputs.config.energy.costs.reproduce_cost,
+        inputs.creatures[parent_id].complexity(),
+        inputs.creatures[parent_id].age,
     ) * genome_replication_cost_multiplier(
-        sim.config.energy.lifecycle.genome_replication_cost_per_unit,
-        sim.creatures[parent_id].genome_size(),
+        inputs
+            .config
+            .energy
+            .lifecycle
+            .genome_replication_cost_per_unit,
+        inputs.creatures[parent_id].genome_size(),
     );
-    let energy_before_cost = sim.creatures[parent_id].energy;
+    let energy_before_cost = inputs.creatures[parent_id].energy;
     let after_cost = energy_before_cost - cost;
 
     // Step 6: Check parent would have sufficient energy after the charge.
-    if after_cost < sim.config.energy.lifecycle.min_reproduce_energy {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
+    if after_cost < inputs.config.energy.lifecycle.min_reproduce_energy {
+        inputs.stats.reproduction_actions_rejected_total += 1;
+        *inputs
+            .stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedEnergyConstraints)
             .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedEnergyConstraints;
+        return Err(ReproductionActionResult::RejectedEnergyConstraints);
     }
 
     // Step 7 (T17.F01): the litter is a fraction of the parent's post-cost
@@ -260,49 +274,54 @@ fn conceive(
     // conceived, and the refusal pays only Step 0.
     let fraction = clamp_unit_interval(energy_transfer_fraction);
     let transfer =
-        (fraction * after_cost).min(sim.config.energy.lifecycle.default_offspring_energy);
+        (fraction * after_cost).min(inputs.config.energy.lifecycle.default_offspring_energy);
 
-    if transfer <= 0.0 || transfer < sim.config.energy.lifecycle.initial_energy {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        sim.stats.reproduction_actions_rejected_litter_total += 1;
-        *sim.stats
+    if transfer <= 0.0 || transfer < inputs.config.energy.lifecycle.initial_energy {
+        inputs.stats.reproduction_actions_rejected_total += 1;
+        inputs.stats.reproduction_actions_rejected_litter_total += 1;
+        *inputs
+            .stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedEnergyConstraints)
             .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedEnergyConstraints;
+        return Err(ReproductionActionResult::RejectedEnergyConstraints);
     }
 
     // Step 8: Both gates passed; deduct cost, then transfer, as two
     // successive f32 subtractions so the parent lands on the same value the
     // charge-first order produced.
-    sim.creatures[parent_id].energy = after_cost;
-    sim.stats.energy_flows.action_charges[ActionType::Reproduce] +=
-        sim.creatures[parent_id].observe_energy(energy_before_cost, DeathCause::ActionReproduce);
-    sim.creatures[parent_id].energy = after_cost - transfer;
-    sim.stats.energy_flows.parental_transfer_debit +=
-        sim.creatures[parent_id].observe_energy(after_cost, DeathCause::ParentalTransfer);
+    inputs.creatures[parent_id].energy = after_cost;
+    inputs.stats.energy_flows.action_charges[ActionType::Reproduce] +=
+        inputs.creatures[parent_id].observe_energy(energy_before_cost, DeathCause::ActionReproduce);
+    inputs.creatures[parent_id].energy = after_cost - transfer;
+    inputs.stats.energy_flows.parental_transfer_debit +=
+        inputs.creatures[parent_id].observe_energy(after_cost, DeathCause::ParentalTransfer);
 
     // Conception (T03.F12): the litter is carried for the gestation span and
     // born at the parent's Phase 2 slot on its last tick. A span of 0 is
-    // delivered here, at the validated target, exactly as before the feature.
-    sim.stats.gestations_started_total += 1;
+    // handed to the caller for delivery at the validated target, exactly as
+    // before the feature.
+    inputs.stats.gestations_started_total += 1;
     let span = gestation_ticks(
-        sim.creatures[parent_id].genome_size(),
-        sim.config
+        inputs.creatures[parent_id].genome_size(),
+        inputs
+            .config
             .energy
             .lifecycle
             .gestation_ticks_per_founder_genome,
     );
     if span == 0 {
-        spawn_child(parent_id, sim, target, dir, transfer, rng);
-    } else {
-        sim.creatures[parent_id].pending_birth = Some(PendingBirth {
-            direction: dir,
-            litter_energy: transfer,
-            deliver_tick: sim.tick.saturating_add(span),
-        });
+        return Ok(Some(Conception {
+            target,
+            litter: transfer,
+        }));
     }
-    ReproductionActionResult::Conceived
+    inputs.creatures[parent_id].pending_birth = Some(PendingBirth {
+        direction: dir,
+        litter_energy: transfer,
+        deliver_tick: inputs.tick.saturating_add(span),
+    });
+    Ok(None)
 }
 
 /// Outcome of delivering a pending birth (T03.F12).
@@ -353,6 +372,7 @@ pub(crate) fn deliver_pending_birth(
         sim.stats.gestations_lost_no_cell_total += 1;
         return BirthDelivery::LostNoCell;
     };
+    // WORKAROUND(G4): the birth transaction of T29.F01 takes world context, not the simulation
     spawn_child(
         parent_id,
         sim,
@@ -373,7 +393,7 @@ pub(crate) fn deliver_pending_birth(
     reason = "Steps 9 to 14 of the unified reproduction sequence in \
               v3-reproduction-spec.md Section 6 are ordered end to end"
 )]
-fn spawn_child(
+pub(crate) fn spawn_child(
     parent_id: CreatureId,
     sim: &mut Simulation,
     target: Position,
@@ -574,6 +594,7 @@ mod tests {
     };
     use crate::genome::{BackendDef, CreatureGenome};
     use crate::genome::{HebbianRule, PlasticityConfig};
+    use crate::simulation::actions::reproduce_now;
 
     /// A parent state on `genome` whose plastic slots of mesh node `n`
     /// learned `parent[n]`, in canonical order (each backend visited).
@@ -1127,7 +1148,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            apply_reproduce(
+            reproduce_now(
                 parent_id,
                 &mut sim,
                 direction,
@@ -1254,7 +1275,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            apply_reproduce(
+            reproduce_now(
                 parent_id,
                 &mut sim,
                 direction,
@@ -1383,7 +1404,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            apply_reproduce(
+            reproduce_now(
                 parent_id,
                 &mut sim,
                 direction,
@@ -1440,7 +1461,7 @@ mod tests {
                 })
                 .unwrap();
             assert_eq!(
-                apply_reproduce(
+                reproduce_now(
                     parent_id,
                     &mut sim,
                     direction,

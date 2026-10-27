@@ -7,7 +7,7 @@ use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
-use super::{apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat};
+use super::{apply_move, apply_typed_eat, move_effort, reproduce_now, steal_now};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, Position};
@@ -212,7 +212,7 @@ fn steal(victim_energy: f32, effort: f32) -> (Simulation, CreatureId, PredationA
         .config
         .energy
         .action_effort(0.0, attacker.complexity(), attacker.age);
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, effort).result;
+    let result = steal_now(ids[0], &mut sim, Direction::N, effort).result;
     (sim, ids[0], result, 195.0 - charge)
 }
 
@@ -263,7 +263,7 @@ fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
 fn predation_under_the_cap_books_no_clamp_loss() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0), (Position::new(5, 4), 50.0)]);
     sim.config.exchange.effort_rate = 0.0;
-    let result = apply_steal_energy(ids[0], &mut sim, Direction::N, 1.0).result;
+    let result = steal_now(ids[0], &mut sim, Direction::N, 1.0).result;
     assert_eq!(result, PredationActionResult::Transferred);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
 }
@@ -284,7 +284,7 @@ fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     assert_eq!(sim.creatures[parent].body.capacity, 200.0);
     let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.75, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 0.75, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let child = sim
         .creatures
@@ -315,7 +315,7 @@ fn a_lowered_range_clamps_the_next_unmutated_newborn_but_not_its_parent() {
     let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
     let mut known = ids.clone();
     let mut deliver = |sim: &mut Simulation, parent: CreatureId| {
-        let result = apply_reproduce(parent, sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent, sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         let newborn = sim
             .creatures
@@ -350,7 +350,7 @@ fn a_litter_within_the_childs_capacity_books_no_overflow() {
     let parent = ids[0];
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 0.5, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.offspring_capacity_overflow, 0.0);
@@ -401,7 +401,15 @@ fn a_large_body_pays_its_move_factor_on_the_move_base() {
         creature.complexity(),
         creature.age,
     );
-    assert_eq!(creature.move_effort(&sim.config.energy), expected);
+    assert_eq!(
+        move_effort(
+            &creature.body,
+            &sim.config.energy,
+            creature.complexity(),
+            creature.age
+        ),
+        expected
+    );
 }
 
 proptest::proptest! {
@@ -427,7 +435,7 @@ proptest::proptest! {
         let creature = &mut sim.creatures[id];
         creature.age = age;
         creature.body.capacity = 1.0 + share * (reference * 4.0 - 1.0);
-        let effort = creature.move_effort(&sim.config.energy);
+        let effort = move_effort(&creature.body, &sim.config.energy, creature.complexity(), creature.age);
         let noop = sim.config.energy.action_effort(
             sim.config.energy.costs.noop_cost,
             creature.complexity(),
@@ -442,7 +450,7 @@ proptest::proptest! {
             creature.age,
         );
         proptest::prop_assert_eq!(
-            creature.move_effort(&sim.config.energy).to_bits(),
+            move_effort(&creature.body, &sim.config.energy, creature.complexity(), creature.age).to_bits(),
             today.to_bits()
         );
     }
@@ -527,7 +535,7 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
     sim.config.mutation.capacity.chance = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 0.5, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     sim.creatures
         .values()

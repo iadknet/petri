@@ -5,8 +5,8 @@ use crate::creature::action_log::{ActionResult, ActionType};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::simulation::actions::{
-    apply_reproduce, apply_steal_energy, BarrierReaderState, MoveBlockedCause,
-    ReproductionActionResult, ReproductionInvalidTargetCause,
+    reproduce_now, steal_now, BarrierReaderState, MoveBlockedCause, ReproductionActionResult,
+    ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
 use rand::SeedableRng;
@@ -467,7 +467,7 @@ fn reproduction_invalid_target_helper_classifies_out_of_bounds_and_contention() 
     let successful_spawn_targets = HashSet::new();
 
     assert_eq!(
-        super::super::classify_reproduction_invalid_target_cause(
+        super::super::actions::classify_reproduction_invalid_target_cause(
             &world,
             None,
             &successful_spawn_targets
@@ -478,7 +478,7 @@ fn reproduction_invalid_target_helper_classifies_out_of_bounds_and_contention() 
     let mut successful_spawn_targets = HashSet::new();
     successful_spawn_targets.insert(Position::new(1, 1));
     assert_eq!(
-        super::super::classify_reproduction_invalid_target_cause(
+        super::super::actions::classify_reproduction_invalid_target_cause(
             &world,
             Some(Position::new(1, 1)),
             &successful_spawn_targets
@@ -499,13 +499,23 @@ fn last_tick_steal_resets_each_tick() {
 fn steal_energy_dispatch_transfers_and_removes_victim() {
     let (mut sim, attacker_id, victim_id) = make_sim_two_creatures(50.0, 5.0);
     sim.config.exchange.effort_rate = 0.0;
+    sim.action_logs
+        .insert(attacker_id, crate::creature::action_log::ActionLog::new(8));
     let victim_pos = Position::new(5, 4);
 
-    let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0).result;
+    execute(
+        &mut sim,
+        attacker_id,
+        crate::contracts::WorldAction::StealEnergy {
+            direction: Direction::N,
+            effort: 20.0,
+        },
+    );
 
+    let entry = sim.action_logs[attacker_id].entries().back().copied();
     assert_eq!(
-        result,
-        crate::simulation::actions::PredationActionResult::TransferredAndKilled
+        entry.map(|entry| entry.result),
+        Some(ActionResult::TransferredAndKilled)
     );
     assert!(
         !sim.creatures.contains_key(victim_id),
@@ -528,7 +538,7 @@ fn killed_creature_steal_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.exchange.effort_rate = 0.0;
 
-    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,
@@ -536,7 +546,7 @@ fn killed_creature_steal_action_does_not_panic() {
     assert!(!sim.creatures.contains_key(b_id), "B should be dead");
 
     if sim.creatures.contains_key(b_id) {
-        let _result = apply_steal_energy(b_id, &mut sim, Direction::S, 10.0).result;
+        let _result = steal_now(b_id, &mut sim, Direction::S, 10.0).result;
     }
 }
 
@@ -545,7 +555,7 @@ fn killed_creature_reproduce_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.exchange.effort_rate = 0.0;
 
-    let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0).result;
+    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result;
     assert_eq!(
         result,
         crate::simulation::actions::PredationActionResult::TransferredAndKilled,
@@ -554,7 +564,7 @@ fn killed_creature_reproduce_action_does_not_panic() {
 
     if sim.creatures.contains_key(b_id) {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(99);
-        let _result = apply_reproduce(b_id, &mut sim, Direction::S, 10.0, &mut rng);
+        let _result = reproduce_now(b_id, &mut sim, Direction::S, 10.0, &mut rng);
     }
 }
 
@@ -663,7 +673,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
             .learned
             .set_slot(0, 0, 1.5, 3.0);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-        let _ = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
+        let _ = reproduce_now(parent, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(sim.creatures.len(), 2, "reproduction must actually succeed");
         let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
         // A child's credit starts at zero: no trace before its first visit
@@ -687,7 +697,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
 }
 
 /// A one-node VM genome padded with `Noop`s so its `genome_size()` clears the
-/// founder anchor by a known margin; `apply_reproduce` is called directly, so
+/// founder anchor by a known margin; `reproduce_now` is called directly, so
 /// the program never runs.
 fn oversized_vm_genome() -> CreatureGenome {
     vm_program_genome(vec![VmInstruction::Noop; 300])
@@ -697,7 +707,7 @@ fn oversized_vm_genome() -> CreatureGenome {
 /// `default_offspring_energy` cap, independent of the charge (T17.F01).
 const CAPPED_TRANSFER: f32 = 100.0;
 
-/// One direct `apply_reproduce` on a fresh 1000-energy parent at reproduce
+/// One direct `reproduce_now` on a fresh 1000-energy parent at reproduce
 /// age, at a transfer fraction of 1.0 (so the child gets `CAPPED_TRANSFER`);
 /// returns the parent's energy after the birth, the child's energy, and the
 /// recorded `action_charges[ActionType::Reproduce]`.
@@ -714,7 +724,7 @@ fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
         sim.config.energy.lifecycle.default_offspring_energy,
         CAPPED_TRANSFER
     );
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 1.0, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 1.0, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
     (

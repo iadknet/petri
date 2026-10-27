@@ -53,7 +53,7 @@ fn the_window_forgets_a_node_the_creature_stopped_dispatching() {
 #[test]
 fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
     use crate::contracts::Direction;
-    use crate::simulation::actions::{apply_reproduce, ReproductionActionResult};
+    use crate::simulation::actions::{reproduce_now, ReproductionActionResult};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
@@ -72,7 +72,7 @@ fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
     sim.creatures[parent].energy = 80.0;
 
     let mut rng = SmallRng::seed_from_u64(3);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
+    let result = reproduce_now(parent, &mut sim, Direction::N, 20.0, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
     let child = sim
         .creatures

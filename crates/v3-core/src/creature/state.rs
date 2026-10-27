@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use crate::config::{EnergyCapacityConfig, EnergyConfig, RuntimeConfig};
+use crate::config::{EnergyCapacityConfig, RuntimeConfig};
 use crate::contracts::{
     CreatureId, Direction, OrdinaryFoodTypeId, PerceptionRequirements, Position, WorldInputKey,
     SHARED_MEMORY_SLOTS,
@@ -155,16 +155,6 @@ impl CreatureState {
     #[must_use]
     pub fn energy_cap(&self) -> f32 {
         self.body.capacity
-    }
-
-    /// The effort one move charges this creature, successful or blocked
-    /// (T26.F02 body rule): the move base scaled by the body's
-    /// [`HeritableBody::move_factor`], through [`EnergyConfig::action_effort`]
-    /// at this creature's complexity and age, so the noop floor still holds.
-    #[must_use]
-    pub fn move_effort(&self, energy: &EnergyConfig) -> f32 {
-        let factor = self.body.move_factor(&energy.capacity);
-        energy.action_effort(energy.costs.move_cost * factor, self.complexity(), self.age)
     }
 
     /// Observe the already-applied arithmetic without changing the stored energy.

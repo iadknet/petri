@@ -3,8 +3,8 @@
 
 use super::support::*;
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldAction};
+use crate::creature::action_log::ActionType;
 use crate::ledger::{applied_debit, DeathCause, EnergyFlows};
-use crate::simulation::tick::ActionType;
 use crate::simulation::Simulation;
 
 const REPRODUCE: WorldAction = WorldAction::Reproduce {

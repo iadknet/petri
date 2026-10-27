@@ -2,15 +2,72 @@ pub(crate) mod cgp_reproduction;
 mod giving;
 mod predation;
 mod reproduction;
+mod transaction;
 
 use crate::creature::action_log::ActionType;
-pub use giving::{apply_give_energy, GiveActionResult};
-pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
-pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
-pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
+pub(crate) use giving::apply_give_energy;
+pub use giving::GiveActionResult;
+pub(crate) use predation::apply_steal_energy;
+pub use predation::{PredationActionResult, PredationEventRecord};
+pub(crate) use reproduction::apply_reproduce;
+pub(crate) use reproduction::{deliver_pending_birth, spawn_child, BirthDelivery};
+pub use reproduction::{ReproductionActionResult, ReproductionInvalidTargetCause};
+pub(crate) use transaction::{resolve, ActionInputs, Applied, Conception};
+
+/// [`apply_reproduce`] on `sim` with a span-0 conception born at once, as
+/// the commit step delivers it.
+#[cfg(test)]
+pub(crate) fn reproduce_now(
+    parent: CreatureId,
+    sim: &mut crate::simulation::simulation::Simulation,
+    dir: Direction,
+    energy_transfer_fraction: f32,
+    rng: &mut impl rand::Rng,
+) -> ReproductionActionResult {
+    let (result, conception) = apply_reproduce(
+        &mut sim.action_inputs(),
+        parent,
+        dir,
+        energy_transfer_fraction,
+    );
+    if let Some(conception) = conception {
+        spawn_child(parent, sim, conception.target, dir, conception.litter, rng);
+    }
+    result
+}
+
+/// [`apply_steal_energy`] on `sim` with a killed victim removed, as the
+/// commit step settles it.
+#[cfg(test)]
+pub(crate) fn steal_now(
+    attacker: CreatureId,
+    sim: &mut crate::simulation::simulation::Simulation,
+    dir: Direction,
+    effort: f32,
+) -> TransferOutcome<PredationActionResult> {
+    let outcome = apply_steal_energy(&mut sim.action_inputs(), attacker, dir, effort);
+    if let (PredationActionResult::TransferredAndKilled, Some(victim)) =
+        (outcome.result, outcome.counterpart)
+    {
+        sim.remove_creature(victim);
+    }
+    outcome
+}
+
+/// [`apply_give_energy`] on `sim`.
+#[cfg(test)]
+pub(crate) fn give_now(
+    giver: CreatureId,
+    sim: &mut crate::simulation::simulation::Simulation,
+    dir: Direction,
+    effort: f32,
+) -> TransferOutcome<GiveActionResult> {
+    apply_give_energy(&mut sim.action_inputs(), giver, dir, effort)
+}
 
 use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction};
+use crate::creature::body::HeritableBody;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::ledger::{applied_debit, DeathCause, EnergyFlows};
@@ -81,13 +138,14 @@ fn exchange_amount(intensity: f32, store: f32) -> Option<f32> {
 /// The creature on the neighbour cell of `actor` in `dir`, never `actor`
 /// itself (a degenerate world can wrap onto it).
 fn neighbour_creature(
-    sim: &crate::simulation::simulation::Simulation,
+    inputs: &ActionInputs<'_>,
     actor: CreatureId,
     dir: Direction,
 ) -> Option<CreatureId> {
-    sim.world
-        .resolve_neighbor(sim.creatures[actor].position, dir)
-        .and_then(|target_pos| sim.world.creature_at(target_pos))
+    inputs
+        .world
+        .resolve_neighbor(inputs.creatures[actor].position, dir)
+        .and_then(|target_pos| inputs.world.creature_at(target_pos))
         .filter(|&id| id != actor)
 }
 
@@ -217,6 +275,19 @@ pub fn apply_typed_eat(
     eaten
 }
 
+/// The effort one move charges, successful or blocked (T26.F02): the move
+/// base scaled by the body's [`HeritableBody::move_factor`], through
+/// [`EnergyConfig::action_effort`] at the actor's `complexity` and `age`, so
+/// the noop floor still holds.
+#[must_use]
+pub fn move_effort(body: &HeritableBody, energy: &EnergyConfig, complexity: u32, age: u64) -> f32 {
+    energy.action_effort(
+        energy.costs.move_cost * body.move_factor(&energy.capacity),
+        complexity,
+        age,
+    )
+}
+
 /// Apply a Move action: move one step in `dir` if the target is valid.
 ///
 /// The effort is always deducted, and nothing more if the move is rejected
@@ -244,7 +315,12 @@ pub fn apply_move(
         false
     };
 
-    let move_effort = creature.move_effort(&config.energy);
+    let move_effort = move_effort(
+        &creature.body,
+        &config.energy,
+        creature.complexity(),
+        creature.age,
+    );
     let effort = charge_effort(creature, move_effort, DeathCause::ActionMove);
     flows.action_charges[ActionType::Move] += effort;
     if !succeeded {
@@ -290,7 +366,7 @@ mod tests {
         cfg.world.width = 10;
         cfg.world.height = 10;
         cfg.population.initial_creatures = 1;
-        // Births here are checked at `apply_reproduce`'s return; rate 0.0
+        // Births here are checked at `reproduce_now`'s return; rate 0.0
         // delivers at conception (T03.F12), the pre-gestation sequence.
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         cfg
@@ -353,7 +429,7 @@ mod tests {
         sim.creatures[id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
         assert_eq!(
-            apply_reproduce(id, &mut sim, Direction::N, 0.5, &mut rng),
+            reproduce_now(id, &mut sim, Direction::N, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
     }
@@ -555,7 +631,7 @@ mod tests {
         );
     }
 
-    // ── apply_reproduce ────────────────────────────────────────────────────────
+    // ── reproduce_now ────────────────────────────────────────────────────────
 
     #[test]
     fn apply_reproduce_creates_child_with_inherited_genome() {
@@ -564,7 +640,7 @@ mod tests {
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2);
         let child = sim.creatures.values().find(|c| c.id != parent_id).unwrap();
@@ -590,7 +666,7 @@ mod tests {
         let after_cost = post_effort(&sim, parent_id) - reproduce_charge(&sim, parent_id);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
 
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
         assert_eq!(result, ReproductionActionResult::Conceived);
         (
@@ -669,7 +745,7 @@ mod tests {
         sim.config.energy.lifecycle.initial_energy = transfer;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(40);
 
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
         assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(child_energy(&sim, parent_id).to_bits(), transfer.to_bits());
@@ -717,7 +793,7 @@ mod tests {
             food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(0),
         };
         let mut rng = rand::rngs::SmallRng::seed_from_u64(2);
-        let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedInvalidTarget);
         assert_eq!(sim.creatures.len(), 2, "no new creature spawned");
     }
@@ -737,7 +813,7 @@ mod tests {
         let (mut sim, parent_id) = make_sim_one_creature(pos, low_energy);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(3);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
     }
 
@@ -748,7 +824,7 @@ mod tests {
         sim.config.energy.lifecycle.min_reproduce_age = 20;
         sim.creatures[parent_id].age = 0;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(31);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedAgeConstraints);
         assert_eq!(sim.creatures.len(), 1, "no child should be spawned");
     }
@@ -761,7 +837,7 @@ mod tests {
         sim.creatures[parent_id].age = 0;
         let after_effort = post_effort(&sim, parent_id);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(32);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedAgeConstraints);
         assert_eq!(
             sim.creatures[parent_id].energy.to_bits(),
@@ -782,7 +858,7 @@ mod tests {
             )
     }
 
-    /// The reproduce charge in `apply_reproduce`, as the same product
+    /// The reproduce charge in `reproduce_now`, as the same product
     /// expression the engine evaluates (T16.F01 invariant 3).
     fn reproduce_charge(sim: &Simulation, parent_id: CreatureId) -> f32 {
         let parent = &sim.creatures[parent_id];
@@ -812,7 +888,7 @@ mod tests {
         let rejected_before = sim.stats.reproduction_actions_rejected_total;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
 
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
         assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
         assert_eq!(sim.creatures.len(), 1, "no child should be spawned");
@@ -884,7 +960,7 @@ mod tests {
         );
         let mut rng = rand::rngs::SmallRng::seed_from_u64(38);
 
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
         assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
@@ -911,7 +987,7 @@ mod tests {
         let expected_energy = after_cost - transfer;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(37);
 
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
         assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(
@@ -945,7 +1021,7 @@ mod tests {
         sim.config.energy.lifecycle.min_reproduce_age = 20;
         sim.creatures[parent_id].age = 20;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(33);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
     }
@@ -958,7 +1034,7 @@ mod tests {
         let cost = sim.config.energy.costs.reproduce_cost;
         let energy_before = sim.creatures[parent_id].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(4);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         // Parent should have lost at least reproduce_cost.
         assert!(
@@ -973,7 +1049,7 @@ mod tests {
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
         sim.config.population.max_creatures = 1; // cap at current count
         let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedPopulationCap);
     }
 
@@ -984,7 +1060,7 @@ mod tests {
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(6);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         let child = sim
             .creatures
@@ -1004,7 +1080,7 @@ mod tests {
         sim.creatures[parent_id].shared_memory[7] = 0.99;
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(7);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
         let child = sim
             .creatures
@@ -1036,7 +1112,7 @@ mod tests {
             let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+            let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
 
             if result == ReproductionActionResult::Conceived
                 && sim.stats.mutation_events_applied_total > 0
@@ -1095,7 +1171,7 @@ mod tests {
             let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+            let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
             if result == ReproductionActionResult::Conceived
                 && sim.stats.mutation_events_applied_total == 0
                 && sim.stats.mutation_events_skipped_total > 0
@@ -1139,7 +1215,7 @@ mod tests {
 
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
         let after_first = sim.stats.mutation_executed_target_total;
@@ -1149,7 +1225,7 @@ mod tests {
         );
 
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
         assert!(
@@ -1178,7 +1254,7 @@ mod tests {
 
         // Act
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
 
@@ -1189,7 +1265,7 @@ mod tests {
 
         // Act: a second birth from the same parent.
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
 
@@ -1219,7 +1295,7 @@ mod tests {
 
         // Act
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
 
@@ -1231,7 +1307,7 @@ mod tests {
 
         // Act: a second birth from the same parent.
         assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
+            reproduce_now(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
             ReproductionActionResult::Conceived
         );
 
@@ -1267,7 +1343,7 @@ mod tests {
         // `DetachGraphEdge` remap every Graph draw, and seed 101 meets a
         // domain-level skip; 100 is the first seed from 100 without one.
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+        let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
         assert_eq!(result, ReproductionActionResult::Conceived);
 
         let attempted_by_domain: u64 = sim
@@ -1651,7 +1727,7 @@ mod tests {
         sim_low.creatures[parent_low].age = sim_low.config.energy.lifecycle.min_reproduce_age;
         let energy_before_low = sim_low.creatures[parent_low].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
-        let _ = apply_reproduce(parent_low, &mut sim_low, Direction::N, 0.5, &mut rng);
+        let _ = reproduce_now(parent_low, &mut sim_low, Direction::N, 0.5, &mut rng);
         let cost_low = energy_before_low - sim_low.creatures[parent_low].energy;
 
         // High-complexity parent
@@ -1660,7 +1736,7 @@ mod tests {
         sim_high.creatures[parent_high].age = sim_high.config.energy.lifecycle.min_reproduce_age;
         let energy_before_high = sim_high.creatures[parent_high].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
-        let _ = apply_reproduce(parent_high, &mut sim_high, Direction::N, 0.5, &mut rng);
+        let _ = reproduce_now(parent_high, &mut sim_high, Direction::N, 0.5, &mut rng);
         let cost_high = energy_before_high - sim_high.creatures[parent_high].energy;
 
         // The reproduce_cost portion should be higher for complex creatures.
@@ -1694,7 +1770,7 @@ mod tests {
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
         let energy_before_low = sim_low.creatures[attacker_low].energy;
-        let _ = apply_steal_energy(attacker_low, &mut sim_low, Direction::N, 10.0);
+        let _ = steal_now(attacker_low, &mut sim_low, Direction::N, 10.0);
         let cost_low = energy_before_low - sim_low.creatures[attacker_low].energy;
 
         // Set up high-complexity attacker with victim
@@ -1713,7 +1789,7 @@ mod tests {
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
         let energy_before_high = sim_high.creatures[attacker_high].energy;
-        let _ = apply_steal_energy(attacker_high, &mut sim_high, Direction::N, 10.0);
+        let _ = steal_now(attacker_high, &mut sim_high, Direction::N, 10.0);
         let cost_high = energy_before_high - sim_high.creatures[attacker_high].energy;
 
         // Both take the same share of equal victims, but the effort (the
@@ -1853,14 +1929,14 @@ mod tests {
         let (mut sim_young, parent_young) = make_sim_one_creature(Position::new(5, 5), 80.0);
         let energy_before_young = sim_young.creatures[parent_young].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
-        let _ = apply_reproduce(parent_young, &mut sim_young, Direction::N, 0.5, &mut rng);
+        let _ = reproduce_now(parent_young, &mut sim_young, Direction::N, 0.5, &mut rng);
         let cost_young = energy_before_young - sim_young.creatures[parent_young].energy;
 
         let (mut sim_old, parent_old) = make_sim_one_creature(Position::new(5, 5), 80.0);
         sim_old.creatures[parent_old].age = 400;
         let energy_before_old = sim_old.creatures[parent_old].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
-        let _ = apply_reproduce(parent_old, &mut sim_old, Direction::N, 0.5, &mut rng);
+        let _ = reproduce_now(parent_old, &mut sim_old, Direction::N, 0.5, &mut rng);
         let cost_old = energy_before_old - sim_old.creatures[parent_old].energy;
 
         assert!(
@@ -1888,7 +1964,7 @@ mod tests {
         });
         sim_young.world.place_creature(victim_pos, victim_young);
         let energy_before_young = sim_young.creatures[attacker_young].energy;
-        let _ = apply_steal_energy(attacker_young, &mut sim_young, Direction::N, 10.0);
+        let _ = steal_now(attacker_young, &mut sim_young, Direction::N, 10.0);
         let cost_young = energy_before_young - sim_young.creatures[attacker_young].energy;
 
         // Old attacker
@@ -1907,7 +1983,7 @@ mod tests {
         });
         sim_old.world.place_creature(victim_pos, victim_old);
         let energy_before_old = sim_old.creatures[attacker_old].energy;
-        let _ = apply_steal_energy(attacker_old, &mut sim_old, Direction::N, 10.0);
+        let _ = steal_now(attacker_old, &mut sim_old, Direction::N, 10.0);
         let cost_old = energy_before_old - sim_old.creatures[attacker_old].energy;
 
         // Both steal from victim, but old attacker's cost portion is higher.
@@ -1936,7 +2012,7 @@ mod tests {
         let (mut sim, id) =
             make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
         sim.creatures[id].age = FOUNDER_MARGIN_MAX_AGE + 1;
-        let result = apply_reproduce(
+        let result = reproduce_now(
             id,
             &mut sim,
             Direction::N,
@@ -1950,7 +2026,7 @@ mod tests {
         /// T17.F01 invariant 5: every founder profile, at any energy strictly
         /// above its gate up to its 200 capacity and any age from
         /// `min_reproduce_age` through [`FOUNDER_MARGIN_MAX_AGE`], is accepted
-        /// by `apply_reproduce` on default economics when it emits its own
+        /// by `reproduce_now` on default economics when it emits its own
         /// transfer fraction.
         #[test]
         fn founder_profiles_are_accepted_at_every_energy_above_their_gate(
@@ -1976,7 +2052,7 @@ mod tests {
             let (mut sim, id) = make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
             proptest::prop_assert!(age >= sim.config.energy.lifecycle.min_reproduce_age);
             sim.creatures[id].age = age;
-            let result = apply_reproduce(id, &mut sim, Direction::N, policy.transfer_fraction, &mut rand::rngs::SmallRng::seed_from_u64(7));
+            let result = reproduce_now(id, &mut sim, Direction::N, policy.transfer_fraction, &mut rand::rngs::SmallRng::seed_from_u64(7));
             proptest::prop_assert_eq!(result, ReproductionActionResult::Conceived, "{:?} energy={} age={}", profile, energy, age);
             let child = child_energy(&sim, id);
             proptest::prop_assert!(child >= sim.config.energy.lifecycle.initial_energy);
@@ -2025,7 +2101,7 @@ mod tests {
                 }
             };
             assert_eq!(
-                apply_reproduce(
+                reproduce_now(
                     id,
                     &mut sim,
                     Direction::N,
@@ -2057,7 +2133,7 @@ mod tests {
             sim.creatures[id].age = 20;
             let after_effort = post_effort(&sim, id);
             assert_eq!(
-                apply_reproduce(
+                reproduce_now(
                     id,
                     &mut sim,
                     Direction::N,
@@ -2086,7 +2162,7 @@ mod tests {
             20,
         );
         assert_eq!(
-            apply_reproduce(
+            reproduce_now(
                 id,
                 &mut sim,
                 Direction::N,

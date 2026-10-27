@@ -683,6 +683,7 @@ mod tests {
     use crate::arena::arena_config;
     use crate::scene::{centre, SceneSpec};
     use v3_core::creature::founder::founder_genome_with_age_gate;
+    use v3_core::simulation::actions::move_effort;
 
     fn setup(lifetime: u32, start_energy: f32) -> Setup {
         Setup::new(arena_config(48), start_energy, lifetime)
@@ -819,7 +820,12 @@ mod tests {
         let lifecycle = &setup.config.energy.lifecycle;
         // The body's move rule at age 0 (T26.F02): the founder body sits at
         // the reference, so the factor is 1.
-        let per_tick = actor.move_effort(&setup.config.energy) + lifecycle.energy_decay_per_tick;
+        let per_tick = move_effort(
+            &actor.body,
+            &setup.config.energy,
+            actor.complexity(),
+            actor.age,
+        ) + lifecycle.energy_decay_per_tick;
         assert!(per_tick > lifecycle.energy_decay_per_tick);
         let energy = score.energy_end.value();
         assert!((100.0 - energy - 5.0 * per_tick).abs() < 1e-3, "{energy}");
@@ -878,7 +884,7 @@ mod tests {
         for age in 0..u64::from(LIFETIME) {
             // The body's move rule at each age (T26.F02).
             actor.age = age;
-            expected -= actor.move_effort(energy_config);
+            expected -= move_effort(&actor.body, energy_config, actor.complexity(), actor.age);
             expected -= energy_config.lifecycle.energy_decay_per_tick;
         }
         let energy = score.energy_end.value();

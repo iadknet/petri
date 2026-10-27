@@ -188,9 +188,9 @@ or work counter, or a renamed exported key would show it wrong.
 
 Pass 1 (executors with narrow inputs and the cost composition):
 
-- [ ] `simulation::actions::move_effort`; `CreatureState::move_effort`
+- [x] `simulation::actions::move_effort`; `CreatureState::move_effort`
       deleted; `apply_move` and the lab on it (R3; invariant 3).
-- [ ] `simulation/actions/transaction.rs` with `ActionInputs` (holding
+- [x] `simulation/actions/transaction.rs` with `ActionInputs` (holding
       `stats: &mut SimStats` in this pass only, for the records the moved
       executors still write), `resolve` and `Applied` with the settle step
       (the floor, the netting, the removal report), `Applied.result` being
@@ -199,7 +199,7 @@ Pass 1 (executors with narrow inputs and the cost composition):
       functions on the inputs, the victim removal and the span-0 spawn
       returned to the caller (R1, R2, R6; invariants 2, 6, 7 with the
       `WORKAROUND(G4)` comments).
-- [ ] `simulation/tick/actions.rs` with the loop, the log push and the
+- [x] `simulation/tick/actions.rs` with the loop, the log push and the
       settlement; `tick.rs` without the executors (R1; invariant 4).
 - [ ] Gate run; `deterministic` values and work counters equal.
 
@@ -219,11 +219,11 @@ Pass 2 (the one applied result and the records derived from it):
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first -> result.
-- [ ] `simulation/actions/transaction` tests: the settle order (failed
+- [x] `cargo test -p v3-core --test viability` first -> 30 passed.
+- [x] `simulation/actions/transaction` tests: the settle order (failed
       effort booked before the floor and the netting), the conception
       handoff at span 0, an exhausted victim kept, no removal inside
-      `resolve` -> results.
+      `resolve` -> 5 passed.
 - [ ] Focused tests (`simulation/actions`, `simulation/tick/tests`,
       v3-server `transport::action_log` and `wire_types`, frontend
       `npm test`) -> results.

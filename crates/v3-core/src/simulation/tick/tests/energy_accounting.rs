@@ -1,13 +1,13 @@
 use super::support::*;
 use crate::contracts::Direction;
 use crate::contracts::{OrdinaryFoodTypeId, WorldAction};
+use crate::creature::action_log::ActionType;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::ledger::DeathCause;
 use crate::runtime::types::ComputeCostReport;
-use crate::simulation::actions::apply_steal_energy;
+use crate::simulation::actions::steal_now;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::run_phase_0;
-use crate::simulation::tick::ActionType;
 use rand::{rngs::SmallRng, SeedableRng};
 
 #[test]
@@ -201,7 +201,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
     sim.creatures[attacker].body.capacity = 10.0;
     assert_eq!(sim.creatures[victim].complexity(), 4);
-    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    steal_now(attacker, &mut sim, Direction::N, 10.0);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.predation_victim_debit, 2.0);
     assert_eq!(flows.predation_attacker_credit, 2.0);
@@ -220,7 +220,7 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
     assert_eq!(sim.creatures[victim].complexity(), 3);
-    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    steal_now(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.creatures[attacker].energy, 1.0);
     assert_eq!(sim.creatures[victim].energy, -2.0);
     let flows = &sim.stats.energy_flows;
@@ -575,7 +575,7 @@ fn predation_leaves_an_exhausted_victim_its_own_cause_and_takes_nothing() {
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.0;
     sim.creatures[victim].pending_death_cause = Some(DeathCause::VmCompute);
-    apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
+    steal_now(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.stats.predation_kills_total, 0);
     assert_eq!(sim.stats.energy_flows.predation_victim_debit, 0.0);
     assert_eq!(sim.stats.energy_flows.predation_attacker_credit, 0.0);

@@ -9,7 +9,7 @@ use crate::creature::action_log::{ActionLog, ActionLogEntry, ActionResult};
 use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{CreatureGenome, OutcomeChannel, VmInstruction};
 use crate::ledger::{applied_debit, DeathCause};
-use crate::simulation::actions::{apply_give_energy, GiveActionResult};
+use crate::simulation::actions::{give_now, GiveActionResult};
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::Simulation;
 use rand::SeedableRng;
@@ -90,7 +90,7 @@ fn the_give_intensity_scales_the_share_by_the_effort_up_to_one() {
         let (mut sim, giver, recipient) = make_sim_two_creatures(50.0, 30.0);
         sim.creatures[giver].body.give_share = share;
         let after_effort = 50.0f32 - exchange_effort(&sim, giver, intensity);
-        let outcome = apply_give_energy(giver, &mut sim, Direction::N, effort);
+        let outcome = give_now(giver, &mut sim, Direction::N, effort);
         assert_eq!(outcome.result, GiveActionResult::Transferred);
         assert_eq!(
             outcome.amount,
@@ -233,7 +233,7 @@ proptest::proptest! {
         sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
         sim.creatures[giver].energy = store;
 
-        let outcome = apply_give_energy(giver, &mut sim, Direction::N, f32::from_bits(effort_bits));
+        let outcome = give_now(giver, &mut sim, Direction::N, f32::from_bits(effort_bits));
 
         match outcome.result {
             GiveActionResult::Transferred => {
