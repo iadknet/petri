@@ -217,15 +217,13 @@ Pass 2 (the one applied result and the records derived from it):
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` first -> 30 passed.
-- [x] `simulation/actions/transaction` tests (settle order, failed effort
-      booked once, span-0 handoff, exhausted victim kept, no removal in
-      `resolve`) -> 6 passed.
-- [x] Focused tests: v3-core `--all-features` lib 2348 and every
-      integration test passed; v3-server 174, v3-telemetry 80, v3-lab 212;
-      `npm test` 673, `tsc -b`, lint, `make rust-clippy`, `cargo fmt --all
-      --check` and `cargo check --workspace --all-targets` clean.
-- [ ] `applied_trajectory`: state-only sampled digests (log bytes excluded)
-      pinned, equal at `18342fef^` and after -> values in the readings file.
+- [x] `simulation/actions/transaction` tests (settle order, one effort
+      booking, span-0 handoff, exhausted victim) -> 6 passed.
+- [x] v3-core lib 2348 (`--all-features`) and integration, v3-server 174,
+      v3-telemetry 80, v3-lab 212, npm 673 pass; tsc, lint, clippy, fmt,
+      check pass.
+- [x] `applied_trajectory` state-only digests (no log bytes) equal at
+      `18342fef^` and after, pinned: `4830c71f...` / `00a1b0bb...`.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0.
 - [ ] Gate after pass 1 (readings only) and after pass 2 (summary at
@@ -282,5 +280,8 @@ re-pinned.
 - Decision: the sampled `applied_trajectory` digests hash the log text and
   follow its vocabulary; state-only digests pinned beside them enforce the
   unchanged histories; no test maps the new vocabulary to the old.
+- Exception: `osv-scanner.toml` ignores GHSA-qwgh-2vcv-g2f7 (block-buffer
+  0.10.4, no fix) until 2027-01-26 (7053017d), user-reviewed
+  2026-10-26; answers the correctness P1.
 - Deferred: audit R8, the birth path on `&mut Simulation`, is paid by
   T29.F01 (G4); the `WORKAROUND(G4)` comments mark both sites.

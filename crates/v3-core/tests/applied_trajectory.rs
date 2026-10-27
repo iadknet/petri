@@ -200,7 +200,9 @@
 //! where `NoVictim`, `EnergyConstraints` and `EnergyConstraints` stood, which
 //! moves the two sampled digests (cc976227... -> 5b792ac8..., gestation rate
 //! 0.0 82d14a4e... -> 67dcf4ca...); mapping the log text back to the old
-//! shape restores both old digests, and both guard digests hold.
+//! shape restores both old digests, and both guard digests hold. The
+//! state-only sampled digests (log bytes excluded) are 4830c71f... /
+//! 00a1b0bb... at 18342fef^ and after.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -211,17 +213,26 @@ use v3_core::simulation::{run_tick, seed_simulation};
 #[test]
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
-        sampled_trajectory_digest(None),
+        sampled_trajectory_digest(None, true),
         "5b792ac8b46bf3c997854eede8686b808ee751e48506ba59ed8b273f1ab38679"
     );
     assert_eq!(
-        sampled_trajectory_digest(Some(0.0)),
+        sampled_trajectory_digest(Some(0.0), true),
         "67dcf4caa33bd6d13501a4ae56e45dc15cdbe473eb64730863de2075897fe108"
+    );
+    assert_eq!(
+        sampled_trajectory_digest(None, false),
+        "4830c71f78b9871994a9800617dc733f918ad6738e3201d25d930e843abefe7b"
+    );
+    assert_eq!(
+        sampled_trajectory_digest(Some(0.0), false),
+        "00a1b0bb349ad0c49d89a685c167ebc75de3cd7bcc139272209bf0d87c92588f"
     );
 }
 
-/// The sampled-trajectory digest at the default gestation rate or `rate`.
-fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
+/// The sampled-trajectory digest at the default gestation rate or `rate`;
+/// `with_log` false skips the action-log bytes and hashes the state alone.
+fn sampled_trajectory_digest(gestation_rate: Option<f32>, with_log: bool) -> String {
     let mut hash = Sha256::new();
     for seed in [7, 19] {
         let mut config = SimulationConfig::default();
@@ -259,8 +270,10 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
                     ))
                     .unwrap(),
                 );
-                if let Some(log) = sim.action_logs.get(id) {
-                    hash.update(serde_json::to_vec(log.entries()).unwrap());
+                if with_log {
+                    if let Some(log) = sim.action_logs.get(id) {
+                        hash.update(serde_json::to_vec(log.entries()).unwrap());
+                    }
                 }
             }
             for y in 0..24 {

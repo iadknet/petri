@@ -9,7 +9,7 @@ use crate::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
-use crate::simulation::tick::{reproduce_now, steal_now};
+use crate::simulation::tick::reproduce_now;
 use rand::SeedableRng;
 use std::collections::HashSet;
 
@@ -532,35 +532,6 @@ fn steal_energy_dispatch_transfers_and_removes_victim() {
     );
     assert_eq!(sim.stats.predation_kills_total, 1);
     assert_eq!(sim.stats.predation_actions_attempted_total, 1);
-}
-
-#[test]
-fn killed_creature_steal_action_does_not_panic() {
-    let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
-    sim.config.exchange.effort_rate = 0.0;
-
-    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result.outcome;
-    assert_eq!(result, ActionOutcome::TransferredAndKilled,);
-    assert!(!sim.creatures.contains_key(b_id), "B should be dead");
-
-    if sim.creatures.contains_key(b_id) {
-        let _result = steal_now(b_id, &mut sim, Direction::S, 10.0).result.outcome;
-    }
-}
-
-#[test]
-fn killed_creature_reproduce_action_does_not_panic() {
-    let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
-    sim.config.exchange.effort_rate = 0.0;
-
-    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result.outcome;
-    assert_eq!(result, ActionOutcome::TransferredAndKilled,);
-    assert!(!sim.creatures.contains_key(b_id), "B should be dead");
-
-    if sim.creatures.contains_key(b_id) {
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(99);
-        let _result = reproduce_now(b_id, &mut sim, Direction::S, 10.0, &mut rng);
-    }
 }
 
 #[test]
