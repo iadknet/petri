@@ -284,7 +284,7 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // rule lowers the carrying cost and the mutation draw count, and 2733 is
     // the first seed from 740 whose tick-50 state meets the precondition;
     // the old size rule and anchor 97 restore 740. Re-seeded by T25.F04
-    // commit 1 (2733 -> 3249): `AddDirectionPairBundle` joins the Graph
+    // commit 1 (2733 -> 3249): `AddDirectionPairGroup` joins the Graph
     // default arm and remaps every Graph draw; 3249 is the first seed from
     // 2733 that passes both the unlowered and the lowered-cap case; removing
     // the catalog entry restores 2733. Re-seeded by T26.F02 (3249 -> 3282,

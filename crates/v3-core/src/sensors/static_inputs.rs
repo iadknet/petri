@@ -2,7 +2,6 @@ use slotmap::SecondaryMap;
 
 use crate::config::EnergyConfig;
 use crate::contracts::{CreatureId, Direction, Position, StaticIntrospectionKey};
-// WORKAROUND(G2): OutcomeChannel moves to contracts (T25.F11)
 use crate::contracts::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
 use crate::kernel::WorldState;
 

@@ -7,7 +7,7 @@ use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
-use crate::genome::cgp::{ring_offset, validate_graph, BundleId, CgpGraphBackendDef, Shape};
+use crate::genome::cgp::{ring_offset, validate_graph, BundleId, CgpGraphBackendDef};
 use crate::genome::cgp_mesh_annotations::derive_cgp_annotations;
 use crate::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -64,7 +64,7 @@ proptest! {
         let before = genome.genome_size();
         for (earlier, (kind, offset, lost)) in (before..).zip(bundles) {
             let def = graph_mut(&mut genome.nodes[idx]);
-            let id = def.add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
+            let id = def.add_ring_bundle(ring, DirectedVoteKind::ALL[kind], offset);
             prop_assert_eq!(genome.genome_size(), earlier + 1);
             let def = graph_mut(&mut genome.nodes[idx]);
             for _ in 0..lost {
@@ -96,7 +96,8 @@ proptest! {
                 .filter(|&i| i != removed)
                 .filter(|&i| {
                     let reference = &refs[usize::from(i)];
-                    if pair { !reference.direction_pairs().is_empty() } else { reference.is_ring() }
+                    let InputReference::World(key) = reference else { return false };
+                    if pair { !key.direction_pairs().is_empty() } else { key.is_neighbor_ring() }
                 })
                 .collect()
         };
@@ -106,18 +107,18 @@ proptest! {
             let kind = DirectedVoteKind::ALL[*kind];
             if *pair {
                 let ref_idx = pairs[index.index(pairs.len())];
-                let layout = refs[usize::from(ref_idx)].direction_pairs()[0];
-                def.add_pair_bundle(ref_idx, 0, layout, kind, *offset, &[]);
+                let layout = crate::contracts::pair_layout(&refs[usize::from(ref_idx)], 0);
+                def.add_pair_bundle(ref_idx, 0, layout, kind, *offset);
             } else {
                 let ring_ref = rings[index.index(rings.len())];
-                def.add_ring_bundle(Shape::Ring { ring_ref }, kind, *offset);
+                def.add_ring_bundle(ring_ref, kind, *offset);
             }
         }
         let expected: Vec<InputReference> = def
             .bundles()
             .iter()
             .map(|bundle| {
-                let ring_ref = bundle.shape().ref_idx();
+                let ring_ref = bundle.source().ref_idx().expect("a sensor source");
                 refs[usize::from(ring_ref)].clone()
             })
             .collect();
@@ -126,7 +127,7 @@ proptest! {
         def.reindex_input_refs_after_removal(removed);
         prop_assert_eq!(def.bundles().len(), expected.len());
         for (bundle, reference) in def.bundles().iter().zip(&expected) {
-            let ring_ref = bundle.shape().ref_idx();
+            let ring_ref = bundle.source().ref_idx().expect("a sensor source");
             prop_assert_eq!(&after_refs[usize::from(ring_ref)], reference);
         }
         let node = NodeGenome {
@@ -153,12 +154,12 @@ proptest! {
         let ring = node.input_refs.len() as u16;
         node.input_refs
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        graph_mut(node).add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, offset);
+        graph_mut(node).add_ring_bundle(ring, DirectedVoteKind::Move, offset);
         let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
         let summary = node.input_refs.len() as u16;
         node.input_refs.push(area.clone());
-        let layout = area.direction_pairs()[1];
-        graph_mut(node).add_pair_bundle(summary, 1, layout, DirectedVoteKind::StealEnergy, offset, &[]);
+        let layout = crate::contracts::pair_layout(&area, 1);
+        graph_mut(node).add_pair_bundle(summary, 1, layout, DirectedVoteKind::StealEnergy, offset);
         prop_assert!(!prunable_indices(node).contains(&usize::from(ring)));
         prop_assert!(!prunable_indices(node).contains(&usize::from(summary)));
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -167,12 +168,12 @@ proptest! {
                 .unwrap();
         }
         let node = &mut genome.nodes[idx];
-        let ring_ref = graph_mut(node).bundles()[0].shape().ref_idx();
+        let ring_ref = graph_mut(node).bundles()[0].source().ref_idx().unwrap();
         prop_assert_eq!(
             &node.input_refs[usize::from(ring_ref)],
             &InputReference::World(WorldInputKey::NeighborBarrierRing)
         );
-        let pair_ref = graph_mut(node).bundles()[1].shape().ref_idx();
+        let pair_ref = graph_mut(node).bundles()[1].source().ref_idx().unwrap();
         prop_assert_eq!(&node.input_refs[usize::from(pair_ref)], &area);
         prop_assert!(validate_graph(node).is_ok());
     }
@@ -184,11 +185,7 @@ fn genome_identity_distinguishes_bundles_and_a_founder_is_unchanged() {
     assert_eq!(founder.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
     let (ringed, idx, ring) = founder_with_ring();
     let mut grouped = ringed.clone();
-    let id = graph_mut(&mut grouped.nodes[idx]).add_ring_bundle(
-        Shape::Ring { ring_ref: ring },
-        DirectedVoteKind::Move,
-        0,
-    );
+    let id = graph_mut(&mut grouped.nodes[idx]).add_ring_bundle(ring, DirectedVoteKind::Move, 0);
     assert_ne!(genome_identity(&grouped), genome_identity(&ringed));
     let mut rescaled = grouped.clone();
     graph_mut(&mut rescaled.nodes[idx])
@@ -206,7 +203,7 @@ fn a_bundle_is_a_live_component_reading_its_ring_and_writing_action() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     assert!(!def.enters_visit());
     let empty = crate::genome::cgp_analysis::cgp_functional_complexity(&def);
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Reproduce, 3);
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Reproduce, 3);
     assert_eq!(id, BundleId::new(0));
     assert!(def.enters_visit());
     // One record, eight wired sinks and one consumed reference.
@@ -221,7 +218,7 @@ fn a_bundle_is_a_live_component_reading_its_ring_and_writing_action() {
 }
 
 /// The ring offset is `(d − channel) mod 8` for every `u8` pair, not only
-/// for the eight directions and channels recruitment and the census draw.
+/// for the eight directions and channels the census reads.
 #[test]
 fn ring_offset_is_mod_eight_for_every_u8_pair() {
     let rotation =

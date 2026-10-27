@@ -346,10 +346,10 @@ pub struct SimStats {
     /// `SetScope`) by the scope they landed on, indexed by `Scope::index`
     /// (T25.F08).
     pub mutation_attribute_changes_total_by_scope: [u64; 2],
-    /// Births whose committed genome holds a `DirectionPair` bundle with
-    /// `|scale| > 1e-3` that no event of the birth could have created: the
-    /// inheritance witness (T25.F04).
-    pub pair_bundle_inherited_nonzero_births_total: u64,
+    /// Bundles committed creation events made (T25.F11), by operator, then
+    /// wiring (`plain`, `ring`, `pair`) and creation form (`uniform`,
+    /// `randomized`).
+    pub bundles_created_total: HashMap<MutationOperator, [[u64; 2]; 3]>,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
     pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
     /// The same aggregates keyed by birth edge class (`drive_births`,

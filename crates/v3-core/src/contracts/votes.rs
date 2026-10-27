@@ -26,6 +26,49 @@ const FIRST_DRIVE_SINK: usize = 1 + VOTE_DIRECTION_COUNT as usize * DIRECTED_VOT
 const _: () = assert!(VOTE_DIRECTION_COUNT as usize == crate::contracts::Direction::ALL.len());
 const _: () = assert!(FIRST_DRIVE_SINK + DIRECTED_VOTE_KIND_COUNT == VOTE_SINK_COUNT - 2);
 
+/// [`VoteSink::as_key`] in catalog index order.
+const VOTE_SINK_KEYS: [&str; VOTE_SINK_COUNT] = [
+    "Eat",
+    "Move.0",
+    "Move.1",
+    "Move.2",
+    "Move.3",
+    "Move.4",
+    "Move.5",
+    "Move.6",
+    "Move.7",
+    "Reproduce.0",
+    "Reproduce.1",
+    "Reproduce.2",
+    "Reproduce.3",
+    "Reproduce.4",
+    "Reproduce.5",
+    "Reproduce.6",
+    "Reproduce.7",
+    "StealEnergy.0",
+    "StealEnergy.1",
+    "StealEnergy.2",
+    "StealEnergy.3",
+    "StealEnergy.4",
+    "StealEnergy.5",
+    "StealEnergy.6",
+    "StealEnergy.7",
+    "GiveEnergy.0",
+    "GiveEnergy.1",
+    "GiveEnergy.2",
+    "GiveEnergy.3",
+    "GiveEnergy.4",
+    "GiveEnergy.5",
+    "GiveEnergy.6",
+    "GiveEnergy.7",
+    "Drive.Move",
+    "Drive.Reproduce",
+    "Drive.StealEnergy",
+    "Drive.GiveEnergy",
+    "Terminate",
+    "Decide",
+];
+
 /// One node's contribution, or the mesh's accumulated vote, over the catalog.
 pub type VoteVector = [f32; VOTE_SINK_COUNT];
 
@@ -180,6 +223,14 @@ impl VoteSink {
         }
     }
 
+    /// Stable report key, unique per sink: `Eat`, `Move.0` … `Move.7` (the
+    /// kind's serde name and the `Direction::ALL` index), `Drive.Move`,
+    /// `Terminate`, `Decide`. Never a `Debug` rendering.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        VOTE_SINK_KEYS[self.index()]
+    }
+
     /// Every sink in catalog index order.
     pub fn all() -> impl Iterator<Item = Self> {
         (0..VOTE_SINK_COUNT).filter_map(Self::from_index)
@@ -213,14 +264,25 @@ pub enum DirectedVoteKind {
 }
 
 impl DirectedVoteKind {
-    /// Catalog order, the order `AddRingBundle` and `RetargetBundleKind` draw
-    /// over.
+    /// Catalog order, the order the birth policy's kind draw and
+    /// `RetargetBundle` draw over.
     pub const ALL: [Self; 4] = [
         Self::Move,
         Self::Reproduce,
         Self::StealEnergy,
         Self::GiveEnergy,
     ];
+
+    /// Stable report key: the variant's serde name.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Move => "Move",
+            Self::Reproduce => "Reproduce",
+            Self::StealEnergy => "StealEnergy",
+            Self::GiveEnergy => "GiveEnergy",
+        }
+    }
 
     /// Position in [`Self::ALL`].
     #[must_use]
@@ -451,6 +513,33 @@ mod tests {
             "actionTypes": action_types,
         });
         assert_eq!(fixture, declared);
+    }
+
+    /// Every sink's report key is unique and names its kind's serde name
+    /// (T25.F11 invariant 11: stable keys, never a `Debug` rendering).
+    #[test]
+    fn vote_sink_keys_are_unique_and_follow_the_catalog() {
+        let keys: std::collections::BTreeSet<_> = VoteSink::all().map(VoteSink::as_key).collect();
+        assert_eq!(keys.len(), VOTE_SINK_COUNT);
+        assert_eq!(VoteSink::Eat.as_key(), "Eat");
+        assert_eq!(
+            VoteSink::Directed(DirectedVoteKind::GiveEnergy, 7).as_key(),
+            "GiveEnergy.7"
+        );
+        assert_eq!(
+            VoteSink::Drive(DirectedVoteKind::Move).as_key(),
+            "Drive.Move"
+        );
+        assert_eq!(VoteSink::Decide.as_key(), "Decide");
+        for kind in DirectedVoteKind::ALL {
+            assert_eq!(
+                serde_json::to_string(&kind).unwrap(),
+                format!("\"{}\"", kind.as_key())
+            );
+            assert!(VoteSink::Directed(kind, 0)
+                .as_key()
+                .starts_with(kind.as_key()));
+        }
     }
 
     #[test]

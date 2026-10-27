@@ -12,7 +12,7 @@ use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::{
-    test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind, Scope, Shape,
+    test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind, Scope,
 };
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
@@ -40,8 +40,7 @@ fn grouped_founder() -> (CreatureGenome, usize, u16) {
     let ring = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
         .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-    let id =
-        graph_mut(node).add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 2);
+    let id = graph_mut(node).add_ring_bundle(ring, DirectedVoteKind::Move, 2);
     graph_mut(node).bundle_mut(id).set_scale(0.5);
     (genome, idx, ring)
 }
@@ -284,7 +283,7 @@ fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
     assert!(graph_mut(&mut detached.nodes[idx]).bundles().is_empty());
     assert_eq!(detached.genome_size(), genome.genome_size());
     let mut summary = MutationSummary::zero();
-    summary.record_bundle_edits(edits);
+    summary.record_bundle_edits(MutationOperator::GraphDetachGraphEdge, edits);
     assert_eq!(
         (summary.graph_edges_detached, summary.bundles_removed),
         (1, 1)
@@ -296,9 +295,9 @@ fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
 /// member.
 fn sole_member_genome(fact: bool) -> CreatureGenome {
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
-    let layout = area.direction_pairs()[0];
+    let layout = crate::contracts::pair_layout(&area, 0);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+    let id = def.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3);
     def.bundle_mut(id).set_scale(0.5);
     let keep = if fact {
         def.members(id).last()
@@ -312,7 +311,10 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
     }
     let kept = def.members(id).next().unwrap();
     assert_eq!(def.members(id).count(), 1);
-    assert_eq!(def.is_fact_member(kept), fact);
+    assert_eq!(
+        def.site_of(kept) == Some(crate::genome::cgp::Site::Drive),
+        fact
+    );
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -328,6 +330,80 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
 /// turns into one independent edge: `+1 − 1`, the record's unit becomes
 /// the edge's (T25.F10).
 const SOLE_MEMBER_DETACH_DELTA: i64 = 0;
+
+/// T25.F11 invariant 8: every creation operator changes `genome_size` by
+/// its unit delta: `AddSensor*` on a Graph node 1 + the bundles it made
+/// (`NearbyCreature` 5, an area summary 3, any other sensor 2), on a VM
+/// node 1; `AddBundle*` 1. Seeds are walked until every sensor class has
+/// been seen on the Graph node.
+#[test]
+fn every_creation_operator_moves_genome_size_by_its_unit_delta() {
+    use crate::contracts::SensorDescriptor;
+    use crate::mutation::graph::GraphMutator;
+    use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+    let context = crate::config::test_sensor_context(1);
+    let base = v3alpha1_founder_genome();
+    let graph = graph_index(&base);
+    let mut vm_genome = base.clone();
+    vm_genome.nodes[graph].backend_def = BackendDef::Vm(VmBackendDef {
+        register_count: 1,
+        constants: vec![],
+        program: vec![VmInstruction::Halt],
+    });
+    let mut seen = std::collections::BTreeSet::new();
+    for op in [
+        InputRefOperator::AddSensorLive,
+        InputRefOperator::AddSensorSilent,
+    ] {
+        for seed in 0..512 {
+            let mut genome = base.clone();
+            InputRefMutator::apply_to_node(
+                &mut genome,
+                op,
+                graph,
+                &mut SmallRng::seed_from_u64(seed),
+                &context,
+            )
+            .expect("a full catalog wires every sensor");
+            let reference = genome.nodes[graph].input_refs.last().unwrap();
+            let sets = SensorDescriptor::of(reference, &context).field_set_count();
+            let delta = genome.genome_size() - base.genome_size();
+            assert_eq!(delta as usize, 1 + sets, "{op:?} {reference:?}");
+            seen.insert(sets);
+
+            let mut vm = vm_genome.clone();
+            InputRefMutator::apply_to_node(
+                &mut vm,
+                op,
+                graph,
+                &mut SmallRng::seed_from_u64(seed),
+                &context,
+            )
+            .unwrap();
+            assert_eq!(vm.genome_size(), vm_genome.genome_size() + 1, "{op:?}");
+        }
+    }
+    assert_eq!(
+        seen,
+        [1, 2, 4].into(),
+        "a plain sensor, an area summary, NearbyCreature"
+    );
+    for op in [GraphOperator::AddBundleLive, GraphOperator::AddBundleSilent] {
+        for seed in 0..64 {
+            let mut genome = base.clone();
+            GraphMutator::apply_to_node(
+                &mut genome,
+                op,
+                graph,
+                &mut SmallRng::seed_from_u64(seed),
+                &MutationConfig::default(),
+                &context,
+            )
+            .expect("the founder's Graph node has an admissible source");
+            assert_eq!(genome.genome_size(), base.genome_size() + 1, "{op:?}");
+        }
+    }
+}
 
 /// Invariant 1: a sole direction member and a sole fact member under each
 /// detaching operator (`DetachGraphEdge`, `RetargetGraphEdge`,
@@ -462,8 +538,8 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
     assert_eq!(scopes, [true; 2]);
 
     for op in [
-        GraphOperator::AddRingBundle,
-        GraphOperator::AddRandomizedRingBundle,
+        GraphOperator::AddBundleSilent,
+        GraphOperator::AddBundleLive,
         GraphOperator::DetachGraphEdge,
         GraphOperator::AlterGraphEdgeWeight,
     ] {
@@ -491,16 +567,22 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
 #[test]
 fn record_bundle_edits_accumulates_across_events() {
     let mut summary = MutationSummary::zero();
-    summary.record_bundle_edits(BundleEdits {
-        detached: 2,
-        removed: 1,
-        ..BundleEdits::default()
-    });
-    summary.record_bundle_edits(BundleEdits {
-        detached: 3,
-        removed: 4,
-        ..BundleEdits::default()
-    });
+    summary.record_bundle_edits(
+        MutationOperator::GraphRemoveBundle,
+        BundleEdits {
+            detached: 2,
+            removed: 1,
+            ..BundleEdits::default()
+        },
+    );
+    summary.record_bundle_edits(
+        MutationOperator::GraphRemoveBundle,
+        BundleEdits {
+            detached: 3,
+            removed: 4,
+            ..BundleEdits::default()
+        },
+    );
     assert_eq!(summary.graph_edges_detached, 5);
     assert_eq!(summary.bundles_removed, 5);
 }
@@ -513,10 +595,15 @@ fn expected_delta(
     after: &CgpGraphBackendDef,
 ) -> Option<Vec<i64>> {
     match op {
-        MutationOperator::GraphAddRingBundle
-        | MutationOperator::GraphAddRandomizedRingBundle
-        | MutationOperator::GraphAddDirectionPairBundle
-        | MutationOperator::GraphAddRandomizedDirectionPairBundle => Some(vec![1]),
+        MutationOperator::GraphAddBundleSilent | MutationOperator::GraphAddBundleLive => {
+            Some(vec![1])
+        }
+        // One declaration and one record per field set (T25.F11
+        // invariant 8).
+        MutationOperator::InputRefAddSensorLive | MutationOperator::InputRefAddSensorSilent => {
+            let made = after.bundles().len() - before.bundles().len();
+            Some(vec![1 + i64::try_from(made).unwrap()])
+        }
         MutationOperator::GraphDetachGraphEdge => {
             Some(vec![if after.bundles().len() < before.bundles().len() {
                 0
@@ -533,7 +620,7 @@ fn expected_delta(
         MutationOperator::GraphRemoveGraphEdge if member_removed(before, after) => Some(vec![0]),
         MutationOperator::GraphAlterBundleScale
         | MutationOperator::GraphShiftBundleOffset
-        | MutationOperator::GraphRetargetBundleKind
+        | MutationOperator::GraphRetargetBundle
         | MutationOperator::GraphEnableRetention
         | MutationOperator::GraphDisableRetention
         | MutationOperator::GraphMutateRetention
@@ -556,17 +643,21 @@ fn member_removed(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> bo
     members(after) < members(before)
 }
 
-/// The shape of one generated bundle.
+/// The shape of one generated bundle: every wiring and both sources
+/// (T25.F11).
 #[derive(Clone, Copy, Debug)]
 enum BundleShape {
     /// A `Ring` bundle on an appended occupied-ring reference.
     Ring,
-    /// A `DirectionPair` gene on occupancy pair `pair`; `with_facts` adds its
-    /// fact members (T25.F10). The last member of a fact-bearing gene is a
-    /// fact member (the drive sinks follow every direction sink), so the
-    /// drops generate fact holes and fact-only survivors as well as sole
-    /// direction members.
-    Pair { pair: u8, with_facts: bool },
+    /// A `DirectionPair` bundle on occupancy pair `pair`, its facts on the
+    /// drive. The last member is a fact member (the drive sinks follow
+    /// every direction sink), so the drops generate fact holes and
+    /// fact-only survivors as well as sole direction members.
+    Pair { pair: u8 },
+    /// A `Plain` bundle on vote sink `sink` (a catalog index) reading the
+    /// appended `CommitCounts` sensor, or a memory bank when `memory` is
+    /// set (`previous` the bank).
+    Plain { sink: usize, memory: Option<bool> },
 }
 
 /// One generated bundle: kind, offset, scale, the members to drop (a bit per
@@ -576,42 +667,73 @@ type BundleSpec = (usize, u8, f32, u16, BundleShape);
 /// Draws a `BundleSpec` over every shape: a ring, or each occupancy pair with
 /// and without its fact members.
 fn bundle_spec() -> impl Strategy<Value = BundleSpec> {
-    let pairs = InputReference::World(WorldInputKey::AreaOccupancySummary)
-        .direction_pairs()
-        .len();
-    let pair = (0..u8::try_from(pairs).unwrap(), any::<bool>())
-        .prop_map(|(pair, with_facts)| BundleShape::Pair { pair, with_facts });
-    let shape = prop_oneof![1 => Just(BundleShape::Ring), 4 => pair];
+    let pairs = WorldInputKey::AreaOccupancySummary.direction_pairs().len();
+    let pair = (0..u8::try_from(pairs).unwrap()).prop_map(|pair| BundleShape::Pair { pair });
+    let plain = (
+        0..crate::contracts::votes::VOTE_SINK_COUNT,
+        prop::option::of(any::<bool>()),
+    )
+        .prop_map(|(sink, memory)| BundleShape::Plain { sink, memory });
+    let shape = prop_oneof![1 => Just(BundleShape::Ring), 2 => pair, 2 => plain];
     (0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), shape)
 }
 
 /// Adds one bundle per entry of `bundles` to the Graph `node`: a `Ring` reads
 /// an appended occupied-ring reference, a `DirectionPair` an appended
-/// occupancy summary; each with members dropped (a bundle keeps at least
-/// one).
+/// occupancy summary, a `Plain` an appended `CommitCounts` or a memory bank;
+/// each with members dropped (a bundle keeps at least one).
 fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
+    use crate::genome::cgp::{BundleBirth, BundleSource, Wiring};
     let ring = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
         .push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     let summary = ring + 1;
     node.input_refs.push(area.clone());
+    let counts = ring + 2;
+    node.input_refs.push(InputReference::CommitCounts);
+    let context = crate::config::test_sensor_context(1);
+    let refs = node.input_refs.clone();
     let def = graph_mut(node);
     for &(kind, offset, scale, drop, shape) in bundles {
         let kind = DirectedVoteKind::ALL[kind];
         let id = match shape {
-            BundleShape::Ring => def.add_ring_bundle(Shape::Ring { ring_ref: ring }, kind, offset),
-            BundleShape::Pair { pair, with_facts } => {
-                let layout = area.direction_pairs()[usize::from(pair)];
-                let facts = if with_facts { layout.facts } else { &[] };
-                def.add_pair_bundle(summary, pair, layout, kind, offset, facts)
+            BundleShape::Ring => def.add_ring_bundle(ring, kind, offset),
+            BundleShape::Pair { pair } => {
+                let layout = crate::contracts::pair_layout(&area, pair);
+                def.add_pair_bundle(summary, pair, layout, kind, offset)
+            }
+            BundleShape::Plain { sink, memory } => {
+                let source = match memory {
+                    Some(previous) => BundleSource::Memory { previous },
+                    None => BundleSource::Sensor {
+                        ref_idx: counts,
+                        field_set: 0,
+                    },
+                };
+                let set = match source {
+                    BundleSource::Memory { .. } => crate::contracts::MEMORY_BANK,
+                    BundleSource::Sensor { .. } => {
+                        crate::contracts::SensorDescriptor::of(&refs[usize::from(counts)], &context)
+                            .field_set(0)
+                            .unwrap()
+                    }
+                };
+                let birth = BundleBirth {
+                    field_set: 0,
+                    wiring: Wiring::Plain {
+                        sink: VoteSink::from_index(sink).unwrap(),
+                    },
+                    scale: 0.0,
+                };
+                def.add_bundle(source, set, birth).unwrap()
             }
         };
         def.bundle_mut(id).set_scale(scale);
         let members: Vec<_> = def.members(id).collect();
         let last = members.len() - 1;
         for (index, occurrence) in members.into_iter().enumerate().rev() {
-            if index < last && drop & (1 << index) != 0 {
+            if index < last && index < 16 && drop & (1 << index) != 0 {
                 def.remove_edge(occurrence);
             }
         }

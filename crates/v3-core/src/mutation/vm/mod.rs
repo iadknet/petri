@@ -115,6 +115,10 @@ impl VmOperator {
     }
 
     /// Pick a random VM operator weighted by impact tier.
+    // WORKAROUND(T25.F08): a sampler beside the engine's
+    // `select_weighted_index`; the VM and Topology domains' `random` and
+    // `TOTAL_WEIGHT` go in one area change (Graph's and InputRef's went
+    // with T25.F11), tests drawing through the engine's sampler.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {

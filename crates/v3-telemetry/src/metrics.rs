@@ -25,6 +25,7 @@ use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::{ActionType, WorldInputKey};
 use v3_core::genome::cgp::Scope;
 use v3_core::ledger::DeathCause;
+use v3_core::mutation::{FORM_KEYS, WIRING_KEYS};
 use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::neighborhood::sensor_census::{
@@ -549,7 +550,6 @@ fn counters(f: &mut Families, s: &SimStats) {
         mutation_not_applicable_target_total,
         graph_edges_detached_total,
         bundles_removed_total,
-        pair_bundle_inherited_nonzero_births_total,
         mesh_hops_total,
         vm_steps_total,
         graph_relax_iters_total,
@@ -800,6 +800,36 @@ fn mutations(f: &mut Families, s: &SimStats) {
                 .map(|(input, count)| (input.as_key().to_owned(), *count))
                 .collect()
         },
+    );
+
+    // T25.F11: bundles the four creation operators committed, by wiring and
+    // creation form, summed over operators; all six series exported.
+    let mut created = [[0u64; 2]; 3];
+    for by_operator in s.bundles_created_total.values() {
+        for (row, add) in created.iter_mut().zip(by_operator) {
+            for (count, add) in row.iter_mut().zip(add) {
+                *count += add;
+            }
+        }
+    }
+    f.push(
+        run_name("bundles_created"),
+        Kind::Sum,
+        "",
+        WIRING_KEYS
+            .iter()
+            .enumerate()
+            .flat_map(|(wiring, wiring_key)| {
+                FORM_KEYS.iter().enumerate().map(move |(form, form_key)| {
+                    (
+                        vec![
+                            ("petri.wiring", (*wiring_key).to_owned()),
+                            ("petri.form", (*form_key).to_owned()),
+                        ],
+                        created[wiring][form].into(),
+                    )
+                })
+            }),
     );
 
     // T25.F08: committed attribute changes by the scope they landed on, both

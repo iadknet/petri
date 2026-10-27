@@ -89,10 +89,14 @@ fn grid_for(population: u64) -> OccupancyGrid {
     }
 }
 
-/// A `pair_bundles` block keyed to `tick`: no bundles, the two counters
-/// traceable to the tick.
-fn pair_bundles_for(tick: u64) -> crate::bench::pair_bundles::PairBundles {
-    crate::bench::pair_bundles::PairBundles::census(std::iter::empty(), tick, tick * 2)
+/// A `bundles` block keyed to `tick`: no bundles, one creation traceable
+/// to the tick (T25.F11).
+fn bundles_for(tick: u64) -> crate::bench::bundles::Bundles {
+    let created = std::collections::HashMap::from([(
+        v3_core::mutation::MutationOperator::GraphAddBundleLive,
+        [[tick, 0], [0, 0], [0, 0]],
+    )]);
+    crate::bench::bundles::Bundles::census(std::iter::empty(), &created)
 }
 
 /// A plasticity census of `population` creatures carrying no plastic edge:
@@ -180,13 +184,11 @@ fn empty_readings() -> PopulationReadings {
         mean_mesh_nodes: 0.0,
         mean_generation: 0.0,
         mean_wired_sinks: 0.0,
-        mean_ring_bundles: 0.0,
-        mean_ring_bundle_members: None,
         surviving_founder_clade_count: 0,
         shannon_entropy_nats: UNDEFINED.to_string(),
         sensor_census: census_for(0),
         occupancy_grid: grid_for(0),
-        pair_bundles: None,
+        bundles: None,
         plasticity_census: plasticity_for(0),
         capacity: None,
         shares: None,
@@ -228,13 +230,11 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         mean_mesh_nodes: tick as f64 * 2.0,
         mean_generation: tick as f64 * 3.0,
         mean_wired_sinks: tick as f64 * 5.0,
-        mean_ring_bundles: tick as f64 * 7.0,
-        mean_ring_bundle_members: Some(tick as f64 * 11.0),
         surviving_founder_clade_count: population,
         shannon_entropy_nats: six(tick as f64 / 4.0),
         sensor_census: census_for(population),
         occupancy_grid: grid_for(population),
-        pair_bundles: Some(pair_bundles_for(tick)),
+        bundles: Some(bundles_for(tick)),
         plasticity_census: plasticity_for(population),
         capacity: Some(capacity_block(tick as f64)),
         shares: Some(shares_block(tick as f64 / 1000.0)),
@@ -348,14 +348,6 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
         assert_eq!(
             sample.mean_wired_sinks.as_deref(),
             Some(six(expected.mean_wired_sinks).as_str())
-        );
-        assert_eq!(
-            sample.mean_ring_bundles.as_deref(),
-            Some(six(expected.mean_ring_bundles).as_str())
-        );
-        assert_eq!(
-            sample.mean_ring_bundle_members,
-            expected.mean_ring_bundle_members.map(six)
         );
         assert_eq!(sample.surviving_founder_clade_count, Some(6));
         assert_eq!(
@@ -565,8 +557,6 @@ proptest! {
         mean_mesh_nodes in proptest::option::of(0.0f64..1e6),
         mean_generation in proptest::option::of(0.0f64..1e6),
         mean_wired_sinks in proptest::option::of(0.0f64..1e3),
-        mean_ring_bundles in proptest::option::of(0.0f64..1e3),
-        mean_ring_bundle_members in proptest::option::of(0.0f64..8.0),
         surviving_founder_clade_count in proptest::option::of(0u64..10_000),
         shannon_entropy_nats in proptest::option::of(0.0f64..20.0),
         population in 0u64..1000,
@@ -580,13 +570,11 @@ proptest! {
             mean_mesh_nodes: mean_mesh_nodes.map(six),
             mean_generation: mean_generation.map(six),
             mean_wired_sinks: mean_wired_sinks.map(six),
-            mean_ring_bundles: mean_ring_bundles.map(six),
-            mean_ring_bundle_members: mean_ring_bundle_members.map(six),
             surviving_founder_clade_count,
             shannon_entropy_nats: shannon_entropy_nats.map(six),
             sensor_census: Some(census_for(population)),
             occupancy_grid: Some(grid_for(population)),
-            pair_bundles: None,
+            bundles: None,
             plasticity_census: Some(plasticity_for(population)),
             capacity: (population > 0).then(|| capacity_block(population as f64)),
             shares: (population > 0).then(|| shares_block(population as f64 / 1000.0)),
@@ -601,8 +589,6 @@ proptest! {
         prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
         prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
         prop_assert_eq!(&decoded.mean_wired_sinks, &sample.mean_wired_sinks);
-        prop_assert_eq!(&decoded.mean_ring_bundles, &sample.mean_ring_bundles);
-        prop_assert_eq!(&decoded.mean_ring_bundle_members, &sample.mean_ring_bundle_members);
         prop_assert_eq!(
             decoded.surviving_founder_clade_count,
             sample.surviving_founder_clade_count
@@ -622,8 +608,6 @@ proptest! {
             "mean_mesh_nodes",
             "mean_generation",
             "mean_wired_sinks",
-            "mean_ring_bundles",
-            "mean_ring_bundle_members",
             "surviving_founder_clade_count",
             "shannon_entropy_nats",
             "sensor_census",
@@ -640,8 +624,6 @@ proptest! {
         prop_assert_eq!(historical.mean_mesh_nodes, None);
         prop_assert_eq!(historical.mean_generation, None);
         prop_assert_eq!(historical.mean_wired_sinks, None);
-        prop_assert_eq!(historical.mean_ring_bundles, None);
-        prop_assert_eq!(historical.mean_ring_bundle_members, None);
         prop_assert_eq!(historical.surviving_founder_clade_count, None);
         prop_assert_eq!(historical.shannon_entropy_nats, None);
         prop_assert_eq!(historical.sensor_census, None);
@@ -792,7 +774,6 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.mutation_not_applicable_target_total = 3;
     stats.graph_edges_detached_total = 8;
     stats.bundles_removed_total = 2;
-    stats.pair_bundle_inherited_nonzero_births_total = 5;
     stats.mutation_attribute_changes_total_by_scope = [7, 4];
     stats.mutation_operator_funnel_total_by_operator.insert(
         MutationOperator::GraphDetachGraphEdge,
@@ -860,7 +841,6 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             not_applicable_target_total: 3,
             graph_edges_detached_total: 8,
             bundles_removed_total: 2,
-            pair_bundle_inherited_nonzero_births_total: 5,
             attribute_changes_by_scope: AttributeChangesByScope { edge: 7, bundle: 4 },
             operator_funnel_by_operator: BTreeMap::from([(
                 "Graph.DetachGraphEdge".to_string(),
@@ -1428,8 +1408,6 @@ fn tracking_fields_default_when_absent() {
     assert_eq!(legacy.mean_mesh_nodes, None);
     assert_eq!(legacy.mean_generation, None);
     assert_eq!(legacy.mean_wired_sinks, None);
-    assert_eq!(legacy.mean_ring_bundles, None);
-    assert_eq!(legacy.mean_ring_bundle_members, None);
     assert_eq!(legacy.surviving_founder_clade_count, None);
     assert_eq!(legacy.shannon_entropy_nats, None);
     assert_eq!(legacy.sensor_census, None);
@@ -1451,13 +1429,11 @@ fn tracking_fields_survive_a_round_trip() {
         mean_mesh_nodes: Some(six(8.0)),
         mean_generation: Some(six(3.5)),
         mean_wired_sinks: Some(six(17.0)),
-        mean_ring_bundles: Some(six(0.5)),
-        mean_ring_bundle_members: Some(six(7.5)),
         surviving_founder_clade_count: Some(4),
         shannon_entropy_nats: Some(six(1.25)),
         sensor_census: Some(census_for(5)),
         occupancy_grid: Some(grid_for(5)),
-        pair_bundles: Some(pair_bundles_for(100)),
+        bundles: Some(bundles_for(100)),
         plasticity_census: Some(plasticity_for(5)),
         capacity: Some(capacity_block(200.0)),
         shares: Some(shares_block(0.2)),
@@ -1497,10 +1473,9 @@ fn tracking_fields_survive_a_round_trip() {
                 not_applicable_target_total: 1,
                 graph_edges_detached_total: 4,
                 bundles_removed_total: 1,
-                pair_bundle_inherited_nonzero_births_total: 3,
                 attribute_changes_by_scope: AttributeChangesByScope { edge: 2, bundle: 1 },
                 operator_funnel_by_operator: BTreeMap::from([(
-                    "Graph.AddRandomizedRingBundle".to_string(),
+                    "Graph.AddBundleLive".to_string(),
                     OperatorFunnel {
                         attempted: 2,
                         applied: 1,

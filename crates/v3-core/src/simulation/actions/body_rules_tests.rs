@@ -557,6 +557,12 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 /// widened decision sub-index draws change the genome mutation's draws
 /// (channels `[0, 0, 93, 92, 138, 138]` -> `[0, 0, 91, 92, 138, 138]`, the
 /// third polarity subtracting, kin tag 3_756_156_572 -> 3_756_156_052).
+/// Re-pinned by T25.F11 commit 3: the four creation operators replace
+/// `InputRef.Add`, recruitment and the four `Add*Group` (Graph weight 78,
+/// InputRef 12) and every birth draws whole field sets, which changes the
+/// genome mutation's draws (channels `[0, 0, 91, 92, 138, 138]` ->
+/// `[1, 0, 92, 92, 138, 138]`, active 2 -> 0, polarity all adding, kin tag
+/// 3_756_156_052 -> 3_756_156_044).
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
     let parent = parent_body();
@@ -570,13 +576,13 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
         child,
         HeritableBody {
             phenotype: Phenotype {
-                channels: [0, 0, 91, 92, 138, 138],
-                active_channel: 2,
-                polarity: [true, true, false, true, true, true],
+                channels: [1, 0, 92, 92, 138, 138],
+                active_channel: 0,
+                polarity: [true; 6],
             },
             identity: CreatureIdentityState {
                 lineage_id: 3,
-                kin_tag: 3_756_156_052,
+                kin_tag: 3_756_156_044,
             },
             capacity: 200.0,
             steal_share: 0.2,

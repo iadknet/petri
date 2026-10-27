@@ -326,7 +326,6 @@ fn run_families(families: &mut Vec<Family>) {
         "mutation_not_applicable_target",
         "graph_edges_detached",
         "bundles_removed",
-        "pair_bundle_inherited_nonzero_births",
         "mesh_hops",
         "vm_steps",
         "graph_relax_iters",
@@ -537,6 +536,20 @@ fn mutation_families(families: &mut Vec<Family>) {
         "petri.run.mutation_attribute_changes_by_scope".to_owned(),
         MonotonicSum,
         vec![("petri.scope", strings(["Edge", "Group"], str::to_owned))],
+    ));
+    families.push((
+        "petri.run.bundles_created".to_owned(),
+        MonotonicSum,
+        vec![
+            (
+                "petri.wiring",
+                strings(v3_core::mutation::WIRING_KEYS, str::to_owned),
+            ),
+            (
+                "petri.form",
+                strings(v3_core::mutation::FORM_KEYS, str::to_owned),
+            ),
+        ],
     ));
     for (field, kind) in [
         ("carriers_observed", MonotonicSum),

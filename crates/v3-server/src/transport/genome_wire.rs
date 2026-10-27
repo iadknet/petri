@@ -829,7 +829,7 @@ mod tests {
     /// exhaustive `From` is their pin.
     #[test]
     fn mirrors_serialize_as_the_core_types_do() {
-        use crate::transport::brain::{BundleShape, Scope};
+        use crate::transport::brain::{BundleSource, Scope, Wiring};
 
         assert_same_variants::<core_vote::DirectedVoteKind, DirectedVoteKind>();
         assert_same_variants::<core_vote::VoteSink, VoteSink>();
@@ -844,7 +844,8 @@ mod tests {
         assert_same_variants::<core_mesh::MeshWriteClass, MeshWriteClass>();
         assert_same_variants::<CoreVmInstruction, VmInstruction>();
         assert_same_variants::<core_cgp::Scope, Scope>();
-        assert_same_variants::<core_cgp::Shape, BundleShape>();
+        assert_same_variants::<core_cgp::BundleSource, BundleSource>();
+        assert_same_variants::<core_cgp::Wiring, Wiring>();
 
         assert_mirrors_all::<_, DirectedVoteKind>(&core_vote::DirectedVoteKind::ALL);
         assert_mirrors_all::<_, ActionParamField>(&core_vote::ActionParamField::ALL);

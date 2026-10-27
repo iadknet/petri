@@ -52,13 +52,11 @@ fn full_assembly_matches_production_for_a_genome_reading_every_input() {
 }
 
 #[test]
-fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
-    use crate::config::NeutralInputRecruitment as Arm;
-    use crate::contracts::votes::VoteSink;
+fn an_added_sensor_triggers_native_declaration_driven_sensor_assembly() {
     use crate::contracts::NodeId;
+    use crate::genome::cgp::test_support::add_first_plan_sensor;
     use crate::genome::cgp::CgpGraphBackendDef;
     use crate::genome::{BackendDef, NodeGenome};
-    use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     let parent = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -86,14 +84,7 @@ fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
         ),
     ] {
         let mut child = parent.clone();
-        recruit_source(
-            &mut child.nodes[0],
-            &SourceFamily::Input(InputReference::World(key)),
-            Arm::WholeFamily,
-            0,
-            VoteSink::Eat,
-        )
-        .unwrap();
+        add_first_plan_sensor(&mut child.nodes[0], InputReference::World(key));
         assert_eq!(genome_uses_extended_perception(&child), extended);
         assert_eq!(genome_uses_typed_local_food(&child), typed);
         let donors = world_with(&parent);
@@ -124,6 +115,5 @@ fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
                 .zip(&before)
                 .any(|(a, b)| a.1.typed_local_food != b.1.typed_local_food));
         }
-        println!("RECRUIT_ASSEMBLY {key:?}: creatures={} extended_assemblies={} typed_local_assemblies={}", ids.len(), usize::from(extended)*ids.len(), usize::from(typed)*ids.len());
     }
 }

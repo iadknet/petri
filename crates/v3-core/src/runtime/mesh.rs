@@ -2151,13 +2151,9 @@ mod tests {
     #[test]
     fn a_ring_bundle_records_its_ring() {
         use crate::contracts::votes::DirectedVoteKind;
-        use crate::genome::cgp::{CgpGraphBackendDef, Shape};
+        use crate::genome::cgp::CgpGraphBackendDef;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_ring_bundle(
-            Shape::Ring { ring_ref: 0 },
-            DirectedVoteKind::StealEnergy,
-            0,
-        );
+        let id = def.add_ring_bundle(0, DirectedVoteKind::StealEnergy, 0);
         def.bundle_mut(id).set_scale(0.5);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),

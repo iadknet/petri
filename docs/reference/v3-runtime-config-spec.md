@@ -62,7 +62,7 @@ Transport posture note:
 | Key | Type | Default | Constraint / normalization | Used by |
 | --- | --- | --- | --- | --- |
 | `runtime.max_mesh_hops` | `u32` | `64` | Must be `>= 1`; invalid values fall back to `64`. Per-pass hop cap (T19.F02): a pass dispatches at most this many mesh nodes, revisits included; reaching it ends the pass `PassCapReached` with the votes and queue kept and counts one `pass_cap_hits` (T19.F04 names the pass reason). | `v3-mesh-execution-spec.md` |
-| `runtime.max_actions_per_turn` | `usize` | `10` | Must be `>= 1`; invalid values fall back to `10`. Upper bound on queued actions returned from one mesh evaluation. | `v3-mesh-execution-spec.md`, `v3-graph-backend-spec.md`, `v3-vm-isa-spec.md` |
+| `runtime.max_actions_per_turn` | `usize` | `10` | Must be `>= 1`; invalid values fall back to `10`. Upper bound on queued actions returned from one mesh evaluation. Also sets the `ActionQueue` sensor's width, `min(3 × max_actions_per_turn, 65 536)` (T25.F11): the mutation draws and reader censuses address every queue slot, and a live patch changes it for later births. | `v3-mesh-execution-spec.md`, `v3-graph-backend-spec.md`, `v3-vm-isa-spec.md` |
 | `runtime.max_vm_steps` | `u32` | `10000` | Must be `>= 1`; invalid values fall back to `10000`. | `v3-vm-isa-spec.md` |
 | `runtime.graph_node_base_cost` | `f32` | `1e-5` | Must be `>= 0.0`; invalid values fall back to `1e-5`. | `v3-graph-backend-spec.md` |
 | `runtime.vm.opcode_cost_multiplier` | `f32` | `1e-6` | Must be finite and `>= 0.0`; invalid values fall back to `1e-6`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
@@ -96,7 +96,6 @@ Type posture:
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
 | `mutation.per_unit_rate` | `f64` | `0.0060625` | The only mutation-count setting (T11.F19, T11.F20): chance that one genome unit requests a mutation event. Missing field defaults to `0.0060625`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.0060625`. The default is `0.485 / 80` (T25.F02): the 80-unit V3Alpha1 founder expects 0.485 events per birth, the supply of the 97-unit founder at 0.005. The five keys of the retired per-birth rule (T11.F20) are rejected as unknown fields. |
-| `mutation.neutral_input_recruitment` | enum | `"WholeFamily"` | Graph input recruitment (T20.F04), `"WholeFamily"` by default since 2026-10-12: `"Off"`, `"SingleChannel"`, or `"WholeFamily"`. Omission means WholeFamily; other values are rejected. Enabled arms admit `Graph.RecruitNeutralInput` at structural weight 1; Off excludes it before sampling and consumes no extra RNG. Restricted size pressure excludes this growth operator. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
@@ -241,9 +240,10 @@ Genome carrying cost:
   existing `energy <= 0.0` rule in the same tick.
 - The unit is total genome size (`genome_size()`), which counts every node,
   input reference, target, VM instruction, VM constant, compute node, and
-  edge on both graph surfaces (compute inputs and sink inputs, edge-group
-  members included) one unit each, and each edge-group record one, so a full
-  `Ring` group is nine (T25.F03); a wired sink adds nothing of itself
+  edge on both graph surfaces (compute inputs and sink inputs that are not
+  bundle members) one unit each, and each bundle record one with nothing for
+  its members, so a full `Ring` bundle is one (T25.F10); a wired sink adds
+  nothing of itself
   (T25.F02). It is not reachability-aware, so unreachable and dead structure is
   charged exactly like the executed core.
 - Is NOT scaled by the complexity or age action multipliers, exactly as

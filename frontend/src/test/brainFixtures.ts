@@ -1,6 +1,7 @@
 import type { BrainBundle } from "../types/generated/BrainBundle.ts";
 import type { BrainEdge } from "../types/generated/BrainEdge.ts";
 import type { BrainView } from "../types/generated/BrainView.ts";
+import type { DirectedVoteKind } from "../types/generated/DirectedVoteKind.ts";
 import type { EdgeLearner } from "../types/generated/EdgeLearner.ts";
 import type { GraphBrain } from "../types/generated/GraphBrain.ts";
 import type { GraphSource } from "../types/generated/GraphSource.ts";
@@ -87,17 +88,27 @@ export function learner(overrides: Partial<EdgeLearner> = {}): EdgeLearner {
 	};
 }
 
-/** A ring bundle on `Move` at offset 0 and scale 0 with all eight members present. */
-export function ringBundle(ringRef: number, overrides: Partial<BrainBundle> = {}): BrainBundle {
+/** A ring bundle on `ringRef` into `kind` (default `Move`) at `offset`
+ * (default 0) and scale 0, with all eight members present. */
+export function ringBundle(
+	ringRef: number,
+	{
+		kind = "Move",
+		offset = 0,
+		...overrides
+	}: Partial<BrainBundle> & { kind?: DirectedVoteKind; offset?: number } = {},
+): BrainBundle {
 	return {
-		shape: { Ring: { ring_ref: ringRef } },
-		kind: "Move",
-		offset: 0,
+		source: { Sensor: { ref_idx: ringRef, field_set: 0 } },
+		wiring: { Ring: { kind, offset } },
 		scale: 0,
 		inherit_scale: false,
 		retention: 1,
-		coordinates: Array.from({ length: 8 }, (_, c) => ({ field: c, direction: c, present: true })),
-		facts: [],
+		coordinates: Array.from({ length: 8 }, (_, c) => ({
+			field: c,
+			site: { Direction: (c + offset) % 8 },
+			present: true,
+		})),
 		...overrides,
 	};
 }

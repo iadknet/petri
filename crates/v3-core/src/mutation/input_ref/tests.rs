@@ -19,15 +19,6 @@ use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-/// A reference's descriptor width at the default context, as a draw bound.
-fn width_of(reference: &InputReference) -> u16 {
-    u16::try_from(
-        crate::contracts::SensorDescriptor::of(reference, &crate::config::test_sensor_context(1))
-            .width(),
-    )
-    .expect("a test width fits u16")
-}
-
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
@@ -59,7 +50,7 @@ fn add_input_ref_increases_count() {
     let mut r = rng(0);
     InputRefMutator::apply(
         &mut genome,
-        InputRefOperator::Add,
+        InputRefOperator::AddSensorLive,
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
@@ -213,7 +204,7 @@ fn kind_is_class_and_width() {
         ),
         InputRefKind {
             class: MeshReadClass::ActionQueue,
-            width: 12
+            width: 30
         }
     );
 }
@@ -643,13 +634,13 @@ fn random_input_reference_covers_all_categories() {
         };
         categories.insert(cat);
     }
-    // 16 categories: 8 original + 4 extended perception families (one
+    // 17 categories: 8 original + 4 extended perception families (one
     // `NearbyCreature`, T25.F05) + the four decision-state compounds
-    // (T19.F05; `HopsThisTick` is a dynamic key).
+    // (T19.F05; `HopsThisTick` is a dynamic key) + `UpstreamBus` (T25.F11).
     assert_eq!(
         categories.len(),
-        16,
-        "all 16 input reference categories must be reachable; got {:?}",
+        17,
+        "all 17 input reference categories must be reachable; got {:?}",
         categories
     );
 }
@@ -694,7 +685,7 @@ fn raw_field_mutation_upstream_slot_bounded() {
 #[test]
 fn input_ref_after_mutation_passes_parseability_gate() {
     let operators = [
-        InputRefOperator::Add,
+        InputRefOperator::AddSensorLive,
         InputRefOperator::Prune,
         InputRefOperator::Swap,
         InputRefOperator::RawFieldMutation,
@@ -718,29 +709,11 @@ fn input_ref_after_mutation_passes_parseability_gate() {
 }
 
 #[test]
-fn input_ref_weighted_random_favors_refinement() {
-    let mut counts = std::collections::HashMap::new();
-    let mut r = rng(42);
-    for _ in 0..10_000 {
-        let op = InputRefOperator::random(&mut r);
-        *counts.entry(op).or_insert(0u32) += 1;
-    }
-    let swap = counts.get(&InputRefOperator::Swap).copied().unwrap_or(0);
-    let add = counts.get(&InputRefOperator::Add).copied().unwrap_or(0);
-    assert!(
-        swap > add + (add / 2),
-        "Swap (weight 4) must appear >1.5x Add (weight 2); got {} vs {}",
-        swap,
-        add,
-    );
-}
-
-#[test]
 fn input_ref_operator_weights_are_positive() {
     let all = InputRefOperator::ALL;
     assert_eq!(
         all.len(),
-        4,
+        5,
         "ALL must cover every InputRefOperator variant"
     );
     for &op in &all {
@@ -766,7 +739,7 @@ fn complexity_effect_consistent_with_types() {
     }
 }
 
-// ── InputRef::Add declares a born-connected input on Graph (T20.F16) ───────
+// ── AddSensorLive / AddSensorSilent wire every field set (T25.F11) ─────────
 
 /// One Graph node with the full fixed sink catalog and no references.
 fn graph_node_genome_full_catalog() -> CreatureGenome {
@@ -814,76 +787,127 @@ fn edge_count(node: &NodeGenome) -> usize {
     }
 }
 
-/// The vote edges `after` carries beyond `before`'s, as a multiset
-/// difference; panics when an old vote edge is gone.
-fn new_vote_edges(before: &NodeGenome, after: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
-    let mut new = vote_edges(after);
-    for edge in vote_edges(before) {
-        let pos = new
-            .iter()
-            .position(|candidate| *candidate == edge)
-            .expect("every old vote edge kept");
-        new.remove(pos);
-    }
-    new
-}
+const ADD_SENSOR: [InputRefOperator; 2] = [
+    InputRefOperator::AddSensorLive,
+    InputRefOperator::AddSensorSilent,
+];
 
 fn apply_add_to_node(
     genome: &mut CreatureGenome,
+    op: InputRefOperator,
     node_idx: usize,
     rng: &mut SmallRng,
     food_type_count: usize,
-) {
+) -> Result<InputRefEventReport, MutationSkipReason> {
     InputRefMutator::apply_to_node(
         genome,
-        InputRefOperator::Add,
+        op,
         node_idx,
         rng,
         &crate::config::test_sensor_context(food_type_count),
     )
-    .expect("Add always applies");
 }
 
-/// `InputRef::Add` on a Graph node is a connection event: it appends one
-/// reference and one edge from it into one `ActionVote` sink of the same
-/// node, at a sub-value under the reference's width and a weight in [-1, 1].
-#[test]
-fn add_input_ref_to_graph_node_wires_one_vote_edge() {
-    for seed in 0u64..200 {
-        let base = graph_node_genome_full_catalog();
-        let mut genome = base.clone();
-        let mut r = rng(seed);
-        InputRefMutator::apply(
-            &mut genome,
-            InputRefOperator::Add,
-            &mut TargetSelector::reachable_only(&[], 0.0),
-            &mut r,
-            &default_config(),
-        )
-        .unwrap();
-        let after = &genome.nodes[0];
-        assert_eq!(after.input_refs.len(), 1, "seed {seed}");
-        assert_eq!(edge_count(after), 1, "seed {seed}: exactly one edge");
-        let new = new_vote_edges(&base.nodes[0], after);
-        assert_eq!(new.len(), 1, "seed {seed}: the edge is on a vote sink");
-        let (_, source, weight) = new[0];
-        let GraphSource::InputLeaf { ref_idx, sub_idx } = source else {
-            panic!("seed {seed}: the born edge reads the new reference, not {source:?}");
-        };
-        assert_eq!(ref_idx, 0, "seed {seed}");
-        assert!(sub_idx < width_of(&after.input_refs[0]), "seed {seed}");
-        assert!(
-            (-1.0..=1.0).contains(&weight),
-            "seed {seed}: weight {weight}"
+/// The whole-set postcondition of a creation on `before` → `after` (T25.F11
+/// invariants 5–7): one declaration appended; on a Graph node one bundle
+/// per field set of the new sensor, in set order, each with every
+/// coordinate its wiring materializes present, own weight 0, and a scale
+/// in `[-1, 1]` (live) or exactly 0 (silent); nothing else changes.
+fn assert_whole_sensor(before: &NodeGenome, after: &NodeGenome, op: InputRefOperator) {
+    assert_eq!(after.input_refs.len(), before.input_refs.len() + 1);
+    assert_eq!(
+        after.input_refs[..before.input_refs.len()],
+        before.input_refs[..]
+    );
+    let ref_idx = u16::try_from(before.input_refs.len()).unwrap();
+    let reference = &after.input_refs[usize::from(ref_idx)];
+    let (BackendDef::Graph(b), BackendDef::Graph(a)) = (&before.backend_def, &after.backend_def)
+    else {
+        assert_eq!(
+            after.backend_def, before.backend_def,
+            "a VM node is unchanged"
         );
+        return;
+    };
+    assert_eq!(a.compute_nodes(), b.compute_nodes());
+    assert_eq!(a.bundles()[..b.bundles().len()], b.bundles()[..]);
+    let sets: Vec<_> =
+        crate::contracts::SensorDescriptor::of(reference, &crate::config::test_sensor_context(1))
+            .field_sets()
+            .collect();
+    let new: Vec<_> = (b.bundles().len()..a.bundles().len())
+        .map(|index| crate::genome::cgp::BundleId::new(u16::try_from(index).unwrap()))
+        .collect();
+    assert_eq!(
+        new.len(),
+        sets.len(),
+        "{reference:?}: one bundle per field set"
+    );
+    let mut members = 0;
+    for (field_set, (&id, set)) in new.iter().zip(&sets).enumerate() {
+        let record = &a.bundles()[id.index()];
+        assert_eq!(
+            record.source(),
+            crate::genome::cgp::BundleSource::Sensor {
+                ref_idx,
+                field_set: u8::try_from(field_set).unwrap()
+            }
+        );
+        assert!(
+            record.wiring().fits(set),
+            "{reference:?}: {:?}",
+            record.wiring()
+        );
+        // Every coordinate of the set under the run's context, each once.
+        let mut want = record.wiring().coordinates(set);
+        let mut got: Vec<_> = a
+            .members(id)
+            .map(|m| {
+                let GraphSource::InputLeaf { sub_idx, .. } = a.edge_at(m).source() else {
+                    panic!("a sensor member reads a leaf");
+                };
+                (sub_idx, a.site_of(m).expect("a member on its wiring"))
+            })
+            .collect();
+        want.sort_unstable();
+        got.sort_unstable();
+        assert_eq!(got, want, "{reference:?}: the whole set");
+        assert!(a.members(id).all(|m| a.edge_at(m).own_weight() == 0.0));
+        members += want.len();
+        match op {
+            InputRefOperator::AddSensorSilent => assert_eq!(record.scale(), 0.0),
+            _ => assert!((-1.0..=1.0).contains(&record.scale())),
+        }
+    }
+    assert_eq!(edge_count(after), edge_count(before) + members);
+}
+
+/// Both creation operators on a bare full-catalog Graph node declare one
+/// sensor and wire every field set of it, live or silent by the operator.
+#[test]
+fn add_sensor_on_a_graph_node_wires_the_whole_sensor() {
+    for op in ADD_SENSOR {
+        for seed in 0u64..200 {
+            let base = graph_node_genome_full_catalog();
+            let mut genome = base.clone();
+            InputRefMutator::apply(
+                &mut genome,
+                op,
+                &mut TargetSelector::reachable_only(&[], 0.0),
+                &mut rng(seed),
+                &default_config(),
+            )
+            .unwrap();
+            assert_whole_sensor(&base.nodes[0], &genome.nodes[0], op);
+        }
     }
 }
 
 /// A populated founder decision node with plasticity and birth seeds:
-/// every incumbent compute node, plasticity entry, sink, edge and weight is
-/// kept, and the one new edge is the last input of one vote sink.
+/// every incumbent compute node, seed, sink edge and weight is kept, and the
+/// new members follow each sink's incumbents.
 #[test]
-fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
+fn add_sensor_to_graph_node_leaves_existing_edges_untouched() {
     let mut base = v3alpha1_founder_genome();
     {
         let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
@@ -910,256 +934,249 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
     }
     let before_def = graph_def(&base.nodes[1]).clone();
     assert_eq!(before_def.output_sinks().len(), 108, "a full sink catalog");
-    assert!(
-        before_def
-            .compute_nodes()
-            .iter()
-            .any(|node| node.inputs.iter().any(|edge| edge.own_weight() != 0.0)),
-        "the fixture carries weighted compute edges"
-    );
-    assert!(
-        vote_edges(&base.nodes[1]).iter().any(|edge| edge.2 != 0.0),
-        "the fixture carries weighted vote edges"
-    );
-    for seed in 0u64..32 {
-        let mut genome = base.clone();
-        let mut r = rng(seed);
-        apply_add_to_node(&mut genome, 1, &mut r, 2);
-        assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
-        let after_def = graph_def(&genome.nodes[1]);
-        assert_eq!(
-            after_def.compute_nodes(),
-            before_def.compute_nodes(),
-            "seed {seed}"
-        );
-        assert_eq!(
-            after_def.birth_seeds().map(|seeds| seeds.compute_rows()),
-            before_def.birth_seeds().map(|seeds| seeds.compute_rows()),
-            "seed {seed}"
-        );
-        assert_eq!(
-            after_def.output_sinks().len(),
-            before_def.output_sinks().len()
-        );
-        let mut grown = 0;
-        for (after_sink, before_sink) in after_def
-            .output_sinks()
-            .iter()
-            .zip(before_def.output_sinks())
-        {
-            assert_eq!(after_sink.kind, before_sink.kind, "seed {seed}");
-            let kept = before_sink.inputs.len();
+    for op in ADD_SENSOR {
+        for seed in 0u64..32 {
+            let mut genome = base.clone();
+            apply_add_to_node(&mut genome, op, 1, &mut rng(seed), 2).expect("a full catalog");
+            assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
+            assert_whole_sensor(&base.nodes[1], &genome.nodes[1], op);
+            let after_def = graph_def(&genome.nodes[1]);
             assert_eq!(
-                after_sink.inputs[..kept],
-                before_sink.inputs[..],
+                after_def.birth_seeds().map(|seeds| seeds.compute_rows()),
+                before_def.birth_seeds().map(|seeds| seeds.compute_rows()),
                 "seed {seed}"
             );
-            match after_sink.inputs.len() - kept {
-                0 => {}
-                1 => {
-                    assert!(matches!(after_sink.kind, OutputSinkKind::ActionVote(_)));
-                    grown += 1;
-                }
-                extra => panic!("seed {seed}: {extra} edges appended to one sink"),
+            for (after_sink, before_sink) in after_def
+                .output_sinks()
+                .iter()
+                .zip(before_def.output_sinks())
+            {
+                assert_eq!(after_sink.kind, before_sink.kind, "seed {seed}");
+                let kept = before_sink.inputs.len();
+                assert_eq!(
+                    after_sink.inputs[..kept],
+                    before_sink.inputs[..],
+                    "seed {seed}"
+                );
             }
         }
-        assert_eq!(grown, 1, "seed {seed}: exactly one vote sink grew");
-        let len = base.nodes[1].input_refs.len();
-        assert_eq!(
-            genome.nodes[1].input_refs[..len],
-            base.nodes[1].input_refs[..]
-        );
-        assert_eq!(genome.nodes[1].input_refs.len(), len + 1);
     }
 }
 
-/// The three draws after the reference are, in order: the sub-value under
-/// the width, the vote sink by index over all 27, the weight on [-1, 1].
-/// Replaying them by hand reproduces the edge and leaves the stream at the
-/// same position.
+/// The draws after the sensor are, per field set in order, the plan (a
+/// `Plain` set's sink over the present vote sinks in catalog order; a
+/// geometric set's kind over the hostable kinds, then the offset) and, for
+/// a live bundle, its scale; replaying them by hand reproduces every
+/// wiring and scale (T25.F11 invariant 6).
 #[test]
-fn add_input_ref_on_graph_draws_sub_value_then_sink_then_weight() {
-    for seed in 0u64..64 {
-        let mut genome = graph_node_genome_full_catalog();
-        let mut r = rng(seed);
-        apply_add_to_node(&mut genome, 0, &mut r, 1);
-        let mut replay = rng(seed);
-        let reference = random_input_reference(&mut replay, &crate::config::test_sensor_context(1));
-        let sub_idx = replay.gen_range(0..width_of(&reference));
-        let sink = VoteSink::from_index(replay.gen_range(0..VOTE_SINK_COUNT)).unwrap();
-        let weight = replay.gen_range(-1.0f32..=1.0);
-        assert_eq!(genome.nodes[0].input_refs, vec![reference], "seed {seed}");
-        assert_eq!(
-            vote_edges(&genome.nodes[0]),
-            vec![(
-                sink,
-                GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx
-                },
-                weight
-            )],
-            "seed {seed}"
-        );
-        assert_eq!(
-            r.gen::<u64>(),
-            replay.gen::<u64>(),
-            "seed {seed}: nothing else drawn"
-        );
-    }
-}
-
-/// On a VM node `Add` is the old path draw for draw: one reference, no
-/// extra random number.
-#[test]
-fn add_input_ref_on_vm_draws_only_the_reference() {
-    for food_type_count in [1usize, 3] {
+fn add_sensor_draws_the_sensor_then_each_sets_plan_and_scale() {
+    use crate::contracts::votes::DirectedVoteKind;
+    use crate::contracts::{FieldSet, SensorDescriptor};
+    use crate::genome::cgp::Wiring;
+    let context = crate::config::test_sensor_context(1);
+    for op in ADD_SENSOR {
         for seed in 0u64..64 {
-            let mut genome = single_node_genome_with_input_ref(InputReference::ActionQueue);
-            let before = genome.clone();
-            let mut r = rng(seed);
-            apply_add_to_node(&mut genome, 0, &mut r, food_type_count);
+            let mut genome = graph_node_genome_full_catalog();
+            apply_add_to_node(&mut genome, op, 0, &mut rng(seed), 1).unwrap();
             let mut replay = rng(seed);
-            let reference = if food_type_count <= 1 {
-                random_input_reference(&mut replay, &crate::config::test_sensor_context(1))
-            } else {
-                random_input_reference_for_food_types(&mut replay, food_type_count)
-            };
-            assert_eq!(
-                genome.nodes[0].input_refs,
-                vec![InputReference::ActionQueue, reference]
-            );
-            assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
-            assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
+            let reference = random_input_reference(&mut replay, &context);
+            assert_eq!(genome.nodes[0].input_refs, vec![reference.clone()]);
+            let expected: Vec<(Wiring, f32)> = SensorDescriptor::of(&reference, &context)
+                .field_sets()
+                .map(|set| {
+                    let wiring = match set {
+                        FieldSet::Plain { .. } => Wiring::Plain {
+                            sink: VoteSink::from_index(replay.gen_range(0..VOTE_SINK_COUNT))
+                                .unwrap(),
+                        },
+                        FieldSet::Ring | FieldSet::Pair(_) => {
+                            let kind = DirectedVoteKind::ALL
+                                [replay.gen_range(0..DirectedVoteKind::ALL.len())];
+                            let offset = replay.gen_range(0..8u8);
+                            if set == FieldSet::Ring {
+                                Wiring::Ring { kind, offset }
+                            } else {
+                                Wiring::DirectionPair { kind, offset }
+                            }
+                        }
+                    };
+                    let scale = match op {
+                        InputRefOperator::AddSensorLive => replay.gen_range(-1.0f32..=1.0),
+                        _ => 0.0,
+                    };
+                    (wiring, scale)
+                })
+                .collect();
+            let made: Vec<(Wiring, f32)> = graph_def(&genome.nodes[0])
+                .bundles()
+                .iter()
+                .map(|bundle| (bundle.wiring(), bundle.scale()))
+                .collect();
+            assert_eq!(made, expected, "{op:?} seed {seed}");
         }
     }
 }
 
-/// A drawn sink the node lacks leaves the event a plain declaration, with
-/// the three draws still taken.
+/// On a VM node a creation is the declaration alone: one reference drawn,
+/// no further draw and no backend change.
 #[test]
-fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
-    for seed in 0u64..64 {
-        let mut genome = graph_node_genome_full_catalog();
-        let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
-            unreachable!()
-        };
-        crate::genome::cgp::test_support::edit_sinks(def, |sinks| {
-            sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
-        });
-        let before = genome.clone();
-        let mut r = rng(seed);
-        apply_add_to_node(&mut genome, 0, &mut r, 1);
-        assert_eq!(genome.nodes[0].input_refs.len(), 1, "seed {seed}");
-        assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
-        let mut full = graph_node_genome_full_catalog();
-        let mut replay = rng(seed);
-        apply_add_to_node(&mut full, 0, &mut replay, 1);
-        assert_eq!(
-            r.gen::<u64>(),
-            replay.gen::<u64>(),
-            "seed {seed}: same draws"
-        );
+fn add_sensor_on_vm_draws_only_the_reference() {
+    for op in ADD_SENSOR {
+        for food_type_count in [1usize, 3] {
+            for seed in 0u64..64 {
+                let mut genome = single_node_genome_with_input_ref(InputReference::ActionQueue);
+                let before = genome.clone();
+                let mut r = rng(seed);
+                apply_add_to_node(&mut genome, op, 0, &mut r, food_type_count).unwrap();
+                let mut replay = rng(seed);
+                let reference = if food_type_count <= 1 {
+                    random_input_reference(&mut replay, &crate::config::test_sensor_context(1))
+                } else {
+                    random_input_reference_for_food_types(&mut replay, food_type_count)
+                };
+                assert_eq!(
+                    genome.nodes[0].input_refs,
+                    vec![InputReference::ActionQueue, reference]
+                );
+                assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
+                assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
+            }
+        }
     }
 }
 
-/// The appended index 65,535 still fits `u16` and connects; 65,536 does not,
-/// so `add_sensor` refuses it and nothing is written, after the same three
-/// draws.
+/// A Graph node without a vote sink admits no plan: the event skips with
+/// `NoApplicableTarget` before the first set's draws and writes nothing, so
+/// no unwired declaration survives.
 #[test]
-fn add_input_ref_declares_only_while_the_index_fits_u16() {
+fn add_sensor_without_an_admissible_plan_skips_and_writes_nothing() {
+    for op in ADD_SENSOR {
+        for seed in 0u64..64 {
+            let mut genome = graph_node_genome_full_catalog();
+            let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+                unreachable!()
+            };
+            crate::genome::cgp::test_support::edit_sinks(def, |sinks| {
+                sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
+            });
+            let before = genome.clone();
+            let mut r = rng(seed);
+            assert_eq!(
+                apply_add_to_node(&mut genome, op, 0, &mut r, 1),
+                Err(MutationSkipReason::NoApplicableTarget)
+            );
+            assert_eq!(genome, before, "seed {seed}");
+            let mut replay = rng(seed);
+            random_input_reference(&mut replay, &crate::config::test_sensor_context(1));
+            assert_eq!(
+                r.gen::<u64>(),
+                replay.gen::<u64>(),
+                "seed {seed}: the sensor only"
+            );
+        }
+    }
+}
+
+/// The appended index 65,535 still fits `u16` and is wired; 65,536 does
+/// not, so `add_sensor` refuses it and nothing is written.
+#[test]
+fn add_sensor_declares_only_while_the_index_fits_u16() {
     let filler = InputReference::ActionQueue;
     let mut fits = graph_node_genome_full_catalog();
     fits.nodes[0].input_refs = vec![filler.clone(); 65_535];
     let mut overflows = graph_node_genome_full_catalog();
     overflows.nodes[0].input_refs = vec![filler; 65_536];
 
-    let mut r_fits = rng(7);
-    apply_add_to_node(&mut fits, 0, &mut r_fits, 1);
-    let mut r_overflows = rng(7);
+    apply_add_to_node(
+        &mut fits,
+        InputRefOperator::AddSensorLive,
+        0,
+        &mut rng(7),
+        1,
+    )
+    .unwrap();
     let before = overflows.clone();
     assert_eq!(
-        InputRefMutator::apply_to_node(
+        apply_add_to_node(
             &mut overflows,
-            InputRefOperator::Add,
+            InputRefOperator::AddSensorLive,
             0,
-            &mut r_overflows,
-            &crate::config::test_sensor_context(1),
+            &mut rng(7),
+            1
         ),
         Err(MutationSkipReason::NoApplicableTarget),
         "a declaration past the u16 index space is refused (T25.F11 `add_sensor`)"
     );
-
     assert_eq!(fits.nodes[0].input_refs.len(), 65_536);
     let edges = vote_edges(&fits.nodes[0]);
-    assert_eq!(edges.len(), 1);
-    assert!(matches!(
-        edges[0].1,
+    assert!(!edges.is_empty());
+    assert!(edges.iter().all(|edge| matches!(
+        edge.1,
         GraphSource::InputLeaf {
             ref_idx: 65_535,
             ..
         }
-    ));
+    )));
     assert_eq!(overflows, before, "nothing written");
-    assert_eq!(r_fits.gen::<u64>(), r_overflows.gen::<u64>(), "same draws");
 }
 
-/// The born edge consumes the new reference, so `Prune` cannot take it.
+/// The members consume the new reference, so `Prune` cannot take it.
 #[test]
-fn add_input_ref_on_graph_leaves_the_new_reference_unprunable() {
-    for seed in 0u64..32 {
-        let mut genome = graph_node_genome_full_catalog();
-        let mut r = rng(seed);
-        apply_add_to_node(&mut genome, 0, &mut r, 1);
-        assert!(prunable_indices(&genome.nodes[0]).is_empty(), "seed {seed}");
+fn add_sensor_on_graph_leaves_the_new_reference_unprunable() {
+    for op in ADD_SENSOR {
+        for seed in 0u64..32 {
+            let mut genome = graph_node_genome_full_catalog();
+            apply_add_to_node(&mut genome, op, 0, &mut rng(seed), 1).unwrap();
+            assert!(prunable_indices(&genome.nodes[0]).is_empty(), "seed {seed}");
+        }
     }
 }
 
-/// Over many seeds the born edge reaches every one of the 27 vote sinks and
-/// all 8 sub-values of a ring, with both signs: every draw is uniform over
-/// its whole range, named by index, never by meaning.
+/// Over many seeds a one-field sensor's `Plain` bundle reaches every vote
+/// sink, and a live scale takes both signs; a ring's bundle reaches every
+/// kind and offset and always wires all eight cells.
 #[test]
-fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
-    let ring = InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
-        0,
-    )));
-    let width = width_of(&ring);
-    assert_eq!(width, 8);
+fn creations_reach_every_plan_and_both_signs() {
+    use crate::genome::cgp::Wiring;
+    use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
+    let context = crate::config::test_sensor_context(1);
     let mut sinks = std::collections::BTreeSet::new();
-    let mut subs = std::collections::BTreeSet::new();
+    let mut rings = std::collections::BTreeSet::new();
     let (mut negative, mut positive) = (0u32, 0u32);
     for seed in 0u64..4096 {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let mut r = rng(seed);
-        connect_declared_input(&mut def, Some(7), u32::from(width), &mut r);
-        let mut edges = def
-            .output_sinks()
-            .iter()
-            .flat_map(|sink| sink.inputs.iter().map(move |edge| (sink.kind, *edge)));
-        let (kind, edge) = edges.next().expect("one edge");
-        assert!(edges.next().is_none(), "seed {seed}: only one edge");
-        let OutputSinkKind::ActionVote(vote) = kind else {
-            panic!("seed {seed}: {kind:?} is not a vote sink");
-        };
-        sinks.insert(vote.index());
-        let GraphSource::InputLeaf {
-            ref_idx: 7,
-            sub_idx,
-        } = edge.source()
-        else {
-            panic!("seed {seed}: {:?}", edge.source());
-        };
-        subs.insert(sub_idx);
-        if edge.own_weight() < 0.0 {
-            negative += 1;
-        } else {
-            positive += 1;
+        for reference in [
+            InputReference::UpstreamSlot(7),
+            InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
+                0,
+            ))),
+        ] {
+            let mut genome = graph_node_genome_full_catalog();
+            let node = &mut genome.nodes[0];
+            let before = node.clone();
+            add_sensor_by_law(node, reference, BirthLaw::Live, &context, &mut rng(seed))
+                .expect("a full catalog");
+            assert_whole_sensor(&before, node, InputRefOperator::AddSensorLive);
+            let bundle = graph_def(node).bundles()[0];
+            match bundle.wiring() {
+                Wiring::Plain { sink } => {
+                    sinks.insert(sink.index());
+                }
+                Wiring::Ring { kind, offset } => {
+                    rings.insert((kind, offset));
+                }
+                Wiring::DirectionPair { .. } => panic!("no pair set"),
+            }
+            if bundle.scale() < 0.0 {
+                negative += 1;
+            } else {
+                positive += 1;
+            }
         }
     }
     assert_eq!(sinks.len(), VOTE_SINK_COUNT);
-    assert_eq!(subs.len(), usize::from(width));
+    assert_eq!(rings.len(), 4 * 8);
     assert!(
-        negative > 1500 && positive > 1500,
+        negative > 3000 && positive > 3000,
         "{negative} negative, {positive} positive"
     );
 }
@@ -1167,96 +1184,68 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(48))]
 
-    /// Over generated genomes, `Add` appends exactly one reference to the
-    /// target node and keeps every earlier one; on a VM node the backend is
-    /// unchanged; on a Graph node at most one edge is added (exactly one with
-    /// the full vote catalog), on a vote sink, sourced from the appended index
-    /// at a sub-value under its width, with a weight in [-1, 1], and the
-    /// compute nodes are unchanged; every other node is unchanged.
+    /// Over generated genomes, a creation either skips writing nothing or
+    /// appends exactly one reference to the target node and wires every
+    /// field set of it on a Graph node (a VM node's backend unchanged);
+    /// every other node is unchanged.
     #[test]
-    fn add_declares_one_reference_and_at_most_one_vote_edge(
+    fn add_sensor_declares_one_reference_and_wires_it_whole(
         seed in any::<u64>(),
         sizes in prop::collection::vec(module_size(), 1..4),
         food_type_count in 1usize..4,
     ) {
         let base = generated_genome(seed, &sizes);
-        for node_idx in 0..base.nodes.len() {
-            let mut genome = base.clone();
-            let mut r = rng(seed ^ node_idx as u64);
-            InputRefMutator::apply_to_node(
-                &mut genome, InputRefOperator::Add, node_idx, &mut r, &crate::config::test_sensor_context(food_type_count),
-            )
-            .expect("Add always applies");
-            for (idx, node) in genome.nodes.iter().enumerate() {
-                if idx != node_idx {
-                    prop_assert_eq!(node, &base.nodes[idx], "an untargeted node changed");
+        for op in ADD_SENSOR {
+            for node_idx in 0..base.nodes.len() {
+                let mut genome = base.clone();
+                let result = apply_add_to_node(
+                    &mut genome, op, node_idx, &mut rng(seed ^ node_idx as u64), food_type_count,
+                );
+                if result.is_err() {
+                    prop_assert_eq!(&genome, &base, "a skip writes nothing");
+                    continue;
                 }
-            }
-            let before = &base.nodes[node_idx];
-            let after = &genome.nodes[node_idx];
-            prop_assert_eq!(after.input_refs.len(), before.input_refs.len() + 1);
-            prop_assert_eq!(&after.input_refs[..before.input_refs.len()], &before.input_refs[..]);
-            let width = width_of(&after.input_refs[before.input_refs.len()]);
-            match (&before.backend_def, &after.backend_def) {
-                (BackendDef::Vm(b), BackendDef::Vm(a)) => prop_assert_eq!(a, b),
-                (BackendDef::Graph(b), BackendDef::Graph(a)) => {
-                    prop_assert_eq!(a.compute_nodes(), b.compute_nodes());
-                    let vote_sinks = b
-                        .output_sinks()
-                        .iter()
-                        .filter(|sink| matches!(sink.kind, OutputSinkKind::ActionVote(_)))
-                        .count();
-                    let new = new_vote_edges(before, after);
-                    if vote_sinks == VOTE_SINK_COUNT {
-                        prop_assert_eq!(new.len(), 1, "a full catalog receives the edge");
-                    } else {
-                        prop_assert!(new.len() <= 1);
-                    }
-                    prop_assert_eq!(edge_count(after), edge_count(before) + new.len());
-                    if let Some(&(_, source, weight)) = new.first() {
-                        let GraphSource::InputLeaf { ref_idx, sub_idx } = source else {
-                            return Err(TestCaseError::fail(format!("born edge source {source:?}")));
-                        };
-                        prop_assert_eq!(usize::from(ref_idx), before.input_refs.len());
-                        prop_assert!(sub_idx < width);
-                        prop_assert!((-1.0..=1.0).contains(&weight));
+                for (idx, node) in genome.nodes.iter().enumerate() {
+                    if idx != node_idx {
+                        prop_assert_eq!(node, &base.nodes[idx], "an untargeted node changed");
                     }
                 }
-                _ => prop_assert!(false, "the backend kind changed"),
+                assert_whole_sensor(&base.nodes[node_idx], &genome.nodes[node_idx], op);
             }
         }
     }
 }
 
-/// The VM `ReadInput` auto-insertion is removed: `InputRef::Add` on a VM
-/// node leaves the program byte-identical.
+/// The VM `ReadInput` auto-insertion is removed: a creation on a VM node
+/// leaves the program byte-identical.
 #[test]
-fn add_input_ref_to_vm_node_leaves_program_unchanged() {
-    let mut genome = single_node_genome_with_input_ref(InputReference::World(
-        WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
-    ));
-    genome.nodes[0].input_refs.clear(); // start with 0 refs
-    let program_before = match &genome.nodes[0].backend_def {
-        BackendDef::Vm(vm) => vm.program.clone(),
-        _ => panic!("expected VM backend"),
-    };
-    let mut r = rng(42);
-    InputRefMutator::apply(
-        &mut genome,
-        InputRefOperator::Add,
-        &mut TargetSelector::reachable_only(&[], 0.0),
-        &mut r,
-        &default_config(),
-    )
-    .unwrap();
-    assert_eq!(genome.nodes[0].input_refs.len(), 1);
-    let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
-        panic!("expected VM backend");
-    };
-    assert_eq!(
-        vm.program, program_before,
-        "InputRef::Add must not insert or otherwise change any VM instruction"
-    );
+fn add_sensor_to_vm_node_leaves_program_unchanged() {
+    for op in ADD_SENSOR {
+        let mut genome = single_node_genome_with_input_ref(InputReference::World(
+            WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
+        ));
+        genome.nodes[0].input_refs.clear(); // start with 0 refs
+        let program_before = match &genome.nodes[0].backend_def {
+            BackendDef::Vm(vm) => vm.program.clone(),
+            _ => panic!("expected VM backend"),
+        };
+        InputRefMutator::apply(
+            &mut genome,
+            op,
+            &mut TargetSelector::reachable_only(&[], 0.0),
+            &mut rng(42),
+            &default_config(),
+        )
+        .unwrap();
+        assert_eq!(genome.nodes[0].input_refs.len(), 1);
+        let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
+            panic!("expected VM backend");
+        };
+        assert_eq!(
+            vm.program, program_before,
+            "{op:?} changes no VM instruction"
+        );
+    }
 }
 
 // Legacy flat-graph lifecycle tests were removed during the CGP migration.
@@ -1435,7 +1424,7 @@ fn input_ref_add_can_introduce_non_default_food_type() {
         let mut genome = v3alpha1_founder_genome();
         let _ = InputRefMutator::apply_in(
             &mut genome,
-            InputRefOperator::Add,
+            InputRefOperator::AddSensorLive,
             &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),

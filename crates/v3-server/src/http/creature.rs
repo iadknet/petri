@@ -425,6 +425,7 @@ pub async fn get_creature(
                 creature.genome(),
                 creature.graph_runtime().learned(),
                 &mesh_annotations,
+                &sim.config.sensor_context(sim.config.world.food.types.len()),
             )
         }),
         learning: if exclude.contains("learning") {

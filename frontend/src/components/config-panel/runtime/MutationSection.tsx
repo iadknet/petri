@@ -1,4 +1,4 @@
-import type { AnyFieldDef, BooleanFieldDef, EnumFieldDef, FieldDef } from "../shared/types.ts";
+import type { AnyFieldDef, BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
@@ -155,23 +155,6 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	},
 ];
 
-/** Mutation settings that pick one mode rather than a number. */
-export const MUTATION_ENUMS: EnumFieldDef[] = [
-	{
-		path: "mutation.neutral_input_recruitment",
-		label: "Neutral Input Recruitment",
-		testId: "config-field-mutation-neutral-input-recruitment",
-		defaultValue: "WholeFamily",
-		options: [
-			{ value: "Off", label: "Off" },
-			{ value: "SingleChannel", label: "Single channel" },
-			{ value: "WholeFamily", label: "Whole family" },
-		],
-		tooltip:
-			"Grows new input-to-vote links that start silent (weight 0), one sensor channel or a whole sensor family at a time",
-	},
-];
-
 /** The capacity mutation drawn on every birth (T26.F02). */
 export const MUTATION_CAPACITY_FIELDS: FieldDef[] = [
 	{
@@ -223,5 +206,4 @@ export const MUTATION_ALL_FIELDS: AnyFieldDef[] = [
 	...MUTATION_SHARE_FIELDS,
 	...MUTATION_FIELDS,
 	...MUTATION_TOGGLES,
-	...MUTATION_ENUMS,
 ];

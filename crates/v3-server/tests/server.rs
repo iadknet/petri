@@ -2663,7 +2663,6 @@ fn learning_edge(
 async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::Shape;
     use v3_core::genome::BackendDef;
 
     let state = test_state();
@@ -2691,10 +2690,11 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
             let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let refs = node.input_refs.clone();
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let bundle = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let bundle = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             def.bundle_mut(bundle).set_scale(0.5);
             let members: Vec<_> = def.members(bundle).collect();
             def.edge_mut(members[0]).set_weight(0.25);
@@ -2710,18 +2710,19 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
         let graph = brain_graph(&body, node_id);
         let record = &graph["bundles"][bundle];
         assert_eq!(
-            record["shape"],
-            serde_json::json!({"Ring": {"ring_ref": ring_ref}})
+            record["source"],
+            serde_json::json!({"Sensor": {"ref_idx": ring_ref, "field_set": 0}})
         );
-        assert_eq!(record["kind"], "Move");
-        assert_eq!(record["offset"], 0);
+        assert_eq!(
+            record["wiring"],
+            serde_json::json!({"Ring": {"kind": "Move", "offset": 0}})
+        );
         assert_eq!(record["scale"], 0.5);
         assert!(record.get("learned_scale").is_none());
         let coordinates: Vec<_> = (0..8)
-            .map(|c| serde_json::json!({"field": c, "direction": c, "present": true}))
+            .map(|c| serde_json::json!({"field": c, "site": {"Direction": c}, "present": true}))
             .collect();
         assert_eq!(record["coordinates"], serde_json::json!(coordinates));
-        assert_eq!(record["facts"], serde_json::json!([]));
         for (index, &member) in members.iter().enumerate() {
             let edge = brain_sink_edge(graph, member);
             let own = if index == 0 { 0.25 } else { 0.0 };
@@ -2756,7 +2757,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::{
-        BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
+        BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
     };
     use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig};
 
@@ -2789,10 +2790,11 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
             let node_id = node.node_id.0;
+            let refs = node.input_refs.clone();
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let bundle = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let bundle = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             let members: Vec<_> = def.members(bundle).collect();
             let vote_sink = def
                 .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
@@ -2911,7 +2913,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::OutcomeChannel;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
+    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope};
     use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
 
     let state = test_state();
@@ -2953,10 +2955,11 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
             let node_id = node.node_id.0;
+            let refs = node.input_refs.clone();
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let id = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let id = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             def.bundle_mut(id).set_scale(0.5);
             def.bundle_mut(id).set_inherit_scale(true);
             let members: Vec<EdgeOccurrence> = def.members(id).collect();
@@ -3052,16 +3055,97 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     assert_eq!(edge["learner"]["learned"], 0.75);
 }
 
-/// `brain` for `DirectionPair` genes (invariants 3 and 4): twelve birth
-/// coordinates with presence and the declared facts with presence; a fact
-/// member sits on the drive at pattern 0 with `genomic == own`
-/// (preservation case); a zero-pattern direction member is listed as present
-/// outside the coordinates (preservation case).
+/// `brain` lists a bundle's coordinates under the run's `SensorContext`
+/// from the session config (T25.F11 invariant 11), not validation's
+/// `WIDEST`: an `ActionQueue` `Plain` bundle lists the configured queue's
+/// width, 30 at the default 10 actions per turn and 60 at 20, on the same
+/// genome.
 #[tokio::test]
-async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_members() {
+async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width() {
+    use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
+    use v3_core::contracts::{InputReference, SensorDescriptor};
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
+    use v3_core::genome::BackendDef;
+
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let (node_id, bundle) = {
+        let mut handle = state.sim.lock().await;
+        let context = handle
+            .sim
+            .config
+            .sensor_context(handle.sim.config.world.food.types.len());
+        assert_eq!(context.action_queue_width(), 30, "the default queue");
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        rebuild_with(creature, |genome| {
+            let node = genome
+                .nodes
+                .iter_mut()
+                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs.push(InputReference::ActionQueue);
+            let set = SensorDescriptor::of(&InputReference::ActionQueue, &context)
+                .field_set(0)
+                .expect("one field set");
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let birth = BundleBirth {
+                field_set: 0,
+                wiring: Wiring::Plain {
+                    sink: VoteSink::Directed(DirectedVoteKind::Move, 0),
+                },
+                scale: 0.5,
+            };
+            let source = BundleSource::Sensor {
+                ref_idx,
+                field_set: 0,
+            };
+            let bundle = def.add_bundle(source, set, birth).expect("a Plain bundle");
+            (node.node_id.0, bundle.index())
+        })
+    };
+    let coordinates = |body: &serde_json::Value| {
+        let gene = &brain_graph(body, node_id)["bundles"][bundle];
+        let coordinates = gene["coordinates"].as_array().unwrap().clone();
+        let present = coordinates.iter().filter(|c| c["present"] == true).count();
+        (coordinates.len(), present)
+    };
+    let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(coordinates(&body), (30, 30));
+
+    state
+        .sim
+        .lock()
+        .await
+        .sim
+        .config
+        .runtime
+        .max_actions_per_turn = 20;
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        coordinates(&body),
+        (60, 30),
+        "the same members at the wider queue"
+    );
+}
+
+/// `brain` for a `DirectionPair` bundle (T25.F11 invariants 3, 4 and 11):
+/// its source and wiring, its twelve compass coordinates and its facts on
+/// the drive with presence; every member, a fact included, at its pattern
+/// with `genomic = scale × pattern + own`.
+#[tokio::test]
+async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::CgpGraphBackendDef;
+    use v3_core::genome::cgp::Site;
     use v3_core::genome::BackendDef;
 
     let state = test_state();
@@ -3071,152 +3155,89 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
     };
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
-    let layout = area.direction_pairs()[0];
-    let edit = |with_facts: bool| {
-        let state = state.clone();
-        let area = area.clone();
-        async move {
-            let mut handle = state.sim.lock().await;
-            let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-            rebuild_with(creature, |genome| {
-                let node = genome
-                    .nodes
-                    .iter_mut()
-                    .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-                    .expect("a Graph node");
-                let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-                node.input_refs.push(area);
-                let node_id = node.node_id.0;
-                let BackendDef::Graph(def) = &mut node.backend_def else {
-                    unreachable!()
-                };
-                let facts = if with_facts { layout.facts } else { &[] };
-                let bundle =
-                    def.add_pair_bundle(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
-                def.bundle_mut(bundle).set_scale(2.0);
-                if with_facts {
-                    let member = def.members(bundle).next().unwrap();
-                    def.remove_edge(member);
-                    let fact = def
-                        .members(bundle)
-                        .find(|&m| def.is_fact_member(m))
-                        .unwrap();
-                    def.edge_mut(fact).set_weight(0.375);
-                } else {
-                    // A member on a direction where its pattern is 0: `x` at
-                    // relative N, which no birth places (a hand-built genome).
-                    let mut json = serde_json::to_value(&*def).unwrap();
-                    let sinks = json["output_sinks"].as_array_mut().unwrap();
-                    let north = sinks
-                        .iter_mut()
-                        .find(|sink| {
-                            sink["kind"]
-                                == serde_json::json!({"ActionVote": {"Directed": ["Move", 0]}})
-                        })
-                        .unwrap();
-                    let inputs = north["inputs"].as_array_mut().unwrap();
-                    inputs.push(serde_json::json!({
-                        "source": {"InputLeaf": {"ref_idx": ref_idx, "sub_idx": layout.x}},
-                        "own_weight": 0.25,
-                        "membership": {"bundle": bundle.index(), "scope": "Edge"},
-                    }));
-                    // The I10 order: independent edges, then members by
-                    // (bundle, field).
-                    inputs.sort_by_key(|edge| {
-                        edge.get("membership").map(|m| {
-                            (
-                                m["bundle"].as_u64().unwrap(),
-                                edge["source"]["InputLeaf"]["sub_idx"].as_u64().unwrap(),
-                            )
-                        })
-                    });
-                    *def = serde_json::from_value::<CgpGraphBackendDef>(json).unwrap();
-                }
-                (node_id, bundle.index())
-            })
-        }
+    let (node_id, ref_idx, bundle) = {
+        let mut handle = state.sim.lock().await;
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        rebuild_with(creature, |genome| {
+            let node = genome
+                .nodes
+                .iter_mut()
+                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs.push(area);
+            let refs = node.input_refs.clone();
+            let node_id = node.node_id.0;
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let bundle = add_geometric(def, &refs, ref_idx, 0, DirectedVoteKind::Move, 0);
+            def.bundle_mut(bundle).set_scale(2.0);
+            let first = def.members(bundle).next().unwrap();
+            def.remove_edge(first);
+            let fact = def
+                .members(bundle)
+                .find(|&m| def.site_of(m) == Some(Site::Drive))
+                .unwrap();
+            def.edge_mut(fact).set_weight(0.375);
+            (node_id, ref_idx, bundle.index())
+        })
     };
-    let (node_id, first) = edit(false).await;
-    let (_, second) = edit(true).await;
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert_eq!(body["protocol_version"], "v3alpha16");
     let graph = brain_graph(&body, node_id);
 
-    let present = |record: &serde_json::Value, list: &str| {
-        record[list]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter(|c| c["present"] == true)
-            .count()
-    };
-    let gene = &graph["bundles"][first];
-    assert_eq!(gene["shape"]["DirectionPair"]["pair"], 0);
-    assert_eq!(gene["coordinates"].as_array().unwrap().len(), 12);
-    assert_eq!(present(gene, "coordinates"), 12);
-    assert_eq!(gene["facts"].as_array().unwrap().len(), layout.facts.len());
-    assert_eq!(present(gene, "facts"), 0, "born without its facts");
-    assert!(
-        gene["coordinates"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|c| !(c["field"] == layout.x && c["direction"] == 0)),
-        "x at relative N is no birth coordinate"
+    let gene = &graph["bundles"][bundle];
+    assert_eq!(
+        gene["source"],
+        serde_json::json!({"Sensor": {"ref_idx": ref_idx, "field_set": 0}})
     );
-
-    let gene = &graph["bundles"][second];
-    assert_eq!(present(gene, "coordinates"), 11, "one member removed");
-    assert_eq!(present(gene, "facts"), layout.facts.len());
+    assert_eq!(
+        gene["wiring"],
+        serde_json::json!({"DirectionPair": {"kind": "Move", "offset": 0}})
+    );
+    let coordinates = gene["coordinates"].as_array().unwrap();
+    assert_eq!(coordinates.len(), 12 + 3, "twelve compass and three facts");
+    let present = coordinates.iter().filter(|c| c["present"] == true).count();
+    assert_eq!(present, 14, "one member removed");
+    let drives: Vec<_> = coordinates
+        .iter()
+        .filter(|c| c["site"] == "Drive")
+        .collect();
+    assert_eq!(drives.len(), 3);
+    assert!(drives.iter().all(|c| c["present"] == true));
 
     let edges: Vec<&serde_json::Value> = graph["output_sinks"]
         .as_array()
         .unwrap()
         .iter()
         .flat_map(|sink| sink["edges"].as_array().unwrap())
+        .filter(|edge| edge["member"]["bundle"] == bundle)
         .collect();
-    let member_of = |bundle: usize| {
-        edges
-            .iter()
-            .copied()
-            .filter(move |edge| edge["member"]["bundle"] == bundle)
-    };
-    let zero: Vec<_> = member_of(first)
-        .filter(|edge| edge["member"]["site"] == serde_json::json!({"Direction": 0}))
-        .filter(|edge| edge["member"]["field"] == layout.x)
-        .collect();
-    assert_eq!(zero.len(), 1, "the zero-pattern member is listed");
-    assert_eq!(zero[0]["member"]["pattern"], 0.0);
-    assert_eq!(
-        (&zero[0]["genomic"], &zero[0]["own"]),
-        (&serde_json::json!(0.25), &serde_json::json!(0.25))
-    );
-
-    let facts: Vec<_> = member_of(second)
+    assert_eq!(edges.len(), 14);
+    for edge in &edges {
+        let (pattern, own) = (
+            edge["member"]["pattern"].as_f64().unwrap(),
+            edge["own"].as_f64().unwrap(),
+        );
+        assert_ne!(pattern, 0.0, "no member off its wiring: {edge}");
+        assert_eq!(
+            edge["genomic"].as_f64().unwrap(),
+            2.0 * pattern + own,
+            "{edge}"
+        );
+    }
+    let facts: Vec<_> = edges
+        .iter()
         .filter(|edge| edge["member"]["site"] == "Drive")
         .collect();
-    assert_eq!(facts.len(), layout.facts.len());
-    assert!(facts
-        .iter()
-        .all(|edge| edge["member"]["pattern"] == 0.0 && edge["genomic"] == edge["own"]));
+    assert_eq!(facts.len(), 3);
+    assert!(facts.iter().all(|edge| edge["member"]["pattern"] == 1.0));
     assert_eq!(
-        facts.iter().filter(|edge| edge["own"] == 0.375).count(),
+        facts.iter().filter(|edge| edge["genomic"] == 2.375).count(),
         1,
         "{body}"
-    );
-    let mut genomic: Vec<f64> = member_of(first)
-        .filter(|edge| edge["member"]["pattern"] != 0.0)
-        .map(|edge| edge["genomic"].as_f64().unwrap())
-        .collect();
-    genomic.sort_by(f64::total_cmp);
-    let diagonal = f64::from(2.0 * std::f32::consts::FRAC_1_SQRT_2);
-    assert_eq!(
-        genomic,
-        [
-            -2.0, -2.0, -diagonal, -diagonal, -diagonal, -diagonal, diagonal, diagonal, diagonal,
-            diagonal, 2.0, 2.0
-        ]
     );
 }
 
@@ -4616,4 +4637,33 @@ async fn recipe_export_preserves_complete_config_and_large_seeds() {
             .1,
         exported
     );
+}
+
+/// A silent bundle on field set `field_set` of `refs[ref_idx]`, wired into
+/// `kind` at `offset`: a ring set as `Ring`, a pair set as `DirectionPair`
+/// (a fixture through the container's public primitive).
+fn add_geometric(
+    def: &mut v3_core::genome::cgp::CgpGraphBackendDef,
+    refs: &[v3_core::contracts::InputReference],
+    ref_idx: u16,
+    field_set: u8,
+    kind: v3_core::contracts::votes::DirectedVoteKind,
+    offset: u8,
+) -> v3_core::genome::cgp::BundleId {
+    use v3_core::contracts::{FieldSet, SensorContext, SensorDescriptor};
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
+    let set = SensorDescriptor::of(&refs[usize::from(ref_idx)], &SensorContext::WIDEST)
+        .field_set(field_set)
+        .expect("a declared field set");
+    let wiring = match set {
+        FieldSet::Ring => Wiring::Ring { kind, offset },
+        _ => Wiring::DirectionPair { kind, offset },
+    };
+    let birth = BundleBirth {
+        field_set,
+        wiring,
+        scale: 0.0,
+    };
+    def.add_bundle(BundleSource::Sensor { ref_idx, field_set }, set, birth)
+        .expect("a geometric fixture on a full catalog")
 }

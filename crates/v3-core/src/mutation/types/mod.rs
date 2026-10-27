@@ -61,6 +61,14 @@ impl BundleEdits {
     }
 }
 
+/// The report keys of [`BundleEdits::created`]'s rows, by [`wiring_index`].
+pub const WIRING_KEYS: [&str; 3] = ["plain", "ring", "pair"];
+
+/// The report keys of [`BundleEdits::created`]'s columns: the creation
+/// form, uniform (one learning draw for the bundle) or randomized (one per
+/// member).
+pub const FORM_KEYS: [&str; 2] = ["uniform", "randomized"];
+
 /// A wiring's row in [`BundleEdits::created`]: `plain`, `ring`, `pair`.
 #[must_use]
 pub const fn wiring_index(wiring: &crate::genome::cgp::Wiring) -> usize {
@@ -281,16 +289,13 @@ pub enum MutationOperator {
     GraphDisableRewardModulation,
     GraphMutateRewardSource,
     GraphMutateTraceDecay,
-    GraphRecruitNeutralInput,
-    GraphAddRingBundle,
-    GraphAddDirectionPairBundle,
+    GraphAddBundleLive,
+    GraphAddBundleSilent,
     GraphAlterBundleScale,
     GraphShiftBundleOffset,
-    GraphRetargetBundleKind,
+    GraphRetargetBundle,
     GraphRemoveBundle,
     GraphSetScope,
-    GraphAddRandomizedRingBundle,
-    GraphAddRandomizedDirectionPairBundle,
     GraphDetachGraphEdge,
     GraphEnableRetention,
     GraphDisableRetention,
@@ -299,7 +304,8 @@ pub enum MutationOperator {
     GraphDisableBundleRetention,
     GraphMutateBundleRetention,
     // InputRef
-    InputRefAdd,
+    InputRefAddSensorLive,
+    InputRefAddSensorSilent,
     InputRefPrune,
     InputRefSwap,
     InputRefRawFieldMutation,
@@ -359,16 +365,13 @@ impl MutationOperator {
             Self::GraphDisableRewardModulation => "Graph.DisableRewardModulation",
             Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
-            Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
-            Self::GraphAddRingBundle => "Graph.AddRingBundle",
-            Self::GraphAddDirectionPairBundle => "Graph.AddDirectionPairBundle",
+            Self::GraphAddBundleLive => "Graph.AddBundleLive",
+            Self::GraphAddBundleSilent => "Graph.AddBundleSilent",
             Self::GraphAlterBundleScale => "Graph.AlterBundleScale",
             Self::GraphShiftBundleOffset => "Graph.ShiftBundleOffset",
-            Self::GraphRetargetBundleKind => "Graph.RetargetBundleKind",
+            Self::GraphRetargetBundle => "Graph.RetargetBundle",
             Self::GraphRemoveBundle => "Graph.RemoveBundle",
             Self::GraphSetScope => "Graph.SetScope",
-            Self::GraphAddRandomizedRingBundle => "Graph.AddRandomizedRingBundle",
-            Self::GraphAddRandomizedDirectionPairBundle => "Graph.AddRandomizedDirectionPairBundle",
             Self::GraphDetachGraphEdge => "Graph.DetachGraphEdge",
             Self::GraphEnableRetention => "Graph.EnableRetention",
             Self::GraphDisableRetention => "Graph.DisableRetention",
@@ -376,7 +379,8 @@ impl MutationOperator {
             Self::GraphEnableBundleRetention => "Graph.EnableBundleRetention",
             Self::GraphDisableBundleRetention => "Graph.DisableBundleRetention",
             Self::GraphMutateBundleRetention => "Graph.MutateBundleRetention",
-            Self::InputRefAdd => "InputRef.Add",
+            Self::InputRefAddSensorLive => "InputRef.AddSensorLive",
+            Self::InputRefAddSensorSilent => "InputRef.AddSensorSilent",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
             Self::InputRefRawFieldMutation => "InputRef.RawFieldMutation",
@@ -436,16 +440,13 @@ impl MutationOperator {
             | Self::GraphDisableRewardModulation
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
-            | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingBundle
-            | Self::GraphAddDirectionPairBundle
+            | Self::GraphAddBundleLive
+            | Self::GraphAddBundleSilent
             | Self::GraphAlterBundleScale
             | Self::GraphShiftBundleOffset
-            | Self::GraphRetargetBundleKind
+            | Self::GraphRetargetBundle
             | Self::GraphRemoveBundle
             | Self::GraphSetScope
-            | Self::GraphAddRandomizedRingBundle
-            | Self::GraphAddRandomizedDirectionPairBundle
             | Self::GraphDetachGraphEdge
             | Self::GraphEnableRetention
             | Self::GraphDisableRetention
@@ -453,7 +454,8 @@ impl MutationOperator {
             | Self::GraphEnableBundleRetention
             | Self::GraphDisableBundleRetention
             | Self::GraphMutateBundleRetention => MutationDomain::Graph,
-            Self::InputRefAdd
+            Self::InputRefAddSensorLive
+            | Self::InputRefAddSensorSilent
             | Self::InputRefPrune
             | Self::InputRefSwap
             | Self::InputRefRawFieldMutation => MutationDomain::InputRef,
@@ -506,11 +508,8 @@ impl MutationOperator {
             | Self::GraphCopyNodeInputs
             | Self::GraphEnableHebbian
             | Self::GraphEnableRewardModulation
-            | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingBundle
-            | Self::GraphAddDirectionPairBundle
-            | Self::GraphAddRandomizedRingBundle
-            | Self::GraphAddRandomizedDirectionPairBundle => ComplexityEffect::Increasing,
+            | Self::GraphAddBundleLive
+            | Self::GraphAddBundleSilent => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
@@ -530,7 +529,7 @@ impl MutationOperator {
             | Self::GraphMutateTraceDecay
             | Self::GraphAlterBundleScale
             | Self::GraphShiftBundleOffset
-            | Self::GraphRetargetBundleKind
+            | Self::GraphRetargetBundle
             | Self::GraphSetScope
             | Self::GraphDetachGraphEdge
             | Self::GraphEnableRetention
@@ -540,14 +539,16 @@ impl MutationOperator {
             | Self::GraphDisableBundleRetention
             | Self::GraphMutateBundleRetention => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
-            Self::InputRefAdd => ComplexityEffect::Increasing,
+            Self::InputRefAddSensorLive | Self::InputRefAddSensorSilent => {
+                ComplexityEffect::Increasing
+            }
             Self::InputRefPrune => ComplexityEffect::Decreasing,
             Self::InputRefSwap | Self::InputRefRawFieldMutation => ComplexityEffect::Neutral,
         }
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 71] {
+    pub const fn all() -> [Self; 69] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -599,16 +600,13 @@ impl MutationOperator {
             Self::GraphDisableRewardModulation,
             Self::GraphMutateRewardSource,
             Self::GraphMutateTraceDecay,
-            Self::GraphRecruitNeutralInput,
-            Self::GraphAddRingBundle,
-            Self::GraphAddDirectionPairBundle,
+            Self::GraphAddBundleLive,
+            Self::GraphAddBundleSilent,
             Self::GraphAlterBundleScale,
             Self::GraphShiftBundleOffset,
-            Self::GraphRetargetBundleKind,
+            Self::GraphRetargetBundle,
             Self::GraphRemoveBundle,
             Self::GraphSetScope,
-            Self::GraphAddRandomizedRingBundle,
-            Self::GraphAddRandomizedDirectionPairBundle,
             Self::GraphDetachGraphEdge,
             Self::GraphEnableRetention,
             Self::GraphDisableRetention,
@@ -616,7 +614,8 @@ impl MutationOperator {
             Self::GraphEnableBundleRetention,
             Self::GraphDisableBundleRetention,
             Self::GraphMutateBundleRetention,
-            Self::InputRefAdd,
+            Self::InputRefAddSensorLive,
+            Self::InputRefAddSensorSilent,
             Self::InputRefPrune,
             Self::InputRefSwap,
             Self::InputRefRawFieldMutation,
@@ -692,11 +691,6 @@ pub struct MutationOperatorFunnel {
 /// Accounting invariant: `attempted_events == applied_events + skipped_events`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MutationSummary {
-    /// Applied native event snapshots for the bounded engineering test panel.
-    /// Absent from production builds and transports; recording draws no RNG.
-    #[cfg(test)]
-    pub(crate) recruitment_deltas:
-        Vec<(crate::genome::CreatureGenome, crate::genome::CreatureGenome)>,
     pub attempted_events: u32,
     pub applied_events: u32,
     pub skipped_events: u32,
@@ -721,8 +715,9 @@ pub struct MutationSummary {
     /// One record per attempted event, in draw order (T13.F01). Purely
     /// observational: recording consumes no RNG and changes no selection.
     pub events: Vec<MutationEventRecord>,
-    /// The class of each vote-sink edge an applied `AddGraphEdge` or
-    /// `InputRef.Add` pushed, in event order (T11.F30).
+    /// The class of the vote sink each applied `AddGraphEdge` pushed onto,
+    /// or each creation's one `Plain` bundle wires, in event order (T11.F30,
+    /// T25.F11).
     pub vote_edge_classes: Vec<BirthEdgeClass>,
     /// Bundle members committed events detached (T25.F03): retarget,
     /// raw-field step or split of a member.
@@ -730,6 +725,11 @@ pub struct MutationSummary {
     /// Edge bundles committed events removed (T25.F03): `RemoveBundle`, and a
     /// last member's removal or detach.
     pub bundles_removed: u32,
+    /// Bundles committed creation events made (T25.F11), by operator, then
+    /// wiring (`plain`, `ring`, `pair`) and creation form (`uniform`,
+    /// `randomized`), so a wiring is attributed to the operator that built
+    /// it when one event builds several.
+    pub bundles_created_by_operator: HashMap<MutationOperator, [[u32; 2]; 3]>,
     /// Committed attribute changes (the nine plasticity operators and
     /// `SetScope`) by the scope they landed on, indexed by
     /// [`Scope::index`] (T25.F08).
@@ -740,8 +740,6 @@ impl MutationSummary {
     /// Return a summary with all counts zero and an empty skip-reason map.
     pub fn zero() -> Self {
         Self {
-            #[cfg(test)]
-            recruitment_deltas: Vec::new(),
             attempted_events: 0,
             applied_events: 0,
             skipped_events: 0,
@@ -763,12 +761,25 @@ impl MutationSummary {
             vote_edge_classes: Vec::new(),
             graph_edges_detached: 0,
             bundles_removed: 0,
+            bundles_created_by_operator: HashMap::new(),
             attribute_changes_by_scope: [0; 2],
         }
     }
 
-    /// Record the detaches and bundle removals of a committed event.
-    pub fn record_bundle_edits(&mut self, edits: BundleEdits) {
+    /// Record the creations, detaches and bundle removals of a committed
+    /// event of `operator`.
+    pub fn record_bundle_edits(&mut self, operator: MutationOperator, edits: BundleEdits) {
+        if edits.created != [[0; 2]; 3] {
+            let created = self
+                .bundles_created_by_operator
+                .entry(operator)
+                .or_default();
+            for (row, add) in created.iter_mut().zip(edits.created) {
+                for (count, add) in row.iter_mut().zip(add) {
+                    *count += u32::from(add);
+                }
+            }
+        }
         self.graph_edges_detached += u32::from(edits.detached);
         self.bundles_removed += u32::from(edits.removed);
     }
@@ -784,14 +795,18 @@ impl MutationSummary {
     }
 
     /// The birth's edge class (T11.F30): defined only when the birth applied
-    /// exactly one event, that event was one `AddGraphEdge` or one
-    /// `InputRef.Add`, and it pushed an edge onto a drive or direction sink.
+    /// exactly one event, that event was one `AddGraphEdge` or one of the
+    /// four creation operators, and it pushed one edge or made one `Plain`
+    /// bundle on a drive or direction sink (T25.F11 invariant 8).
     #[must_use]
     pub fn birth_edge_class(&self) -> Option<BirthEdgeClass> {
         let single = self.applied_events == 1
             && [
                 MutationOperator::GraphAddGraphEdge,
-                MutationOperator::InputRefAdd,
+                MutationOperator::GraphAddBundleLive,
+                MutationOperator::GraphAddBundleSilent,
+                MutationOperator::InputRefAddSensorLive,
+                MutationOperator::InputRefAddSensorSilent,
             ]
             .iter()
             .any(|operator| self.applied_by_operator.get(operator) == Some(&1));

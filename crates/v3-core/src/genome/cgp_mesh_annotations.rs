@@ -111,9 +111,8 @@ mod tests {
     #[test]
     fn a_member_only_node_is_an_action_writer() {
         use crate::contracts::votes::DirectedVoteKind;
-        use crate::genome::cgp::Shape;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 5);
+        def.add_ring_bundle(0, DirectedVoteKind::Move, 5);
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[ring]);
         assert_eq!(writes, vec![MeshWriteClass::Action]);

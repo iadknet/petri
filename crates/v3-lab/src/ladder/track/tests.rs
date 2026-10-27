@@ -83,19 +83,15 @@ fn the_founder_has_a_sensor_site_and_a_motor_site() {
 #[test]
 fn a_node_voting_only_through_bundle_members_is_a_motor_node() {
     use v3_core::contracts::votes::DirectedVoteKind;
-    use v3_core::genome::cgp::Shape;
     for (kind, motor) in [
         (DirectedVoteKind::Move, true),
         (DirectedVoteKind::Reproduce, false),
         (DirectedVoteKind::StealEnergy, false),
     ] {
+        let refs = vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)];
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, 4);
-        let genome = one_node(node(
-            0,
-            vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
-            BackendDef::Graph(def),
-        ));
+        add_geometric(&mut def, &refs, 0, 0, kind, 4);
+        let genome = one_node(node(0, refs, BackendDef::Graph(def)));
         assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
     }
 }
@@ -250,7 +246,7 @@ fn a_birth_counts_events_on_the_parents_sites_by_operator_and_reason() {
             Vec::new(),
         ),
         event(
-            Some(MutationOperator::InputRefAdd),
+            Some(MutationOperator::InputRefAddSensorLive),
             None,
             MutationEventOutcome::Skipped(MutationSkipReason::ParseabilityViolation),
             Vec::new(),
@@ -877,8 +873,37 @@ fn a_node_voting_only_through_pair_members_is_a_motor_node() {
         (DirectedVoteKind::Reproduce, false),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_bundle(0, 0, area.direction_pairs()[0], kind, 6, &[]);
+        add_geometric(&mut def, std::slice::from_ref(&area), 0, 0, kind, 6);
         let genome = one_node(node(0, vec![area.clone()], BackendDef::Graph(def)));
         assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
     }
+}
+
+/// A silent bundle on field set `field_set` of `refs[ref_idx]`, wired into
+/// `kind` at `offset`: a ring set as `Ring`, a pair set as `DirectionPair`
+/// (a fixture through the container's public primitive).
+fn add_geometric(
+    def: &mut CgpGraphBackendDef,
+    refs: &[InputReference],
+    ref_idx: u16,
+    field_set: u8,
+    kind: v3_core::contracts::votes::DirectedVoteKind,
+    offset: u8,
+) -> v3_core::genome::cgp::BundleId {
+    use v3_core::contracts::{FieldSet, SensorContext, SensorDescriptor};
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
+    let set = SensorDescriptor::of(&refs[usize::from(ref_idx)], &SensorContext::WIDEST)
+        .field_set(field_set)
+        .expect("a declared field set");
+    let wiring = match set {
+        FieldSet::Ring => Wiring::Ring { kind, offset },
+        _ => Wiring::DirectionPair { kind, offset },
+    };
+    let birth = BundleBirth {
+        field_set,
+        wiring,
+        scale: 0.0,
+    };
+    def.add_bundle(BundleSource::Sensor { ref_idx, field_set }, set, birth)
+        .expect("a geometric fixture on a full catalog")
 }

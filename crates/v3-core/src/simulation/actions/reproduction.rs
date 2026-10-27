@@ -124,34 +124,6 @@ impl ReproductionInvalidTargetCause {
     }
 }
 
-/// The inheritance witness (T25.F04): the child's committed genome holds a
-/// `DirectionPair` bundle with `|scale| > 1e-3` and no event of the birth
-/// could have created a bundle (no committed `Graph.AddDirectionPairBundle`
-/// or `Graph.RecruitNeutralInput`), so every pair bundle it carries came from
-/// the parent's genome.
-pub(crate) fn inherits_nonzero_pair_bundle(
-    child: &crate::genome::CreatureGenome,
-    summary: &crate::mutation::types::MutationSummary,
-) -> bool {
-    use crate::genome::cgp::Shape;
-    use crate::genome::BackendDef;
-    use crate::mutation::types::MutationOperator as Op;
-    let created = [
-        Op::GraphAddDirectionPairBundle,
-        Op::GraphRecruitNeutralInput,
-    ]
-    .iter()
-    .any(|op| summary.applied_by_operator.get(op).is_some_and(|&n| n > 0));
-    !created
-        && child.nodes.iter().any(|node| match &node.backend_def {
-            BackendDef::Graph(def) => def.bundles().iter().any(|bundle| {
-                matches!(bundle.shape(), Shape::DirectionPair { .. })
-                    && bundle.scale().abs() > crate::neighborhood::drives::PATH_WEIGHT_FLOOR
-            }),
-            BackendDef::Vm(_) => false,
-        })
-}
-
 /// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
 ///
 /// `energy_transfer_fraction` is the share of the parent's post-cost energy
@@ -495,6 +467,14 @@ pub(crate) fn spawn_child(
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
     sim.stats.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
     sim.stats.bundles_removed_total += u64::from(summary.bundles_removed);
+    for (&operator, created) in &summary.bundles_created_by_operator {
+        let total = sim.stats.bundles_created_total.entry(operator).or_default();
+        for (row, add) in total.iter_mut().zip(created) {
+            for (count, add) in row.iter_mut().zip(add) {
+                *count += u64::from(*add);
+            }
+        }
+    }
     for (total, count) in sim
         .stats
         .mutation_attribute_changes_total_by_scope
@@ -503,8 +483,6 @@ pub(crate) fn spawn_child(
     {
         *total += u64::from(count);
     }
-    sim.stats.pair_bundle_inherited_nonzero_births_total +=
-        u64::from(inherits_nonzero_pair_bundle(&child_genome, &summary));
     let mut child_birth_mutation_operators: Vec<_> =
         summary.applied_by_operator.keys().copied().collect();
     child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
@@ -1216,7 +1194,6 @@ mod tests {
         use crate::contracts::votes::DirectedVoteKind;
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::creature::founder::v3alpha1_founder_genome;
-        use crate::genome::cgp::Shape;
         use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
@@ -1236,8 +1213,8 @@ mod tests {
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("a Graph node")
         };
-        def.add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 0);
-        def.add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 4);
+        def.add_ring_bundle(ring, DirectedVoteKind::Move, 0);
+        def.add_ring_bundle(ring, DirectedVoteKind::Move, 4);
         let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
             *founder = genome.clone();
         });
@@ -1302,100 +1279,14 @@ mod tests {
             .expect("the founder carries a Graph node");
         let reference = InputReference::World(WorldInputKey::AreaBarrierSummary);
         let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-        let layout = reference.direction_pairs()[0];
+        let layout = crate::contracts::pair_layout(&reference, 0);
         node.input_refs.push(reference);
         let BackendDef::Graph(def) = &mut node.backend_def else {
             unreachable!("a Graph node")
         };
-        let id = def.add_pair_bundle(ref_idx, 0, layout, DirectedVoteKind::Move, 3, &[]);
+        let id = def.add_pair_bundle(ref_idx, 0, layout, DirectedVoteKind::Move, 3);
         def.bundle_mut(id).set_scale(scale);
         genome
-    }
-
-    fn applied(
-        ops: &[crate::mutation::types::MutationOperator],
-    ) -> crate::mutation::types::MutationSummary {
-        let mut summary = crate::mutation::types::MutationSummary::zero();
-        for &op in ops {
-            summary.attempted_by_operator.insert(op, 1);
-            summary.applied_by_operator.insert(op, 1);
-        }
-        summary
-    }
-
-    #[test]
-    fn the_inheritance_witness_counts_an_inherited_nonzero_pair_bundle_only() {
-        use crate::mutation::types::MutationOperator as Op;
-        let nonzero = pair_grouped_founder(0.5);
-        let zero = pair_grouped_founder(1e-3);
-        // No creation event and a nonzero inherited bundle: counted.
-        assert!(inherits_nonzero_pair_bundle(&nonzero, &applied(&[])));
-        assert!(inherits_nonzero_pair_bundle(
-            &nonzero,
-            &applied(&[Op::GraphAlterBundleScale])
-        ));
-        // A committed creation event: not counted, even with a nonzero bundle.
-        for op in [
-            Op::GraphAddDirectionPairBundle,
-            Op::GraphRecruitNeutralInput,
-        ] {
-            assert!(!inherits_nonzero_pair_bundle(&nonzero, &applied(&[op])));
-        }
-        // A rolled-back creation event (attempted, skipped) does not suppress.
-        let mut rolled_back = applied(&[]);
-        rolled_back
-            .attempted_by_operator
-            .insert(Op::GraphAddDirectionPairBundle, 1);
-        rolled_back
-            .skipped_by_operator
-            .insert(Op::GraphAddDirectionPairBundle, 1);
-        assert!(inherits_nonzero_pair_bundle(&nonzero, &rolled_back));
-        // A scale at or below the floor, and no pair bundle at all: not counted.
-        assert!(!inherits_nonzero_pair_bundle(&zero, &applied(&[])));
-        assert!(!inherits_nonzero_pair_bundle(
-            &crate::creature::founder::v3alpha1_founder_genome(),
-            &applied(&[])
-        ));
-    }
-
-    /// A mutation-free birth from a parent carrying a nonzero pair bundle
-    /// reaches the run's witness total.
-    #[test]
-    fn an_unmutated_birth_of_a_pair_bundle_carrier_counts_once() {
-        use crate::config::SimulationConfig;
-        use crate::simulation::seeding::seed_simulation_with_founder_genomes;
-        use rand::SeedableRng;
-
-        let mut cfg = SimulationConfig::default();
-        cfg.population.initial_creatures = 1;
-        cfg.mutation.per_unit_rate = 0.0;
-        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-        let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
-            *founder = pair_grouped_founder(-0.25);
-        });
-        let parent_id = sim.creatures.keys().next().unwrap();
-        let parent = &mut sim.creatures[parent_id];
-        parent.age = sim.config.energy.lifecycle.min_reproduce_age;
-        parent.energy = 10000.0;
-        let direction = Direction::ALL
-            .into_iter()
-            .find(|&direction| {
-                sim.world
-                    .resolve_neighbor(sim.creatures[parent_id].position, direction)
-                    .is_some_and(|p| sim.world.is_valid_target_cell(p))
-            })
-            .unwrap();
-        assert_eq!(
-            reproduce_now(
-                parent_id,
-                &mut sim,
-                direction,
-                10.0,
-                &mut rand::rngs::SmallRng::seed_from_u64(1)
-            ),
-            ReproductionActionResult::Conceived
-        );
-        assert_eq!(sim.stats.pair_bundle_inherited_nonzero_births_total, 1);
     }
 
     /// A birth's committed attribute changes reach the run's totals by the

@@ -1,17 +1,17 @@
-//! The edge-bundle operators (T25.F03, T25.F04, T25.F08, T25.F09): four
-//! create a silent bundle (`Ring`, `DirectionPair`, each in the uniform and
-//! the randomized form), four change an existing bundle through its record,
-//! three move its learned scale's retention, and one detaches a member.
+//! The bundle operators (T25.F03, T25.F08, T25.F09, T25.F11): the one birth
+//! policy behind the four creation operators, four that change an existing
+//! bundle through its record, three that move its learned scale's
+//! retention, and one that detaches a member.
 
 use rand::Rng;
 
 use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
-use crate::contracts::{FieldSet, InputReference, SensorContext};
+use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK};
 use crate::genome::cgp::{
     self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, Scope, Wiring,
 };
 use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
-use crate::mutation::types::{BundleEdits, MutationSkipReason};
+use crate::mutation::types::{BirthEdgeClass, BundleEdits, MutationSkipReason};
 
 use super::hebbian::{
     draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
@@ -75,15 +75,10 @@ fn draw_learning(
     def.bundle_mut(id).set_inherit_scale(inherit_scale);
 }
 
-// Commit 1 of T25.F11: the birth policy exists and is tested; the four
-// creation operators of commit 3 call it.
 /// The birth law of a creation operator (T25.F11): a live bundle's scale is
 /// one `gen_range(-1.0..=1.0)` draw, a silent bundle's is 0 with no draw.
+/// Live and silent are separate operators, never a draw inside one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "T25.F11 commit 1: called from commit 3")
-)]
 pub(crate) enum BirthLaw {
     Live,
     Silent,
@@ -96,10 +91,6 @@ pub(crate) enum BirthLaw {
 /// `DirectedVoteKind::ALL` order, then a `gen_range(0..8)` offset — and its
 /// scale by `law`. A set with no admissible plan skips the event before its
 /// draws (the earlier sets' draws already taken).
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "T25.F11 commit 1: called from commit 3")
-)]
 pub(crate) fn draw_births(
     def: &CgpGraphBackendDef,
     sets: &[(u8, FieldSet)],
@@ -117,7 +108,7 @@ pub(crate) fn draw_births(
                 FieldSet::Ring | FieldSet::Pair(_) => {
                     let kinds: Vec<DirectedVoteKind> = DirectedVoteKind::ALL
                         .into_iter()
-                        .filter(|&kind| admissible.iter().any(|plan| plan_kind(plan) == Some(kind)))
+                        .filter(|&kind| admissible.iter().any(|plan| plan.kind() == Some(kind)))
                         .collect();
                     let kind = kinds[rng.gen_range(0..kinds.len())];
                     let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
@@ -140,26 +131,10 @@ pub(crate) fn draw_births(
         .collect()
 }
 
-/// The kind a directed plan votes for.
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "T25.F11 commit 1: called from commit 3")
-)]
-const fn plan_kind(wiring: &Wiring) -> Option<DirectedVoteKind> {
-    match *wiring {
-        Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. } => Some(kind),
-        Wiring::Plain { .. } => None,
-    }
-}
-
 /// The birth policy's learning draws (T25.F11 invariant 6), after every
 /// bundle of `ids` is materialized: per bundle in order, the form coin
 /// `gen_bool(0.5)` (true `Randomized`), then [`draw_learning`] in that
 /// form. Returns the creations, by wiring and form.
-#[cfg_attr(
-    not(test),
-    allow(dead_code, reason = "T25.F11 commit 1: called from commit 3")
-)]
 pub(crate) fn draw_birth_learning(
     def: &mut CgpGraphBackendDef,
     ids: &[BundleId],
@@ -175,103 +150,117 @@ pub(crate) fn draw_birth_learning(
             CreationForm::Uniform
         };
         draw_learning(def, id, form, rng);
-        let created = BundleEdits::creation(wiring, randomized).created;
-        for (row, add) in edits.created.iter_mut().zip(created) {
-            for (count, add) in row.iter_mut().zip(add) {
-                *count += add;
-            }
-        }
+        edits.created[cgp_wiring_row(wiring)][usize::from(randomized)] += 1;
     }
     edits
 }
 
-/// The node's ring indices a bundle can name, ascending: neighbor rings at an
-/// index representable as `u16`.
-fn ring_indices(input_refs: &[InputReference]) -> impl Iterator<Item = u16> + '_ {
-    input_refs
-        .iter()
-        .take(usize::from(u16::MAX) + 1)
-        .enumerate()
-        .filter(|(_, reference)| reference.is_ring())
-        .map(|(idx, _)| u16::try_from(idx).expect("index within u16"))
+/// A wiring's row in [`BundleEdits::created`].
+fn cgp_wiring_row(wiring: &Wiring) -> usize {
+    crate::mutation::types::wiring_index(wiring)
 }
 
-/// Whether `AddRingBundle` has a site: a ring at an index ≤ 65,535 and a
-/// graph that can host a bundle ([`CgpGraphBackendDef::can_host_bundle`]).
-pub(super) fn can_add(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
-    def.can_host_bundle() && ring_indices(input_refs).next().is_some()
+/// The edge class a creation reports (T11.F30, T25.F11 invariant 8): the
+/// class of the vote sink when it made exactly one bundle and that bundle is
+/// `Plain`; `None` otherwise.
+pub(crate) fn creation_class(wirings: &[Wiring]) -> Option<BirthEdgeClass> {
+    match wirings {
+        [Wiring::Plain { sink }] => BirthEdgeClass::of_sink(*sink),
+        _ => None,
+    }
 }
 
-/// The node's declared pairs a bundle can name (T25.F04), the flat list
-/// `(ref_idx ascending, pair ascending)`: every pair of every reference at
-/// an index representable as `u16`.
-fn pair_sites(input_refs: &[InputReference]) -> impl Iterator<Item = (u16, u8)> + '_ {
-    input_refs
+/// The node's admissible bundle sources for `AddBundle*`, in order (T25.F11
+/// invariant 7): declared sensors by `ref_idx` (at an index representable
+/// as `u16`), field sets ascending, then `Memory { previous: false }` and
+/// `Memory { previous: true }`; each when its set has an admissible plan.
+pub(crate) fn bundle_sources(
+    def: &CgpGraphBackendDef,
+    input_refs: &[InputReference],
+    context: &SensorContext,
+) -> Vec<(BundleSource, FieldSet)> {
+    let sensors = input_refs
         .iter()
         .take(usize::from(u16::MAX) + 1)
         .enumerate()
         .flat_map(|(idx, reference)| {
             let ref_idx = u16::try_from(idx).expect("index within u16");
-            (0..reference.direction_pairs().len())
-                .map(move |pair| (ref_idx, u8::try_from(pair).expect("few pairs")))
-        })
+            SensorDescriptor::of(reference, context)
+                .field_sets()
+                .enumerate()
+                .map(move |(set, fields)| {
+                    let field_set = u8::try_from(set).expect("few field sets");
+                    (BundleSource::Sensor { ref_idx, field_set }, fields)
+                })
+        });
+    let banks = [false, true].map(|previous| (BundleSource::Memory { previous }, MEMORY_BANK));
+    sensors
+        .chain(banks)
+        .filter(|(_, set)| !cgp::plans(def, set).is_empty())
+        .collect()
 }
 
-/// Whether `AddDirectionPairBundle` has a site: a pair-declaring reference at
-/// an index ≤ 65,535 and a graph that can host a bundle.
-pub(super) fn can_add_pair(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
-    def.can_host_bundle() && pair_sites(input_refs).next().is_some()
-}
-
-/// `AddDirectionPairBundle` (T25.F04) and `AddRandomizedDirectionPairBundle`
-/// (T25.F08): three draws in order — one pair uniformly over the flat list
-/// `(ref_idx ascending, pair ascending)`, the kind over
-/// `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent
-/// `DirectionPair` bundle: twelve members at own weight 0 and scale 0, with
-/// learned creation's draws in `form` ([`draw_learning`]). Duplicates are
-/// allowed.
-pub(crate) fn add_pair_in_form(
+/// `AddBundleLive` / `AddBundleSilent` (T25.F11 invariant 7): one
+/// `gen_range` over the node's admissible sources ([`bundle_sources`]),
+/// then the birth policy for that one set under `law`
+/// ([`draw_births`], [`NodeGenome::add_bundle`],
+/// [`draw_birth_learning`]). Duplicates are allowed.
+pub(crate) fn add_bundle_by_law(
     node: &mut NodeGenome,
-    form: CreationForm,
+    law: BirthLaw,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
-    let sites: Vec<(u16, u8)> = pair_sites(input_refs).collect();
-    if sites.is_empty() || !def.can_host_bundle() {
+    let sources = bundle_sources(def, input_refs, context);
+    if sources.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let (ref_idx, pair) = sites[rng.gen_range(0..sites.len())];
-    let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
-    let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
-    let source = BundleSource::Sensor {
-        ref_idx,
-        field_set: pair,
-    };
-    let wiring = Wiring::DirectionPair { kind, offset };
-    let birth = BundleBirth {
-        field_set: pair,
-        wiring,
-        scale: 0.0,
-    };
+    let (source, set) = sources[rng.gen_range(0..sources.len())];
+    let births = draw_births(def, &[(source.field_set(), set)], law, rng)?;
     let id = node
-        .add_bundle(source, birth, context)
+        .add_bundle(source, births[0], context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     let (def, _) = graph_node(node)?;
-    // Commit 1 of T25.F11: this route keeps its twelve direction members;
-    // the fact members the transaction wires leave again, in reverse.
-    let facts: Vec<_> = def
-        .members(id)
-        .filter(|&member| def.is_fact_member(member))
+    let wirings = [births[0].wiring];
+    let edits = draw_birth_learning(def, &[id], &wirings, rng);
+    Ok((edits, creation_class(&wirings)))
+}
+
+/// `AddSensorLive` / `AddSensorSilent` on a node, after the sensor draw
+/// (T25.F11 invariant 7): on a Graph node the birth policy for every field
+/// set of `reference` in order, then [`NodeGenome::add_sensor`] with every
+/// birth, then the learning draws per bundle; on a VM node the declaration
+/// alone. A set without an admissible plan skips before its draws; an
+/// `Err` from `add_sensor` skips after them.
+pub(crate) fn add_sensor_by_law(
+    node: &mut NodeGenome,
+    reference: InputReference,
+    law: BirthLaw,
+    context: &SensorContext,
+    rng: &mut impl Rng,
+) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
+    let BackendDef::Graph(def) = &node.backend_def else {
+        node.add_sensor(reference, &[], context)
+            .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+        return Ok((BundleEdits::default(), None));
+    };
+    let sets: Vec<(u8, FieldSet)> = SensorDescriptor::of(&reference, context)
+        .field_sets()
+        .enumerate()
+        .map(|(index, set)| (u8::try_from(index).expect("few field sets"), set))
         .collect();
-    for member in facts.into_iter().rev() {
-        def.remove_edge(member);
-    }
-    draw_learning(def, id, form, rng);
-    Ok(BundleEdits::creation(
-        &wiring,
-        form == CreationForm::Randomized,
-    ))
+    let births = draw_births(def, &sets, law, rng)?;
+    let first = def.bundles().len();
+    node.add_sensor(reference, &births, context)
+        .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+    let (def, _) = graph_node(node)?;
+    let ids: Vec<BundleId> = (first..def.bundles().len())
+        .map(|index| BundleId::new(u16::try_from(index).expect("bundles below u16::MAX")))
+        .collect();
+    let wirings: Vec<Wiring> = births.iter().map(|birth| birth.wiring).collect();
+    let edits = draw_birth_learning(def, &ids, &wirings, rng);
+    Ok((edits, creation_class(&wirings)))
 }
 
 /// Whether the unit operators have a site: at least one bundle.
@@ -288,51 +277,11 @@ fn graph_node(
     }
 }
 
-/// `AddRingBundle` and `AddRandomizedRingBundle` (T25.F08): three draws in
-/// order — the ring uniformly over the ring indices ascending, the kind
-/// over `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent `Ring`
-/// bundle: eight members at own weight 0 and scale 0, with learned
-/// creation's draws in `form` ([`draw_learning`]). Duplicates are allowed.
-pub(crate) fn add_in_form(
-    node: &mut NodeGenome,
-    form: CreationForm,
-    context: &SensorContext,
-    rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
-    let (def, input_refs) = graph_node(node)?;
-    let rings: Vec<u16> = ring_indices(input_refs).collect();
-    if rings.is_empty() || !def.can_host_bundle() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let ring_ref = rings[rng.gen_range(0..rings.len())];
-    let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
-    let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
-    let source = BundleSource::Sensor {
-        ref_idx: ring_ref,
-        field_set: 0,
-    };
-    let wiring = Wiring::Ring { kind, offset };
-    let birth = BundleBirth {
-        field_set: 0,
-        wiring,
-        scale: 0.0,
-    };
-    let id = node
-        .add_bundle(source, birth, context)
-        .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
-    let (def, _) = graph_node(node)?;
-    draw_learning(def, id, form, rng);
-    Ok(BundleEdits::creation(
-        &wiring,
-        form == CreationForm::Randomized,
-    ))
-}
-
 /// `DetachGraphEdge` (T25.F08): one member uniformly in canonical order,
 /// one draw and no other, then the F03 detach ([`cgp::detach`]): its own
 /// weight becomes `compose(own, scale, pattern)` bitwise, it leaves its
 /// bundle keeping its plasticity, its seed composes (T25.F07 invariant 6;
-/// a fact member detaches own-only, T25.F10), and a last member's detach
+/// every member alike, T25.F11 invariant 4), and a last member's detach
 /// removes the bundle.
 pub(crate) fn detach_member(
     node: &mut NodeGenome,
@@ -361,42 +310,67 @@ pub(crate) fn alter_scale(
     Ok(())
 }
 
-/// `ShiftBundleOffset`: `gen_bool(0.5)` true shifts +1, false −1, mod 8;
-/// every member moves to its new sink.
+/// Whether a bundle is wired geometrically (`Ring`, `DirectionPair`): the
+/// records `ShiftBundleOffset` rotates.
+pub(super) fn is_geometric(bundle: &cgp::Bundle) -> bool {
+    bundle.wiring().offset().is_some()
+}
+
+/// `ShiftBundleOffset` (geometric bundles only): one geometric bundle, then
+/// `gen_bool(0.5)` true shifts +1, false −1, mod 8; every member moves to
+/// its new site by coordinate.
 pub(crate) fn shift_offset(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let id = pick(def, rng)?;
+    let id = pick_where(def, is_geometric, rng)?;
     let n = VOTE_DIRECTION_COUNT;
     let step = if rng.gen_bool(0.5) { 1 } else { n - 1 };
-    let bundle = def.bundles()[id.index()];
-    def.relocate_bundle(id, bundle.kind(), (bundle.offset() + step) % n);
+    let wiring = def.bundles()[id.index()].wiring();
+    let (Some(kind), Some(offset)) = (wiring.kind(), wiring.offset()) else {
+        unreachable!("a geometric bundle");
+    };
+    def.relocate_bundle(id, wiring.rotated(kind, (offset + step) % n));
     Ok(())
 }
 
-/// `RetargetBundleKind`: `gen_range(0..3)` over the other three kinds in
-/// catalog order; every member moves to its new sink, a fact member to the
-/// new kind's drive. A gene with a fact member is not retargeted to a kind
-/// that cannot host facts ([`CgpGraphBackendDef::can_host_facts`],
-/// T25.F10): the event skips after its draws.
-pub(crate) fn retarget_kind(
+/// `RetargetBundle` (T25.F11 invariant 7): one bundle; a `Plain` bundle
+/// moves to another present vote sink, `gen_range` over the others in
+/// catalog order (`NoApplicableTarget` before that draw when there is
+/// none); a geometric bundle to another kind, `gen_range(0..3)` over
+/// `DirectedVoteKind::ALL` minus its own, skipping after the draw when the
+/// graph lacks a site the new kind needs. Every member moves by coordinate.
+pub(crate) fn retarget(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let id = pick(def, rng)?;
-    let bundle = def.bundles()[id.index()];
-    let pick = rng.gen_range(0..DirectedVoteKind::ALL.len() - 1);
-    let kind = DirectedVoteKind::ALL
-        .into_iter()
-        .filter(|&kind| kind != bundle.kind())
-        .nth(pick)
-        .expect("another kind");
-    let has_facts = def.members(id).any(|member| def.is_fact_member(member));
-    if has_facts && !def.can_host_facts(kind) {
+    let wiring = def.bundles()[id.index()].wiring();
+    let target = match wiring {
+        Wiring::Plain { sink } => {
+            let others: Vec<Wiring> = cgp::plans(def, &MEMORY_BANK)
+                .into_iter()
+                .filter(|plan| *plan != Wiring::Plain { sink })
+                .collect();
+            if others.is_empty() {
+                return Err(MutationSkipReason::NoApplicableTarget);
+            }
+            others[rng.gen_range(0..others.len())]
+        }
+        Wiring::Ring { kind, offset } | Wiring::DirectionPair { kind, offset } => {
+            let pick = rng.gen_range(0..DirectedVoteKind::ALL.len() - 1);
+            let other = DirectedVoteKind::ALL
+                .into_iter()
+                .filter(|&candidate| candidate != kind)
+                .nth(pick)
+                .expect("another kind");
+            wiring.rotated(other, offset)
+        }
+    };
+    if !cgp::hosts(def, &target) {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    def.relocate_bundle(id, kind, bundle.offset());
+    def.relocate_bundle(id, target);
     Ok(())
 }
 

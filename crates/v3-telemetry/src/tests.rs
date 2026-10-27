@@ -1278,9 +1278,9 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
 #[test]
 fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
     use v3_core::contracts::votes::DirectedVoteKind;
+    use v3_core::contracts::SensorContext;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::Shape;
-    use v3_core::genome::BackendDef;
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1305,17 +1305,20 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
                 .iter()
                 .position(|r| *r == InputReference::World(WorldInputKey::NeighborOccupiedRing))
                 .expect("the founder's entry node lists the occupied ring");
-            let BackendDef::Graph(def) = &mut node.backend_def else {
-                panic!("the default founder's entry node is a Graph node");
+            let source = BundleSource::Sensor {
+                ref_idx: u16::try_from(ring).unwrap(),
+                field_set: 0,
             };
-            let bundle = def.add_ring_bundle(
-                Shape::Ring {
-                    ring_ref: u16::try_from(ring).unwrap(),
+            let birth = BundleBirth {
+                field_set: 0,
+                wiring: Wiring::Ring {
+                    kind: DirectedVoteKind::StealEnergy,
+                    offset: 0,
                 },
-                DirectedVoteKind::StealEnergy,
-                0,
-            );
-            def.bundle_mut(bundle).set_scale(0.5);
+                scale: 0.5,
+            };
+            node.add_bundle(source, birth, &SensorContext::WIDEST)
+                .expect("the default founder's entry node is a Graph node on a full catalog");
         },
     );
     let id = sim.creatures.keys().next().unwrap();

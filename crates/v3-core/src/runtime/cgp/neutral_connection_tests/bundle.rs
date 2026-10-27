@@ -3,7 +3,7 @@
 //! equivalent ungrouped edges is bitwise.
 use super::*;
 use crate::contracts::votes::DirectedVoteKind;
-use crate::genome::cgp::{BundleId, EdgeSurface, Shape};
+use crate::genome::cgp::{BundleId, EdgeSurface};
 use crate::mutation::graph::bundle;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::types::sanitize_f32;
@@ -104,7 +104,7 @@ fn add_bundle(
     scale: f32,
     corrections: &[f32],
 ) -> BundleId {
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+    let id = def.add_ring_bundle(ring_ref, kind, offset);
     def.bundle_mut(id).set_scale(scale);
     let members: Vec<_> = def.members(id).collect();
     for (occurrence, &own) in members.into_iter().zip(corrections) {
@@ -152,7 +152,7 @@ proptest! {
             wire(&mut def, OutputSinkKind::ActionVote(vote), edge(memory(0, true), weight));
         }
         let before = effects_at(&def, &rings(), &sensors);
-        def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+        def.add_ring_bundle(ring_ref, kind, offset);
         let after = effects_at(&def, &rings(), &sensors);
         prop_assert_eq!(after.side.dispatch_effects(), before.side.dispatch_effects());
         prop_assert_eq!(after.result, before.result);
@@ -241,7 +241,7 @@ proptest! {
         let before = votes(&def, &sensors);
         bundle::shift_offset(&mut def, &mut SmallRng::seed_from_u64(seed)).unwrap();
         let after = votes(&def, &sensors);
-        let step = (def.bundles()[0].offset() + 8 - offset) % 8;
+        let step = (def.bundles()[0].wiring().offset().expect("a geometric bundle") + 8 - offset) % 8;
         prop_assert!(step == 1 || step == 7);
         for d in 0..8u8 {
             let from = (d + 8 - step) % 8;
@@ -308,13 +308,12 @@ fn duplicate_bundles_and_incumbent_edges_sum_in_sink_order() {
     }
 }
 
-/// An unresolvable `ring_ref` (out of range or not a ring) reads pattern 0:
-/// every member weighs its own correction, so a bundle at any finite scale
-/// with zero corrections contributes nothing. Such a bundle fails
-/// `validate_graph` (I7) and never reaches a live genome.
+/// An unresolvable `ring_ref` (out of range or not a ring) is a
+/// `ShapeReference` violation: such a bundle never reaches a live genome,
+/// so no reader weighs it (T25.F11 invariant 3 deleted the pattern-0
+/// fallback).
 #[test]
-fn an_unresolvable_ring_ref_reads_pattern_zero() {
-    let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
+fn an_unresolvable_ring_ref_fails_validation() {
     for ring_ref in [3, 4, u16::MAX] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         add_bundle(
@@ -325,15 +324,6 @@ fn an_unresolvable_ring_ref_reads_pattern_zero() {
             2.0,
             &[0.0; 8],
         );
-        assert!(def
-            .sink_weight_rows(&rings())
-            .iter()
-            .flat_map(|row| row.iter())
-            .all(|&w| w == 0.0));
-        assert!(
-            votes(&def, &sensors).iter().all(|&v| v == 0.0),
-            "{ring_ref}"
-        );
         let node = crate::genome::NodeGenome {
             node_id: crate::contracts::NodeId(0),
             input_refs: rings(),
@@ -342,40 +332,9 @@ fn an_unresolvable_ring_ref_reads_pattern_zero() {
         };
         assert_eq!(
             crate::genome::cgp::validate_graph(&node),
-            Err(crate::genome::cgp::GraphInvariantViolation::ShapeReference)
+            Err(crate::genome::cgp::GraphInvariantViolation::ShapeReference),
+            "{ring_ref}"
         );
-    }
-}
-
-/// With pattern 0 a member's genomic weight is its correction, so an
-/// unresolvable bundle beside the kind's incumbent edges leaves their votes
-/// unchanged at any finite scale.
-#[test]
-fn an_unresolvable_ring_ref_leaves_incumbent_votes_unchanged() {
-    let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
-    let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
-    for d in 0..8u8 {
-        wire(
-            &mut base,
-            OutputSinkKind::ActionVote(DirectedVoteKind::Move.sink(d)),
-            edge(leaf(0, u16::from(d)), 1.5),
-        );
-    }
-    let incumbent = votes(&base, &sensors);
-    assert!((0..8u8).all(|d| incumbent[DirectedVoteKind::Move.sink(d).index()] != 0.0));
-    for ring_ref in [3, 4, u16::MAX] {
-        for scale in [-3.0e38, -2.0, 7.5, 3.0e38] {
-            let mut def = base.clone();
-            add_bundle(
-                &mut def,
-                ring_ref,
-                DirectedVoteKind::Move,
-                1,
-                scale,
-                &[0.0; 8],
-            );
-            assert_eq!(votes(&def, &sensors), incumbent, "{ring_ref} {scale}");
-        }
     }
 }
 
@@ -387,7 +346,7 @@ fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
     }
     let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
     assert!(votes(&def, &sensors).iter().all(|&v| v == 0.0));
     bundle::alter_scale(&mut def, &mut SmallRng::seed_from_u64(5)).unwrap();
     let scale = def.bundles()[0].scale();
@@ -619,8 +578,8 @@ mod pair {
         sensors: &SensorSnapshot,
     ) -> [f32; 8] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let layout = reference.direction_pairs()[usize::from(pair)];
-        let id = def.add_pair_bundle(0, pair, layout, kind, offset, &[]);
+        let layout = crate::contracts::pair_layout(reference, pair);
+        let id = def.add_pair_bundle(0, pair, layout, kind, offset);
         def.bundle_mut(id).set_scale(1.0);
         let votes = effects_at(&def, std::slice::from_ref(reference), sensors)
             .side
@@ -721,7 +680,7 @@ mod pair {
         /// twelve ungrouped edges of weight `compose(c_i, s, pattern_i)` in
         /// the I10 position, beside edges of other kinds.
         #[test]
-        fn a_pair_bundle_equals_its_twelve_edges(
+        fn a_pair_bundle_equals_its_fifteen_edges(
             area in perception_strategy(),
             kind in kind_strategy(),
             offset in 0u8..8,
@@ -742,11 +701,11 @@ mod pair {
                 wire(&mut base, OutputSinkKind::ActionVote(vote), edge(memory(0, true), w));
             }
             let mut grouped = base.clone();
-            let layout = refs[0].direction_pairs()[usize::from(pair)];
-            let id = grouped.add_pair_bundle(0, pair, layout, kind, offset, &[]);
+            let layout = crate::contracts::pair_layout(&refs[0], pair);
+            let id = grouped.add_pair_bundle(0, pair, layout, kind, offset);
             grouped.bundle_mut(id).set_scale(scale);
             let members: Vec<_> = grouped.members(id).collect();
-            prop_assert_eq!(members.len(), 12);
+            prop_assert_eq!(members.len(), 12 + 3, "twelve compass members and three facts");
             for (occurrence, &own) in members.iter().zip(&corrections) {
                 grouped.edge_mut(*occurrence).set_weight(own);
             }

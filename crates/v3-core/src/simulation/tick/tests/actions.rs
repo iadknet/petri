@@ -1101,50 +1101,40 @@ fn per_type_standing_density_matches_the_applied_growth_summary() {
     assert_eq!(sim.stats.last_tick_food_total_density_by_type, expected);
 }
 
+/// A creation's genome growth is charged at reproduction (T25.F10): one
+/// unit per bundle, whatever its source.
 #[test]
-fn neutral_recruitment_costs_follow_applied_genome_growth() {
-    use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
-    use crate::contracts::votes::VoteSink;
-    use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
-    use crate::simulation::tick::Phase0Charge;
-    let config = crate::config::SimulationConfig::default();
+fn bundle_costs_follow_applied_genome_growth() {
+    use crate::config::OrdinaryFoodTypeId;
+    use crate::genome::cgp::test_support::{add_first_plan_bundle, add_first_plan_sensor};
+    use crate::genome::cgp::BundleSource;
+    let lifecycle = crate::config::SimulationConfig::default().energy.lifecycle;
     let parent = v3alpha1_founder_genome();
-    let families = [
-        SourceFamily::Input(InputReference::World(WorldInputKey::area_food_summary(
-            OrdinaryFoodTypeId::new(0),
-        ))),
-        SourceFamily::Input(InputReference::World(WorldInputKey::food_here(
-            OrdinaryFoodTypeId::new(1),
-        ))),
-        SourceFamily::Input(InputReference::World(WorldInputKey::neighbor_food_ring(
-            OrdinaryFoodTypeId::new(0),
-        ))),
-        SourceFamily::Memory(false),
-        SourceFamily::Memory(true),
-    ];
-    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
-        for family in &families {
-            let mut child = parent.clone();
-            recruit_source(&mut child.nodes[0], family, arm, 0, VoteSink::Eat).unwrap();
-            let growth = child.genome_size() - parent.genome_size();
-            assert!(growth > 0);
-            let lifecycle = &config.energy.lifecycle;
-            let carrying = Phase0Charge::new(
-                0.0,
-                lifecycle.genome_carry_cost_per_unit,
-                child.genome_size(),
-                0.0,
-            )
-            .base;
-            let base = base_reproduce_charge(&child);
-            let (_, transferred, charge) =
-                charged_reproduction(child.clone(), lifecycle.genome_replication_cost_per_unit);
-            assert_eq!(transferred, CAPPED_TRANSFER);
-            let nominal = base * (1.0 + lifecycle.genome_replication_cost_per_unit * growth as f32);
-            // Telemetry records the applied f32 debit at this fixture's 1000
-            // energy, including subtraction rounding, not the nominal charge.
-            assert_eq!(charge, 1000.0f32 - (1000.0f32 - nominal));
-            println!("RECRUIT_COST {arm:?} {family:?}: size={} growth={growth} carry={carrying:.6} reproduction_charge={charge:.6} base={base:.6} next_supply={:.6}", child.genome_size(), config.mutation.per_unit_rate * f64::from(child.genome_size()));
-        }
+    let sensors = [
+        WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(0)),
+        WorldInputKey::food_here(OrdinaryFoodTypeId::new(1)),
+        WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(0)),
+    ]
+    .map(|key| {
+        let mut child = parent.clone();
+        add_first_plan_sensor(&mut child.nodes[0], InputReference::World(key));
+        child
+    });
+    let banks = [false, true].map(|previous| {
+        let mut child = parent.clone();
+        add_first_plan_bundle(&mut child.nodes[0], BundleSource::Memory { previous });
+        child
+    });
+    for child in sensors.into_iter().chain(banks) {
+        let growth = child.genome_size() - parent.genome_size();
+        assert!(growth > 0);
+        let base = base_reproduce_charge(&child);
+        let (_, transferred, charge) =
+            charged_reproduction(child.clone(), lifecycle.genome_replication_cost_per_unit);
+        assert_eq!(transferred, CAPPED_TRANSFER);
+        let nominal = base * (1.0 + lifecycle.genome_replication_cost_per_unit * growth as f32);
+        // Telemetry records the applied f32 debit at this fixture's 1000
+        // energy, including subtraction rounding, not the nominal charge.
+        assert_eq!(charge, 1000.0f32 - (1000.0f32 - nominal));
     }
 }

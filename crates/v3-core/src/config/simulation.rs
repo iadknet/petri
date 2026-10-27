@@ -935,28 +935,11 @@ impl Default for ReachableBiasConfig {
     }
 }
 
-/// Native Graph input recruitment (T20.F04): a mutation grows new
-/// input-to-vote links that start silent. `WholeFamily`, a whole sensor family
-/// per event, is the production default (user decision, 2026-10-12).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub enum NeutralInputRecruitment {
-    Off,
-    SingleChannel,
-    #[default]
-    WholeFamily,
-}
-
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
-    /// Initially silent input-to-vote growth (T20.F04). `WholeFamily` by
-    /// default (user decision, 2026-10-12); omitted configuration means
-    /// `WholeFamily`.
-    #[serde(default)]
-    pub neutral_input_recruitment: NeutralInputRecruitment,
     /// Chance that one genome unit requests a mutation event at birth: the
     /// only supply rule (T11.F19, T11.F20). A birth draws one Bernoulli trial
     /// per unit, so the requested event count is `Binomial(units, per_unit_rate)`
@@ -1019,7 +1002,6 @@ fn default_executed_window_ticks() -> u64 {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            neutral_input_recruitment: NeutralInputRecruitment::default(),
             per_unit_rate: default_per_unit_rate(),
             mesh_layer_probability: 0.2,
             large_copy_weight_percent: default_large_copy_weight_percent(),

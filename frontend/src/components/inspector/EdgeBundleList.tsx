@@ -1,15 +1,18 @@
 import { type ReactNode, useState } from "react";
 import type { BrainBundle } from "../../types/generated/BrainBundle.ts";
-import type { BundleCoordinate } from "../../types/generated/BundleCoordinate.ts";
+import type { BundleSource } from "../../types/generated/BundleSource.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { InputRef } from "../../types/generated/InputRef.ts";
 import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import type { Scope } from "../../types/generated/Scope.ts";
+import type { Site } from "../../types/generated/Site.ts";
+import type { Wiring } from "../../types/generated/Wiring.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { joinLearning } from "./brainLearning.ts";
 import { directionName } from "./directions.ts";
 import { composeTerms, scopeLabel } from "./edgeBundleWeights.ts";
-import { describeInputRef, directionPairs, formatInputRef } from "./inputRefUtils.ts";
+import { describeInputRef, formatInputRef } from "./inputRefUtils.ts";
+import { formatVoteSink } from "./voteSinks.ts";
 
 interface EdgeBundleListProps {
 	graphDef: GraphBrain;
@@ -19,10 +22,10 @@ interface EdgeBundleListProps {
 }
 
 export interface BundleMember {
-	/** The field the member reads: a ring cell, or a pair's field. */
+	/** The field the member reads: a sensor's sub-value or a memory slot. */
 	field: number | undefined;
-	/** The direction of the sink the member sits on; absent on the drive. */
-	direction: number | undefined;
+	/** Where the member sits under its bundle's wiring. */
+	site: Site | undefined;
 	sink: number;
 	edge: number;
 	own: number;
@@ -34,12 +37,6 @@ export interface BundleMember {
 	scope: Scope;
 	/** The weight in force. */
 	applied: number;
-}
-
-/** The reference a bundle reads, or its dangling index. */
-function refLabel(refIdx: number, inputRefs: InputRef[]): string {
-	const ref = inputRefs[refIdx];
-	return ref === undefined ? `ref ${refIdx} (missing)` : formatInputRef(ref);
 }
 
 /** Each bundle's members in sink order, as the brain view lists them. */
@@ -56,8 +53,7 @@ export function collectBundleMembers(
 			if (!member || !list) return;
 			list.push({
 				field: member.field,
-				direction:
-					member.site !== undefined && member.site !== "Drive" ? member.site.Direction : undefined,
+				site: member.site,
 				sink: sinkIndex,
 				edge: edgeIndex,
 				own: edge.own,
@@ -72,11 +68,44 @@ export function collectBundleMembers(
 	return members;
 }
 
-/** Whether `member` sits on one of `coordinates`. */
-function atCoordinate(member: BundleMember, coordinates: readonly BundleCoordinate[]): boolean {
-	return coordinates.some(
-		(coordinate) => coordinate.field === member.field && coordinate.direction === member.direction,
-	);
+/** Whether two sites are the same. */
+function sameSite(a: Site | undefined, b: Site): boolean {
+	if (a === undefined) return false;
+	if (typeof a === "string" || typeof b === "string") return a === b;
+	return a.Direction === b.Direction;
+}
+
+/** A geometric wiring's kind and offset; `null` for `Plain`. */
+function geometry(wiring: Wiring): { shape: string; kind: string; offset: number } | null {
+	if ("Ring" in wiring) return { shape: "Ring", ...wiring.Ring };
+	if ("DirectionPair" in wiring) return { shape: "Pair", ...wiring.DirectionPair };
+	return null;
+}
+
+/** The sink a site names under `wiring`. */
+function siteLabel(site: Site, wiring: Wiring): string {
+	if ("Plain" in wiring) return formatVoteSink(wiring.Plain.sink);
+	const kind = geometry(wiring)?.kind ?? "?";
+	if (site === "Drive") return `${kind} drive`;
+	if (site === "Sink") return kind;
+	return `${kind}[${directionName(site.Direction)}]`;
+}
+
+/** What a bundle reads: its sensor (and field set when it declares several)
+ * or its memory bank. */
+function sourceLabel(source: BundleSource, inputRefs: InputRef[]): string {
+	if ("Memory" in source) return source.Memory.previous ? "memory (previous)" : "memory";
+	const { ref_idx: refIdx, field_set: fieldSet } = source.Sensor;
+	const ref = inputRefs[refIdx];
+	const label = ref === undefined ? `ref ${refIdx} (missing)` : formatInputRef(ref);
+	return fieldSet === 0 ? label : `${label} set ${fieldSet}`;
+}
+
+/** A field of the bundle's source, as the inspector names it. */
+function fieldLabel(source: BundleSource, field: number, inputRefs: InputRef[]): string {
+	if ("Memory" in source) return `${source.Memory.previous ? "prev" : "mem"}[${field}]`;
+	const ref = inputRefs[source.Sensor.ref_idx];
+	return ref === undefined ? `field ${field}` : describeInputRef(ref, field).label;
 }
 
 /** A coordinate list's presence: `count/total ●○…`. */
@@ -103,21 +132,37 @@ function MemberWeights({ member }: { member: BundleMember }) {
 	);
 }
 
-/** Bundle facts shared by both shapes, each explained in a tooltip. */
+/** "1 step" or "n steps". */
+function steps(n: number): string {
+	return `${n} step${n === 1 ? "" : "s"}`;
+}
+
+/** The facts every bundle carries, each explained in a tooltip. */
 function BundleFacts({
 	bundle,
 	learnedScale,
-	offsetTip,
 }: {
 	bundle: BrainBundle;
 	/** The learned scale, for an initialized scale slot (T25.F07). */
 	learnedScale: number | undefined;
-	offsetTip: string;
 }) {
+	const geo = geometry(bundle.wiring);
 	return (
 		<>
-			<span className="text-slate-400">{bundle.kind}</span>
-			<Tip content={offsetTip}>offset {bundle.offset}</Tip>
+			{geo ? (
+				<>
+					<span className="text-slate-400">{geo.kind}</span>
+					<Tip
+						content={
+							geo.shape === "Ring"
+								? `Each ring cell votes ${geo.kind} toward the direction ${steps(geo.offset)} clockwise from that cell (0 = same, 4 = opposite).`
+								: `Votes ${geo.kind} toward the sensed offset, rotated ${steps(geo.offset)} clockwise (0 = toward, 4 = away); the facts vote on the drive.`
+						}
+					>
+						offset {geo.offset}
+					</Tip>
+				</>
+			) : null}
 			<Tip content="The bundle's shared weight: each member's weight is scale × its pattern + its own correction.">
 				scale={bundle.scale.toFixed(3)}
 			</Tip>
@@ -146,25 +191,34 @@ function BundleFacts({
 	);
 }
 
-/** "1 step" or "n steps". */
-function steps(n: number): string {
-	return `${n} step${n === 1 ? "" : "s"}`;
-}
-
 /**
- * A row's header and member lines, collapsible and open by default. Only
- * the name toggles; the facts beside it carry their own tooltips.
+ * One bundle: its source and wiring, its facts, and its members listed by
+ * birth coordinate `(field, site)`, a hole where no member sits (T25.F11).
+ * Collapsible and open by default; only the name toggles.
  */
-function BundleRowShell({
-	name,
-	facts,
-	children,
+function BundleRow({
+	bundle,
+	index,
+	members,
+	inputRefs,
+	learnedScale,
 }: {
-	name: ReactNode;
-	facts: ReactNode;
-	children: ReactNode;
+	bundle: BrainBundle;
+	index: number;
+	members: BundleMember[];
+	inputRefs: InputRef[];
+	learnedScale: number | undefined;
 }) {
 	const [open, setOpen] = useState(true);
+	const wiringName =
+		"Plain" in bundle.wiring
+			? `Plain → ${formatVoteSink(bundle.wiring.Plain.sink)}`
+			: geometry(bundle.wiring)?.shape;
+	const name: ReactNode = (
+		<span>
+			{wiringName} {sourceLabel(bundle.source, inputRefs)} #{index}
+		</span>
+	);
 	return (
 		<li data-testid="edge-bundle" className="space-y-0.5">
 			<div className="flex flex-wrap gap-2">
@@ -177,152 +231,47 @@ function BundleRowShell({
 					<span aria-hidden="true">{open ? "▾" : "▸"}</span>
 					{name}
 				</button>
-				{facts}
+				<BundleFacts bundle={bundle} learnedScale={learnedScale} />
+				<Tip
+					data-testid="edge-bundle-members"
+					content="Members present over the birth coordinates, in birth order (● present, ○ hole)."
+				>
+					{presence(bundle.coordinates)}
+				</Tip>
 			</div>
-			{open ? <ul className="ml-4 space-y-0.5 text-slate-400">{children}</ul> : null}
+			{open ? (
+				<ul className="ml-4 space-y-0.5 text-slate-400">
+					{bundle.coordinates.map((coordinate) => {
+						const member = members.find(
+							(candidate) =>
+								candidate.field === coordinate.field && sameSite(candidate.site, coordinate.site),
+						);
+						const at = `${fieldLabel(bundle.source, coordinate.field, inputRefs)} → ${siteLabel(
+							coordinate.site,
+							bundle.wiring,
+						)}`;
+						const key = `${coordinate.field}:${JSON.stringify(coordinate.site)}`;
+						return member ? (
+							<li key={key} data-testid="edge-bundle-member">
+								{at} <MemberWeights member={member} />
+							</li>
+						) : (
+							<li key={key} data-testid="edge-bundle-hole" className="text-slate-400">
+								{at} (hole)
+							</li>
+						);
+					})}
+				</ul>
+			) : null}
 		</li>
 	);
 }
 
-function RingRow({
-	bundle,
-	ringRef,
-	index,
-	members,
-	inputRefs,
-	learnedScale,
-}: {
-	bundle: BrainBundle;
-	ringRef: number;
-	index: number;
-	members: BundleMember[];
-	inputRefs: InputRef[];
-	learnedScale: number | undefined;
-}) {
-	const byField = [...members].sort((a, b) => (a.field ?? 0) - (b.field ?? 0));
-	return (
-		<BundleRowShell
-			name={
-				<span>
-					Ring {refLabel(ringRef, inputRefs)} #{index}
-				</span>
-			}
-			facts={
-				<>
-					<BundleFacts
-						bundle={bundle}
-						learnedScale={learnedScale}
-						offsetTip={`Each ring cell votes ${bundle.kind} toward the direction ${steps(bundle.offset)} clockwise from that cell (0 = same, 4 = opposite).`}
-					/>
-					<Tip
-						data-testid="edge-bundle-members"
-						content="Members present, by ring cell from N clockwise (● present, ○ hole)."
-					>
-						{presence(bundle.coordinates)}
-					</Tip>
-				</>
-			}
-		>
-			{byField.map((member) => (
-				<li key={`${member.sink}:${member.edge}`} data-testid="edge-bundle-member">
-					cell {directionName(member.field ?? 0)} → {bundle.kind}[
-					{directionName(member.direction ?? 0)}] <MemberWeights member={member} />
-				</li>
-			))}
-		</BundleRowShell>
-	);
-}
-
-function PairRow({
-	bundle,
-	refIdx,
-	pair,
-	index,
-	members,
-	inputRefs,
-	learnedScale,
-}: {
-	bundle: BrainBundle;
-	refIdx: number;
-	pair: number;
-	index: number;
-	members: BundleMember[];
-	inputRefs: InputRef[];
-	learnedScale: number | undefined;
-}) {
-	const ref = inputRefs[refIdx];
-	const fields = directionPairs(ref)[pair];
-	const label =
-		ref === undefined || fields === undefined
-			? `${refLabel(refIdx, inputRefs)} pair ${pair}`
-			: `${describeInputRef(ref, fields.x).label}/${
-					describeInputRef(ref, fields.y).label.split(".").pop() ?? fields.y
-				}`;
-	const role = (member: BundleMember): "x" | "y" | "?" =>
-		member.field === fields?.x ? "x" : member.field === fields?.y ? "y" : "?";
-	// A fact member (T25.F10) sits on the kind's drive: no sink direction.
-	const directions = members.filter((member) => member.direction !== undefined);
-	const factMembers = members.filter((member) => member.direction === undefined);
-	const factLabel = (field: number) =>
-		ref === undefined
-			? `field ${field}`
-			: (describeInputRef(ref, field).label.split(".").pop() ?? `field ${field}`);
-	const extra = directions.filter((member) => !atCoordinate(member, bundle.coordinates));
-	return (
-		<BundleRowShell
-			name={
-				<span>
-					Pair {label} #{index}
-				</span>
-			}
-			facts={
-				<>
-					<BundleFacts
-						bundle={bundle}
-						learnedScale={learnedScale}
-						offsetTip={`Votes ${bundle.kind} toward the sensed offset, rotated ${steps(bundle.offset)} clockwise (0 = toward, 4 = away).`}
-					/>
-					<Tip
-						data-testid="edge-bundle-members"
-						content={`Members present over the birth coordinates, in birth order (● present, ○ hole${
-							extra.length > 0 ? `; +${extra.length} outside them, zero pattern` : ""
-						}).`}
-					>
-						{presence(bundle.coordinates)}
-						{extra.length > 0 ? ` +${extra.length}` : ""}
-					</Tip>
-					{factMembers.length > 0 ? (
-						<Tip
-							data-testid="edge-bundle-facts"
-							content="Fact members present over the pair's declared facts, wired into the kind's drive; each weighs its own weight alone (● present, ○ hole)."
-						>
-							facts {presence(bundle.facts)}
-						</Tip>
-					) : null}
-				</>
-			}
-		>
-			{factMembers.map((member) => (
-				<li key={`${member.sink}:${member.edge}`} data-testid="edge-bundle-fact">
-					{factLabel(member.field ?? 0)} → {bundle.kind} drive <MemberWeights member={member} />
-				</li>
-			))}
-			{directions.map((member) => (
-				<li key={`${member.sink}:${member.edge}`} data-testid="edge-bundle-member">
-					{role(member)} → {bundle.kind}[{directionName(member.direction ?? 0)}]{" "}
-					<MemberWeights member={member} />
-					{atCoordinate(member, bundle.coordinates) ? "" : " (zero pattern)"}
-				</li>
-			))}
-		</BundleRowShell>
-	);
-}
-
 /**
- * A Graph node's edge bundles (T25.F03, T25.F04): one row per bundle with its
- * shape, kind, offset, scale and the members present over its birth
- * coordinates (holes shown), each row expandable to its member edges and
- * open by default.
+ * A Graph node's edge bundles (T25.F03, T25.F11): one row per bundle with
+ * its source, wiring, scale and the members present over its birth
+ * coordinates (holes shown), each row expandable to its members by
+ * coordinate and open by default.
  */
 export function EdgeBundleList({ graphDef, inputRefs, learning }: EdgeBundleListProps) {
 	const bundles = graphDef.bundles;
@@ -335,32 +284,17 @@ export function EdgeBundleList({ graphDef, inputRefs, learning }: EdgeBundleList
 				Edge bundles ({bundles.length})
 			</h4>
 			<ul className="space-y-1 font-mono text-[10px] text-slate-300">
-				{bundles.map((bundle, index) =>
-					"Ring" in bundle.shape ? (
-						<RingRow
-							// biome-ignore lint/suspicious/noArrayIndexKey: a BundleId is the bundle's index
-							key={index}
-							bundle={bundle}
-							ringRef={bundle.shape.Ring.ring_ref}
-							index={index}
-							members={members[index] ?? []}
-							inputRefs={inputRefs}
-							learnedScale={join.learnedScale(index, bundle)}
-						/>
-					) : (
-						<PairRow
-							// biome-ignore lint/suspicious/noArrayIndexKey: a BundleId is the bundle's index
-							key={index}
-							bundle={bundle}
-							refIdx={bundle.shape.DirectionPair.ref_idx}
-							pair={bundle.shape.DirectionPair.pair}
-							index={index}
-							members={members[index] ?? []}
-							inputRefs={inputRefs}
-							learnedScale={join.learnedScale(index, bundle)}
-						/>
-					),
-				)}
+				{bundles.map((bundle, index) => (
+					<BundleRow
+						// biome-ignore lint/suspicious/noArrayIndexKey: a BundleId is the bundle's index
+						key={index}
+						bundle={bundle}
+						index={index}
+						members={members[index] ?? []}
+						inputRefs={inputRefs}
+						learnedScale={join.learnedScale(index, bundle)}
+					/>
+				))}
 			</ul>
 		</section>
 	);

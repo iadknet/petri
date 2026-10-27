@@ -16,9 +16,10 @@ mod edge;
 pub(crate) mod test_support;
 
 pub use bundle::{
-    compose, detach, pair_birth_members, pair_relative, plans, ring_birth_members, ring_offset,
-    BirthCoordinate, Bundle, BundleBirth, BundleId, BundleSource, Shape, Site, Wiring,
+    compose, detach, hosts, pair_relative, plans, ring_offset, BirthCoordinate, Bundle,
+    BundleBirth, BundleId, BundleSource, Site, Wiring,
 };
+pub(crate) use container::bundle_capacity_admits;
 pub use container::{
     validate_graph, BirthSeeds, BundleMut, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList,
     EdgeMut, EdgeOccurrence, EdgeSurface, GraphInvariantViolation, OutputSink, OutputSinks,

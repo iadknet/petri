@@ -151,10 +151,19 @@ fn complexity_effect_known_classifications() {
         MutationOperator::TopologyRetargetNodeTarget.complexity_effect(),
         ComplexityEffect::Neutral
     );
-    assert_eq!(
-        MutationOperator::InputRefAdd.complexity_effect(),
-        ComplexityEffect::Increasing
-    );
+    // The four creation operators are increasing (T25.F11 invariant 7).
+    for creation in [
+        MutationOperator::InputRefAddSensorLive,
+        MutationOperator::InputRefAddSensorSilent,
+        MutationOperator::GraphAddBundleLive,
+        MutationOperator::GraphAddBundleSilent,
+    ] {
+        assert_eq!(
+            creation.complexity_effect(),
+            ComplexityEffect::Increasing,
+            "{creation:?}"
+        );
+    }
     assert_eq!(
         MutationOperator::InputRefPrune.complexity_effect(),
         ComplexityEffect::Decreasing
@@ -249,16 +258,13 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphDisableRewardModulation
             | MutationOperator::GraphMutateRewardSource
             | MutationOperator::GraphMutateTraceDecay
-            | MutationOperator::GraphRecruitNeutralInput
-            | MutationOperator::GraphAddRingBundle
-            | MutationOperator::GraphAddDirectionPairBundle
+            | MutationOperator::GraphAddBundleLive
+            | MutationOperator::GraphAddBundleSilent
             | MutationOperator::GraphAlterBundleScale
             | MutationOperator::GraphShiftBundleOffset
-            | MutationOperator::GraphRetargetBundleKind
+            | MutationOperator::GraphRetargetBundle
             | MutationOperator::GraphRemoveBundle
             | MutationOperator::GraphSetScope
-            | MutationOperator::GraphAddRandomizedRingBundle
-            | MutationOperator::GraphAddRandomizedDirectionPairBundle
             | MutationOperator::GraphDetachGraphEdge
             | MutationOperator::GraphEnableRetention
             | MutationOperator::GraphDisableRetention
@@ -268,7 +274,8 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphMutateBundleRetention => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
-            MutationOperator::InputRefAdd
+            MutationOperator::InputRefAddSensorLive
+            | MutationOperator::InputRefAddSensorSilent
             | MutationOperator::InputRefPrune
             | MutationOperator::InputRefSwap
             | MutationOperator::InputRefRawFieldMutation => {
@@ -375,20 +382,13 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             }
             GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-            GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            GraphOperator::AddRingBundle => MutationOperator::GraphAddRingBundle,
-            GraphOperator::AddDirectionPairBundle => MutationOperator::GraphAddDirectionPairBundle,
+            GraphOperator::AddBundleLive => MutationOperator::GraphAddBundleLive,
+            GraphOperator::AddBundleSilent => MutationOperator::GraphAddBundleSilent,
             GraphOperator::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
             GraphOperator::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
-            GraphOperator::RetargetBundleKind => MutationOperator::GraphRetargetBundleKind,
+            GraphOperator::RetargetBundle => MutationOperator::GraphRetargetBundle,
             GraphOperator::RemoveBundle => MutationOperator::GraphRemoveBundle,
             GraphOperator::SetScope => MutationOperator::GraphSetScope,
-            GraphOperator::AddRandomizedRingBundle => {
-                MutationOperator::GraphAddRandomizedRingBundle
-            }
-            GraphOperator::AddRandomizedDirectionPairBundle => {
-                MutationOperator::GraphAddRandomizedDirectionPairBundle
-            }
             GraphOperator::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
             GraphOperator::EnableRetention => MutationOperator::GraphEnableRetention,
             GraphOperator::DisableRetention => MutationOperator::GraphDisableRetention,
@@ -409,7 +409,8 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
 
     for &ir in &InputRefOperator::ALL {
         let mo = match ir {
-            InputRefOperator::Add => MutationOperator::InputRefAdd,
+            InputRefOperator::AddSensorLive => MutationOperator::InputRefAddSensorLive,
+            InputRefOperator::AddSensorSilent => MutationOperator::InputRefAddSensorSilent,
             InputRefOperator::Prune => MutationOperator::InputRefPrune,
             InputRefOperator::Swap => MutationOperator::InputRefSwap,
             InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
@@ -466,16 +467,13 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::DisableRewardModulation
             | GraphOperator::MutateRewardSource
             | GraphOperator::MutateTraceDecay
-            | GraphOperator::RecruitNeutralInput
-            | GraphOperator::AddRingBundle
-            | GraphOperator::AddDirectionPairBundle
+            | GraphOperator::AddBundleLive
+            | GraphOperator::AddBundleSilent
             | GraphOperator::AlterBundleScale
             | GraphOperator::ShiftBundleOffset
-            | GraphOperator::RetargetBundleKind
+            | GraphOperator::RetargetBundle
             | GraphOperator::RemoveBundle
             | GraphOperator::SetScope
-            | GraphOperator::AddRandomizedRingBundle
-            | GraphOperator::AddRandomizedDirectionPairBundle
             | GraphOperator::DetachGraphEdge
             | GraphOperator::EnableRetention
             | GraphOperator::DisableRetention
@@ -485,7 +483,26 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::MutateBundleRetention => {}
         }
     }
-    assert_eq!(variants.len(), 38);
+    // T25.F11 invariant 7: the four `Add*Bundle` and `RecruitNeutralInput`
+    // leave, `AddBundleLive` and `AddBundleSilent` join (35 at weight 78);
+    // `InputRef.Add` becomes `AddSensorLive` and `AddSensorSilent` (5 at
+    // weight 12).
+    assert_eq!(variants.len(), 35);
+    let weight = |weights: &mut dyn Iterator<Item = u8>| weights.map(u32::from).sum::<u32>();
+    assert_eq!(
+        weight(&mut GraphOperator::ALL.into_iter().map(GraphOperator::weight)),
+        78
+    );
+    assert_eq!(
+        weight(
+            &mut InputRefOperator::ALL
+                .into_iter()
+                .map(InputRefOperator::weight)
+        ),
+        12
+    );
+    assert_eq!(InputRefOperator::ALL.len(), 5);
+    assert_eq!(MutationOperator::all().len(), 69);
 
     let image: HashSet<MutationOperator> = GraphOperator::ALL
         .into_iter()

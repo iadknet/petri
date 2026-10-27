@@ -699,8 +699,6 @@ impl WorldTracking {
                 not_applicable_target_total: stats.mutation_not_applicable_target_total,
                 graph_edges_detached_total: stats.graph_edges_detached_total,
                 bundles_removed_total: stats.bundles_removed_total,
-                pair_bundle_inherited_nonzero_births_total: stats
-                    .pair_bundle_inherited_nonzero_births_total,
                 attribute_changes_by_scope: stats.mutation_attribute_changes_total_by_scope.into(),
                 operator_funnel_by_operator: stats
                     .mutation_operator_funnel_total_by_operator
@@ -821,15 +819,6 @@ pub struct PersistenceSample {
     /// extinction and absent in reports stored before T25.F02.
     #[serde(default)]
     pub mean_wired_sinks: Option<String>,
-    /// Mean `Ring` edge-bundle count per living creature (T25.F03). `null` at
-    /// extinction and absent in reports stored before T25.F03.
-    #[serde(default)]
-    pub mean_ring_bundles: Option<String>,
-    /// Mean members present per `Ring` bundle across the living population
-    /// (T25.F03). `null` with no bundle or at extinction, and absent in
-    /// reports stored before T25.F03.
-    #[serde(default)]
-    pub mean_ring_bundle_members: Option<String>,
     /// Founder clades with at least one living creature — a true `0` at
     /// extinction, absent in reports stored before T14.F04.
     #[serde(default)]
@@ -848,11 +837,11 @@ pub struct PersistenceSample {
     /// before T14.F10.
     #[serde(default)]
     pub occupancy_grid: Option<OccupancyGrid>,
-    /// The `DirectionPair` bundles the living population carries on reachable
-    /// nodes (T25.F04, `pair-bundles-v2` since T25.F10). `null` at extinction, absent in
-    /// reports stored before T25.F04.
+    /// The bundles the living population carries, by wiring (T25.F11,
+    /// `bundles-v1`). `null` at extinction, absent in reports stored before
+    /// T25.F11.
     #[serde(default)]
-    pub pair_bundles: Option<super::pair_bundles::PairBundles>,
+    pub bundles: Option<super::bundles::Bundles>,
     /// The plastic edges the living population carries on reachable nodes
     /// (T25.F06), beside `sensor_census`. A true all-zero census at
     /// extinction, absent in reports stored before T25.F06.
@@ -1165,13 +1154,11 @@ pub(super) struct PopulationReadings {
     pub(super) mean_mesh_nodes: f64,
     pub(super) mean_generation: f64,
     pub(super) mean_wired_sinks: f64,
-    pub(super) mean_ring_bundles: f64,
-    pub(super) mean_ring_bundle_members: Option<f64>,
     pub(super) surviving_founder_clade_count: u64,
     pub(super) shannon_entropy_nats: String,
     sensor_census: SensorCensus,
     occupancy_grid: OccupancyGrid,
-    pair_bundles: Option<super::pair_bundles::PairBundles>,
+    bundles: Option<super::bundles::Bundles>,
     plasticity_census: PlasticityCensusBlock,
     capacity: Option<super::capacity::CapacityDistribution>,
     shares: Option<super::capacity::ShareDistributions>,
@@ -1187,13 +1174,11 @@ impl PopulationReadings {
             mean_mesh_nodes: means.mesh_nodes,
             mean_generation: means.generation,
             mean_wired_sinks: means.wired_sinks,
-            mean_ring_bundles: means.ring_bundles,
-            mean_ring_bundle_members: means.ring_bundle_members,
             surviving_founder_clade_count,
             shannon_entropy_nats,
             sensor_census: SensorCensus::observe(sim),
             occupancy_grid: OccupancyGrid::observe(sim),
-            pair_bundles: super::pair_bundles::PairBundles::observe(sim),
+            bundles: super::bundles::Bundles::observe(sim),
             plasticity_census: PlasticityCensusBlock::observe(sim),
             capacity: super::capacity::CapacityDistribution::observe(sim),
             shares: super::capacity::ShareDistributions::observe(sim),
@@ -1286,16 +1271,11 @@ impl PersistenceAccumulator {
                 mean_mesh_nodes: alive.then(|| six(readings.mean_mesh_nodes)),
                 mean_generation: alive.then(|| six(readings.mean_generation)),
                 mean_wired_sinks: alive.then(|| six(readings.mean_wired_sinks)),
-                mean_ring_bundles: alive.then(|| six(readings.mean_ring_bundles)),
-                mean_ring_bundle_members: readings
-                    .mean_ring_bundle_members
-                    .filter(|_| alive)
-                    .map(six),
                 surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 sensor_census: Some(readings.sensor_census),
                 occupancy_grid: Some(readings.occupancy_grid),
-                pair_bundles: readings.pair_bundles.filter(|_| alive),
+                bundles: readings.bundles.filter(|_| alive),
                 plasticity_census: Some(readings.plasticity_census),
                 capacity: readings.capacity.filter(|_| alive),
                 shares: readings.shares.filter(|_| alive),

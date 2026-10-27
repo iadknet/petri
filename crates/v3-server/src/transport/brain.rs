@@ -7,7 +7,7 @@
 //! number is read, never recomputed.
 
 use serde::Serialize;
-use v3_core::contracts::{InputReference, NodeId};
+use v3_core::contracts::{InputReference, NodeId, SensorContext};
 use v3_core::genome::cgp::{self as core_cgp, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
 use v3_core::genome::mesh_annotations::MeshNodeAnnotation;
 use v3_core::genome::{BackendDef, CreatureGenome, VmBackendDef};
@@ -15,7 +15,7 @@ use v3_core::runtime::plasticity::{LearnedEdge, LearnedState};
 
 use crate::transport::genome_wire::{
     ComputeNodeKind, DirectedVoteKind, GraphSource, HebbianRule, InputRef, MeshReadClass,
-    MeshWriteClass, OutcomeChannel, OutputSinkKind, RouteTarget, VmInstruction,
+    MeshWriteClass, OutcomeChannel, OutputSinkKind, RouteTarget, VmInstruction, VoteSink,
 };
 
 // ── Brain ───────────────────────────────────────────────────────────────────
@@ -181,11 +181,12 @@ impl From<core_cgp::Scope> for Scope {
     }
 }
 
-/// Where a member sits relative to its bundle's kind: a direction sink or
-/// the kind's drive.
+/// Where a member sits under its bundle's wiring: a `Plain` wiring's vote
+/// sink, a direction sink of a geometric wiring's kind, or that kind's drive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Site {
+    Sink,
     Direction(u8),
     Drive,
 }
@@ -193,6 +194,7 @@ pub enum Site {
 impl From<core_cgp::Site> for Site {
     fn from(site: core_cgp::Site) -> Self {
         match site {
+            core_cgp::Site::Sink => Self::Sink,
             core_cgp::Site::Direction(d) => Self::Direction(d),
             core_cgp::Site::Drive => Self::Drive,
         }
@@ -255,14 +257,13 @@ pub struct EdgeLearner {
     pub trace: Option<f32>,
 }
 
-/// One edge bundle: its record, its learned scale and its birth coordinates
-/// with presence.
+/// One bundle (T25.F11): its record, its learned scale and its birth
+/// coordinates with presence.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BrainBundle {
-    pub shape: BundleShape,
-    pub kind: DirectedVoteKind,
-    pub offset: u8,
+    pub source: BundleSource,
+    pub wiring: Wiring,
     pub scale: f32,
     pub inherit_scale: bool,
     pub retention: f32,
@@ -270,45 +271,61 @@ pub struct BrainBundle {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub learned_scale: Option<f32>,
-    /// The direction coordinates a member is born on.
+    /// Every coordinate a member is born on, with presence.
     pub coordinates: Vec<BundleCoordinate>,
-    /// A pair gene's declared facts on its kind's drive; empty for a ring.
-    pub facts: Vec<BundleFact>,
 }
 
-/// The geometry a bundle's members fit.
+/// What a bundle reads: a declared sensor's field set or a memory bank.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
-pub enum BundleShape {
-    Ring { ring_ref: u16 },
-    DirectionPair { ref_idx: u16, pair: u8 },
+pub enum BundleSource {
+    Sensor { ref_idx: u16, field_set: u8 },
+    Memory { previous: bool },
 }
 
-impl From<core_cgp::Shape> for BundleShape {
-    fn from(shape: core_cgp::Shape) -> Self {
-        match shape {
-            core_cgp::Shape::Ring { ring_ref } => Self::Ring { ring_ref },
-            core_cgp::Shape::DirectionPair { ref_idx, pair } => {
-                Self::DirectionPair { ref_idx, pair }
+impl From<core_cgp::BundleSource> for BundleSource {
+    fn from(source: core_cgp::BundleSource) -> Self {
+        match source {
+            core_cgp::BundleSource::Sensor { ref_idx, field_set } => {
+                Self::Sensor { ref_idx, field_set }
             }
+            core_cgp::BundleSource::Memory { previous } => Self::Memory { previous },
         }
     }
 }
 
-/// A birth coordinate on a direction sink.
+/// How a bundle's members sit on the sinks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
+pub enum Wiring {
+    Plain { sink: VoteSink },
+    Ring { kind: DirectedVoteKind, offset: u8 },
+    DirectionPair { kind: DirectedVoteKind, offset: u8 },
+}
+
+impl From<core_cgp::Wiring> for Wiring {
+    fn from(wiring: core_cgp::Wiring) -> Self {
+        match wiring {
+            core_cgp::Wiring::Plain { sink } => Self::Plain { sink: sink.into() },
+            core_cgp::Wiring::Ring { kind, offset } => Self::Ring {
+                kind: kind.into(),
+                offset,
+            },
+            core_cgp::Wiring::DirectionPair { kind, offset } => Self::DirectionPair {
+                kind: kind.into(),
+                offset,
+            },
+        }
+    }
+}
+
+/// A birth coordinate: the field a member born with the bundle reads, its
+/// site, and whether a member sits there now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BundleCoordinate {
     pub field: u16,
-    pub direction: u8,
-    pub present: bool,
-}
-
-/// A declared fact of a pair gene.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct BundleFact {
-    pub field: u16,
+    pub site: Site,
     pub present: bool,
 }
 
@@ -405,12 +422,14 @@ fn surface_of(occurrence: EdgeOccurrence) -> (WeightSurface, usize) {
 
 /// The brain view of `genome`, its learned state `learned` and its mesh
 /// annotations (`derive_mesh_annotations_with_reachable_indices`, one per
-/// node in genome order).
+/// node in genome order), its bundle coordinates resolved under the run's
+/// `context` from the session config (T25.F11 invariant 11).
 #[must_use]
 pub fn brain_view(
     genome: &CreatureGenome,
     learned: &LearnedState,
     annotations: &[MeshNodeAnnotation],
+    context: &SensorContext,
 ) -> BrainView {
     debug_assert_eq!(annotations.len(), genome.nodes.len());
     BrainView {
@@ -426,9 +445,13 @@ pub fn brain_view(
                 input_refs: node.input_refs.iter().map(InputRef::from).collect(),
                 backend: match &node.backend_def {
                     BackendDef::Vm(vm) => BrainBackend::Vm(vm.into()),
-                    BackendDef::Graph(def) => {
-                        BrainBackend::Graph(graph_brain(def, &node.input_refs, learned, node_idx))
-                    }
+                    BackendDef::Graph(def) => BrainBackend::Graph(graph_brain(
+                        def,
+                        &node.input_refs,
+                        learned,
+                        node_idx,
+                        context,
+                    )),
                 },
                 targets: node.targets.iter().map(RouteTarget::from).collect(),
             })
@@ -441,6 +464,7 @@ fn graph_brain(
     input_refs: &[InputReference],
     learned: &LearnedState,
     node_idx: usize,
+    context: &SensorContext,
 ) -> GraphBrain {
     let mut compute_nodes: Vec<BrainComputeNode> = def
         .compute_nodes()
@@ -475,33 +499,23 @@ fn graph_brain(
             let learned_scale = scales
                 .next_if(|scale| scale.bundle == id)
                 .and_then(|scale| scale.learned);
-            let mut coordinates = Vec::new();
-            let mut facts = Vec::new();
-            for coordinate in def.birth_coordinates(id, input_refs) {
-                match coordinate.site {
-                    core_cgp::Site::Direction(direction) => {
-                        coordinates.push(BundleCoordinate {
-                            field: coordinate.field,
-                            direction,
-                            present: coordinate.present,
-                        });
-                    }
-                    core_cgp::Site::Drive => facts.push(BundleFact {
-                        field: coordinate.field,
-                        present: coordinate.present,
-                    }),
-                }
-            }
+            let coordinates = def
+                .birth_coordinates(id, input_refs, context)
+                .into_iter()
+                .map(|coordinate| BundleCoordinate {
+                    field: coordinate.field,
+                    site: coordinate.site.into(),
+                    present: coordinate.present,
+                })
+                .collect();
             BrainBundle {
-                shape: record.shape().into(),
-                kind: record.kind().into(),
-                offset: record.offset(),
+                source: record.source().into(),
+                wiring: record.wiring().into(),
                 scale: record.scale(),
                 inherit_scale: record.inherit_scale(),
                 retention: record.retention(),
                 learned_scale,
                 coordinates,
-                facts,
             }
         })
         .collect();
@@ -525,7 +539,8 @@ fn brain_edge(
         site: def.site_of(walked.occurrence).map(Site::from),
         field: match edge.source() {
             core_cgp::GraphSource::InputLeaf { sub_idx, .. } => Some(sub_idx),
-            _ => None,
+            core_cgp::GraphSource::SharedMemory { slot, .. } => Some(u16::from(slot)),
+            core_cgp::GraphSource::ComputeNode(_) => None,
         },
         pattern: def.pattern(walked.occurrence, input_refs),
         scale: def.bundles()[membership.bundle.index()].scale(),

@@ -1,20 +1,25 @@
-//! Edge bundles (T25.F03): one developmental program that wires a whole map.
+//! Bundles (T25.F03, T25.F11): one developmental program that wires a whole
+//! field set.
 //!
-//! A [`Bundle`] is a record `{shape, kind, offset, scale, inherit_scale,
-//! retention}`; its members are
-//! real sink edges whose [`super::Membership`] names it. A member's genomic
-//! weight is [`compose`]`(own_weight, scale, pattern)`.
+//! A [`Bundle`] is a record `{source, wiring, scale, inherit_scale,
+//! retention}`; its members are real sink edges whose [`super::Membership`]
+//! names it. Every member, whatever its wiring, weighs
+//! [`compose`]`(own_weight, scale, pattern)`, the pattern read from the
+//! wiring at the member's coordinate `(field, site)`.
 
 use super::{CgpGraphBackendDef, EdgeOccurrence, OutputSinkKind};
 use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
-use crate::contracts::{compass_x, compass_y, DirectionPair, FieldSet, InputReference};
+use crate::contracts::{
+    compass_x, compass_y, FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK,
+};
 
-/// Where a member sits relative to its bundle's kind `K` (T25.F10): a
-/// **direction member** on a direction sink `K(d)`, or a **fact member** of
-/// a `DirectionPair` gene on `K`'s drive sink. The role is read from the
-/// sink, never stored.
+/// Where a member sits relative to its bundle's wiring (T25.F11): the one
+/// vote sink of a `Plain` wiring, a direction sink `K(d)` of a geometric
+/// wiring's kind `K`, or `K`'s drive. Read from the sink, never stored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Site {
+    /// The vote sink a `Plain` wiring names.
+    Sink,
     /// The direction sink `K(d)`, `d < 8`.
     Direction(u8),
     /// The drive sink `Drive K`.
@@ -22,24 +27,40 @@ pub enum Site {
 }
 
 impl Site {
-    /// The site a sink of kind `sink` offers a member of a kind-`kind`
-    /// bundle; `None` for any other sink, another kind's included.
+    /// The site a sink of kind `sink` offers a member of a bundle wired
+    /// `wiring`; `None` for any other sink.
     #[must_use]
-    pub fn of(sink: OutputSinkKind, kind: DirectedVoteKind) -> Option<Self> {
-        if sink == Self::Drive.sink(kind) {
-            return Some(Self::Drive);
+    pub fn of(sink: OutputSinkKind, wiring: &Wiring) -> Option<Self> {
+        match *wiring {
+            Wiring::Plain { sink: vote } => {
+                (sink == OutputSinkKind::ActionVote(vote)).then_some(Self::Sink)
+            }
+            Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. } => {
+                if sink == OutputSinkKind::ActionVote(kind.drive()) {
+                    return Some(Self::Drive);
+                }
+                sink.direction()
+                    .filter(|&(on, _)| on == kind)
+                    .map(|(_, d)| Self::Direction(d))
+            }
         }
-        sink.direction()
-            .filter(|&(on, _)| on == kind)
-            .map(|(_, d)| Self::Direction(d))
     }
 
-    /// The sink this site names for a kind-`kind` bundle.
+    /// The sink this site names under `wiring`; `None` for a site the
+    /// wiring has no sink for (`Sink` of a geometric wiring, a direction or
+    /// the drive of a `Plain` one).
     #[must_use]
-    pub const fn sink(self, kind: DirectedVoteKind) -> OutputSinkKind {
-        match self {
-            Self::Direction(d) => OutputSinkKind::ActionVote(kind.sink(d)),
-            Self::Drive => OutputSinkKind::ActionVote(kind.drive()),
+    pub const fn sink(self, wiring: &Wiring) -> Option<OutputSinkKind> {
+        match (self, *wiring) {
+            (Self::Sink, Wiring::Plain { sink }) => Some(OutputSinkKind::ActionVote(sink)),
+            (
+                Self::Direction(d),
+                Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. },
+            ) => Some(OutputSinkKind::ActionVote(kind.sink(d))),
+            (Self::Drive, Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. }) => {
+                Some(OutputSinkKind::ActionVote(kind.drive()))
+            }
+            _ => None,
         }
     }
 }
@@ -66,56 +87,225 @@ impl BundleId {
     }
 }
 
-/// The geometry a bundle's members fit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum Shape {
-    /// Members: ring cell `c` of `input_refs[ring_ref]` into sink
-    /// `K[(c + offset) mod 8]`; pattern 1.
-    Ring { ring_ref: u16 },
-    /// Members (T25.F04): the `x` and `y` fields of pair `pair` of
-    /// `input_refs[ref_idx]` (`WorldInputKey::direction_pairs`) into sink
-    /// `K[d]` at pattern `compass_x((d − offset) mod 8)` and
-    /// `compass_y(...)`: at a positive scale the bundle votes toward the
-    /// sensed offset.
-    DirectionPair { ref_idx: u16, pair: u8 },
+/// What a bundle reads (T25.F11): one field set of a declared sensor, or a
+/// shared-memory bank (no declaration; its one field set is index 0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum BundleSource {
+    Sensor { ref_idx: u16, field_set: u8 },
+    Memory { previous: bool },
 }
 
-impl Shape {
-    /// The `input_refs` index the shape reads.
+impl BundleSource {
+    /// The field set index the source names.
     #[inline]
     #[must_use]
-    pub const fn ref_idx(self) -> u16 {
+    pub const fn field_set(self) -> u8 {
         match self {
-            Self::Ring { ring_ref } => ring_ref,
-            Self::DirectionPair { ref_idx, .. } => ref_idx,
+            Self::Sensor { field_set, .. } => field_set,
+            Self::Memory { .. } => 0,
         }
     }
 
-    /// The pair a `DirectionPair` shape names, when its reference declares
-    /// it; `None` for a `Ring` or an unresolvable pair.
+    /// The declaration index a sensor source reads; `None` for a memory
+    /// bank.
+    #[inline]
     #[must_use]
-    pub fn resolve_pair(self, input_refs: &[InputReference]) -> Option<DirectionPair> {
-        let Self::DirectionPair { ref_idx, pair } = self else {
-            return None;
-        };
-        input_refs
-            .get(usize::from(ref_idx))?
-            .direction_pairs()
-            .get(usize::from(pair))
-            .copied()
+    pub const fn ref_idx(self) -> Option<u16> {
+        match self {
+            Self::Sensor { ref_idx, .. } => Some(ref_idx),
+            Self::Memory { .. } => None,
+        }
+    }
+
+    /// The field set this source names on a node declaring `input_refs`,
+    /// resolved under [`SensorContext::WIDEST`]: the genome's geometry and
+    /// validity never depend on the configured queue.
+    #[must_use]
+    pub fn resolve(self, input_refs: &[InputReference]) -> Option<FieldSet> {
+        self.resolve_in(input_refs, &SensorContext::WIDEST)
+    }
+
+    /// The field set this source names on a node declaring `input_refs`
+    /// under `context`: a reader's view of the run (an `ActionQueue` set
+    /// spans the configured queue's width).
+    #[must_use]
+    pub fn resolve_in(
+        self,
+        input_refs: &[InputReference],
+        context: &SensorContext,
+    ) -> Option<FieldSet> {
+        match self {
+            Self::Sensor { ref_idx, field_set } => {
+                let reference = input_refs.get(usize::from(ref_idx))?;
+                SensorDescriptor::of(reference, context).field_set(field_set)
+            }
+            Self::Memory { .. } => Some(MEMORY_BANK),
+        }
     }
 }
 
-/// One edge bundle's record. Fields are written only through the container's
+/// How a bundle's members sit on the sinks (T25.F11): every field on one
+/// vote sink (`Plain`), a ring cell per direction (`Ring`), or an offset
+/// pair across the compass with its facts on the drive (`DirectionPair`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Wiring {
+    Plain { sink: VoteSink },
+    Ring { kind: DirectedVoteKind, offset: u8 },
+    DirectionPair { kind: DirectedVoteKind, offset: u8 },
+}
+
+impl Wiring {
+    /// The kind a geometric wiring votes for; `None` for `Plain`.
+    #[inline]
+    #[must_use]
+    pub const fn kind(self) -> Option<DirectedVoteKind> {
+        match self {
+            Self::Ring { kind, .. } | Self::DirectionPair { kind, .. } => Some(kind),
+            Self::Plain { .. } => None,
+        }
+    }
+
+    /// A geometric wiring's rotation; `None` for `Plain`.
+    #[inline]
+    #[must_use]
+    pub const fn offset(self) -> Option<u8> {
+        match self {
+            Self::Ring { offset, .. } | Self::DirectionPair { offset, .. } => Some(offset),
+            Self::Plain { .. } => None,
+        }
+    }
+
+    /// This wiring with a geometric wiring's kind and offset replaced; a
+    /// `Plain` wiring is returned unchanged.
+    #[must_use]
+    pub const fn rotated(self, kind: DirectedVoteKind, offset: u8) -> Self {
+        match self {
+            Self::Ring { .. } => Self::Ring { kind, offset },
+            Self::DirectionPair { .. } => Self::DirectionPair { kind, offset },
+            Self::Plain { .. } => self,
+        }
+    }
+
+    /// Whether this wiring fits `set`'s geometry: `Plain` a set without
+    /// geometry, `Ring` a ring, `DirectionPair` a pair.
+    #[must_use]
+    pub const fn fits(self, set: &FieldSet) -> bool {
+        matches!(
+            (self, set),
+            (Self::Plain { .. }, FieldSet::Plain { .. })
+                | (Self::Ring { .. }, FieldSet::Ring)
+                | (Self::DirectionPair { .. }, FieldSet::Pair(_))
+        )
+    }
+
+    /// Whether the wiring alone, without the field set, can map `field` to
+    /// `site` (T25.F11 invariant 4, the record-and-edge half of
+    /// `MemberShape`): a `Plain` member on `Sink`; a `Ring` cell `c < 8` on
+    /// `Direction((c + offset) mod 8)`, never the drive; a `DirectionPair`
+    /// member on a direction or the drive, whose field role needs the set.
+    #[must_use]
+    pub const fn admits_site(self, field: u16, site: Site) -> bool {
+        let n = VOTE_DIRECTION_COUNT as u16;
+        match (self, site) {
+            (Self::Plain { .. }, Site::Sink) => true,
+            (Self::Ring { offset, .. }, Site::Direction(d)) => {
+                field < n && (field + offset as u16 % n) % n == d as u16
+            }
+            (Self::DirectionPair { .. }, Site::Direction(_) | Site::Drive) => true,
+            _ => false,
+        }
+    }
+
+    /// The pattern at coordinate `(field, site)` of a bundle on `set` with
+    /// this wiring (T25.F11 invariant 3), `None` when the wiring maps
+    /// `field` to no such site (an off-site or wrong-field member): 1 for
+    /// every field of a `Plain` set on `Sink`; 1 for ring cell `c` on
+    /// `Direction((c + offset) mod 8)`; for a pair, `compass_x` /
+    /// `compass_y` of `(d − offset) mod 8` at `x` / `y` on a direction where
+    /// it is non-zero, and 1 at each fact on `Drive`.
+    #[must_use]
+    pub fn pattern(self, set: &FieldSet, field: u16, site: Site) -> Option<f32> {
+        if !self.fits(set) || !set.contains(field) {
+            return None;
+        }
+        let n = VOTE_DIRECTION_COUNT;
+        match (self, site, set) {
+            (Self::Plain { .. }, Site::Sink, _) => Some(1.0),
+            (Self::Ring { offset, .. }, Site::Direction(d), _) => {
+                let on = (u16::from(offset % n) + field) % u16::from(n);
+                (u16::from(d) == on).then_some(1.0)
+            }
+            (Self::DirectionPair { offset, .. }, Site::Direction(d), FieldSet::Pair(pair))
+                if d < n =>
+            {
+                let relative = pair_relative(d, offset);
+                let pattern = if field == pair.x {
+                    compass_x(relative)
+                } else if field == pair.y {
+                    compass_y(relative)
+                } else {
+                    0.0
+                };
+                (pattern != 0.0).then_some(pattern)
+            }
+            (Self::DirectionPair { .. }, Site::Drive, FieldSet::Pair(pair)) => {
+                pair.facts.contains(&field).then_some(1.0)
+            }
+            _ => None,
+        }
+    }
+
+    /// Every coordinate a new bundle on `set` with this wiring materializes,
+    /// in canonical order: a `Plain` set's fields on `Sink`; a ring's eight
+    /// cells; a pair's twelve non-zero compass coordinates
+    /// ([`pair_birth_members`]) then its facts on `Drive`. Empty when the
+    /// wiring does not fit the set.
+    #[must_use]
+    pub fn coordinates(self, set: &FieldSet) -> Vec<(u16, Site)> {
+        let n = VOTE_DIRECTION_COUNT;
+        match (self, set) {
+            (Self::Plain { .. }, FieldSet::Plain { .. }) => {
+                set.fields().into_iter().map(|f| (f, Site::Sink)).collect()
+            }
+            (Self::Ring { offset, .. }, FieldSet::Ring) => (0..n)
+                .map(|c| (u16::from(c), Site::Direction((c + offset % n) % n)))
+                .collect(),
+            (Self::DirectionPair { offset, .. }, FieldSet::Pair(pair)) => {
+                let mut coordinates: Vec<(u16, Site)> = (0..n)
+                    .flat_map(|relative| {
+                        let d = (relative + offset % n) % n;
+                        let x =
+                            (compass_x(relative) != 0.0).then_some((pair.x, Site::Direction(d)));
+                        let y =
+                            (compass_y(relative) != 0.0).then_some((pair.y, Site::Direction(d)));
+                        x.into_iter().chain(y)
+                    })
+                    .collect();
+                coordinates.extend(pair.facts.iter().map(|&fact| (fact, Site::Drive)));
+                coordinates
+            }
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// One sampled plan with its birth law (T25.F11): the field set it wires,
+/// the wiring, and the record's scale (0 for a silent bundle).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BundleBirth {
+    pub field_set: u8,
+    pub wiring: Wiring,
+    pub scale: f32,
+}
+
+/// One bundle's record. Fields are written only through the container's
 /// bundle primitives.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Bundle {
-    pub(super) shape: Shape,
-    pub(super) kind: DirectedVoteKind,
-    /// Rotation, always `< 8`.
-    pub(super) offset: u8,
-    /// One shared weight, born 0.
+    pub(super) source: BundleSource,
+    pub(super) wiring: Wiring,
+    /// One shared weight.
     pub(super) scale: f32,
     /// Whether a parent's learned scale seeds the child's (T25.F07); born
     /// false.
@@ -126,74 +316,28 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    /// The silent record: scale 0, `inherit_scale` false, retention 1.
+    /// A silent record: scale 0, `inherit_scale` false, retention 1.
     #[must_use]
-    pub(super) const fn new(shape: Shape, kind: DirectedVoteKind, offset: u8) -> Self {
+    pub(super) const fn new(source: BundleSource, wiring: Wiring) -> Self {
         Self {
-            shape,
-            kind,
-            offset,
+            source,
+            wiring,
             scale: 0.0,
             inherit_scale: false,
             retention: 1.0,
         }
     }
 
-    /// The bundle's pattern at the member reading field `sub_idx` on a sink
-    /// of direction `direction`: 1 for a `Ring` bundle whose `ring_ref`
-    /// resolves to a ring of `input_refs` (the coordinate ignored); for a
-    /// `DirectionPair` whose pair resolves, `compass_x((direction − offset)
-    /// mod 8)` at the pair's `x` field and `compass_y(...)` at its `y`
-    /// field; 0 otherwise, a `direction >= 8` included. Resolved from the
-    /// shape reference, never from the member's own source.
+    #[inline]
     #[must_use]
-    pub fn pattern(&self, input_refs: &[InputReference], sub_idx: u16, direction: u8) -> f32 {
-        match self.shape {
-            Shape::Ring { ring_ref } => {
-                if input_refs
-                    .get(usize::from(ring_ref))
-                    .is_some_and(InputReference::is_ring)
-                {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
-            Shape::DirectionPair { .. } => {
-                let Some(pair) = self.shape.resolve_pair(input_refs) else {
-                    return 0.0;
-                };
-                if direction >= VOTE_DIRECTION_COUNT {
-                    return 0.0;
-                }
-                let relative = pair_relative(direction, self.offset);
-                if sub_idx == pair.x {
-                    compass_x(relative)
-                } else if sub_idx == pair.y {
-                    compass_y(relative)
-                } else {
-                    0.0
-                }
-            }
-        }
+    pub const fn source(&self) -> BundleSource {
+        self.source
     }
 
     #[inline]
     #[must_use]
-    pub const fn shape(&self) -> Shape {
-        self.shape
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn kind(&self) -> DirectedVoteKind {
-        self.kind
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn offset(&self) -> u8 {
-        self.offset
+    pub const fn wiring(&self) -> Wiring {
+        self.wiring
     }
 
     #[inline]
@@ -217,11 +361,11 @@ impl Bundle {
     }
 }
 
-/// Detach the member at `occurrence` (an edit that changes its source outside
-/// a shape operator): its own weight becomes its genomic weight, bitwise, and
-/// it leaves its bundle. Returns the edge's new occurrence, on which the
-/// calling operator continues its edit, and whether the bundle was removed
-/// (it was the last member).
+/// Detach the member at `occurrence` (an edit that changes its source
+/// outside a bundle operator): its own weight becomes its genomic weight,
+/// bitwise, and it leaves its bundle. Returns the edge's new occurrence, on
+/// which the calling operator continues its edit, and whether the bundle
+/// was removed (it was the last member).
 pub fn detach(
     def: &mut CgpGraphBackendDef,
     occurrence: EdgeOccurrence,
@@ -246,35 +390,14 @@ pub const fn pair_relative(d: u8, offset: u8) -> u8 {
     ring_offset(d, offset)
 }
 
-/// The `(channel, direction)` members a new `Ring` bundle at `offset`
-/// materializes: channel `c` on direction `(c + offset) mod 8` — eight.
-pub fn ring_birth_members(offset: u8) -> impl Iterator<Item = (u16, u8)> {
-    let n = VOTE_DIRECTION_COUNT;
-    (0..n).map(move |channel| (u16::from(channel), (channel + offset % n) % n))
-}
-
 /// One birth coordinate of a bundle (T30.F01): the field a member born with
 /// the bundle reads, the site it is born on, and whether a member of the
-/// bundle reading that field of the shape's reference sits there now.
+/// bundle reading that field sits there now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BirthCoordinate {
     pub field: u16,
     pub site: Site,
     pub present: bool,
-}
-
-/// The `(field, direction)` members a new `DirectionPair` bundle on `pair` at
-/// `offset` materializes: every one whose pattern is non-zero, `x` at the
-/// relative directions NE, E, SE, SW, W, NW and `y` at N, NE, SE, S, SW, NW —
-/// twelve.
-pub fn pair_birth_members(pair: DirectionPair, offset: u8) -> impl Iterator<Item = (u16, u8)> {
-    let n = VOTE_DIRECTION_COUNT;
-    (0..n).flat_map(move |relative| {
-        let d = (relative + offset % n) % n;
-        let x = (compass_x(relative) != 0.0).then_some((pair.x, d));
-        let y = (compass_y(relative) != 0.0).then_some((pair.y, d));
-        x.into_iter().chain(y)
-    })
 }
 
 /// The only composition formula: a member's genomic weight from its own
@@ -285,50 +408,23 @@ pub fn compose(own: f32, scale: f32, pattern: f32) -> f32 {
     scale * pattern + own
 }
 
-/// What a bundle reads (T25.F11): one field set of a declared sensor, or a
-/// shared-memory bank (no declaration; its one field set is index 0).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum BundleSource {
-    Sensor { ref_idx: u16, field_set: u8 },
-    Memory { previous: bool },
-}
-
-impl BundleSource {
-    /// The field set index the source names.
-    #[inline]
-    #[must_use]
-    pub const fn field_set(self) -> u8 {
-        match self {
-            Self::Sensor { field_set, .. } => field_set,
-            Self::Memory { .. } => 0,
-        }
-    }
-}
-
-/// How a bundle's members sit on the sinks (T25.F11): every field on one
-/// vote sink (`Plain`), a ring cell per direction (`Ring`), or an offset
-/// pair across the compass with its facts on the drive (`DirectionPair`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Wiring {
-    Plain { sink: VoteSink },
-    Ring { kind: DirectedVoteKind, offset: u8 },
-    DirectionPair { kind: DirectedVoteKind, offset: u8 },
-}
-
-/// One sampled plan with its birth law (T25.F11): the field set it wires,
-/// the wiring, and the record's scale (0 for a silent bundle).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BundleBirth {
-    pub field_set: u8,
-    pub wiring: Wiring,
-    pub scale: f32,
-}
-
 /// Whether `def` carries every sink `kind`'s directed wirings need: its
 /// eight direction sinks, and its drive when `drive` is set.
 fn hosts_kind(def: &CgpGraphBackendDef, kind: DirectedVoteKind, drive: bool) -> bool {
     let present = |vote: VoteSink| def.sink(OutputSinkKind::ActionVote(vote)).is_some();
     (0..VOTE_DIRECTION_COUNT).all(|d| present(kind.sink(d))) && (!drive || present(kind.drive()))
+}
+
+/// Whether `def` carries every sink `wiring` needs: a `Plain` wiring's vote
+/// sink; a `Ring`'s eight direction sinks; a `DirectionPair`'s eight and the
+/// drive.
+#[must_use]
+pub fn hosts(def: &CgpGraphBackendDef, wiring: &Wiring) -> bool {
+    match *wiring {
+        Wiring::Plain { sink } => def.sink(OutputSinkKind::ActionVote(sink)).is_some(),
+        Wiring::Ring { kind, .. } => hosts_kind(def, kind, false),
+        Wiring::DirectionPair { kind, .. } => hosts_kind(def, kind, true),
+    }
 }
 
 /// Every admissible wiring of `set` on `def`, in deterministic order (T25.F11

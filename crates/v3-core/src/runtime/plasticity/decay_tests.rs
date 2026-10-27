@@ -11,7 +11,7 @@ use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::test_support::plastic_node;
 use crate::genome::cgp::{
     BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, Scope, Shape,
+    GraphEdge, GraphSource, Scope,
 };
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
 
@@ -70,11 +70,7 @@ fn ungrouped(weight: f32, config: PlasticityConfig) -> CgpGraphBackendDef {
 /// `scale` and retention `retention`.
 fn ring(scale: f32, retention: f32) -> (CgpGraphBackendDef, BundleId, Vec<EdgeOccurrence>) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_ring_bundle(
-        Shape::Ring { ring_ref: RING_REF },
-        DirectedVoteKind::Move,
-        0,
-    );
+    let id = def.add_ring_bundle(RING_REF, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(scale);
     def.bundle_mut(id).set_retention(retention);
     let members = def.members(id).collect();

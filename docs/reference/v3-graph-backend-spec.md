@@ -16,9 +16,9 @@ Related references:
 The graph backend is subject to the mesh-wide node-type evolvability contract
 in `v3-mutation-spec.md`. T11.F03 implements its growth-versus-connection
 taxonomy and neutral-growth semantics (`AddComputeNode`'s three forms,
-`CopyComputeNode`'s faithful-copy rule, `InputRef.Add`'s unwired push (a
-Graph-node `Add` wires the new reference into one `ActionVote` sink since
-T20.F16, so on this backend it is a connection event), and the
+`CopyComputeNode`'s faithful-copy rule, `InputRef.AddSensor*`'s unwired
+push on a VM node (on a Graph node it wires every field set of the new
+sensor as bundles since T25.F11), and the
 `insert_compute_node_at`/`remove_compute_node_at` index-remap pair); the
 taxonomy and per-operator contract text live in `v3-mutation-spec.md` rather
 than being duplicated here. T11.F08 adds duplication placement
@@ -55,22 +55,21 @@ produces a structurally valid genome.
 pub struct GraphBackendDef {
     compute_nodes: Vec<ComputeNode>,
     output_sinks: Vec<OutputSink>,
-    /// Edge-group records by `GroupId` (T25.F03); omitted from JSON when empty.
-    groups: Vec<Group>,
+    /// Bundle records by `BundleId` (T25.F03, T25.F11); omitted from JSON when empty.
+    bundles: Vec<Bundle>,
 }
 
-pub struct Group {
-    shape: Shape,                    // Ring { ring_ref: u16 }
-    kind: DirectedVoteKind,          // Move | Reproduce | StealEnergy
-    offset: u8,                      // always < 8
-    scale: f32,                      // one shared weight, born 0
+pub struct Bundle {
+    source: BundleSource,            // Sensor { ref_idx: u16, field_set: u8 } | Memory { previous: bool }
+    wiring: Wiring,                  // Plain { sink } | Ring { kind, offset } | DirectionPair { kind, offset }; offset < 8
+    scale: f32,                      // one shared weight; a live birth draws it, a silent birth 0
     inherit_scale: bool,             // a parent's learned scale seeds the child (T25.F07), born false
     retention: f32,                  // the learned scale's retention per tick, [0, 1] (T25.F09), born 1
 }
 
 pub struct Membership {
-    group: GroupId,
-    scope: Scope,                    // Edge | Group (T25.F07), born Edge
+    bundle: BundleId,
+    scope: Scope,                    // Edge | Group (T25.F07; the learning scope T25.F12 replaces), born Edge
 }
 
 pub struct ComputeNode {
@@ -87,18 +86,19 @@ pub struct GraphEdge {
     source: GraphSource,
     own_weight: f32,                 // JSON key `own_weight`
     plasticity: Option<PlasticityConfig>, // Section 13; omitted when None
-    membership: Option<Membership>,  // { group: GroupId, scope: Scope }; omitted when None
-}                                    // 36 bytes (T25.F06)
+    membership: Option<Membership>,  // { bundle: BundleId, scope: Scope }; omitted when None
+}                                    // 40 bytes
 ```
 
 Design choice: edges are co-located with each node/sink for linear,
 cache-friendly evaluation. Fixed structural outputs are stored in separate
 Vecs to prevent topology mutations from affecting them. Fields are private;
 the container (`cgp/container.rs`) is the only writer and keeps the birth
-seeds and the group invariants aligned; `EdgeMut::set_plasticity` is the only
-writer of an edge's learning attributes. A group's members are ordinary sink
-edges (Section 6). Equality, the `Debug` genome identity and JSON cover every
-heritable field and nothing else (`Debug` prints `groups` unconditionally);
+seeds and the bundle invariants aligned; `EdgeMut::set_plasticity` is the only
+writer of an edge's learning attributes. A bundle stores no member list: its
+members are ordinary sink edges whose membership names it (Section 6).
+Equality, the `Debug` genome identity and JSON cover every heritable field
+and nothing else (`Debug` prints `bundles` unconditionally);
 the `cgp` genome types deny unknown JSON fields.
 
 ---
@@ -314,87 +314,87 @@ neither free storage/work/reproduction nor unchanged fitness.
 The runtime and property fixtures, commands and cost observations are indexed
 in [T20.F02 readings](../progress/readings/t20-f02.md).
 
-### Ring edge groups (T25.F03)
+### Bundles (T25.F03, T25.F04, T25.F11)
 
-A `Ring` group `{shape: Ring {ring_ref}, kind K, offset k, scale s}` is one
-record plus up to eight member sink edges: the member for ring cell `c` reads
-`InputLeaf { ring_ref, c }` and sits on sink `K((c + k) mod 8)`, `c < 8`, the
-ring being the neighbor ring at `input_refs[ring_ref]`, whose channel `c` is
-`Direction::ALL[c]`. A member's genomic weight is
-`compose(own_weight, s, pattern) = s · pattern + own_weight`, the only
-formula; a `Ring` member's pattern is 1 when `ring_ref` resolves to a ring and
-0 otherwise, resolved from the group's `ring_ref`, never the member's own
-source, so an ablation redirect keeps the weight. A non-member's genomic
-weight is its `own_weight`.
+A bundle is one gene that wires one field set of one source. Its `source`
+names a declared sensor's field set (`Sensor { ref_idx, field_set }`, the set
+from the sensor's descriptor in `contracts::inputs`) or a shared-memory bank
+(`Memory { previous }`, 16 fields, no declaration). A member is a sink edge
+whose `Membership` names the bundle; it reads a field of the set
+(`InputLeaf { ref_idx, field }` or `SharedMemory { slot, previous }`), and
+its **coordinate** is `(field, site)`, the site read from its sink: `Sink`
+(the one vote sink of a `Plain` wiring), `Direction(d)` (the direction sink
+`K(d)` of a geometric wiring's kind `K`) or `Drive` (`Drive K`). The wiring
+owns the legal coordinates and the pattern:
 
-- Invariants (checked by `validate_graph` at `GenomeFile::load` and in the
-  mutation gate): only sink edges are members; every `GroupId` names a record
-  and `groups.len() ≤ u16::MAX`; a member fits its shape; at most one member
-  per `(group, source, target)`; a group has at least one member;
-  `input_refs[ring_ref]` is a ring and `offset < 8`; within a sink,
-  independent edges come first in insertion order, then members sorted by
-  `(GroupId, sub_idx)` (I10; a `Ring` member's channel).
+| Wiring | Field set | Coordinates | Pattern |
+| --- | --- | --- | --- |
+| `Plain { sink }` | without geometry | every field on `Sink` | 1 |
+| `Ring { kind K, offset k }` | a neighbor ring | cell `c` on `Direction((c + k) mod 8)`, `c < 8`, cell `c` being `Direction::ALL[c]` | 1 |
+| `DirectionPair { kind K, offset k }` | a pair `{x, y, facts}` | `x` and `y` on the twelve directions whose compass value is non-zero; each fact on `Drive` | `compass_x((d − k) mod 8)` at `x`, `compass_y((d − k) mod 8)` at `y`, 1 at a fact |
+
+`compass_x(d)` is `Direction::ALL[d].delta().0` normalized (±1 or ±1/√2 on
+the twelve coordinates) and `compass_y(d) = compass_x((d + 6) mod 8)`; at
+`s > 0` and `k = 0` a pair bundle votes toward the sensed offset, at `k = 4`
+away from it.
+
+**The one member law.** Every member of every wiring, a fact member
+included, weighs `compose(own_weight, s, pattern) = s · pattern +
+own_weight` under the bundle's shared scale `s`, the pattern read from the
+wiring at the member's coordinate; the runtime's learned term, the sink
+weight rows, the server's composed weight and a detached edge's weight read
+the same pattern. Learning, decay, seeds, detach and removal are identical
+for every member. A non-member's genomic weight is its `own_weight`.
+
+- **Creation.** `NodeGenome::add_sensor` declares a sensor and builds one
+  bundle per field set in one edit; `NodeGenome::add_bundle` builds one for
+  a declared sensor's set or a memory bank. Both check everything before
+  writing (the declaration index fits `u16`, the births cover the sensor's
+  sets exactly once on a Graph node, every wiring is admissible for its
+  set, the record count stays within `u16::MAX`) and write nothing on
+  failure. `plans(def, set)` lists the admissible wirings: one
+  `Plain { sink }` per present vote sink for a set without geometry, and
+  `(kind, offset)` for every kind whose eight direction sinks (and, for a
+  pair, its drive) are present. A new bundle materializes every coordinate
+  of its set in canonical order (a pair's twelve compass coordinates, then
+  its facts), own weight 0, static, scope `Edge`, no seed; its scale follows
+  the birth law (`v3-mutation-spec.md`).
+- **Invariants.** `check_local_invariants` checks everything the record and
+  the edge decide, after every bundle-touching primitive in debug builds:
+  only sink edges are members; every `BundleId` names a record and
+  `bundles.len() ≤ u16::MAX`; a member reads its source's kind on a site its
+  wiring maps that field to as far as the record decides (a `Ring` cell on
+  its offset's direction, no `Ring` or `Plain` member on a drive);
+  coordinates are unique per bundle; a bundle has at least one member;
+  `offset < 8`; retention in `[0, 1]`; within a sink, independent edges come
+  first in insertion order, then members sorted by `(BundleId, field)` (I10).
+  `validate_graph` (at `GenomeFile::load` and in the mutation gate) adds what
+  needs the declarations: the source resolves to a field set the wiring
+  fits (`ShapeReference`), and every member reads a field of that set on
+  the site its wiring maps it to (`MemberShape`), resolved under
+  `SensorContext::WIDEST` so validity never depends on the configured
+  action queue.
 - Members are summed with the sink's other edges at their genomic weights,
   sequentially in the I10 order: the runtime reads one weight per sink edge
   from the table `GraphRuntimeState::for_genome` builds at construction. A
-  `Ring` group at scale `s` with corrections `c_i` is bitwise its eight
-  ungrouped edges of weight `s + c_i`.
-- A new group (scale 0, corrections 0) is silent. No per-group energy
-  charge: members wire their sinks, so a group on a dormant graph makes the
-  visit entered (Section 8) and pays one minimum visit, as the first zero
-  vote edge does.
-- A group record is one `genome_size()` unit and its members nothing
-  (T25.F10), so a `Ring` group is one unit with or without holes; a
-  detached member is an ordinary edge at one unit. Its ring is consumed
-  through its members; `Prune` never deletes it.
-- The VM has no group (T11.F18 parity exemption): a VM node reaches one by
+  bundle at scale `s` with corrections `c_i` is bitwise its ungrouped edges
+  of weight `s · pattern_i + c_i`.
+- A silent bundle (scale 0, corrections 0) votes nothing. No per-bundle
+  energy charge: members wire their sinks, so a bundle on a dormant graph
+  makes the visit entered (Section 8) and pays one minimum visit, as the
+  first zero vote edge does.
+- **Edits.** Shift (`ShiftBundleOffset`, geometric wirings only) and
+  retarget (`RetargetBundle`: a `Plain` bundle to another vote sink, a
+  geometric one to another kind) move every member to its new site by
+  coordinate, keeping holes, so an edit and its inverse return an equal
+  genome. Detach turns a member into an ordinary edge carrying its composed
+  weight and its seed. Removing a member leaves a hole; the record goes
+  with its last member. A source-changing edit detaches first.
+- A bundle record is one `genome_size()` unit and its members nothing
+  (T25.F10), with or without holes; a detached member is an ordinary edge at
+  one unit. `Prune` never deletes a sensor a member reads.
+- The VM has no bundle (T11.F18 parity exemption): a VM node reaches one by
   `SwapNodeBackend` to Graph.
-
-### Direction-pair edge groups (T25.F04)
-
-A `DirectionPair` group `{shape: DirectionPair {ref_idx, pair}, kind K,
-offset k, scale s}` reads pair `pair` of `input_refs[ref_idx]` (a `World` key's
-`direction_pairs()`, sensor spec Section 5.7): a member reads
-`InputLeaf { ref_idx, x }` or `InputLeaf { ref_idx, y }` and sits on a
-direction sink `K(d)`; its coordinate is `(field, d)`. Its pattern is
-`compass_x((d − k) mod 8)` for the `x` field and `compass_y((d − k) mod 8)`
-for the `y` field, `compass_x(d)` being `Direction::ALL[d].delta().0`
-normalized (exactly 0, ±1 or ±1/√2) and `compass_y(d) = compass_x((d + 6)
-mod 8)`; any other field, a direction past 7 or an unresolvable pair reads 0.
-At `s > 0` and `k = 0` the group votes toward the sensed offset, at `k = 4`
-away from it. The weight formula is the `Ring` group's `compose`; the pattern
-resolves from the group's `ref_idx` and the member's sink, so
-`edge_weight(edge, sink, input_refs)` and `genomic_weight(occurrence, …)`
-take the sink.
-
-- Creation materializes the twelve non-zero-pattern members (`x` at relative
-  NE, E, SE, SW, W, NW; `y` at N, NE, SE, S, SW, NW) at own weight 0 and scale
-  0: one `genome_size()` unit, silent. A member on a zero-pattern
-  direction is valid (a loaded genome may carry one) and never created.
-- Invariants as for `Ring`, keyed by `(sub_idx, direction)` instead of the
-  ring channel: `input_refs[ref_idx]` declares `pair` and every member reads
-  its `x` or `y` field (`validate_graph`); at most two members per sink.
-- Shift and retarget move a member on `K(d)` to `K'((d + k' − k) mod 8)`,
-  keeping every member's relative coordinate (holes and zero-pattern members
-  included), so an edit and its inverse return an equal genome. Detach,
-  removal and the last member's removal behave as for `Ring`.
-- **Fact members** (T25.F10): a `DirectionPair` gene may carry members on
-  its kind's drive sink `Drive K`, each reading one of the pair's declared
-  `facts` (`InputLeaf { ref_idx, fact }`); the role is read from the sink
-  (a member's site is `Direction(d)` or `Drive`), so no field marks it.
-  Only recruitment's pair case creates them: one container primitive builds
-  the record, the twelve direction members and one fact member per fact in
-  `facts` order, all born 0, static, scope `Edge`. A fact member's pattern
-  is 0 by role, so its genomic weight is its own weight, the scale never
-  reaches it and a `Group`-scope fact learner credits nothing.
-  Validation keys a pair member by `(sub_idx, site)`, admits a drive site
-  only on the record's kind and only for a `DirectionPair` record, and
-  requires a direction member's field in `{x, y}` and a fact member's in
-  `facts`. A shift leaves fact members on their drive; a retarget moves them
-  to `Drive K'` and needs that sink (`can_host_facts`). A fact member
-  detaches own-only: its own weight bits and its seed entry stay exactly as
-  stored. The gene goes with its last member of either role, so it may
-  outlive its direction members. The whole gene costs one unit.
 
 ---
 
@@ -418,7 +418,7 @@ visits and world time in ticks: a module's state advances once per visit,
 however many visits a tick's pass makes, and the per-pass hop cap and the
 per-tick hop ramp bound and price those visits. A visit is entered when the
 graph has at least one compute node or a wired effect surface (an output
-sink carrying at least one edge, a group member included). An entered visit evaluates all compute nodes once in index order,
+sink carrying at least one edge, a bundle member included). An entered visit evaluates all compute nodes once in index order,
 including disconnected nodes; with zero compute nodes that evaluation is
 empty and the effects pass still runs.
 
@@ -572,20 +572,21 @@ Every edge on either surface may be plastic except an edge of a `ClearSlot`
 sink (its sum is ignored); `validate_graph` rejects that case and any value
 outside the ranges above (I1), which the mutation draws and perturbations
 keep by construction. The laws read the stored values; no runtime clamp
-normalizes them. A learning attribute, a member's `scope` and a group's
+normalizes them. A learning attribute, a member's `scope` and a bundle's
 `inherit_scale` and `retention` carry no genome unit; `validate_graph`
-rejects a group retention outside `[0, 1]` (`GroupRetentionOutOfRange`). `CgpGraphBackendDef::plastic_edges()`
+rejects a bundle retention outside `[0, 1]` (`BundleRetentionOutOfRange`). `CgpGraphBackendDef::plastic_edges()`
 enumerates the plastic edges in canonical (`edge_sites`) order and is the
 one definition of "carries learning".
 
-A plastic group member (T25.F07) learns at its `scope`: an **edge learner**
-(`Edge`) learns its own correction as an ungrouped edge learns its weight; a
-**group learner** (`Group`) learns for its group, crediting the group's one
-shared scale. A group with at least one group learner has a **scale slot**
-whose **bound** is the smallest `weight_clamp` among its group learners; a
-static member of such a group is a **passive member**, weighed through the
-learned scale. Scope never splits a group: membership compares the
-`GroupId` only.
+A plastic bundle member (T25.F07) learns at its `scope`, the same for every
+member of every wiring: an **edge learner** (`Edge`) learns its own
+correction as an ungrouped edge learns its weight; a **group learner**
+(`Group`, the learning scope's name until T25.F12 replaces it) learns for its
+bundle, crediting the bundle's one shared scale. A bundle with at least one
+group learner has a **scale slot** whose **bound** is the smallest
+`weight_clamp` among its group learners; a static member of such a bundle is
+a **passive member**, weighed through the learned scale. Scope never splits
+a bundle: membership compares the `BundleId` only.
 
 When `modulation` is `None`: pure Hebbian learning, applied after the
 effects of each committed visit. When `Some`: reward-modulated three-factor
@@ -597,7 +598,7 @@ in Phase 2.5.
 `GraphRuntimeState::for_genome(genome, seeds)` is the only constructor and
 builds the learned state once (`runtime::plasticity::LearnedState`): per
 mesh node, the learner slots over both surfaces in canonical order, the
-scale slots in `GroupId` order (genomic scale, bound, learned scale, seeded
+scale slots in `BundleId` order (genomic scale, bound, learned scale, seeded
 flag), the passive members, a learned own quantity per ungrouped or edge
 learner (a group learner stores none), a trace per reward-modulated learner
 and a visited flag. A graph without a plastic edge allocates no learned
@@ -607,8 +608,8 @@ state and runs the static loops. One composition gives every dynamic edge's
 ```text
 applied = own + scale × pattern
 own   = the learned own quantity when the learner has one, else the genomic own weight
-scale = the learned scale when the group has a scale slot, else the genomic scale
-pattern = 0 for an ungrouped edge
+scale = the learned scale when the bundle has a scale slot, else the genomic scale
+pattern = the wiring's pattern at the member's coordinate; 0 for an ungrouped edge
 ```
 
 The executor's weighing, `applied_weight(occurrence)` (one edge, else the
@@ -621,7 +622,7 @@ applied, trace, bound, kind, scope, birth, retention)`, where `genomic` is
 the genomic own weight (a member's correction), `birth` the own quantity's
 birth value, `learned` the initialized own quantity (always `None` for a
 group learner) and `trace` present only for an initialized learner; and per
-scale slot `(group, genomic, birth, retention, learned, bound,
+scale slot `(bundle, genomic, birth, retention, learned, bound,
 inherit_scale)`, `learned` present only for an initialized scale slot.
 
 - A learner slot is initialized when its backend has been visited (the flag
@@ -637,7 +638,7 @@ inherit_scale)`, `learned` present only for an initialized scale slot.
   backend's first visit. A group learner ignores any seed on its row and
   holds its raw genomic own weight, which is not a learned quantity, is
   never written and composes unclamped. A scale slot starts at
-  `clamp(seed, ±bound)`, seeded, when the child group has `inherit_scale`
+  `clamp(seed, ±bound)`, seeded, when the child bundle has `inherit_scale`
   and a seed, else at `clamp(genomic, ±bound)`. Traces start at zero. See
   [reproduction inheritance](v3-reproduction-spec.md#graph-state).
 - Birth seeds are temporary, excluded from serialization and genome
@@ -689,7 +690,7 @@ trace <- trace + activity(pre, post, w)             (per committed visit)
 The second line is the learned-weight decay (T25.F09): every initialized
 own quantity of an ungrouped or edge learner relaxes toward its birth value
 `b` by its edge's `retention`, and every initialized learned scale by its
-group's; a retention of exactly 1 is skipped (an exact no-op), an
+bundle's; a retention of exactly 1 is skipped (an exact no-op), an
 uninitialized quantity holds `b`, and a group learner has no own decay. The
 stored value stays absolute, so a decayed value stops within `ulp(x) /
 (2(1 − retention))` of `b`. Learning in the same tick acts on the decayed
@@ -735,10 +736,10 @@ contribution:
   `functional_complexity()`; `genome_size()` charges a wired sink its edges
   only, one unit each, and nothing for the sink itself (T25.F02).
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
-  any wired sink, vote and parameter sinks included. An edge-group record is
+  any wired sink, vote and parameter sinks included. A bundle record is
   one `genome_size()` and one `functional_complexity()` unit; its members are
   sink edges that wire their sinks at no `genome_size()` unit (T25.F10), and
-  its ring is consumed through them (T25.F03).
+  its source is consumed through them.
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.
 
@@ -788,8 +789,8 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | Graph with no wired vote sink | Votes nothing; the pass commits only what other nodes vote |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |
-| Group whose `ring_ref` is out of range or not a ring | Pattern 0: each member weighs its own correction; `validate_graph` rejects the genome (I7), so a live genome never carries one |
-| Group `offset >= 8` or a member off its shape | Rejected by `validate_graph`; the mutation gate rolls the event back under `GraphInvariantViolation` |
+| Bundle whose source does not resolve to a field set its wiring fits | Rejected by `validate_graph` (`ShapeReference`), so a live genome never carries one |
+| Bundle `offset >= 8` or a member off its wiring's coordinates | Rejected by `validate_graph` (`OffsetOutOfRange`, `MemberShape`); the mutation gate rolls the event back under `GraphInvariantViolation` |
 | Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
 

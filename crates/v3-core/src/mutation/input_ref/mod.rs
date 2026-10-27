@@ -2,15 +2,12 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
-use crate::contracts::votes::{VoteSink, VOTE_SINK_COUNT};
-use crate::contracts::{
-    InputReference, SensorContext, SensorDescriptor, WorldInputKey, OUTPUT_SLOT_COUNT,
-};
-use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::genome::{input_ref_kind, BackendDef, CreatureGenome, NodeGenome};
+use crate::contracts::{InputReference, SensorContext, WorldInputKey, OUTPUT_SLOT_COUNT};
+use crate::genome::{input_ref_kind, CreatureGenome, NodeGenome};
+use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
-use crate::mutation::types::{BirthEdgeClass, MutationSkipReason, TargetReachability};
+use crate::mutation::types::{BirthEdgeClass, BundleEdits, MutationSkipReason, TargetReachability};
 
 /// Every `InputReference` a genome can carry in a world with
 /// `context.food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
@@ -70,7 +67,12 @@ pub fn prunable_indices(node: &NodeGenome) -> Vec<usize> {
 /// Input reference mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InputRefOperator {
-    Add,
+    /// Declare a sampled sensor and wire it whole, every bundle live
+    /// (T25.F11).
+    AddSensorLive,
+    /// Declare a sampled sensor and wire it whole, every bundle silent
+    /// (T25.F11).
+    AddSensorSilent,
     /// Delete one entry no consumer addresses (T11.F22; formerly `Remove`,
     /// which deleted any entry and dropped its consumers).
     Prune,
@@ -80,14 +82,20 @@ pub enum InputRefOperator {
 }
 
 impl InputRefOperator {
-    pub const ALL: [Self; 4] = [Self::Add, Self::Prune, Self::Swap, Self::RawFieldMutation];
+    pub const ALL: [Self; 5] = [
+        Self::AddSensorLive,
+        Self::AddSensorSilent,
+        Self::Prune,
+        Self::Swap,
+        Self::RawFieldMutation,
+    ];
 
     /// Whether the operator has a site on `node` (T13.F03 applicability
     /// predicate; the single source of truth `apply` draws from).
     #[must_use]
     pub fn applies_to(self, node: &NodeGenome, context: &SensorContext) -> bool {
         match self {
-            Self::Add => true,
+            Self::AddSensorLive | Self::AddSensorSilent => true,
             Self::Prune => !prunable_indices(node).is_empty(),
             Self::Swap => !swappable_indices(node, context).is_empty(),
             Self::RawFieldMutation => node.input_refs.iter().any(is_raw_mutable),
@@ -99,51 +107,30 @@ impl InputRefOperator {
     #[must_use]
     pub const fn weight(self) -> u8 {
         match self {
-            Self::Add => 2,
+            // T25.F11: the live and silent pair split `Add`'s 2 evenly.
+            Self::AddSensorLive | Self::AddSensorSilent => 1,
             Self::Prune => 2,
             Self::Swap => 4,
             Self::RawFieldMutation => 4,
         }
     }
 
-    const TOTAL_WEIGHT: u16 = {
-        assert!(
-            Self::ALL.len() == 4,
-            "ALL must cover every InputRefOperator variant"
-        );
-        let mut sum = 0u16;
-        let mut i = 0;
-        while i < Self::ALL.len() {
-            sum += Self::ALL[i].weight() as u16;
-            i += 1;
-        }
-        sum
-    };
-
     /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
     pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
         use crate::mutation::types::ComplexityEffect;
         match self {
-            Self::Add => ComplexityEffect::Increasing,
+            Self::AddSensorLive | Self::AddSensorSilent => ComplexityEffect::Increasing,
             Self::Prune => ComplexityEffect::Decreasing,
             Self::Swap | Self::RawFieldMutation => ComplexityEffect::Neutral,
         }
     }
-
-    /// Pick a random input ref operator weighted by impact tier.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
-        for &op in &Self::ALL {
-            let w = op.weight() as u16;
-            if r < w {
-                return op;
-            }
-            r -= w;
-        }
-        unreachable!()
-    }
 }
+
+/// What an applied InputRef event reports beside its reachability: the
+/// vote-sink class of an `AddSensor*` that made exactly one `Plain` bundle
+/// (T11.F30, T25.F11 invariant 8) and its bundle edits.
+pub(crate) type InputRefEventReport = (Option<BirthEdgeClass>, BundleEdits);
 
 /// Input reference domain mutator.
 pub struct InputRefMutator;
@@ -181,8 +168,8 @@ impl InputRefMutator {
             .map(|(reachability, _)| reachability)
     }
 
-    /// [`Self::apply_in`] with the class of the vote-sink
-    /// edge an `Add` on a Graph node pushed (T11.F30); the same draws.
+    /// [`Self::apply_in`] with what the event reports
+    /// ([`InputRefEventReport`]); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
@@ -190,14 +177,14 @@ impl InputRefMutator {
         rng: &mut impl Rng,
         _config: &MutationConfig,
         context: &SensorContext,
-    ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
+    ) -> Result<(TargetReachability, InputRefEventReport), MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         if op == InputRefOperator::RawFieldMutation {
             return apply_raw_field_mutation(genome, rng, context)
-                .map(|reachability| (reachability, None));
+                .map(|reachability| (reachability, (None, BundleEdits::default())));
         }
         let eligible = Self::applicable_indices(genome, op, context);
         if eligible.is_empty() {
@@ -206,13 +193,8 @@ impl InputRefMutator {
         let (node_idx, reachability) = targets
             .select(&eligible, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        let class = if op == InputRefOperator::Add {
-            apply_add(&mut genome.nodes[node_idx], rng, context)?
-        } else {
-            Self::apply_to_node(genome, op, node_idx, rng, context)?;
-            None
-        };
-        Ok((reachability, class))
+        let report = Self::apply_to_node(genome, op, node_idx, rng, context)?;
+        Ok((reachability, report))
     }
 
     /// The nodes `op`'s predicate accepts, in index order.
@@ -231,7 +213,7 @@ impl InputRefMutator {
             .collect()
     }
 
-    /// Apply a node-targeted operator (`Add`, `Prune`, `Swap`) to
+    /// Apply a node-targeted operator (`AddSensor*`, `Prune`, `Swap`) to
     /// `node_idx`. `RawFieldMutation` draws over the whole genome's table and
     /// has no node target, so it is not routed here.
     pub(crate) fn apply_to_node(
@@ -240,12 +222,18 @@ impl InputRefMutator {
         node_idx: usize,
         rng: &mut impl Rng,
         context: &SensorContext,
-    ) -> Result<(), MutationSkipReason> {
+    ) -> Result<InputRefEventReport, MutationSkipReason> {
         let node = &mut genome.nodes[node_idx];
+        let unreported = |result: Result<(), MutationSkipReason>| {
+            result.map(|()| (None, BundleEdits::default()))
+        };
         match op {
-            InputRefOperator::Add => apply_add(node, rng, context).map(|_| ()),
-            InputRefOperator::Prune => apply_prune(node, rng),
-            InputRefOperator::Swap => apply_swap(node, rng, context),
+            InputRefOperator::AddSensorLive => apply_add_sensor(node, BirthLaw::Live, rng, context),
+            InputRefOperator::AddSensorSilent => {
+                apply_add_sensor(node, BirthLaw::Silent, rng, context)
+            }
+            InputRefOperator::Prune => unreported(apply_prune(node, rng)),
+            InputRefOperator::Swap => unreported(apply_swap(node, rng, context)),
             InputRefOperator::RawFieldMutation => {
                 unreachable!("RawFieldMutation is genome-wide and never node-targeted")
             }
@@ -253,69 +241,20 @@ impl InputRefMutator {
     }
 }
 
-/// Declare a new input reference on the target node through
-/// [`NodeGenome::add_sensor`].
-///
-/// On a VM node the reference is wired into nothing: no `ReadInput` is
-/// inserted, nothing else is drawn, and the reference becomes addressable
-/// only by the VM operators that construct `ReadInput`, so the event is a
-/// neutral growth step.
-///
-/// On a Graph node the event is a connection (T20.F16, born-connected input
-/// declaration): the reference is declared already wired into one of the
-/// node's `ActionVote` sinks by [`connect_declared_input`], so it is live and
-/// exposed to selection at birth (`docs/reference/v3-mutation-spec.md`'s
-/// InputRef domain). Returns the class of the vote sink the born edge lands
-/// on (T11.F30). A declaration the node cannot hold skips the event after
-/// every draw.
-fn apply_add(
+/// `AddSensorLive` / `AddSensorSilent` (T25.F11 invariant 7): one sensor
+/// from the 30-bucket sampler under `context` (food-typed where the world
+/// has more than one food type), then on a Graph node the birth policy for
+/// every field set and one `add_sensor` transaction; on a VM node the
+/// declaration alone, wired into nothing (a neutral growth step).
+fn apply_add_sensor(
     node: &mut NodeGenome,
+    law: BirthLaw,
     rng: &mut impl Rng,
     context: &SensorContext,
-) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
-    let new_ref = sampling::random_input_reference(rng, context);
-    let width = SensorDescriptor::of(&new_ref, context).width();
-    let declared = node.add_sensor(new_ref, &[], context);
-    let class = match &mut node.backend_def {
-        BackendDef::Graph(def) => connect_declared_input(def, declared.ok(), width, rng),
-        BackendDef::Vm(_) => None,
-    };
-    declared.map_err(|_| MutationSkipReason::NoApplicableTarget)?;
-    Ok(class)
-}
-
-/// Wire the just-declared reference `ref_idx` into one `ActionVote` sink.
-///
-/// Three draws in this order: the sub-value uniformly under `width`, the
-/// sink uniformly by index over all `VOTE_SINK_COUNT`, and the weight from
-/// `AddGraphEdge`'s new-edge law (uniform on [-1, 1]). The draws are always
-/// taken; the edge is pushed only when the reference was declared (`ref_idx`
-/// is `Some`) and the node carries the drawn sink, otherwise the event stays
-/// a plain declaration with the same draw stream. Returns the class of the
-/// sink the edge was pushed onto (T11.F30), `None` when none was pushed.
-pub(crate) fn connect_declared_input(
-    def: &mut CgpGraphBackendDef,
-    ref_idx: Option<u16>,
-    width: u32,
-    rng: &mut impl Rng,
-) -> Option<BirthEdgeClass> {
-    let width = u16::try_from(width).expect("a declared width below u16::MAX");
-    debug_assert!(
-        width > 0,
-        "every input reference has at least one sub-value"
-    );
-    let sub_idx = rng.gen_range(0..width);
-    let sink = VoteSink::from_index(rng.gen_range(0..VOTE_SINK_COUNT));
-    let weight = rng.gen_range(-1.0f32..=1.0);
-    let (Some(ref_idx), Some(vote)) = (ref_idx, sink) else {
-        return None;
-    };
-    let surface = def.sink_surface(OutputSinkKind::ActionVote(vote))?;
-    def.push_edge(
-        surface,
-        GraphEdge::new(GraphSource::InputLeaf { ref_idx, sub_idx }, weight),
-    );
-    BirthEdgeClass::of_sink(vote)
+) -> Result<InputRefEventReport, MutationSkipReason> {
+    let reference = sampling::random_input_reference(rng, context);
+    let (edits, class) = add_sensor_by_law(node, reference, law, context, rng)?;
+    Ok((class, edits))
 }
 
 /// Delete one entry drawn uniformly among those no consumer addresses

@@ -245,10 +245,6 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 				),
 			},
 			{
-				title: "Experimental arms",
-				fields: pick("mutation.neutral_input_recruitment"),
-			},
-			{
 				title: "Capacity drift",
 				fields: pick("mutation.capacity.chance", "mutation.capacity.log_step"),
 			},

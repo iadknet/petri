@@ -11,19 +11,16 @@ use std::fmt;
 use std::ops::Deref;
 
 use super::bundle::{
-    compose, pair_birth_members, plans, ring_birth_members, BirthCoordinate, Bundle, BundleBirth,
-    BundleId, BundleSource, Shape, Site, Wiring,
+    compose, plans, BirthCoordinate, Bundle, BundleBirth, BundleId, BundleSource, Site, Wiring,
 };
 use super::edge::{GraphEdge, GraphSource};
 use super::edge::{Membership, Scope};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
-use crate::contracts::votes::{
-    ActionParamField, DirectedVoteKind as Kind, VoteSink, VOTE_DIRECTION_COUNT,
-};
+use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::contracts::MAX_GATE_SLOTS;
-use crate::contracts::{DirectionPair, FieldSet, InputReference};
+use crate::contracts::{FieldSet, InputReference, SensorContext};
 use crate::genome::{BackendDef, NodeEditError, NodeGenome, PlasticityConfig};
 
 // ── Read-only list newtypes ─────────────────────────────────────────────────
@@ -415,15 +412,48 @@ pub enum GraphInvariantViolation {
     BundleRetentionOutOfRange,
 }
 
-/// The direction a `Ring` member of `bundle` on `channel` votes toward:
-/// `(offset + channel) mod 8`.
-fn member_direction(bundle: &Bundle, channel: u16) -> u8 {
-    ((u16::from(bundle.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT)) as u8
+/// Whether a graph holding `existing` bundle records can take `births` more
+/// within the `u16::MAX` records validation admits (T25.F11 invariant 5):
+/// the one capacity precheck of `add_bundle` and `NodeGenome::add_sensor`.
+#[must_use]
+pub(crate) const fn bundle_capacity_admits(existing: usize, births: usize) -> bool {
+    existing.saturating_add(births) <= u16::MAX as usize
+}
+
+/// The field a member reads from its bundle's source: an input leaf's
+/// sub-value or a memory slot; `None` for a compute-node source.
+fn member_field(source: GraphSource) -> Option<u16> {
+    match source {
+        GraphSource::InputLeaf { sub_idx, .. } => Some(sub_idx),
+        GraphSource::SharedMemory { slot, .. } => Some(u16::from(slot)),
+        GraphSource::ComputeNode(_) => None,
+    }
+}
+
+/// Whether `source` reads `bundle`'s source: the sensor's declaration, or
+/// the memory bank of its `previous` flag.
+fn reads_source(source: GraphSource, bundle: &Bundle) -> bool {
+    match (source, bundle.source) {
+        (GraphSource::InputLeaf { ref_idx, .. }, BundleSource::Sensor { ref_idx: at, .. }) => {
+            ref_idx == at
+        }
+        (
+            GraphSource::SharedMemory { previous, .. },
+            BundleSource::Memory {
+                previous: bank_previous,
+            },
+        ) => previous == bank_previous,
+        _ => false,
+    }
 }
 
 /// Check every graph invariant (I2–I10) of `node`'s graph against its input
 /// references: at `GenomeFile::load` and in the mutation gate. A VM node
-/// passes.
+/// passes. Beyond the record-and-edge checks it adds what needs the
+/// declarations: every bundle's source resolves to a field set its wiring
+/// fits (`ShapeReference`), and every member reads a field of that set on
+/// the site the wiring maps it to (`MemberShape`), resolved under
+/// [`crate::contracts::SensorContext::WIDEST`] (T25.F11 invariant 4).
 ///
 /// # Errors
 ///
@@ -433,37 +463,28 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
         return Ok(());
     };
     def.check_local_invariants()?;
+    let mut sets = Vec::with_capacity(def.bundles.len());
     for bundle in &def.bundles {
-        let resolves = match bundle.shape {
-            Shape::Ring { ring_ref } => node
-                .input_refs
-                .get(usize::from(ring_ref))
-                .is_some_and(InputReference::is_ring),
-            Shape::DirectionPair { .. } => bundle.shape.resolve_pair(&node.input_refs).is_some(),
-        };
-        if !resolves {
-            return Err(GraphInvariantViolation::ShapeReference);
+        match bundle.source.resolve(&node.input_refs) {
+            Some(set) if bundle.wiring.fits(&set) => sets.push(set),
+            _ => return Err(GraphInvariantViolation::ShapeReference),
         }
     }
-    // I4's pair roles (T25.F10): a direction member reads its pair's `x` or
-    // `y` field, a fact member one of its pair's `facts`.
     for sink in def.output_sinks.iter() {
         for edge in sink.inputs.iter() {
             let Some(Membership { bundle, .. }) = edge.membership else {
                 continue;
             };
             let record = &def.bundles[bundle.index()];
-            let Some(pair) = record.shape.resolve_pair(&node.input_refs) else {
-                continue;
-            };
-            let GraphSource::InputLeaf { sub_idx, .. } = edge.source else {
-                return Err(GraphInvariantViolation::MemberShape);
-            };
-            let fits = match Site::of(sink.kind, record.kind) {
-                Some(Site::Direction(_)) => sub_idx == pair.x || sub_idx == pair.y,
-                Some(Site::Drive) => pair.facts.contains(&sub_idx),
-                None => false,
-            };
+            let fits = reads_source(edge.source, record)
+                && member_field(edge.source).is_some_and(|field| {
+                    Site::of(sink.kind, &record.wiring).is_some_and(|site| {
+                        record
+                            .wiring
+                            .pattern(&sets[bundle.index()], field, site)
+                            .is_some()
+                    })
+                });
             if !fits {
                 return Err(GraphInvariantViolation::MemberShape);
             }
@@ -690,11 +711,14 @@ impl CgpGraphBackendDef {
         )
     }
 
-    /// The pattern of member `edge` on a sink of kind `sink`: 0 for a fact
-    /// member, by role, before any geometry (T25.F10); otherwise its bundle's
-    /// at the member's field and the sink's direction (pattern 0 for a
-    /// member that reads no input leaf or sits on no direction sink of its
-    /// bundle's kind).
+    /// The pattern of member `edge` on a sink of kind `sink`: its bundle's
+    /// wiring's at the member's coordinate (T25.F11 invariant 3), the one law
+    /// for every member.
+    ///
+    /// # Panics
+    ///
+    /// If the member sits off its wiring's coordinates, a `MemberShape`
+    /// violation no validated graph carries.
     fn pattern_at(
         &self,
         edge: &GraphEdge,
@@ -703,17 +727,18 @@ impl CgpGraphBackendDef {
     ) -> f32 {
         let Membership { bundle, .. } = edge.membership.expect("pattern_at: a member");
         let record = &self.bundles[bundle.index()];
-        let (GraphSource::InputLeaf { sub_idx, .. }, Some(Site::Direction(direction))) =
-            (edge.source, Site::of(sink, record.kind))
-        else {
-            return 0.0;
-        };
-        record.pattern(input_refs, sub_idx, direction)
+        record
+            .source
+            .resolve(input_refs)
+            .zip(member_field(edge.source))
+            .zip(Site::of(sink, &record.wiring))
+            .and_then(|((set, field), site)| record.wiring.pattern(&set, field, site))
+            .expect("pattern_at: a member on its wiring's coordinates (MemberShape)")
     }
 
-    /// The site of the member at `occurrence` relative to its bundle's kind
-    /// (T25.F10); `None` for an ungrouped edge or a member off its kind's
-    /// sinks (a broken genome).
+    /// The site of the member at `occurrence` under its bundle's wiring;
+    /// `None` for an ungrouped edge or a member off its wiring's sinks (a
+    /// broken genome).
     #[must_use]
     pub fn site_of(&self, occurrence: EdgeOccurrence) -> Option<Site> {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
@@ -722,15 +747,8 @@ impl CgpGraphBackendDef {
         let Membership { bundle, .. } = self.edge_at(occurrence).membership?;
         Site::of(
             self.output_sinks[sink].kind,
-            self.bundles[bundle.index()].kind,
+            &self.bundles[bundle.index()].wiring,
         )
-    }
-
-    /// Whether the edge at `occurrence` is a fact member: a member on its
-    /// bundle's kind's drive sink (T25.F10).
-    #[must_use]
-    pub fn is_fact_member(&self, occurrence: EdgeOccurrence) -> bool {
-        self.site_of(occurrence) == Some(Site::Drive)
     }
 
     /// One row per sink, one genomic weight per sink edge in order: the
@@ -1058,23 +1076,19 @@ impl CgpGraphBackendDef {
     // ── Input-reference primitives ──────────────────────────────────────────
 
     /// After the input reference at `removed_ref_idx` is pruned, decrement
-    /// every higher `InputLeaf.ref_idx` and bundle shape reference. `Prune`
+    /// every higher `InputLeaf.ref_idx` and bundle source. `Prune`
     /// removes only an index nothing addresses (`prunable_indices`), so no
     /// edge or bundle is removed and the seeds are untouched.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
         for bundle in &mut self.bundles {
-            let (Shape::Ring {
-                ring_ref: shape_ref,
-            }
-            | Shape::DirectionPair {
-                ref_idx: shape_ref, ..
-            }) = &mut bundle.shape;
-            debug_assert_ne!(
-                *shape_ref, removed_ref_idx,
-                "a pruned input reference is addressed by no bundle"
-            );
-            if *shape_ref > removed_ref_idx {
-                *shape_ref -= 1;
+            if let BundleSource::Sensor { ref_idx, .. } = &mut bundle.source {
+                debug_assert_ne!(
+                    *ref_idx, removed_ref_idx,
+                    "a pruned input reference is the source of no bundle"
+                );
+                if *ref_idx > removed_ref_idx {
+                    *ref_idx -= 1;
+                }
             }
         }
         self.for_each_edge_mut(|edge| {
@@ -1104,31 +1118,12 @@ impl CgpGraphBackendDef {
         });
     }
 
-    // ── Bundle primitives (T25.F03, T25.F04) ─────────────────────────────────
+    // ── Bundle primitives (T25.F03, T25.F11) ─────────────────────────────────
 
-    /// Whether a bundle of either shape can be created: all 24 direction
-    /// sinks are present and the bundle list is below capacity.
-    #[must_use]
-    pub fn can_host_bundle(&self) -> bool {
-        self.bundles.len() < usize::from(u16::MAX)
-            && Kind::ALL.into_iter().all(|kind| {
-                (0..VOTE_DIRECTION_COUNT)
-                    .all(|d| self.site_sink(kind, Site::Direction(d)).is_some())
-            })
-    }
-
-    /// Whether a gene of kind `kind` can carry fact members: `kind`'s drive
-    /// sink is present (T25.F10). Recruitment's pair preflight and
-    /// `RetargetBundleKind` read it.
-    #[must_use]
-    pub fn can_host_facts(&self, kind: Kind) -> bool {
-        self.site_sink(kind, Site::Drive).is_some()
-    }
-
-    /// The catalog index of the sink `site` names for a kind-`kind` bundle,
-    /// when present.
-    fn site_sink(&self, kind: Kind, site: Site) -> Option<usize> {
-        let target = site.sink(kind);
+    /// The catalog index of the sink `site` names under `wiring`, when
+    /// present.
+    fn site_sink(&self, wiring: &Wiring, site: Site) -> Option<usize> {
+        let target = site.sink(wiring)?;
         self.output_sinks
             .iter()
             .position(|sink| sink.kind == target)
@@ -1149,43 +1144,32 @@ impl CgpGraphBackendDef {
             })
     }
 
-    /// The birth coordinates of `bundle` with presence (T30.F01): a `Ring`
-    /// bundle's eight [`ring_birth_members`]; a `DirectionPair` bundle's
-    /// twelve [`super::pair_birth_members`] then one drive coordinate per
-    /// declared fact of its pair, none when the pair no longer resolves. A
-    /// coordinate is present when a member of `bundle` reads its field of
-    /// the shape's reference on its site.
+    /// The birth coordinates of `bundle` with presence (T30.F01): every
+    /// coordinate its wiring materializes on its field set
+    /// ([`Wiring::coordinates`]) under the reader's `context`, none when the
+    /// source no longer resolves. A coordinate is present when a member of
+    /// `bundle` reads its field on its site.
     #[must_use]
     pub fn birth_coordinates(
         &self,
         bundle: BundleId,
         input_refs: &[InputReference],
+        context: &SensorContext,
     ) -> Vec<BirthCoordinate> {
         let record = &self.bundles[bundle.index()];
-        let ref_idx = record.shape.ref_idx();
-        let births: Vec<(u16, Site)> = match record.shape {
-            Shape::Ring { .. } => ring_birth_members(record.offset)
-                .map(|(field, d)| (field, Site::Direction(d)))
-                .collect(),
-            Shape::DirectionPair { .. } => record
-                .shape
-                .resolve_pair(input_refs)
-                .map(|pair| {
-                    pair_birth_members(pair, record.offset)
-                        .map(|(field, d)| (field, Site::Direction(d)))
-                        .chain(pair.facts.iter().map(|&field| (field, Site::Drive)))
-                        .collect()
-                })
-                .unwrap_or_default(),
-        };
+        let births = record
+            .source
+            .resolve_in(input_refs, context)
+            .map(|set| record.wiring.coordinates(&set))
+            .unwrap_or_default();
         let members: Vec<(u16, Site)> = self
             .members(bundle)
-            .filter_map(|member| match self.edge_at(member).source {
-                GraphSource::InputLeaf {
-                    ref_idx: at,
-                    sub_idx,
-                } if at == ref_idx => Some((sub_idx, self.site_of(member)?)),
-                _ => None,
+            .filter_map(|member| {
+                let edge = self.edge_at(member);
+                reads_source(edge.source, record)
+                    .then(|| member_field(edge.source))
+                    .flatten()
+                    .zip(self.site_of(member))
             })
             .collect();
         births
@@ -1198,88 +1182,15 @@ impl CgpGraphBackendDef {
             .collect()
     }
 
-    /// Create a `Ring` bundle reading `input_refs[ring_ref]` into `kind` at
-    /// `offset`: one record at scale 0 and eight members at own weight 0,
-    /// channel `c` on sink `kind[(c + offset) mod 8]`. A new bundle is silent.
-    ///
-    /// # Panics
-    ///
-    /// If `shape` is not a `Ring` (a pair bundle is created by
-    /// [`Self::add_pair_bundle`]), [`Self::can_host_bundle`] is false or
-    /// `offset >= 8`.
-    pub fn add_ring_bundle(&mut self, shape: Shape, kind: Kind, offset: u8) -> BundleId {
-        let Shape::Ring { ring_ref } = shape else {
-            panic!("add_bundle: a DirectionPair bundle is created by add_pair_bundle");
-        };
-        let id = self.push_bundle_record(shape, kind, offset);
-        for (channel, direction) in ring_birth_members(offset) {
-            self.insert_member(
-                Self::new_member(id, ring_ref, channel),
-                Site::Direction(direction),
-                None,
-            );
-        }
-        self.debug_assert_bundles();
-        id
-    }
-
-    /// Create a `DirectionPair` gene on pair `pair` (`layout`, the pair
-    /// `input_refs[ref_idx]` declares there) into `kind` at `offset`: one
-    /// record at scale 0, the twelve direction members whose pattern is
-    /// non-zero ([`super::pair_birth_members`]), then one fact member on
-    /// `kind`'s drive sink per field of `facts`, in `facts` order (T25.F10):
-    /// every member born at own weight 0, static, scope `Edge`, no seed. A
-    /// new gene is silent. `AddDirectionPairBundle` passes no facts;
-    /// recruitment's pair case passes `layout.facts`.
-    ///
-    /// # Panics
-    ///
-    /// If [`Self::can_host_bundle`] is false, `offset >= 8`, a field of
-    /// `facts` is not one of `layout.facts`, or `facts` is non-empty and
-    /// [`Self::can_host_facts`] is false for `kind`.
-    pub fn add_pair_bundle(
-        &mut self,
-        ref_idx: u16,
-        pair: u8,
-        layout: DirectionPair,
-        kind: Kind,
-        offset: u8,
-        facts: &[u16],
-    ) -> BundleId {
-        assert!(
-            facts.iter().all(|field| layout.facts.contains(field)),
-            "add_pair_bundle: every fact member reads one of the pair's facts"
-        );
-        assert!(
-            facts.is_empty() || self.can_host_facts(kind),
-            "add_pair_bundle: fact members need the kind's drive sink"
-        );
-        let id = self.push_bundle_record(Shape::DirectionPair { ref_idx, pair }, kind, offset);
-        for (field, direction) in pair_birth_members(layout, offset) {
-            self.insert_member(
-                Self::new_member(id, ref_idx, field),
-                Site::Direction(direction),
-                None,
-            );
-        }
-        for &field in facts {
-            self.insert_member(Self::new_member(id, ref_idx, field), Site::Drive, None);
-        }
-        self.debug_assert_bundles();
-        id
-    }
-
     /// Build one bundle reading `source`, whose field set the node resolved
-    /// to `set`, with `birth`'s wiring and scale: every member of the set
-    /// at own weight 0, static, scope `Edge`, no seed, in one edit.
+    /// to `set`, with `birth`'s wiring and scale: every coordinate of the set
+    /// under the wiring ([`Wiring::coordinates`]) one member at own weight 0,
+    /// static, scope `Edge`, no seed, in one edit (T25.F11 invariant 5).
     ///
     /// # Errors
     ///
     /// The wiring is not admissible for `set` ([`plans`]) or the graph holds
     /// `u16::MAX` records; nothing is written.
-    // Commit 1 of T25.F11: a record holds a sensor's `Ring` or `Pair` set
-    // only; any other source or set is `Inadmissible` until the record
-    // carries its source and wiring.
     pub fn add_bundle(
         &mut self,
         source: BundleSource,
@@ -1289,42 +1200,36 @@ impl CgpGraphBackendDef {
         if !plans(self, &set).contains(&birth.wiring) {
             return Err(NodeEditError::Inadmissible);
         }
-        if self.bundles.len() >= usize::from(u16::MAX) {
+        if !bundle_capacity_admits(self.bundles.len(), 1) {
             return Err(NodeEditError::BundleCapacity);
         }
-        let BundleSource::Sensor { ref_idx, field_set } = source else {
-            return Err(NodeEditError::Inadmissible);
-        };
-        let id = match (set, birth.wiring) {
-            (FieldSet::Ring, Wiring::Ring { kind, offset }) => {
-                self.add_ring_bundle(Shape::Ring { ring_ref: ref_idx }, kind, offset)
-            }
-            (FieldSet::Pair(layout), Wiring::DirectionPair { kind, offset }) => {
-                self.add_pair_bundle(ref_idx, field_set, layout, kind, offset, layout.facts)
-            }
-            _ => return Err(NodeEditError::Inadmissible),
-        };
-        self.bundle_mut(id).set_scale(birth.scale);
-        Ok(id)
-    }
-
-    fn push_bundle_record(&mut self, shape: Shape, kind: Kind, offset: u8) -> BundleId {
-        assert!(
-            self.can_host_bundle(),
-            "add_bundle: the graph cannot host a bundle"
-        );
-        assert!(offset < VOTE_DIRECTION_COUNT, "add_bundle: offset below 8");
         let id = BundleId(u16::try_from(self.bundles.len()).expect("bundles below u16::MAX"));
-        self.bundles.push(Bundle::new(shape, kind, offset));
+        let mut record = Bundle::new(source, birth.wiring);
+        record.scale = birth.scale;
+        self.bundles.push(record);
         if let Some(seeds) = &mut self.birth_seeds {
             seeds.bundles_mut().push(None);
         }
-        id
+        for (field, site) in birth.wiring.coordinates(&set) {
+            self.insert_member(Self::new_member(id, source, field), site, None);
+        }
+        self.debug_assert_bundles();
+        Ok(id)
     }
 
-    fn new_member(bundle: BundleId, ref_idx: u16, sub_idx: u16) -> GraphEdge {
+    fn new_member(bundle: BundleId, source: BundleSource, field: u16) -> GraphEdge {
+        let source = match source {
+            BundleSource::Sensor { ref_idx, .. } => GraphSource::InputLeaf {
+                ref_idx,
+                sub_idx: field,
+            },
+            BundleSource::Memory { previous } => GraphSource::SharedMemory {
+                slot: u8::try_from(field).expect("a memory slot below 16"),
+                previous,
+            },
+        };
         GraphEdge {
-            source: GraphSource::InputLeaf { ref_idx, sub_idx },
+            source,
             own_weight: 0.0,
             plasticity: None,
             membership: Some(Membership {
@@ -1343,54 +1248,56 @@ impl CgpGraphBackendDef {
         removed
     }
 
-    /// Move `bundle` to `kind` at `offset` (`ShiftBundleOffset`,
-    /// `RetargetBundleKind`): every member leaves its sink and is re-inserted
-    /// at its new sink in the I10 position, keeping its own weight. A `Ring`
-    /// member moves by its channel; a `DirectionPair` direction member on
-    /// direction `d` moves to `(d + offset − old_offset) mod 8`, so every
-    /// member's relative coordinate, holes included, is preserved; a fact
-    /// member moves to the new kind's drive sink (T25.F10).
+    /// Rewire `bundle` to `wiring` (`ShiftBundleOffset`, `RetargetBundle`):
+    /// every member leaves its sink and is re-inserted at its new site in
+    /// the I10 position, keeping its own weight and seed, by coordinate
+    /// (T25.F11 invariant 4): a `Plain` member stays on `Sink`; a `Ring`
+    /// member on cell `c` moves to `(c + offset) mod 8`; a `DirectionPair`
+    /// member on direction `d` moves to `(d + offset − old offset) mod 8`
+    /// and a fact stays on the drive; holes are preserved.
     ///
     /// # Panics
     ///
-    /// If `offset >= 8`, or the bundle has a fact member and
-    /// [`Self::can_host_facts`] is false for `kind`.
-    pub fn relocate_bundle(&mut self, bundle: BundleId, kind: Kind, offset: u8) {
+    /// If `wiring` is of another variant than the bundle's, a geometric
+    /// offset is not below 8, or the graph lacks a sink `wiring` needs.
+    pub fn relocate_bundle(&mut self, bundle: BundleId, wiring: Wiring) {
+        let n = VOTE_DIRECTION_COUNT;
+        let old = self.bundles[bundle.index()].wiring;
         assert!(
-            offset < VOTE_DIRECTION_COUNT,
+            std::mem::discriminant(&old) == std::mem::discriminant(&wiring),
+            "relocate_bundle: a rewiring keeps the wiring variant"
+        );
+        assert!(
+            wiring.offset().is_none_or(|offset| offset < n),
             "relocate_bundle: offset below 8"
         );
-        let n = VOTE_DIRECTION_COUNT;
-        let old = self.bundles[bundle.index()];
         let moved = self.take_members(bundle);
-        let record = &mut self.bundles[bundle.index()];
-        record.kind = kind;
-        record.offset = offset;
-        let record = *record;
+        self.bundles[bundle.index()].wiring = wiring;
         for (edge, site, seed) in moved {
-            let site = match (record.shape, site) {
-                (_, Site::Drive) => Site::Drive,
-                (Shape::Ring { .. }, Site::Direction(_)) => {
-                    let (_, channel) = Self::member_key(&edge).expect("a member");
-                    Site::Direction(member_direction(&record, channel))
+            let site = match (wiring, site) {
+                (Wiring::Ring { offset, .. }, Site::Direction(_)) => {
+                    let field = member_field(edge.source).expect("a member reads a field");
+                    let field = u8::try_from(field % u16::from(n)).expect("below 8");
+                    Site::Direction((field + offset) % n)
                 }
-                (Shape::DirectionPair { .. }, Site::Direction(d)) => {
-                    Site::Direction((d + n - old.offset + offset) % n)
+                (Wiring::DirectionPair { offset, .. }, Site::Direction(d)) => {
+                    let old_offset = old.offset().expect("a geometric wiring");
+                    Site::Direction((d + n - old_offset + offset) % n)
                 }
+                (_, site) => site,
             };
             self.insert_member(edge, site, seed);
         }
         self.debug_assert_bundles();
     }
 
-    /// Detach the member at `occurrence` with its bundle's `pattern` there:
-    /// its own weight becomes its genomic weight
-    /// `compose(own, scale, pattern)`, bitwise, its membership is cleared and
-    /// it moves to the end of its sink's independent prefix. A fact member
-    /// (T25.F10) detaches own-only: its own weight bits and its seed entry
-    /// stay exactly as stored and `pattern` is not read. Detaching a bundle's
-    /// last member removes the bundle. Returns the edge's new occurrence and
-    /// whether the bundle was removed.
+    /// Detach the member at `occurrence` with its bundle's `pattern` there
+    /// (T25.F11 invariant 4, the one member law): its own weight becomes its
+    /// genomic weight `compose(own, scale, pattern)`, bitwise, its seed
+    /// composes (T25.F07 invariant 6), its membership is cleared and it
+    /// moves to the end of its sink's independent prefix. Detaching a
+    /// bundle's last member removes the bundle. Returns the edge's new
+    /// occurrence and whether the bundle was removed.
     pub fn detach_at(
         &mut self,
         occurrence: EdgeOccurrence,
@@ -1399,32 +1306,29 @@ impl CgpGraphBackendDef {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             panic!("detach_at: only a sink edge is a member");
         };
-        let fact = self.is_fact_member(occurrence);
         let mut edge = self.output_sinks.0[sink].inputs.0.remove(occurrence.index);
-        let mut seed = self
+        let seed = self
             .birth_seeds
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
         let Membership { bundle, .. } = edge.membership.expect("detach_at: the edge is a member");
-        if !fact {
-            let scale = self.bundles[bundle.index()].scale;
-            // The composed seed (T25.F07 invariant 6): what the detached
-            // edge weighed at the parent, from the edge's and the bundle's
-            // seeds, each falling back to its genomic value; no flag read and
-            // no clamp (`from_seeds` clamps at construction).
-            let bundle_seed = self
-                .birth_seeds
-                .as_ref()
-                .and_then(|seeds| seeds.bundle_value(bundle));
-            seed = (seed.is_some() || bundle_seed.is_some()).then(|| {
-                compose(
-                    seed.unwrap_or(edge.own_weight),
-                    bundle_seed.unwrap_or(scale),
-                    pattern,
-                )
-            });
-            edge.own_weight = compose(edge.own_weight, scale, pattern);
-        }
+        let scale = self.bundles[bundle.index()].scale;
+        // The composed seed (T25.F07 invariant 6): what the detached edge
+        // weighed at the parent, from the edge's and the bundle's seeds, each
+        // falling back to its genomic value; no flag read and no clamp
+        // (`from_seeds` clamps at construction).
+        let bundle_seed = self
+            .birth_seeds
+            .as_ref()
+            .and_then(|seeds| seeds.bundle_value(bundle));
+        let seed = (seed.is_some() || bundle_seed.is_some()).then(|| {
+            compose(
+                seed.unwrap_or(edge.own_weight),
+                bundle_seed.unwrap_or(scale),
+                pattern,
+            )
+        });
+        edge.own_weight = compose(edge.own_weight, scale, pattern);
         edge.membership = None;
         let at = self.first_member(sink);
         self.output_sinks.0[sink].inputs.0.insert(at, edge);
@@ -1456,25 +1360,21 @@ impl CgpGraphBackendDef {
             .unwrap_or(inputs.len())
     }
 
-    /// The I10 sort key of a member: `(BundleId, sub_idx)` (a `Ring`
-    /// member's channel; a pair member's field, `x ≠ y`, so unique within a
-    /// sink).
+    /// The I10 sort key of a member: `(BundleId, field)`, unique within a
+    /// sink (a wiring puts each field of a bundle on a sink at most once);
+    /// a compute-node source keys `u16::MAX`.
     fn member_key(edge: &GraphEdge) -> Option<(BundleId, u16)> {
         let Membership { bundle, .. } = edge.membership?;
-        let channel = match edge.source {
-            GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
-            _ => u16::MAX,
-        };
-        Some((bundle, channel))
+        Some((bundle, member_field(edge.source).unwrap_or(u16::MAX)))
     }
 
-    /// Insert member `edge` with `seed` on the sink `site` names for its
-    /// bundle's kind, in the I10 position.
+    /// Insert member `edge` with `seed` on the sink `site` names under its
+    /// bundle's wiring, in the I10 position.
     fn insert_member(&mut self, edge: GraphEdge, site: Site, seed: Option<f32>) {
         let key = Self::member_key(&edge);
         let (bundle, _) = key.expect("a member");
         let sink = self
-            .site_sink(self.bundles[bundle.index()].kind, site)
+            .site_sink(&self.bundles[bundle.index()].wiring, site)
             .expect("a bundle's graph carries every sink its members sit on");
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
@@ -1490,13 +1390,13 @@ impl CgpGraphBackendDef {
     /// Remove every member of `bundle` from its sink, in canonical order,
     /// each with its site and its seed.
     fn take_members(&mut self, bundle: BundleId) -> Vec<(GraphEdge, Site, Option<f32>)> {
-        let kind = self.bundles[bundle.index()].kind;
-        let mut taken = Vec::with_capacity(usize::from(2 * VOTE_DIRECTION_COUNT));
+        let wiring = self.bundles[bundle.index()].wiring;
+        let mut taken = Vec::new();
         for (sink_idx, sink) in self.output_sinks.0.iter_mut().enumerate() {
-            let Some(site) = Site::of(sink.kind, kind) else {
+            let Some(site) = Site::of(sink.kind, &wiring) else {
                 debug_assert!(
                     !sink.inputs.iter().any(|edge| edge.is_member_of(bundle)),
-                    "a member sits on a sink of its bundle's kind"
+                    "a member sits on a sink of its bundle's wiring"
                 );
                 continue;
             };
@@ -1546,11 +1446,14 @@ impl CgpGraphBackendDef {
         }
     }
 
-    /// The invariants that need only the def (I2–I6, I10, `offset < 8`). A
-    /// bundle's member set is keyed by channel for a `Ring` and by
-    /// `(sub_idx, site)` for a `DirectionPair` (a drive site only on the
-    /// record's kind, T25.F10); the pair's field roles need the input
-    /// references ([`validate_graph`]).
+    /// Every invariant that needs only the record and the edge (I2–I6, I10,
+    /// `offset < 8`, capacity): members of one bundle keyed `(field, site)`
+    /// unique, every member reading its bundle's source kind on a site its
+    /// wiring maps that field to as far as the record decides
+    /// ([`Wiring::admits_site`]: a `Ring` cell on its offset's direction, no
+    /// `Ring` or `Plain` member on a drive), the I10 order. Source
+    /// resolution and field-set membership need the input references
+    /// ([`validate_graph`]).
     pub(crate) fn check_local_invariants(&self) -> Result<(), GraphInvariantViolation> {
         use GraphInvariantViolation as V;
         if self.bundles.len() > usize::from(u16::MAX) {
@@ -1563,11 +1466,12 @@ impl CgpGraphBackendDef {
         {
             return Err(V::MemberOnComputeInput);
         }
-        if self
-            .bundles
-            .iter()
-            .any(|bundle| bundle.offset >= VOTE_DIRECTION_COUNT)
-        {
+        if self.bundles.iter().any(|bundle| {
+            bundle
+                .wiring
+                .offset()
+                .is_some_and(|offset| offset >= VOTE_DIRECTION_COUNT)
+        }) {
             return Err(V::OffsetOutOfRange);
         }
         if self
@@ -1586,8 +1490,7 @@ impl CgpGraphBackendDef {
             }
         }
         let mut members = vec![0u32; self.bundles.len()];
-        let mut ring_channels = vec![0u8; self.bundles.len()];
-        let mut pair_coordinates = std::collections::HashSet::new();
+        let mut coordinates = std::collections::HashSet::new();
         for sink in self.output_sinks.iter() {
             let mut previous: Option<(BundleId, u16)> = None;
             let mut in_members = false;
@@ -1605,41 +1508,19 @@ impl CgpGraphBackendDef {
                     _ => {}
                 }
                 previous = Some(key);
-                let (bundle, sub_idx) = key;
+                let (bundle, field) = key;
                 let Some(record) = self.bundles.get(bundle.index()) else {
                     return Err(V::BundleIdOutOfRange);
                 };
-                let reads_shape_ref = matches!(
-                    edge.source,
-                    GraphSource::InputLeaf { ref_idx, .. } if ref_idx == record.shape.ref_idx()
-                );
-                // A `Ring` member sits on the direction sink of its channel;
-                // a `DirectionPair` member on a direction sink of its kind
-                // or, as a fact member, on its kind's drive (T25.F10).
-                let site = Site::of(sink.kind, record.kind).filter(|&site| {
-                    reads_shape_ref
-                        && match (record.shape, site) {
-                            (Shape::Ring { .. }, Site::Direction(d)) => {
-                                sub_idx < u16::from(VOTE_DIRECTION_COUNT)
-                                    && member_direction(record, sub_idx) == d
-                            }
-                            (Shape::Ring { .. }, Site::Drive) => false,
-                            (Shape::DirectionPair { .. }, _) => true,
-                        }
+                let site = Site::of(sink.kind, &record.wiring).filter(|&site| {
+                    member_field(edge.source).is_some()
+                        && reads_source(edge.source, record)
+                        && record.wiring.admits_site(field, site)
                 });
                 let Some(site) = site else {
                     return Err(V::MemberShape);
                 };
-                let fresh = match record.shape {
-                    Shape::Ring { .. } => {
-                        let bit = 1u8 << sub_idx;
-                        let fresh = ring_channels[bundle.index()] & bit == 0;
-                        ring_channels[bundle.index()] |= bit;
-                        fresh
-                    }
-                    Shape::DirectionPair { .. } => pair_coordinates.insert((bundle, sub_idx, site)),
-                };
-                if !fresh {
+                if !coordinates.insert((bundle, field, site)) {
                     return Err(V::DuplicateMember);
                 }
                 members[bundle.index()] += 1;
@@ -1751,10 +1632,16 @@ impl CgpGraphBackendDef {
     }
 
     /// Fill the bundle table to its `u16::MAX`-record limit with memberless
-    /// records, so [`Self::can_host_bundle`] is false on an otherwise full
-    /// sink catalog (a preflight fixture; such a def fails `EmptyBundle`).
+    /// records, so `add_bundle` and `add_sensor` refuse a further record on
+    /// an otherwise full sink catalog (a preflight fixture; such a def fails
+    /// `EmptyBundle`).
     pub(crate) fn exhaust_bundle_capacity(&mut self) {
-        let record = Bundle::new(Shape::Ring { ring_ref: 0 }, Kind::Move, 0);
+        let record = Bundle::new(
+            BundleSource::Memory { previous: false },
+            Wiring::Plain {
+                sink: VoteSink::Eat,
+            },
+        );
         self.bundles = vec![record; usize::from(u16::MAX)];
     }
 
@@ -1762,6 +1649,52 @@ impl CgpGraphBackendDef {
     /// [`Self::exhaust_bundle_capacity`]).
     pub(crate) fn drop_last_bundle_record(&mut self) {
         self.bundles.pop();
+    }
+
+    /// A silent `Ring` bundle on ring reference `ring_ref` into `kind` at
+    /// `offset`, through [`Self::add_bundle`] (a fixture).
+    pub(crate) fn add_ring_bundle(
+        &mut self,
+        ring_ref: u16,
+        kind: crate::contracts::votes::DirectedVoteKind,
+        offset: u8,
+    ) -> BundleId {
+        let source = BundleSource::Sensor {
+            ref_idx: ring_ref,
+            field_set: 0,
+        };
+        let birth = BundleBirth {
+            field_set: 0,
+            wiring: Wiring::Ring { kind, offset },
+            scale: 0.0,
+        };
+        self.add_bundle(source, FieldSet::Ring, birth)
+            .expect("a ring fixture on a full catalog")
+    }
+
+    /// A silent `DirectionPair` bundle on pair `pair` (`layout`) of
+    /// reference `ref_idx` into `kind` at `offset`, through
+    /// [`Self::add_bundle`] (a fixture): the twelve compass members and one
+    /// drive member per fact.
+    pub(crate) fn add_pair_bundle(
+        &mut self,
+        ref_idx: u16,
+        pair: u8,
+        layout: crate::contracts::DirectionPair,
+        kind: crate::contracts::votes::DirectedVoteKind,
+        offset: u8,
+    ) -> BundleId {
+        let source = BundleSource::Sensor {
+            ref_idx,
+            field_set: pair,
+        };
+        let birth = BundleBirth {
+            field_set: pair,
+            wiring: Wiring::DirectionPair { kind, offset },
+            scale: 0.0,
+        };
+        self.add_bundle(source, FieldSet::Pair(layout), birth)
+            .expect("a pair fixture on a full catalog")
     }
 }
 

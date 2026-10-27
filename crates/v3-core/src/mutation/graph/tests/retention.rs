@@ -10,7 +10,6 @@ use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     validate_graph, BundleId, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, Scope,
-    Shape,
 };
 use crate::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
 use crate::mutation::graph::hebbian::{
@@ -53,7 +52,7 @@ fn refs() -> Vec<InputReference> {
 /// retentions `members` (the rest static).
 fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
     let all: Vec<EdgeOccurrence> = def.members(id).collect();
     for (&member, &retention) in all.iter().zip(&members) {
         def.edge_mut(member)
@@ -117,7 +116,7 @@ fn replay_pick(
 
 #[test]
 fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
-    assert_eq!(&GraphOperator::ALL[32..38], &RETENTION_OPERATORS);
+    assert_eq!(&GraphOperator::ALL[29..35], &RETENTION_OPERATORS);
     let keys = RETENTION_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
         keys,
@@ -139,7 +138,6 @@ fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
         assert_eq!(op.operator().complexity_effect(), ComplexityEffect::Neutral);
         // Restricted size pressure admits only decreasing operators.
         assert!(!op.complexity_effect().is_decreasing(), "{op:?}");
-        assert!(op.enabled(&MutationConfig::default()), "{op:?}");
     }
 }
 
@@ -304,7 +302,7 @@ fn the_retention_step_clamps_the_deficit() {
 fn the_bundle_retention_operators_pick_an_admitted_record() {
     let mut original = CgpGraphBackendDef::new_with_fixed_outputs();
     for offset in 0..4 {
-        original.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);
+        original.add_ring_bundle(0, DirectedVoteKind::Move, offset);
     }
     original.bundle_mut(BundleId::new(1)).set_retention(0.5);
     original.bundle_mut(BundleId::new(3)).set_retention(0.9);
@@ -364,7 +362,7 @@ fn the_dispatch_reports_edge_scopes_and_keeps_the_graph_valid() {
     let (mut def, _) = fixture(1.0, [0.5, 1.0, 0.5]);
     def.bundle_mut(BundleId::new(0)).set_retention(0.5);
     // A second, retaining record, so every bundle operator has a site.
-    def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    def.add_ring_bundle(0, DirectedVoteKind::Move, 1);
     let genome = crate::genome::CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(def)],

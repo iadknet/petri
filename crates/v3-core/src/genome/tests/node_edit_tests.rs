@@ -3,8 +3,8 @@ use crate::config::test_sensor_context;
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::{FieldSet, InputReference, NodeId, WorldInputKey, MEMORY_BANK};
 use crate::genome::cgp::{
-    plans, test_support::edit_sinks, BundleBirth, BundleSource, CgpGraphBackendDef, GraphEdge,
-    GraphSource, OutputSinkKind, Wiring,
+    bundle_capacity_admits, plans, test_support::edit_sinks, BundleBirth, BundleSource,
+    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, Wiring,
 };
 use crate::genome::{BackendDef, NodeEditError, NodeGenome, VmBackendDef, VmInstruction};
 
@@ -186,6 +186,20 @@ fn add_sensor_one_record_below_capacity_returns_err_and_writes_nothing() {
         Err(NodeEditError::BundleCapacity)
     );
     assert_eq!(node, before);
+}
+
+/// The capacity precheck admits an edit reaching exactly `u16::MAX`
+/// records and rejects one record more; tested on the counts because a
+/// filled container cannot carry valid records for the success half.
+#[test]
+fn the_capacity_precheck_admits_exactly_u16_max_records() {
+    let max = usize::from(u16::MAX);
+    assert!(bundle_capacity_admits(max - 2, 2));
+    assert!(bundle_capacity_admits(max - 1, 1));
+    assert!(!bundle_capacity_admits(max - 1, 2));
+    assert!(!bundle_capacity_admits(max, 1));
+    assert!(bundle_capacity_admits(max, 0));
+    assert!(!bundle_capacity_admits(usize::MAX, 1));
 }
 
 #[test]

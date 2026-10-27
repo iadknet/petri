@@ -4,10 +4,10 @@
 //! builder.
 
 use super::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    OutputSink, OutputSinkKind,
+    BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
+    EdgeOccurrence, EdgeSurface, GraphEdge, OutputSink, OutputSinkKind,
 };
-use crate::contracts::NodeId;
+use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, PlasticityConfig};
 use crate::runtime::state::GraphRuntimeState;
 
@@ -165,4 +165,53 @@ pub(crate) fn set_sink_inputs(
 /// carries no seeds.
 pub(crate) fn set_compute_inputs(def: &mut CgpGraphBackendDef, idx: usize, edges: Vec<GraphEdge>) {
     edit_compute_nodes(def, |nodes| nodes[idx].inputs = edges);
+}
+
+/// Declare `reference` on `node` with one silent bundle per field set, each
+/// on its set's first admissible plan ([`super::plans`]), under the default
+/// sensor context (a fixture). Returns the declaration's index.
+///
+/// # Panics
+///
+/// If a set has no admissible plan or the node rejects the edit.
+pub(crate) fn add_first_plan_sensor(node: &mut NodeGenome, reference: InputReference) -> u16 {
+    let context = crate::config::test_sensor_context(1);
+    let births = match &node.backend_def {
+        BackendDef::Graph(def) => SensorDescriptor::of(&reference, &context)
+            .field_sets()
+            .enumerate()
+            .map(|(index, set)| first_plan_birth(def, u8::try_from(index).unwrap(), &set))
+            .collect(),
+        BackendDef::Vm(_) => Vec::new(),
+    };
+    node.add_sensor(reference, &births, &context)
+        .expect("a first-plan sensor fixture")
+}
+
+/// One silent bundle reading `source` on its set's first admissible plan
+/// (a fixture).
+///
+/// # Panics
+///
+/// If the node is no Graph node, the source does not resolve or its set
+/// has no admissible plan.
+pub(crate) fn add_first_plan_bundle(node: &mut NodeGenome, source: BundleSource) -> BundleId {
+    let context = crate::config::test_sensor_context(1);
+    let set = node
+        .field_set(source, &context)
+        .expect("a resolvable source");
+    let BackendDef::Graph(def) = &node.backend_def else {
+        panic!("add_first_plan_bundle: a Graph node");
+    };
+    let birth = first_plan_birth(def, source.field_set(), &set);
+    node.add_bundle(source, birth, &context)
+        .expect("a first-plan bundle fixture")
+}
+
+fn first_plan_birth(def: &CgpGraphBackendDef, field_set: u8, set: &FieldSet) -> BundleBirth {
+    BundleBirth {
+        field_set,
+        wiring: *super::plans(def, set).first().expect("an admissible plan"),
+        scale: 0.0,
+    }
 }

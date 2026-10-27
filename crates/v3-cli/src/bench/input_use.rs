@@ -1,4 +1,4 @@
-//! The per-world `input_use` block (T20.F01, `input-use-v4`): the input-use
+//! The per-world `input_use` block (T20.F01, `input-use-v5`): the input-use
 //! funnel per T11.F26 cohort, family and channel, projected from
 //! `v3_core::neighborhood::input_use`.
 //!
@@ -95,8 +95,6 @@ fn decode_counts<'a>(
 pub struct RowBlock {
     pub family: String,
     pub channel: u16,
-    /// An `ActionQueue` channel at or past the mutation draw width 12.
-    pub beyond_draw_width: bool,
     /// Parents at each stage, in `ROW_FIELDS` order.
     pub counts: Vec<Option<u32>>,
 }
@@ -106,7 +104,6 @@ impl RowBlock {
         Self {
             family: row.channel.family.label(),
             channel: row.channel.channel,
-            beyond_draw_width: row.channel.beyond_draw_width(),
             counts: vec![
                 row.declared,
                 Some(row.connected),
@@ -124,12 +121,7 @@ impl RowBlock {
     /// The row string.
     #[must_use]
     pub fn encode(&self) -> String {
-        let head = format!(
-            "{} {}{}",
-            self.family,
-            self.channel,
-            if self.beyond_draw_width { "*" } else { "" }
-        );
+        let head = format!("{} {}", self.family, self.channel);
         encode_counts(head, &self.counts)
     }
 
@@ -139,15 +131,10 @@ impl RowBlock {
         let mut fields = text.split(' ');
         let family = fields.next()?.to_string();
         let channel = fields.next()?;
-        let (channel, beyond_draw_width) = match channel.strip_suffix('*') {
-            Some(channel) => (channel, true),
-            None => (channel, false),
-        };
         let counts = decode_counts(fields, ROW_FIELDS.len())?;
         Some(Self {
             family,
             channel: channel.parse().ok()?,
-            beyond_draw_width,
             counts,
         })
     }

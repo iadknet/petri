@@ -1,6 +1,5 @@
 use proptest::prelude::*;
 
-use super::catalog::ACTION_QUEUE_DRAW_WIDTH;
 use super::*;
 use crate::config::{FounderProfile, OrdinaryFoodTypeId, RuntimeConfig, SimulationConfig};
 use crate::contracts::votes::VoteSink;
@@ -268,27 +267,35 @@ fn world_compound_channels_wrap_to_one_row() {
     assert_eq!(parent.connected, BTreeSet::from([channel(&barriers(), 2)]));
 }
 
+/// `ActionQueue`'s channels follow the configured queue (T25.F11
+/// invariant 1): every channel below `3 × max_actions_per_turn` (30 at the
+/// default) is a row, and a read at or past it is out of width.
 #[test]
-fn action_queue_channels_past_the_draw_width_are_kept_and_labelled() {
-    let parent = Fixture::new().read(&eat_from(InputReference::ActionQueue, 14));
-    let beyond = channel(&InputReference::ActionQueue, 14);
-    assert!(beyond.beyond_draw_width());
-    assert!(parent.connected.contains(&beyond) && parent.executed.contains(&beyond));
+fn action_queue_channels_follow_the_configured_width() {
+    let width = u16::try_from(
+        crate::contracts::SensorDescriptor::of(
+            &InputReference::ActionQueue,
+            &crate::config::test_sensor_context(1),
+        )
+        .width(),
+    )
+    .unwrap();
+    assert_eq!(width, 30);
+    let parent = Fixture::new().read(&eat_from(InputReference::ActionQueue, width - 1));
+    let last = channel(&InputReference::ActionQueue, width - 1);
+    assert!(parent.connected.contains(&last) && parent.executed.contains(&last));
     let cohort = fold_cohort(Cohort::Founder, 1, &[parent], RETENTION_CHILDREN);
-    let row = cohort
-        .rows
-        .iter()
-        .find(|row| row.channel == beyond)
-        .unwrap();
-    assert_eq!(row.declared, Some(1));
     assert_eq!(
         cohort
             .rows
             .iter()
             .filter(|row| row.channel.family == Family::ActionQueue)
             .count(),
-        usize::from(ACTION_QUEUE_DRAW_WIDTH) + 1
+        usize::from(width)
     );
+    let past = Fixture::new().read(&eat_from(InputReference::ActionQueue, width));
+    assert_eq!(past.out_of_width.get(&Family::ActionQueue), Some(&1));
+    assert!(past.connected.is_empty());
 }
 
 #[test]
@@ -657,12 +664,11 @@ proptest! {
 #[test]
 fn a_ring_bundle_consumes_all_eight_channels_of_its_ring() {
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::Shape;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 1);
     def.bundle_mut(id).set_scale(-2.0);
     let parent = Fixture::new().read(&genome(vec![node]));
     for c in 0..8 {
@@ -679,7 +685,7 @@ fn a_ring_bundle_consumes_all_eight_channels_of_its_ring() {
 #[test]
 fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() {
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{GraphSource, Shape};
+    use crate::genome::cgp::GraphSource;
     let refs = vec![barriers(), food_here(), barriers()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
     let BackendDef::Graph(def) = &mut node.backend_def else {
@@ -689,7 +695,7 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
         (0, DirectedVoteKind::Move, 1, -2.0),
         (2, DirectedVoteKind::Reproduce, 0, 1.0),
     ] {
-        let id = def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+        let id = def.add_ring_bundle(ring_ref, kind, offset);
         def.bundle_mut(id).set_scale(scale);
     }
     let genome = genome(vec![node]);
@@ -753,10 +759,9 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     let id = def.add_pair_bundle(
         0,
         1,
-        area.direction_pairs()[1],
+        crate::contracts::pair_layout(&area, 1),
         DirectedVoteKind::Move,
         3,
-        &[],
     );
     def.bundle_mut(id).set_scale(0.75);
     let genome = genome(vec![node]);
@@ -796,5 +801,5 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
             assert_eq!(new.source(), old.source());
         }
     }
-    assert_eq!(redirected, 12);
+    assert_eq!(redirected, 12 + 3, "twelve compass members and three facts");
 }

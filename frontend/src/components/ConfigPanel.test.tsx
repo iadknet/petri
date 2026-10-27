@@ -683,7 +683,6 @@ describe("ConfigPanel", () => {
 				"config-field-energy-lifecycle-age-reference-ticks",
 				"config-field-runtime-hop-ramp-allowance",
 				"config-field-runtime-hop-ramp-cost",
-				"config-field-mutation-neutral-input-recruitment",
 			]) {
 				expect(screen.getByTestId(testId)).toBeInTheDocument();
 			}
@@ -691,13 +690,13 @@ describe("ConfigPanel", () => {
 
 		it("applies an enum change", async () => {
 			render(<ConfigPanel />);
-			fireEvent.change(screen.getByTestId("config-field-mutation-neutral-input-recruitment"), {
-				target: { value: "Off" },
+			fireEvent.change(screen.getByTestId("config-field-energy-capacity-sensor-scale"), {
+				target: { value: "own" },
 			});
 			fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
 			await waitFor(() =>
 				expect(api.patchConfig).toHaveBeenCalledWith({
-					mutation: { neutral_input_recruitment: "Off" },
+					energy: { capacity: { sensor_scale: "own" } },
 				}),
 			);
 		});

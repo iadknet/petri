@@ -46,7 +46,7 @@ fn bundle(
     offset: u8,
     scale: f32,
 ) -> BundleId {
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, offset);
+    let id = def.add_ring_bundle(0, kind, offset);
     def.bundle_mut(id).set_scale(scale);
     id
 }
@@ -176,7 +176,7 @@ fn only_ring_references_above_the_weight_floor_carry_a_path() {
         OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
         leaf(1, 0, -PATH_WEIGHT_FLOOR),
     );
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Reproduce, 0);
+    let id = def.add_ring_bundle(1, DirectedVoteKind::Reproduce, 0);
     def.bundle_mut(id).set_scale(PATH_WEIGHT_FLOOR);
 
     // Act
@@ -307,10 +307,9 @@ fn ring_rules_ignore_a_pair_bundle() {
         let id = def.add_pair_bundle(
             0,
             1,
-            area.direction_pairs()[1],
+            crate::contracts::pair_layout(&area, 1),
             DirectedVoteKind::Move,
             0,
-            &[],
         );
         def.bundle_mut(id).set_scale(1.0);
         def

@@ -1303,7 +1303,7 @@ mod tests {
     /// retained discovery stays useful (Graph Drift `[18, 14, 12, 7]` ->
     /// `[18, 14, 12, 8]`). Every other row and the discard counts are
     /// unchanged. Re-pinned by T25.F04 (direction-pair bundles): the
-    /// `AddDirectionPairBundle` entry remaps every default-arm Graph draw
+    /// `AddDirectionPairGroup` entry remaps every default-arm Graph draw
     /// (invariant 13) and recruitment's `WholeFamily` pair case changes its
     /// draws and plan (invariant 9) (Graph Drift `[18, 14, 12, 8]` ->
     /// `[14, 11, 10, 6]`, Selection `[18; 4]` -> `[14; 4]`; VM Drift
@@ -1339,19 +1339,26 @@ mod tests {
     /// sink draws 39/108, field draws 0..5 remap the mutation draws (Graph
     /// Drift `[15, 10, 9, 2]` -> `[16, 10, 9, 2]`); Graph Selection
     /// `[16; 4]`, both VM rows and the discard counts (zero) are unchanged.
+    /// Re-pinned by T25.F11 commit 3 (the bundle model: four creation
+    /// operators replace `InputRef.Add`, recruitment and the four
+    /// `Add*Group`, Graph weight 78, InputRef 12, so every Graph and
+    /// InputRef draw remaps): Graph Drift `[16, 10, 9, 2]` ->
+    /// `[16, 11, 9, 7]`, Selection `[16; 4]` -> `[17; 4]`; VM Drift
+    /// `[22, 16, 16, 9]` -> `[22, 16, 16, 10]`; VM Selection `[22; 4]` and
+    /// the discard counts (zero) are unchanged.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [16, 10, 9, 2], [0, 0]),
+            ("graph_prepared", Policy::Drift, [16, 11, 9, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [16, 16, 16, 16],
+                [17, 17, 17, 17],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [22, 16, 16, 9], [0, 0]),
+            ("vm_prepared", Policy::Drift, [22, 16, 16, 10], [0, 0]),
             ("vm_prepared", Policy::Selection, [22, 22, 22, 22], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
@@ -1486,7 +1493,7 @@ mod tests {
     /// rule): 16/16 graph (censored 9 -> 16) and 20/20 VM (censored 8 -> 12)
     /// retained discoveries remain useful; rate 0.005 and then the old size
     /// rule with anchor 97 restore the previous values. Re-pinned by T25.F04
-    /// (the `AddDirectionPairBundle` entry remaps every default-arm Graph
+    /// (the `AddDirectionPairGroup` entry remaps every default-arm Graph
     /// draw, and recruitment's `WholeFamily` pair case changes its draws and
     /// plan): 15/15 graph (censored 16 -> 17) and 21/21 VM (censored
     /// 12 -> 11) retained discoveries remain useful. Re-pinned by T25.F07
@@ -1501,14 +1508,17 @@ mod tests {
     /// (the six retention operators, enabled Graph weight 67 -> 79, remap
     /// every Graph draw; the runtime commit alone keeps the T25.F08 values):
     /// 18/18 graph (censored 15 -> 14) and 20/20 VM (censored 12, unchanged)
-    /// retained discoveries remain useful.
+    /// retained discoveries remain useful. Re-pinned by T25.F11 commit 3
+    /// (the bundle model's creation operators remap every Graph and InputRef
+    /// draw): 18/18 graph (censored 14, unchanged) and 21/21 VM (censored
+    /// 12 -> 11) retained discoveries remain useful.
     #[test]
     #[ignore = "slow tier: recruitment-paths experiment pin; run with make rust-test-slow"]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
             ("graph_prepared", [18, 18, 18, 18], 14),
-            ("vm_prepared", [20, 20, 20, 20], 12),
+            ("vm_prepared", [21, 21, 21, 21], 11),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);

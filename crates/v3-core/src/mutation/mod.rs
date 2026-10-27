@@ -18,5 +18,5 @@ pub use engine::MutationEngine;
 pub use types::{
     BirthEdgeClass, BundleEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
-    MutationSummary, TargetReachability,
+    MutationSummary, TargetReachability, FORM_KEYS, WIRING_KEYS,
 };

@@ -233,11 +233,10 @@ mod tests {
 
     #[test]
     fn a_move_bundle_votes_move_through_its_members_and_another_kind_does_not() {
-        use crate::genome::cgp::Shape;
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, 0);
+            def.add_ring_bundle(0, kind, 0);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {
@@ -268,7 +267,7 @@ mod tests {
         });
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.add_pair_bundle(0, 0, area.direction_pairs()[0], kind, 2, &[]);
+            def.add_pair_bundle(0, 0, crate::contracts::pair_layout(&area, 0), kind, 2);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {

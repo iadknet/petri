@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc a639ace511a5f93ac0a2f7a8baaa58479e421a5364a2def396e37c3fdf139f93 # shrinks to seed = 3712479678483087848, sizes = [ModuleSize { compute_nodes: 1, edges_per_node: 1, sinks: 0, input_refs: 2, instructions: 0, constants: 0 }] (two ModuleSize fields of a since-deleted surface omitted)
+cc 37cd2bf58cb27d012a48d44a95380ee68993c4765b29226f4c3ec6b31c6e3834 # shrinks to seed = 9785783814030395955, sizes = [ModuleSize { compute_nodes: 0, edges_per_node: 0, sinks: 0, vote_sinks: 1, vote_edges: 0, input_refs: 0, instructions: 0, constants: 0 }], food_type_count = 1

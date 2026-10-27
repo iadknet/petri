@@ -323,12 +323,12 @@ and T11.F08's): a growth operator adds structure and must be neutral at the
 moment it fires — identical action, output-slot, and shared-memory behavior
 when both executions have enough energy. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
-`CopySubgraph`, `InputRef.Add` on a VM node, the VM `VmCopyInstructionBlock`,
+`CopySubgraph`, `InputRef.AddSensor*` on a VM node, the VM `VmCopyInstructionBlock`,
 `VmCopyGeneBackwardSlice`, and `VmCopyGeneForwardSlice`,
 and the topology `AddNode`, `CopyNode`, mesh slices, `SpliceNode`,
 `AddRouteTarget`, and `SwapNodeBackend`. `VmCopyInstructionBlockRemapped` is
 not in this class: the register-renamed inline copy is an explicit
-behavior-changing macro, as `CopyEdgeBundle` and the paired slot-address
+behavior-changing macro, as `CopyNodeInputs` and the paired slot-address
 operator are. `VmCopyConstantBlock` is not in this class either: it is
 append-only and silent in practice, but a `const_idx` that wraps the constant
 pool resolves differently after the append, so it is not neutral by
@@ -336,25 +336,27 @@ construction. T11.F15 owns the topology attachment and paired-routing
 guarantees; F08 owns copy placement and post-activation qualification on
 every backend. A connection or parameter operator may change
 behavior, and must do so in one small step: `AddGraphEdge`,
-`RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, `SwapGraphOperator`,
-`MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Add` on a
-Graph node (T20.F16), `InputRef.Swap`, and `InputRef.RawFieldMutation` are all
-in this class. Topology connection operators
+`RetargetGraphEdge`, `RemoveGraphEdge`, `CopyNodeInputs`, `SwapGraphOperator`,
+`MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.AddSensorLive`
+on a Graph node (T25.F11; `AddSensorSilent` and `AddBundleSilent` build
+silent bundles), `AddBundleLive`, `InputRef.Swap`, and
+`InputRef.RawFieldMutation` are all in this class. Topology connection operators
 are `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `MutateGateBias`,
 `SwapRouteTargets`, and the explicit macro `ChangeEntryNode`, all owned by
-T11.F15, and `AddFeedbackRoute`, owned by T11.F29. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
+T11.F15, and `AddFeedbackRoute`, owned by T11.F29. The retired identity rename is outside this live taxonomy. `CopyNodeInputs` remains an
 explicit multi-edge macro, as the VM's paired-slot-address operator is. A
 grown node still costs `graph_node_base_cost` per visit; growth neutrality
 does not extend to energy exhaustion.
 
 ### Graph domain
 
-T20.F02 qualifies ordinary zero-weight edges to existing `ActionVote` sinks
-for F04 recruitment. The [graph consumer contract](v3-graph-backend-spec.md#qualified-zero-vote-connections-t20f02)
+T20.F02 qualifies ordinary zero-weight edges to existing `ActionVote` sinks.
+The [graph consumer contract](v3-graph-backend-spec.md#qualified-zero-vote-connections-t20f02)
 owns eligible destinations, finite/context preconditions, independently mutable
 occurrences, prune/reindex and copy/serde behavior, address/admission limits,
 and native storage/work costs. Existing weight mutation and edge deletion apply
-to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
+to zero edges. A silent bundle (T25.F11, below) is the way a whole sensor
+arrives at zero weight.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (the 108 output sinks, vote and parameter sinks included) are never
@@ -396,21 +398,21 @@ added/removed/retyped — only their edges are evolvable.
   neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
-- Edge operators and edge groups (T25.F03): every edge draw indexes
-  `edge_sites`, which enumerates group members as ordinary sink edges. A
+- Edge operators and bundles (T25.F03, T25.F11): every edge draw indexes
+  `edge_sites`, which enumerates bundle members as ordinary sink edges. A
   member may be re-weighted (its correction), removed (the last member's
-  removal removes the group) or retargeted on its own; an edit that changes a
-  member's source outside a group operator (`RetargetGraphEdge` with a changed
+  removal removes the bundle) or retargeted on its own; an edit that changes a
+  member's source outside a bundle operator (`RetargetGraphEdge` with a changed
   source, every `GraphRawFieldMutation` step on a member, `AddComputeNode`'s
   split) detaches it first: its own weight becomes its genomic weight
-  `scale + own_weight`, bitwise, and it moves to the end of its sink's
+  `compose(own, scale, pattern)`, bitwise, and it moves to the end of its sink's
   independent edges, where the edit continues. A same-source retarget draw
   changes nothing. `DetachGraphEdge` (below) detaches one member and
-  nothing else. `AddGraphEdge` and `InputRef.Add` insert before a sink's
-  first member and never join a group: the pushed edge carries no
-  membership and every group keeps its record and member set (T25.F08).
-  Each committed detach and group removal is counted
-  (`graph_edges_detached_total`, `groups_removed_total`). Under the T25.F10
+  nothing else. `AddGraphEdge` inserts before a sink's first member and
+  never joins a bundle: the pushed edge carries no membership and every
+  bundle keeps its record and member set (T25.F08). Each committed detach
+  and bundle removal is counted (`graph_edges_detached_total`,
+  `bundles_removed_total`). Under the T25.F10
   unit rule a member costs nothing, so a detach adds one unit beside the
   operator's own delta, less the record's when its last member goes (a sole
   member's detach adds nothing); removing a member is 0, or −1 with the
@@ -469,16 +471,16 @@ added/removed/retyped — only their edges are evolvable.
   originals. Both copy operators reserve room for their copies before
   selection, so a graph that would produce an index at or above the
   `u16::MAX` dangling-reference sentinel is not an applicable target.
-- `CopyEdgeBundle` (copies one compute node's edge set onto another; the
+- `CopyNodeInputs` (copies one compute node's edge set onto another; the
   source is drawn from the nodes that have edges, and a graph with fewer than
   two compute nodes or no edge-bearing node is not an applicable target)
 - The nine plasticity operators act on edges (T25.F06): each picks one edge
   uniformly among the edges matching its predicate, in `edge_sites` order over
   both surfaces (count-then-select, one draw), writes through
   `EdgeMut::set_plasticity`, and applies to a module when any edge matches. A
-  `ClearSlot` edge never matches; a group member does (T25.F07). After the
+  `ClearSlot` edge never matches; a bundle member does (T25.F07). After the
   pick a member draws the **scope coin** `gen_bool(0.5)`: false, the change
-  lands on the picked member; true, on every member of its group the
+  lands on the picked member; true, on every member of its bundle the
   operator's predicate admits, the rest untouched with no draw; a non-member
   draws no coin. Value draws follow the coin and are drawn once, and each
   target applies the law to its own config: `EnableHebbian` writes one
@@ -494,8 +496,8 @@ added/removed/retyped — only their edges are evolvable.
   genome unit.
   Plasticity travels with its edge: retarget, split (the consumer keeps it,
   the identity edge is static), `CopyComputeNode`, `CopySubgraph` and
-  `CopyEdgeBundle` copy it; `AddGraphEdge`, recruitment and group creation
-  push static edges; `RemoveGraphEdge` removes it with the edge.
+  `CopyNodeInputs` copy it; `AddGraphEdge` pushes a static edge and a
+  creation draws its bundle's learning; `RemoveGraphEdge` removes it with the edge.
 - `EnableHebbian` (a static, eligible edge: rule, rate `0.01..0.2`, clamp
   `1.0..5.0`, Lamarckian coin)
 - `DisableHebbian` (a plastic edge: remove its `PlasticityConfig`)
@@ -507,15 +509,15 @@ added/removed/retyped — only their edges are evolvable.
 - `MutateRewardSource` (a modulated edge: one of the other three channels)
 - `MutateTraceDecay` (a modulated edge: perturb `trace_decay`, kept in `[0, 1]`)
 - `SetScope` (T25.F07, key `Graph.SetScope`, weight 2, Neutral, after
-  `RemoveGroup` in the catalog; applies to a Graph node with a member): one
+  `RemoveBundle` in the catalog; applies to a Graph node with a member): one
   member uniformly in canonical order, the scope coin, then the other of the
-  picked member's scope written to it alone or to every member of its group;
+  picked member's scope written to it alone or to every member of its bundle;
   no value draw. Scope carries no genome unit.
   Each committed change of the nine plasticity operators, `SetScope` and
   the three edge retention operators counts once at the scope it landed on,
   `Group` for a member with a true coin, else `Edge`
   (`attribute_changes_by_scope`, T25.F08, T25.F09).
-- **Retention** (T25.F09): an edge's `retention` and a group's (its learned
+- **Retention** (T25.F09): an edge's `retention` and a bundle's (its learned
   scale's) set how far a learned quantity relaxes toward its birth value
   each tick (graph backend spec Section 13); `EnableHebbian` and both
   creation forms write 1 with no draw. Six operators after
@@ -524,182 +526,104 @@ added/removed/retyped — only their edges are evolvable.
 
   | Operator | Weight | Applies to | Draws, in order |
   | --- | ---: | --- | --- |
-  | `EnableRetention` | 1 | a Graph node with a plastic edge at retention 1 | one such edge uniformly in canonical order; the scope coin for a member (a group-wide change reaches every admitted member); one `u = gen_range(-4.0..=0.0)`; retention `1 − 10ᵘ` on every target |
+  | `EnableRetention` | 1 | a Graph node with a plastic edge at retention 1 | one such edge uniformly in canonical order; the scope coin for a member (a bundle-wide change reaches every admitted member); one `u = gen_range(-4.0..=0.0)`; retention `1 − 10ᵘ` on every target |
   | `DisableRetention` | 1 | a Graph node with a plastic edge below retention 1 | the edge and coin; no value draw; retention 1 |
   | `MutateRetention` | 4 | as `DisableRetention` | the edge and coin; one `u = gen_range(-1.0..=1.0)`; each target's deficit `d = 1 − retention` becomes `(d · (1 + 0.3u)).clamp(10⁻⁴, 1)` |
-  | `EnableGroupRetention` | 1 | a Graph node with a group record at retention 1 | one such record uniformly in `GroupId` order (a record without a scale slot admitted, its retention inert); `EnableRetention`'s draw |
-  | `DisableGroupRetention` | 1 | a Graph node with a group record below retention 1 | the record; retention 1 |
-  | `MutateGroupRetention` | 4 | as `DisableGroupRetention` | the record; `MutateRetention`'s `u` and step |
+  | `EnableBundleRetention` | 1 | a Graph node with a bundle record at retention 1 | one such record uniformly in `BundleId` order (a record without a scale slot admitted, its retention inert); `EnableRetention`'s draw |
+  | `DisableBundleRetention` | 1 | a Graph node with a bundle record below retention 1 | the record; retention 1 |
+  | `MutateBundleRetention` | 4 | as `DisableBundleRetention` | the record; `MutateRetention`'s `u` and step |
 
   A scope-`Group` member's retention is inert but editable, as its
-  `lamarckian` flag; the group three report no scope.
-- `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled by
-  `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`;
-  `"WholeFamily"` is the default since 2026-10-12.
-  Select one Graph node through the existing applicable-node and target-bias
-  rules, then one admissible source family and one present valid `ActionVote`
-  sink occurrence, empty or wired. SingleChannel appends one ordinary edge of
-  weight `0.0`; WholeFamily appends each canonical finite channel once to that
-  one sink. Only missing input declarations are appended. Existing coefficients,
-  duplicate occurrences, references, compute nodes, routes and backend kinds
-  are preserved.
+  `lamarckian` flag; the bundle three report no scope.
+- Bundle operators (T25.F03, T25.F11), after `MutateTraceDecay`:
+  `AddBundleLive`, `AddBundleSilent`, `AlterBundleScale`,
+  `ShiftBundleOffset`, `RetargetBundle`, `RemoveBundle`, then `SetScope`
+  (T25.F07), `DetachGraphEdge` (T25.F08) and the six retention operators
+  (T25.F09). The Graph catalog holds 35 operators at total weight 78; no
+  operator is disabled by configuration. A bundle is a record
+  `{source: Sensor {ref_idx, field_set} | Memory {previous}, wiring:
+  Plain {sink} | Ring {kind, offset} | DirectionPair {kind, offset}, scale,
+  inherit_scale, retention}` plus its member sink edges, each with a
+  `scope` (graph backend spec, "Edge bundles"). The sensor descriptor
+  (`contracts::SensorDescriptor`) gives every sensor its width and field
+  sets: one per slot of `NearbyCreature`, two per area summary (sharing the
+  facts), one `Ring` set per neighbor ring, one plain set of every field for
+  every other sensor; each shared-memory bank is one plain set of 16 slots
+  with no declaration. The unit operators pick one bundle uniformly over
+  every wiring, edit the record and move members with it by coordinate,
+  scope included.
 
-  Sources cover the existing input-reference universe, every configured food
-  identity, all 24 upstream slots and both 16-slot shared-memory banks. Fixed
-  compounds use their actual widths and scalars use channel 0. SingleChannel
-  samples ActionQueue across all `u16` channels; WholeFamily excludes it because
-  it has no small complete fixed-width family. WholeFamily groups upstream into
-  24 channels/declarations and each memory bank into 16 channels with no
-  declaration. The event appends at most 39 edges and 24 declarations, to one
-  sink, and counts as one mutation event. Typed families name one food type.
+  **Plans.** `plans(def, set)` lists a set's admissible wirings in order: a
+  plain set one `Plain` per present vote sink in catalog order; a `Ring` or
+  `Pair` set `(kind, offset)` for every kind whose sites are present (eight
+  direction sinks, and for a pair the drive), kinds in
+  `[Move, Reproduce, StealEnergy, GiveEnergy]` order, offsets `0..8`.
 
-  Source admission reuses the first representable matching declaration, or
-  preflights every append before sampling. Appends cannot bind any incumbent
-  dangling InputLeaf, and new indices must fit `u16`; there is no truncation,
-  overwrite or partial bundle. A full declaration table still admits existing
-  sources and shared memory, so a node with a valid vote sink always has a
-  feasible source. VM-only nodes and absent or invalid vote sinks are excluded.
-  Direct unavailable constructions leave the genome unchanged.
-
-  Off (also the omitted default) removes recruitment before sampling and keeps
-  existing operator order, weights and RNG draws. Size-pressure restriction
-  excludes recruitment as growth. The existing operator funnel and selected
-  node record use `Graph.RecruitNeutralInput`; observation draws no RNG. The
-  neighborhood schema includes a zero-valued row when Off. Ordinary
-  `InputRef.Add`, `AddGraphEdge`, retargeting and VM paths remain separate, and
-  the old ActionQueue source draw remains 12 channels. Independent weight
-  mutation, pruning and copy/serialization operate on the ordinary new edges.
-
-  Exact finite-source vote neutrality requires the F02 execution/input context
-  and adequate budget. New declarations may activate sensor assembly; added
-  units increase maintenance, replication and later size-derived mutation
-  supply. An already active graph has no separate physiological per-edge price;
-  a dormant graph's first edge adds its minimum charged visit. Silent signaling
-  does not imply physiological neutrality or discovered usefulness.
-
-  Ring case (T25.F03): a ring family (`NeighborFoodRing`, `NeighborBarrierRing`,
-  `NeighborOccupiedRing`) landing on a directed sink `K(d)` is declared as
-  above, then creates one silent `Ring` edge group on that reference into `K`
-  at offset `(d − channel) mod 8` (`channel` 0 under WholeFamily): eight
-  members at own weight 0 and scale 0, in place of the edge or column, with no
-  new draw. Other families and destinations are unchanged: a ring family
-  landing on a kind drive (T11.F30) appends its zero-weight edges as on `Eat`,
-  never a group. The family universe drops ring families when the graph
-  cannot host a group (`can_host_group`: all 24 direction sinks and
-  fewer than `u16::MAX` groups), so a drawn ring plan always completes. A
-  dangling member reference bounds admission as any dangling leaf does.
-
-  Pair case (T25.F04): under WholeFamily, a pair-declaring family (sensor
-  spec Section 5.7) landing on a directed sink `K(d)` draws one pair
-  `gen_range(0..direction_pairs().len())` after the destination (the only new
-  draw) and creates one silent `DirectionPair` gene at offset `d` through
-  one container primitive: twelve direction members plus one born-0 fact
-  member into `Drive K` per fact of the pair, in facts order (T25.F10): 15
-  members for an area family, 20 for a creature slot (eight facts since
-  T27.F01), one `genome_size()` unit beside its declarations.
-  The reference is declared once and shared. SingleChannel keeps its
-  one-edge plan and draws, an area family on an undirected destination its
-  whole-family edges. `NearbyCreature`, whose pairs are its slots
-  (`slot_pairs()`, T25.F05), takes the pair draw on every destination: on a
-  directed sink the pair case above wires a whole neighbor, its offset to the
-  eight direction votes and its eight other fields to the drive; on any other
-  sink the drawn slot's ten channels `10k..10k+10`, ascending and born 0,
-  never the family's 40. The WholeFamily universe
-  drops pair-declaring families when the graph cannot host a group or any
-  kind's `Drive` sink is absent, so a drawn pair plan always completes; ring
-  admission is unchanged.
-
-- Edge-group operators (T25.F03), at the catalog positions and weights of the
-  T11.F31 ring projection operators they replace, after
-  `RecruitNeutralInput`, with `AddDirectionPairGroup` (T25.F04) directly
-  after `AddRingGroup`, `SetScope` (T25.F07) after `RemoveGroup`, and
-  `AddRandomizedRingGroup`, `AddRandomizedDirectionPairGroup` and
-  `DetachGraphEdge` (T25.F08) after `SetScope`, and the six retention
-  operators (T25.F09) after `DetachGraphEdge`. The Graph catalog holds 38
-  operators; the default-arm total weight (every operator but
-  `RecruitNeutralInput`) is 78, and the enabled total at the default config
-  79. A group is a record
-  `{shape: Ring {ring_ref} | DirectionPair {ref_idx, pair}, kind, offset,
-  scale, inherit_scale, retention}` plus its member sink edges, each with a `scope`
-  (graph backend spec, "Ring edge groups" and "Direction-pair edge groups");
-  the unit operators pick one group uniformly over both shapes, edit the
-  record and move members with it, scope included.
-
-  **Learned creation** (T25.F07): after its shape draws a creation operator
-  draws one mode `gen_range(0..3u8)` (0 static, 1 Hebbian, 2
-  reward-modulated); a learning mode draws one config by `EnableHebbian`'s
-  law (then `EnableRewardModulation`'s for mode 2) written to every member;
-  then one scope coin (`gen_bool(0.5)`, true `Group`) written to every
-  member; then one `inherit_scale` coin (`gen_bool(0.5)`). The pattern and
-  the scale are never randomized: a new group is silent.
-
-  **Randomized creation** (T25.F08): `AddRandomizedRingGroup` and
-  `AddRandomizedDirectionPairGroup` apply where their uniform twins do, make
-  the twin's shape draws in the same order and create the silent group
-  through the same constructor; then, per member in canonical order, its
-  own mode `gen_range(0..3u8)`, that mode's config by the same laws and its
-  own scope coin; then one `inherit_scale` coin for the group. A mutation in
-  the uniform form changes every member it builds; the randomized form
-  gives each member its own learning attributes.
+  **The birth policy** (one function for the four creation operators): for
+  each field set in order, the plan (`Plain`: `gen_range` over the set's
+  admissible sinks; geometric: the kind `gen_range` over the hostable kinds,
+  then `gen_range(0..8)` offset) and the birth law (live: scale
+  `gen_range(-1.0f32..=1.0)`; silent: scale 0, no draw); a set with no
+  admissible plan skips the event with `NoApplicableTarget` before its
+  draws. The node's owner operation then builds every bundle at once, each
+  with every coordinate of its set (own weight 0, static, scope `Edge`, no
+  seed). Then, per bundle in order, learning: the form coin
+  `gen_bool(0.5)` (true `Randomized`); the uniform form draws one mode
+  `gen_range(0..3u8)` (0 static, 1 Hebbian, 2 reward-modulated), its
+  config by `EnableHebbian`'s law (then `EnableRewardModulation`'s for
+  mode 2) and one scope coin, written to every member; the randomized form
+  draws a mode, config and scope coin per member in canonical order; both
+  then draw one `inherit_scale` coin. The pattern is never drawn.
 
   **Detach** (T25.F08): `DetachGraphEdge` applies to a Graph node with a
   member. It draws one member uniformly in canonical order (one draw, no
   coin, no value draw) and detaches it as a retarget does: its own weight
   becomes `compose(own, scale, pattern)` bitwise, its membership and scope
   clear, its plasticity stays, it moves to the end of its sink's
-  independent prefix, and its seed composes (T25.F07 invariant 6). A fact
-  member (T25.F10) detaches own-only: its own weight bits and its seed entry
-  stay exactly as stored. A last
-  member's detach removes the record and renumbers higher `GroupId`s. A
+  independent prefix, and its seed composes (T25.F07 invariant 6); every
+  member, a fact on the drive included, detaches by this one law. A last
+  member's detach removes the record and renumbers higher `BundleId`s. A
   committed detach counts one `graph_edges_detached`, and one
-  `groups_removed` when the record went.
+  `bundles_removed` when the record went.
 
   | Operator (key `Graph.<name>`) | Weight | Applies to | Draws, in order | Complexity |
   | --- | ---: | --- | --- | --- |
-  | `AddRingGroup` | 2 | a Graph node with a ring at an index ≤ 65,535 that can host a group | the ring uniformly over those indices ascending; kind `gen_range(0..4)` over `[Move, Reproduce, StealEnergy, GiveEnergy]`; offset `gen_range(0..8)`; creates a group at scale 0 with eight members at own weight 0 (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
-  | `AddDirectionPairGroup` | 2 | a Graph node with a pair-declaring reference at an index ≤ 65,535 that can host a group | one pair uniformly over the flat list (`ref_idx` ascending, `pair` ascending) of declared pairs; kind `gen_range(0..4)`; offset `gen_range(0..8)`; creates a group at scale 0 with twelve members at own weight 0 and no fact members (duplicates allowed); then learned creation's draws; `Δgenome_size` +1 | Increasing |
-  | `AlterGroupScale` | 4 | a Graph node with a group | the group uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
-  | `ShiftGroupOffset` | 2 | same | the group; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new sink | Neutral |
-  | `RetargetGroupKind` | 2 | same | the group; `gen_range(0..3)` over the other three kinds in catalog order; every member moves to its new sink, a fact member to the new kind's drive; a gene with a fact member skips after its draws when that drive is absent | Neutral |
-  | `RemoveGroup` | 2 | same | the group; removes the record and every member of either role, renumbering higher `GroupId`s; `Δgenome_size` −1 | Decreasing |
-  | `AddRandomizedRingGroup` | 2 | as `AddRingGroup` | `AddRingGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
-  | `AddRandomizedDirectionPairGroup` | 2 | as `AddDirectionPairGroup` | `AddDirectionPairGroup`'s shape draws; creates the same silent group; then randomized creation's per-member draws and one `inherit_scale` coin; `Δgenome_size` +1 | Increasing |
-  | `DetachGraphEdge` | 2 | a Graph node with a member | one member uniformly in canonical order; detaches it (a fact member own-only); `Δgenome_size` +1, or 0 when the record goes | Neutral |
+  | `AddBundleLive` | 4 | a Graph node with an admissible `(source, field set)` | one `gen_range` over the node's admissible sets (declared sensors by `ref_idx` ≤ 65,535, field sets ascending, then `Memory { previous: false }`, `Memory { previous: true }`); the birth policy for that set, live; `Δgenome_size` +1 | Increasing |
+  | `AddBundleSilent` | 4 | as `AddBundleLive` | the same, silent | Increasing |
+  | `AlterBundleScale` | 4 | a Graph node with a bundle | the bundle uniformly; `AlterGraphEdgeWeight`'s law on the scale (`\|w\| > 0.01` scales by `1 + U[−0.2, 0.2]`, else adds `U[−0.1, 0.1]`) | Neutral |
+  | `ShiftBundleOffset` | 2 | a Graph node with a geometric bundle | one geometric bundle uniformly; `gen_bool(0.5)` true +1, false −1, mod 8; every member moves to its new site | Neutral |
+  | `RetargetBundle` | 2 | a Graph node with a bundle | the bundle; a `Plain` bundle moves to another present vote sink, `gen_range` over the others in catalog order (skipping before that draw when there is none); a geometric bundle to another kind, `gen_range(0..3)` over the other three, skipping after the draw when the kind lacks a site the wiring needs | Neutral |
+  | `RemoveBundle` | 2 | a Graph node with a bundle | the bundle; removes the record and every member, renumbering higher `BundleId`s; `Δgenome_size` −1 | Decreasing |
+  | `DetachGraphEdge` | 2 | a Graph node with a member | one member uniformly in canonical order; detaches it; `Δgenome_size` +1, or 0 when the record goes | Neutral |
 
-  Restricted size pressure admits only `RemoveGroup` of these nine. A shift or
-  retarget re-inserts each member at its new sink in the I10 position, so it
-  and its inverse return an equal genome. A born-connected `InputRef.Add`
-  ring landing on a direction sink stays one ordinary edge (T20.F16
-  unchanged, draw for draw).
+  Restricted size pressure admits only `RemoveBundle` of these. A shift or
+  retarget re-inserts each member at its new site in the I10 position, so
+  it and its inverse return an equal genome. Each committed creation counts
+  in `bundles_created_total` by operator, wiring (`plain`, `ring`, `pair`)
+  and form (`uniform`, `randomized`). A birth whose only applied event is
+  one creation that made exactly one `Plain` bundle stores the class of its
+  sink (`drive` or `direction`, T11.F30), as one `AddGraphEdge` does.
 
 ### InputRef domain
 
-- `Add` — pushes one reference to `input_refs`. On a VM node it is a growth
-  operator and wires nothing (no `ReadInput` auto-insertion, no further draw);
-  the VM `ReadInput { ref_idx }` reference becomes addressable only by the VM
-  operators that construct `ReadInput`. On a Graph node it is a connection
-  operator (T20.F16, born-connected input declaration): after the reference
-  draw it draws `sub_idx = gen_range(0..width)` (`width` the reference's
-  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..39))` and a
-  weight `gen_range(-1.0f32..=1.0)` (`AddGraphEdge`'s new-edge law), in that
-  order, and appends one `GraphEdge { source: InputLeaf { ref_idx, sub_idx },
-  weight }` to that `ActionVote` sink's inputs, `ref_idx` the appended index.
-  The draws are always taken; when the index does not fit `u16` or the node
-  lacks the drawn sink, no edge is pushed and the event stays a plain
-  declaration. `Add` and `AddGraphEdge` report the class of the vote sink
-  they push onto (`drive` or `direction`, T11.F30); a birth whose only
-  applied event is one of them stores that class, and `SimStats` keys its
-  carrier outcome by it (`mutation_value_totals_by_birth_edge_class`). The born edge is an ordinary edge with no provenance; the
-  connected reference is not prunable while the edge consumes it. A ring
-  landing on a direction sink stays this one ordinary edge, never joining an
-  edge group (T25.F03).
+- `AddSensorLive` / `AddSensorSilent` (T25.F11, weight 1 each, Increasing)
+  — push one sensor to `input_refs`, drawn from the bucket table below
+  under the run's sensor context. On a VM node the declaration alone, wired
+  into nothing, with no further draw (a growth operator). On a Graph node
+  the birth policy (Graph domain, "Bundle operators") for every field set
+  of the sensor, live or silent by the operator, then one `add_sensor`
+  transaction declares the sensor and builds one bundle per set: a sensor
+  arrives whole, `NearbyCreature` as four pair bundles, an area summary as
+  two, every other sensor as one; `Δgenome_size` 1 + bundles made (1 on a
+  VM node). A set with no admissible plan skips the event before its draws,
+  and a declaration index past `u16` or a full bundle table skips it after
+  them; nothing is written either way. The members consume the new
+  reference, so it is not prunable while they do.
 
   The new reference is one `gen_range(0..30)` key draw into the one bucket
   table, `sampling::INPUT_BUCKETS` (T27.F01); `input_reference_universe`
-  (the `Swap` partition, recruitment's enumeration) is the same table
-  expanded over the food types and the 24 upstream slots, deduplicated in
-  table order. Recruitment's family weights (`universe_entries`) are a
-  separate declaration.
+  (the `Swap` partition) is the same table expanded over the food types and
+  the 24 upstream slots, deduplicated in table order.
 
   | Index | Reference | Extra draw |
   | --- | --- | --- |
@@ -712,12 +636,13 @@ added/removed/retyped — only their edges are evolvable.
   | 11 | `AreaFoodSummary` | food type, with more than one food type |
   | 12 to 16 | `AreaBarrierSummary`, `NearbyCreature` (13, 14 and 15, T25.F05), `AreaOccupancySummary` | none |
   | 17 to 21 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
-  | 22 to 29 | `UpstreamSlot` (eight buckets, the slot over all 24) | the slot |
+  | 22 to 28 | `UpstreamSlot` (seven buckets, the slot over all 24) | the slot |
+  | 29 | `UpstreamBus` (T25.F11: every upstream slot, 24 wide) | none |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
-  `GraphSource::InputLeaf { ref_idx }` on any edge container (a group's
-  members address its ring), and no VM `ReadInput { ref_idx }` anywhere
+  `GraphSource::InputLeaf { ref_idx }` on any edge container (a bundle's
+  members address its sensor), and no VM `ReadInput { ref_idx }` anywhere
   in the program, live or not. Higher `ref_idx` values are decremented on both
-  backends, group shape references included, so every consumer
+  backends, bundle sources included, so every consumer
   resolves to the same reference afterwards and none is removed or rewritten;
   the event is neutral at birth. A node with no unreferenced entry is not a
   target.
@@ -867,7 +792,7 @@ reachability layer at the domain's `ReachableBiasConfig` threshold.
 For VM and Graph operators the eligible set is the operator's applicable set
 — the backend's nodes filtered by the operator's applicability predicate
 (T13.F03) — so both biases apply within the modules that carry a suitable
-site. For Topology and for InputRef `Add` the eligible set is unchanged;
+site. For Topology and for InputRef `AddSensor*` the eligible set is unchanged;
 InputRef `Swap` and `Prune` filter per entry (a node with a swappable entry, a
 node with an unreferenced entry) before the draw, so neither can select a
 node and then find no site.
@@ -971,9 +896,9 @@ records no target.
 ### Post-apply parseability check (global)
 
 After each event, run `ParseabilityGate`, then `validate_graph` on every Graph
-backend (T25.F03): the edge-group invariants I2–I10 of the graph backend
+backend (T25.F03): the bundle invariants I2–I10 of the graph backend
 spec, checked after every applied event of any domain, since `InputRef.Prune`
-reindexes shape references and topology events clone and swap backends.
+reindexes bundle sources and topology events clone and swap backends.
 
 Required parseability invariants are defined authoritatively in
 `v3-genome-spec.md` (Section 4) and must be applied verbatim by
@@ -997,8 +922,8 @@ If an event results in non-parseable genome or a Graph backend failing
 1. rollback that event (the genome, birth seeds included, is restored),
 2. mark event skipped with reason `ParseabilityViolation` or
    `GraphInvariantViolation`,
-3. continue with remaining events. A rolled-back event counts no detach and no
-   group removal.
+3. continue with remaining events. A rolled-back event counts no creation, detach or
+   bundle removal.
 
 No behavioral repair is required.
 No global topology rewrite is required.

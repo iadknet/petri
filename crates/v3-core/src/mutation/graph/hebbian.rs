@@ -900,7 +900,7 @@ mod tests {
     // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
 
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{BundleId, Scope, Shape};
+    use crate::genome::cgp::{BundleId, Scope};
 
     /// A full catalog with one ring bundle of eight members on `Move`, member
     /// `k` carrying `configs[k]` (static past the list's end).
@@ -908,7 +908,7 @@ mod tests {
         configs: &[Option<PlasticityConfig>],
     ) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
+        let id = def.add_ring_bundle(1, DirectedVoteKind::Move, 0);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();
         for (&member, &config) in members.iter().zip(configs) {
             def.edge_mut(member).set_plasticity(config);
@@ -1008,20 +1008,24 @@ mod tests {
     #[test]
     fn a_bundle_broadcast_from_a_direction_member_reaches_the_fact_members() {
         use crate::contracts::{InputReference, WorldInputKey};
-        let layout =
-            InputReference::World(WorldInputKey::AreaOccupancySummary).direction_pairs()[0];
+        let layout = crate::contracts::pair_layout(
+            &InputReference::World(WorldInputKey::AreaOccupancySummary),
+            0,
+        );
         let mut original = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = original.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+        let id = original.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3);
         let (facts, directions): (Vec<_>, Vec<_>) = original
             .members(id)
-            .partition(|&member| original.is_fact_member(member));
+            .partition(|&member| original.site_of(member) == Some(crate::genome::cgp::Site::Drive));
         assert_eq!(facts.len(), layout.facts.len());
         assert!(!facts.is_empty() && !directions.is_empty());
         let mut broadcasts = 0;
         for seed in 0..128 {
             let mut expected = rng(seed);
             let (picked, coin) = replay_pick(&original, can_enable_hebbian, &mut expected);
-            if original.is_fact_member(picked) || coin != Some(true) {
+            if original.site_of(picked) == Some(crate::genome::cgp::Site::Drive)
+                || coin != Some(true)
+            {
                 continue;
             }
             let config = draw_hebbian_config(&mut expected);

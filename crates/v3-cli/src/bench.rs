@@ -6,13 +6,13 @@
 //! wall-clock as an unasserted secondary signal.
 
 pub mod artifacts;
+pub mod bundles;
 pub mod capacity;
 mod comparison;
 pub mod drives;
 mod indicators;
 pub mod input_use;
 pub mod mutation_effects;
-pub mod pair_bundles;
 mod profiles;
 mod progress;
 pub mod ring_rules;

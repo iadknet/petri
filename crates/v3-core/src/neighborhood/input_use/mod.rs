@@ -1,4 +1,4 @@
-//! Input-use funnel (T20.F01, `input-use-v4`): per cohort parent, how far
+//! Input-use funnel (T20.F01, `input-use-v5`): per cohort parent, how far
 //! each input family and channel gets from declaration to connection,
 //! executed read, causal action effect and one-step retention, over
 //! T11.F26's cohorts, contexts and proposals.
@@ -44,9 +44,11 @@ pub(in crate::neighborhood) use consumers::ablated;
 use consumers::{declarations, fixed_channel, Inventory, Target};
 use reads::{ReadEvent, ReadRecording};
 
-/// `input-use-v4` since T27.F03: `CommitCounts` is 5 wide and `ActionVotes`
-/// / `PreviousPassVotes` 39 wide, so their channel meanings changed.
-pub const VERSION: &str = "input-use-v4";
+/// `input-use-v5` since T25.F11: the beyond-draw-width `*` marker is gone;
+/// every `ActionQueue` channel below the configured width is drawn and a
+/// read past it is `OutOfWidth`, and `UpstreamBus` is a family. (`v4`,
+/// T27.F03: `CommitCounts` 5 wide, `ActionVotes` / `PreviousPassVotes` 39.)
+pub const VERSION: &str = "input-use-v5";
 /// Children read for retention per parent with a causal channel.
 pub const RETENTION_CHILDREN: u32 = 10;
 
@@ -502,7 +504,7 @@ fn observe_cohort(
     fold_cohort(cohort, parents_requested, &uses, wanted)
 }
 
-/// One world's complete `input-use-v4` reading.
+/// One world's complete `input-use-v5` reading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reading {
     pub founder: CohortUse,

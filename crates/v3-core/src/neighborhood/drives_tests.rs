@@ -214,11 +214,9 @@ fn a_weight_exactly_at_the_floor_carries_no_path() {
 #[test]
 fn a_bundle_is_not_a_fanout() {
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::genome::cgp::Shape;
     let mut grouped = CgpGraphBackendDef::new_with_fixed_outputs();
     for offset in [0, 3] {
-        let id =
-            grouped.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);
+        let id = grouped.add_ring_bundle(0, DirectedVoteKind::Move, offset);
         grouped.bundle_mut(id).set_scale(1.0);
     }
     let mut independent = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -259,10 +257,9 @@ fn pair_members_are_not_a_fanout() {
     let id = def.add_pair_bundle(
         0,
         0,
-        area.direction_pairs()[0],
+        crate::contracts::pair_layout(&area, 0),
         DirectedVoteKind::Move,
         2,
-        &[],
     );
     def.bundle_mut(id).set_scale(1.0);
     let mut genome = graph_genome(def);

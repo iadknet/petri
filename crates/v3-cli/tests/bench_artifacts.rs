@@ -209,12 +209,35 @@ fn value_digest(value: &serde_json::Value) -> String {
     format!("sha256:{}", artifacts::sha256(&canonical))
 }
 
-/// Undoes T27.F03 commit 3 on the resolved goal recipes: removing
-/// `exchange` and `mutation.share` and restoring `predation.steal_cost_rate`
-/// at the effort rate recovers the T26.F02 digests, whose values it returns.
-fn undo_t27_f03(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
+/// Undoes T25.F11 commit 3 on the resolved goal recipes: re-inserting
+/// `mutation.neutral_input_recruitment` at `WholeFamily` recovers the
+/// T27.F03 digests, whose values it returns.
+fn undo_t25_f11(configs: [v3_core::config::SimulationConfig; 3]) -> [Value; 3] {
     let values = configs.map(|config| {
         let mut value = serde_json::to_value(config).unwrap();
+        let mutation = value["mutation"].as_object_mut().unwrap();
+        assert_eq!(
+            mutation.insert("neutral_input_recruitment".into(), json!("WholeFamily")),
+            None
+        );
+        value
+    });
+    assert_eq!(
+        values.each_ref().map(value_digest),
+        [
+            "sha256:7f9c8d9fcf1bcb4afc2ed729c303a309c61d6fb51358a66844dd826e6427c1a0",
+            "sha256:70d437d4810597f22966d17e6f8dc9edf13b81648e26c96c41501d6f1daf95ea",
+            "sha256:fdbcbbc3b4280dc7e5e94bfcd9d27c0fc01d751235e5734b649dbea5fa45a5fb",
+        ]
+    );
+    values
+}
+
+/// Undoes T27.F03 commit 3 on the goal recipes' T27.F03 values: removing
+/// `exchange` and `mutation.share` and restoring `predation.steal_cost_rate`
+/// at the effort rate recovers the T26.F02 digests, whose values it returns.
+fn undo_t27_f03(values: [Value; 3]) -> [Value; 3] {
+    let values = values.map(|mut value| {
         let exchange = value.as_object_mut().unwrap().remove("exchange").unwrap();
         assert!(value["mutation"]
             .as_object_mut()
@@ -359,7 +382,11 @@ fn undo_t25_f02(values: [Value; 3]) -> [Value; 3] {
 /// recovers them. T27.F03 commit 3 re-pinned all three after two agreeing
 /// runs: the resolved config adds `exchange` and `mutation.share` and
 /// `predation` drops `steal_cost_rate` (09bd4d5d..., f9aca208...,
-/// bcfa2253...); [`undo_t27_f03`] recovers them.
+/// bcfa2253...); [`undo_t27_f03`] recovers them. T25.F11 commit 3
+/// re-pinned all three after two agreeing runs: the resolved
+/// `MutationConfig` drops `neutral_input_recruitment` (7f9c8d9f... ->
+/// b3fb34a7..., 70d437d4... -> 46e16952..., fdbcbbc3... -> d04db7ab...);
+/// [`undo_t25_f11`] recovers them.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -375,13 +402,15 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:7f9c8d9fcf1bcb4afc2ed729c303a309c61d6fb51358a66844dd826e6427c1a0",
-            "sha256:70d437d4810597f22966d17e6f8dc9edf13b81648e26c96c41501d6f1daf95ea",
-            "sha256:fdbcbbc3b4280dc7e5e94bfcd9d27c0fc01d751235e5734b649dbea5fa45a5fb",
+            "sha256:b3fb34a7ae323de3c08dc0c57e944077277c90604c3b7462c7064cc1c894a764",
+            "sha256:46e16952c441b6aca8ef46d5de4dfbcd607bb8e3a9cb470d6aa6ca4e45196c47",
+            "sha256:d04db7abfa1e13e225d812bf6590d8e58a090609a77378762c2a8f089c9e5b36",
         ]
     );
 
-    let input_values = undo_t25_f02(undo_t25_f08(undo_t26_f02(undo_t27_f03(configs))));
+    let input_values = undo_t25_f02(undo_t25_f08(undo_t26_f02(undo_t27_f03(undo_t25_f11(
+        configs,
+    )))));
     assert_eq!(
         input_values.each_ref().map(value_digest),
         [

@@ -1035,7 +1035,10 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// 653 -> 4890): the `EatLeaveShare` sink widens the edge-surface draw.
 /// T27.F03 commit 4 moves every Graph seed and the VM vote seeds:
 /// `GiveEnergy`'s nine sinks and `GiveEffort` widen the vote catalog to 39
-/// and the edge surface to `c + 108`.
+/// and the edge surface to `c + 108`. T25.F11 commit 3 moves the
+/// `graph_unprepared` seeds and lengthens it 3 -> 4 events: the ring is
+/// wired whole by `InputRef.AddSensorLive`, so the bundle's `Move(N)`
+/// member is removed after the incumbent's `Move(N)` vote edge.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1056,13 +1059,17 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         record,
         [
-            ("graph_blank", vec![(InputRefAdd, 5649), swap], None),
+            (
+                "graph_blank",
+                vec![(InputRefAddSensorLive, 5649), swap],
+                None
+            ),
             ("graph_copy", vec![(GraphAddGraphEdge, 732), swap], None),
             ("graph_split", vec![(GraphAddGraphEdge, 2221), swap], None),
             (
                 "vm_blank",
                 vec![
-                    (InputRefAdd, 201),
+                    (InputRefAddSensorLive, 201),
                     (VmInstructionMutation, 1279),
                     (VmInstructionMutation, 39_910),
                     swap,
@@ -1072,13 +1079,18 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
                 "graph_unprepared",
-                vec![(InputRefAdd, 12_947), (GraphRemoveGraphEdge, 0), swap],
+                vec![
+                    (InputRefAddSensorLive, 41_639),
+                    (GraphRemoveGraphEdge, 7),
+                    (GraphRemoveGraphEdge, 55),
+                    swap
+                ],
                 None,
             ),
             (
                 "vm_unprepared",
                 vec![
-                    (InputRefAdd, 1),
+                    (InputRefAddSensorLive, 1),
                     (VmInstructionRawFieldMutation, 18),
                     (VmInstructionRawFieldMutation, 25),
                     (VmInstructionRawFieldMutation, 25),
@@ -1087,11 +1099,11 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 ],
                 None,
             ),
-            ("graph_detour", vec![(InputRefAdd, 5649)], None),
+            ("graph_detour", vec![(InputRefAddSensorLive, 5649)], None),
             (
                 "vm_detour",
                 vec![
-                    (InputRefAdd, 201),
+                    (InputRefAddSensorLive, 201),
                     (VmInstructionMutation, 1279),
                     (VmInstructionMutation, 39_910),
                 ],
@@ -1140,7 +1152,7 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
         );
         let table_grew = after_node.input_refs.len() == before_node.input_refs.len() + 1
             && after_node.input_refs[..before_node.input_refs.len()] == before_node.input_refs[..];
-        let is_add = last.event.operator() == MutationOperator::InputRefAdd;
+        let is_add = last.event.operator() == MutationOperator::InputRefAddSensorLive;
         assert!(
             if is_add {
                 table_grew
@@ -1153,7 +1165,7 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
         match last.event.operator() {
             // T20.F16: a Graph-node `Add` exposes a dispatched detour with
             // its born `Move(E)` vote edge.
-            MutationOperator::InputRefAdd => {
+            MutationOperator::InputRefAddSensorLive => {
                 assert_eq!(change.node, NodeId::new(2));
                 assert_eq!(before_node.targets, after_node.targets);
                 let (BackendDef::Graph(b), BackendDef::Graph(a)) =
@@ -2712,7 +2724,7 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// four batches: `lineage` seeds by position and `batches` only bounds the
 /// panel. Rate 0.005 restores batch 7 lineage 7; the old size rule and rate
 /// 0.005 together restore batch 2 lineage 2. Re-pinned at T25.F04 commit 1
-/// (`AddDirectionPairBundle` remaps every Graph draw; batch 22 lineage 0 now
+/// (`AddDirectionPairGroup` remaps every Graph draw; batch 22 lineage 0 now
 /// reads `NoLongerUseful`): batch 1 lineage 3 is the first `Deleted`
 /// lineage of arm 12 in batch, lineage order (batches 0-40, lineages 0-15,
 /// discovery 9, followup 256), the search recorded in

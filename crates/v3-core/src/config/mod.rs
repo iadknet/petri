@@ -14,10 +14,9 @@ pub use simulation::{
     AnnealingConfig, EnergyCapacityConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig,
     ExchangeConfig, FertilityAlgorithm, FertilityBlend, FertilityConfig, FertilityLayer,
     FertilityLayerTarget, FoodConfig, FoodResourceConfig, FoodTypeConfig, FounderProfile,
-    GrazingConfig, LogStepMutationConfig, MutationConfig, NeutralInputRecruitment,
-    OccupancyDepletionConfig, PhenotypeConfig, PopulationConfig, PredationConfig,
-    ReachableBiasConfig, RuntimeConfig, SensorScale, SimulationConfig, VmRuntimeConfig,
-    WorldConfig, WorldEdgeMode,
+    GrazingConfig, LogStepMutationConfig, MutationConfig, OccupancyDepletionConfig,
+    PhenotypeConfig, PopulationConfig, PredationConfig, ReachableBiasConfig, RuntimeConfig,
+    SensorScale, SimulationConfig, VmRuntimeConfig, WorldConfig, WorldEdgeMode,
 };
 pub use terrain::{PatternBounds, PatternParams, TerrainLayer};
 

@@ -189,6 +189,34 @@
       "before": "edges only, group record 1: every edge on both surfaces one unit, group members included, plus one unit per edge-group record (a Ring group 9, a pair group 13, a recruited pair gene 13 plus its ungrouped facts)",
       "after": "ungrouped edges only, group record 1, members 0: a gene of either shape costs one unit whatever its members, holes cost nothing and a detached member is an ordinary edge",
       "comparison": "unchanged for a genome without groups (the founders: 80, ForageFirst 83); smaller for every grouped genome, so mean_genome_size, the carry charge, the replication multiplier, gestation, the size-pressure roll and the per-unit mutation supply are not like-for-like across F10 where groups exist"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "pair_groups (pair-groups-v2) -> bundles (bundles-v1)",
+      "before": "pair-groups-v2: reachable DirectionPair groups only, with direction members, fact members and own_nonzero, plus the inheritance witness's two counters",
+      "after": "bundles-v1: per wiring (plain, ring, pair) bundles, genomic_nonzero, learned_nonzero (absent where no runtime is sampled), members, own_nonzero and unreachable; created by operator, wiring and form from bundles_created_total; rows by wiring and kind or sink, every key an as_key string",
+      "comparison": "not like-for-like: the block covers every wiring and both sources, a pair's facts are members on the drive at pattern 1, and the witness is retired; pair totals before F11 are no reference for the pair wiring after it"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "structure_means (groups, members)",
+      "before": "structure_means carried ring_groups (mean Ring groups per creature) and ring_group_members (mean members per Ring group)",
+      "after": "both dropped; bundle counts and members by wiring are read from the bundles block",
+      "comparison": "no successor field; compare the bundles block's ring row only from F11 on"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "groups_removed_total -> bundles_removed_total",
+      "before": "records removed by RemoveGroup, a last member's removal or detach",
+      "after": "the same events over bundles of every wiring",
+      "comparison": "same definition over the renamed record; counts move with the creation rate, which F11 changes (whole sensors arrive as bundles)"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "input_use (input-use-v4 -> input-use-v5)",
+      "before": "input-use-v4: ActionQueue's first 12 channels were drawn and a channel past them was kept and marked beyond the draw width (*)",
+      "after": "input-use-v5: ActionQueue's width follows the configured queue (3 x max_actions_per_turn, 30 at the default), every channel below it is drawn and a read at or past it is OutOfWidth; the * marker is gone and UpstreamBus is a family",
+      "comparison": "ActionQueue rows 12 to 29 change from beyond-draw-width to drawn channels; other families like-for-like"
     }
   ],
   "goal_worlds": {

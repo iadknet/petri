@@ -130,7 +130,8 @@ impl EditSurface {
             | MutationOperator::TopologyCopyNode
             | MutationOperator::TopologyCopyMeshBackwardSlice
             | MutationOperator::TopologyCopyMeshForwardSlice
-            | MutationOperator::InputRefAdd
+            | MutationOperator::InputRefAddSensorLive
+            | MutationOperator::InputRefAddSensorSilent
             | MutationOperator::InputRefPrune
             | MutationOperator::InputRefSwap
             | MutationOperator::InputRefRawFieldMutation => Self::Other,

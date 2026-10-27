@@ -22,7 +22,9 @@ use std::collections::BTreeMap;
 
 use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::genome::cgp::{ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape};
+use crate::genome::cgp::{
+    ring_offset, BundleSource, CgpGraphBackendDef, GraphSource, OutputSinkKind, Wiring,
+};
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::neighborhood::sensor_census::world_input_key_label;
 
@@ -224,7 +226,13 @@ impl RingRuleCensus {
                 }
             }
             for (index, bundle) in def.bundles().iter().enumerate() {
-                let Shape::Ring { ring_ref } = bundle.shape() else {
+                let (
+                    Wiring::Ring { kind, offset },
+                    BundleSource::Sensor {
+                        ref_idx: ring_ref, ..
+                    },
+                ) = (bundle.wiring(), bundle.source())
+                else {
                     continue;
                 };
                 let members = def
@@ -242,7 +250,7 @@ impl RingRuleCensus {
                 };
                 let counts = self
                     .ring_bundle_counts
-                    .entry((family, bundle.kind(), bundle.offset()))
+                    .entry((family, kind, offset))
                     .or_default();
                 counts.count += 1;
                 counts.positive += u64::from(nonzero && bundle.scale() > 0.0);
@@ -259,7 +267,7 @@ impl RingRuleCensus {
                 BackendDef::Graph(def) => Some(
                     def.bundles()
                         .iter()
-                        .filter(|bundle| matches!(bundle.shape(), Shape::Ring { .. }))
+                        .filter(|bundle| matches!(bundle.wiring(), Wiring::Ring { .. }))
                         .count() as u64,
                 ),
                 BackendDef::Vm(_) => None,

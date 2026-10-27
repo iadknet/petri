@@ -319,7 +319,7 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
 fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::WorldInputKey;
-    use crate::genome::cgp::{BirthSeeds, EdgeSurface, Scope, Shape};
+    use crate::genome::cgp::{BirthSeeds, EdgeSurface, Scope};
     use crate::genome::HebbianRule;
 
     let lamarckian = PlasticityConfig {
@@ -331,7 +331,7 @@ fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
         retention: 1.0,
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(0.5);
     def.bundle_mut(id).set_inherit_scale(true);
     let members: Vec<EdgeOccurrence> = def.members(id).collect();
@@ -424,7 +424,7 @@ fn retention_bins_cover_every_admitted_retention() {
 fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::genome::cgp::{Scope, Shape};
+    use crate::genome::cgp::Scope;
 
     for (retention, bin) in [
         (1.0, 0),
@@ -434,7 +434,7 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         (0.0, 4),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+        let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
         def.bundle_mut(id).set_scale(0.5);
         def.bundle_mut(id).set_retention(retention);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();

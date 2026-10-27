@@ -11,7 +11,7 @@ use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, OutputSinkKind, Scope, Shape,
+    GraphEdge, GraphSource, OutputSinkKind, Scope,
 };
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
@@ -60,8 +60,8 @@ fn modulated(eta: f32, clamp: f32) -> PlasticityConfig {
 /// ±1 and ±1/√2) at genomic scale `scale`.
 fn pair_def(scale: f32) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let layout = refs()[usize::from(PAIR_REF)].direction_pairs()[0];
-    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, &[]);
+    let layout = crate::contracts::pair_layout(&refs()[usize::from(PAIR_REF)], 0);
+    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(scale);
     (def, id)
 }
@@ -70,11 +70,7 @@ fn pair_def(scale: f32) -> (CgpGraphBackendDef, BundleId) {
 /// 1) at genomic scale `scale`.
 fn ring_def(scale: f32) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_ring_bundle(
-        Shape::Ring { ring_ref: RING_REF },
-        DirectedVoteKind::Move,
-        0,
-    );
+    let id = def.add_ring_bundle(RING_REF, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(scale);
     (def, id)
 }
@@ -702,11 +698,7 @@ fn ring_sensors(values: [f32; 8]) -> SensorSnapshot {
 #[test]
 fn applied_weight_agrees_with_the_executor_and_the_view() {
     let (mut def, id) = ring_def(0.5);
-    let silent = def.add_ring_bundle(
-        Shape::Ring { ring_ref: RING_REF },
-        DirectedVoteKind::Move,
-        1,
-    );
+    let silent = def.add_ring_bundle(RING_REF, DirectedVoteKind::Move, 1);
     def.bundle_mut(silent).set_scale(-0.25);
     let all = members(&def, id);
     def.bundle_mut(id).set_inherit_scale(true);
@@ -796,22 +788,24 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     }
 }
 
-/// T25.F10 invariant 2: a fact member's pattern is 0 by role, so a
-/// `Bundle`-scope fact learner credits `0 × Δ` and leaves the scale as it
-/// starts, an `Edge`-scope one learns its own correction, and a static fact
-/// member of a bundle with a scale slot is a passive dynamic edge weighing
-/// its own weight alone.
+/// T25.F11 invariant 4, the one member law: a fact member (on the drive)
+/// reads pattern 1 like every member, so a `Bundle`-scope fact learner
+/// credits `1 × Δ` to the scale, an `Edge`-scope one learns its own
+/// correction on top of the scale, and a static fact member of a bundle
+/// with a scale slot weighs `scale × 1 + own`.
 #[test]
-fn a_fact_member_weighs_and_learns_without_the_scale() {
+fn a_fact_member_weighs_and_learns_with_the_scale() {
+    use crate::genome::cgp::Site;
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let layout = refs()[usize::from(PAIR_REF)].direction_pairs()[0];
-    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, layout.facts);
+    let layout = crate::contracts::pair_layout(&refs()[usize::from(PAIR_REF)], 0);
+    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(0.5);
     let facts: Vec<EdgeOccurrence> = members(&def, id)
         .into_iter()
-        .filter(|&member| def.is_fact_member(member))
+        .filter(|&member| def.site_of(member) == Some(Site::Drive))
         .collect();
     assert_eq!(facts.len(), 3);
+    assert!(facts.iter().all(|&fact| def.pattern(fact, &refs()) == 1.0));
     let classic = hebbian(HebbianRule::Classic, 1.0, 4.0);
     learn(&mut def, facts[0], classic, Scope::Group);
     def.edge_mut(facts[1]).set_weight(0.25);
@@ -819,12 +813,19 @@ fn a_fact_member_weighs_and_learns_without_the_scale() {
     def.edge_mut(facts[2]).set_weight(-0.125);
     let mut learned = state(&def, None);
     drive(&mut learned, &def, |_| 0.5, 0.5);
-    assert_eq!(scale(&learned).learned, Some(0.5), "0 × Δ moves no scale");
-    assert_eq!(view_edge(&learned, facts[0]).applied, 0.0);
+    let delta = 1.0 * 0.5 * 0.5;
+    let scaled = 0.5 + 1.0 * delta;
     assert_eq!(
-        view_edge(&learned, facts[1]).learned,
-        Some(0.25 + 1.0 * 0.5 * 0.5)
+        scale(&learned).learned,
+        Some(scaled),
+        "1 × Δ moves the scale"
     );
-    assert_eq!(applied(&learned, facts[1]), 0.25 + 1.0 * 0.5 * 0.5);
-    assert_eq!(applied(&learned, facts[2]), -0.125, "a passive fact member");
+    assert_eq!(view_edge(&learned, facts[0]).applied, scaled);
+    assert_eq!(view_edge(&learned, facts[1]).learned, Some(0.25 + delta));
+    assert_eq!(applied(&learned, facts[1]), scaled + (0.25 + delta));
+    assert_eq!(
+        applied(&learned, facts[2]),
+        scaled - 0.125,
+        "a passive fact member"
+    );
 }

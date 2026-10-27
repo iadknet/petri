@@ -1,11 +1,10 @@
 pub(crate) mod bundle;
 pub mod hebbian;
 pub(crate) mod operators;
-pub(crate) mod recruitment;
 
 use rand::Rng;
 
-use crate::config::{MutationConfig, NeutralInputRecruitment};
+use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
 use crate::genome::cgp::{CgpGraphBackendDef, Scope};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -52,16 +51,13 @@ pub enum GraphOperator {
     DisableRewardModulation,
     MutateRewardSource,
     MutateTraceDecay,
-    RecruitNeutralInput,
-    AddRingBundle,
-    AddDirectionPairBundle,
+    AddBundleLive,
+    AddBundleSilent,
     AlterBundleScale,
     ShiftBundleOffset,
-    RetargetBundleKind,
+    RetargetBundle,
     RemoveBundle,
     SetScope,
-    AddRandomizedRingBundle,
-    AddRandomizedDirectionPairBundle,
     DetachGraphEdge,
     EnableRetention,
     DisableRetention,
@@ -72,7 +68,7 @@ pub enum GraphOperator {
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 35] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -94,16 +90,13 @@ impl GraphOperator {
         Self::DisableRewardModulation,
         Self::MutateRewardSource,
         Self::MutateTraceDecay,
-        Self::RecruitNeutralInput,
-        Self::AddRingBundle,
-        Self::AddDirectionPairBundle,
+        Self::AddBundleLive,
+        Self::AddBundleSilent,
         Self::AlterBundleScale,
         Self::ShiftBundleOffset,
-        Self::RetargetBundleKind,
+        Self::RetargetBundle,
         Self::RemoveBundle,
         Self::SetScope,
-        Self::AddRandomizedRingBundle,
-        Self::AddRandomizedDirectionPairBundle,
         Self::DetachGraphEdge,
         Self::EnableRetention,
         Self::DisableRetention,
@@ -139,23 +132,16 @@ impl GraphOperator {
             Self::DisableRewardModulation => 1,
             Self::MutateRewardSource => 2,
             Self::MutateTraceDecay => 4,
-            Self::RecruitNeutralInput => 1,
-            // Edge bundles (T25.F03, at the catalog positions and weights of
-            // the T11.F31 ring projection operators): each the tier of the
-            // edge operator it parallels.
-            Self::AddRingBundle => 2,
-            // T25.F04: beside `AddRingBundle`, at its tier.
-            Self::AddDirectionPairBundle => 2,
+            // T25.F11: the two creation operators split the four retired
+            // `Add*Group` operators' weight 8 evenly.
+            Self::AddBundleLive | Self::AddBundleSilent => 4,
             Self::AlterBundleScale => 4,
             Self::ShiftBundleOffset => 2,
-            Self::RetargetBundleKind => 2,
+            Self::RetargetBundle => 2,
             Self::RemoveBundle => 2,
             // T25.F07: after `RemoveBundle`, at the tier of a moderate edit.
             Self::SetScope => 2,
-            // T25.F08: after `SetScope`, each at its uniform twin's tier and
-            // detach at a moderate edit's.
-            Self::AddRandomizedRingBundle => 2,
-            Self::AddRandomizedDirectionPairBundle => 2,
+            // T25.F08: after `SetScope`, detach at a moderate edit's tier.
             Self::DetachGraphEdge => 2,
             // T25.F09: after `DetachGraphEdge`, the enable and disable twins
             // at a structural tier and the steps at a refinement's, as
@@ -166,22 +152,6 @@ impl GraphOperator {
             Self::MutateBundleRetention => 4,
         }
     }
-
-    const TOTAL_WEIGHT: u16 = {
-        assert!(
-            Self::ALL.len() == 38,
-            "ALL must cover every GraphOperator variant"
-        );
-        let mut sum = 0u16;
-        let mut i = 0;
-        while i < Self::ALL.len() {
-            if !matches!(Self::ALL[i], Self::RecruitNeutralInput) {
-                sum += Self::ALL[i].weight() as u16;
-            }
-            i += 1;
-        }
-        sum
-    };
 
     /// The engine's operator key for this operator: the one table every
     /// per-operator classification of a Graph operator reads.
@@ -209,18 +179,13 @@ impl GraphOperator {
             Self::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
             Self::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             Self::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-            Self::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            Self::AddRingBundle => MutationOperator::GraphAddRingBundle,
-            Self::AddDirectionPairBundle => MutationOperator::GraphAddDirectionPairBundle,
+            Self::AddBundleLive => MutationOperator::GraphAddBundleLive,
+            Self::AddBundleSilent => MutationOperator::GraphAddBundleSilent,
             Self::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
             Self::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
-            Self::RetargetBundleKind => MutationOperator::GraphRetargetBundleKind,
+            Self::RetargetBundle => MutationOperator::GraphRetargetBundle,
             Self::RemoveBundle => MutationOperator::GraphRemoveBundle,
             Self::SetScope => MutationOperator::GraphSetScope,
-            Self::AddRandomizedRingBundle => MutationOperator::GraphAddRandomizedRingBundle,
-            Self::AddRandomizedDirectionPairBundle => {
-                MutationOperator::GraphAddRandomizedDirectionPairBundle
-            }
             Self::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
             Self::EnableRetention => MutationOperator::GraphEnableRetention,
             Self::DisableRetention => MutationOperator::GraphDisableRetention,
@@ -238,36 +203,6 @@ impl GraphOperator {
         self.operator().complexity_effect()
     }
 
-    /// Whether configuration admits this operator before any sampling.
-    pub fn enabled(self, config: &MutationConfig) -> bool {
-        match self {
-            Self::RecruitNeutralInput => {
-                config.neutral_input_recruitment != NeutralInputRecruitment::Off
-            }
-            _ => true,
-        }
-    }
-
-    /// Pick a default-arm graph operator weighted by impact tier.
-    // WORKAROUND(T25.F08): a test-only sampler beside the engine's
-    // `select_weighted_index` over the enabled catalog; the four domains'
-    // `random` and `TOTAL_WEIGHT` go in one area change and the catalog pins
-    // assert `ALL.len()` and the engine's enabled weight sum.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
-        for &op in &Self::ALL {
-            if op == Self::RecruitNeutralInput {
-                continue;
-            }
-            let w = op.weight() as u16;
-            if r < w {
-                return op;
-            }
-            r -= w;
-        }
-        unreachable!()
-    }
-
     /// Whether this operator has a site to apply to on one Graph-backend
     /// node. Each arm delegates to the same enumeration the operator draws
     /// its target from. Numeric proposal rejection can still skip atomically.
@@ -282,7 +217,6 @@ impl GraphOperator {
             Self::MutateGraphOperatorParam => operators::has_parameterized_compute_node(def),
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
-            Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, inputs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -298,16 +232,13 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
-            Self::AddRingBundle | Self::AddRandomizedRingBundle => {
-                bundle::can_add(def, inputs.refs)
+            Self::AddBundleLive | Self::AddBundleSilent => {
+                !bundle::bundle_sources(def, inputs.refs, inputs.context).is_empty()
             }
-            Self::AddDirectionPairBundle | Self::AddRandomizedDirectionPairBundle => {
-                bundle::can_add_pair(def, inputs.refs)
+            Self::AlterBundleScale | Self::RetargetBundle | Self::RemoveBundle => {
+                bundle::has_bundle(def)
             }
-            Self::AlterBundleScale
-            | Self::ShiftBundleOffset
-            | Self::RetargetBundleKind
-            | Self::RemoveBundle => bundle::has_bundle(def),
+            Self::ShiftBundleOffset => bundle::any_bundle(def, bundle::is_geometric),
             Self::SetScope | Self::DetachGraphEdge => hebbian::any_edge(def, hebbian::is_member),
             Self::EnableRetention => hebbian::any_edge(def, hebbian::can_enable_retention),
             Self::DisableRetention | Self::MutateRetention => {
@@ -398,9 +329,6 @@ impl GraphMutator {
         config: &MutationConfig,
         context: &SensorContext,
     ) -> Result<(TargetReachability, GraphEventReport), MutationSkipReason> {
-        if !op.enabled(config) {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
         let applicable = Self::applicable_indices(genome, op, context);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
@@ -422,16 +350,10 @@ impl GraphMutator {
         op: GraphOperator,
         node_idx: usize,
         rng: &mut impl Rng,
-        config: &MutationConfig,
+        _config: &MutationConfig,
         context: &SensorContext,
     ) -> Result<GraphEventReport, MutationSkipReason> {
         match op {
-            GraphOperator::RecruitNeutralInput => unreported(recruitment::recruit(
-                node_mut(genome, node_idx)?,
-                config.neutral_input_recruitment,
-                context,
-                rng,
-            )),
             GraphOperator::AlterGraphEdgeWeight => {
                 unreported(operators::alter_edge_weight(genome, node_idx, rng))
             }
@@ -519,7 +441,7 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::RetargetBundleKind => unreported(bundle::retarget_kind(
+            GraphOperator::RetargetBundle => unreported(bundle::retarget(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -531,27 +453,15 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::AddRingBundle => edited(bundle::add_in_form(
+            GraphOperator::AddBundleLive => created(bundle::add_bundle_by_law(
                 node_mut(genome, node_idx)?,
-                bundle::CreationForm::Uniform,
+                bundle::BirthLaw::Live,
                 context,
                 rng,
             )),
-            GraphOperator::AddRandomizedRingBundle => edited(bundle::add_in_form(
+            GraphOperator::AddBundleSilent => created(bundle::add_bundle_by_law(
                 node_mut(genome, node_idx)?,
-                bundle::CreationForm::Randomized,
-                context,
-                rng,
-            )),
-            GraphOperator::AddDirectionPairBundle => edited(bundle::add_pair_in_form(
-                node_mut(genome, node_idx)?,
-                bundle::CreationForm::Uniform,
-                context,
-                rng,
-            )),
-            GraphOperator::AddRandomizedDirectionPairBundle => edited(bundle::add_pair_in_form(
-                node_mut(genome, node_idx)?,
-                bundle::CreationForm::Randomized,
+                bundle::BirthLaw::Silent,
                 context,
                 rng,
             )),
@@ -608,6 +518,18 @@ fn edited(
     result: Result<BundleEdits, MutationSkipReason>,
 ) -> Result<GraphEventReport, MutationSkipReason> {
     result.map(|bundle_edits| GraphEventReport {
+        bundle_edits,
+        ..GraphEventReport::default()
+    })
+}
+
+/// A creation reporting its bundle edits and the class of its one `Plain`
+/// bundle's sink, if any (T25.F11 invariant 8).
+fn created(
+    result: Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason>,
+) -> Result<GraphEventReport, MutationSkipReason> {
+    result.map(|(bundle_edits, class)| GraphEventReport {
+        class,
         bundle_edits,
         ..GraphEventReport::default()
     })

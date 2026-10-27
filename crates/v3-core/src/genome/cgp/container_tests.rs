@@ -5,7 +5,8 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
-    compose, detach, BundleId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
+    compose, detach, BundleId, BundleSource, Membership, Scope, Site, Wiring,
+    FIRST_ACTION_VOTE_SINK,
 };
 use crate::genome::HebbianRule;
 
@@ -26,13 +27,18 @@ fn def_fields_are_exhaustively_accounted_for() {
         membership: _,
     } = GraphEdge::new(leaf(0), 0.0);
     let Bundle {
-        shape: _,
-        kind: _,
-        offset: _,
+        source: _,
+        wiring: _,
         scale: _,
         inherit_scale: _,
         retention: _,
-    } = Bundle::new(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    } = Bundle::new(
+        RING_SOURCE,
+        Wiring::Ring {
+            kind: DirectedVoteKind::Move,
+            offset: 0,
+        },
+    );
     let Membership {
         bundle: _,
         scope: _,
@@ -51,15 +57,20 @@ fn a_graph_edge_is_forty_bytes() {
 /// retention 1 (T25.F09 invariant 1).
 #[test]
 fn a_new_bundle_record_is_silent_with_retention_one() {
-    let record = Bundle::new(Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2);
+    let source = BundleSource::Sensor {
+        ref_idx: 3,
+        field_set: 0,
+    };
+    let wiring = Wiring::Ring {
+        kind: DirectedVoteKind::Move,
+        offset: 2,
+    };
+    let record = Bundle::new(source, wiring);
     assert_eq!(
         (record.scale(), record.inherit_scale(), record.retention()),
         (0.0, false, 1.0)
     );
-    assert_eq!(
-        (record.shape(), record.kind(), record.offset()),
-        (Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2)
-    );
+    assert_eq!((record.source(), record.wiring()), (source, wiring));
 }
 
 /// An edge's and a bundle's `retention` are always written and required
@@ -73,11 +84,11 @@ fn retention_is_always_written_and_required() {
     let without = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without).is_err());
 
-    let bundle = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
+    let bundle = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
     let record: Bundle = serde_json::from_str(bundle).unwrap();
     assert_eq!(record.retention(), 0.5);
     assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
-    let without = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false}"#;
+    let without = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":false}"#;
     assert!(serde_json::from_str::<Bundle>(without).is_err());
 }
 
@@ -144,12 +155,11 @@ fn scope_and_inherit_scale_are_always_written_and_required() {
     let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without_scope).is_err());
 
-    let bundle = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
+    let bundle = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
     let record: Bundle = serde_json::from_str(bundle).unwrap();
     assert!(record.inherit_scale());
     assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
-    let without_flag =
-        r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"retention":1.0}"#;
+    let without_flag = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"retention":1.0}"#;
     assert!(serde_json::from_str::<Bundle>(without_flag).is_err());
 }
 
@@ -520,8 +530,15 @@ fn ring_refs() -> Vec<InputReference> {
     ]
 }
 
-fn ring() -> Shape {
-    Shape::Ring { ring_ref: RING }
+/// The ring sensor's one field set, the source of every ring fixture.
+const RING_SOURCE: BundleSource = BundleSource::Sensor {
+    ref_idx: RING,
+    field_set: 0,
+};
+
+/// A `Ring` wiring into `kind` at `offset`.
+fn ring_wiring(kind: DirectedVoteKind, offset: u8) -> Wiring {
+    Wiring::Ring { kind, offset }
 }
 
 fn vote_sink(kind: DirectedVoteKind, d: u8) -> usize {
@@ -539,7 +556,7 @@ fn grouped(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId)
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.5),
     );
-    let id = def.add_ring_bundle(ring(), kind, offset);
+    let id = def.add_ring_bundle(RING, kind, offset);
     (def, id)
 }
 
@@ -605,9 +622,9 @@ fn push_edge_inserts_an_independent_edge_before_the_first_member() {
 #[test]
 fn remove_bundle_leaves_no_member_and_renumbers_higher_bundles() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let first = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
-    let second = def.add_ring_bundle(ring(), DirectedVoteKind::StealEnergy, 2);
-    let third = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 5);
+    let first = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
+    let second = def.add_ring_bundle(RING, DirectedVoteKind::StealEnergy, 2);
+    let third = def.add_ring_bundle(RING, DirectedVoteKind::Move, 5);
     assert_eq!(def.remove_bundle(second), 8);
     assert_eq!(def.bundles().len(), 2);
     assert!(def.edges().all(|edge| edge.membership()
@@ -617,7 +634,13 @@ fn remove_bundle_leaves_no_member_and_renumbers_higher_bundles() {
         })));
     // The third bundle is now `BundleId(1)`, its members with it.
     let renumbered = BundleId::new(1);
-    assert_eq!(def.bundles()[1].offset(), 5);
+    assert_eq!(
+        def.bundles()[1]
+            .wiring()
+            .offset()
+            .expect("a geometric bundle"),
+        5
+    );
     assert_eq!(def.members(renumbered).count(), 8);
     assert_eq!(def.members(first).count(), 8);
     assert!(def.check_local_invariants().is_ok());
@@ -650,8 +673,8 @@ fn a_last_member_removed_or_detached_removes_its_bundle() {
 #[test]
 fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_the_detached_edge() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let first = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
-    let second = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
+    let first = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
+    let second = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
     weigh(&mut def, second, 0.5, &[0.25; 8]);
     let sink = vote_sink(DirectedVoteKind::Move, 0);
     // The sink holds the first bundle's member, then the second's.
@@ -682,20 +705,89 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
     assert_eq!(def.members(second).count(), 7);
 }
 
+/// `plans` admits a geometric kind only with every sink it needs (T25.F11
+/// invariant 5): a ring the eight direction sinks, a pair those and the
+/// drive; a `Plain` set one plan per present vote sink.
 #[test]
-fn can_host_bundle_needs_every_direction_sink_and_capacity() {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert!(def.can_host_bundle());
-    def.exhaust_bundle_capacity();
-    assert!(!def.can_host_bundle());
-    let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
-    crate::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
-        sinks.retain(|sink| {
-            sink.kind
-                != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 7))
+fn plans_need_every_sink_a_wiring_names() {
+    use crate::contracts::FieldSet;
+    let full = CgpGraphBackendDef::new_with_fixed_outputs();
+    let plain = FieldSet::Plain { width: 3 };
+    let pair = FieldSet::Pair(pair_layout());
+    assert_eq!(plans(&full, &plain).len(), VoteSink::all().count());
+    assert_eq!(plans(&full, &FieldSet::Ring).len(), 4 * 8);
+    assert_eq!(plans(&full, &pair).len(), 4 * 8);
+    let without = |vote: VoteSink| {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        crate::genome::cgp::test_support::edit_sinks(&mut def, |sinks| {
+            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(vote));
         });
-    });
-    assert!(!partial.can_host_bundle());
+        def
+    };
+    let steal = DirectedVoteKind::StealEnergy;
+    let partial = without(VoteSink::Directed(steal, 7));
+    for set in [FieldSet::Ring, pair] {
+        let kinds: Vec<_> = plans(&partial, &set)
+            .iter()
+            .filter_map(|w| w.kind())
+            .collect();
+        assert_eq!(kinds.len(), 3 * 8, "{set:?}");
+        assert!(!kinds.contains(&steal));
+    }
+    assert_eq!(plans(&partial, &plain).len(), VoteSink::all().count() - 1);
+    let driveless = without(steal.drive());
+    assert_eq!(plans(&driveless, &FieldSet::Ring).len(), 4 * 8);
+    assert_eq!(plans(&driveless, &pair).len(), 3 * 8);
+    // Kinds in `ALL` order, offsets ascending.
+    assert_eq!(
+        plans(&full, &FieldSet::Ring)[..9],
+        (0..8)
+            .map(|offset| ring_wiring(DirectedVoteKind::Move, offset))
+            .chain([ring_wiring(DirectedVoteKind::Reproduce, 0)])
+            .collect::<Vec<_>>()[..]
+    );
+}
+
+/// `add_bundle` refuses an inadmissible wiring and a full table, writing
+/// nothing (T25.F11 invariant 5).
+#[test]
+fn add_bundle_refuses_an_inadmissible_wiring_or_a_full_table() {
+    use crate::contracts::FieldSet;
+    use crate::genome::cgp::BundleBirth;
+    let birth = |wiring| BundleBirth {
+        field_set: 0,
+        wiring,
+        scale: 0.0,
+    };
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let before = def.clone();
+    let plain = Wiring::Plain {
+        sink: VoteSink::Eat,
+    };
+    assert_eq!(
+        def.add_bundle(RING_SOURCE, FieldSet::Ring, birth(plain)),
+        Err(NodeEditError::Inadmissible)
+    );
+    assert_eq!(
+        def.add_bundle(
+            RING_SOURCE,
+            FieldSet::Ring,
+            birth(ring_wiring(DirectedVoteKind::Move, 8))
+        ),
+        Err(NodeEditError::Inadmissible)
+    );
+    assert_eq!(def, before);
+    def.exhaust_bundle_capacity();
+    let full = def.clone();
+    assert_eq!(
+        def.add_bundle(
+            RING_SOURCE,
+            FieldSet::Ring,
+            birth(ring_wiring(DirectedVoteKind::Move, 0))
+        ),
+        Err(NodeEditError::BundleCapacity)
+    );
+    assert_eq!(def, full);
 }
 
 #[test]
@@ -708,7 +800,7 @@ fn validate_graph_rejects_each_broken_invariant() {
     };
     let (def, _) = grouped(DirectedVoteKind::Move, 1);
     assert_eq!(validate_graph(&node(def.clone(), ring_refs())), Ok(()));
-    // I7: the shape reference is not a ring.
+    // A sensor source whose set does not resolve to the wiring's geometry.
     assert_eq!(
         validate_graph(&node(def.clone(), vec![InputReference::ActionVotes; 2])),
         Err(GraphInvariantViolation::ShapeReference)
@@ -722,7 +814,7 @@ fn validate_graph_rejects_each_broken_invariant() {
     );
     // I7: offset out of range.
     let mut offset = def.clone();
-    offset.bundles[0].offset = 8;
+    offset.bundles[0].wiring = ring_wiring(DirectedVoteKind::Move, 8);
     assert_eq!(
         offset.check_local_invariants(),
         Err(GraphInvariantViolation::OffsetOutOfRange)
@@ -740,9 +832,10 @@ fn validate_graph_rejects_each_broken_invariant() {
     let mut zero = def.clone();
     zero.bundles[0].retention = 0.0;
     assert_eq!(zero.check_local_invariants(), Ok(()));
-    // I4: a member on the wrong sink.
+    // I4: a `Ring` member on a direction its offset does not map its cell
+    // to (record and edge only, so the local check).
     let mut shifted = def.clone();
-    shifted.bundles[0].offset = 2;
+    shifted.bundles[0].wiring = ring_wiring(DirectedVoteKind::Move, 2);
     assert_eq!(
         shifted.check_local_invariants(),
         Err(GraphInvariantViolation::MemberShape)
@@ -790,7 +883,7 @@ fn validate_graph_rejects_each_broken_invariant() {
 #[test]
 fn the_bundle_count_limit_is_u16_max_records() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let record = Bundle::new(ring(), DirectedVoteKind::Move, 0);
+    let record = Bundle::new(RING_SOURCE, ring_wiring(DirectedVoteKind::Move, 0));
     def.bundles = vec![record; usize::from(u16::MAX)];
     assert_eq!(
         def.check_local_invariants(),
@@ -838,7 +931,7 @@ fn a_member_reading_channel_eight_is_out_of_shape() {
 #[should_panic(expected = "graph invariant violated")]
 fn a_primitive_on_a_broken_grouped_def_is_a_debug_assertion() {
     let (mut def, _) = grouped(DirectedVoteKind::Move, 1);
-    def.bundles[0].offset = 2;
+    def.bundles[0].wiring = ring_wiring(DirectedVoteKind::Move, 2);
     def.push_edge(
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.25),
@@ -860,7 +953,7 @@ fn a_grouped_def_round_trips_json_and_identity_both_ways() {
     let mut scaled = def.clone();
     scaled.bundle_mut(id).set_scale(0.5);
     let mut moved = def.clone();
-    moved.relocate_bundle(id, DirectedVoteKind::StealEnergy, 5);
+    moved.relocate_bundle(id, ring_wiring(DirectedVoteKind::StealEnergy, 5));
     let mut corrected = def.clone();
     let first = corrected.members(id).next().unwrap();
     corrected.edge_mut(first).set_weight(1.0);
@@ -885,11 +978,10 @@ proptest! {
     fn detach_preserves_genomic_weight_bitwise(
         (kind, offset, scale, corrections) in bundle_strategy(),
         pick in 0usize..8,
-        resolves in any::<bool>(),
     ) {
         let (mut def, id) = grouped(DirectedVoteKind::ALL[kind], offset);
         weigh(&mut def, id, scale, &corrections);
-        let refs = if resolves { ring_refs() } else { vec![InputReference::ActionVotes; 2] };
+        let refs = ring_refs();
         let occurrence = def.members(id).nth(pick).unwrap();
         let before = def.genomic_weight(occurrence, &refs);
         let source = def.edge_at(occurrence).source();
@@ -913,21 +1005,20 @@ proptest! {
     ) {
         let (mut def, id) = grouped(DirectedVoteKind::ALL[kind], offset);
         if second {
-            def.add_ring_bundle(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
+            def.add_ring_bundle(RING, DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
         }
         weigh(&mut def, id, scale, &corrections);
         let original = def.clone();
-        def.relocate_bundle(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
+        def.relocate_bundle(id, ring_wiring(DirectedVoteKind::ALL[other_kind], (offset + step) % 8));
         prop_assert!(def.check_local_invariants().is_ok());
-        def.relocate_bundle(id, DirectedVoteKind::ALL[kind], offset);
+        def.relocate_bundle(id, ring_wiring(DirectedVoteKind::ALL[kind], offset));
         prop_assert_eq!(&def, &original);
         prop_assert_eq!(format!("{def:?}"), format!("{original:?}"));
     }
 
-    /// A `Ring` member weighs `scale + own` bitwise when its ring resolves
-    /// and `own` when it does not.
+    /// A `Ring` member weighs `scale + own` bitwise (pattern 1).
     #[test]
-    fn a_member_weighs_scale_plus_correction_when_its_ring_resolves(
+    fn a_ring_member_weighs_scale_plus_correction(
         (kind, offset, scale, corrections) in bundle_strategy(),
     ) {
         let (mut def, id) = grouped(DirectedVoteKind::ALL[kind], offset);
@@ -939,18 +1030,14 @@ proptest! {
                 def.genomic_weight(occurrence, &ring_refs()).to_bits(),
                 (scale + own).to_bits()
             );
-            prop_assert_eq!(
-                def.genomic_weight(occurrence, &[InputReference::ActionVotes]).to_bits(),
-                own.to_bits()
-            );
         }
     }
 }
 
-// ── Direction-pair bundles (T25.F04) ─────────────────────────────────────────
+// ── Direction-pair bundles (T25.F04, T25.F11) ──────────────────────────────
 
 /// `input_refs[PAIR_REF]` is `AreaFoodSummary`; its pair 1 is
-/// `(nearest_dx, nearest_dy)`, fields `(3, 4)`.
+/// `(nearest_dx, nearest_dy)`, fields `(3, 4)`, with the facts `0, 5, 6`.
 const PAIR_REF: u16 = 2;
 const PX: u16 = 3;
 const PY: u16 = 4;
@@ -966,7 +1053,11 @@ fn pair_refs() -> Vec<InputReference> {
 }
 
 fn pair_layout() -> crate::contracts::DirectionPair {
-    pair_refs()[usize::from(PAIR_REF)].direction_pairs()[1]
+    crate::contracts::pair_layout(&pair_refs()[usize::from(PAIR_REF)], 1)
+}
+
+fn pair_wiring(kind: DirectedVoteKind, offset: u8) -> Wiring {
+    Wiring::DirectionPair { kind, offset }
 }
 
 fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) {
@@ -975,26 +1066,22 @@ fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) 
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.5),
     );
-    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset, &[]);
+    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset);
     (def, id)
 }
 
-/// A member's `(field, sink direction)`.
-fn coordinates_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> (u16, u8) {
-    let EdgeSurface::SinkInput(sink) = occurrence.surface else {
-        unreachable!("members are sink edges")
-    };
-    let OutputSinkKind::ActionVote(vote) = def.output_sinks()[sink].kind else {
-        unreachable!("members sit on vote sinks")
-    };
+/// A member's `(field, site)`.
+fn coordinates_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> (u16, Site) {
     let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(occurrence).source() else {
         unreachable!("members read leaves")
     };
-    let (_, d) = DirectedVoteKind::of_sink(vote).expect("a direction sink");
-    (sub_idx, d)
+    (
+        sub_idx,
+        def.site_of(occurrence).expect("a member on its wiring"),
+    )
 }
 
-fn coordinates(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, u8)> {
+fn coordinates(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, Site)> {
     def.members(id).map(|o| coordinates_of(def, o)).collect()
 }
 
@@ -1015,17 +1102,23 @@ fn resort(def: &mut CgpGraphBackendDef, sink: usize) {
         .sort_by_key(CgpGraphBackendDef::member_key);
 }
 
+/// A pair bundle is born with its twelve non-zero compass members and one
+/// drive member per fact, every member at own weight 0 and a non-zero
+/// pattern (T25.F11 invariant 3).
 #[test]
-fn pair_creation_materializes_12_members_not_16() {
+fn pair_creation_materializes_12_compass_members_and_the_facts() {
     for offset in 0..8u8 {
         let (def, id) = paired(DirectedVoteKind::StealEnergy, offset);
         let mut got = coordinates(&def, id);
         got.sort_unstable();
-        let rel = |field: u16, relatives: [u8; 6]| relatives.map(|r| (field, (r + offset) % 8));
+        let rel = |field: u16, relatives: [u8; 6]| {
+            relatives.map(|r| (field, Site::Direction((r + offset) % 8)))
+        };
         // x at NE, E, SE, SW, W, NW; y at N, NE, SE, S, SW, NW.
         let mut want: Vec<_> = rel(PX, [1, 2, 3, 5, 6, 7])
             .into_iter()
             .chain(rel(PY, [0, 1, 3, 4, 5, 7]))
+            .chain(pair_layout().facts.iter().map(|&fact| (fact, Site::Drive)))
             .collect();
         want.sort_unstable();
         assert_eq!(got, want, "offset {offset}");
@@ -1039,27 +1132,49 @@ fn pair_creation_materializes_12_members_not_16() {
     }
 }
 
+/// A geometric wiring's coordinates reduce every offset mod 8.
 #[test]
-fn pair_birth_members_reduce_every_offset_mod_8() {
-    let layout = pair_layout();
+fn wiring_coordinates_reduce_every_offset_mod_8() {
+    use crate::contracts::FieldSet;
+    let pair = FieldSet::Pair(pair_layout());
     for offset in 0..=u8::MAX {
-        let got: Vec<_> = crate::genome::cgp::pair_birth_members(layout, offset).collect();
-        let want: Vec<_> = crate::genome::cgp::pair_birth_members(layout, offset % 8).collect();
-        assert_eq!(got, want, "offset {offset}");
+        for kind in DirectedVoteKind::ALL {
+            assert_eq!(
+                pair_wiring(kind, offset).coordinates(&pair),
+                pair_wiring(kind, offset % 8).coordinates(&pair),
+                "offset {offset}"
+            );
+            assert_eq!(
+                ring_wiring(kind, offset).coordinates(&FieldSet::Ring),
+                ring_wiring(kind, offset % 8).coordinates(&FieldSet::Ring),
+                "offset {offset}"
+            );
+        }
     }
 }
 
+/// Every member weighs its wiring's pattern at its coordinate: the compass
+/// pattern of its relative direction for `x` and `y`, 1 for a fact on the
+/// drive (T25.F11 invariant 3).
 #[test]
-fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
+fn a_pair_member_weighs_the_pattern_at_its_coordinate() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 3);
     def.bundle_mut(id).set_scale(1.0);
     for occurrence in def.members(id).collect::<Vec<_>>() {
-        let (field, d) = coordinates_of(&def, occurrence);
-        let relative = (d + 8 - 3) % 8;
-        let want = if field == PX {
-            crate::contracts::compass_x(relative)
-        } else {
-            crate::contracts::compass_y(relative)
+        let want = match coordinates_of(&def, occurrence) {
+            (field, Site::Direction(d)) => {
+                let relative = (d + 8 - 3) % 8;
+                if field == PX {
+                    crate::contracts::compass_x(relative)
+                } else {
+                    crate::contracts::compass_y(relative)
+                }
+            }
+            (field, Site::Drive) => {
+                assert!(pair_layout().facts.contains(&field));
+                1.0
+            }
+            (_, Site::Sink) => unreachable!("a pair has no Plain site"),
         };
         assert_eq!(
             def.genomic_weight(occurrence, &pair_refs()).to_bits(),
@@ -1068,37 +1183,38 @@ fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
     }
 }
 
+/// A wiring has no pattern off its coordinates: a field outside the set, an
+/// `x` on the drive, a fact on a direction, an `x` where its compass is 0,
+/// a direction past the compass, a site of another wiring (T25.F11
+/// invariant 3).
 #[test]
-fn an_unresolvable_or_non_pair_reference_reads_pattern_zero() {
-    let (mut def, id) = paired(DirectedVoteKind::Move, 0);
-    def.bundle_mut(id).set_scale(2.0);
-    let occurrence = def.members(id).next().unwrap();
-    let bundle = def.bundles()[0];
-    // Too short, a non-pair world key, a non-world reference.
-    let short = ring_refs();
-    let mut ring_at = pair_refs();
-    ring_at[usize::from(PAIR_REF)] =
-        InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
-    let mut votes_at = pair_refs();
-    votes_at[usize::from(PAIR_REF)] = InputReference::ActionVotes;
-    for refs in [short, ring_at, votes_at] {
-        assert_eq!(def.member_pattern(occurrence, &refs), 0.0);
-        assert_eq!(def.genomic_weight(occurrence, &refs), 0.0);
-    }
-    // A pair index beyond the declared ones.
-    let beyond = Bundle {
-        shape: Shape::DirectionPair {
-            ref_idx: PAIR_REF,
-            pair: 2,
-        },
-        ..bundle
+fn a_wiring_has_no_pattern_off_its_coordinates() {
+    use crate::contracts::FieldSet;
+    let set = FieldSet::Pair(pair_layout());
+    let wiring = pair_wiring(DirectedVoteKind::Move, 0);
+    assert_eq!(wiring.pattern(&set, 1, Site::Direction(2)), None);
+    assert_eq!(wiring.pattern(&set, PX, Site::Drive), None);
+    assert_eq!(wiring.pattern(&set, 0, Site::Direction(2)), None);
+    assert_eq!(wiring.pattern(&set, PX, Site::Direction(0)), None);
+    assert_eq!(wiring.pattern(&set, PX, Site::Direction(8)), None);
+    assert_eq!(wiring.pattern(&set, PX, Site::Sink), None);
+    assert_eq!(wiring.pattern(&set, 0, Site::Drive), Some(1.0));
+    assert_eq!(wiring.pattern(&FieldSet::Ring, 0, Site::Direction(0)), None);
+    let ring = ring_wiring(DirectedVoteKind::Move, 2);
+    assert_eq!(ring.pattern(&FieldSet::Ring, 8, Site::Direction(2)), None);
+    assert_eq!(ring.pattern(&FieldSet::Ring, 0, Site::Direction(3)), None);
+    assert_eq!(ring.pattern(&FieldSet::Ring, 0, Site::Drive), None);
+    assert_eq!(
+        ring.pattern(&FieldSet::Ring, 0, Site::Direction(2)),
+        Some(1.0)
+    );
+    let plain = Wiring::Plain {
+        sink: VoteSink::Eat,
     };
-    for d in 0..8 {
-        assert_eq!(beyond.pattern(&pair_refs(), PX, d), 0.0);
-    }
-    // A field that is neither x nor y, and a direction past the compass.
-    assert_eq!(bundle.pattern(&pair_refs(), 0, 2), 0.0);
-    assert_eq!(bundle.pattern(&pair_refs(), PX, 8), 0.0);
+    let width = FieldSet::Plain { width: 3 };
+    assert_eq!(plain.pattern(&width, 2, Site::Sink), Some(1.0));
+    assert_eq!(plain.pattern(&width, 3, Site::Sink), None);
+    assert_eq!(plain.pattern(&width, 0, Site::Drive), None);
 }
 
 #[test]
@@ -1134,7 +1250,7 @@ fn identical_source_members_on_different_sinks_resolve_different_weights() {
 #[test]
 fn a_pair_bundles_last_member_removed_removes_the_bundle() {
     let (mut def, id) = paired(DirectedVoteKind::Reproduce, 5);
-    for remaining in (1..12).rev() {
+    for remaining in (1..15).rev() {
         let occurrence = def.members(id).next().unwrap();
         def.remove_edge(occurrence);
         assert_eq!(def.members(id).count(), remaining);
@@ -1146,18 +1262,44 @@ fn a_pair_bundles_last_member_removed_removes_the_bundle() {
     assert!(def.edges().all(|edge| edge.membership().is_none()));
 }
 
-/// Relocation preserves every member's relative coordinate, holes and a
-/// hand-built zero-pattern member included.
+/// Relocation preserves every member's relative coordinate, holes and the
+/// facts on the drive included; a hand-built member where its compass is 0
+/// is a `MemberShape` violation (T25.F11 invariants 3–4).
 #[test]
-fn a_pair_bundle_with_holes_and_a_zero_pattern_member_relocates_by_relative_coordinate() {
+fn a_pair_bundle_with_holes_relocates_by_relative_coordinate() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 2);
     // A hole: the x member at relative E (direction 4).
     let hole = def
         .members(id)
-        .find(|&o| coordinates_of(&def, o) == (PX, 4))
+        .find(|&o| coordinates_of(&def, o) == (PX, Site::Direction(4)))
         .unwrap();
     def.remove_edge(hole);
-    // A zero-pattern member: x at relative N (direction 2).
+    assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
+    let relative = |def: &CgpGraphBackendDef| {
+        let offset = def.bundles()[0]
+            .wiring()
+            .offset()
+            .expect("a geometric bundle");
+        let mut set: Vec<_> = coordinates(def, id)
+            .into_iter()
+            .map(|(field, site)| match site {
+                Site::Direction(d) => (field, Site::Direction((d + 8 - offset) % 8)),
+                other => (field, other),
+            })
+            .collect();
+        set.sort_unstable();
+        set
+    };
+    let before = relative(&def);
+    assert_eq!(before.len(), 14);
+    let original = def.clone();
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::StealEnergy, 7));
+    assert_eq!(relative(&def), before);
+    assert_eq!(def.check_local_invariants(), Ok(()));
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::Move, 2));
+    assert_eq!(def, original);
+
+    // x at relative N (direction 2) has compass 0: off the wiring.
     let sink = vote_sink(DirectedVoteKind::Move, 2);
     def.output_sinks.0[sink].inputs.0.push(GraphEdge {
         source: GraphSource::InputLeaf {
@@ -1173,53 +1315,34 @@ fn a_pair_bundle_with_holes_and_a_zero_pattern_member_relocates_by_relative_coor
     });
     resort(&mut def, sink);
     assert_eq!(def.check_local_invariants(), Ok(()));
-    assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
-    let zero = def
-        .members(id)
-        .find(|&o| coordinates_of(&def, o) == (PX, 2))
-        .unwrap();
-    assert_eq!(def.member_pattern(zero, &pair_refs()), 0.0);
-    let relative = |def: &CgpGraphBackendDef| {
-        let offset = def.bundles()[0].offset();
-        let mut set: Vec<_> = coordinates(def, id)
-            .into_iter()
-            .map(|(field, d)| (field, (d + 8 - offset) % 8))
-            .collect();
-        set.sort_unstable();
-        set
-    };
-    let before = relative(&def);
-    assert_eq!(before.len(), 12);
-    let original = def.clone();
-    def.relocate_bundle(id, DirectedVoteKind::StealEnergy, 7);
-    assert_eq!(relative(&def), before);
-    assert_eq!(def.check_local_invariants(), Ok(()));
-    def.relocate_bundle(id, DirectedVoteKind::Move, 2);
-    assert_eq!(def, original);
+    assert_eq!(
+        validate_graph(&pair_node(def, pair_refs())),
+        Err(GraphInvariantViolation::MemberShape)
+    );
 }
 
 #[test]
 fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     let (def, id) = paired(DirectedVoteKind::Move, 1);
     assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
-    // I7: the pair index is out of range for the reference.
+    // The field set index is out of range for the reference.
     let mut range = def.clone();
-    range.bundles[0].shape = Shape::DirectionPair {
+    range.bundles[0].source = BundleSource::Sensor {
         ref_idx: PAIR_REF,
-        pair: 2,
+        field_set: 2,
     };
     assert_eq!(
         validate_graph(&pair_node(range, pair_refs())),
         Err(GraphInvariantViolation::ShapeReference)
     );
-    // I7: the reference declares no pairs.
+    // The reference declares no pairs.
     let mut no_pairs = pair_refs();
     no_pairs[usize::from(PAIR_REF)] = InputReference::ActionVotes;
     assert_eq!(
         validate_graph(&pair_node(def.clone(), no_pairs)),
         Err(GraphInvariantViolation::ShapeReference)
     );
-    // I4: a member reading a field that is neither x nor y.
+    // A fact member on a direction sink.
     let first = def.members(id).next().unwrap();
     let EdgeSurface::SinkInput(sink) = first.surface else {
         unreachable!()
@@ -1235,7 +1358,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
         validate_graph(&pair_node(role, pair_refs())),
         Err(GraphInvariantViolation::MemberShape)
     );
-    // I5: a duplicate (field, direction).
+    // A duplicate (field, site).
     let mut duplicate = def.clone();
     let copied = *duplicate.edge_at(first);
     duplicate.output_sinks.0[sink]
@@ -1246,8 +1369,8 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
         duplicate.check_local_invariants(),
         Err(GraphInvariantViolation::DuplicateMember)
     );
-    // I5: an equal member key is a duplicate before its shape is checked:
-    // the repeat reads another reference at the same field.
+    // An equal member key is a duplicate before its source is checked: the
+    // repeat reads another reference at the same field.
     let mut repeated = def.clone();
     let mut stray = *repeated.edge_at(first);
     let GraphSource::InputLeaf { sub_idx, .. } = stray.source else {
@@ -1279,7 +1402,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
         })
         .find(|&(_, n)| n >= 2)
         .expect("a sink holding both pair fields");
-    assert_eq!(members, 2);
+    assert!(members >= 2);
     let inputs = &mut swapped.output_sinks.0[two].inputs.0;
     let at: Vec<usize> = (0..inputs.len())
         .filter(|&i| inputs[i].membership.is_some())
@@ -1289,7 +1412,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
         swapped.check_local_invariants(),
         Err(GraphInvariantViolation::SinkOrder)
     );
-    // I4: a member reading another reference.
+    // A member reading another reference.
     let mut other = def;
     other.output_sinks.0[sink].inputs.0[first.index].source = GraphSource::InputLeaf {
         ref_idx: RING,
@@ -1301,7 +1424,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     );
 }
 
-/// T25.F10: a pair gene adds one unit, with or without its fact members.
+/// T25.F10: a pair gene adds one unit, its fact members included.
 #[test]
 fn a_pair_gene_adds_one_unit() {
     let base = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -1309,44 +1432,46 @@ fn a_pair_gene_adds_one_unit() {
         entry_node_id: crate::contracts::NodeId(0),
         nodes: vec![pair_node(def, pair_refs())],
     };
-    for facts in [&[][..], pair_layout().facts] {
-        let mut grouped = base.clone();
-        grouped.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, facts);
-        assert_eq!(
-            genome(grouped).genome_size() - genome(base.clone()).genome_size(),
-            1
-        );
-    }
+    let mut grouped = base.clone();
+    grouped.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0);
+    assert_eq!(
+        genome(grouped).genome_size() - genome(base).genome_size(),
+        1
+    );
 }
 
+/// A record's `source` and `wiring` are externally tagged in the genome
+/// JSON (T25.F11 invariant 2).
 #[test]
-fn a_pair_shape_round_trips_json_with_its_external_tag() {
+fn a_bundle_record_round_trips_json_with_its_source_and_wiring() {
     let (mut def, id) = paired(DirectedVoteKind::StealEnergy, 6);
     def.bundle_mut(id).set_scale(-0.5);
     let json = serde_json::to_string(&def).unwrap();
     assert!(
-        json.contains(r#"{"DirectionPair":{"ref_idx":2,"pair":1}}"#),
+        json.contains(
+            r#""source":{"Sensor":{"ref_idx":2,"field_set":1}},"wiring":{"DirectionPair":{"kind":"StealEnergy","offset":6}}"#
+        ),
         "{json}"
     );
     let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, def);
     assert_eq!(format!("{decoded:?}"), format!("{def:?}"));
-    // A ring bundle's text is unchanged by the new variant.
     let (ring_def, _) = grouped(DirectedVoteKind::Move, 0);
     assert!(serde_json::to_string(&ring_def)
         .unwrap()
-        .contains(r#"{"Ring":{"ring_ref":1}}"#));
+        .contains(r#""wiring":{"Ring":{"kind":"Move","offset":0}}"#));
 }
 
 proptest! {
-    /// Detach of a pair member is bitwise `compose` at its pattern.
+    /// Detach of a pair member, a fact member included, is bitwise
+    /// `compose` at its pattern.
     #[test]
     fn detaching_a_pair_member_preserves_its_genomic_weight_bitwise(
         kind in 0usize..3,
         offset in 0u8..8,
         scale in -4.0f32..4.0,
         own in -4.0f32..4.0,
-        pick in 0usize..12,
+        pick in 0usize..15,
     ) {
         let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
         def.bundle_mut(id).set_scale(scale);
@@ -1362,12 +1487,12 @@ proptest! {
         prop_assert_eq!(edge.membership(), None);
         prop_assert_eq!(edge.source(), source);
         prop_assert_eq!(edge.own_weight().to_bits(), before.to_bits());
-        prop_assert_eq!(def.members(id).count(), 11);
+        prop_assert_eq!(def.members(id).count(), 14);
     }
 
     /// A pair bundle's shift or retarget followed by its inverse returns an
-    /// equal def, direction and fact holes, fact members (T25.F10) and a
-    /// ring bundle beside it included.
+    /// equal def, direction and fact holes and a ring bundle beside it
+    /// included.
     #[test]
     fn pair_shift_then_unshift_is_identity(
         kind in 0usize..3,
@@ -1375,14 +1500,9 @@ proptest! {
         step in 1u8..8,
         other_kind in 0usize..3,
         holes in any::<u16>(),
-        with_facts in any::<bool>(),
     ) {
-        let (mut def, id) = if with_facts {
-            fact_gene(DirectedVoteKind::ALL[kind], offset)
-        } else {
-            paired(DirectedVoteKind::ALL[kind], offset)
-        };
-        def.add_ring_bundle(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
+        let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
+        def.add_ring_bundle(RING, DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
         let members: Vec<_> = def.members(id).collect();
         // Punch holes, keeping the first member.
         for (i, occurrence) in members.into_iter().enumerate().skip(1).rev() {
@@ -1391,10 +1511,10 @@ proptest! {
             }
         }
         let original = def.clone();
-        def.relocate_bundle(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
+        def.relocate_bundle(id, pair_wiring(DirectedVoteKind::ALL[other_kind], (offset + step) % 8));
         prop_assert!(def.check_local_invariants().is_ok());
         prop_assert!(validate_graph(&pair_node(def.clone(), pair_refs())).is_ok());
-        def.relocate_bundle(id, DirectedVoteKind::ALL[kind], offset);
+        def.relocate_bundle(id, pair_wiring(DirectedVoteKind::ALL[kind], offset));
         prop_assert_eq!(&def, &original);
     }
 }
@@ -1536,6 +1656,9 @@ enum SeedOp {
     SetPlasticity(usize),
     AddBundle(u8),
     AddPairGene(u8),
+    /// A `Plain` bundle on vote sink `index % 39`, reading a memory bank
+    /// (`Some(previous)`) or the `ActionVotes` sensor.
+    AddPlain(usize, Option<bool>),
     Relocate(u8),
     Detach(usize),
     RemoveBundle,
@@ -1557,6 +1680,8 @@ fn seed_op_strategy() -> impl Strategy<Value = SeedOp> {
         (0usize..64).prop_map(SeedOp::SetPlasticity),
         (0u8..8).prop_map(SeedOp::AddBundle),
         (0u8..8).prop_map(SeedOp::AddPairGene),
+        (0usize..64, prop::option::of(any::<bool>()))
+            .prop_map(|(sink, memory)| SeedOp::AddPlain(sink, memory)),
         (0u8..8).prop_map(SeedOp::Relocate),
         (0usize..64).prop_map(SeedOp::Detach),
         Just(SeedOp::RemoveBundle),
@@ -1586,15 +1711,16 @@ proptest! {
     /// as its scale (in `(0.9, 1.5)`, so an integer own tag plus a scale tag
     /// is unique too) and, when seeded, the tag as its seed. Through any
     /// sequence of primitives on both surfaces (push, remove, split, the
-    /// source and weight writes, `Ring` and fact-bearing pair gene creation
-    /// (T25.F10), relocation, detach and removal, scope, `inherit_scale` and
-    /// scale writes, node removal, a draft's clone) each row and the bundle
-    /// slots stay aligned with their edges and records (node duplication
-    /// copies rows and is pinned by `cgp_reproduction`'s copy-remove
-    /// property): a seed is its own tag exactly while the model keeps the
-    /// tag seeded, `None` otherwise; a detached direction member's seed is
-    /// its composed weight when its edge or its bundle was seeded, a detached
-    /// fact member keeps its own bits and seed entry.
+    /// source and weight writes, creation of every wiring from both sources
+    /// (`Ring`, `DirectionPair` with its facts, `Plain` on a sensor or a
+    /// memory bank, T25.F11), relocation, detach and removal, scope,
+    /// `inherit_scale` and scale writes, node removal, a draft's clone) each
+    /// row and the bundle slots stay aligned with their edges and records
+    /// (node duplication copies rows and is pinned by `cgp_reproduction`'s
+    /// copy-remove property): a seed is its own tag exactly while the model
+    /// keeps the tag seeded, `None` otherwise; a detached member's seed is
+    /// its composed weight when its edge or its bundle was seeded, for
+    /// every member (the one member law).
     #[test]
     fn seed_rows_follow_their_edges_through_every_primitive(
         ops in prop::collection::vec(seed_op_strategy(), 1..40),
@@ -1621,7 +1747,7 @@ proptest! {
             def.bundle_mut(id).set_scale(fresh() / 1024.0);
         };
         for (kind, offset) in [(DirectedVoteKind::Move, 2), (DirectedVoteKind::StealEnergy, 5)] {
-            let id = def.add_ring_bundle(ring(), kind, offset);
+            let id = def.add_ring_bundle(RING, kind, offset);
             tag_bundle(&mut def, id, &mut fresh);
         }
         // Seed every edge and bundle with its tag.
@@ -1694,43 +1820,59 @@ proptest! {
                     }
                 }
                 SeedOp::AddBundle(offset) => {
-                    if def.can_host_bundle() && def.bundles().len() < 3 {
-                        let id = def.add_ring_bundle(ring(), DirectedVoteKind::Move, offset);
+                    if def.bundles().len() < 3 {
+                        let id = def.add_ring_bundle(RING, DirectedVoteKind::Move, offset);
                         prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
                         tag_bundle(&mut def, id, &mut fresh);
                     }
                 }
                 SeedOp::AddPairGene(offset) => {
-                    if def.can_host_bundle() && def.bundles().len() < 3 {
-                        let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset, facts());
+                    if def.bundles().len() < 3 {
+                        let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset);
+                        prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
+                        tag_bundle(&mut def, id, &mut fresh);
+                    }
+                }
+                SeedOp::AddPlain(sink, memory) => {
+                    if def.bundles().len() < 3 {
+                        let (source, set) = match memory {
+                            Some(previous) => (BundleSource::Memory { previous }, crate::contracts::MEMORY_BANK),
+                            None => (
+                                BundleSource::Sensor { ref_idx: 0, field_set: 0 },
+                                crate::contracts::FieldSet::Plain { width: 39 },
+                            ),
+                        };
+                        let wiring = Wiring::Plain { sink: VoteSink::from_index(sink % 39).unwrap() };
+                        let birth = crate::genome::cgp::BundleBirth { field_set: 0, wiring, scale: 0.0 };
+                        let id = def.add_bundle(source, set, birth).unwrap();
                         prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
                         tag_bundle(&mut def, id, &mut fresh);
                     }
                 }
                 SeedOp::Relocate(offset) => {
-                    if !def.bundles().is_empty() {
-                        def.relocate_bundle(BundleId::new(0), DirectedVoteKind::Reproduce, offset);
+                    if let Some(bundle) = def.bundles().first().copied() {
+                        let wiring = match bundle.wiring() {
+                            Wiring::Plain { .. } => Wiring::Plain {
+                                sink: VoteSink::from_index(usize::from(offset) * 4).unwrap(),
+                            },
+                            geometric => geometric.rotated(DirectedVoteKind::Reproduce, offset),
+                        };
+                        def.relocate_bundle(BundleId::new(0), wiring);
                     }
                 }
                 SeedOp::Detach(i) => {
                     let members: Vec<EdgeOccurrence> = if def.bundles().is_empty() { Vec::new() } else { def.members(BundleId::new(0)).collect() };
                     if let Some(&member) = members.get(i % members.len().max(1)) {
-                        let fact = def.is_fact_member(member);
                         let pattern = def.member_pattern(member, &refs);
                         let own = def.edge_at(member).own_weight();
                         let scale = def.bundles()[0].scale();
                         let edge_seeded = seeded_tags.remove(&own.to_bits());
-                        // A fact member detaches own-only (T25.F10): its bits
-                        // and its seed entry stay; a direction member's seed
-                        // composes when its edge or its bundle was seeded.
-                        let seeded = edge_seeded || (!fact && seeded_scales.contains(&scale.to_bits()));
+                        // Every member's seed composes when its edge or its
+                        // bundle was seeded (T25.F11 invariant 4).
+                        let seeded = edge_seeded || seeded_scales.contains(&scale.to_bits());
                         let (detached, _) = def.detach_at(member, pattern);
                         let composed = def.edge_at(detached).own_weight();
-                        if fact {
-                            prop_assert_eq!(composed.to_bits(), own.to_bits());
-                        } else {
-                            prop_assert_eq!(composed, compose(own, scale, pattern));
-                        }
+                        prop_assert_eq!(composed, compose(own, scale, pattern));
                         if seeded {
                             seeded_tags.insert(composed.to_bits());
                         }
@@ -1903,13 +2045,13 @@ fn a_mixed_scope_bundle_survives_a_relocation_and_its_inverse() {
     seed_with(&mut def, &edge_seeds, &[(id, 7.5)]);
     let before = def.clone();
     let seeds_before = def.birth_seeds().unwrap().clone();
-    def.relocate_bundle(id, DirectedVoteKind::Reproduce, 6);
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::Reproduce, 6));
     assert_eq!(
         def.members(id).count(),
         all.len(),
         "scope never splits a bundle"
     );
-    def.relocate_bundle(id, DirectedVoteKind::Move, 3);
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::Move, 3));
     assert_eq!(def, before);
     assert_eq!(def.birth_seeds().unwrap(), &seeds_before);
 }
@@ -1939,15 +2081,15 @@ fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_bundle_see
     );
 }
 
-// ── Fact members (T25.F10) ──────────────────────────────────────────────────
+// ── Fact members (T25.F10, T25.F11) ─────────────────────────────────────────
 
 /// The pair's declared facts.
 fn facts() -> &'static [u16] {
     pair_layout().facts
 }
 
-/// `paired` with the pair's fact members, after an independent edge on the
-/// kind's drive: one gene, twelve direction members and three facts.
+/// `paired` after an independent edge on the kind's drive: one gene, twelve
+/// direction members and three facts.
 fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.push_edge(
@@ -1956,14 +2098,14 @@ fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleI
     );
     let drive = drive_sink(&def, kind);
     def.push_edge(drive, GraphEdge::new(leaf(0), -0.5));
-    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset, facts());
+    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset);
     (def, id)
 }
 
 /// The fact members of `id`, in canonical order.
 fn fact_members(def: &CgpGraphBackendDef, id: BundleId) -> Vec<EdgeOccurrence> {
     def.members(id)
-        .filter(|&member| def.is_fact_member(member))
+        .filter(|&member| def.site_of(member) == Some(Site::Drive))
         .collect()
 }
 
@@ -1972,9 +2114,10 @@ fn drive_sink(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> EdgeSurface {
         .unwrap()
 }
 
-/// Invariant 3: the pair gene is the record, twelve direction members and
-/// one fact member per declared fact on its kind's drive, after the drive's
-/// independent edge, every one born 0, static, at `Edge`, with pattern 0.
+/// The pair gene is the record, twelve direction members and one fact
+/// member per declared fact on its kind's drive, after the drive's
+/// independent edge, every one born 0, static, at `Edge`, with pattern 1
+/// (T25.F11 invariant 3: one member law).
 #[test]
 fn a_pair_gene_places_one_fact_member_per_fact_on_its_kinds_drive() {
     for kind in DirectedVoteKind::ALL {
@@ -2003,42 +2146,16 @@ fn a_pair_gene_places_one_fact_member_per_fact_on_its_kinds_drive() {
             assert_eq!(edge.own_weight(), 0.0);
             assert_eq!(edge.plasticity(), None);
             assert_eq!(edge.membership().unwrap().scope, Scope::Edge);
-            assert_eq!(def.member_pattern(member, &pair_refs()), 0.0);
+            assert_eq!(def.member_pattern(member, &pair_refs()), 1.0);
         }
-        // Pattern 0 by role: the scale never reaches a fact member.
+        // Pattern 1: the scale reaches a fact member as any member.
         def.bundle_mut(id).set_scale(3.0);
         for &member in &found {
             def.edge_mut(member).set_weight(0.25);
-            assert_eq!(def.genomic_weight(member, &pair_refs()), 0.25);
+            assert_eq!(def.genomic_weight(member, &pair_refs()), 3.25);
         }
         assert_eq!(validate_graph(&pair_node(def, pair_refs())), Ok(()));
     }
-}
-
-/// `can_host_facts` reads only the kind's drive sink; a gene with facts
-/// asks for it.
-#[test]
-fn can_host_facts_needs_the_kinds_drive_sink() {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert!(DirectedVoteKind::ALL
-        .into_iter()
-        .all(|kind| def.can_host_facts(kind)));
-    let drive = OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive());
-    def.output_sinks.0.retain(|sink| sink.kind != drive);
-    assert!(!def.can_host_facts(DirectedVoteKind::Reproduce));
-    assert!(def.can_host_facts(DirectedVoteKind::Move));
-    assert!(def.can_host_bundle());
-    let result = std::panic::catch_unwind(move || {
-        def.add_pair_bundle(
-            PAIR_REF,
-            1,
-            pair_layout(),
-            DirectedVoteKind::Reproduce,
-            0,
-            facts(),
-        );
-    });
-    assert!(result.is_err());
 }
 
 /// Relocation: a shift leaves fact members on their drive, a retarget
@@ -2073,14 +2190,14 @@ fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
     let original = def.clone();
     let original_seeds = def.birth_seeds().unwrap().clone();
 
-    def.relocate_bundle(id, DirectedVoteKind::Move, 3);
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::Move, 3));
     let move_drive = drive_sink(&def, DirectedVoteKind::Move);
     assert!(fact_members(&def, id)
         .iter()
         .all(|member| member.surface == move_drive));
     assert_eq!(snapshot(&def), facts_before);
 
-    def.relocate_bundle(id, DirectedVoteKind::StealEnergy, 3);
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::StealEnergy, 3));
     let steal_drive = drive_sink(&def, DirectedVoteKind::StealEnergy);
     let moved = fact_members(&def, id);
     assert_eq!(moved.len(), facts().len());
@@ -2088,7 +2205,7 @@ fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
     assert_eq!(snapshot(&def), facts_before);
     assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
 
-    def.relocate_bundle(id, DirectedVoteKind::Move, 2);
+    def.relocate_bundle(id, pair_wiring(DirectedVoteKind::Move, 2));
     assert_eq!(def, original);
     assert_eq!(def.birth_seeds().unwrap(), &original_seeds);
 }
@@ -2186,7 +2303,9 @@ fn a_fact_only_survivor_is_a_valid_gene_until_its_last_member_goes() {
     def.remove_edge(hole);
     assert_eq!(fact_members(&def, id).len(), facts().len() - 1);
     loop {
-        let direction = def.members(id).find(|&member| !def.is_fact_member(member));
+        let direction = def
+            .members(id)
+            .find(|&member| def.site_of(member) != Some(Site::Drive));
         let Some(direction) = direction else { break };
         def.remove_edge(direction);
     }
@@ -2203,16 +2322,16 @@ fn a_fact_only_survivor_is_a_valid_gene_until_its_last_member_goes() {
     assert!(def.bundles().is_empty());
 }
 
-/// R8: a fact member detaches own-only: its bits (`-0.0` included) and its
-/// seed entry stay as stored, `None` staying `None` beside a bundle seed;
-/// it moves to the independent prefix of its drive; the last member's
-/// detach drops the record.
+/// A fact member detaches as every member (T25.F11 invariant 4): its own
+/// weight becomes `compose(own, scale, 1)`, its seed composes from the
+/// edge's and the bundle's seeds; it moves to the independent prefix of its
+/// drive; the last member's detach drops the record.
 #[test]
-fn a_fact_member_detaches_own_only() {
+fn a_fact_member_detaches_by_the_one_member_law() {
     let (mut def, id) = fact_gene(DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(0.5);
     let found = fact_members(&def, id);
-    def.edge_mut(found[0]).set_weight(-0.0);
+    def.edge_mut(found[0]).set_weight(-0.25);
     def.edge_mut(found[1]).set_weight(0.75);
     seed_with(&mut def, &[(found[1], 9.0)], &[(id, 12.0)]);
     let refs = pair_refs();
@@ -2224,18 +2343,21 @@ fn a_fact_member_detaches_own_only() {
     assert_eq!(at.index, 1, "the end of the independent prefix");
     let edge = def.edge_at(at);
     assert_eq!(edge.membership(), None);
-    assert_eq!(edge.own_weight().to_bits(), (-0.0f32).to_bits());
+    assert_eq!(edge.own_weight(), compose(-0.25, 0.5, 1.0));
     assert_eq!(
         def.birth_seeds().unwrap().value(at),
-        None,
-        "no seed manufactured from the bundle seed"
+        Some(compose(-0.25, 12.0, 1.0)),
+        "the bundle seed with the edge's own weight"
     );
 
     let seeded = fact_members(&def, id)[0];
     assert_eq!(def.edge_at(seeded).own_weight(), 0.75);
     let (at, _) = detach(&mut def, seeded, &refs);
-    assert_eq!(def.edge_at(at).own_weight().to_bits(), 0.75f32.to_bits());
-    assert_eq!(def.birth_seeds().unwrap().value(at), Some(9.0));
+    assert_eq!(def.edge_at(at).own_weight(), compose(0.75, 0.5, 1.0));
+    assert_eq!(
+        def.birth_seeds().unwrap().value(at),
+        Some(compose(9.0, 12.0, 1.0))
+    );
     assert_eq!(
         validate_graph(&pair_node(def.clone(), refs.clone())),
         Ok(())
@@ -2286,7 +2408,7 @@ proptest! {
             let (def, id) = grouped(kind, offset);
             (def, id, ring_refs())
         };
-        let coordinates = def.birth_coordinates(id, &refs);
+        let coordinates = def.birth_coordinates(id, &refs, &crate::contracts::SensorContext::WIDEST);
         prop_assert!(coordinates.iter().all(|c| c.present));
         let mut sites = coordinate_sites(&coordinates);
         let expected = if pair { 12 + facts().len() } else { 8 };
@@ -2313,7 +2435,7 @@ proptest! {
         let site = site_ofs(&def, id)[pick];
         def.remove_edge(members[pick]);
         let absent: Vec<_> = def
-            .birth_coordinates(id, &refs)
+            .birth_coordinates(id, &refs, &crate::contracts::SensorContext::WIDEST)
             .into_iter()
             .filter(|c| !c.present)
             .map(|c| (c.field, c.site))
@@ -2322,19 +2444,21 @@ proptest! {
     }
 }
 
-/// A pair gene born without facts lists its declared facts absent; a pair
+/// A pair gene lists every compass and fact coordinate present; a pair
 /// whose reference no longer declares it has no coordinates.
 #[test]
 fn an_unresolvable_pair_has_no_coordinates() {
     let (def, id) = paired(DirectedVoteKind::Move, 0);
-    let coordinates = def.birth_coordinates(id, &pair_refs());
+    let coordinates =
+        def.birth_coordinates(id, &pair_refs(), &crate::contracts::SensorContext::WIDEST);
     let (directions, drives): (Vec<&BirthCoordinate>, Vec<_>) = coordinates
         .iter()
         .partition(|c| matches!(c.site, Site::Direction(_)));
     assert_eq!(directions.len(), 12);
-    assert!(directions.iter().all(|c| c.present));
     let fields: Vec<u16> = drives.iter().map(|c| c.field).collect();
     assert_eq!(fields, facts());
-    assert!(drives.iter().all(|c| !c.present));
-    assert!(def.birth_coordinates(id, &ring_refs()).is_empty());
+    assert!(coordinates.iter().all(|c| c.present));
+    assert!(def
+        .birth_coordinates(id, &ring_refs(), &crate::contracts::SensorContext::WIDEST)
+        .is_empty());
 }

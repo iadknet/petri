@@ -67,19 +67,23 @@ and fixed structural outputs (the sinks). The fixed catalog holds 108 sinks: 24 
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
 `genome_size` charges one unit per compute edge and per sink edge with no
 membership and nothing for a sink itself, so unwired sinks add nothing to it
-(T25.F02), and one unit per edge-group record with nothing for its members of
-either role (T25.F03, T25.F10: a gene costs one unit, an explicit economic
-discount); the founder carries no group and is 80 units.
+(T25.F02), and one unit per bundle record with nothing for its members
+(T25.F03, T25.F10, T25.F11: a gene costs one unit, an explicit economic
+discount); the founder carries no bundle and is 80 units.
 A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
 (T25.F06: learning attributes live on the edge; a compute node is `{kind,
 inputs}`, and a genome with a node-level `plasticity` key fails to
 deserialize, with no conversion path) and a graph
-backend with edge groups carries `groups: [{shape: {Ring: {ring_ref}}, kind,
-offset, scale, inherit_scale, retention}]` (T25.F03, T25.F07, T25.F09), each member's
-`membership` is `{group, scope}` with `scope` `"Edge"` or `"Group"` (T25.F07;
-both keys always written, so a genome from before T25.F07 fails to
-deserialize, with no conversion path); every `plasticity` config and every
-group carries `retention` in `[0, 1]`, always written (T25.F09, genome file
+backend with bundles carries `bundles: [{source, wiring, scale,
+inherit_scale, retention}]` (T25.F03, T25.F07, T25.F09, T25.F11), `source`
+`{"Sensor": {ref_idx, field_set}}` or `{"Memory": {previous}}` and `wiring`
+`{"Plain": {sink}}`, `{"Ring": {kind, offset}}` or
+`{"DirectionPair": {kind, offset}}`; each member's `membership` is
+`{bundle, scope}` with `scope` `"Edge"` or `"Group"` (T25.F07, the learning
+scope T25.F12 replaces; both keys always written, so a genome from before
+T25.F11 fails to deserialize, with no conversion path); every `plasticity`
+config and every bundle carries `retention` in `[0, 1]`, always written
+(T25.F09, genome file
 format 6); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
 with no conversion path. A genome from before T25.F05 that names
@@ -109,8 +113,9 @@ Required invariants:
 - Graph backend fixed output catalog is structurally intact (correct sink
   count and sink kinds match the canonical catalog).
 - Every Graph backend passes `validate_graph` (T25.F03, T25.F06): the
-  edge-group invariants of `v3-graph-backend-spec.md` ("Ring edge groups"),
-  every learning attribute in range, and no plastic `ClearSlot` edge or group
+  bundle invariants of `v3-graph-backend-spec.md` ("Bundles": one member
+  law, every member on a coordinate its wiring maps its field to), every
+  learning attribute in range, and no plastic `ClearSlot` edge or bundle
   member (Section 13 there), checked in the mutation gate after every event
   and at the lab's `GenomeFile::load`.
 
@@ -142,9 +147,9 @@ misalignment across topology mutations.
 Within each mesh node, operator state, committed outputs and scratch
 buffers are indexed by compute node index. Learned state (T25.F06) is one
 slot per plastic edge over both surfaces in canonical order — a sink edge can
-learn — and, since T25.F07, one scale slot per edge group with a
-group-scope learner, in `GroupId` order, built once at birth
-(`v3-graph-backend-spec.md` Section 13). A member's `scope` and a group's
+learn — and, since T25.F07, one scale slot per bundle with a
+group-scope learner, in `BundleId` order, built once at birth
+(`v3-graph-backend-spec.md` Section 13). A member's `scope` and a bundle's
 `inherit_scale` and `retention` and an edge's `retention` are genome fields;
 the learned scale is runtime state. Fixed
 structural outputs (the sinks) carry no operator state.

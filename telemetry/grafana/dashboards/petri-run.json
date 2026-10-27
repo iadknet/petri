@@ -4098,8 +4098,8 @@
     {
       "id": 77,
       "type": "timeseries",
-      "title": "Births inheriting a pair-group scale",
-      "description": "Of the births in each minute, the share whose genome holds a nonzero direction-pair group scale that no mutation at that birth could have made. The scale was inherited from the parent.\n\nA direction-pair group turns a sensed x/y offset (such as nearest food) into votes for the eight directions.",
+      "title": "Bundles created by wiring",
+      "description": "Bundles the four creation operators (InputRef.AddSensorLive/Silent, Graph.AddBundleLive/Silent) committed per second, by wiring (plain, ring, pair) and creation form (uniform, randomized learning).\n\nA bundle wires one whole field set of a sensor or a memory bank; a live one is born with a drawn scale, a silent one at scale 0.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -4117,8 +4117,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(petri_run_pair_bundle_inherited_nonzero_births_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_reproduction_actions_spawned_total{petri_run_id=\"$run_id\"}[1m]))",
-          "legendFormat": "inherited nonzero",
+          "expr": "sum by (petri_wiring, petri_form) (rate(petri_run_bundles_created_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_wiring}} {{petri_form}}",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -4127,7 +4127,7 @@
       "interval": "1s",
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
+          "unit": "short",
           "custom": {
             "drawStyle": "line",
             "lineWidth": 1,

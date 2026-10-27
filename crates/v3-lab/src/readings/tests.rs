@@ -8,7 +8,6 @@ use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::cgp::{
     BundleId, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, OutputSink,
-    Shape as BundleShape,
 };
 use v3_core::genome::VmBackendDef;
 
@@ -502,15 +501,12 @@ fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
     let mut genome = founder(&setup);
     let (entry, barrier) = with_ring(&mut genome, WorldInputKey::NeighborBarrierRing);
     let (_, occupied) = with_ring(&mut genome, WorldInputKey::NeighborOccupiedRing);
+    let refs = genome.nodes[entry].input_refs.clone();
     let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
         panic!("the founder entry is a graph node");
     };
     for (ring_ref, offset, scale) in [(barrier, 0, 0.5), (occupied, 3, -0.5)] {
-        let id = graph.add_ring_bundle(
-            BundleShape::Ring { ring_ref },
-            DirectedVoteKind::Move,
-            offset,
-        );
+        let id = add_geometric(graph, &refs, ring_ref, 0, DirectedVoteKind::Move, offset);
         graph.bundle_mut(id).set_scale(scale);
     }
     (genome, entry, barrier, occupied)
@@ -674,8 +670,7 @@ fn a_ring_read_only_through_a_bundle_is_causal() {
             .with_output_sinks(sinks);
         moved += rings.len();
         for ring_ref in rings {
-            let id =
-                graph.add_ring_bundle(BundleShape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let id = add_geometric(graph, refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             graph.bundle_mut(id).set_scale(1.0);
         }
     }
@@ -1035,11 +1030,11 @@ fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
     let (entry, summary) = with_ring(&mut genome, WorldInputKey::AreaBarrierSummary);
-    let layout = genome.nodes[entry].input_refs[usize::from(summary)].direction_pairs()[1];
+    let refs = genome.nodes[entry].input_refs.clone();
     let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
         panic!("the founder entry is a graph node");
     };
-    let id = graph.add_pair_bundle(summary, 1, layout, DirectedVoteKind::Move, 2, &[]);
+    let id = add_geometric(graph, &refs, summary, 1, DirectedVoteKind::Move, 2);
     graph.bundle_mut(id).set_scale(0.75);
     (genome, entry)
 }
@@ -1062,7 +1057,11 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
             other => panic!("a member reads a leaf, not {other:?}"),
         })
         .collect();
-    assert_eq!(reads.len(), 12);
+    assert_eq!(
+        reads.len(),
+        12 + 3,
+        "twelve compass members and three facts"
+    );
     assert!(reads.iter().all(|&ref_idx| usize::from(ref_idx) >= len));
     assert!(!consumers(&ablated).contains_key(&Family::AreaBarrierSummary));
 
@@ -1078,4 +1077,33 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
         before.genomic_weight(before.members(bundle).next().unwrap(), refs),
         0.0
     );
+}
+
+/// A silent bundle on field set `field_set` of `refs[ref_idx]`, wired into
+/// `kind` at `offset`: a ring set as `Ring`, a pair set as `DirectionPair`
+/// (a fixture through the container's public primitive).
+fn add_geometric(
+    def: &mut CgpGraphBackendDef,
+    refs: &[InputReference],
+    ref_idx: u16,
+    field_set: u8,
+    kind: v3_core::contracts::votes::DirectedVoteKind,
+    offset: u8,
+) -> v3_core::genome::cgp::BundleId {
+    use v3_core::contracts::{FieldSet, SensorContext, SensorDescriptor};
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
+    let set = SensorDescriptor::of(&refs[usize::from(ref_idx)], &SensorContext::WIDEST)
+        .field_set(field_set)
+        .expect("a declared field set");
+    let wiring = match set {
+        FieldSet::Ring => Wiring::Ring { kind, offset },
+        _ => Wiring::DirectionPair { kind, offset },
+    };
+    let birth = BundleBirth {
+        field_set,
+        wiring,
+        scale: 0.0,
+    };
+    def.add_bundle(BundleSource::Sensor { ref_idx, field_set }, set, birth)
+        .expect("a geometric fixture on a full catalog")
 }

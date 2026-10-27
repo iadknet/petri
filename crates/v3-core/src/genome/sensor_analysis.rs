@@ -731,9 +731,8 @@ mod tests {
     #[test]
     fn a_ring_bundle_is_a_live_consumer_of_its_ring() {
         use crate::contracts::votes::DirectedVoteKind;
-        use crate::genome::cgp::Shape;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
+        graph.add_ring_bundle(1, DirectedVoteKind::Move, 0);
         let refs = vec![
             InputReference::World(WorldInputKey::food_here(FOOD_0)),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),

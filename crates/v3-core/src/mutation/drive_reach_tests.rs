@@ -1,7 +1,8 @@
 //! Mutation reach of the kind drives and the birth edge class (T11.F30):
 //! the existing draws over the catalog reach every drive, `AddGraphEdge` and
-//! `InputRef.Add` report the class of the sink they pushed onto, and a
-//! birth's class is defined only for one applied event of either operator.
+//! a creation that makes one `Plain` bundle report the class of the sink
+//! they pushed onto, and a birth's class is defined only for one applied
+//! event of `AddGraphEdge` or a creation operator (T25.F11 invariant 8).
 
 use std::collections::BTreeSet;
 
@@ -10,10 +11,11 @@ use rand::{rngs::SmallRng, SeedableRng};
 
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
+use crate::contracts::NodeId;
 use crate::genome::cgp::{CgpGraphBackendDef, OutputSinkKind};
-use crate::genome::VmInstruction;
+use crate::genome::{BackendDef, NodeGenome, VmInstruction};
+use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
 use crate::mutation::graph::operators::add_edge;
-use crate::mutation::input_ref::connect_declared_input;
 use crate::mutation::types::{BirthEdgeClass, MutationDomain, MutationOperator, MutationSummary};
 use crate::mutation::vm::operators::random_vm_instruction;
 
@@ -30,6 +32,44 @@ fn grown_vote_sink(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> O
         })
 }
 
+/// A Graph node on a full sink catalog declaring nothing.
+fn bare_graph_node() -> NodeGenome {
+    NodeGenome {
+        node_id: NodeId(0),
+        input_refs: Vec::new(),
+        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+        targets: Vec::new(),
+    }
+}
+
+/// `AddSensorLive` of `reference` onto a bare Graph node with `seed`: the
+/// node's def before and after, and the class the creation reports.
+fn add_sensor_on_bare_node(
+    reference: InputReference,
+    seed: u64,
+) -> (
+    CgpGraphBackendDef,
+    CgpGraphBackendDef,
+    Option<BirthEdgeClass>,
+) {
+    let mut node = bare_graph_node();
+    let BackendDef::Graph(before) = node.backend_def.clone() else {
+        unreachable!()
+    };
+    let (_, class) = add_sensor_by_law(
+        &mut node,
+        reference,
+        BirthLaw::Live,
+        &crate::config::test_sensor_context(1),
+        &mut SmallRng::seed_from_u64(seed),
+    )
+    .expect("a full catalog hosts every Plain bundle");
+    let BackendDef::Graph(after) = node.backend_def else {
+        unreachable!()
+    };
+    (before, after, class)
+}
+
 fn drives() -> BTreeSet<usize> {
     DirectedVoteKind::ALL
         .map(|kind| kind.drive().index())
@@ -38,7 +78,7 @@ fn drives() -> BTreeSet<usize> {
 }
 
 #[test]
-fn add_graph_edge_and_input_ref_add_reach_every_drive() {
+fn add_graph_edge_and_add_sensor_reach_every_drive() {
     let refs = [InputReference::ActionVotes];
     let mut by_edge = BTreeSet::new();
     let mut by_input = BTreeSet::new();
@@ -55,9 +95,7 @@ fn add_graph_edge_and_input_ref_add_reach_every_drive() {
             assert_eq!(class, Some(BirthEdgeClass::Drive));
             by_edge.insert(sink.index());
         }
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let class =
-            connect_declared_input(&mut def, Some(0), 30, &mut SmallRng::seed_from_u64(seed));
+        let (before, def, class) = add_sensor_on_bare_node(InputReference::UpstreamSlot(0), seed);
         if let Some(sink @ VoteSink::Drive(_)) = grown_vote_sink(&before, &def) {
             assert_eq!(class, Some(BirthEdgeClass::Drive));
             by_input.insert(sink.index());
@@ -129,20 +167,28 @@ fn vm_add_vote_reaches_every_drive() {
 }
 
 proptest! {
-    /// The class `add_edge` and `connect_declared_input` report is the class
-    /// of the vote sink they pushed onto, `None` when no vote sink grew.
+    /// The class `add_edge` and a one-`Plain`-bundle `AddSensor*` report is
+    /// the class of the vote sink they pushed onto, `None` when no vote sink
+    /// grew; a sensor of several field sets reports none.
     #[test]
-    fn the_reported_class_is_the_class_of_the_pushed_sink(seed in any::<u64>(), width in 1u16..40) {
+    fn the_reported_class_is_the_class_of_the_pushed_sink(seed in any::<u64>(), slot in 0usize..24) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let before = def.clone();
         let class = add_edge(&mut def, crate::mutation::graph::operators::test_inputs(&[InputReference::ActionVotes]), &mut SmallRng::seed_from_u64(seed)).unwrap();
         prop_assert_eq!(class, grown_vote_sink(&before, &def).and_then(BirthEdgeClass::of_sink));
 
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let class = connect_declared_input(&mut def, Some(0), u32::from(width), &mut SmallRng::seed_from_u64(seed));
-        let grown = grown_vote_sink(&before, &def);
-        prop_assert!(grown.is_some(), "a full catalog carries every drawn sink");
-        prop_assert_eq!(class, grown.and_then(BirthEdgeClass::of_sink));
+        for reference in [InputReference::UpstreamSlot(slot), InputReference::ActionVotes] {
+            let (before, def, class) = add_sensor_on_bare_node(reference, seed);
+            let grown = grown_vote_sink(&before, &def);
+            prop_assert!(grown.is_some(), "a full catalog carries every drawn sink");
+            prop_assert_eq!(class, grown.and_then(BirthEdgeClass::of_sink));
+        }
+        let area = InputReference::World(crate::contracts::WorldInputKey::AreaBarrierSummary);
+        let (_, _, class) = add_sensor_on_bare_node(area, seed);
+        prop_assert_eq!(class, None, "two pair bundles carry no class");
+        let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
+        let (_, _, class) = add_sensor_on_bare_node(ring, seed);
+        prop_assert_eq!(class, None, "one geometric bundle carries no class");
     }
 }
 
@@ -179,10 +225,11 @@ fn summary(
 }
 
 #[test]
-fn a_birth_has_a_class_only_for_one_applied_edge_or_input_add() {
+fn a_birth_has_a_class_only_for_one_applied_edge_or_creation() {
     use MutationDomain::{Graph, InputRef, Vm};
     use MutationOperator::{
-        GraphAddGraphEdge, GraphRemoveGraphEdge, InputRefAdd, VmDeleteInstruction,
+        GraphAddBundleLive, GraphAddBundleSilent, GraphAddGraphEdge, GraphRemoveGraphEdge,
+        InputRefAddSensorLive, InputRefAddSensorSilent, VmDeleteInstruction,
     };
     let drive = Some(BirthEdgeClass::Drive);
     let direction = Some(BirthEdgeClass::Direction);
@@ -191,8 +238,18 @@ fn a_birth_has_a_class_only_for_one_applied_edge_or_input_add() {
         drive
     );
     assert_eq!(
-        summary(&[(InputRef, InputRefAdd, direction)]).birth_edge_class(),
+        summary(&[(InputRef, InputRefAddSensorLive, direction)]).birth_edge_class(),
         direction
+    );
+    for operator in [GraphAddBundleLive, GraphAddBundleSilent] {
+        assert_eq!(
+            summary(&[(Graph, operator, direction)]).birth_edge_class(),
+            direction
+        );
+    }
+    assert_eq!(
+        summary(&[(InputRef, InputRefAddSensorSilent, drive)]).birth_edge_class(),
+        drive
     );
     // One applied event of any other operator has no class, even with a
     // recorded vote-sink push.
@@ -225,7 +282,7 @@ fn a_birth_has_a_class_only_for_one_applied_edge_or_input_add() {
     );
     assert_eq!(
         summary(&[
-            (InputRef, InputRefAdd, direction),
+            (InputRef, InputRefAddSensorLive, direction),
             (Vm, VmDeleteInstruction, None)
         ])
         .birth_edge_class(),

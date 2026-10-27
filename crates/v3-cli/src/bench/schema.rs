@@ -1079,10 +1079,6 @@ pub struct MutationSupply {
     /// Edge bundles committed events removed (T25.F03); absent in reports
     /// stored before T25.F03.
     pub bundles_removed_total: u64,
-    /// Births whose committed genome holds an inherited `DirectionPair` bundle
-    /// with `|scale| > 1e-3` (T25.F04); absent in reports stored before
-    /// T25.F04.
-    pub pair_bundle_inherited_nonzero_births_total: u64,
     /// Committed attribute changes by the scope they landed on (T25.F08);
     /// absent in reports stored before T25.F08.
     pub attribute_changes_by_scope: AttributeChangesByScope,

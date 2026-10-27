@@ -305,15 +305,6 @@ impl WorldInputKey {
         }
     }
 
-    /// Whether this family's pairs partition its layout, one pair per slot
-    /// (T25.F05): every channel in exactly one pair's `{x, y} ∪ facts`, so
-    /// a drawn pair names a whole slot. `NearbyCreature` only; pinned
-    /// against [`Self::direction_pairs`] and [`Self::compound_width`].
-    #[must_use]
-    pub const fn slot_pairs(self) -> bool {
-        matches!(self, Self::NearbyCreature)
-    }
-
     /// Returns the typed food index for food-specific world keys, or `None` otherwise.
     #[must_use]
     pub const fn food_type_idx(self) -> Option<OrdinaryFoodTypeId> {
@@ -460,33 +451,6 @@ pub enum InputReference {
     PreviousOutcome,
 }
 
-impl InputReference {
-    /// Whether this reference is a neighbor ring a `Ring` edge bundle can read
-    /// (T25.F03): `World` of one of [`WorldInputKey::is_neighbor_ring`].
-    #[must_use]
-    pub const fn is_ring(&self) -> bool {
-        matches!(self, Self::World(key) if key.is_neighbor_ring())
-    }
-
-    /// The `(x, y)` pairs this reference declares (T25.F04): its world
-    /// key's [`WorldInputKey::direction_pairs`], none for a non-world
-    /// reference.
-    #[must_use]
-    pub const fn direction_pairs(&self) -> &'static [DirectionPair] {
-        match self {
-            Self::World(key) => key.direction_pairs(),
-            _ => &[],
-        }
-    }
-
-    /// Whether this reference's pairs are its slots (T25.F05): its world
-    /// key's [`WorldInputKey::slot_pairs`], false for a non-world reference.
-    #[must_use]
-    pub const fn slot_pairs(&self) -> bool {
-        matches!(self, Self::World(key) if key.slot_pairs())
-    }
-}
-
 // ── Sensor descriptor (T25.F11) ─────────────────────────────────────────────
 
 /// What a sensor's descriptor reads beyond the reference itself: the run's
@@ -501,6 +465,23 @@ pub struct SensorContext {
 }
 
 impl SensorContext {
+    /// Every queue slot addressable: the context the genome reads its
+    /// geometry and validity under, so a genome's validity never depends
+    /// on the configured queue (T25.F11 invariant 4).
+    pub const WIDEST: Self = Self::new(1, u32::MAX);
+
+    /// `ActionQueue`'s width: three sub-values per queued action, bounded by
+    /// the `u16` sub-value address space (65,536).
+    #[must_use]
+    pub const fn action_queue_width(self) -> u32 {
+        let width = self.action_queue_slots.saturating_mul(3);
+        if width < ACTION_QUEUE_ADDRESSES {
+            width
+        } else {
+            ACTION_QUEUE_ADDRESSES
+        }
+    }
+
     #[must_use]
     pub const fn new(food_type_count: usize, action_queue_slots: u32) -> Self {
         Self {
@@ -510,9 +491,9 @@ impl SensorContext {
     }
 }
 
-/// `ActionQueue`'s declared width: the first four queued actions, three
-/// sub-values each, whatever the configured queue.
-const ACTION_QUEUE_WIDTH: u32 = 12;
+/// The `u16` sub-value address space of `GraphSource::InputLeaf` and
+/// `resolve_input`: the bound of `ActionQueue`'s width.
+const ACTION_QUEUE_ADDRESSES: u32 = 1 << 16;
 
 /// One field set of a sensor or a shared-memory bank: the fields one bundle
 /// wires and the geometry they carry. Field indices are the sensor's
@@ -590,10 +571,9 @@ impl SensorDescriptor {
     /// The descriptor of `reference` under `context`.
     #[must_use]
     pub fn of(reference: &InputReference, context: &SensorContext) -> Self {
-        let _ = context;
         let width = match reference {
             InputReference::World(key) => u32::from(key.compound_width()),
-            InputReference::ActionQueue => ACTION_QUEUE_WIDTH,
+            InputReference::ActionQueue => context.action_queue_width(),
             InputReference::ActionVotes | InputReference::PreviousPassVotes => {
                 crate::contracts::votes::VOTE_SINK_COUNT as u32
             }
@@ -646,6 +626,19 @@ impl SensorDescriptor {
             self.field_set(u8::try_from(index).expect("few field sets"))
                 .expect("an index below the count")
         })
+    }
+}
+
+/// Pair field set `pair` of `reference` through its descriptor (a fixture).
+///
+/// # Panics
+///
+/// If the sensor declares no `Pair` set at `pair`.
+#[cfg(test)]
+pub(crate) fn pair_layout(reference: &InputReference, pair: u8) -> DirectionPair {
+    match SensorDescriptor::of(reference, &SensorContext::WIDEST).field_set(pair) {
+        Some(FieldSet::Pair(layout)) => layout,
+        other => panic!("pair_layout: {reference:?} set {pair} is {other:?}"),
     }
 }
 
@@ -737,13 +730,45 @@ mod tests {
         assert_eq!(width(InputReference::PreviousOutcome), 4);
         assert_eq!(width(InputReference::UpstreamBus), 24);
         assert_eq!(width(InputReference::UpstreamSlot(9)), 1);
-        assert_eq!(width(InputReference::ActionQueue), 12);
+        assert_eq!(width(InputReference::ActionQueue), 30);
         let ring = SensorDescriptor::of(
             &InputReference::World(WorldInputKey::NeighborBarrierRing),
             &CONTEXT,
         );
         assert_eq!(ring.field_set(0), Some(FieldSet::Ring));
         assert_eq!(MEMORY_BANK.fields().len(), 16);
+    }
+
+    /// `ActionQueue`'s width follows the configured queue: three sub-values
+    /// per queued action (30 at the default 10, 60 at 20), bounded by the
+    /// `u16` sub-value space, and every field below it is addressable by one
+    /// `Plain` set (T25.F11 invariant 1).
+    #[test]
+    fn the_action_queue_width_follows_the_configured_queue() {
+        let queue = |slots| {
+            SensorDescriptor::of(&InputReference::ActionQueue, &SensorContext::new(1, slots))
+        };
+        let default = crate::config::test_sensor_context(1);
+        assert_eq!(
+            SensorDescriptor::of(&InputReference::ActionQueue, &default).width(),
+            30
+        );
+        assert_eq!(queue(20).width(), 60);
+        assert_eq!(queue(21_845).width(), 65_535);
+        assert_eq!(queue(21_846).width(), 65_536);
+        assert_eq!(queue(u32::MAX).width(), 65_536);
+        for slots in [1, 10, 20, 21_846] {
+            let descriptor = queue(slots);
+            let set = descriptor.field_set(0).expect("one set");
+            assert_eq!(
+                set,
+                FieldSet::Plain {
+                    width: descriptor.width()
+                }
+            );
+            assert_eq!(set.fields().len(), descriptor.width() as usize);
+            assert!(set.contains(u16::try_from(descriptor.width() - 1).unwrap()));
+        }
     }
 
     #[test]
@@ -808,37 +833,6 @@ mod tests {
             ]
             .into()
         );
-        assert!(InputReference::ActionVotes.direction_pairs().is_empty());
-        assert_eq!(
-            InputReference::World(food).direction_pairs(),
-            food.direction_pairs()
-        );
-    }
-
-    /// `slot_pairs` is true exactly where the pairs partition the layout:
-    /// every channel in exactly one pair's `{x, y} ∪ facts` (T25.F05).
-    #[test]
-    fn slot_pairs_holds_exactly_where_the_pairs_partition_the_layout() {
-        let mut slotted = Vec::new();
-        for key in every_world_key() {
-            let mut covered = vec![0u32; usize::from(key.compound_width())];
-            for pair in key.direction_pairs() {
-                for &field in [pair.x, pair.y].iter().chain(pair.facts) {
-                    covered[usize::from(field)] += 1;
-                }
-            }
-            let partitions =
-                !key.direction_pairs().is_empty() && covered.iter().all(|&count| count == 1);
-            assert_eq!(key.slot_pairs(), partitions, "{key:?}");
-            if key.slot_pairs() {
-                slotted.push(key.as_key());
-            }
-        }
-        assert_eq!(slotted, ["NearbyCreature"]);
-        assert_eq!(
-            WorldInputKey::NearbyCreature.direction_pairs().len(),
-            nearby_idx::SLOTS
-        );
     }
 
     #[test]
@@ -854,7 +848,7 @@ mod tests {
     }
 
     #[test]
-    fn every_swap_alternative_keeps_the_pairs() {
+    fn every_swap_alternative_keeps_the_field_sets() {
         for food_types in 1..=3 {
             for key in every_world_key() {
                 let reference = InputReference::World(key);
@@ -862,9 +856,14 @@ mod tests {
                     &reference,
                     &crate::config::test_sensor_context(food_types),
                 ) {
+                    let sets = |reference: &InputReference| {
+                        SensorDescriptor::of(reference, &CONTEXT)
+                            .field_sets()
+                            .collect::<Vec<_>>()
+                    };
                     assert_eq!(
-                        alternative.direction_pairs(),
-                        reference.direction_pairs(),
+                        sets(&alternative),
+                        sets(&reference),
                         "{reference:?} -> {alternative:?}"
                     );
                 }

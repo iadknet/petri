@@ -6,7 +6,9 @@
 use std::collections::BTreeSet;
 
 use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK};
-use crate::genome::cgp::{plans, BundleBirth, BundleId, BundleSource, GraphSource};
+use crate::genome::cgp::{
+    bundle_capacity_admits, plans, BundleBirth, BundleId, BundleSource, GraphSource,
+};
 use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 
@@ -100,8 +102,6 @@ impl NodeGenome {
     /// # Errors
     ///
     /// Any check that fails; nothing is written.
-    // Commit 1 of T25.F11: a Graph node may also take no births, the
-    // `InputRef.Add` route wiring its own lone edge.
     pub fn add_sensor(
         &mut self,
         reference: InputReference,
@@ -121,7 +121,7 @@ impl NodeGenome {
                     && covered
                         .iter()
                         .all(|&index| usize::from(index) < descriptor.field_set_count());
-                if !births.is_empty() && !exact {
+                if !exact {
                     return Err(NodeEditError::Coverage);
                 }
                 for birth in births {
@@ -132,7 +132,7 @@ impl NodeGenome {
                         return Err(NodeEditError::Inadmissible);
                     }
                 }
-                if def.bundles().len() + births.len() > usize::from(u16::MAX) {
+                if !bundle_capacity_admits(def.bundles().len(), births.len()) {
                     return Err(NodeEditError::BundleCapacity);
                 }
             }

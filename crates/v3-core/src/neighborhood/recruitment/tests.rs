@@ -979,7 +979,7 @@ fn exposure_counts_every_selection_by_surface_and_outcome() {
                 MutationOperator::TopologyRemoveRouteTarget,
                 Some(1),
             ),
-            applied(MutationOperator::InputRefAdd, 1),
+            applied(MutationOperator::InputRefAddSensorLive, 1),
         ]),
     );
     birth(

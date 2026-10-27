@@ -96,11 +96,9 @@ fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
     );
 }
 
-/// Every operator in the four `ALL` lists produces a row. Enabled operators
-/// record every trial, whether they apply or skip; every operator is enabled
-/// at production defaults (the T20.F04 and T20.F05 input mechanisms since
-/// 2026-10-12). An operator disabled by configuration retains its catalog
-/// row with no attempted trials.
+/// Every operator in the four `ALL` lists produces a row and records every
+/// trial, whether it applies or skips: no operator is disabled by
+/// configuration (T25.F11 deleted the last switch).
 #[test]
 fn every_operator_in_the_four_domains_produces_a_row() {
     let evaluation = founder_evaluation(1);
@@ -113,24 +111,6 @@ fn every_operator_in_the_four_domains_produces_a_row() {
             row.tally.trials, REDUCED_OPERATOR_TRIALS,
             "{} runs every trial at defaults",
             row.operator
-        );
-    }
-
-    let disabled = founder_evaluation_with(1, |config| {
-        config.mutation.neutral_input_recruitment = v3_core::config::NeutralInputRecruitment::Off;
-    });
-    assert_eq!(
-        disabled.operator_rows.len(),
-        v3_core::neighborhood::operator_catalog().len()
-    );
-    for row in &disabled.operator_rows {
-        assert_eq!(
-            row.tally.trials,
-            if row.operator == "RecruitNeutralInput" {
-                0
-            } else {
-                REDUCED_OPERATOR_TRIALS
-            }
         );
     }
 }

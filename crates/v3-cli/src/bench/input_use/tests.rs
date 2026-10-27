@@ -107,7 +107,7 @@ fn world_set_cases_carry_the_input_use_block_and_the_gate_does_not() {
     assert_eq!(timings.input_use_wall_clock_ms_per_seed.len(), 3);
     for case in &report.goal_indicators.cases {
         let block = case.input_use.defined().expect("defined on the world set");
-        assert_eq!(block.version, "input-use-v4");
+        assert_eq!(block.version, "input-use-v5");
         assert_eq!(block.row_format, ROW_FORMAT);
         assert_eq!(block.family_row_format, FAMILY_ROW_FORMAT);
         assert_eq!(block.scenes.original_executions, 80);
@@ -191,7 +191,6 @@ fn row_strings_round_trip_and_reject_malformed_text() {
     let row = RowBlock {
         family: "ActionQueue".to_string(),
         channel: 14,
-        beyond_draw_width: true,
         counts: vec![
             Some(3),
             Some(1),
@@ -204,7 +203,7 @@ fn row_strings_round_trip_and_reject_malformed_text() {
             None,
         ],
     };
-    assert_eq!(row.encode(), "ActionQueue 14* 3 1 1 0 0 0 0 0 -");
+    assert_eq!(row.encode(), "ActionQueue 14 3 1 1 0 0 0 0 0 -");
     assert_eq!(RowBlock::decode(&row.encode()), Some(row));
     assert_eq!(RowBlock::decode("SharedMemory 3 - 1"), None);
     assert_eq!(RowBlock::decode("x y 1 1 1 1 1 1 1 1 1"), None);
@@ -216,13 +215,12 @@ proptest::proptest! {
     fn row_strings_decode_to_the_encoded_row(
         family in "[A-Za-z]{1,20}(:[0-9]{1,2})?",
         channel in proptest::num::u16::ANY,
-        beyond_draw_width in proptest::bool::ANY,
         counts in proptest::collection::vec(
             proptest::option::of(proptest::num::u32::ANY),
             ROW_FIELDS.len(),
         ),
     ) {
-        let row = RowBlock { family, channel, beyond_draw_width, counts };
+        let row = RowBlock { family, channel, counts };
         proptest::prop_assert_eq!(RowBlock::decode(&row.encode()), Some(row));
     }
 

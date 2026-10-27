@@ -42,29 +42,14 @@ function grouped(): GraphBrain {
 			member(
 				channel,
 				{ Direction: (channel + 1) % 8 },
-				{
-					own,
-					genomic: 0.5 + own,
-					pattern: 1,
-					scale: 0.5,
-				},
+				{ own, genomic: 0.5 + own, pattern: 1, scale: 0.5 },
 			),
 		);
 	}
-	return graphBrain({
-		output_sinks: sinks,
-		bundles: [
-			ringBundle(1, {
-				offset: 1,
-				scale: 0.5,
-				coordinates: Array.from({ length: 8 }, (_, c) => ({
-					field: c,
-					direction: (c + 1) % 8,
-					present: c !== 3,
-				})),
-			}),
-		],
-	});
+	const bundle = ringBundle(1, { offset: 1, scale: 0.5 });
+	const missing = bundle.coordinates[3];
+	if (missing) missing.present = false;
+	return graphBrain({ output_sinks: sinks, bundles: [bundle] });
 }
 
 const refs = [
@@ -72,17 +57,25 @@ const refs = [
 	{ family: "world", key: "NeighborBarrierRing" },
 ] as const;
 
-/** The pair coordinates the view lists for a Move gene at offset 2 on
- * AreaFoodSummary pair 1 (x field 3, y field 4), in birth order, with the
- * x coordinate on direction 4 absent. */
-function pairCoordinates(offset: number, missing?: number): BrainBundle["coordinates"] {
-	const x = [1, 2, 3, 5, 6, 7].map((r) => ({ field: 3, direction: (r + offset) % 8 }));
-	const y = [0, 1, 3, 4, 5, 7].map((r) => ({ field: 4, direction: (r + offset) % 8 }));
-	return [...x, ...y].map((c) => ({ ...c, present: !(c.field === 3 && c.direction === missing) }));
+/** The coordinates of a `DirectionPair` bundle on AreaFoodSummary pair 1
+ * (x field 3, y field 4, facts 0, 5, 6) at `offset`, in birth order: the
+ * twelve compass coordinates, then the facts on the drive; `absent` lists
+ * the coordinates without a member. */
+function pairCoordinates(
+	offset: number,
+	absent: (field: number, site: Site) => boolean = () => false,
+): BrainBundle["coordinates"] {
+	const compass = (field: number, relatives: number[]) =>
+		relatives.map((r) => ({ field, site: { Direction: (r + offset) % 8 } as Site }));
+	return [
+		...compass(3, [1, 2, 3, 5, 6, 7]),
+		...compass(4, [0, 1, 3, 4, 5, 7]),
+		...[0, 5, 6].map((field) => ({ field, site: "Drive" as Site })),
+	].map((c) => ({ ...c, present: !absent(c.field, c.site) }));
 }
 
 describe("EdgeBundleList", () => {
-	it("lists each bundle's ring, kind, offset, scale and members present with holes", () => {
+	it("lists each bundle's wiring, kind, offset, scale and members by coordinate with holes", () => {
 		render(
 			<EdgeBundleList
 				graphDef={grouped()}
@@ -95,13 +88,17 @@ describe("EdgeBundleList", () => {
 			/>,
 		);
 		const row = screen.getByTestId("edge-bundle");
+		expect(row).toHaveTextContent("Ring");
 		expect(row).toHaveTextContent("Move");
 		expect(row).toHaveTextContent("offset 1");
 		expect(row).toHaveTextContent("scale=0.500");
 		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("7/8 ●●●○●●●●");
 		const members = screen.getAllByTestId("edge-bundle-member");
 		expect(members).toHaveLength(7);
-		expect(members[0]).toHaveTextContent("cell N → Move[NE] own=0.250 genomic=0.750");
+		expect(members[0]).toHaveTextContent("→ Move[NE] own=0.250 genomic=0.750");
+		const holes = screen.getAllByTestId("edge-bundle-hole");
+		expect(holes).toHaveLength(1);
+		expect(holes[0]).toHaveTextContent("→ Move[S] (hole)");
 		fireEvent.mouseEnter(screen.getAllByText(/own=0\.250/)[0] as HTMLElement);
 		expect(screen.getByTestId("tooltip")).toHaveTextContent(
 			"scale × pattern + correction0.500 × 1.00 + 0.250 = 0.750",
@@ -165,7 +162,7 @@ describe("EdgeBundleList", () => {
 		expect(screen.getByTestId("tooltip")).toHaveTextContent(/1 step clockwise/);
 		fireEvent.mouseLeave(offset);
 		fireEvent.focus(screen.getByTestId("edge-bundle-members"));
-		expect(screen.getByTestId("tooltip")).toHaveTextContent(/by ring cell/);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/in birth order/);
 	});
 
 	it("collapses and reopens a bundle's member rows, open by default", () => {
@@ -181,103 +178,80 @@ describe("EdgeBundleList", () => {
 		expect(screen.getAllByTestId("edge-bundle-member")).toHaveLength(7);
 	});
 
-	it("renders a pair gene's coordinates from the view and a zero-pattern member outside them", () => {
-		// Preservation case (T30.F01 invariant 4): a zero-pattern direction
-		// member, x at relative N (sink 2), is listed as present outside the
-		// coordinates; the x coordinate on sink 4 is a hole.
-		const sinks = directionSinks("Move");
-		for (const c of pairCoordinates(2, 4).filter((c) => c.present)) {
-			sinks[c.direction]?.edges.push(
-				member(
-					c.field,
-					{ Direction: c.direction },
-					{ own: 0, genomic: 0.5, pattern: 0.5, scale: 1 },
-				),
-			);
+	it("lists a pair bundle's compass and fact members by coordinate, the facts on the drive", () => {
+		// The x coordinate on direction 4 and the fact `max` (field 6) are
+		// holes; a fact member weighs `scale × 1 + own` like every member.
+		const absent = (field: number, site: Site) =>
+			(field === 3 && typeof site !== "string" && site.Direction === 4) ||
+			(field === 6 && site === "Drive");
+		const coordinates = pairCoordinates(2, absent);
+		const sinks = directionSinks("StealEnergy");
+		const drive: BrainSink = { kind: { ActionVote: { Drive: "StealEnergy" } }, edges: [] };
+		for (const c of coordinates.filter((c) => c.present)) {
+			if (c.site === "Drive") {
+				const own = c.field === 5 ? 0.25 : 0;
+				drive.edges.push(member(c.field, "Drive", { own, genomic: 2 + own, pattern: 1, scale: 2 }));
+			} else if (typeof c.site !== "string") {
+				sinks[c.site.Direction]?.edges.push(
+					member(c.field, c.site, { own: 0, genomic: 1, pattern: 0.5, scale: 2 }),
+				);
+			}
 		}
-		sinks[2]?.edges.push(
-			member(3, { Direction: 2 }, { own: 0.125, genomic: 0.125, pattern: 0, scale: 1 }),
-		);
 		const bundle: BrainBundle = {
 			...ringBundle(0),
-			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
-			offset: 2,
-			scale: 1,
-			coordinates: pairCoordinates(2, 4),
-			facts: [
-				{ field: 0, present: false },
-				{ field: 5, present: false },
-				{ field: 6, present: false },
-			],
+			source: { Sensor: { ref_idx: 0, field_set: 1 } },
+			wiring: { DirectionPair: { kind: "StealEnergy", offset: 2 } },
+			scale: 2,
+			coordinates,
 		};
 		render(
 			<EdgeBundleList
-				graphDef={graphBrain({ output_sinks: sinks, bundles: [bundle] })}
+				graphDef={graphBrain({ output_sinks: [...sinks, drive], bundles: [bundle] })}
 				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
 				learning={null}
 			/>,
 		);
 		const row = screen.getByTestId("edge-bundle");
 		expect(row).toHaveTextContent("Pair");
-		expect(row).toHaveTextContent("nearestDx/nearestDy #0");
+		expect(row).toHaveTextContent("set 1 #0");
 		expect(row).toHaveTextContent("offset 2");
-		expect(row).toHaveTextContent("scale=1.000");
-		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("11/12 ●○●●●●●●●●●● +1");
+		expect(row).toHaveTextContent("scale=2.000");
+		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("13/15 ●○●●●●●●●●●●●●○");
 		const members = screen.getAllByTestId("edge-bundle-member");
-		expect(members).toHaveLength(12);
-		const zero = members.filter((m) => m.textContent?.includes("(zero pattern)"));
-		expect(zero).toHaveLength(1);
-		expect(zero[0]).toHaveTextContent("x → Move[E]");
-		fireEvent.mouseEnter(screen.getByText(/own=0\.125/));
-		expect(screen.getByTestId("tooltip")).toHaveTextContent("1.000 × 0.00 + 0.125 = 0.125");
+		expect(members).toHaveLength(13);
+		const drives = members.filter((m) => m.textContent?.includes("StealEnergy drive"));
+		expect(drives).toHaveLength(2);
+		expect(drives[1]).toHaveTextContent("own=0.250 genomic=2.250");
+		expect(screen.getAllByTestId("edge-bundle-hole")).toHaveLength(2);
+		fireEvent.mouseEnter(screen.getByText(/own=0\.250/));
+		expect(screen.getByTestId("tooltip")).toHaveTextContent("2.000 × 1.00 + 0.250 = 2.250");
 	});
 
-	it("lists a pair gene's fact members on a facts line with the view's presence", () => {
-		// Preservation case (T30.F01 invariant 4): a fact member sits on the
-		// drive at pattern 0 with `genomic == own`; the declared fact `max`
-		// (field 6) is a hole.
-		const sinks = directionSinks("StealEnergy");
-		for (const c of pairCoordinates(0)) {
-			sinks[c.direction]?.edges.push(
-				member(c.field, { Direction: c.direction }, { own: 0, genomic: 1, pattern: 0.5, scale: 2 }),
-			);
+	it("names a Plain bundle's sink and a memory bank's slots", () => {
+		const sink: BrainSink = { kind: { ActionVote: "Eat" }, edges: [] };
+		for (let slot = 0; slot < 2; slot++) {
+			sink.edges.push(member(slot, "Sink", { own: 0, genomic: 0.5, pattern: 1, scale: 0.5 }));
 		}
-		sinks.push({
-			kind: { ActionVote: { Drive: "StealEnergy" } },
-			edges: [
-				{ source: { InputLeaf: { ref_idx: 0, sub_idx: 1 } }, own: 0.5, genomic: 0.5, applied: 0.5 },
-				member(0, "Drive", { own: 0, genomic: 0, pattern: 0, scale: 2 }),
-				member(5, "Drive", { own: 0.25, genomic: 0.25, pattern: 0, scale: 2 }),
-			],
-		});
 		const bundle: BrainBundle = {
 			...ringBundle(0),
-			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
-			kind: "StealEnergy",
-			scale: 2,
-			coordinates: pairCoordinates(0),
-			facts: [
-				{ field: 0, present: true },
-				{ field: 5, present: true },
-				{ field: 6, present: false },
-			],
+			source: { Memory: { previous: true } },
+			wiring: { Plain: { sink: "Eat" } },
+			scale: 0.5,
+			coordinates: [0, 1, 2].map((field) => ({ field, site: "Sink", present: field < 2 })),
 		};
 		render(
 			<EdgeBundleList
-				graphDef={graphBrain({ output_sinks: sinks, bundles: [bundle] })}
-				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
+				graphDef={graphBrain({ output_sinks: [sink], bundles: [bundle] })}
+				inputRefs={[]}
 				learning={null}
 			/>,
 		);
-		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("12/12 ●●●●●●●●●●●●");
-		expect(screen.getByTestId("edge-bundle-facts")).toHaveTextContent("facts 2/3 ●●○");
-		expect(screen.getAllByTestId("edge-bundle-member")).toHaveLength(12);
-		const facts = screen.getAllByTestId("edge-bundle-fact");
-		expect(facts).toHaveLength(2);
-		expect(facts[0]).toHaveTextContent("amount → StealEnergy drive own=0.000");
-		expect(facts[1]).toHaveTextContent("nearestDist → StealEnergy drive own=0.250 genomic=0.250");
-		fireEvent.mouseEnter(screen.getByText(/own=0\.250/));
-		expect(screen.getByTestId("tooltip")).toHaveTextContent("2.000 × 0.00 + 0.250 = 0.250");
+		const row = screen.getByTestId("edge-bundle");
+		expect(row).toHaveTextContent("Plain → Eat memory (previous) #0");
+		expect(screen.queryByText(/offset/)).toBeNull();
+		const members = screen.getAllByTestId("edge-bundle-member");
+		expect(members[0]).toHaveTextContent("prev[0] → Eat own=0.000 genomic=0.500");
+		expect(screen.getByTestId("edge-bundle-hole")).toHaveTextContent("prev[2] → Eat (hole)");
 	});
 
 	it("renders nothing without bundles", () => {

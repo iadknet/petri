@@ -1280,7 +1280,7 @@ mod tests {
         // Rate 1.0: every genome unit requests one event.
         sim.config.mutation.per_unit_rate = 1.0;
 
-        // Re-seeded by T25.F04 commit 1 (100 -> 101): `AddDirectionPairBundle`
+        // Re-seeded by T25.F04 commit 1 (100 -> 101): `AddDirectionPairGroup`
         // remaps every Graph draw, and at seed 100 one VM-domain attempt finds
         // no applicable operator (a domain-level skip, counted by domain and
         // by no operator); 101 is the first seed from 100 without one, and

@@ -58,16 +58,15 @@ pub(crate) struct NodeInputs<'a> {
 
 impl NodeInputs<'_> {
     /// The sub-value draw bound of `refs[index]` (its descriptor width, at
-    /// least 1), when declared.
-    fn width_at(self, index: usize) -> Option<u16> {
-        self.refs.get(index).map(|reference| {
-            let width = SensorDescriptor::of(reference, self.context).width().max(1);
-            u16::try_from(width).expect("a declared width below u16::MAX")
-        })
+    /// least 1, at most the 65,536 `u16` addresses), when declared.
+    fn width_at(self, index: usize) -> Option<u32> {
+        self.refs
+            .get(index)
+            .map(|reference| SensorDescriptor::of(reference, self.context).width().max(1))
     }
 
     /// [`Self::width_at`] of a declared `ref_idx`.
-    fn width(self, ref_idx: u16) -> u16 {
+    fn width(self, ref_idx: u16) -> u32 {
         self.width_at(usize::from(ref_idx))
             .expect("a declared reference")
     }
@@ -248,7 +247,8 @@ pub(crate) fn random_graph_source(
         let width = inputs.width(ref_idx);
         GraphSource::InputLeaf {
             ref_idx,
-            sub_idx: rng.gen_range(0..width),
+            sub_idx: u16::try_from(rng.gen_range(0..width))
+                .expect("a width within the u16 addresses"),
         }
     } else {
         GraphSource::SharedMemory {
@@ -773,7 +773,7 @@ fn valid_edge_field_moves(
             if ref_idx > 0 {
                 let candidate = (ref_idx - 1) as usize;
                 if let Some(width) = inputs.width_at(candidate) {
-                    if sub_idx < width {
+                    if u32::from(sub_idx) < width {
                         moves.push(EdgeFieldMove::RefIdx(-1));
                     }
                 }
@@ -781,7 +781,7 @@ fn valid_edge_field_moves(
             if ref_idx + 1 < ref_count {
                 let candidate = (ref_idx + 1) as usize;
                 if let Some(width) = inputs.width_at(candidate) {
-                    if sub_idx < width {
+                    if u32::from(sub_idx) < width {
                         moves.push(EdgeFieldMove::RefIdx(1));
                     }
                 }
@@ -791,7 +791,7 @@ fn valid_edge_field_moves(
                 if sub_idx > 0 {
                     moves.push(EdgeFieldMove::SubIdx(-1));
                 }
-                if sub_idx + 1 < width {
+                if u32::from(sub_idx) + 1 < width {
                     moves.push(EdgeFieldMove::SubIdx(1));
                 }
             }

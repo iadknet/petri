@@ -67,7 +67,7 @@
 //! f01286e7...) at the merge base and after the commit, so the commit moved
 //! no simulation; reverting the key rename restores both old digests.
 //! Re-pinned by T25.F03 commit 2 after two agreeing runs: ring projections
-//! become `Ring` edge bundles, so a projection-creating draw writes a bundle of
+//! become `Ring` edge groups, so a projection-creating draw writes a group of
 //! eight members into the genome text, which moves the two sampled digests
 //! (8cad8472... -> 545c5490..., gestation rate 0.0 e46c2e81... ->
 //! b5c8617d...). The sampled digest without genome bytes holds (ef1d2719...,
@@ -75,7 +75,7 @@
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
 //! commit, genome bytes included (a81e66c5..., gestation rate 0.0
 //! 17189f7a...); reverting the commit restores both old digests.
-//! Re-pinned by T25.F04 commit 1: `AddDirectionPairBundle` joins the Graph
+//! Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
 //! default arm (weight 56 -> 58) and remaps every Graph draw, moving all four
 //! digests (sampled 545c5490... -> f9778798..., gestation rate 0.0
 //! b5c8617d... -> ac6b54b7...; guard 2d0116fe... -> 45759536..., rate 0.0
@@ -109,15 +109,15 @@
 //! 527a14e0... -> d3b71fcd...), and without them is byte-identical across
 //! the commit (633e120e..., gestation rate 0.0 f49b5c17...).
 //! Re-pinned by T25.F07 commit 1 (text only) after two agreeing runs: every
-//! member's JSON names its `scope` and every bundle's its `inherit_scale`,
+//! member's JSON names its `scope` and every group's its `inherit_scale`,
 //! which moves the two sampled digests (bc6cee03... -> 63d2f57d...,
 //! gestation rate 0.0 bde1dbeb... -> a3b599b9...); the guard digests hold.
 //! The sampled digest without genome bytes is 9e21186e... (rate 0.0
 //! 53b0c507...) at the merge base and after the commit, and with
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical
 //! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
-//! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned bundle
-//! creation, the scope coin and `SetScope` change every Graph draw, bundles
+//! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned group
+//! creation, the scope coin and `SetScope` change every Graph draw, groups
 //! learn, and the learned row carries the initialized learned scales after
 //! the edge items, which moves all four digests (sampled 63d2f57d... ->
 //! 38f68975..., gestation rate 0.0 a3b599b9... -> 0d037fb0...; guard
@@ -137,7 +137,7 @@
 //! a187a3fe...; guard dc32a1fa... -> 3d299de5..., rate 0.0 d61cf3eb... ->
 //! 7d7ae0e2...).
 //! Re-pinned by T25.F09 commit 1 (text only): every plastic edge's and
-//! every bundle's JSON names its `retention`, which moves the two sampled
+//! every group's JSON names its `retention`, which moves the two sampled
 //! digests (9458abf6... -> 5beb9f71..., gestation rate 0.0 a187a3fe... ->
 //! 23a0754d...); the guard digests hold. The sampled digest without genome
 //! bytes is 146fe823... (rate 0.0 4eb8afe8...) at the merge base and after
@@ -209,6 +209,13 @@
 //! gestation rate 0.0 67dcf4ca... -> d60fedee...; state-only 4830c71f...
 //! -> 68592232..., 00a1b0bb... -> 70f49495...); mapping the genome text
 //! back restores the old digests, and both guard digests hold.
+//! Re-pinned by T25.F11 commit 3 after two agreeing runs: the four creation
+//! operators replace `InputRef.Add`, recruitment and the four `Add*Group`
+//! (Graph weight 78, InputRef 12) and every creation wires a whole field
+//! set, which moves all six digests (sampled dd205579... -> cac92d5f...,
+//! gestation rate 0.0 d60fedee... -> bb733cc1...; state-only 68592232... ->
+//! 79a60101..., 70f49495... -> d78b8297...; guard 9d4e5755... ->
+//! 3ff27565..., rate 0.0 23ff7d5e... -> 65256033...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -220,19 +227,19 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None, true),
-        "dd205579b71c7b39db75e38dbdf244f1c81773b4838372ca10443579ff58e336"
+        "cac92d5fd191437ff03c48c2e4a3cfcefa93b06a56b5df9ee9be34cbed25037f"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), true),
-        "d60fedeee807c78988976f406b649049342b95b90cbb29a92cec0a58f088eeb4"
+        "bb733cc1146f35146165308c68e1cfc9496d528df55dd85a14453814cfb7a9ea"
     );
     assert_eq!(
         sampled_trajectory_digest(None, false),
-        "68592232be7dddd192a99d41aea50dc081efe8b20d64c368f0b6536933515117"
+        "79a601013258b20fdb0739461af4681c7545fb9fddd963b16db77e63ede5492a"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), false),
-        "70f49495dbdba0bb3d2afe1025a8af81d3bc868227f62bd0798afdea17c6fe96"
+        "d78b829714c2f222956a0fd96c67ee5768b565870b83c3e647fedb203fafc1f4"
     );
 }
 
@@ -308,11 +315,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>, with_log: bool) -> Str
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "9d4e5755d6c5c32e1e6c460fb6b4674d2cf4e6d6972e7551992304feeb93dba4"
+        "3ff27565caebac573c2e249e30035f3d2ceeb6b4314ef626fbe7c2ad5d65b814"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "23ff7d5eb9db5a326d64ae5b2eab6961e12d57294b6dae3d1164591d918b52b2"
+        "65256033e37360f1d7a2dc28f9293ac9f22e4724deca009d9da88c40d5c539b7"
     );
 }
 

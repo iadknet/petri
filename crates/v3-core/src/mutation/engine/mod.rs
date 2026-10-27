@@ -276,7 +276,6 @@ impl MutationEngine {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
                             .iter()
                             .copied()
-                            .filter(|op| op.enabled(config))
                             .filter(|op| !restricted || op.complexity_effect().is_decreasing())
                             .collect();
                         let selected = loop {
@@ -288,9 +287,7 @@ impl MutationEngine {
                             let op = available[idx];
                             let operator = op.operator();
                             let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator)
-                                    || (cfg!(test) && op == GraphOperator::RecruitNeutralInput)
-                                {
+                                if operator_requires_added_node_input_tracking(operator) {
                                     Some(genome.clone())
                                 } else {
                                     None
@@ -339,7 +336,7 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.input_ref);
-                            let result = apply_input_ref_event(
+                            let (result, bundle_edits) = apply_input_ref_event(
                                 genome,
                                 op,
                                 &mut targets,
@@ -359,7 +356,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
-                                bundle_edits: BundleEdits::default(),
+                                bundle_edits,
                                 attribute_scope: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
@@ -409,7 +406,7 @@ impl MutationEngine {
             match result {
                 Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
-                    summary.record_bundle_edits(bundle_edits);
+                    summary.record_bundle_edits(operator, bundle_edits);
                     if let Some(scope) = attribute_scope {
                         summary.record_attribute_scope(scope);
                     }
@@ -417,12 +414,6 @@ impl MutationEngine {
                         summary.record_vote_edge_class(class);
                     }
                     if let Some(before) = tracked_before.as_ref() {
-                        #[cfg(test)]
-                        if operator == MutationOperator::GraphRecruitNeutralInput {
-                            summary
-                                .recruitment_deltas
-                                .push((before.clone(), genome.clone()));
-                        }
                         if let Some(classes) =
                             collect_added_node_input_classes(before, genome, operator)
                         {
@@ -672,7 +663,8 @@ fn apply_graph_event(
     )
 }
 
-/// Apply one input ref mutation event with parseability gate.
+/// Apply one input ref mutation event with parseability gate, and the bundle edits
+/// it made, counted only when it commits.
 fn apply_input_ref_event(
     genome: &mut CreatureGenome,
     op: InputRefOperator,
@@ -680,10 +672,17 @@ fn apply_input_ref_event(
     rng: &mut impl Rng,
     config: &MutationConfig,
     context: &SensorContext,
-) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
-    apply_gated(genome, |genome| {
+) -> (ClassifiedResult, BundleEdits) {
+    let result = apply_gated(genome, |genome| {
         InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
-    })
+    });
+    let edits = result
+        .as_ref()
+        .map_or(BundleEdits::default(), |(_, (_, edits))| *edits);
+    (
+        result.map(|(reachability, (class, _))| (reachability, class)),
+        edits,
+    )
 }
 
 pub(crate) fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
@@ -731,7 +730,8 @@ pub(crate) fn vm_operator_key(op: VmOperator) -> MutationOperator {
 
 pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
     match op {
-        InputRefOperator::Add => MutationOperator::InputRefAdd,
+        InputRefOperator::AddSensorLive => MutationOperator::InputRefAddSensorLive,
+        InputRefOperator::AddSensorSilent => MutationOperator::InputRefAddSensorSilent,
         InputRefOperator::Prune => MutationOperator::InputRefPrune,
         InputRefOperator::Swap => MutationOperator::InputRefSwap,
         InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
@@ -742,10 +742,10 @@ pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
 mod tests;
 
 #[cfg(test)]
-mod recruitment_tests;
-
-#[cfg(test)]
 mod membership_tests;
 
 #[cfg(test)]
 mod bundle_tests;
+
+#[cfg(test)]
+mod draw_stream_tests;

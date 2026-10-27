@@ -1,4 +1,4 @@
-//! The `input-use-v4` catalog: the 20 named input families the mutation
+//! The `input-use-v5` catalog: the 21 named input families the mutation
 //! engine draws, `UpstreamSlot` (one channel per slot), and the separate
 //! shared-memory inventory, with the channel each read actually addresses
 //! under `runtime::inputs::resolve_input`.
@@ -42,10 +42,6 @@ pub enum Family {
     /// Shared memory, previous tick (channel = slot); no declaration or causal stage.
     SharedMemoryPrevious,
 }
-
-/// The mutation draw width of `ActionQueue`: channels at or past it are
-/// labelled `beyond_draw_width` (audit S4).
-pub const ACTION_QUEUE_DRAW_WIDTH: u16 = 12;
 
 impl Family {
     /// The family of a reference.
@@ -113,14 +109,6 @@ pub struct Channel {
     pub channel: u16,
 }
 
-impl Channel {
-    /// An `ActionQueue` channel at or past the mutation draw width.
-    #[must_use]
-    pub fn beyond_draw_width(self) -> bool {
-        self.family == Family::ActionQueue && self.channel >= ACTION_QUEUE_DRAW_WIDTH
-    }
-}
-
 /// What one reference read addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Addressed {
@@ -131,16 +119,17 @@ pub enum Addressed {
 
 /// The channel a read of `reference` at `sub_idx` resolves, mirroring
 /// `resolve_input`: scalars read channel 0, world compounds wrap `sub_idx`
-/// modulo their width, `ActionQueue` addresses the raw `sub_idx`, decision
-/// compounds address `sub_idx` below their width and nothing at or past it,
+/// modulo their width, `ActionQueue` (its width the context's queue), the
+/// decision compounds and `UpstreamBus` address `sub_idx` below their width
+/// and nothing at or past it,
 /// and `UpstreamSlot(k)` is channel `k`.
 #[must_use]
 pub fn addressed(reference: &InputReference, sub_idx: u16, context: &SensorContext) -> Addressed {
     let family = Family::of(reference);
     let channel = match reference {
         InputReference::World(key) if key.compound_width() > 1 => sub_idx % key.compound_width(),
-        InputReference::ActionQueue => sub_idx,
-        InputReference::ActionVotes
+        InputReference::ActionQueue
+        | InputReference::ActionVotes
         | InputReference::PreviousPassVotes
         | InputReference::CommitCounts
         | InputReference::PreviousOutcome
@@ -224,24 +213,25 @@ mod tests {
     }
 
     #[test]
-    fn action_queue_keeps_the_raw_index_and_labels_past_the_draw_width() {
-        let Addressed::Channel(inside) = addressed(
-            &InputReference::ActionQueue,
-            11,
-            &crate::config::test_sensor_context(1),
-        ) else {
-            panic!("ActionQueue always addresses a channel");
+    fn action_queue_addresses_below_the_configured_width_only() {
+        let context = crate::config::test_sensor_context(1);
+        let Addressed::Channel(inside) = addressed(&InputReference::ActionQueue, 29, &context)
+        else {
+            panic!("ActionQueue addresses a channel below its width");
         };
-        assert!(!inside.beyond_draw_width());
-        let Addressed::Channel(beyond) = addressed(
-            &InputReference::ActionQueue,
-            14,
-            &crate::config::test_sensor_context(1),
-        ) else {
-            panic!("ActionQueue always addresses a channel");
-        };
-        assert_eq!(beyond.channel, 14);
-        assert!(beyond.beyond_draw_width());
+        assert_eq!(inside.channel, 29);
+        assert_eq!(
+            addressed(&InputReference::ActionQueue, 30, &context),
+            Addressed::OutOfWidth(Family::ActionQueue)
+        );
+        assert!(matches!(
+            addressed(
+                &InputReference::ActionQueue,
+                59,
+                &crate::contracts::SensorContext::new(1, 20)
+            ),
+            Addressed::Channel(_)
+        ));
     }
 
     #[test]

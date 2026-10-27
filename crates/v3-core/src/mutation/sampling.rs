@@ -53,9 +53,8 @@ const BUCKET_COUNT: u8 = 30;
 /// is one `gen_range(0..30)` into this table, and
 /// `input_ref::input_reference_universe` is the table expanded. A
 /// reference's bucket count is its draw weight: `NearbyCreature` keeps the
-/// three buckets its three predecessors held (T25.F05) and `UpstreamSlot`
-/// eight, whatever its slot count. Recruitment's family weights are a
-/// separate declaration (`graph::recruitment::universe_entries`).
+/// three buckets its three predecessors held (T25.F05), `UpstreamSlot`
+/// seven, whatever its slot count, and `UpstreamBus` one (T25.F11).
 pub(crate) static INPUT_BUCKETS: [Bucket; BUCKET_COUNT as usize] = [
     Bucket::Food(FoodFamily::FoodHere),
     Bucket::Food(FoodFamily::NeighborFoodRing),
@@ -86,7 +85,7 @@ pub(crate) static INPUT_BUCKETS: [Bucket; BUCKET_COUNT as usize] = [
     Bucket::Upstream,
     Bucket::Upstream,
     Bucket::Upstream,
-    Bucket::Upstream,
+    Bucket::Fixed(InputReference::UpstreamBus),
 ];
 
 /// Every reference [`INPUT_BUCKETS`] can produce with `food_type_count`
@@ -313,10 +312,11 @@ mod tests {
         }
     }
 
-    /// Indices 22 to 29 are the upstream slot, which draws its slot.
+    /// Indices 22 to 28 are the upstream slot, which draws its slot; 29 is
+    /// the upstream bus, one draw (T25.F11 invariant 1).
     #[test]
-    fn typed_sampler_upstream_range_is_the_last_eight_indices() {
-        for index in 22_u64..30 {
+    fn typed_sampler_upstream_range_is_seven_slots_then_the_bus() {
+        for index in 22_u64..29 {
             let (reference, draws) = draw_at(index, 1);
             assert!(
                 matches!(reference, InputReference::UpstreamSlot(_)),
@@ -324,6 +324,7 @@ mod tests {
             );
             assert_eq!(draws, 2);
         }
+        assert_eq!(draw_at(29, 1), (InputReference::UpstreamBus, 1));
     }
 
     /// Every reference the sampler can produce at `food_type_count` food
@@ -402,7 +403,7 @@ mod tests {
                 "one family per named reference"
             );
             if food_type_count == 1 {
-                assert_eq!(named.len(), 20, "20 named families");
+                assert_eq!(named.len(), 21, "21 named families (UpstreamBus, T25.F11)");
             }
         }
     }
@@ -441,6 +442,6 @@ mod tests {
         .map(|r| at(r).expect("in universe"))
         .collect();
         assert_eq!(order, [4, 5, 6, 7, 8]);
-        assert_eq!(universe.len(), 20 + OUTPUT_SLOT_COUNT);
+        assert_eq!(universe.len(), 21 + OUTPUT_SLOT_COUNT);
     }
 }

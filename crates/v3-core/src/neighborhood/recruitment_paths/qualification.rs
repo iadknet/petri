@@ -6,9 +6,12 @@ use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::votes::VoteSink;
-use crate::contracts::{InputReference, NodeId};
+use crate::contracts::{InputReference, NodeId, SensorContext};
 use crate::genome::analysis::mesh_reachable_nodes;
-use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::cgp::{
+    BundleId, BundleSource, CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, Site,
+    Wiring,
+};
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -583,28 +586,84 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
     ]
 }
 
-/// The Task B-correct Graph copy: the ring added beside the copied
-/// `FoodHere` with its born edge from the east sub-index into `Move(E)`, the
-/// `Move(N)` vote edge removed, activation: three events (T20.F16). The
-/// copied sensing node goes dead beside the direct ring edge.
+/// The Task B-correct Graph copy (T25.F11): the ring added beside the copied
+/// `FoodHere`, wired whole as one `Ring` bundle into `Move` at offset 0; the
+/// incumbent's `Move(N)` vote edge removed; the bundle's `Move(N)` member
+/// removed, leaving a hole at the north cell; activation: four events. The
+/// copied sensing node goes dead beside the bundle.
 fn graph_unprepared_plan() -> Vec<StepSpec> {
-    let north_removed = step(
+    let north_vote_removed = step(
         "north_vote_removed",
-        "Graph.RemoveGraphEdge: the Move(N) vote edge",
+        "Graph.RemoveGraphEdge: the incumbent's independent Move(N) vote edge",
         ProductionEvent::Graph(GraphOperator::RemoveGraphEdge),
         |before, after| {
             let (b, a) = (graph(before), graph(after));
-            only_scaffold_backend_changed(before, after)
-                && a.compute_nodes() == b.compute_nodes()
-                && move_sink(a, 0).inputs.is_empty()
-                && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
-                    x.kind
-                        == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0))
-                        || x == y
-                })
+            let members: Vec<GraphEdge> = move_sink(b, 0)
+                .inputs
+                .iter()
+                .filter(|edge| edge.membership().is_some())
+                .copied()
+                .collect();
+            north_sink_edited(before, after) && *move_sink(a, 0).inputs == *members
         },
     );
-    vec![ring_added(), north_removed, swap_activation()]
+    let north_member_removed = step(
+        "north_member_removed",
+        "Graph.RemoveGraphEdge: the ring bundle's Move(N) member, a hole at the north cell",
+        ProductionEvent::Graph(GraphOperator::RemoveGraphEdge),
+        |before, after| {
+            let (b, a) = (graph(before), graph(after));
+            let Some(ring) = b.bundles().len().checked_sub(1) else {
+                return false;
+            };
+            let ring = BundleId::new(u16::try_from(ring).expect("a small fixture"));
+            let remaining: Vec<GraphEdge> = move_sink(b, 0)
+                .inputs
+                .iter()
+                .filter(|edge| !(edge.is_member_of(ring) && edge.source() == NORTH_CELL))
+                .copied()
+                .collect();
+            let refs = &node(after, SCAFFOLD).input_refs;
+            let absent: Vec<(u16, Site)> = a
+                .birth_coordinates(ring, refs, &SensorContext::WIDEST)
+                .into_iter()
+                .filter(|coordinate| !coordinate.present)
+                .map(|coordinate| (coordinate.field, coordinate.site))
+                .collect();
+            north_sink_edited(before, after)
+                && remaining.len() + 1 == move_sink(b, 0).inputs.len()
+                && *move_sink(a, 0).inputs == *remaining
+                && a.members(ring).count() == 7
+                && absent == [(0, Site::Direction(0))]
+        },
+    );
+    vec![
+        ring_added(),
+        north_vote_removed,
+        north_member_removed,
+        swap_activation(),
+    ]
+}
+
+/// The ring's north cell: sub-index 0 of the ring declared second.
+const NORTH_CELL: GraphSource = GraphSource::InputLeaf {
+    ref_idx: 1,
+    sub_idx: 0,
+};
+
+/// Only the scaffold's `Move(N)` sink changed: compute nodes, records and
+/// every other sink as before.
+fn north_sink_edited(before: &CreatureGenome, after: &CreatureGenome) -> bool {
+    let (b, a) = (graph(before), graph(after));
+    let north = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0));
+    only_scaffold_backend_changed(before, after)
+        && a.compute_nodes() == b.compute_nodes()
+        && a.bundles() == b.bundles()
+        && a.output_sinks().len() == b.output_sinks().len()
+        && a.output_sinks()
+            .iter()
+            .zip(b.output_sinks())
+            .all(|(x, y)| x.kind == north || x == y)
 }
 
 /// Blank Graph tissue: the cue declared with its born edge into `Move(E)`
@@ -630,25 +689,26 @@ const VOTE_CUE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 0 };
 const VOTE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 2 };
 const _: () = assert!(VoteSink::Directed(DirectedVoteKind::Move, EAST).index() == 3);
 
-/// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
-/// `expected` and nothing else on the node changes but, on a Graph scaffold,
-/// the born edge (T20.F16): `Move(E)` gains exactly one appended edge from
-/// the appended entry at `sub_idx` with a positive weight, every compute node
-/// and every other sink unchanged. A VM scaffold's backend stays unchanged.
+/// `InputRef.AddSensorLive` on the scaffold, accepted when the table
+/// becomes exactly `expected` and nothing else on the node changes but, on
+/// a Graph scaffold, the sensor's one bundle (T25.F11): one new record
+/// reading the appended entry's field set 0 with `wiring` and a positive
+/// scale, its members static and appended after every incumbent edge,
+/// every compute node unchanged. A VM scaffold's backend stays unchanged.
 fn input_ref_added(
     name: &'static str,
     edits: &'static str,
     expected: Vec<InputReference>,
-    sub_idx: u16,
+    wiring: Wiring,
 ) -> StepSpec {
-    let born = GraphSource::InputLeaf {
+    let source = BundleSource::Sensor {
         ref_idx: u16::try_from(expected.len() - 1).expect("a small fixture table"),
-        sub_idx,
+        field_set: 0,
     };
     step(
         name,
         edits,
-        ProductionEvent::InputRef(InputRefOperator::Add),
+        ProductionEvent::InputRef(InputRefOperator::AddSensorLive),
         move |before, after| {
             let delta = GenomeDelta::between(before, after);
             let (b, a) = (node(before, SCAFFOLD), node(after, SCAFFOLD));
@@ -659,7 +719,7 @@ fn input_ref_added(
                 && match (&b.backend_def, &a.backend_def) {
                     (BackendDef::Vm(_), _) => a.backend_def == b.backend_def,
                     (BackendDef::Graph(b), BackendDef::Graph(a)) => {
-                        only_east_edge_appended(b, a, |source| *source == born)
+                        only_one_bundle_appended(b, a, source, wiring)
                     }
                     (BackendDef::Graph(_), BackendDef::Vm(_)) => false,
                 }
@@ -667,26 +727,60 @@ fn input_ref_added(
     )
 }
 
-/// The cue, born at its Task A sub-index on a Graph scaffold.
+/// Compute nodes and every incumbent edge and record unchanged, and exactly
+/// one new record reading `source` with `wiring` and a positive scale, every
+/// appended edge a static member of it.
+fn only_one_bundle_appended(
+    b: &CgpGraphBackendDef,
+    a: &CgpGraphBackendDef,
+    source: BundleSource,
+    wiring: Wiring,
+) -> bool {
+    let new = BundleId::new(u16::try_from(b.bundles().len()).expect("a small fixture"));
+    a.compute_nodes() == b.compute_nodes()
+        && a.output_sinks().len() == b.output_sinks().len()
+        && a.bundles().len() == b.bundles().len() + 1
+        && a.bundles()[..b.bundles().len()] == *b.bundles()
+        && a.bundles().last().is_some_and(|record| {
+            record.source() == source && record.wiring() == wiring && record.scale() > 0.0
+        })
+        && a.output_sinks().iter().zip(b.output_sinks()).all(|(x, y)| {
+            x.kind == y.kind
+                && x.inputs.len() >= y.inputs.len()
+                && x.inputs[..y.inputs.len()] == *y.inputs
+                && x.inputs[y.inputs.len()..]
+                    .iter()
+                    .all(|edge| edge.is_member_of(new) && edge.plasticity().is_none())
+        })
+}
+
+/// The cue, wired whole on a Graph scaffold: `FoodHere` is one field, so its
+/// one `Plain` bundle is one member into `Move(E)`.
 fn cue_added() -> StepSpec {
     input_ref_added(
         "cue_added",
-        "InputRef.Add on the scaffold: FoodHere (type 0), born into Move(E) on a Graph scaffold",
+        "InputRef.AddSensorLive on the scaffold: FoodHere (type 0), one static Plain member into Move(E) at a positive scale on a Graph scaffold",
         vec![cue(Task::A)],
-        0,
+        Wiring::Plain {
+            sink: VoteSink::Directed(DirectedVoteKind::Move, EAST),
+        },
     )
 }
 
 /// T11.F22: `Swap` stays within a kind, so the copied `FoodHere` entry
 /// cannot become the ring in one event; the ring is added beside it. On a
-/// Graph copy its born edge reads the east sub-index (T20.F16); on a VM copy
-/// each consumer moves to it on its own.
+/// Graph copy it is wired whole (T25.F11): one `Ring` bundle into `Move` at
+/// offset 0, cell `d` on `Move(d)`, the east cell on `Move(E)`; on a VM
+/// copy each consumer moves to it on its own.
 fn ring_added() -> StepSpec {
     input_ref_added(
         "ring_added",
-        "InputRef.Add on the copy: NeighborFoodRing (type 0) beside the copied FoodHere, born from east into Move(E) on a Graph copy",
+        "InputRef.AddSensorLive on the copy: NeighborFoodRing (type 0) beside the copied FoodHere, one static Ring bundle into Move at offset 0 and a positive scale on a Graph copy",
         vec![cue(Task::A), cue(Task::B)],
-        2,
+        Wiring::Ring {
+            kind: DirectedVoteKind::Move,
+            offset: 0,
+        },
     )
 }
 
@@ -820,6 +914,14 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // 4251 -> 5649, copy 417 -> 732, split 4890 -> 2221, `ring_added`
 // 82914 -> 12947, `vote_east` 2189 -> 39910, `vote_to_east`
 // 79414 -> 33754).
+// Re-pinned by T25.F11 commit 3: `InputRef.AddSensorLive` wires the whole
+// sensor (one `Plain` member for `FoodHere`, a `Ring` bundle of eight for
+// the ring), so the Graph additions are accepted on their bundle, the north
+// vote removal leaves the ring's member and a second removal takes that
+// member (`ring_added` 12947 -> 41639, `north_vote_removed` 0 -> 7,
+// `north_member_removed` new at 55; `graph_unprepared` 3 -> 4 events).
+// `cue_added` holds at 5649; the VM seeds hold (a VM declaration draws only
+// the sensor).
 
 const SWAP: u64 = 0;
 const GRAPH_BLANK_SEEDS: &[u64] = &[5649, SWAP];
@@ -827,8 +929,9 @@ const GRAPH_DETOUR_SEEDS: &[u64] = &[5649];
 const GRAPH_COPY_SEEDS: &[u64] = &[732, SWAP];
 const GRAPH_SPLIT_SEEDS: &[u64] = &[2221, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
-/// Ring born into `Move(E)`, remove north, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[12_947, 0, SWAP];
+/// Ring wired into `Move`, remove the north vote, remove the north
+/// member, swap.
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[41_639, 7, 55, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
 const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 33_754, SWAP];
 /// Cue, read, vote, swap.
@@ -985,59 +1088,73 @@ mod tests {
         graph.edge_mut(born)
     }
 
-    /// The born edge must carry a strictly positive weight: the same edge at
-    /// weight zero is rejected.
-    #[test]
-    fn input_ref_added_rejects_a_zero_weight_born_edge() {
-        // Arrange
-        let (accept, before, mut zero_weight) = born_ring_step();
-
-        // Act
-        born_edge_mut(&mut zero_weight).set_weight(0.0);
-
-        // Assert
-        assert!(!accept(&before, &zero_weight));
+    /// The ring's bundle: the last record of the scaffold's graph.
+    fn born_bundle(graph: &CgpGraphBackendDef) -> BundleId {
+        BundleId::new(u16::try_from(graph.bundles().len() - 1).expect("a small fixture"))
     }
 
-    /// The born edge must land in `Move(E)`: the same edge moved into
-    /// another vote sink is rejected.
+    /// The wired sensor's bundle must carry a strictly positive scale: the
+    /// same bundle at scale zero is rejected.
     #[test]
-    fn input_ref_added_rejects_a_born_edge_into_another_sink() {
+    fn input_ref_added_rejects_a_zero_scale_bundle() {
         // Arrange
-        let (accept, before, mut elsewhere) = born_ring_step();
+        let (accept, before, mut silent) = born_ring_step();
 
         // Act
-        let graph = scaffold_graph_mut(&mut elsewhere);
-        let born = born_edge(graph);
-        let edge = *graph.edge_at(born);
-        graph.remove_edge(born);
-        let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
-                DirectedVoteKind::Move,
-                0,
-            )))
-            .expect("the fixed catalog holds every Move sink");
-        graph.push_edge(surface, edge);
+        let graph = scaffold_graph_mut(&mut silent);
+        let born = born_bundle(graph);
+        graph.bundle_mut(born).set_scale(0.0);
 
         // Assert
-        assert!(!accept(&before, &elsewhere));
+        assert!(!accept(&before, &silent));
     }
 
-    /// The born edge must read the task's sub-index of the appended entry:
-    /// the same edge at another sub-index is rejected.
+    /// The ring must be wired into `Move` at offset 0: the same bundle
+    /// rotated is rejected.
     #[test]
-    fn input_ref_added_rejects_a_born_edge_at_another_sub_index() {
+    fn input_ref_added_rejects_a_rotated_bundle() {
         // Arrange
-        let (accept, before, mut other_sub) = born_ring_step();
+        let (accept, before, mut rotated) = born_ring_step();
 
         // Act
-        born_edge_mut(&mut other_sub).set_source(GraphSource::InputLeaf {
-            ref_idx: 1,
-            sub_idx: 1,
-        });
+        let graph = scaffold_graph_mut(&mut rotated);
+        let born = born_bundle(graph);
+        graph.relocate_bundle(
+            born,
+            Wiring::Ring {
+                kind: DirectedVoteKind::Move,
+                offset: 1,
+            },
+        );
 
         // Assert
-        assert!(!accept(&before, &other_sub));
+        assert!(!accept(&before, &rotated));
+    }
+
+    /// The wired sensor's members must be static: the same bundle with a
+    /// learning member is rejected.
+    #[test]
+    fn input_ref_added_rejects_a_learning_member() {
+        // Arrange
+        let (accept, before, mut learning) = born_ring_step();
+
+        // Act
+        let graph = scaffold_graph_mut(&mut learning);
+        let born = born_bundle(graph);
+        let member = graph.members(born).next().expect("a member");
+        graph
+            .edge_mut(member)
+            .set_plasticity(Some(crate::genome::PlasticityConfig {
+                rule: crate::genome::HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: None,
+                retention: 1.0,
+            }));
+
+        // Assert
+        assert!(!accept(&before, &learning));
     }
 
     /// The added `Move(E)` vote edge must carry a strictly positive weight:

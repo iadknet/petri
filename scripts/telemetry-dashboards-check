@@ -130,7 +130,6 @@ petri_run_mutation_not_applicable_target_total
 petri_run_graph_edges_detached_total
 petri_run_bundles_removed_total
 petri_run_mutation_attribute_changes_by_scope_total
-petri_run_pair_bundle_inherited_nonzero_births_total
 petri_run_mesh_hops_total
 petri_run_vm_steps_total
 petri_run_graph_relax_iters_total
@@ -233,6 +232,7 @@ petri_tick_sensor_read
 # mutation_skip_reasons_total_by_operator or four of the six reader-state
 # maps; a change in simulation behavior can change this list.
 keyed_names='
+petri_run_bundles_created_total
 petri_run_mutation_events_attempted_by_domain_total
 petri_run_mutation_events_applied_by_domain_total
 petri_run_mutation_events_attempted_by_operator_total

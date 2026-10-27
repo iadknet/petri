@@ -9,7 +9,7 @@ use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::genome::cgp::{
     detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
-    OutputSink, OutputSinkKind, Shape,
+    OutputSink, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
@@ -81,23 +81,24 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     let area = InputReference::World(WorldInputKey::area_food_summary(
         OrdinaryFoodTypeId::default(),
     ));
+    let ring_ref = InputReference::World(WorldInputKey::NeighborBarrierRing);
+    let refs = [ring_ref, area.clone()];
     let size = |def: &CgpGraphBackendDef| {
         let mut genome = graph_genome(def.clone(), 0, 0);
-        genome.nodes[0].input_refs = vec![area.clone()];
+        genome.nodes[0].input_refs = refs.to_vec();
         genome.genome_size()
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let base = size(&def);
-    let ring = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    let ring = def.add_ring_bundle(0, DirectedVoteKind::Move, 1);
     assert_eq!(size(&def), base + 1, "a Ring gene of eight members");
-    let layout = area.direction_pairs()[1];
-    let pair = def.add_pair_bundle(0, 1, layout, DirectedVoteKind::StealEnergy, 4, layout.facts);
+    let layout = crate::contracts::pair_layout(&area, 1);
+    let pair = def.add_pair_bundle(1, 1, layout, DirectedVoteKind::StealEnergy, 4);
     assert_eq!(def.members(pair).count(), 12 + 3);
     assert_eq!(size(&def), base + 2, "a pair gene with its facts");
     let hole = def.members(pair).next().unwrap();
     def.remove_edge(hole);
     assert_eq!(size(&def), base + 2, "a hole costs nothing");
-    let refs = [area.clone()];
     let member = def.members(ring).next().unwrap();
     detach(&mut def, member, &refs);
     assert_eq!(
@@ -110,7 +111,7 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     assert_eq!(size(&def), base + 4, "a detached fact member too");
 
     let mut sole = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = sole.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    let id = sole.add_ring_bundle(0, DirectedVoteKind::Move, 1);
     while sole.members(id).count() > 1 {
         let next = sole.members(id).next().unwrap();
         sole.remove_edge(next);
@@ -155,13 +156,13 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
                 }
             }
             let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
-            let layout = area.direction_pairs()[0];
+            let layout = crate::contracts::pair_layout(&area, 0);
             for (kind, offset, keep, pair) in bundles {
                 let kind = DirectedVoteKind::ALL[kind];
                 let id = if pair {
-                    def.add_pair_bundle(0, 0, layout, kind, offset, layout.facts)
+                    def.add_pair_bundle(0, 0, layout, kind, offset)
                 } else {
-                    def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, offset)
+                    def.add_ring_bundle(0, kind, offset)
                 };
                 let members: Vec<_> = def.members(id).collect();
                 for (index, occurrence) in members.into_iter().enumerate().rev() {

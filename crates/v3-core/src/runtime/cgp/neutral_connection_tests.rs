@@ -32,7 +32,6 @@ mod boundaries;
 mod bundle;
 mod lifecycle;
 mod offspring;
-mod recruitment;
 
 const BASE_COST: f32 = 0.25;
 
@@ -417,25 +416,46 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         gate_bias: 1.0,
     });
     let mut silent = original.clone();
-    for vote in VoteSink::all() {
-        use crate::config::NeutralInputRecruitment::WholeFamily;
-        use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
-        recruit_source(
-            &mut silent,
-            &SourceFamily::Input(InputReference::World(WorldInputKey::NearbyCreature)),
-            WholeFamily,
-            0,
-            vote,
-        )
-        .unwrap();
-        recruit_source(
-            &mut silent,
-            &SourceFamily::Memory(true),
-            WholeFamily,
-            0,
-            vote,
-        )
-        .unwrap();
+    // A silent bundle on every admissible plan of every field set of the
+    // declared sensor and of the previous memory bank (T25.F11).
+    {
+        use crate::contracts::SensorDescriptor;
+        use crate::genome::cgp::{plans, BundleBirth, BundleSource};
+        let context = crate::config::test_sensor_context(1);
+        let BackendDef::Graph(def) = &silent.backend_def else {
+            unreachable!()
+        };
+        let sources: Vec<_> = SensorDescriptor::of(&silent.input_refs[0], &context)
+            .field_sets()
+            .enumerate()
+            .map(|(set, fields)| {
+                let field_set = u8::try_from(set).unwrap();
+                (
+                    BundleSource::Sensor {
+                        ref_idx: 0,
+                        field_set,
+                    },
+                    fields,
+                )
+            })
+            .chain([(
+                BundleSource::Memory { previous: true },
+                crate::contracts::MEMORY_BANK,
+            )])
+            .flat_map(|(source, set)| {
+                plans(def, &set)
+                    .into_iter()
+                    .map(move |wiring| (source, wiring))
+            })
+            .collect();
+        for (source, wiring) in sources {
+            let birth = BundleBirth {
+                field_set: source.field_set(),
+                wiring,
+                scale: 0.0,
+            };
+            silent.add_bundle(source, birth, &context).unwrap();
+        }
     }
     let genomes = [original, silent].map(|node| CreatureGenome {
         entry_node_id: node.node_id,
