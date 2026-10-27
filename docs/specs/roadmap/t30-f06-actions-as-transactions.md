@@ -289,8 +289,8 @@ re-pinned.
 - Decision: `applied_trajectory`'s log-text digests follow the new
   vocabulary; pinned state-only digests enforce unchanged histories.
 - Exception: `osv-scanner.toml` ignores GHSA-qwgh-2vcv-g2f7 (block-buffer
-  0.10.4, no fix) until 2027-01-26 (7053017d), user-reviewed
-  2026-10-26; answers the correctness P1.
+  0.10.4, no fix; 2b228f8a), user-reviewed 2026-10-26; answers the
+  correctness P1.
 - Deferred: audit R8, the birth path on `&mut Simulation`, is paid by
   T29.F01 (G4); the `WORKAROUND(G4)` comments mark both sites.
 - Cost: no /usage; 4 passes, advisor 2 each; 4 resumes; 2 rounds,
