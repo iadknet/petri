@@ -224,7 +224,7 @@ Pass 2 (the one applied result and the records derived from it):
       check pass.
 - [x] `applied_trajectory` state-only digests (no log bytes) equal at
       `18342fef^` and after, pinned: `4830c71f...` / `00a1b0bb...`.
-- [x] `make check` -> exit 0 at tested ffc5b1cc; `make rust-test-slow` ->
+- [x] `make check` -> exit 0 at tested f81a5a2f; `make rust-test-slow` ->
       exit 0.
 - [x] Gate after pass 1 (readings only) and after pass 2 (summary at
       `docs/progress/features/t30-f06.json`, raw hash and byte counts, series
