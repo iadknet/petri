@@ -78,14 +78,15 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 
 Priority order for new starts: T30.F03, T26.F01, T25.F10, T27.F01, T26.F02,
 T27.F03, T30.F01, T30.F07, T30.F08, T25.F11, T25.F12, T29.F01, T29.F02, T29.F03,
-T30.F02, T30.F04, T30.F05, T30.F06, T27.F02, T28.F01, T28.F02.
+T30.F02, T30.F04, T30.F05, T30.F06, T30.F09, T27.F02, T28.F01, T28.F02.
 
 - T27.F02 was moved after T29.F03 and T30.F05 on 2026-10-27 at the user's
   direction: "Move T27.F02 after T29.F03 and T30.F05 so all architecture
   debt is paid first". The review found that a priority position alone does
   not enforce this under the concurrent-start rule, so the user made it a
   dependency: T27.F02 and T28.F01 depend on T29.F03 and T30.F05, whose
-  chains cover every debt payer in `docs/architecture.md` section 5, and
+  chains cover every debt payer in `docs/architecture.md` section 5, and on
+  T30.F09 (added 2026-10-27, user: "like T29.F03 and T30.F05"), and
   T28.F02 follows through T28.F01. No remaining new mechanism can start
   before that debt is paid
   ([T27.F02 reorder review](progress/readings/t27-f02-reorder-design-review.md)).

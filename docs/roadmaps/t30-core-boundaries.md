@@ -1,7 +1,7 @@
 # T30 — Core Boundaries
 
 **Status**: In Progress
-**Last updated**: 2026-10-26
+**Last updated**: 2026-10-27
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -36,6 +36,8 @@ behavior.
   - Goal: Offspring inherit and brains run exactly as before, with the genome a domain of its own beside the creature record rather than inside it, with no behavior change.
 - [x] **T30.F08 — A Creature's Genome and Its Derived State Agree** — Depends on: None
   - Goal: A creature's genome and everything computed from it at birth are set together by construction and cannot drift apart, so tests build the creature they need instead of swapping genomes and resyncing caches by hand, with no behavior change.
+- [ ] **T30.F09 — Retire the Pre-Lab Experiments in Core** — Depends on: None
+  - Goal: The two capability experiments placed in `v3-core` before the T22 lab rule, recruitment paths (2026-09-12) and T20.F01's discovery and ecological-opportunity assay (2026-09-25), leave core together with their goal indicator, CLI commands and the recruitment half of the slow tier, and the lab's reachability assays answer their supply, discovery and retention questions, with no simulation behavior change.
 
 ## Notes for AI Agents
 
@@ -111,7 +113,12 @@ behavior.
   `apply_add_feedback_route` in `mutation::topology::routing`) become
   genome-owned edit operations with their semantics unchanged;
   mutation supplies the sampled indices and direction, and all other sampling
-  stays in mutation (G23).
+  stays in mutation (G23). F05 also deletes the test-only samplers
+  `VmOperator::random` and `TopologyOperator::random`
+  (`WORKAROUND(T25.F08)`, T25.F11's unpaid accept), so their distribution
+  tests draw through the engine's sampler over the enabled catalog (user,
+  2026-10-27: "Add the VM/Topology test-only sampler cleanup to T30.F05's
+  scope").
 - F06 moves the per-action executors, action energy flooring and the
   removals actions cause from `simulation/tick.rs` into mechanics with
   narrow inputs (no whole `Simulation`), composes action costs there with
@@ -172,8 +179,39 @@ behavior.
   with one birth transaction (G4), and T30.F02 moves `GraphRuntimeState`
   out of the record (G8); both edit `creature/state.rs`, and concurrent
   sessions reconcile it at integration.
+- F09 was added on 2026-10-27 at the user's direction, paying T25.F11's
+  unpaid accept on `neighborhood/recruitment_paths`: asked at T25.F11's
+  closure whether to move the experiment to `v3-lab` or retire it, the user
+  answered "Propose retiring the recruitment-paths slow tier instead of
+  moving it", then "Add the T30.F09 retirement row as drafted". The design
+  review then found T20.F01's discovery assay (`neighborhood/opportunity`,
+  added `a0939c050` on 2026-09-25, before the lab rule `496245d24` on
+  2026-09-28) in core with no payer; the user widened F09: "Widen T30.F09
+  to retire the T20.F01 discovery experiment and the input-opportunity
+  command too". F09 deletes `neighborhood/recruitment_paths` and
+  `crates/v3-core/tests/recruitment_paths.rs`; the goal profile's
+  `recruitment_paths` indicator and its wall-clock field (`v3-cli`
+  `bench/profiles.rs`, `indicators.rs`, `run.rs`, `schema.rs`,
+  `artifacts.rs`); the `recruitment` and `input-opportunity` CLI commands
+  (`v3-cli/src/recruitment.rs`, `opportunity.rs`, their `main.rs` arms and
+  measurement readings, and their names in `v3-telemetry`'s command list);
+  `neighborhood/opportunity`'s assay, discovery, fixtures and verdict; the
+  recruitment line of `make rust-test-slow` and the `recruitment_paths`
+  invocation in `make rust-test-temporal-fixtures`. The authored
+  controllers and `Family` (`opportunity/controllers.rs`), which the lab's
+  comparator, calibration and evaluation use, move into `v3-lab`, with one
+  shared Ring-wiring operation that both `controller()` and
+  `barrier_comparator` (which today repeats the Ring construction by hand)
+  call, their reference indices, constants and genomes unchanged. The
+  workflow's slow-tests row keeps only the lab half, and
+  `docs/progress/benchmark-series.json` records the dropped block under
+  `counter_definition_changes`. Past readings stay as history. The goal
+  summary's shape changes; simulation trajectories do not
+  ([F09 design review](../progress/readings/t30-f09-design-review.md)).
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
-  T25.F11, F08 after F07 (assistant proposal), and F02 and F06 before
-  T28, as preferences, not prerequisites.
+  T25.F11, F08 after F07 (assistant proposal), F02 and F06 before T28, and
+  F09 after F06 (assistant proposal), as preferences, not prerequisites.
+  F09 is also a dependency of T27.F02 and T28.F01, like T29.F03 and
+  T30.F05 (user, 2026-10-27).
 - Verification (assistant proposal): each row gate with pins unchanged; F01
   adds the frontend's own tests and the type-parity test.

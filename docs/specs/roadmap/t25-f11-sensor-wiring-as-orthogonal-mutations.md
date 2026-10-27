@@ -305,11 +305,11 @@ are marked in the series, so those columns are not like-for-like.
   in the closing commit; no threshold or stored baseline is edited.
 - Deferred: unpaid accept, `neighborhood/recruitment_paths` (a reachability
   assay in `v3-core`, placed 2026-09-12 before the T22 lab rule; F11 only
-  re-expressed one plan step); payer proposed to the user at closure: a row
-  moving it to `v3-lab`, or retiring the tier.
+  re-expressed one plan step); paid by T30.F09, which retires it (user,
+  2026-10-27).
 - Deferred: unpaid accept, the test-only samplers at `mutation/vm/mod.rs:118`
   and `mutation/topology/mod.rs:134` (T25.F08's marker; F11 removed the
-  Graph and InputRef ones); payer proposed to the user at closure.
+  Graph and InputRef ones); paid by T30.F05 (user, 2026-10-27).
 - Deferred: bundle bloat is read by T27.F02's goal-long (count, members,
   own corrections, compute, energy).
 - Deferred: `sensor_read` beside `sensor_wired` in the bench census and
