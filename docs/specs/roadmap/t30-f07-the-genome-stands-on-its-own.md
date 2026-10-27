@@ -213,7 +213,7 @@ moved deterministic block or a changed test value would show it wrong.
       -p v3-telemetry` -> pass counts in the readings, no expected value
       edited, no test ignored or deleted; `cargo check --workspace
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
-- [x] `make check` -> exit 0 at tested commit `9e338190`;
+- [x] `make check` -> exit 0 at tested commit `f4070c82`;
       `make rust-test-slow` -> exit 0 there.
 - [x] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
       -> pass, median 0.9984 (readings).
@@ -233,13 +233,13 @@ Overhead check: `scripts/telemetry-overhead`'s method on the harness (as
 T21.F06 did for `bench`), ceiling 1.10; expected well under it, since the
 record pair sits outside the timed loop.
 
-**Measured verdict.** Overhead at `eb03d13e`:
+**Measured verdict.** Overhead at `3aeba221`:
 
 | T | Spread | Pairs | Median ratio | 90% interval | Verdict | Used |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1989 (calibrated) | 9.19% | 24/24 | 0.9984 | [0.9920, 1.0124] | pass | 204.0 s of 300 s |
 
-Gate at `d5ffb1a1`: exits 0/0, `severe=false`, counters `ok`, deterministic
+Gate at `39c61e95`: exits 0/0, `severe=false`, counters `ok`, deterministic
 block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
 
 - Summary of the declared profile:
