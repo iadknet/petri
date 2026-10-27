@@ -248,7 +248,7 @@ re-pinned.
 | Reading | Value |
 | --- | --- |
 | Gate | exit 0, severe `false` |
-| Wall clock | flag, unattributed |
+| Wall clock | flag (+71.40% vs t30-f07) attributed to host drift: same-host interleaved A/B against a03a3692 read base 0.004249, 0.004248 and feature 0.004336, 0.004424 ms/creature-tick, R = 1.031, within the gate's 25% flag band; deterministic block and work counters identical in both arms |
 | Work counters vs t30-f07 | 0.000000% each |
 | Wall clock ms/creature-tick | 0.004129 vs 0.002409 (+71.40%, flag) |
 | `deterministic`, nine counters | equal to t30-f07 |
