@@ -103,7 +103,7 @@ behavior depending on readers. Two prohibitions it does not say:
 
 | Concept | Owner |
 | --- | --- |
-| shared vocabulary: ids, directions, actions, sensor descriptors (fields, field sets, geometry), the brain I/O catalog (action kinds, vote sinks, parameters, widths derived from it), the applied action result (outcome kind and attempt effort); values, and pure functions over them, that no domain above owns (deterministic hashing among them). Behavior a domain owns never moves here to dodge the order | `contracts` |
+| shared vocabulary: ids, directions, actions, sensor descriptors (fields, field sets, geometry), the brain I/O catalog (action kinds, vote sinks, parameters, widths derived from it), the applied action result (outcome kind, attempt effort and the amount moved); values, and pure functions over them, that no domain above owns (deterministic hashing among them). Behavior a domain owns never moves here to dodge the order | `contracts` |
 | configuration schema, pattern parameters included | `config` |
 | energy and material accounting primitives (death cause, debits, cognition energy, stock and sink records) | energy ledger (`ledger/`) |
 | world state and world-edit primitives | world (`kernel`) |
