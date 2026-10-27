@@ -1,6 +1,6 @@
 # T25.F11 — Sensor Wiring as Orthogonal Mutations
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-27
 **Feature**: T25.F11
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -199,7 +199,7 @@ pin. On the feature head:
 
 - [x] `cargo test -p v3-core --test viability` -> founder digests unchanged
       in every commit.
-- [ ] `make check` -> 0 on the final commit; `make rust-test-slow` -> re-pinned
+- [x] `make check` -> 0 on the final commit; `make rust-test-slow` -> re-pinned
       readings recorded in the readings file.
 - [x] Gate and goal summaries at `docs/progress/features/t25-f11.json` and
       `t25-f11-goal.json`; series entries point at them; no full report
@@ -270,10 +270,10 @@ are marked in the series, so those columns are not like-for-like.
 - [x] A sensor added to a Graph node is wired whole, one bundle per field
       set, live or silent as the operator says; the one member law holds for
       every wiring and both sources (property tests).
-- [ ] G1, G13, G14 and G2's vocabulary lines are deleted from
+- [x] G1, G13, G14 and G2's vocabulary lines are deleted from
       `docs/architecture.md` and `scripts/architecture-debts.txt`;
       `make check` passes.
-- [ ] Gate and goal summaries stored and read as predeclared; the slow tier
+- [x] Gate and goal summaries stored and read as predeclared; the slow tier
       re-pinned.
 
 ## Notes for AI Agents
@@ -310,8 +310,9 @@ are marked in the series, so those columns are not like-for-like.
 - Deferred: unpaid accept, the test-only samplers at `mutation/vm/mod.rs:118`
   and `mutation/topology/mod.rs:134` (T25.F08's marker; F11 removed the
   Graph and InputRef ones); payer proposed to the user at closure.
-- Deferred: bloat under bundles arriving at the declaration rate is read
-  by T27.F02's goal-long (bundle count, members, own corrections, with
-  compute and energy), naming every feature closed in between.
+- Deferred: bundle bloat is read by T27.F02's goal-long (count, members,
+  own corrections, compute, energy).
 - Deferred: `sensor_read` beside `sensor_wired` in the bench census and
-  the by-family pair read belong to T27.F02's run (intent audit gaps 3–4).
+  the by-family pair read go to T27.F02's run (intent audit gaps 3–4).
+- Cost: tested `2dfb8ead6`; 5 passes, 12 consults, 6 resumes, 5 rounds
+  (ready); P1/P2/P3 2/1/0, 2/0/0, 0/1/1.

@@ -54,7 +54,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 
 - [x] **T25.F10 — Group Genes Cost as Genes** — Depends on: T25.F09
   - Goal: The genomic bottleneck: one developmental gene wires many synapses, so a creature pays to carry and copy the gene, not every synapse it built.
-- [ ] **T25.F11 — Sensor Wiring as Orthogonal Mutations** — Depends on: T25.F10
+- [x] **T25.F11 — Sensor Wiring as Orthogonal Mutations** — Depends on: T25.F10
   - Goal: One developmental program wires a sensory map however the gene that calls it was reached, and a new synapse may transmit from the start or wait silent until activity unsilences it: a sensor arrives whole, one bundle per field set, a bundle can wrap a sensor already there, and every bundle is built and edited one way, live or silent, with geometry-aware wiring as the only difference.
 - [ ] **T25.F12 — Learning as One Type on Edges and Bundles** — Depends on: T25.F11
   - Goal: Synapses and the developmental programs that build them learn by one machinery, as one family of plasticity rules serves every synapse type: a bundle owns its learning and whether it learns as a group or per edge, each member inherits it, stays static, or overrides it with its own, may credit the group as well, and one learner serves every learnable number.
