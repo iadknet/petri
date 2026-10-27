@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { graphBrain, learner, ringGroup } from "../../test/brainFixtures.ts";
+import { graphBrain, learner, ringBundle } from "../../test/brainFixtures.ts";
 import type { EdgeLearner } from "../../types/generated/EdgeLearner.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { InputRef } from "../../types/generated/InputRef.ts";
@@ -81,12 +81,12 @@ const refs: InputRef[] = [
 	{ family: "world", key: "NeighborBarrierRing" },
 ];
 
-/** A ring group's two group-scope learners on `Move[1]` and `Move[2]` that
+/** A ring bundle's two group-scope learners on `Move[1]` and `Move[2]` that
  * differ in rule, rate, reward source and trace: one learned scale moves
  * both (preservation case: heterogeneous contributors, T25.F07 invariant 4). */
-function groupLearners(initialized: boolean): GraphBrain {
+function bundleLearners(initialized: boolean): GraphBrain {
 	const member = (field: number) => ({
-		group: 0,
+		bundle: 0,
 		scope: "Group" as const,
 		site: { Direction: field + 1 },
 		field,
@@ -129,14 +129,14 @@ function groupLearners(initialized: boolean): GraphBrain {
 				],
 			},
 		],
-		groups: [ringGroup(1, { offset: 1, scale: 0.5 })],
+		bundles: [ringBundle(1, { offset: 1, scale: 0.5 })],
 	});
 }
 
-/** The group learners' poll: no own quantity, the scale slot initialized. */
-const groupLearning: NodeLearning = {
+/** The bundle learners' poll: no own quantity, the scale slot initialized. */
+const bundleLearning: NodeLearning = {
 	node_id: 0,
-	scales: [{ group: 0, learned: 0.8, initialized: true }],
+	scales: [{ bundle: 0, learned: 0.8, initialized: true }],
 	edges: [
 		{ surface: "sink", container: 0, edge: 0, applied: 1.05, initialized: true },
 		{ surface: "sink", container: 1, edge: 0, applied: 0.8, initialized: true },
@@ -152,15 +152,15 @@ describe("PlasticEdgeList", () => {
 	});
 
 	it("names a member's scope in the badge and its tooltip", () => {
-		const group = { ...hebbian, scope: "group" } as const;
+		const bundle = { ...hebbian, scope: "group" } as const;
 		const edge = { ...hebbian, scope: "edge" } as const;
-		expect(plasticityBadge(group)).toBe("Oja · hebbian · darwinian · group scope");
+		expect(plasticityBadge(bundle)).toBe("Oja · hebbian · darwinian · group scope");
 		expect(plasticityBadge(edge)).toBe("Oja · hebbian · darwinian · edge scope");
-		expect(plasticityDetail(group)[0]).toMatch(/shared scale/);
+		expect(plasticityDetail(bundle)[0]).toMatch(/shared scale/);
 		expect(plasticityDetail(hebbian)).toHaveLength(3);
 	});
 
-	it("explains a group learner's inheritance by the view's inherits, its lamarckian flag inert", () => {
+	it("explains a bundle learner's inheritance by the view's inherits, its lamarckian flag inert", () => {
 		const darwinianScale = { ...hebbian, scope: "group", inherits: false } as const;
 		expect(plasticityBadge(darwinianScale)).toBe("Oja · hebbian · darwinian · group scope");
 		const detail = plasticityDetail(darwinianScale);
@@ -182,7 +182,7 @@ describe("PlasticEdgeList", () => {
 		expect(detail.join(" ")).toMatch(/keeps 0\.9990 of its learned change/);
 	});
 
-	it("names a group learner's own retention inert: its group's retention governs", () => {
+	it("names a bundle learner's own retention inert: its bundle's retention governs", () => {
 		const forgetful = { ...hebbian, retention: 0 };
 		const detail = plasticityDetail({ ...forgetful, scope: "group" }).join(" ");
 		expect(detail).not.toMatch(/Decays/);
@@ -193,7 +193,7 @@ describe("PlasticEdgeList", () => {
 	});
 
 	it("shows heterogeneous contributors of one scale as their own learners", () => {
-		const rows = collectPlasticEdges(groupLearners(false), refs, groupLearning);
+		const rows = collectPlasticEdges(bundleLearners(false), refs, bundleLearning);
 		expect(rows.map((row) => [row.learner.rule, row.learner.learning_rate])).toEqual([
 			["Oja", 0.1],
 			["Covariance", 0.3],
@@ -201,7 +201,11 @@ describe("PlasticEdgeList", () => {
 		expect(rows.every((row) => row.initialized && row.learned === undefined)).toBe(true);
 		expect(rows.map((row) => row.applied)).toEqual([1.05, 0.8]);
 		render(
-			<PlasticEdgeList graphDef={groupLearners(false)} inputRefs={refs} learning={groupLearning} />,
+			<PlasticEdgeList
+				graphDef={bundleLearners(false)}
+				inputRefs={refs}
+				learning={bundleLearning}
+			/>,
 		);
 		const rendered = screen.getAllByTestId("plastic-edge");
 		expect(rendered).toHaveLength(2);
@@ -213,11 +217,11 @@ describe("PlasticEdgeList", () => {
 	});
 
 	it("takes a learner's initialization from the brain when the poll lists nothing", () => {
-		const [row] = collectPlasticEdges(groupLearners(true), refs, null);
+		const [row] = collectPlasticEdges(bundleLearners(true), refs, null);
 		expect(row?.initialized).toBe(true);
-		const [unborn] = collectPlasticEdges(groupLearners(false), refs, null);
+		const [unborn] = collectPlasticEdges(bundleLearners(false), refs, null);
 		expect(unborn?.initialized).toBe(false);
-		render(<PlasticEdgeList graphDef={groupLearners(false)} inputRefs={refs} learning={null} />);
+		render(<PlasticEdgeList graphDef={bundleLearners(false)} inputRefs={refs} learning={null} />);
 		expect(screen.getAllByTestId("plastic-edge")[0]).toHaveTextContent("not initialized");
 	});
 

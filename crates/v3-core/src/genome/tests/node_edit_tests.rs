@@ -114,8 +114,8 @@ fn add_sensor_declares_and_wires_one_bundle_per_field_set() {
     let BackendDef::Graph(def) = &node.backend_def else {
         unreachable!()
     };
-    assert_eq!(def.groups().len(), 1);
-    assert_eq!(def.members(crate::genome::cgp::GroupId::new(0)).count(), 8);
+    assert_eq!(def.bundles().len(), 1);
+    assert_eq!(def.members(crate::genome::cgp::BundleId::new(0)).count(), 8);
 }
 
 #[test]
@@ -168,8 +168,8 @@ fn add_sensor_refuses_a_partial_cover_or_an_inadmissible_wiring() {
 fn add_sensor_one_record_below_capacity_returns_err_and_writes_nothing() {
     let context = test_sensor_context(1);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.exhaust_group_capacity();
-    def.drop_last_group_record();
+    def.exhaust_bundle_capacity();
+    def.drop_last_bundle_record();
     let mut node = graph_node(vec![], def);
     let before = node.clone();
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);

@@ -6,7 +6,7 @@ import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import type { RouteTarget } from "../../types/generated/RouteTarget.ts";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
-import { EdgeGroupList } from "./EdgeGroupList.tsx";
+import { EdgeBundleList } from "./EdgeBundleList.tsx";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
 import { PlasticEdgeList } from "./PlasticEdgeList.tsx";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
@@ -181,7 +181,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 					/>
 				</ReactFlowProvider>
 			</div>
-			<EdgeGroupList graphDef={graphDef} inputRefs={inputRefs} learning={learning} />
+			<EdgeBundleList graphDef={graphDef} inputRefs={inputRefs} learning={learning} />
 			<PlasticEdgeList graphDef={graphDef} inputRefs={inputRefs} learning={learning} />
 		</div>
 	);

@@ -9,9 +9,9 @@
 //! over initialized own quantities (an ungrouped edge's weight, an
 //! edge-scope member's correction; lifetime learning, T25.F09), and an
 //! initialized own quantity sits at its clamp when it reaches the edge's
-//! clamp, which every write saturates to exactly. A group learner has no
+//! clamp, which every write saturates to exactly. A bundle learner has no
 //! own quantity and adds neither (T25.F07). Every learner counts by scope;
-//! each scale slot counts once per group, by its `inherit_scale`, with its
+//! each scale slot counts once per bundle, by its `inherit_scale`, with its
 //! drift `|learned - birth|` and whether it sits at its bound. Edges and
 //! scale slots also count by retention bin ([`RETENTION_KEYS`], T25.F09).
 //!
@@ -41,12 +41,12 @@ pub const LEARNING_KEYS: [&str; 2] = ["hebbian", "reward_modulated"];
 pub const SURFACE_KEYS: [&str; 2] = ["compute", "sink"];
 
 /// The `petri.plasticity_inheritance` keys, by inheritance index (0
-/// Darwinian, 1 Lamarckian). A scale slot's inheritance is its group's
+/// Darwinian, 1 Lamarckian). A scale slot's inheritance is its bundle's
 /// `inherit_scale`.
 pub const INHERITANCE_KEYS: [&str; 2] = ["darwinian", "lamarckian"];
 
 /// The `petri.plasticity_scope` keys, by scope index (0 ungrouped, 1 edge,
-/// 2 group).
+/// 2 bundle).
 pub const SCOPE_KEYS: [&str; 3] = ["ungrouped", "edge", "group"];
 
 /// The `petri.plasticity_retention` keys, by retention bin (T25.F09): `none`
@@ -158,7 +158,7 @@ pub struct PlasticityCensus {
     /// Reachable plastic edges per retention bin, in [`RETENTION_KEYS`]
     /// order (T25.F09).
     pub edges_by_retention: [RetentionCell; 5],
-    /// Scale slots per their group's retention bin, in [`RETENTION_KEYS`]
+    /// Scale slots per their bundle's retention bin, in [`RETENTION_KEYS`]
     /// order (T25.F09).
     pub scales_by_retention: [RetentionCell; 5],
 }

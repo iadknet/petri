@@ -2,7 +2,7 @@
 //!
 //! Observation only: [`WorldReads`] rides on the frozen [`SensorSnapshot`]
 //! and is marked by `resolve_input` on every world read (a VM `ReadInput`
-//! that executes, a graph leaf that is evaluated, a group member included).
+//! that executes, a graph leaf that is evaluated, a bundle member included).
 //! The tick copies it onto the creature as a [`WorldKeySet`]; no
 //! simulation value depends on it.
 //!

@@ -6,7 +6,7 @@ import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { joinLearning } from "./brainLearning.ts";
-import { scopeLabel } from "./edgeGroupWeights.ts";
+import { scopeLabel } from "./edgeBundleWeights.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
 interface PlasticEdgeListProps {
@@ -47,22 +47,22 @@ export function plasticityBadge(learner: EdgeLearner): string {
 	return learner.scope === "ungrouped" ? badge : `${badge} · ${scopeLabel(learner.scope)}`;
 }
 
-/** The inheritance sentence: a group learner's follows its group's `inherit_scale`. */
+/** The inheritance sentence: a bundle learner's follows its bundle's `inherit_scale`. */
 function inheritanceDetail(learner: EdgeLearner): string {
 	if (learner.scope === "group") {
 		return learner.inherits
-			? "Inherits the scale: offspring start from the group's learned scale (the Lamarckian flag is inert at group scope)."
-			: "Darwinian scale: offspring start from the group's genomic scale (the Lamarckian flag is inert at group scope).";
+			? "Inherits the scale: offspring start from the bundle's learned scale (the Lamarckian flag is inert at group scope)."
+			: "Darwinian scale: offspring start from the bundle's genomic scale (the Lamarckian flag is inert at group scope).";
 	}
 	return learner.inherits
 		? "Lamarckian: offspring inherit the learned weight."
 		: "Darwinian: offspring start from the genomic weight.";
 }
 
-/** The decay sentence of a retention below 1: inert for a group learner, which has no own decay. */
+/** The decay sentence of a retention below 1: inert for a bundle learner, which has no own decay. */
 function retentionDetail(learner: EdgeLearner): string {
 	return learner.scope === "group"
-		? "Edge retention is inert at group scope: the group's retention governs its shared scale."
+		? "Edge retention is inert at group scope: the bundle's retention governs its shared scale."
 		: `Decays toward its birth weight: keeps ${learner.retention.toFixed(4)} of its learned change each tick.`;
 }
 
@@ -73,8 +73,8 @@ export function plasticityDetail(learner: EdgeLearner): string[] {
 			? []
 			: [
 					learner.scope === "group"
-						? "Group scope: learns for its group, moving the group's shared scale."
-						: "Edge scope: learns its own correction on top of the group term.",
+						? "Group scope: learns for its bundle, moving the bundle's shared scale."
+						: "Edge scope: learns its own correction on top of the bundle term.",
 				];
 	return [
 		...scoped,

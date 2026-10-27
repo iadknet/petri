@@ -2655,12 +2655,12 @@ fn learning_edge(
         .expect("a listed dynamic edge")
 }
 
-/// `brain` (invariants 2 and 3): a ring group's record, its eight birth
-/// coordinates present and each member's group facts, the composed weight
+/// `brain` (invariants 2 and 3): a ring bundle's record, its eight birth
+/// coordinates present and each member's bundle facts, the composed weight
 /// read, not recomputed; no dynamic edge, so no `learning`. Each payload
 /// has its own `exclude` token.
 #[tokio::test]
-async fn get_creature_brain_resolves_ring_members_and_their_group() {
+async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::Shape;
@@ -2679,7 +2679,7 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
         "no dynamic edge, no payload"
     );
 
-    let (node_id, ring_ref, group, members) = {
+    let (node_id, ring_ref, bundle, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
         rebuild_with(creature, |genome| {
@@ -2694,11 +2694,11 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-            def.group_mut(group).set_scale(0.5);
-            let members: Vec<_> = def.members(group).collect();
+            let bundle = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            def.bundle_mut(bundle).set_scale(0.5);
+            let members: Vec<_> = def.members(bundle).collect();
             def.edge_mut(members[0]).set_weight(0.25);
-            (node.node_id.0, ring_ref, group.index(), members)
+            (node.node_id.0, ring_ref, bundle.index(), members)
         })
     };
 
@@ -2708,7 +2708,7 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
         assert_eq!(status, StatusCode::OK, "body: {body}");
         assert!(body.get("learning").is_none(), "{body}");
         let graph = brain_graph(&body, node_id);
-        let record = &graph["groups"][group];
+        let record = &graph["bundles"][bundle];
         assert_eq!(
             record["shape"],
             serde_json::json!({"Ring": {"ring_ref": ring_ref}})
@@ -2733,7 +2733,7 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
             assert_eq!(
                 edge["member"],
                 serde_json::json!({
-                    "group": group,
+                    "bundle": bundle,
                     "scope": "Edge",
                     "site": {"Direction": field},
                     "field": field,
@@ -2792,8 +2792,8 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-            let members: Vec<_> = def.members(group).collect();
+            let bundle = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let members: Vec<_> = def.members(bundle).collect();
             let vote_sink = def
                 .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
                 .unwrap();
@@ -2827,7 +2827,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
                     .map(|node| vec![None; node.inputs.len()])
                     .collect(),
                 sinks,
-                groups: vec![None; def.groups().len()],
+                bundles: vec![None; def.bundles().len()],
             };
             def.seed_birth(seeds);
             (node_id, vote, members)
@@ -2846,7 +2846,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     let entry = &body["learning"][0];
     assert_eq!(entry["node_id"], node_id);
     assert_eq!(entry["scales"], serde_json::json!([]));
-    // Static members of a group without a scale slot are not dynamic.
+    // Static members of a bundle without a scale slot are not dynamic.
     assert_eq!(entry["edges"].as_array().unwrap().len(), 2, "{entry}");
     assert_eq!(
         *learning_edge(entry, compute),
@@ -2902,7 +2902,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
 
 /// A group-scope scale (invariants 4 and 5): contributors that differ in
 /// rule, rate, reward source and trace are shown as their learners with one
-/// learned scale on the group (preservation case: heterogeneous
+/// learned scale on the bundle (preservation case: heterogeneous
 /// contributors); a passive member's applied weight follows the learned
 /// scale and is listed in `learning` (preservation case: genomic 0.5,
 /// applied 1.5); only an edge-scope learner's correction is `learned`.
@@ -2939,7 +2939,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         }),
         retention: 1.0,
     };
-    let (node_id, group, members) = {
+    let (node_id, bundle, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
         rebuild_with(creature, |genome| {
@@ -2956,9 +2956,9 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let id = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-            def.group_mut(id).set_scale(0.5);
-            def.group_mut(id).set_inherit_scale(true);
+            let id = def.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            def.bundle_mut(id).set_scale(0.5);
+            def.bundle_mut(id).set_inherit_scale(true);
             let members: Vec<EdgeOccurrence> = def.members(id).collect();
             def.edge_mut(members[0]).set_weight(0.25);
             def.edge_mut(members[0]).set_plasticity(Some(config));
@@ -2975,8 +2975,8 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
                 unreachable!()
             };
             sinks[sink][members[0].index] = Some(0.75);
-            let mut groups = vec![None; def.groups().len()];
-            groups[id.index()] = Some(1.5);
+            let mut bundles = vec![None; def.bundles().len()];
+            bundles[id.index()] = Some(1.5);
             let seeds = BirthSeeds::Rows {
                 compute: def
                     .compute_nodes()
@@ -2984,7 +2984,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
                     .map(|node| vec![None; node.inputs.len()])
                     .collect(),
                 sinks,
-                groups,
+                bundles,
             };
             def.seed_birth(seeds);
             (node_id, id.index(), members)
@@ -3001,18 +3001,18 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         .expect("the node's learning entry");
     assert_eq!(
         *entry["scales"].as_array().unwrap().last().unwrap(),
-        serde_json::json!({"group": group, "learned": 1.5, "initialized": true})
+        serde_json::json!({"bundle": bundle, "learned": 1.5, "initialized": true})
     );
     let edge_learner = learning_edge(entry, members[0]);
     assert_eq!(edge_learner["applied"], 2.25);
     assert_eq!(edge_learner["learned"], 0.75);
     assert_eq!(edge_learner["initialized"], true);
     for at in [members[1], members[3]] {
-        let group_learner = learning_edge(entry, at);
-        assert_eq!(group_learner["applied"], 1.5);
-        assert!(group_learner.get("learned").is_none());
+        let bundle_learner = learning_edge(entry, at);
+        assert_eq!(bundle_learner["applied"], 1.5);
+        assert!(bundle_learner.get("learned").is_none());
         assert_eq!(
-            group_learner["initialized"], true,
+            bundle_learner["initialized"], true,
             "its scale slot is seeded"
         );
     }
@@ -3021,7 +3021,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     assert!(passive.get("learned").is_none() && passive.get("initialized").is_none());
 
     let graph = brain_graph(&body, node_id);
-    let record = &graph["groups"][group];
+    let record = &graph["bundles"][bundle];
     assert_eq!(
         (&record["scale"], &record["learned_scale"]),
         (&serde_json::json!(0.5), &serde_json::json!(1.5))
@@ -3091,13 +3091,16 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
                     unreachable!()
                 };
                 let facts = if with_facts { layout.facts } else { &[] };
-                let group =
-                    def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
-                def.group_mut(group).set_scale(2.0);
+                let bundle =
+                    def.add_pair_bundle(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
+                def.bundle_mut(bundle).set_scale(2.0);
                 if with_facts {
-                    let member = def.members(group).next().unwrap();
+                    let member = def.members(bundle).next().unwrap();
                     def.remove_edge(member);
-                    let fact = def.members(group).find(|&m| def.is_fact_member(m)).unwrap();
+                    let fact = def
+                        .members(bundle)
+                        .find(|&m| def.is_fact_member(m))
+                        .unwrap();
                     def.edge_mut(fact).set_weight(0.375);
                 } else {
                     // A member on a direction where its pattern is 0: `x` at
@@ -3115,21 +3118,21 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
                     inputs.push(serde_json::json!({
                         "source": {"InputLeaf": {"ref_idx": ref_idx, "sub_idx": layout.x}},
                         "own_weight": 0.25,
-                        "membership": {"group": group.index(), "scope": "Edge"},
+                        "membership": {"bundle": bundle.index(), "scope": "Edge"},
                     }));
                     // The I10 order: independent edges, then members by
-                    // (group, field).
+                    // (bundle, field).
                     inputs.sort_by_key(|edge| {
                         edge.get("membership").map(|m| {
                             (
-                                m["group"].as_u64().unwrap(),
+                                m["bundle"].as_u64().unwrap(),
                                 edge["source"]["InputLeaf"]["sub_idx"].as_u64().unwrap(),
                             )
                         })
                     });
                     *def = serde_json::from_value::<CgpGraphBackendDef>(json).unwrap();
                 }
-                (node_id, group.index())
+                (node_id, bundle.index())
             })
         }
     };
@@ -3137,7 +3140,7 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
     let (_, second) = edit(true).await;
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha15");
+    assert_eq!(body["protocol_version"], "v3alpha16");
     let graph = brain_graph(&body, node_id);
 
     let present = |record: &serde_json::Value, list: &str| {
@@ -3148,7 +3151,7 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
             .filter(|c| c["present"] == true)
             .count()
     };
-    let gene = &graph["groups"][first];
+    let gene = &graph["bundles"][first];
     assert_eq!(gene["shape"]["DirectionPair"]["pair"], 0);
     assert_eq!(gene["coordinates"].as_array().unwrap().len(), 12);
     assert_eq!(present(gene, "coordinates"), 12);
@@ -3163,7 +3166,7 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
         "x at relative N is no birth coordinate"
     );
 
-    let gene = &graph["groups"][second];
+    let gene = &graph["bundles"][second];
     assert_eq!(present(gene, "coordinates"), 11, "one member removed");
     assert_eq!(present(gene, "facts"), layout.facts.len());
 
@@ -3173,11 +3176,11 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
         .iter()
         .flat_map(|sink| sink["edges"].as_array().unwrap())
         .collect();
-    let member_of = |group: usize| {
+    let member_of = |bundle: usize| {
         edges
             .iter()
             .copied()
-            .filter(move |edge| edge["member"]["group"] == group)
+            .filter(move |edge| edge["member"]["bundle"] == bundle)
     };
     let zero: Vec<_> = member_of(first)
         .filter(|edge| edge["member"]["site"] == serde_json::json!({"Direction": 0}))

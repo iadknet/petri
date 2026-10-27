@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK};
-use crate::genome::cgp::{plans, BundleBirth, BundleSource, GraphSource, GroupId};
+use crate::genome::cgp::{plans, BundleBirth, BundleId, BundleSource, GraphSource};
 use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 
@@ -132,7 +132,7 @@ impl NodeGenome {
                         return Err(NodeEditError::Inadmissible);
                     }
                 }
-                if def.groups().len() + births.len() > usize::from(u16::MAX) {
+                if def.bundles().len() + births.len() > usize::from(u16::MAX) {
                     return Err(NodeEditError::BundleCapacity);
                 }
             }
@@ -162,7 +162,7 @@ impl NodeGenome {
         source: BundleSource,
         birth: BundleBirth,
         context: &SensorContext,
-    ) -> Result<GroupId, NodeEditError> {
+    ) -> Result<BundleId, NodeEditError> {
         let set = self
             .field_set(source, context)
             .filter(|_| birth.field_set == source.field_set())

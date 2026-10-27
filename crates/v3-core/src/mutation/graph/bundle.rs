@@ -1,6 +1,6 @@
-//! The edge-group operators (T25.F03, T25.F04, T25.F08, T25.F09): four
-//! create a silent group (`Ring`, `DirectionPair`, each in the uniform and
-//! the randomized form), four change an existing group through its record,
+//! The edge-bundle operators (T25.F03, T25.F04, T25.F08, T25.F09): four
+//! create a silent bundle (`Ring`, `DirectionPair`, each in the uniform and
+//! the randomized form), four change an existing bundle through its record,
 //! three move its learned scale's retention, and one detaches a member.
 
 use rand::Rng;
@@ -8,7 +8,7 @@ use rand::Rng;
 use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::contracts::{FieldSet, InputReference, SensorContext};
 use crate::genome::cgp::{
-    self, BundleBirth, BundleSource, CgpGraphBackendDef, GroupId, Scope, Wiring,
+    self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, Scope, Wiring,
 };
 use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
 use crate::mutation::types::{BundleEdits, MutationSkipReason};
@@ -19,10 +19,10 @@ use super::hebbian::{
 };
 use super::operators::perturb_weight;
 
-/// How a creation operator draws its new group's learning attributes
-/// (T25.F08): `Uniform` one mode and one scope for the whole group (F07),
+/// How a creation operator draws its new bundle's learning attributes
+/// (T25.F08): `Uniform` one mode and one scope for the whole bundle (F07),
 /// `Randomized` a mode and a scope per member. Both draw one
-/// `inherit_scale` for the group; neither draws the pattern or the scale.
+/// `inherit_scale` for the bundle; neither draws the pattern or the scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CreationForm {
     Uniform,
@@ -43,7 +43,7 @@ fn draw_mode(rng: &mut impl Rng) -> Option<PlasticityConfig> {
     })
 }
 
-/// The scope coin: true `Group`.
+/// The scope coin: true `Bundle`.
 fn draw_scope(rng: &mut impl Rng) -> Scope {
     if rng.gen_bool(0.5) {
         Scope::Group
@@ -53,13 +53,13 @@ fn draw_scope(rng: &mut impl Rng) -> Scope {
 }
 
 /// Learned creation (T25.F07 invariant 7, T25.F08 invariant 2), drawn after
-/// a new group's shape draws. `Uniform`: one mode with its config, then one
+/// a new bundle's shape draws. `Uniform`: one mode with its config, then one
 /// scope coin, written to every member. `Randomized`: per member in
 /// canonical order, its own mode, config and scope coin. Then one
 /// `inherit_scale` coin.
 fn draw_learning(
     def: &mut CgpGraphBackendDef,
-    id: GroupId,
+    id: BundleId,
     form: CreationForm,
     rng: &mut impl Rng,
 ) {
@@ -72,7 +72,7 @@ fn draw_learning(
         edge.set_scope(scope);
     }
     let inherit_scale = rng.gen_bool(0.5);
-    def.group_mut(id).set_inherit_scale(inherit_scale);
+    def.bundle_mut(id).set_inherit_scale(inherit_scale);
 }
 
 // Commit 1 of T25.F11: the birth policy exists and is tested; the four
@@ -162,7 +162,7 @@ const fn plan_kind(wiring: &Wiring) -> Option<DirectedVoteKind> {
 )]
 pub(crate) fn draw_birth_learning(
     def: &mut CgpGraphBackendDef,
-    ids: &[GroupId],
+    ids: &[BundleId],
     wirings: &[Wiring],
     rng: &mut impl Rng,
 ) -> BundleEdits {
@@ -185,7 +185,7 @@ pub(crate) fn draw_birth_learning(
     edits
 }
 
-/// The node's ring indices a group can name, ascending: neighbor rings at an
+/// The node's ring indices a bundle can name, ascending: neighbor rings at an
 /// index representable as `u16`.
 fn ring_indices(input_refs: &[InputReference]) -> impl Iterator<Item = u16> + '_ {
     input_refs
@@ -196,13 +196,13 @@ fn ring_indices(input_refs: &[InputReference]) -> impl Iterator<Item = u16> + '_
         .map(|(idx, _)| u16::try_from(idx).expect("index within u16"))
 }
 
-/// Whether `AddRingGroup` has a site: a ring at an index ≤ 65,535 and a
-/// graph that can host a group ([`CgpGraphBackendDef::can_host_group`]).
+/// Whether `AddRingBundle` has a site: a ring at an index ≤ 65,535 and a
+/// graph that can host a bundle ([`CgpGraphBackendDef::can_host_bundle`]).
 pub(super) fn can_add(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
-    def.can_host_group() && ring_indices(input_refs).next().is_some()
+    def.can_host_bundle() && ring_indices(input_refs).next().is_some()
 }
 
-/// The node's declared pairs a group can name (T25.F04), the flat list
+/// The node's declared pairs a bundle can name (T25.F04), the flat list
 /// `(ref_idx ascending, pair ascending)`: every pair of every reference at
 /// an index representable as `u16`.
 fn pair_sites(input_refs: &[InputReference]) -> impl Iterator<Item = (u16, u8)> + '_ {
@@ -217,17 +217,17 @@ fn pair_sites(input_refs: &[InputReference]) -> impl Iterator<Item = (u16, u8)> 
         })
 }
 
-/// Whether `AddDirectionPairGroup` has a site: a pair-declaring reference at
-/// an index ≤ 65,535 and a graph that can host a group.
+/// Whether `AddDirectionPairBundle` has a site: a pair-declaring reference at
+/// an index ≤ 65,535 and a graph that can host a bundle.
 pub(super) fn can_add_pair(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
-    def.can_host_group() && pair_sites(input_refs).next().is_some()
+    def.can_host_bundle() && pair_sites(input_refs).next().is_some()
 }
 
-/// `AddDirectionPairGroup` (T25.F04) and `AddRandomizedDirectionPairGroup`
+/// `AddDirectionPairBundle` (T25.F04) and `AddRandomizedDirectionPairBundle`
 /// (T25.F08): three draws in order — one pair uniformly over the flat list
 /// `(ref_idx ascending, pair ascending)`, the kind over
 /// `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent
-/// `DirectionPair` group: twelve members at own weight 0 and scale 0, with
+/// `DirectionPair` bundle: twelve members at own weight 0 and scale 0, with
 /// learned creation's draws in `form` ([`draw_learning`]). Duplicates are
 /// allowed.
 pub(crate) fn add_pair_in_form(
@@ -238,7 +238,7 @@ pub(crate) fn add_pair_in_form(
 ) -> Result<BundleEdits, MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let sites: Vec<(u16, u8)> = pair_sites(input_refs).collect();
-    if sites.is_empty() || !def.can_host_group() {
+    if sites.is_empty() || !def.can_host_bundle() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let (ref_idx, pair) = sites[rng.gen_range(0..sites.len())];
@@ -274,9 +274,9 @@ pub(crate) fn add_pair_in_form(
     ))
 }
 
-/// Whether the unit operators have a site: at least one group.
-pub(super) fn has_group(def: &CgpGraphBackendDef) -> bool {
-    !def.groups().is_empty()
+/// Whether the unit operators have a site: at least one bundle.
+pub(super) fn has_bundle(def: &CgpGraphBackendDef) -> bool {
+    !def.bundles().is_empty()
 }
 
 fn graph_node(
@@ -288,10 +288,10 @@ fn graph_node(
     }
 }
 
-/// `AddRingGroup` and `AddRandomizedRingGroup` (T25.F08): three draws in
+/// `AddRingBundle` and `AddRandomizedRingBundle` (T25.F08): three draws in
 /// order — the ring uniformly over the ring indices ascending, the kind
 /// over `DirectedVoteKind::ALL`, the offset in `0..8` — then a silent `Ring`
-/// group: eight members at own weight 0 and scale 0, with learned
+/// bundle: eight members at own weight 0 and scale 0, with learned
 /// creation's draws in `form` ([`draw_learning`]). Duplicates are allowed.
 pub(crate) fn add_in_form(
     node: &mut NodeGenome,
@@ -301,7 +301,7 @@ pub(crate) fn add_in_form(
 ) -> Result<BundleEdits, MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let rings: Vec<u16> = ring_indices(input_refs).collect();
-    if rings.is_empty() || !def.can_host_group() {
+    if rings.is_empty() || !def.can_host_bundle() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let ring_ref = rings[rng.gen_range(0..rings.len())];
@@ -331,9 +331,9 @@ pub(crate) fn add_in_form(
 /// `DetachGraphEdge` (T25.F08): one member uniformly in canonical order,
 /// one draw and no other, then the F03 detach ([`cgp::detach`]): its own
 /// weight becomes `compose(own, scale, pattern)` bitwise, it leaves its
-/// group keeping its plasticity, its seed composes (T25.F07 invariant 6;
+/// bundle keeping its plasticity, its seed composes (T25.F07 invariant 6;
 /// a fact member detaches own-only, T25.F10), and a last member's detach
-/// removes the group.
+/// removes the bundle.
 pub(crate) fn detach_member(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
@@ -344,24 +344,24 @@ pub(crate) fn detach_member(
     Ok(BundleEdits::detach(removed))
 }
 
-/// The first draw of every unit operator: one group, uniformly.
-fn pick(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Result<GroupId, MutationSkipReason> {
+/// The first draw of every unit operator: one bundle, uniformly.
+fn pick(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Result<BundleId, MutationSkipReason> {
     pick_where(def, |_| true, rng)
 }
 
-/// `AlterGroupScale`: `AlterGraphEdgeWeight`'s law on the group's scale.
+/// `AlterBundleScale`: `AlterGraphEdgeWeight`'s law on the bundle's scale.
 pub(crate) fn alter_scale(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let id = pick(def, rng)?;
-    let mut scale = def.groups()[id.index()].scale();
+    let mut scale = def.bundles()[id.index()].scale();
     perturb_weight(&mut scale, rng);
-    def.group_mut(id).set_scale(scale);
+    def.bundle_mut(id).set_scale(scale);
     Ok(())
 }
 
-/// `ShiftGroupOffset`: `gen_bool(0.5)` true shifts +1, false −1, mod 8;
+/// `ShiftBundleOffset`: `gen_bool(0.5)` true shifts +1, false −1, mod 8;
 /// every member moves to its new sink.
 pub(crate) fn shift_offset(
     def: &mut CgpGraphBackendDef,
@@ -370,12 +370,12 @@ pub(crate) fn shift_offset(
     let id = pick(def, rng)?;
     let n = VOTE_DIRECTION_COUNT;
     let step = if rng.gen_bool(0.5) { 1 } else { n - 1 };
-    let group = def.groups()[id.index()];
-    def.relocate_group(id, group.kind(), (group.offset() + step) % n);
+    let bundle = def.bundles()[id.index()];
+    def.relocate_bundle(id, bundle.kind(), (bundle.offset() + step) % n);
     Ok(())
 }
 
-/// `RetargetGroupKind`: `gen_range(0..3)` over the other three kinds in
+/// `RetargetBundleKind`: `gen_range(0..3)` over the other three kinds in
 /// catalog order; every member moves to its new sink, a fact member to the
 /// new kind's drive. A gene with a fact member is not retargeted to a kind
 /// that cannot host facts ([`CgpGraphBackendDef::can_host_facts`],
@@ -385,53 +385,53 @@ pub(crate) fn retarget_kind(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let id = pick(def, rng)?;
-    let group = def.groups()[id.index()];
+    let bundle = def.bundles()[id.index()];
     let pick = rng.gen_range(0..DirectedVoteKind::ALL.len() - 1);
     let kind = DirectedVoteKind::ALL
         .into_iter()
-        .filter(|&kind| kind != group.kind())
+        .filter(|&kind| kind != bundle.kind())
         .nth(pick)
         .expect("another kind");
     let has_facts = def.members(id).any(|member| def.is_fact_member(member));
     if has_facts && !def.can_host_facts(kind) {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    def.relocate_group(id, kind, group.offset());
+    def.relocate_bundle(id, kind, bundle.offset());
     Ok(())
 }
 
-/// A group-record predicate of the retention operators.
-pub(super) type GroupPredicate = fn(&cgp::Group) -> bool;
+/// A bundle-record predicate of the retention operators.
+pub(super) type BundlePredicate = fn(&cgp::Bundle) -> bool;
 
-/// `EnableGroupRetention`: a record whose retention is exactly 1.
-pub(super) fn retains(group: &cgp::Group) -> bool {
-    !retention_decays(group.retention())
+/// `EnableBundleRetention`: a record whose retention is exactly 1.
+pub(super) fn retains(bundle: &cgp::Bundle) -> bool {
+    !retention_decays(bundle.retention())
 }
 
-/// `DisableGroupRetention`, `MutateGroupRetention`: a record whose
+/// `DisableBundleRetention`, `MutateBundleRetention`: a record whose
 /// retention is below 1.
-pub(super) fn is_decaying_group(group: &cgp::Group) -> bool {
-    retention_decays(group.retention())
+pub(super) fn is_decaying_bundle(bundle: &cgp::Bundle) -> bool {
+    retention_decays(bundle.retention())
 }
 
-/// Whether any group record matches `predicate`.
-pub(super) fn any_group(def: &CgpGraphBackendDef, predicate: GroupPredicate) -> bool {
-    def.groups().iter().any(predicate)
+/// Whether any bundle record matches `predicate`.
+pub(super) fn any_bundle(def: &CgpGraphBackendDef, predicate: BundlePredicate) -> bool {
+    def.bundles().iter().any(predicate)
 }
 
-/// One group uniformly among the records `predicate` admits, in `GroupId`
+/// One bundle uniformly among the records `predicate` admits, in `BundleId`
 /// order: count-then-select, one draw. A record without a scale slot is
 /// admitted; its retention is inert.
 fn pick_where(
     def: &CgpGraphBackendDef,
-    predicate: GroupPredicate,
+    predicate: BundlePredicate,
     rng: &mut impl Rng,
-) -> Result<GroupId, MutationSkipReason> {
+) -> Result<BundleId, MutationSkipReason> {
     let matching = || {
-        def.groups()
+        def.bundles()
             .iter()
             .enumerate()
-            .filter(|(_, group)| predicate(group))
+            .filter(|(_, bundle)| predicate(bundle))
     };
     let count = matching().count();
     if count == 0 {
@@ -441,12 +441,12 @@ fn pick_where(
     let (index, _) = matching()
         .nth(pick)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    Ok(GroupId::new(
-        u16::try_from(index).expect("groups below u16::MAX"),
+    Ok(BundleId::new(
+        u16::try_from(index).expect("bundles below u16::MAX"),
     ))
 }
 
-/// `EnableGroupRetention` (T25.F09): one retaining group, then
+/// `EnableBundleRetention` (T25.F09): one retaining bundle, then
 /// `EnableRetention`'s draw on its record.
 pub(crate) fn enable_retention(
     def: &mut CgpGraphBackendDef,
@@ -454,40 +454,40 @@ pub(crate) fn enable_retention(
 ) -> Result<(), MutationSkipReason> {
     let id = pick_where(def, retains, rng)?;
     let retention = draw_retention(rng);
-    def.group_mut(id).set_retention(retention);
+    def.bundle_mut(id).set_retention(retention);
     Ok(())
 }
 
-/// `DisableGroupRetention` (T25.F09): one decaying group's retention
+/// `DisableBundleRetention` (T25.F09): one decaying bundle's retention
 /// returns to 1; no value draw.
 pub(crate) fn disable_retention(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let id = pick_where(def, is_decaying_group, rng)?;
-    def.group_mut(id).set_retention(1.0);
+    let id = pick_where(def, is_decaying_bundle, rng)?;
+    def.bundle_mut(id).set_retention(1.0);
     Ok(())
 }
 
-/// `MutateGroupRetention` (T25.F09): one decaying group, one `u ∈ [−1, 1]`,
+/// `MutateBundleRetention` (T25.F09): one decaying bundle, one `u ∈ [−1, 1]`,
 /// `MutateRetention`'s step on its deficit.
 pub(crate) fn mutate_retention(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let id = pick_where(def, is_decaying_group, rng)?;
+    let id = pick_where(def, is_decaying_bundle, rng)?;
     let u = rng.gen_range(-1.0f32..=1.0);
-    let retention = step_retention(def.groups()[id.index()].retention(), u);
-    def.group_mut(id).set_retention(retention);
+    let retention = step_retention(def.bundles()[id.index()].retention(), u);
+    def.bundle_mut(id).set_retention(retention);
     Ok(())
 }
 
-/// `RemoveGroup`: the record and every member.
+/// `RemoveBundle`: the record and every member.
 pub(crate) fn remove(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<BundleEdits, MutationSkipReason> {
     let id = pick(def, rng)?;
-    def.remove_group(id);
+    def.remove_bundle(id);
     Ok(BundleEdits::removal(true))
 }

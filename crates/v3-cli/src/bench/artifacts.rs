@@ -306,13 +306,13 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                                 "mean_mesh_nodes",
                                 "mean_generation",
                                 "mean_wired_sinks",
-                                "mean_ring_groups",
-                                "mean_ring_group_members",
+                                "mean_ring_bundles",
+                                "mean_ring_bundle_members",
                                 "surviving_founder_clade_count",
                                 "shannon_entropy_nats",
                                 "sensor_census",
                                 "occupancy_grid",
-                                "pair_groups",
+                                "pair_bundles",
                                 "plasticity_census",
                                 "capacity",
                                 "shares",
@@ -664,10 +664,10 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
     "mean_energy",
 ];
 /// Persistence checkpoint fields the page reads, each kept whole, and
-/// `mean_wired_sinks` (T25.F02), `mean_ring_groups` and
-/// `mean_ring_group_members` (T25.F03), `pair_groups` (T25.F04) and
+/// `mean_wired_sinks` (T25.F02), `mean_ring_bundles` and
+/// `mean_ring_bundle_members` (T25.F03), `pair_bundles` (T25.F04) and
 /// `plasticity_census` (T25.F06), `capacity` (T26.F02) and `shares` (T27.F03), which the page
-/// does not read but the readings do; `keep_sample` projects `pair_groups`
+/// does not read but the readings do; `keep_sample` projects `pair_bundles`
 /// further.
 const KEPT_SAMPLE_FIELDS: [&str; 19] = [
     "tick",
@@ -676,8 +676,8 @@ const KEPT_SAMPLE_FIELDS: [&str; 19] = [
     "mean_genome_size",
     "mean_mesh_nodes",
     "mean_wired_sinks",
-    "mean_ring_groups",
-    "mean_ring_group_members",
+    "mean_ring_bundles",
+    "mean_ring_bundle_members",
     "shannon_entropy_nats",
     "surviving_founder_clade_count",
     "food_density_total",
@@ -685,21 +685,21 @@ const KEPT_SAMPLE_FIELDS: [&str; 19] = [
     "grazing_modifier_mean",
     "occupancy_grid",
     "sensor_census",
-    "pair_groups",
+    "pair_bundles",
     "plasticity_census",
     "capacity",
     "shares",
 ];
-/// `pair_groups` aggregates every checkpoint keeps; `rows` is kept only on
+/// `pair_bundles` aggregates every checkpoint keeps; `rows` is kept only on
 /// each world's last checkpoint (T25.F04). `facts` and `own_nonzero`
 /// (T25.F10) ride beside `members`.
-const KEPT_PAIR_GROUP_FIELDS: [&str; 11] = [
+const KEPT_PAIR_BUNDLE_FIELDS: [&str; 11] = [
     "version",
     "creatures",
     "carriers",
-    "groups",
-    "groups_nonzero",
-    "groups_unreachable",
+    "bundles",
+    "bundles_nonzero",
+    "bundles_unreachable",
     "members",
     "facts",
     "own_nonzero",
@@ -800,15 +800,15 @@ fn keep_neighborhood(source: &Value) -> Value {
     })
 }
 
-/// Project a checkpoint; `last` keeps its `pair_groups.rows`.
+/// Project a checkpoint; `last` keeps its `pair_bundles.rows`.
 fn keep_sample(source: &Value, last: bool) -> Value {
     keep_object(source, |sample| {
         let mut out = pick(sample, &KEPT_SAMPLE_FIELDS);
-        keep_field(&mut out, sample, "pair_groups", |groups| {
-            keep_object(groups, |groups| {
-                let mut out = pick(groups, &KEPT_PAIR_GROUP_FIELDS);
+        keep_field(&mut out, sample, "pair_bundles", |bundles| {
+            keep_object(bundles, |bundles| {
+                let mut out = pick(bundles, &KEPT_PAIR_BUNDLE_FIELDS);
                 if last {
-                    keep_field(&mut out, groups, "rows", Value::clone);
+                    keep_field(&mut out, bundles, "rows", Value::clone);
                 }
                 out
             })
@@ -1438,13 +1438,13 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
 mod tests {
     use super::*;
 
-    /// T25.F04: every checkpoint keeps the `pair_groups` aggregates (with
+    /// T25.F04: every checkpoint keeps the `pair_bundles` aggregates (with
     /// T25.F10's `facts` and `own_nonzero`), and `rows` survives only on
     /// each world's last checkpoint.
     #[test]
-    fn pair_groups_keep_rows_only_on_the_last_sample() {
-        let aggregates = json!({"version": "pair-groups-v2", "creatures": 5,
-            "carriers": 3, "groups": 2, "groups_nonzero": 1, "groups_unreachable": 0,
+    fn pair_bundles_keep_rows_only_on_the_last_sample() {
+        let aggregates = json!({"version": "pair-bundles-v2", "creatures": 5,
+            "carriers": 3, "bundles": 2, "bundles_nonzero": 1, "bundles_unreachable": 0,
             "members": 24, "facts": 5, "own_nonzero": 3, "add_applied_total": 7,
             "inherited_nonzero_births_total": 4});
         let mut block = aggregates.clone();
@@ -1452,26 +1452,26 @@ mod tests {
         block["unknown"] = json!(1);
         let persistence = json!({"per_seed": [
             {"seed": 1, "samples": [
-                {"tick": 100, "pair_groups": block, "dropped": 1},
-                {"tick": 200, "pair_groups": null},
-                {"tick": 300, "pair_groups": block}
+                {"tick": 100, "pair_bundles": block, "dropped": 1},
+                {"tick": 200, "pair_bundles": null},
+                {"tick": 300, "pair_bundles": block}
             ]},
             {"seed": 2, "samples": [
-                {"tick": 100, "pair_groups": block},
-                {"tick": 200, "pair_groups": null}
+                {"tick": 100, "pair_bundles": block},
+                {"tick": 200, "pair_bundles": null}
             ]}
         ]});
         let kept = keep_persistence(&persistence);
         let first = &kept["per_seed"][0]["samples"];
-        assert_eq!(first[0]["pair_groups"], aggregates);
+        assert_eq!(first[0]["pair_bundles"], aggregates);
         assert!(first[0].get("dropped").is_none());
-        assert_eq!(first[1]["pair_groups"], Value::Null);
+        assert_eq!(first[1]["pair_bundles"], Value::Null);
         let mut last = aggregates.clone();
         last["rows"] = block["rows"].clone();
-        assert_eq!(first[2]["pair_groups"], last);
+        assert_eq!(first[2]["pair_bundles"], last);
         let extinct = &kept["per_seed"][1]["samples"];
-        assert_eq!(extinct[0]["pair_groups"], aggregates);
-        assert_eq!(extinct[1]["pair_groups"], Value::Null);
+        assert_eq!(extinct[0]["pair_bundles"], aggregates);
+        assert_eq!(extinct[1]["pair_bundles"], Value::Null);
     }
 
     /// T26.F02: every checkpoint keeps the whole `capacity` block, `null`
@@ -1498,7 +1498,7 @@ mod tests {
     fn mutation_supply_survives_summary_projection() {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
-            "pair_group_inherited_nonzero_births_total": 2,
+            "pair_bundle_inherited_nonzero_births_total": 2,
             "attribute_changes_by_scope": {"edge": 5, "group": 1},
             "operator_funnel_by_operator": {"Graph.DetachGraphEdge": {
                 "attempted": 2, "applicable": 2, "structurally_valid": 2,

@@ -149,22 +149,22 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 17948922656767329856); rate 0.005 restores them.
 /// Re-pinned by T25.F03 commit 1 (text only) after two agreeing runs: every
 /// genome's `Debug` text names `own_weight`, `membership: None` and
-/// `groups: []` (default 15444665604557976202 -> 12338524851174507136, rate
+/// `bundles: []` (default 15444665604557976202 -> 12338524851174507136, rate
 /// 0.0 17948922656767329856 -> 10384326889006245954). The identity hashed
 /// without genome text is 18157138273463701869 (rate 0.0
 /// 7389079404809992313) at the merge base and after the commit; reverting
 /// the text change restores both old values.
-/// Re-pinned by T25.F03 commit 2 after two agreeing runs: the edge-group
+/// Re-pinned by T25.F03 commit 2 after two agreeing runs: the edge-bundle
 /// operators replace the projection operators at their catalog positions and
 /// `edge_sites` enumerates members, which changes Graph-domain draws on any
-/// genome carrying a group (invariant 13), and the genome text names groups
+/// genome carrying a bundle (invariant 13), and the genome text names bundles
 /// (default 12338524851174507136 -> 13875145475904938210, rate 0.0
 /// 10384326889006245954 -> 2420636156610368321). Without genome text the
 /// rate-0.0 identity holds (7389079404809992313) and the default one moves
 /// 18157138273463701869 -> 8851126832724384691 by the draw stream; mutation
 /// off leaves every founder trajectory byte-identical (the viability
 /// siblings); reverting the commit restores both old values.
-/// Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+/// Re-pinned by T25.F04 commit 1: `AddDirectionPairBundle` joins the Graph
 /// default arm (weight 56 -> 58) and remaps every Graph draw (default
 /// 13875145475904938210 -> 8823525590455763780, rate 0.0
 /// 2420636156610368321 -> 13485370972105497157); removing the catalog entry
@@ -184,15 +184,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 0.0 821082946294985330), as it is with mutation off (152334251919380938,
 /// rate 0.0 2951681092705485257).
 /// Re-pinned by T25.F07 commit 1 (text only): every member's `Debug` text
-/// names its `scope` and every group's its `inherit_scale`, which moves the
-/// rate-0.0 identity, whose run carries a group (17936859635187403177 ->
+/// names its `scope` and every bundle's its `inherit_scale`, which moves the
+/// rate-0.0 identity, whose run carries a bundle (17936859635187403177 ->
 /// 7887329904345154269); the default identity holds. The hash without
 /// genome text is unchanged at the merge base and after the commit (default
 /// 13644968153452489784, rate 0.0 821082946294985330), as is the run with
 /// mutation off, genome text included (8324246536663749152, rate 0.0
 /// 1561139812032769563).
-/// Re-pinned by T25.F07 commit 2: learned group creation, the scope coin and
-/// `SetScope` remap every Graph draw and groups now learn (default
+/// Re-pinned by T25.F07 commit 2: learned bundle creation, the scope coin and
+/// `SetScope` remap every Graph draw and bundles now learn (default
 /// 12573132385420804636 -> 7345675788631625454, rate 0.0
 /// 7887329904345154269 -> 11318987159188275955); with mutation off the run
 /// is unchanged, genome text included (8324246536663749152, rate 0.0
@@ -207,7 +207,7 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// every Graph draw (default 5737684664837370108 -> 5477079874225389176,
 /// rate 0.0 11540034954633671093 -> 2120864728947376946).
 /// Re-pinned by T25.F09 commit 1 (text only): every plastic edge's and
-/// every group's `Debug` text names its `retention` (default
+/// every bundle's `Debug` text names its `retention` (default
 /// 5477079874225389176 -> 7591672062617439646, rate 0.0 2120864728947376946 ->
 /// 8568333528152149267). The hash without genome text is unchanged at the merge base
 /// and after the commit (default 1525356918335449842, rate 0.0
@@ -254,11 +254,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// commit 4 (kind draws `0..4`, sink draws 39 / 108, field draws `0..5`,
 /// sub-index widths) after two agreeing runs (default 5743177234346840164
 /// -> 8393772808589926382, rate 0.0 4601283646038048810 ->
-/// 15622211672400239421).
+/// 15622211672400239421). Re-pinned by T25.F11 commit 2 (text only): the
+/// genome `Debug` text names bundles where groups stood (default
+/// 8393772808589926382 -> 11389669539280857404, rate 0.0
+/// 15622211672400239421 -> 5635669974551787686); mapping the text back
+/// restores both old values.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 8393772808589926382);
-    assert_eq!(short_run_identity(Some(0.0)), 15622211672400239421);
+    assert_eq!(short_run_identity(None), 11389669539280857404);
+    assert_eq!(short_run_identity(Some(0.0)), 5635669974551787686);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

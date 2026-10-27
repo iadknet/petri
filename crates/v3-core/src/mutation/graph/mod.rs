@@ -1,4 +1,4 @@
-pub(crate) mod group;
+pub(crate) mod bundle;
 pub mod hebbian;
 pub(crate) mod operators;
 pub(crate) mod recruitment;
@@ -42,7 +42,7 @@ pub enum GraphOperator {
     GraphRawFieldMutation,
     CopyInternalNode,
     CopySubgraph,
-    CopyEdgeBundle,
+    CopyNodeInputs,
     EnableHebbian,
     DisableHebbian,
     MutateHebbianRule,
@@ -53,22 +53,22 @@ pub enum GraphOperator {
     MutateRewardSource,
     MutateTraceDecay,
     RecruitNeutralInput,
-    AddRingGroup,
-    AddDirectionPairGroup,
-    AlterGroupScale,
-    ShiftGroupOffset,
-    RetargetGroupKind,
-    RemoveGroup,
+    AddRingBundle,
+    AddDirectionPairBundle,
+    AlterBundleScale,
+    ShiftBundleOffset,
+    RetargetBundleKind,
+    RemoveBundle,
     SetScope,
-    AddRandomizedRingGroup,
-    AddRandomizedDirectionPairGroup,
+    AddRandomizedRingBundle,
+    AddRandomizedDirectionPairBundle,
     DetachGraphEdge,
     EnableRetention,
     DisableRetention,
     MutateRetention,
-    EnableGroupRetention,
-    DisableGroupRetention,
-    MutateGroupRetention,
+    EnableBundleRetention,
+    DisableBundleRetention,
+    MutateBundleRetention,
 }
 
 impl GraphOperator {
@@ -84,7 +84,7 @@ impl GraphOperator {
         Self::GraphRawFieldMutation,
         Self::CopyInternalNode,
         Self::CopySubgraph,
-        Self::CopyEdgeBundle,
+        Self::CopyNodeInputs,
         Self::EnableHebbian,
         Self::DisableHebbian,
         Self::MutateHebbianRule,
@@ -95,22 +95,22 @@ impl GraphOperator {
         Self::MutateRewardSource,
         Self::MutateTraceDecay,
         Self::RecruitNeutralInput,
-        Self::AddRingGroup,
-        Self::AddDirectionPairGroup,
-        Self::AlterGroupScale,
-        Self::ShiftGroupOffset,
-        Self::RetargetGroupKind,
-        Self::RemoveGroup,
+        Self::AddRingBundle,
+        Self::AddDirectionPairBundle,
+        Self::AlterBundleScale,
+        Self::ShiftBundleOffset,
+        Self::RetargetBundleKind,
+        Self::RemoveBundle,
         Self::SetScope,
-        Self::AddRandomizedRingGroup,
-        Self::AddRandomizedDirectionPairGroup,
+        Self::AddRandomizedRingBundle,
+        Self::AddRandomizedDirectionPairBundle,
         Self::DetachGraphEdge,
         Self::EnableRetention,
         Self::DisableRetention,
         Self::MutateRetention,
-        Self::EnableGroupRetention,
-        Self::DisableGroupRetention,
-        Self::MutateGroupRetention,
+        Self::EnableBundleRetention,
+        Self::DisableBundleRetention,
+        Self::MutateBundleRetention,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -129,7 +129,7 @@ impl GraphOperator {
             Self::GraphRawFieldMutation => 4,
             Self::CopyInternalNode => 1,
             Self::CopySubgraph => 1,
-            Self::CopyEdgeBundle => 2,
+            Self::CopyNodeInputs => 2,
             Self::EnableHebbian => 1,
             Self::DisableHebbian => 1,
             Self::MutateHebbianRule => 2,
@@ -140,30 +140,30 @@ impl GraphOperator {
             Self::MutateRewardSource => 2,
             Self::MutateTraceDecay => 4,
             Self::RecruitNeutralInput => 1,
-            // Edge groups (T25.F03, at the catalog positions and weights of
+            // Edge bundles (T25.F03, at the catalog positions and weights of
             // the T11.F31 ring projection operators): each the tier of the
             // edge operator it parallels.
-            Self::AddRingGroup => 2,
-            // T25.F04: beside `AddRingGroup`, at its tier.
-            Self::AddDirectionPairGroup => 2,
-            Self::AlterGroupScale => 4,
-            Self::ShiftGroupOffset => 2,
-            Self::RetargetGroupKind => 2,
-            Self::RemoveGroup => 2,
-            // T25.F07: after `RemoveGroup`, at the tier of a moderate edit.
+            Self::AddRingBundle => 2,
+            // T25.F04: beside `AddRingBundle`, at its tier.
+            Self::AddDirectionPairBundle => 2,
+            Self::AlterBundleScale => 4,
+            Self::ShiftBundleOffset => 2,
+            Self::RetargetBundleKind => 2,
+            Self::RemoveBundle => 2,
+            // T25.F07: after `RemoveBundle`, at the tier of a moderate edit.
             Self::SetScope => 2,
             // T25.F08: after `SetScope`, each at its uniform twin's tier and
             // detach at a moderate edit's.
-            Self::AddRandomizedRingGroup => 2,
-            Self::AddRandomizedDirectionPairGroup => 2,
+            Self::AddRandomizedRingBundle => 2,
+            Self::AddRandomizedDirectionPairBundle => 2,
             Self::DetachGraphEdge => 2,
             // T25.F09: after `DetachGraphEdge`, the enable and disable twins
             // at a structural tier and the steps at a refinement's, as
             // their trace-decay analogs.
             Self::EnableRetention | Self::DisableRetention => 1,
             Self::MutateRetention => 4,
-            Self::EnableGroupRetention | Self::DisableGroupRetention => 1,
-            Self::MutateGroupRetention => 4,
+            Self::EnableBundleRetention | Self::DisableBundleRetention => 1,
+            Self::MutateBundleRetention => 4,
         }
     }
 
@@ -199,7 +199,7 @@ impl GraphOperator {
             Self::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
             Self::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
             Self::CopySubgraph => MutationOperator::GraphCopySubgraph,
-            Self::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
+            Self::CopyNodeInputs => MutationOperator::GraphCopyNodeInputs,
             Self::EnableHebbian => MutationOperator::GraphEnableHebbian,
             Self::DisableHebbian => MutationOperator::GraphDisableHebbian,
             Self::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
@@ -210,24 +210,24 @@ impl GraphOperator {
             Self::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             Self::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             Self::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            Self::AddRingGroup => MutationOperator::GraphAddRingGroup,
-            Self::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
-            Self::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
-            Self::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
-            Self::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
-            Self::RemoveGroup => MutationOperator::GraphRemoveGroup,
+            Self::AddRingBundle => MutationOperator::GraphAddRingBundle,
+            Self::AddDirectionPairBundle => MutationOperator::GraphAddDirectionPairBundle,
+            Self::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
+            Self::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
+            Self::RetargetBundleKind => MutationOperator::GraphRetargetBundleKind,
+            Self::RemoveBundle => MutationOperator::GraphRemoveBundle,
             Self::SetScope => MutationOperator::GraphSetScope,
-            Self::AddRandomizedRingGroup => MutationOperator::GraphAddRandomizedRingGroup,
-            Self::AddRandomizedDirectionPairGroup => {
-                MutationOperator::GraphAddRandomizedDirectionPairGroup
+            Self::AddRandomizedRingBundle => MutationOperator::GraphAddRandomizedRingBundle,
+            Self::AddRandomizedDirectionPairBundle => {
+                MutationOperator::GraphAddRandomizedDirectionPairBundle
             }
             Self::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
             Self::EnableRetention => MutationOperator::GraphEnableRetention,
             Self::DisableRetention => MutationOperator::GraphDisableRetention,
             Self::MutateRetention => MutationOperator::GraphMutateRetention,
-            Self::EnableGroupRetention => MutationOperator::GraphEnableGroupRetention,
-            Self::DisableGroupRetention => MutationOperator::GraphDisableGroupRetention,
-            Self::MutateGroupRetention => MutationOperator::GraphMutateGroupRetention,
+            Self::EnableBundleRetention => MutationOperator::GraphEnableBundleRetention,
+            Self::DisableBundleRetention => MutationOperator::GraphDisableBundleRetention,
+            Self::MutateBundleRetention => MutationOperator::GraphMutateBundleRetention,
         }
     }
 
@@ -286,7 +286,7 @@ impl GraphOperator {
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, inputs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
-            Self::CopyEdgeBundle => operators::can_copy_edge_bundle(def),
+            Self::CopyNodeInputs => operators::can_copy_node_inputs(def),
             Self::EnableHebbian => hebbian::any_edge(def, hebbian::can_enable_hebbian),
             Self::DisableHebbian
             | Self::MutateHebbianRule
@@ -298,22 +298,24 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
-            Self::AddRingGroup | Self::AddRandomizedRingGroup => group::can_add(def, inputs.refs),
-            Self::AddDirectionPairGroup | Self::AddRandomizedDirectionPairGroup => {
-                group::can_add_pair(def, inputs.refs)
+            Self::AddRingBundle | Self::AddRandomizedRingBundle => {
+                bundle::can_add(def, inputs.refs)
             }
-            Self::AlterGroupScale
-            | Self::ShiftGroupOffset
-            | Self::RetargetGroupKind
-            | Self::RemoveGroup => group::has_group(def),
+            Self::AddDirectionPairBundle | Self::AddRandomizedDirectionPairBundle => {
+                bundle::can_add_pair(def, inputs.refs)
+            }
+            Self::AlterBundleScale
+            | Self::ShiftBundleOffset
+            | Self::RetargetBundleKind
+            | Self::RemoveBundle => bundle::has_bundle(def),
             Self::SetScope | Self::DetachGraphEdge => hebbian::any_edge(def, hebbian::is_member),
             Self::EnableRetention => hebbian::any_edge(def, hebbian::can_enable_retention),
             Self::DisableRetention | Self::MutateRetention => {
                 hebbian::any_edge(def, hebbian::is_decaying)
             }
-            Self::EnableGroupRetention => group::any_group(def, group::retains),
-            Self::DisableGroupRetention | Self::MutateGroupRetention => {
-                group::any_group(def, group::is_decaying_group)
+            Self::EnableBundleRetention => bundle::any_bundle(def, bundle::retains),
+            Self::DisableBundleRetention | Self::MutateBundleRetention => {
+                bundle::any_bundle(def, bundle::is_decaying_bundle)
             }
         }
     }
@@ -464,8 +466,8 @@ impl GraphMutator {
             GraphOperator::CopySubgraph => {
                 unreported(operators::apply_copy_subgraph(genome, node_idx, rng))
             }
-            GraphOperator::CopyEdgeBundle => {
-                unreported(operators::apply_copy_edge_bundle(genome, node_idx, rng))
+            GraphOperator::CopyNodeInputs => {
+                unreported(operators::apply_copy_node_inputs(genome, node_idx, rng))
             }
             GraphOperator::EnableHebbian => scoped(hebbian::enable_hebbian_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
@@ -509,19 +511,19 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::AlterGroupScale => unreported(group::alter_scale(
+            GraphOperator::AlterBundleScale => unreported(bundle::alter_scale(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::ShiftGroupOffset => unreported(group::shift_offset(
+            GraphOperator::ShiftBundleOffset => unreported(bundle::shift_offset(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::RetargetGroupKind => unreported(group::retarget_kind(
+            GraphOperator::RetargetBundleKind => unreported(bundle::retarget_kind(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::RemoveGroup => edited(group::remove(
+            GraphOperator::RemoveBundle => edited(bundle::remove(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -529,32 +531,32 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::AddRingGroup => edited(group::add_in_form(
+            GraphOperator::AddRingBundle => edited(bundle::add_in_form(
                 node_mut(genome, node_idx)?,
-                group::CreationForm::Uniform,
+                bundle::CreationForm::Uniform,
                 context,
                 rng,
             )),
-            GraphOperator::AddRandomizedRingGroup => edited(group::add_in_form(
+            GraphOperator::AddRandomizedRingBundle => edited(bundle::add_in_form(
                 node_mut(genome, node_idx)?,
-                group::CreationForm::Randomized,
+                bundle::CreationForm::Randomized,
                 context,
                 rng,
             )),
-            GraphOperator::AddDirectionPairGroup => edited(group::add_pair_in_form(
+            GraphOperator::AddDirectionPairBundle => edited(bundle::add_pair_in_form(
                 node_mut(genome, node_idx)?,
-                group::CreationForm::Uniform,
+                bundle::CreationForm::Uniform,
                 context,
                 rng,
             )),
-            GraphOperator::AddRandomizedDirectionPairGroup => edited(group::add_pair_in_form(
+            GraphOperator::AddRandomizedDirectionPairBundle => edited(bundle::add_pair_in_form(
                 node_mut(genome, node_idx)?,
-                group::CreationForm::Randomized,
+                bundle::CreationForm::Randomized,
                 context,
                 rng,
             )),
             GraphOperator::DetachGraphEdge => {
-                edited(group::detach_member(node_mut(genome, node_idx)?, rng))
+                edited(bundle::detach_member(node_mut(genome, node_idx)?, rng))
             }
             GraphOperator::EnableRetention => scoped(hebbian::enable_retention_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
@@ -568,15 +570,15 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::EnableGroupRetention => unreported(group::enable_retention(
+            GraphOperator::EnableBundleRetention => unreported(bundle::enable_retention(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::DisableGroupRetention => unreported(group::disable_retention(
+            GraphOperator::DisableBundleRetention => unreported(bundle::disable_retention(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::MutateGroupRetention => unreported(group::mutate_retention(
+            GraphOperator::MutateBundleRetention => unreported(bundle::mutate_retention(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),

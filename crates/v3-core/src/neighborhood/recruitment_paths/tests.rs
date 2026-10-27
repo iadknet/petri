@@ -2712,7 +2712,7 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
 /// four batches: `lineage` seeds by position and `batches` only bounds the
 /// panel. Rate 0.005 restores batch 7 lineage 7; the old size rule and rate
 /// 0.005 together restore batch 2 lineage 2. Re-pinned at T25.F04 commit 1
-/// (`AddDirectionPairGroup` remaps every Graph draw; batch 22 lineage 0 now
+/// (`AddDirectionPairBundle` remaps every Graph draw; batch 22 lineage 0 now
 /// reads `NoLongerUseful`): batch 1 lineage 3 is the first `Deleted`
 /// lineage of arm 12 in batch, lineage order (batches 0-40, lineages 0-15,
 /// discovery 9, followup 256), the search recorded in

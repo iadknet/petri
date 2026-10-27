@@ -10,8 +10,8 @@ use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::test_support::plastic_node;
 use crate::genome::cgp::{
-    BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource, GroupId, Scope, Shape,
+    BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
+    GraphEdge, GraphSource, Scope, Shape,
 };
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
 
@@ -66,17 +66,17 @@ fn ungrouped(weight: f32, config: PlasticityConfig) -> CgpGraphBackendDef {
         .with_output_sinks(vec![])
 }
 
-/// A full catalog with one `Ring` group (pattern 1) at genomic scale
+/// A full catalog with one `Ring` bundle (pattern 1) at genomic scale
 /// `scale` and retention `retention`.
-fn ring(scale: f32, retention: f32) -> (CgpGraphBackendDef, GroupId, Vec<EdgeOccurrence>) {
+fn ring(scale: f32, retention: f32) -> (CgpGraphBackendDef, BundleId, Vec<EdgeOccurrence>) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_group(
+    let id = def.add_ring_bundle(
         Shape::Ring { ring_ref: RING_REF },
         DirectedVoteKind::Move,
         0,
     );
-    def.group_mut(id).set_scale(scale);
-    def.group_mut(id).set_retention(retention);
+    def.bundle_mut(id).set_scale(scale);
+    def.bundle_mut(id).set_retention(retention);
     let members = def.members(id).collect();
     (def, id, members)
 }
@@ -138,7 +138,7 @@ fn compute_seed(def: &CgpGraphBackendDef, value: f32) -> BirthSeeds {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect(),
-        groups: vec![None; def.groups().len()],
+        bundles: vec![None; def.bundles().len()],
     }
 }
 
@@ -187,10 +187,10 @@ fn an_out_of_bound_genomic_scale_starts_at_its_bound() {
     assert_eq!(scale(&learned).learned, Some(2.0));
 }
 
-/// A scope-`Group` learner's out-of-clamp own correction is not a learned
+/// A scope-`Bundle` learner's out-of-clamp own correction is not a learned
 /// quantity: it composes raw before and after scale learning.
 #[test]
-fn a_group_learners_out_of_clamp_correction_composes_raw() {
+fn a_bundle_learners_out_of_clamp_correction_composes_raw() {
     let (mut def, _, members) = ring(0.5, 1.0);
     def.edge_mut(members[0]).set_weight(5.0);
     learn(
@@ -246,7 +246,7 @@ fn a_seeded_learner_relaxes_toward_its_clamped_seed_not_its_genomic_weight() {
 #[test]
 fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
     let (mut def, id, members) = ring(0.5, 0.5);
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     learn(
         &mut def,
         members[0],
@@ -254,8 +254,8 @@ fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
         Scope::Group,
     );
     let mut seeds = compute_seed(&def, 0.0);
-    let BirthSeeds::Rows { groups, .. } = &mut seeds;
-    groups[0] = Some(-5.0);
+    let BirthSeeds::Rows { bundles, .. } = &mut seeds;
+    bundles[0] = Some(-5.0);
     let mut learned = state(&def, Some(seeds));
     let view = scale(&learned);
     assert_eq!((view.genomic, view.birth), (0.5, -2.0));
@@ -287,10 +287,10 @@ fn an_edge_scope_member_decays_toward_its_own_correction() {
     assert_eq!(view.applied, 1.75);
 }
 
-/// A scope-`Group` member has no own decay, whatever its retention, while
-/// its scale decays by its group's retention.
+/// A scope-`Bundle` member has no own decay, whatever its retention, while
+/// its scale decays by its bundle's retention.
 #[test]
-fn a_group_scale_decays_by_its_groups_retention_and_its_learner_has_none() {
+fn a_bundle_scale_decays_by_its_bundles_retention_and_its_learner_has_none() {
     let (mut def, _, members) = ring(0.5, 0.5);
     def.edge_mut(members[0]).set_weight(0.125);
     learn(

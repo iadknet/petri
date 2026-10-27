@@ -78,10 +78,10 @@ fn the_founder_has_a_sensor_site_and_a_motor_site() {
     assert!(motor_node(&founder.nodes[1]), "the decision node votes");
 }
 
-/// A node whose only vote edges are a group's members votes through them
-/// (T25.F03): a `Move` group makes it a motor node, a `Reproduce` one not.
+/// A node whose only vote edges are a bundle's members votes through them
+/// (T25.F03): a `Move` bundle makes it a motor node, a `Reproduce` one not.
 #[test]
-fn a_node_voting_only_through_group_members_is_a_motor_node() {
+fn a_node_voting_only_through_bundle_members_is_a_motor_node() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::genome::cgp::Shape;
     for (kind, motor) in [
@@ -90,7 +90,7 @@ fn a_node_voting_only_through_group_members_is_a_motor_node() {
         (DirectedVoteKind::StealEnergy, false),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_group(Shape::Ring { ring_ref: 0 }, kind, 4);
+        def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, 4);
         let genome = one_node(node(
             0,
             vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
@@ -866,8 +866,8 @@ fn a_touching_selection_is_censored_or_resolved_in_the_touching_counts() {
     assert_eq!(row.retention.depths_touching, [[0, 0, 1], [0, 0, 1]]);
 }
 
-/// A node whose only vote edges are a pair group's members votes through
-/// them (T25.F04): a `Move` pair group makes it a motor node.
+/// A node whose only vote edges are a pair bundle's members votes through
+/// them (T25.F04): a `Move` pair bundle makes it a motor node.
 #[test]
 fn a_node_voting_only_through_pair_members_is_a_motor_node() {
     use v3_core::contracts::votes::DirectedVoteKind;
@@ -877,7 +877,7 @@ fn a_node_voting_only_through_pair_members_is_a_motor_node() {
         (DirectedVoteKind::Reproduce, false),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 6, &[]);
+        def.add_pair_bundle(0, 0, area.direction_pairs()[0], kind, 6, &[]);
         let genome = one_node(node(0, vec![area.clone()], BackendDef::Graph(def)));
         assert_eq!(motor_node(&genome.nodes[0]), motor, "{kind:?}");
     }

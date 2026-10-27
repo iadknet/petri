@@ -1,5 +1,5 @@
+import type { BrainBundle } from "../types/generated/BrainBundle.ts";
 import type { BrainEdge } from "../types/generated/BrainEdge.ts";
-import type { BrainGroup } from "../types/generated/BrainGroup.ts";
 import type { BrainView } from "../types/generated/BrainView.ts";
 import type { EdgeLearner } from "../types/generated/EdgeLearner.ts";
 import type { GraphBrain } from "../types/generated/GraphBrain.ts";
@@ -68,9 +68,9 @@ export function upstreamRef(slot: number): InputRef {
 	return { family: "upstream", key: "UpstreamSlot", slot };
 }
 
-/** A Graph backend with no edges and no groups, unless given. */
+/** A Graph backend with no edges and no bundles, unless given. */
 export function graphBrain(overrides: Partial<GraphBrain> = {}): GraphBrain {
-	return { compute_nodes: [], output_sinks: [], groups: [], ...overrides };
+	return { compute_nodes: [], output_sinks: [], bundles: [], ...overrides };
 }
 
 /** A Hebbian ungrouped learner, uninitialized and Darwinian unless overridden. */
@@ -87,8 +87,8 @@ export function learner(overrides: Partial<EdgeLearner> = {}): EdgeLearner {
 	};
 }
 
-/** A ring group on `Move` at offset 0 and scale 0 with all eight members present. */
-export function ringGroup(ringRef: number, overrides: Partial<BrainGroup> = {}): BrainGroup {
+/** A ring bundle on `Move` at offset 0 and scale 0 with all eight members present. */
+export function ringBundle(ringRef: number, overrides: Partial<BrainBundle> = {}): BrainBundle {
 	return {
 		shape: { Ring: { ring_ref: ringRef } },
 		kind: "Move",

@@ -1,7 +1,7 @@
 //! The ring-rule census (`ring-rules-v2`, T11.F31, T25.F03): which
 //! direction-general rules "vote kind `K` toward direction `d` from ring
 //! channel `d − offset`" a population carries, through direct edges or one
-//! bus hop, and the `Ring` edge groups it carries.
+//! bus hop, and the `Ring` edge bundles it carries.
 //!
 //! A rule is `(family, kind, offset, sign)`. A path for direction `d` on a
 //! reachable Graph node is (i) an `ActionVote` edge into `K(d)` whose genomic
@@ -9,7 +9,7 @@
 //! sign of `w`; or (ii) such an edge from `UpstreamSlot(j)` while some
 //! reachable Graph node has an edge with `|w'| > 1e-3` into `CustomOutput(j)`
 //! from that ring channel, sign of `w · w'` (execution order and overwrites
-//! ignored, so an upper bound). Group members are sink edges and take part
+//! ignored, so an upper bound). Bundle members are sink edges and take part
 //! in both paths at their genomic weight `scale + own_weight`; a member's
 //! offset comes from its channel and sink as any edge's does. Compute-node
 //! paths are not traced, and no reachable live VM node votes, so VM nodes
@@ -30,7 +30,7 @@ use crate::neighborhood::sensor_census::world_input_key_label;
 pub const RING_RULES_VERSION: &str = "ring-rules-v2";
 
 /// The weight magnitude above which an edge carries a path, and above which
-/// a group's scale counts as nonzero.
+/// a bundle's scale counts as nonzero.
 pub const PATH_WEIGHT_FLOOR: f32 = 1e-3;
 
 /// A rule covering this many directions or more is direction-general.
@@ -47,10 +47,10 @@ pub struct Rule {
     pub positive: bool,
 }
 
-/// Per-class `Ring` group counts on reachable nodes: groups, those with a
+/// Per-class `Ring` bundle counts on reachable nodes: bundles, those with a
 /// positive or negative nonzero scale, and their members present.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct RingGroupCounts {
+pub struct RingBundleCounts {
     pub count: u64,
     pub positive: u64,
     pub negative: u64,
@@ -66,18 +66,18 @@ pub struct RingRuleCensus {
     pub direction_general: u64,
     /// The same, counting paths through non-member edges only.
     pub direction_general_edges_only: u64,
-    /// Creatures carrying at least one `Ring` group on a reachable node.
-    pub ring_group_carriers: u64,
-    /// `Ring` groups on reachable nodes.
-    pub ring_groups: u64,
-    /// `Ring` groups on reachable nodes with `|scale| > PATH_WEIGHT_FLOOR`.
-    pub ring_groups_nonzero: u64,
-    /// `Ring` groups on unreachable nodes.
-    pub ring_groups_unreachable: u64,
-    /// Members present on reachable `Ring` groups, summed.
-    pub ring_group_members: u64,
-    /// Reachable `Ring` groups by `(family, kind, offset)`.
-    pub ring_group_counts: BTreeMap<(WorldInputKey, DirectedVoteKind, u8), RingGroupCounts>,
+    /// Creatures carrying at least one `Ring` bundle on a reachable node.
+    pub ring_bundle_carriers: u64,
+    /// `Ring` bundles on reachable nodes.
+    pub ring_bundles: u64,
+    /// `Ring` bundles on reachable nodes with `|scale| > PATH_WEIGHT_FLOOR`.
+    pub ring_bundles_nonzero: u64,
+    /// `Ring` bundles on unreachable nodes.
+    pub ring_bundles_unreachable: u64,
+    /// Members present on reachable `Ring` bundles, summed.
+    pub ring_bundle_members: u64,
+    /// Reachable `Ring` bundles by `(family, kind, offset)`.
+    pub ring_bundle_counts: BTreeMap<(WorldInputKey, DirectedVoteKind, u8), RingBundleCounts>,
     /// Creatures by coverage: `coverage[rule][n - 1]` creatures cover the
     /// rule in exactly `n` directions.
     pub coverage: BTreeMap<Rule, [u64; DIRECTIONS as usize]>,
@@ -223,49 +223,49 @@ impl RingRuleCensus {
                     }
                 }
             }
-            for (index, group) in def.groups().iter().enumerate() {
-                let Shape::Ring { ring_ref } = group.shape() else {
+            for (index, bundle) in def.bundles().iter().enumerate() {
+                let Shape::Ring { ring_ref } = bundle.shape() else {
                     continue;
                 };
                 let members = def
-                    .members(crate::genome::cgp::GroupId::new(
-                        u16::try_from(index).expect("groups below u16::MAX"),
+                    .members(crate::genome::cgp::BundleId::new(
+                        u16::try_from(index).expect("bundles below u16::MAX"),
                     ))
                     .count() as u64;
                 carried += 1;
-                self.ring_groups += 1;
-                self.ring_group_members += members;
-                let nonzero = carries(group.scale());
-                self.ring_groups_nonzero += u64::from(nonzero);
+                self.ring_bundles += 1;
+                self.ring_bundle_members += members;
+                let nonzero = carries(bundle.scale());
+                self.ring_bundles_nonzero += u64::from(nonzero);
                 let Some(family) = ring_of(refs.get(usize::from(ring_ref))) else {
                     continue;
                 };
                 let counts = self
-                    .ring_group_counts
-                    .entry((family, group.kind(), group.offset()))
+                    .ring_bundle_counts
+                    .entry((family, bundle.kind(), bundle.offset()))
                     .or_default();
                 counts.count += 1;
-                counts.positive += u64::from(nonzero && group.scale() > 0.0);
-                counts.negative += u64::from(nonzero && group.scale() < 0.0);
+                counts.positive += u64::from(nonzero && bundle.scale() > 0.0);
+                counts.negative += u64::from(nonzero && bundle.scale() < 0.0);
                 counts.members += members;
             }
         }
-        self.ring_groups_unreachable += genome
+        self.ring_bundles_unreachable += genome
             .nodes
             .iter()
             .enumerate()
             .filter(|(idx, _)| !reachable.contains(idx))
             .filter_map(|(_, node)| match &node.backend_def {
                 BackendDef::Graph(def) => Some(
-                    def.groups()
+                    def.bundles()
                         .iter()
-                        .filter(|group| matches!(group.shape(), Shape::Ring { .. }))
+                        .filter(|bundle| matches!(bundle.shape(), Shape::Ring { .. }))
                         .count() as u64,
                 ),
                 BackendDef::Vm(_) => None,
             })
             .sum::<u64>();
-        self.ring_group_carriers += u64::from(carried > 0);
+        self.ring_bundle_carriers += u64::from(carried > 0);
         let general = |mask: u8| mask.count_ones() >= DIRECTION_GENERAL_COVERAGE;
         self.direction_general += u64::from(coverage.0.values().any(|&(all, _)| general(all)));
         self.direction_general_edges_only +=
@@ -279,10 +279,10 @@ impl RingRuleCensus {
     }
 
     /// `family kind offset count positive negative members`, one per
-    /// reachable `Ring` group class, in key order.
+    /// reachable `Ring` bundle class, in key order.
     #[must_use]
-    pub fn ring_group_rows(&self) -> Vec<String> {
-        self.ring_group_counts
+    pub fn ring_bundle_rows(&self) -> Vec<String> {
+        self.ring_bundle_counts
             .iter()
             .map(|(&(family, kind, offset), counts)| {
                 format!(

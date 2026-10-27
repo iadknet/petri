@@ -726,14 +726,14 @@ mod tests {
         );
     }
 
-    /// A group's members are wired sink edges: a member-only graph consumes
+    /// A bundle's members are wired sink edges: a member-only graph consumes
     /// its ring (T25.F03).
     #[test]
-    fn a_ring_group_is_a_live_consumer_of_its_ring() {
+    fn a_ring_bundle_is_a_live_consumer_of_its_ring() {
         use crate::contracts::votes::DirectedVoteKind;
         use crate::genome::cgp::Shape;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-        graph.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
+        graph.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
         let refs = vec![
             InputReference::World(WorldInputKey::food_here(FOOD_0)),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
@@ -865,7 +865,7 @@ mod tests {
             prop_assert!(!census.reads_any_stateful());
         }
 
-        /// Whatever a creature wires it also declares: a graph leaf (a group
+        /// Whatever a creature wires it also declares: a graph leaf (a bundle
         /// member is one) and a VM read each resolve through the node's own
         /// `input_refs`. The declared set is exactly the world references of
         /// the reachable nodes, the oracle built here from the refs alone.

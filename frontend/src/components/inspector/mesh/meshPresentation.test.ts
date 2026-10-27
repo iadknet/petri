@@ -14,7 +14,7 @@ const graphNode: BrainNode = {
 	targets: [],
 	backend: {
 		Graph: {
-			groups: [],
+			bundles: [],
 			compute_nodes: [
 				{
 					kind: { DecayIntegrator: 0.5 },

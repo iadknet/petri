@@ -37,7 +37,7 @@ const genome: BrainView = {
 			targets: [],
 			backend: {
 				Graph: {
-					groups: [],
+					bundles: [],
 					compute_nodes: [],
 					output_sinks: [{ kind: { RouterGate: 0 }, edges: [] }],
 				},

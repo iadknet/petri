@@ -520,7 +520,7 @@ fn assert_family_bounds(cohort: &CohortUse) {
     }
 }
 
-/// An extinct world: the selected cohort and the recorded group are
+/// An extinct world: the selected cohort and the recorded bundle are
 /// undefined with their reason, and the reading is identical across thread
 /// counts.
 #[test]
@@ -652,18 +652,18 @@ proptest! {
     }
 }
 
-/// A `Ring` group's members consume all eight channels of its ring, live and
+/// A `Ring` bundle's members consume all eight channels of its ring, live and
 /// read whenever its node's effects pass runs (T25.F03).
 #[test]
-fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
+fn a_ring_bundle_consumes_all_eight_channels_of_its_ring() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::Shape;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
-    def.group_mut(id).set_scale(-2.0);
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    def.bundle_mut(id).set_scale(-2.0);
     let parent = Fixture::new().read(&genome(vec![node]));
     for c in 0..8 {
         let ring = channel(&barriers(), c);
@@ -675,7 +675,7 @@ fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
 
 /// Ablating one ring channel redirects exactly the members reading it, and
 /// every member keeps its membership and its genomic weight, which resolves
-/// from its group's ring (T25.F03).
+/// from its bundle's ring (T25.F03).
 #[test]
 fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() {
     use crate::contracts::votes::DirectedVoteKind;
@@ -689,8 +689,8 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
         (0, DirectedVoteKind::Move, 1, -2.0),
         (2, DirectedVoteKind::Reproduce, 0, 1.0),
     ] {
-        let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
-        def.group_mut(id).set_scale(scale);
+        let id = def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+        def.bundle_mut(id).set_scale(scale);
     }
     let genome = genome(vec![node]);
     let target = channel(&barriers(), 3);
@@ -705,7 +705,7 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
     else {
         unreachable!()
     };
-    assert_eq!(after.groups(), before.groups());
+    assert_eq!(after.bundles(), before.bundles());
     assert_eq!(
         after.sink_weight_rows(&refs),
         before.sink_weight_rows(&refs)
@@ -730,16 +730,16 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
             _ => assert_eq!(new.source(), old.source()),
         }
     }
-    // Channel 3 of each barrier ring, one member per group.
+    // Channel 3 of each barrier ring, one member per bundle.
     assert_eq!(redirected, 2);
     // The ordinary food consumer is untouched.
     assert_eq!(after.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
 }
 
 /// Masking a pair reference redirects every member of its `DirectionPair`
-/// group to the missing reference, so every member reads zero, while the
-/// group, its memberships and every member's genomic weight survive
-/// bitwise: the pattern resolves from the group's reference (T25.F04).
+/// bundle to the missing reference, so every member reads zero, while the
+/// bundle, its memberships and every member's genomic weight survive
+/// bitwise: the pattern resolves from the bundle's reference (T25.F04).
 #[test]
 fn masking_a_pair_reference_zeroes_every_member_read() {
     use crate::contracts::votes::DirectedVoteKind;
@@ -750,7 +750,7 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
     };
-    let id = def.add_pair_group(
+    let id = def.add_pair_bundle(
         0,
         1,
         area.direction_pairs()[1],
@@ -758,7 +758,7 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
         3,
         &[],
     );
-    def.group_mut(id).set_scale(0.75);
+    def.bundle_mut(id).set_scale(0.75);
     let genome = genome(vec![node]);
     let family = channel(&area, 0).family;
     let ablated = super::consumers::ablated(
@@ -773,7 +773,7 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     else {
         unreachable!()
     };
-    assert_eq!(after.groups(), before.groups());
+    assert_eq!(after.bundles(), before.bundles());
     let bits = |rows: Vec<Box<[f32]>>| -> Vec<Vec<u32>> {
         rows.iter()
             .map(|row| row.iter().map(|w| w.to_bits()).collect())

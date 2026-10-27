@@ -1,5 +1,5 @@
-//! T25.F03 edge-group operators: catalog, applicability, pinned draw orders,
-//! and the operators whose draws a group must not change.
+//! T25.F03 edge-bundle operators: catalog, applicability, pinned draw orders,
+//! and the operators whose draws a bundle must not change.
 
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -11,24 +11,24 @@ use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::test_support::edit_sinks;
 use crate::genome::cgp::{
-    compose, detach, validate_graph, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
-    GroupId, OutputSinkKind, Scope, Shape,
+    compose, detach, validate_graph, BirthSeeds, BundleId, CgpGraphBackendDef, EdgeOccurrence,
+    EdgeSurface, OutputSinkKind, Scope, Shape,
 };
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
     VmBackendDef,
 };
-use crate::mutation::graph::{group, GraphMutator, GraphOperator};
+use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
 
-const GROUP_OPERATORS: [GraphOperator; 6] = [
-    GraphOperator::AddRingGroup,
-    GraphOperator::AddDirectionPairGroup,
-    GraphOperator::AlterGroupScale,
-    GraphOperator::ShiftGroupOffset,
-    GraphOperator::RetargetGroupKind,
-    GraphOperator::RemoveGroup,
+const BUNDLE_OPERATORS: [GraphOperator; 6] = [
+    GraphOperator::AddRingBundle,
+    GraphOperator::AddDirectionPairBundle,
+    GraphOperator::AlterBundleScale,
+    GraphOperator::ShiftBundleOffset,
+    GraphOperator::RetargetBundleKind,
+    GraphOperator::RemoveBundle,
 ];
 
 fn barrier() -> InputReference {
@@ -77,7 +77,7 @@ fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
     }
 }
 
-/// Three groups: Move at 0 (scale 0), Reproduce at 5 (0.5) and StealEnergy
+/// Three bundles: Move at 0 (scale 0), Reproduce at 5 (0.5) and StealEnergy
 /// at 7 (−2), on rings 0, 2, 0.
 fn three() -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -86,14 +86,14 @@ fn three() -> CgpGraphBackendDef {
         (2, DirectedVoteKind::Reproduce, 5, 0.5),
         (0, DirectedVoteKind::StealEnergy, 7, -2.0),
     ] {
-        let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
-        def.group_mut(id).set_scale(scale);
+        let id = def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+        def.bundle_mut(id).set_scale(scale);
     }
     def
 }
 
-fn id(index: usize) -> GroupId {
-    GroupId::new(u16::try_from(index).unwrap())
+fn id(index: usize) -> BundleId {
+    BundleId::new(u16::try_from(index).unwrap())
 }
 
 const RULES: [HebbianRule; 4] = [
@@ -114,7 +114,7 @@ const CHANNELS: [OutcomeChannel; 4] = [
 /// (T25.F07 invariant 7, T25.F08 invariant 2): a mode in `0..3`; for a
 /// learning mode the rule, rate, clamp and inheritance of `EnableHebbian`,
 /// then for mode 2 the channel and decay of `EnableRewardModulation`; then
-/// one scope coin. Learned creation draws it once per group, the
+/// one scope coin. Learned creation draws it once per bundle, the
 /// randomized form once per member. Returns the mode, config and scope.
 fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
     let mode = rng.gen_range(0..3u8);
@@ -147,18 +147,18 @@ fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
     (mode, config, scope)
 }
 
-/// Learned creation's draws on group `group` of `want`: one
+/// Learned creation's draws on bundle `bundle` of `want`: one
 /// [`replay_member`] sequence shared by every member, then one
 /// `inherit_scale` coin. Returns the mode.
-fn replay_learning(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) -> u8 {
+fn replay_learning(want: &mut CgpGraphBackendDef, bundle: BundleId, rng: &mut SmallRng) -> u8 {
     let (mode, config, scope) = replay_member(rng);
     let inherit_scale = rng.gen_bool(0.5);
-    for member in want.members(group).collect::<Vec<_>>() {
+    for member in want.members(bundle).collect::<Vec<_>>() {
         let mut edge = want.edge_mut(member);
         edge.set_plasticity(config);
         edge.set_scope(scope);
     }
-    want.group_mut(group).set_inherit_scale(inherit_scale);
+    want.bundle_mut(bundle).set_inherit_scale(inherit_scale);
     mode
 }
 
@@ -167,25 +167,25 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
     // T25.F09 appends the six retention operators (`retention.rs`).
     assert_eq!(GraphOperator::ALL.len(), 38);
     assert_eq!(crate::mutation::types::MutationOperator::all().len(), 71);
-    assert_eq!(&GraphOperator::ALL[22..28], &GROUP_OPERATORS);
+    assert_eq!(&GraphOperator::ALL[22..28], &BUNDLE_OPERATORS);
     // T25.F08: the randomized twins and `DetachGraphEdge` follow `SetScope`.
     assert_eq!(
         &GraphOperator::ALL[29..32],
         &[
-            GraphOperator::AddRandomizedRingGroup,
-            GraphOperator::AddRandomizedDirectionPairGroup,
+            GraphOperator::AddRandomizedRingBundle,
+            GraphOperator::AddRandomizedDirectionPairBundle,
             GraphOperator::DetachGraphEdge,
         ]
     );
     for (op, key, effect) in [
         (
-            GraphOperator::AddRandomizedRingGroup,
-            "Graph.AddRandomizedRingGroup",
+            GraphOperator::AddRandomizedRingBundle,
+            "Graph.AddRandomizedRingBundle",
             ComplexityEffect::Increasing,
         ),
         (
-            GraphOperator::AddRandomizedDirectionPairGroup,
-            "Graph.AddRandomizedDirectionPairGroup",
+            GraphOperator::AddRandomizedDirectionPairBundle,
+            "Graph.AddRandomizedDirectionPairBundle",
             ComplexityEffect::Increasing,
         ),
         (
@@ -205,7 +205,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .map(|op| u16::from(op.weight()))
         .sum();
     assert_eq!(enabled, 79, "the engine's enabled Graph weight at defaults");
-    // T25.F07: `SetScope` follows `RemoveGroup`, weight 2, neutral.
+    // T25.F07: `SetScope` follows `RemoveBundle`, weight 2, neutral.
     assert_eq!(GraphOperator::ALL[28], GraphOperator::SetScope);
     assert_eq!(GraphOperator::SetScope.weight(), 2);
     assert_eq!(
@@ -220,7 +220,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         GraphOperator::SetScope.operator().complexity_effect(),
         ComplexityEffect::Neutral
     );
-    let weights = GROUP_OPERATORS.map(GraphOperator::weight);
+    let weights = BUNDLE_OPERATORS.map(GraphOperator::weight);
     assert_eq!(weights, [2, 2, 4, 2, 2, 2]);
     let default_arm: u16 = GraphOperator::ALL
         .iter()
@@ -228,36 +228,36 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
         .map(|op| u16::from(op.weight()))
         .sum();
     assert_eq!(default_arm, 78);
-    let keys = GROUP_OPERATORS.map(|op| op.operator().as_key());
+    let keys = BUNDLE_OPERATORS.map(|op| op.operator().as_key());
     assert_eq!(
         keys,
         [
-            "Graph.AddRingGroup",
-            "Graph.AddDirectionPairGroup",
-            "Graph.AlterGroupScale",
-            "Graph.ShiftGroupOffset",
-            "Graph.RetargetGroupKind",
-            "Graph.RemoveGroup",
+            "Graph.AddRingBundle",
+            "Graph.AddDirectionPairBundle",
+            "Graph.AlterBundleScale",
+            "Graph.ShiftBundleOffset",
+            "Graph.RetargetBundleKind",
+            "Graph.RemoveBundle",
         ]
     );
     // Restricted size pressure admits only the decreasing operator, and the
     // operator and its key agree on the complexity effect.
-    let admitted: Vec<_> = GROUP_OPERATORS
+    let admitted: Vec<_> = BUNDLE_OPERATORS
         .into_iter()
         .filter(|op| op.complexity_effect().is_decreasing())
         .collect();
-    assert_eq!(admitted, vec![GraphOperator::RemoveGroup]);
+    assert_eq!(admitted, vec![GraphOperator::RemoveBundle]);
     for add in [
-        GraphOperator::AddRingGroup,
-        GraphOperator::AddDirectionPairGroup,
+        GraphOperator::AddRingBundle,
+        GraphOperator::AddDirectionPairBundle,
     ] {
         assert_eq!(add.complexity_effect(), ComplexityEffect::Increasing);
     }
     let pair = GraphOperator::ALL
         .iter()
-        .position(|&op| op == GraphOperator::AddDirectionPairGroup);
-    assert_eq!(pair, Some(23), "directly after AddRingGroup");
-    for op in GROUP_OPERATORS {
+        .position(|&op| op == GraphOperator::AddDirectionPairBundle);
+    assert_eq!(pair, Some(23), "directly after AddRingBundle");
+    for op in BUNDLE_OPERATORS {
         assert_eq!(
             op.complexity_effect(),
             op.operator().complexity_effect(),
@@ -268,7 +268,7 @@ fn the_catalog_keeps_six_operators_at_their_edge_tiers() {
 }
 
 #[test]
-fn applicability_follows_rings_groups_and_hosting() {
+fn applicability_follows_rings_bundles_and_hosting() {
     let genome = |refs, def| CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![graph_node(refs, def)],
@@ -278,25 +278,25 @@ fn applicability_follows_rings_groups_and_hosting() {
     let ring = genome(vec![InputReference::ActionVotes, barrier()], plain());
     let pair = genome(vec![InputReference::ActionVotes, area_barrier()], plain());
     let grouped = genome(refs(), three());
-    // A graph missing a direction sink hosts no new group, while the group
+    // A graph missing a direction sink hosts no new bundle, while the bundle
     // it carries stays an edit site.
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
-    partial.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    partial.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
     edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| {
             sink.kind
                 != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 3))
         });
     });
-    assert!(!partial.can_host_group());
+    assert!(!partial.can_host_bundle());
     let unhosted = genome(refs(), partial);
-    for op in GROUP_OPERATORS {
+    for op in BUNDLE_OPERATORS {
         let applies = |g: &CreatureGenome| {
             !GraphMutator::applicable_indices(g, op, &crate::config::test_sensor_context(1))
                 .is_empty()
         };
-        let add_ring = op == GraphOperator::AddRingGroup;
-        let add_pair = op == GraphOperator::AddDirectionPairGroup;
+        let add_ring = op == GraphOperator::AddRingBundle;
+        let add_pair = op == GraphOperator::AddDirectionPairBundle;
         assert!(!applies(&none), "{op:?}");
         assert_eq!(applies(&ring), add_ring, "{op:?}");
         assert_eq!(applies(&pair), add_pair, "{op:?}");
@@ -316,7 +316,7 @@ fn applicability_follows_rings_groups_and_hosting() {
             targets: vec![],
         }],
     };
-    for op in GROUP_OPERATORS {
+    for op in BUNDLE_OPERATORS {
         assert!(
             GraphMutator::applicable_indices(&vm, op, &crate::config::test_sensor_context(1))
                 .is_empty()
@@ -332,9 +332,9 @@ fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add_in_form(
+        bundle::add_in_form(
             &mut node,
-            group::CreationForm::Uniform,
+            bundle::CreationForm::Uniform,
             &crate::config::test_sensor_context(1),
             &mut rng,
         )
@@ -344,42 +344,42 @@ fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..DirectedVoteKind::ALL.len())];
         let offset = expected.gen_range(0..8u8);
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-        let group = want.add_group(Shape::Ring { ring_ref }, kind, offset);
-        modes[usize::from(replay_learning(&mut want, group, &mut expected))] = true;
+        let bundle = want.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+        modes[usize::from(replay_learning(&mut want, bundle, &mut expected))] = true;
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         assert!(validate_graph(&node).is_ok());
-        assert_eq!(graph(&node).groups()[0].scale(), 0.0, "born silent");
+        assert_eq!(graph(&node).bundles()[0].scale(), 0.0, "born silent");
     }
     assert_eq!(modes, [true; 3], "every learning mode drawn");
 }
 
 #[test]
-fn unit_operators_draw_the_group_first_and_change_its_record() {
+fn unit_operators_draw_the_bundle_first_and_change_its_record() {
     for seed in 0..64 {
         let before = three();
 
         let mut node = graph_node(refs(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::alter_scale(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::alter_scale(graph_mut(&mut node), &mut rng).unwrap();
         let idx = expected.gen_range(0..3);
-        let mut scale = before.groups()[idx].scale();
+        let mut scale = before.bundles()[idx].scale();
         crate::mutation::graph::operators::perturb_weight(&mut scale, &mut expected);
         let mut want = before.clone();
-        want.group_mut(id(idx)).set_scale(scale);
+        want.bundle_mut(id(idx)).set_scale(scale);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
 
         let mut node = graph_node(refs(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::shift_offset(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::shift_offset(graph_mut(&mut node), &mut rng).unwrap();
         let idx = expected.gen_range(0..3);
         let step = if expected.gen_bool(0.5) { 1 } else { 7 };
         let mut want = before.clone();
-        let record = before.groups()[idx];
-        want.relocate_group(id(idx), record.kind(), (record.offset() + step) % 8);
+        let record = before.bundles()[idx];
+        want.relocate_bundle(id(idx), record.kind(), (record.offset() + step) % 8);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
         assert!(validate_graph(&node).is_ok());
@@ -387,15 +387,15 @@ fn unit_operators_draw_the_group_first_and_change_its_record() {
         let mut node = graph_node(refs(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::retarget_kind(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::retarget_kind(graph_mut(&mut node), &mut rng).unwrap();
         let idx = expected.gen_range(0..3);
-        let record = before.groups()[idx];
+        let record = before.bundles()[idx];
         let others: Vec<_> = DirectedVoteKind::ALL
             .into_iter()
             .filter(|&k| k != record.kind())
             .collect();
         let mut want = before.clone();
-        want.relocate_group(
+        want.relocate_bundle(
             id(idx),
             others[expected.gen_range(0..others.len())],
             record.offset(),
@@ -407,24 +407,24 @@ fn unit_operators_draw_the_group_first_and_change_its_record() {
         let mut node = graph_node(refs(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::remove(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::remove(graph_mut(&mut node), &mut rng).unwrap();
         let mut want = before.clone();
-        want.remove_group(id(expected.gen_range(0..3)));
+        want.remove_bundle(id(expected.gen_range(0..3)));
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
         assert!(validate_graph(&node).is_ok());
     }
     let mut empty = CgpGraphBackendDef::new_with_fixed_outputs();
     assert_eq!(
-        group::remove(&mut empty, &mut SmallRng::seed_from_u64(0)),
+        bundle::remove(&mut empty, &mut SmallRng::seed_from_u64(0)),
         Err(MutationSkipReason::NoApplicableTarget)
     );
 }
 
 /// `InputRef.Add` on a Graph node draws and writes exactly what it would
-/// without groups, apart from the members.
+/// without bundles, apart from the members.
 #[test]
-fn add_is_unchanged_by_groups() {
+fn add_is_unchanged_by_bundles() {
     for seed in 0..64 {
         let mut plain = v3alpha1_founder_genome();
         let idx = plain
@@ -435,7 +435,7 @@ fn add_is_unchanged_by_groups() {
         let ring = u16::try_from(plain.nodes[idx].input_refs.len()).unwrap();
         plain.nodes[idx].input_refs.push(barrier());
         let mut grouped = plain.clone();
-        graph_mut(&mut grouped.nodes[idx]).add_group(
+        graph_mut(&mut grouped.nodes[idx]).add_ring_bundle(
             Shape::Ring { ring_ref: ring },
             DirectedVoteKind::StealEnergy,
             2,
@@ -464,21 +464,21 @@ fn add_is_unchanged_by_groups() {
         };
         assert_eq!(independent(p), independent(q));
         assert_eq!(p.compute_nodes(), q.compute_nodes());
-        assert_eq!(q.groups().len(), 1);
+        assert_eq!(q.bundles().len(), 1);
         assert_eq!(q.members(id(0)).count(), 8);
     }
 }
 
 /// Each unit operator reaches its own edit through the mutator's dispatch.
 #[test]
-fn the_mutator_dispatches_each_unit_operator_to_its_group_edit() {
+fn the_mutator_dispatches_each_unit_operator_to_its_bundle_edit() {
     type Edit = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<(), MutationSkipReason>;
     let cases: [(GraphOperator, Edit); 4] = [
-        (GraphOperator::AlterGroupScale, group::alter_scale),
-        (GraphOperator::ShiftGroupOffset, group::shift_offset),
-        (GraphOperator::RetargetGroupKind, group::retarget_kind),
-        (GraphOperator::RemoveGroup, |def, rng| {
-            group::remove(def, rng).map(|_| ())
+        (GraphOperator::AlterBundleScale, bundle::alter_scale),
+        (GraphOperator::ShiftBundleOffset, bundle::shift_offset),
+        (GraphOperator::RetargetBundleKind, bundle::retarget_kind),
+        (GraphOperator::RemoveBundle, |def, rng| {
+            bundle::remove(def, rng).map(|_| ())
         }),
     ];
     let config = MutationConfig::default();
@@ -513,7 +513,7 @@ fn the_mutator_dispatches_each_unit_operator_to_its_group_edit() {
     }
 }
 
-/// A ring at index 65,535 is a group site; one at 65,536 is not.
+/// A ring at index 65,535 is a bundle site; one at 65,536 is not.
 #[test]
 fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
     // Arrange
@@ -524,34 +524,34 @@ fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
     let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
 
     // Act
-    let added = group::add_in_form(
+    let added = bundle::add_in_form(
         &mut last,
-        group::CreationForm::Uniform,
+        bundle::CreationForm::Uniform,
         &crate::config::test_sensor_context(1),
         &mut SmallRng::seed_from_u64(0),
     );
-    let skipped = group::add_in_form(
+    let skipped = bundle::add_in_form(
         &mut past,
-        group::CreationForm::Uniform,
+        bundle::CreationForm::Uniform,
         &crate::config::test_sensor_context(1),
         &mut SmallRng::seed_from_u64(0),
     );
 
     // Assert
     assert!(added.is_ok());
-    assert_eq!(graph(&last).groups().len(), 1);
+    assert_eq!(graph(&last).bundles().len(), 1);
     assert_eq!(
-        graph(&last).groups()[0].shape(),
+        graph(&last).bundles()[0].shape(),
         Shape::Ring { ring_ref: u16::MAX }
     );
     assert_eq!(skipped, Err(MutationSkipReason::NoApplicableTarget));
-    assert!(graph(&past).groups().is_empty());
+    assert!(graph(&past).bundles().is_empty());
 }
 
-/// `AddRingGroup` spends no draw and skips on a graph that cannot host a
-/// group, even beside a ring.
+/// `AddRingBundle` spends no draw and skips on a graph that cannot host a
+/// bundle, even beside a ring.
 #[test]
-fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
+fn add_skips_without_a_draw_when_the_graph_cannot_host_a_bundle() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| {
@@ -564,9 +564,9 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     let mut rng = SmallRng::seed_from_u64(9);
     let mut untouched = SmallRng::seed_from_u64(9);
     assert_eq!(
-        group::add_in_form(
+        bundle::add_in_form(
             &mut node,
-            group::CreationForm::Uniform,
+            bundle::CreationForm::Uniform,
             &crate::config::test_sensor_context(1),
             &mut rng
         ),
@@ -576,7 +576,7 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>());
 }
 
-// ── `AddDirectionPairGroup` (T25.F04) ───────────────────────────────────────
+// ── `AddDirectionPairBundle` (T25.F04) ───────────────────────────────────────
 
 fn nearby() -> InputReference {
     InputReference::World(WorldInputKey::NearbyCreature)
@@ -604,9 +604,9 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add_pair_in_form(
+        bundle::add_pair_in_form(
             &mut node,
-            group::CreationForm::Uniform,
+            bundle::CreationForm::Uniform,
             &crate::config::test_sensor_context(1),
             &mut rng,
         )
@@ -616,19 +616,19 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let offset = expected.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
         let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-        let group = want.add_pair_group(ref_idx, pair, layout, kind, offset, &[]);
-        replay_learning(&mut want, group, &mut expected);
+        let bundle = want.add_pair_bundle(ref_idx, pair, layout, kind, offset, &[]);
+        replay_learning(&mut want, bundle, &mut expected);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         assert!(validate_graph(&node).is_ok());
         let def = graph(&node);
-        assert_eq!(def.groups()[0].scale(), 0.0);
+        assert_eq!(def.bundles()[0].scale(), 0.0);
         assert_eq!(def.members(id(0)).count(), 12);
     }
 }
 
-/// `AddDirectionPairGroup` spends no draw and skips on a graph that cannot
-/// host a group, and on a node declaring no pair.
+/// `AddDirectionPairBundle` spends no draw and skips on a graph that cannot
+/// host a bundle, and on a node declaring no pair.
 #[test]
 fn add_pair_skips_without_a_draw_without_a_site() {
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -648,9 +648,9 @@ fn add_pair_skips_without_a_draw_without_a_site() {
         let mut rng = SmallRng::seed_from_u64(9);
         let mut untouched = SmallRng::seed_from_u64(9);
         assert_eq!(
-            group::add_pair_in_form(
+            bundle::add_pair_in_form(
                 &mut node,
-                group::CreationForm::Uniform,
+                bundle::CreationForm::Uniform,
                 &crate::config::test_sensor_context(1),
                 &mut rng
             ),
@@ -663,7 +663,7 @@ fn add_pair_skips_without_a_draw_without_a_site() {
 
 /// The dispatcher reaches `add_pair` with the same draws.
 #[test]
-fn the_mutator_dispatches_add_direction_pair_group() {
+fn the_mutator_dispatches_add_direction_pair_bundle() {
     let refs = vec![area_food(0), barrier()];
     for seed in 0..16 {
         let mut genome = CreatureGenome {
@@ -673,36 +673,36 @@ fn the_mutator_dispatches_add_direction_pair_group() {
         let mut direct = graph_node(refs.clone(), three());
         GraphMutator::apply_to_node(
             &mut genome,
-            GraphOperator::AddDirectionPairGroup,
+            GraphOperator::AddDirectionPairBundle,
             0,
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
             &crate::config::test_sensor_context(1),
         )
         .unwrap();
-        group::add_pair_in_form(
+        bundle::add_pair_in_form(
             &mut direct,
-            group::CreationForm::Uniform,
+            bundle::CreationForm::Uniform,
             &crate::config::test_sensor_context(1),
             &mut SmallRng::seed_from_u64(seed),
         )
         .unwrap();
         assert_eq!(graph(&genome.nodes[0]), graph(&direct), "seed {seed}");
-        assert_eq!(graph(&direct).groups().len(), 4);
+        assert_eq!(graph(&direct).bundles().len(), 4);
     }
 }
 
-/// The unit operators pick one group uniformly over a list mixing both
+/// The unit operators pick one bundle uniformly over a list mixing both
 /// shapes and keep their draws.
 #[test]
 fn unit_operators_pick_uniformly_over_both_shapes() {
     let refs = vec![barrier(), area_food(0)];
     let mixed = || {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+        def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
         let layout = refs[1].direction_pairs()[1];
-        let id = def.add_pair_group(1, 1, layout, DirectedVoteKind::Reproduce, 6, &[]);
-        def.group_mut(id).set_scale(0.25);
+        let id = def.add_pair_bundle(1, 1, layout, DirectedVoteKind::Reproduce, 6, &[]);
+        def.bundle_mut(id).set_scale(0.25);
         def
     };
     let mut seen = [false; 2];
@@ -711,13 +711,13 @@ fn unit_operators_pick_uniformly_over_both_shapes() {
         let mut node = graph_node(refs.clone(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::shift_offset(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::shift_offset(graph_mut(&mut node), &mut rng).unwrap();
         let idx = expected.gen_range(0..2);
         seen[idx] = true;
         let step = if expected.gen_bool(0.5) { 1 } else { 7 };
-        let record = before.groups()[idx];
+        let record = before.bundles()[idx];
         let mut want = before.clone();
-        want.relocate_group(id(idx), record.kind(), (record.offset() + step) % 8);
+        want.relocate_bundle(id(idx), record.kind(), (record.offset() + step) % 8);
         assert_eq!(graph(&node), &want);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>());
         assert!(validate_graph(&node).is_ok());
@@ -725,25 +725,25 @@ fn unit_operators_pick_uniformly_over_both_shapes() {
         let mut node = graph_node(refs.clone(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::alter_scale(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::alter_scale(graph_mut(&mut node), &mut rng).unwrap();
         let idx = expected.gen_range(0..2);
-        let mut scale = before.groups()[idx].scale();
+        let mut scale = before.bundles()[idx].scale();
         crate::mutation::graph::operators::perturb_weight(&mut scale, &mut expected);
         let mut want = before.clone();
-        want.group_mut(id(idx)).set_scale(scale);
+        want.bundle_mut(id(idx)).set_scale(scale);
         assert_eq!(graph(&node), &want);
 
         let mut node = graph_node(refs.clone(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
-        group::retarget_kind(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::retarget_kind(graph_mut(&mut node), &mut rng).unwrap();
         assert!(validate_graph(&node).is_ok());
 
         let mut node = graph_node(refs.clone(), before.clone());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::remove(graph_mut(&mut node), &mut rng).unwrap();
+        bundle::remove(graph_mut(&mut node), &mut rng).unwrap();
         let mut want = before;
-        want.remove_group(id(expected.gen_range(0..2)));
+        want.remove_bundle(id(expected.gen_range(0..2)));
         assert_eq!(graph(&node), &want);
         assert!(validate_graph(&node).is_ok());
     }
@@ -758,18 +758,18 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     let mut last = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
     refs.insert(0, InputReference::ActionVotes);
     let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
-    assert!(group::add_pair_in_form(
+    assert!(bundle::add_pair_in_form(
         &mut last,
-        group::CreationForm::Uniform,
+        bundle::CreationForm::Uniform,
         &crate::config::test_sensor_context(1),
         &mut SmallRng::seed_from_u64(0)
     )
     .is_ok());
-    assert_eq!(graph(&last).groups()[0].shape().ref_idx(), u16::MAX);
+    assert_eq!(graph(&last).bundles()[0].shape().ref_idx(), u16::MAX);
     assert_eq!(
-        group::add_pair_in_form(
+        bundle::add_pair_in_form(
             &mut past,
-            group::CreationForm::Uniform,
+            bundle::CreationForm::Uniform,
             &crate::config::test_sensor_context(1),
             &mut SmallRng::seed_from_u64(0)
         ),
@@ -777,18 +777,18 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     );
 }
 
-/// The randomized form's learning draws on group `group` of `want`: one
+/// The randomized form's learning draws on bundle `bundle` of `want`: one
 /// [`replay_member`] sequence per member in canonical order, then one
 /// `inherit_scale` coin.
-fn replay_randomized(want: &mut CgpGraphBackendDef, group: GroupId, rng: &mut SmallRng) {
-    for member in want.members(group).collect::<Vec<_>>() {
+fn replay_randomized(want: &mut CgpGraphBackendDef, bundle: BundleId, rng: &mut SmallRng) {
+    for member in want.members(bundle).collect::<Vec<_>>() {
         let (_, config, scope) = replay_member(rng);
         let mut edge = want.edge_mut(member);
         edge.set_plasticity(config);
         edge.set_scope(scope);
     }
     let inherit_scale = rng.gen_bool(0.5);
-    want.group_mut(group).set_inherit_scale(inherit_scale);
+    want.bundle_mut(bundle).set_inherit_scale(inherit_scale);
 }
 
 /// The refs the creation tests read: rings at 1, 2 and 3 and the
@@ -829,11 +829,11 @@ fn create(op: GraphOperator, seed: u64) -> (NodeGenome, SmallRng) {
 
 /// Either shape's draws, replayed: a `Ring` draws the ring, kind and
 /// offset; a `DirectionPair` the pair over the flat list, kind and offset.
-/// Returns the silent group the container builds from them.
-fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, GroupId) {
+/// Returns the silent bundle the container builds from them.
+fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, BundleId) {
     let refs = creation_refs();
     let mut want = CgpGraphBackendDef::new_with_fixed_outputs();
-    let group = if pair {
+    let bundle = if pair {
         // NearbyCreature: 4 pairs; AreaBarrierSummary 2.
         let flat: Vec<(u16, u8)> = (0..4)
             .map(|p| (4, p))
@@ -843,40 +843,40 @@ fn replay_shape(pair: bool, rng: &mut SmallRng) -> (CgpGraphBackendDef, GroupId)
         let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
         let offset = rng.gen_range(0..8u8);
         let layout = refs[usize::from(ref_idx)].direction_pairs()[usize::from(pair)];
-        want.add_pair_group(ref_idx, pair, layout, kind, offset, &[])
+        want.add_pair_bundle(ref_idx, pair, layout, kind, offset, &[])
     } else {
         let rings = [1u16, 2, 3];
         let ring_ref = rings[rng.gen_range(0..rings.len())];
         let kind = DirectedVoteKind::ALL[rng.gen_range(0..DirectedVoteKind::ALL.len())];
         let offset = rng.gen_range(0..8u8);
-        want.add_group(Shape::Ring { ring_ref }, kind, offset)
+        want.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset)
     };
-    (want, group)
+    (want, bundle)
 }
 
 proptest::proptest! {
     /// T25.F08 invariant 2: a randomized creation makes its uniform twin's
     /// shape draws, then per member its mode, fields and scope, then one
-    /// `inherit_scale`, and no further draw; the group is born silent.
+    /// `inherit_scale`, and no further draw; the bundle is born silent.
     #[test]
     fn randomized_creation_draws_shape_then_per_member_mode_fields_scope_then_inherit_scale(
         seed in proptest::prelude::any::<u64>(),
         pair in proptest::prelude::any::<bool>(),
     ) {
         let op = if pair {
-            GraphOperator::AddRandomizedDirectionPairGroup
+            GraphOperator::AddRandomizedDirectionPairBundle
         } else {
-            GraphOperator::AddRandomizedRingGroup
+            GraphOperator::AddRandomizedRingBundle
         };
         let (node, mut rng) = create(op, seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        let (mut want, group) = replay_shape(pair, &mut expected);
-        replay_randomized(&mut want, group, &mut expected);
+        let (mut want, bundle) = replay_shape(pair, &mut expected);
+        replay_randomized(&mut want, bundle, &mut expected);
         proptest::prop_assert_eq!(graph(&node), &want);
         proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         proptest::prop_assert!(validate_graph(&node).is_ok());
         let def = graph(&node);
-        proptest::prop_assert_eq!(def.groups()[0].scale(), 0.0, "born silent");
+        proptest::prop_assert_eq!(def.bundles()[0].scale(), 0.0, "born silent");
         proptest::prop_assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
     }
 
@@ -889,28 +889,28 @@ proptest::proptest! {
         pair in proptest::prelude::any::<bool>(),
     ) {
         let op = if pair {
-            GraphOperator::AddDirectionPairGroup
+            GraphOperator::AddDirectionPairBundle
         } else {
-            GraphOperator::AddRingGroup
+            GraphOperator::AddRingBundle
         };
         let (node, mut rng) = create(op, seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        let (mut want, group) = replay_shape(pair, &mut expected);
-        replay_learning(&mut want, group, &mut expected);
+        let (mut want, bundle) = replay_shape(pair, &mut expected);
+        replay_learning(&mut want, bundle, &mut expected);
         proptest::prop_assert_eq!(graph(&node), &want);
         proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
     }
 }
 
-/// Randomized members draw their own attributes: some seed gives one group
+/// Randomized members draw their own attributes: some seed gives one bundle
 /// members both static and plastic, and members of both scopes.
 #[test]
-fn randomized_members_differ_within_one_group() {
+fn randomized_members_differ_within_one_bundle() {
     let mut mixed = [false; 2];
     for seed in 0..32 {
         for op in [
-            GraphOperator::AddRandomizedRingGroup,
-            GraphOperator::AddRandomizedDirectionPairGroup,
+            GraphOperator::AddRandomizedRingBundle,
+            GraphOperator::AddRandomizedDirectionPairBundle,
         ] {
             let (node, _) = create(op, seed);
             let def = graph(&node);
@@ -925,14 +925,14 @@ fn randomized_members_differ_within_one_group() {
     assert_eq!(mixed, [true; 2]);
 }
 
-/// A one-ring-group node at scale 0.5 whose first member (canonical order)
+/// A one-ring-bundle node at scale 0.5 whose first member (canonical order)
 /// is a Lamarckian learner at own weight 0.25 with an edge seed of 9.0; the
-/// other seven are static and unseeded, and the group carries no seed.
+/// other seven are static and unseeded, and the bundle carries no seed.
 fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let group = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 3);
-    def.group_mut(group).set_scale(0.5);
-    let first = def.members(group).next().unwrap();
+    let bundle = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 3);
+    def.bundle_mut(bundle).set_scale(0.5);
+    let first = def.members(bundle).next().unwrap();
     let config = PlasticityConfig {
         rule: HebbianRule::Oja,
         learning_rate: 0.1,
@@ -960,7 +960,7 @@ fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
     def.seed_birth(BirthSeeds::Rows {
         compute,
         sinks,
-        groups: vec![None],
+        bundles: vec![None],
     });
     (graph_node(refs(), def), first)
 }
@@ -970,7 +970,7 @@ proptest::proptest! {
     /// canonical order and nothing else, then detaches it as the F03
     /// primitive does: own weight `compose(own, scale, pattern)` bitwise, no
     /// membership, plasticity kept; the Lamarckian member's seed composes
-    /// with the group's scale, a static unseeded member carries none.
+    /// with the bundle's scale, a static unseeded member carries none.
     #[test]
     fn detach_draws_one_member_and_keeps_its_composed_weight_plasticity_and_seed(
         seed in proptest::prelude::any::<u64>(),
@@ -978,7 +978,7 @@ proptest::proptest! {
         let (original, learner) = detach_fixture();
         let mut node = original.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        group::detach_member(&mut node, &mut rng).unwrap();
+        bundle::detach_member(&mut node, &mut rng).unwrap();
         let mut expected = SmallRng::seed_from_u64(seed);
         let def = graph(&original);
         let members: Vec<_> = def.members(id(0)).collect();
@@ -1010,7 +1010,7 @@ proptest::proptest! {
 }
 
 /// `DetachGraphEdge` applies exactly where a member exists: not on a graph
-/// without a group, on one with a group, and not once the groups are gone;
+/// without a bundle, on one with a bundle, and not once the bundles are gone;
 /// it skips without a draw where none is.
 #[test]
 fn applicability_follows_members_for_detach() {
@@ -1030,8 +1030,8 @@ fn applicability_follows_members_for_detach() {
         vec![0]
     );
     let mut emptied = three();
-    while !emptied.groups().is_empty() {
-        emptied.remove_group(id(0));
+    while !emptied.bundles().is_empty() {
+        emptied.remove_bundle(id(0));
     }
     assert!(GraphMutator::applicable_indices(
         &genome(emptied),
@@ -1045,19 +1045,19 @@ fn applicability_follows_members_for_detach() {
     let mut rng = SmallRng::seed_from_u64(5);
     let mut replay = rng.clone();
     assert_eq!(
-        group::detach_member(&mut node, &mut rng),
+        bundle::detach_member(&mut node, &mut rng),
         Err(MutationSkipReason::NoApplicableTarget)
     );
     assert_eq!(node, before);
     assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "no draw");
 }
 
-/// T25.F08 invariant 4: `AddGraphEdge` on a node whose sinks hold groups
-/// pushes an ordinary edge, never a member: every group keeps its record
+/// T25.F08 invariant 4: `AddGraphEdge` on a node whose sinks hold bundles
+/// pushes an ordinary edge, never a member: every bundle keeps its record
 /// and its member set.
 #[test]
-fn add_graph_edge_never_joins_a_group() {
-    let mut onto_a_group_sink = false;
+fn add_graph_edge_never_joins_a_bundle() {
+    let mut onto_a_bundle_sink = false;
     for seed in 0..256 {
         let mut genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -1080,8 +1080,8 @@ fn add_graph_edge_never_joins_a_group() {
             continue;
         }
         let after = graph(&genome.nodes[0]);
-        assert_eq!(after.groups(), before.groups(), "seed {seed}");
-        for index in 0..before.groups().len() {
+        assert_eq!(after.bundles(), before.bundles(), "seed {seed}");
+        for index in 0..before.bundles().len() {
             let members = |def: &CgpGraphBackendDef| -> Vec<_> {
                 def.members(id(index)).map(|at| *def.edge_at(at)).collect()
             };
@@ -1093,7 +1093,7 @@ fn add_graph_edge_never_joins_a_group() {
                 .count()
         };
         assert_eq!(ordinary(after), ordinary(&before) + 1, "seed {seed}");
-        onto_a_group_sink |=
+        onto_a_bundle_sink |=
             after
                 .output_sinks()
                 .iter()
@@ -1104,12 +1104,12 @@ fn add_graph_edge_never_joins_a_group() {
                 });
     }
     assert!(
-        onto_a_group_sink,
-        "some push lands on a sink holding a group"
+        onto_a_bundle_sink,
+        "some push lands on a sink holding a bundle"
     );
 }
 
-/// T25.F10: `RetargetGroupKind` moves a gene's fact members to the new
+/// T25.F10: `RetargetBundleKind` moves a gene's fact members to the new
 /// kind's drive, and skips, after its draws, when that kind cannot host
 /// facts; a gene without facts retargets regardless.
 #[test]
@@ -1118,7 +1118,7 @@ fn retarget_kind_moves_fact_members_only_to_a_kind_that_can_host_them() {
     let layout = refs[0].direction_pairs()[1];
     let gene = |facts: &[u16]| {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_group(0, 1, layout, DirectedVoteKind::Move, 2, facts);
+        def.add_pair_bundle(0, 1, layout, DirectedVoteKind::Move, 2, facts);
         // Reproduce loses its drive sink.
         let drive = OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive());
         edit_sinks(&mut def, |sinks| sinks.retain(|sink| sink.kind != drive));
@@ -1140,10 +1140,10 @@ fn retarget_kind_moves_fact_members_only_to_a_kind_that_can_host_them() {
         };
         let mut factless = gene(&[]);
         assert_eq!(
-            group::retarget_kind(&mut factless, &mut SmallRng::seed_from_u64(seed)),
+            bundle::retarget_kind(&mut factless, &mut SmallRng::seed_from_u64(seed)),
             Ok(())
         );
-        let result = group::retarget_kind(&mut def, &mut rng);
+        let result = bundle::retarget_kind(&mut def, &mut rng);
         if target == DirectedVoteKind::Reproduce {
             assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
             skipped = true;

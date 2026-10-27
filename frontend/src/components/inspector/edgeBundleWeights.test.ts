@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeTerms, scopeLabel } from "./edgeGroupWeights.ts";
+import { composeTerms, scopeLabel } from "./edgeBundleWeights.ts";
 
 describe("composeTerms", () => {
 	it("prints the brain view's scale, pattern, own and genomic without composing them", () => {

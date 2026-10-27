@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Position } from "@xyflow/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
-import { graphBrain, learner, ringGroup } from "../../test/brainFixtures.ts";
+import { graphBrain, learner, ringBundle } from "../../test/brainFixtures.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
@@ -54,9 +54,9 @@ describe("graph edge tooltips", () => {
 			weight: 1.5,
 			own: 0.25,
 			genomic: 0.75,
-			member: { group: 2, scale: 0.5, pattern: 1, scope: "Edge", applied: 1.5 },
+			member: { bundle: 2, scale: 0.5, pattern: 1, scope: "Edge", applied: 1.5 },
 		});
-		expect(tip).toHaveTextContent("group #2 member");
+		expect(tip).toHaveTextContent("bundle #2 member");
 		expect(tip).toHaveTextContent("scale × pattern + correction");
 		expect(tip).toHaveTextContent("0.500 × 1.00 + 0.250 = 0.750");
 		expect(tip).toHaveTextContent("applied 1.500 · scope Edge");
@@ -88,7 +88,7 @@ describe("graph edge tooltips", () => {
 		expect(tip).toHaveTextContent("Lamarckian");
 	});
 
-	it("shows an initialized group learner's scope and scale inheritance", () => {
+	it("shows an initialized bundle learner's scope and scale inheritance", () => {
 		const graphDef: GraphBrain = graphBrain({
 			output_sinks: [
 				{
@@ -101,7 +101,7 @@ describe("graph edge tooltips", () => {
 							applied: 0.75,
 							learner: learner({ rule: "Oja", scope: "group", inherits: false }),
 							member: {
-								group: 0,
+								bundle: 0,
 								scope: "Group",
 								site: { Direction: 1 },
 								field: 0,
@@ -112,7 +112,7 @@ describe("graph edge tooltips", () => {
 					],
 				},
 			],
-			groups: [ringGroup(1, { offset: 1, scale: 0.5 })],
+			bundles: [ringBundle(1, { offset: 1, scale: 0.5 })],
 		});
 		const model = buildFullGraphModel(
 			graphDef,
@@ -122,7 +122,7 @@ describe("graph edge tooltips", () => {
 			],
 			{
 				node_id: 0,
-				scales: [{ group: 0, learned: 0.8, initialized: true }],
+				scales: [{ bundle: 0, learned: 0.8, initialized: true }],
 				edges: [{ surface: "sink", container: 0, edge: 0, applied: 1.05, initialized: true }],
 			},
 		);

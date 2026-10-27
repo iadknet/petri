@@ -2149,16 +2149,16 @@ mod tests {
     }
 
     #[test]
-    fn a_ring_group_records_its_ring() {
+    fn a_ring_bundle_records_its_ring() {
         use crate::contracts::votes::DirectedVoteKind;
         use crate::genome::cgp::{CgpGraphBackendDef, Shape};
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_group(
+        let id = def.add_ring_bundle(
             Shape::Ring { ring_ref: 0 },
             DirectedVoteKind::StealEnergy,
             0,
         );
-        def.group_mut(id).set_scale(0.5);
+        def.bundle_mut(id).set_scale(0.5);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

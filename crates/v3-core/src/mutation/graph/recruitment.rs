@@ -62,7 +62,7 @@ impl Plan {
     }
 
     /// Append the plan at `destination`. A ring family landing on a directed
-    /// vote sink `K(d)` becomes one silent `Ring` group on `ref_idx` into `K`
+    /// vote sink `K(d)` becomes one silent `Ring` bundle on `ref_idx` into `K`
     /// at offset `(d − channel) mod 8`, eight members at own weight 0 and
     /// scale 0, in place of its edges (T25.F03). A pair plan landing on
     /// `K(d)` with drawn pair `pair` becomes one silent `DirectionPair` gene
@@ -155,11 +155,11 @@ struct Admission<'a> {
     existing: HashMap<&'a InputReference, u16>,
     next: usize,
     append_end: usize,
-    /// Whether a ring family's group can be created
-    /// ([`CgpGraphBackendDef::can_host_group`]); when not, ring families
+    /// Whether a ring family's bundle can be created
+    /// ([`CgpGraphBackendDef::can_host_bundle`]); when not, ring families
     /// leave the universe, so a drawn ring plan always completes.
-    hosts_ring_group: bool,
-    /// Whether a pair family's gene can be placed: a group can be hosted
+    hosts_ring_bundle: bool,
+    /// Whether a pair family's gene can be placed: a bundle can be hosted
     /// and every kind can host fact members
     /// ([`CgpGraphBackendDef::can_host_facts`], T25.F04, T25.F10);
     /// when not, pair-declaring families leave the `WholeFamily` universe.
@@ -173,8 +173,8 @@ impl<'a> Admission<'a> {
         def: &CgpGraphBackendDef,
         context: &'a SensorContext,
     ) -> Self {
-        let hosts_ring_group = def.can_host_group();
-        let hosts_pair_plan = hosts_ring_group
+        let hosts_ring_bundle = def.can_host_bundle();
+        let hosts_pair_plan = hosts_ring_bundle
             && DirectedVoteKind::ALL
                 .into_iter()
                 .all(|kind| def.can_host_facts(kind));
@@ -184,7 +184,7 @@ impl<'a> Admission<'a> {
                 .entry(reference)
                 .or_insert(u16::try_from(index).expect("representable prefix"));
         }
-        // A group's members are edges, so a dangling member reference is a
+        // A bundle's members are edges, so a dangling member reference is a
         // dangling leaf like any other (T25.F03).
         let append_end = def
             .edges()
@@ -200,7 +200,7 @@ impl<'a> Admission<'a> {
             existing,
             next: references.len(),
             append_end,
-            hosts_ring_group,
+            hosts_ring_bundle,
             hosts_pair_plan,
             context,
         }
@@ -305,7 +305,7 @@ impl<'a> Admission<'a> {
                         InputReference::ActionQueue | InputReference::UpstreamSlot(_)
                     )
             })
-            .filter(|reference| self.hosts_ring_group || !reference.is_ring())
+            .filter(|reference| self.hosts_ring_bundle || !reference.is_ring())
             .filter(|reference| {
                 arm != Arm::WholeFamily
                     || self.hosts_pair_plan

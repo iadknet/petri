@@ -54,7 +54,7 @@ function makeGenome(): BrainView {
 				targets: [],
 				backend: {
 					Graph: {
-						groups: [],
+						bundles: [],
 						compute_nodes: [
 							{
 								kind: "Add",

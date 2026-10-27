@@ -1750,7 +1750,7 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
                 MutationOperator::GraphRemoveGraphEdge
                     | MutationOperator::GraphRetargetGraphEdge
                     | MutationOperator::GraphAlterGraphEdgeWeight
-                    | MutationOperator::GraphCopyEdgeBundle
+                    | MutationOperator::GraphCopyNodeInputs
             )
         }));
     }

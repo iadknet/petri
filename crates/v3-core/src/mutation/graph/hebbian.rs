@@ -4,7 +4,7 @@
 //! surface. Each picks one edge uniformly among the edges matching its
 //! predicate, in `edge_sites` order over both surfaces (count-then-select,
 //! one draw); a picked member then draws the scope coin, which lands the
-//! change on it alone or on every member of its group the predicate admits
+//! change on it alone or on every member of its bundle the predicate admits
 //! (T25.F07); the value is drawn once and each target applies its law:
 //! - EnableHebbian: add learning attributes to a static, eligible edge
 //! - DisableHebbian: remove them from a plastic edge
@@ -83,7 +83,7 @@ pub(super) fn is_decaying(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) 
     plasticity_of(def, occurrence).is_some_and(|p| retention_decays(p.retention))
 }
 
-/// `SetScope`: a group member.
+/// `SetScope`: a bundle member.
 pub(super) fn is_member(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
     def.edge_at(occurrence).membership().is_some()
 }
@@ -123,8 +123,8 @@ pub(super) fn select_eligible(
 /// The scope coin (T25.F07 invariant 7): the scope a change picked at
 /// `picked` lands on and its targets (T25.F08 invariant 8). A non-member
 /// draws no coin and is the only target, at `Edge`; a member draws
-/// `gen_bool(0.5)`: false, itself at `Edge`; true, every member of its group
-/// that `admits` accepts, in canonical order, at `Group`.
+/// `gen_bool(0.5)`: false, itself at `Edge`; true, every member of its bundle
+/// that `admits` accepts, in canonical order, at `Bundle`.
 pub(super) fn scope_targets(
     def: &CgpGraphBackendDef,
     picked: EdgeOccurrence,
@@ -134,7 +134,7 @@ pub(super) fn scope_targets(
     match def.edge_at(picked).membership() {
         Some(membership) if rng.gen_bool(0.5) => (
             Scope::Group,
-            def.members(membership.group)
+            def.members(membership.bundle)
                 .filter(|&member| admits(def, member))
                 .collect(),
         ),
@@ -503,7 +503,7 @@ pub(crate) fn mutate_retention_in_def(
 
 /// `SetScope` (T25.F07): one member uniformly in canonical order, the scope
 /// coin, then the other of the picked member's scope written to it alone or
-/// to every member of its group; no value draw. Returns the scope the
+/// to every member of its bundle; no value draw. Returns the scope the
 /// change landed on (the coin's), not the scope it wrote.
 pub(crate) fn set_scope_in_def(
     def: &mut CgpGraphBackendDef,
@@ -900,15 +900,15 @@ mod tests {
     // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
 
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{GroupId, Scope, Shape};
+    use crate::genome::cgp::{BundleId, Scope, Shape};
 
-    /// A full catalog with one ring group of eight members on `Move`, member
+    /// A full catalog with one ring bundle of eight members on `Move`, member
     /// `k` carrying `configs[k]` (static past the list's end).
-    fn group_def(
+    fn bundle_def(
         configs: &[Option<PlasticityConfig>],
     ) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
+        let id = def.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();
         for (&member, &config) in members.iter().zip(configs) {
             def.edge_mut(member).set_plasticity(config);
@@ -967,12 +967,12 @@ mod tests {
         }
     }
 
-    /// `EnableHebbian` on a group with a modulated member: the coin lands
+    /// `EnableHebbian` on a bundle with a modulated member: the coin lands
     /// one config on the picked member or on every static member; the
     /// member the predicate rejects is untouched and consumes no draw.
     #[test]
     fn enable_hebbian_lands_one_config_on_the_admitted_members() {
-        let (original, members) = group_def(&[None, None, None, Some(modulated())]);
+        let (original, members) = bundle_def(&[None, None, None, Some(modulated())]);
         let mut tails = [false; 2];
         for seed in 0..64 {
             let mut expected = rng(seed);
@@ -1002,16 +1002,16 @@ mod tests {
         assert_eq!(tails, [true, true]);
     }
 
-    /// T25.F10 invariant 3: a `Group`-scope broadcast selected on a
+    /// T25.F10 invariant 3: a `Bundle`-scope broadcast selected on a
     /// direction member of a fact-bearing `DirectionPair` gene lands on the
     /// gene's fact members as on its direction members.
     #[test]
-    fn a_group_broadcast_from_a_direction_member_reaches_the_fact_members() {
+    fn a_bundle_broadcast_from_a_direction_member_reaches_the_fact_members() {
         use crate::contracts::{InputReference, WorldInputKey};
         let layout =
             InputReference::World(WorldInputKey::AreaOccupancySummary).direction_pairs()[0];
         let mut original = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = original.add_pair_group(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+        let id = original.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
         let (facts, directions): (Vec<_>, Vec<_>) = original
             .members(id)
             .partition(|&member| original.is_fact_member(member));
@@ -1037,14 +1037,14 @@ mod tests {
             }
             broadcasts += 1;
         }
-        assert!(broadcasts > 0, "a direction member's Group coin was drawn");
+        assert!(broadcasts > 0, "a direction member's Bundle coin was drawn");
     }
 
-    /// `EnableRewardModulation` on a heterogeneous group sets one modulation
+    /// `EnableRewardModulation` on a heterogeneous bundle sets one modulation
     /// on every admitted member, each keeping its rule, rate, clamp and flag;
     /// `DisableRewardModulation` clears the modulation alone.
     #[test]
-    fn group_wide_modulation_changes_keep_each_members_config() {
+    fn bundle_wide_modulation_changes_keep_each_members_config() {
         let base = hebbian();
         let configs = [
             Some(base),
@@ -1057,7 +1057,7 @@ mod tests {
                 c.lamarckian = true;
             })),
         ];
-        let (original, members) = group_def(&configs);
+        let (original, members) = bundle_def(&configs);
         let mut all = false;
         for seed in 0..32 {
             let mut expected = rng(seed);
@@ -1086,14 +1086,14 @@ mod tests {
                 }
             }
         }
-        assert!(all, "a group-wide tail");
+        assert!(all, "a bundle-wide tail");
     }
 
     /// `ToggleHebbianLamarckian` writes the picked member's flipped flag to
     /// every target; the rate and decay steps draw one `u` and apply it on
     /// each member's own branch, on both sides of 0.01.
     #[test]
-    fn group_wide_toggle_and_perturbations_follow_the_picked_value_and_each_branch() {
+    fn bundle_wide_toggle_and_perturbations_follow_the_picked_value_and_each_branch() {
         let low = with(modulated(), |c| {
             c.learning_rate = 0.005;
             c.lamarckian = true;
@@ -1104,7 +1104,7 @@ mod tests {
         });
         let high = with(modulated(), |c| c.learning_rate = 0.5);
         let configs = [Some(low), Some(high)];
-        let (original, members) = group_def(&configs);
+        let (original, members) = bundle_def(&configs);
         let mut seen = [false; 3];
         for seed in 0..64 {
             let mut expected = rng(seed);
@@ -1165,7 +1165,7 @@ mod tests {
     /// `MutateHebbianRule` and `MutateRewardSource` draw among the others of
     /// the picked member's value and write it to every target.
     #[test]
-    fn group_wide_rule_and_source_redraws_write_the_drawn_value() {
+    fn bundle_wide_rule_and_source_redraws_write_the_drawn_value() {
         let configs = [
             Some(modulated()),
             Some(with(modulated(), |c| {
@@ -1176,7 +1176,7 @@ mod tests {
                 });
             })),
         ];
-        let (original, members) = group_def(&configs);
+        let (original, members) = bundle_def(&configs);
         let mut seen = false;
         for seed in 0..64 {
             let mut def = original.clone();
@@ -1214,7 +1214,7 @@ mod tests {
     /// member's scope on it alone or on every member; no value draw.
     #[test]
     fn set_scope_flips_one_member_or_every_member() {
-        let (mut original, members) = group_def(&[Some(hebbian())]);
+        let (mut original, members) = bundle_def(&[Some(hebbian())]);
         original.edge_mut(members[2]).set_scope(Scope::Group);
         let mut tails = [false; 2];
         for seed in 0..64 {
@@ -1236,7 +1236,7 @@ mod tests {
                     .filter(|&&m| m != picked)
                     .all(|&m| def.edge_at(m) == original.edge_at(m)));
             }
-            assert_eq!(def.members(GroupId::new(0)).count(), 8);
+            assert_eq!(def.members(BundleId::new(0)).count(), 8);
             tails[usize::from(coin)] = true;
         }
         assert_eq!(tails, [true, true]);

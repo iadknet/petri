@@ -98,7 +98,7 @@ impl SteeringPooled {
 
 /// Whether a node in `executed` structurally contributes to a `Move` sink
 /// (T19.F04): a VM program with an `AddVote` naming a `Move` sink, or a graph
-/// with a wired `ActionVote(Move(_))` sink, group members included
+/// with a wired `ActionVote(Move(_))` sink, bundle members included
 /// (T25.F03); the `Move` drive counts as a `Move` sink (T11.F30).
 #[must_use]
 pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
@@ -232,12 +232,12 @@ mod tests {
     }
 
     #[test]
-    fn a_move_group_votes_move_through_its_members_and_another_kind_does_not() {
+    fn a_move_bundle_votes_move_through_its_members_and_another_kind_does_not() {
         use crate::genome::cgp::Shape;
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.add_group(Shape::Ring { ring_ref: 0 }, kind, 0);
+            def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, 0);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {
@@ -260,15 +260,15 @@ mod tests {
         ));
     }
 
-    /// A pair group votes `Move` through its members (T25.F04).
+    /// A pair bundle votes `Move` through its members (T25.F04).
     #[test]
-    fn a_move_pair_group_votes_move_through_its_members() {
+    fn a_move_pair_bundle_votes_move_through_its_members() {
         let area = InputReference::World(WorldInputKey::AreaFoodSummary {
             type_idx: crate::contracts::OrdinaryFoodTypeId::new(0),
         });
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            def.add_pair_group(0, 0, area.direction_pairs()[0], kind, 2, &[]);
+            def.add_pair_bundle(0, 0, area.direction_pairs()[0], kind, 2, &[]);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![NodeGenome {

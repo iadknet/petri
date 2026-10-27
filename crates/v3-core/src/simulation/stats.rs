@@ -338,18 +338,18 @@ pub struct SimStats {
     pub mutation_executed_target_total: u64,
     /// Mutation events where target reachability was not applicable (exempt operators).
     pub mutation_not_applicable_target_total: u64,
-    /// Group members committed mutation events detached (T25.F03).
+    /// Bundle members committed mutation events detached (T25.F03).
     pub graph_edges_detached_total: u64,
-    /// Edge groups committed mutation events removed (T25.F03).
-    pub groups_removed_total: u64,
+    /// Edge bundles committed mutation events removed (T25.F03).
+    pub bundles_removed_total: u64,
     /// Committed attribute changes (the nine plasticity operators and
     /// `SetScope`) by the scope they landed on, indexed by `Scope::index`
     /// (T25.F08).
     pub mutation_attribute_changes_total_by_scope: [u64; 2],
-    /// Births whose committed genome holds a `DirectionPair` group with
+    /// Births whose committed genome holds a `DirectionPair` bundle with
     /// `|scale| > 1e-3` that no event of the birth could have created: the
     /// inheritance witness (T25.F04).
-    pub pair_group_inherited_nonzero_births_total: u64,
+    pub pair_bundle_inherited_nonzero_births_total: u64,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
     pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
     /// The same aggregates keyed by birth edge class (`drive_births`,

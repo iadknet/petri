@@ -53,7 +53,7 @@ fn carries(weight: f32) -> bool {
     weight.abs() > PATH_WEIGHT_FLOOR
 }
 
-/// One Graph node's fan-outs of `kind`: `(fanouts, fanout_edges)`. A group's
+/// One Graph node's fan-outs of `kind`: `(fanouts, fanout_edges)`. A bundle's
 /// members are not a fan-out (T25.F03): the census reads independent edges.
 fn node_fanouts(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> (u64, u64) {
     let mut by_source: HashMap<(GraphSource, bool), (BTreeSet<u8>, u64)> = HashMap::new();

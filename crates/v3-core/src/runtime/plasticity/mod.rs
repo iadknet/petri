@@ -27,8 +27,8 @@ pub(crate) struct OutcomeSignalBank {
 }
 
 #[cfg(test)]
-mod decay_tests;
+mod bundle_tests;
 #[cfg(test)]
-mod group_tests;
+mod decay_tests;
 #[cfg(test)]
 mod tests;

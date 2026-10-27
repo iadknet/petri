@@ -1,5 +1,5 @@
-//! T25.F03 edge groups on the genome: size, identity, liveness and the
-//! references a group keeps.
+//! T25.F03 edge bundles on the genome: size, identity, liveness and the
+//! references a bundle keeps.
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
@@ -7,7 +7,7 @@ use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
-use crate::genome::cgp::{ring_offset, validate_graph, CgpGraphBackendDef, GroupId, Shape};
+use crate::genome::cgp::{ring_offset, validate_graph, BundleId, CgpGraphBackendDef, Shape};
 use crate::genome::cgp_mesh_annotations::derive_cgp_annotations;
 use crate::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -58,13 +58,13 @@ proptest! {
     /// (T25.F10): a surviving gene of any number of members costs 1.
     #[test]
     fn a_ring_gene_costs_one_unit_whatever_its_holes(
-        groups in prop::collection::vec((0usize..3, 0u8..8, 0usize..8), 0..6),
+        bundles in prop::collection::vec((0usize..3, 0u8..8, 0usize..8), 0..6),
     ) {
         let (mut genome, idx, ring) = founder_with_ring();
         let before = genome.genome_size();
-        for (earlier, (kind, offset, lost)) in (before..).zip(groups) {
+        for (earlier, (kind, offset, lost)) in (before..).zip(bundles) {
             let def = graph_mut(&mut genome.nodes[idx]);
-            let id = def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
+            let id = def.add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::ALL[kind], offset);
             prop_assert_eq!(genome.genome_size(), earlier + 1);
             let def = graph_mut(&mut genome.nodes[idx]);
             for _ in 0..lost {
@@ -76,11 +76,11 @@ proptest! {
         prop_assert!(validate_graph(&genome.nodes[idx]).is_ok());
     }
 
-    /// Removing a reference no group addresses keeps every group of either
+    /// Removing a reference no bundle addresses keeps every bundle of either
     /// shape (and its members) on the same `InputReference` (T25.F03,
     /// T25.F04).
     #[test]
-    fn reindex_keeps_each_group_on_its_reference(
+    fn reindex_keeps_each_bundle_on_its_reference(
         mut refs in prop::collection::vec(reference_strategy(), 2..8),
         picks in prop::collection::vec(
             (any::<prop::sample::Index>(), 0usize..3, 0u8..8, any::<bool>()),
@@ -107,26 +107,26 @@ proptest! {
             if *pair {
                 let ref_idx = pairs[index.index(pairs.len())];
                 let layout = refs[usize::from(ref_idx)].direction_pairs()[0];
-                def.add_pair_group(ref_idx, 0, layout, kind, *offset, &[]);
+                def.add_pair_bundle(ref_idx, 0, layout, kind, *offset, &[]);
             } else {
                 let ring_ref = rings[index.index(rings.len())];
-                def.add_group(Shape::Ring { ring_ref }, kind, *offset);
+                def.add_ring_bundle(Shape::Ring { ring_ref }, kind, *offset);
             }
         }
         let expected: Vec<InputReference> = def
-            .groups()
+            .bundles()
             .iter()
-            .map(|group| {
-                let ring_ref = group.shape().ref_idx();
+            .map(|bundle| {
+                let ring_ref = bundle.shape().ref_idx();
                 refs[usize::from(ring_ref)].clone()
             })
             .collect();
         let mut after_refs = refs.clone();
         after_refs.remove(usize::from(removed));
         def.reindex_input_refs_after_removal(removed);
-        prop_assert_eq!(def.groups().len(), expected.len());
-        for (group, reference) in def.groups().iter().zip(&expected) {
-            let ring_ref = group.shape().ref_idx();
+        prop_assert_eq!(def.bundles().len(), expected.len());
+        for (bundle, reference) in def.bundles().iter().zip(&expected) {
+            let ring_ref = bundle.shape().ref_idx();
             prop_assert_eq!(&after_refs[usize::from(ring_ref)], reference);
         }
         let node = NodeGenome {
@@ -138,10 +138,10 @@ proptest! {
         prop_assert!(validate_graph(&node).is_ok());
     }
 
-    /// `Prune` never deletes a group's ring or pair reference, and every
-    /// group reads the same reference after it.
+    /// `Prune` never deletes a bundle's ring or pair reference, and every
+    /// bundle reads the same reference after it.
     #[test]
-    fn prune_keeps_each_group_on_its_reference(
+    fn prune_keeps_each_bundle_on_its_reference(
         extra in prop::collection::vec(reference_strategy(), 1..6),
         offset in 0u8..8,
         seed in any::<u64>(),
@@ -153,12 +153,12 @@ proptest! {
         let ring = node.input_refs.len() as u16;
         node.input_refs
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        graph_mut(node).add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, offset);
+        graph_mut(node).add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, offset);
         let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
         let summary = node.input_refs.len() as u16;
         node.input_refs.push(area.clone());
         let layout = area.direction_pairs()[1];
-        graph_mut(node).add_pair_group(summary, 1, layout, DirectedVoteKind::StealEnergy, offset, &[]);
+        graph_mut(node).add_pair_bundle(summary, 1, layout, DirectedVoteKind::StealEnergy, offset, &[]);
         prop_assert!(!prunable_indices(node).contains(&usize::from(ring)));
         prop_assert!(!prunable_indices(node).contains(&usize::from(summary)));
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -167,24 +167,24 @@ proptest! {
                 .unwrap();
         }
         let node = &mut genome.nodes[idx];
-        let ring_ref = graph_mut(node).groups()[0].shape().ref_idx();
+        let ring_ref = graph_mut(node).bundles()[0].shape().ref_idx();
         prop_assert_eq!(
             &node.input_refs[usize::from(ring_ref)],
             &InputReference::World(WorldInputKey::NeighborBarrierRing)
         );
-        let pair_ref = graph_mut(node).groups()[1].shape().ref_idx();
+        let pair_ref = graph_mut(node).bundles()[1].shape().ref_idx();
         prop_assert_eq!(&node.input_refs[usize::from(pair_ref)], &area);
         prop_assert!(validate_graph(node).is_ok());
     }
 }
 
 #[test]
-fn genome_identity_distinguishes_groups_and_a_founder_is_unchanged() {
+fn genome_identity_distinguishes_bundles_and_a_founder_is_unchanged() {
     let founder = v3alpha1_founder_genome();
     assert_eq!(founder.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
     let (ringed, idx, ring) = founder_with_ring();
     let mut grouped = ringed.clone();
-    let id = graph_mut(&mut grouped.nodes[idx]).add_group(
+    let id = graph_mut(&mut grouped.nodes[idx]).add_ring_bundle(
         Shape::Ring { ring_ref: ring },
         DirectedVoteKind::Move,
         0,
@@ -192,22 +192,22 @@ fn genome_identity_distinguishes_groups_and_a_founder_is_unchanged() {
     assert_ne!(genome_identity(&grouped), genome_identity(&ringed));
     let mut rescaled = grouped.clone();
     graph_mut(&mut rescaled.nodes[idx])
-        .group_mut(id)
+        .bundle_mut(id)
         .set_scale(0.5);
     assert_ne!(genome_identity(&rescaled), genome_identity(&grouped));
 }
 
-/// A member-only graph is a live component: its group record counts one, its
+/// A member-only graph is a live component: its bundle record counts one, its
 /// members wire eight sinks, the ring counts through the members, and its
 /// annotations read the ring and write the action channel.
 #[test]
-fn a_group_is_a_live_component_reading_its_ring_and_writing_action() {
+fn a_bundle_is_a_live_component_reading_its_ring_and_writing_action() {
     let ring = InputReference::World(WorldInputKey::NeighborOccupiedRing);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     assert!(!def.enters_visit());
     let empty = crate::genome::cgp_analysis::cgp_functional_complexity(&def);
-    let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Reproduce, 3);
-    assert_eq!(id, GroupId::new(0));
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Reproduce, 3);
+    assert_eq!(id, BundleId::new(0));
     assert!(def.enters_visit());
     // One record, eight wired sinks and one consumed reference.
     assert_eq!(

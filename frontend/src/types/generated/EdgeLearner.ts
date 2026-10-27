@@ -17,7 +17,7 @@ export type EdgeLearner = {
 	initialized: boolean;
 	/**
 	 * Whether a child inherits what this learner learns: its `lamarckian`
-	 * flag, or its group's `inherit_scale` at group scope.
+	 * flag, or its bundle's `inherit_scale` at group scope.
 	 */
 	inherits: boolean;
 	/**

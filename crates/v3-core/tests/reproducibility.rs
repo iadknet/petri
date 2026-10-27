@@ -17,7 +17,7 @@
 //! `mesh_layer_probability = 0.5`, so the corrected operators are reached
 //! within the unchanged 250-tick horizon. The T19.F04 founder is all Graph,
 //! so every founder genome gets a VM node routed after its decision node
-//! whose program holds four paired slot groups, which is what makes a
+//! whose program holds four paired slot bundles, which is what makes a
 //! `Vm.MutatePairedSlotAddress` candidate list exist at all; that operator is
 //! exercised from the first birth onward. The node votes nothing, so it adds
 //! hops and compute cost but never changes a committed action.
@@ -50,7 +50,7 @@ fn reproducibility_config() -> SimulationConfig {
 }
 
 /// Seed a simulation and route every founder's decision node into a VM node
-/// that holds the paired slot groups.
+/// that holds the paired slot bundles.
 fn seeded_fixture(seed: u64) -> Simulation {
     seed_simulation_with_founder_genomes(reproducibility_config(), seed, |_, genome| {
         let vm_id = NodeId::new(genome.nodes.len() as u32);

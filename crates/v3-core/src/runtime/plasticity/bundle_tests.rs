@@ -10,8 +10,8 @@ use crate::contracts::OutcomeChannel;
 use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
-    BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource, GroupId, OutputSinkKind, Scope, Shape,
+    BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
+    GraphEdge, GraphSource, OutputSinkKind, Scope, Shape,
 };
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
@@ -56,35 +56,35 @@ fn modulated(eta: f32, clamp: f32) -> PlasticityConfig {
     }
 }
 
-/// A full catalog with one `DirectionPair` group (twelve members, patterns
+/// A full catalog with one `DirectionPair` bundle (twelve members, patterns
 /// ±1 and ±1/√2) at genomic scale `scale`.
-fn pair_def(scale: f32) -> (CgpGraphBackendDef, GroupId) {
+fn pair_def(scale: f32) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let layout = refs()[usize::from(PAIR_REF)].direction_pairs()[0];
-    let id = def.add_pair_group(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, &[]);
-    def.group_mut(id).set_scale(scale);
+    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, &[]);
+    def.bundle_mut(id).set_scale(scale);
     (def, id)
 }
 
-/// A full catalog with one `Ring` group (eight members on `Move`, pattern
+/// A full catalog with one `Ring` bundle (eight members on `Move`, pattern
 /// 1) at genomic scale `scale`.
-fn ring_def(scale: f32) -> (CgpGraphBackendDef, GroupId) {
+fn ring_def(scale: f32) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_group(
+    let id = def.add_ring_bundle(
         Shape::Ring { ring_ref: RING_REF },
         DirectedVoteKind::Move,
         0,
     );
-    def.group_mut(id).set_scale(scale);
+    def.bundle_mut(id).set_scale(scale);
     (def, id)
 }
 
-fn members(def: &CgpGraphBackendDef, id: GroupId) -> Vec<EdgeOccurrence> {
+fn members(def: &CgpGraphBackendDef, id: BundleId) -> Vec<EdgeOccurrence> {
     def.members(id).collect()
 }
 
 /// The first member whose pattern has the sign of `sign`.
-fn member_with_sign(def: &CgpGraphBackendDef, id: GroupId, sign: f32) -> EdgeOccurrence {
+fn member_with_sign(def: &CgpGraphBackendDef, id: BundleId, sign: f32) -> EdgeOccurrence {
     members(def, id)
         .into_iter()
         .find(|&member| def.pattern(member, &refs()) * sign > 0.0)
@@ -126,7 +126,7 @@ fn seeds(def: &CgpGraphBackendDef, edit: impl FnOnce(&mut BirthSeeds)) -> BirthS
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect(),
-        groups: vec![None; def.groups().len()],
+        bundles: vec![None; def.bundles().len()],
     };
     edit(&mut seeds);
     seeds
@@ -141,9 +141,9 @@ fn seed_edge(seeds: &mut BirthSeeds, at: EdgeOccurrence, value: f32) {
     row[at.index] = Some(value);
 }
 
-fn seed_group(seeds: &mut BirthSeeds, group: GroupId, value: f32) {
-    let BirthSeeds::Rows { groups, .. } = seeds;
-    groups[group.index()] = Some(value);
+fn seed_bundle(seeds: &mut BirthSeeds, bundle: BundleId, value: f32) {
+    let BirthSeeds::Rows { bundles, .. } = seeds;
+    bundles[bundle.index()] = Some(value);
 }
 
 /// One committed visit driven through the learner in canonical order: each
@@ -203,19 +203,19 @@ fn signals(energy: f32) -> OutcomeSignalBank {
 }
 
 /// Oja's `w` is the visit-start applied weight `own + scale × pattern`, for
-/// an edge learner (its correction moves) and a group learner (the scale
+/// an edge learner (its correction moves) and a bundle learner (the scale
 /// moves by `pattern × Δ`).
 #[test]
-fn oja_group_members_use_visit_start_applied_weight() {
+fn oja_bundle_members_use_visit_start_applied_weight() {
     let (mut def, id) = pair_def(0.5);
     let edge = member_with_sign(&def, id, 1.0);
-    let group = member_with_sign(&def, id, -1.0);
+    let bundle = member_with_sign(&def, id, -1.0);
     let oja = hebbian(HebbianRule::Oja, 0.5, 4.0);
     def.edge_mut(edge).set_weight(0.25);
     learn(&mut def, edge, oja, Scope::Edge);
-    learn(&mut def, group, oja, Scope::Group);
+    learn(&mut def, bundle, oja, Scope::Group);
     let refs = refs();
-    let (p_edge, p_group) = (def.pattern(edge, &refs), def.pattern(group, &refs));
+    let (p_edge, p_bundle) = (def.pattern(edge, &refs), def.pattern(bundle, &refs));
     let mut learned = state(&def, None);
     let (pre, post) = (0.8f32, 1.5f32);
     drive(&mut learned, &def, |_| pre, post);
@@ -223,19 +223,19 @@ fn oja_group_members_use_visit_start_applied_weight() {
     let w_edge = 0.5 * p_edge + 0.25;
     let delta_edge = 0.5 * post * (pre - w_edge * post);
     assert_eq!(view_edge(&learned, edge).learned, Some(0.25 + delta_edge));
-    let w_group = 0.5 * p_group;
-    let delta_group = 0.5 * post * (pre - w_group * post);
-    assert_eq!(scale(&learned).learned, Some(0.5 + p_group * delta_group));
+    let w_bundle = 0.5 * p_bundle;
+    let delta_bundle = 0.5 * post * (pre - w_bundle * post);
+    assert_eq!(scale(&learned).learned, Some(0.5 + p_bundle * delta_bundle));
     // Δ would differ under the genomic own weight alone.
-    assert_ne!(delta_group, 0.5 * post * pre);
+    assert_ne!(delta_bundle, 0.5 * post * pre);
 }
 
 /// The scale's change is `clamp(scale + Σ pattern × Δ, ±bound)`, summed
-/// over the group learners in canonical order and bounded once; group
+/// over the bundle learners in canonical order and bounded once; bundle
 /// learners store no own quantity, and a negative-pattern member's
 /// contribution has the opposite sign of its `Δ`.
 #[test]
-fn group_scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
+fn bundle_scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
     let (mut def, id) = pair_def(0.0);
     let positive = member_with_sign(&def, id, 1.0);
     let negative = member_with_sign(&def, id, -1.0);
@@ -282,7 +282,10 @@ fn group_scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
     assert_eq!(counts.updates, 2);
     for at in [positive, negative] {
         let edge = view_edge(&learned, at);
-        assert_eq!(edge.learned, None, "a group learner stores no own quantity");
+        assert_eq!(
+            edge.learned, None,
+            "a bundle learner stores no own quantity"
+        );
         assert_eq!(edge.genomic, 0.0);
         assert_eq!(edge.applied, written * def.pattern(at, &refs));
     }
@@ -314,7 +317,7 @@ fn a_modulated_learner_changes_no_weight_at_a_visit() {
     assert_eq!(scale(&learned).learned, Some(0.5));
 }
 
-/// A static member of a learning group samples nothing and moves nothing,
+/// A static member of a learning bundle samples nothing and moves nothing,
 /// and is weighed through the learned scale.
 #[test]
 fn a_static_member_contributes_nothing() {
@@ -351,10 +354,10 @@ fn a_static_member_contributes_nothing() {
     );
 }
 
-/// In one visit, edge learners move their own corrections and group
+/// In one visit, edge learners move their own corrections and bundle
 /// learners move the scale.
 #[test]
-fn a_mixed_group_updates_edge_learners_and_the_scale_separately() {
+fn a_mixed_bundle_updates_edge_learners_and_the_scale_separately() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
     let classic = hebbian(HebbianRule::Classic, 0.5, 4.0);
@@ -375,7 +378,7 @@ fn a_mixed_group_updates_edge_learners_and_the_scale_separately() {
     assert_eq!((counts.updates, counts.changes), (3, 3));
 }
 
-/// Phase 2.5 sums the modulated group learners' contributions and writes
+/// Phase 2.5 sums the modulated bundle learners' contributions and writes
 /// the scale once; a scale slot that is not initialized takes none.
 #[test]
 fn reward_credit_to_a_scale_is_one_bounded_write_per_tick() {
@@ -400,7 +403,7 @@ fn reward_credit_to_a_scale_is_one_bounded_write_per_tick() {
     assert_eq!((counts.updates, counts.changes), (2, 2));
 }
 
-/// Inside the bound, a modulated group learner's reward credit to its
+/// Inside the bound, a modulated bundle learner's reward credit to its
 /// scale is exactly `pattern × η × signal × trace`.
 #[test]
 fn reward_credit_to_a_scale_is_pattern_times_rate_times_signal_times_trace() {
@@ -444,20 +447,20 @@ fn a_genomic_scale_outside_the_bound_starts_at_the_bound() {
     assert_eq!((first.updates, first.changes), (1, 0));
 }
 
-/// `inherit_scale` without a group learner seeds nothing (no scale slot);
-/// a group learner without `inherit_scale` starts at the genomic scale.
+/// `inherit_scale` without a bundle learner seeds nothing (no scale slot);
+/// a bundle learner without `inherit_scale` starts at the genomic scale.
 #[test]
-fn a_scale_seeds_only_with_a_group_scope_learner() {
+fn a_scale_seeds_only_with_a_bundle_scope_learner() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     learn(
         &mut def,
         all[0],
         hebbian(HebbianRule::Classic, 0.5, 4.0),
         Scope::Edge,
     );
-    let parent_seeds = seeds(&def, |seeds| seed_group(seeds, id, 1.5));
+    let parent_seeds = seeds(&def, |seeds| seed_bundle(seeds, id, 1.5));
     let edge_only = state(&def, Some(parent_seeds.clone()));
     assert_eq!(edge_only.scales(0).count(), 0);
     assert_eq!(applied(&edge_only, all[0]), 0.5);
@@ -468,22 +471,22 @@ fn a_scale_seeds_only_with_a_group_scope_learner() {
         hebbian(HebbianRule::Classic, 0.5, 4.0),
         Scope::Group,
     );
-    def.group_mut(id).set_inherit_scale(false);
+    def.bundle_mut(id).set_inherit_scale(false);
     let darwinian = state(&def, Some(parent_seeds.clone()));
     assert_eq!(scale(&darwinian).learned, None);
     assert_eq!(applied(&darwinian, all[0]), 0.5);
 
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     let lamarckian = state(&def, Some(parent_seeds));
     assert_eq!(scale(&lamarckian).learned, Some(1.5));
     assert_eq!(applied(&lamarckian, all[0]), 1.5);
 }
 
-/// A Lamarckian group learner ignores a seed on its row, starts at its
+/// A Lamarckian bundle learner ignores a seed on its row, starts at its
 /// genomic own weight and is captured as `None`; after `SetScope` to
 /// `Edge` its child starts at its genomic correction.
 #[test]
-fn a_group_learner_stores_no_own_quantity() {
+fn a_bundle_learner_stores_no_own_quantity() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
     def.edge_mut(all[0]).set_weight(0.25);
@@ -519,7 +522,7 @@ fn a_group_learner_stores_no_own_quantity() {
 fn initialization_is_per_slot_across_edges_and_scales() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     learn(
         &mut def,
         all[0],
@@ -532,13 +535,16 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     };
     learn(&mut def, all[1], lamarckian, Scope::Edge);
 
-    let scale_seeded = state(&def, Some(seeds(&def, |seeds| seed_group(seeds, id, 1.25))));
+    let scale_seeded = state(
+        &def,
+        Some(seeds(&def, |seeds| seed_bundle(seeds, id, 1.25))),
+    );
     assert_eq!(scale(&scale_seeded).learned, Some(1.25));
     assert!(scale_seeded
         .edges(0)
         .all(|edge| edge.learned.is_none() && edge.trace.is_none()));
     let captured = scale_seeded.capture(0, &def).expect("a seeded scale");
-    assert_eq!(captured.group_value(id), Some(1.25));
+    assert_eq!(captured.bundle_value(id), Some(1.25));
     assert_eq!(captured.value(all[1]), None);
 
     let edge_seeded = state(
@@ -550,7 +556,7 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     assert_eq!((edge.learned, edge.trace), (Some(0.75), Some(0.0)));
     let captured = edge_seeded.capture(0, &def).expect("a seeded learner");
     assert_eq!(captured.value(all[1]), Some(0.75));
-    assert_eq!(captured.group_value(id), None);
+    assert_eq!(captured.bundle_value(id), None);
     // The unseeded, uninitialized scale takes no reward.
     let mut rewarded = edge_seeded.clone();
     rewarded.apply_reward(&signals(1.0));
@@ -566,13 +572,13 @@ fn initialization_is_per_slot_across_edges_and_scales() {
 
 /// The view resolves each learner's initialization and inheritance by its
 /// scope (T30.F01 R3): an ungrouped or edge learner reads its own slot and
-/// its `lamarckian` flag; a group learner reads its scale slot and its
-/// group's `inherit_scale`, as `capture()` applies them.
+/// its `lamarckian` flag; a bundle learner reads its scale slot and its
+/// bundle's `inherit_scale`, as `capture()` applies them.
 #[test]
 fn the_view_resolves_initialization_and_inheritance_by_scope() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     learn(
         &mut def,
         all[0],
@@ -586,16 +592,19 @@ fn the_view_resolves_initialization_and_inheritance_by_scope() {
     learn(&mut def, all[1], lamarckian, Scope::Edge);
 
     let unborn = state(&def, None);
-    let (group, edge) = (view_edge(&unborn, all[0]), view_edge(&unborn, all[1]));
-    assert_eq!((group.initialized, group.inherits), (false, true));
+    let (bundle, edge) = (view_edge(&unborn, all[0]), view_edge(&unborn, all[1]));
+    assert_eq!((bundle.initialized, bundle.inherits), (false, true));
     assert_eq!((edge.initialized, edge.inherits), (false, true));
 
-    // A seeded scale initializes the group learner, not the edge learner.
-    let scale_seeded = state(&def, Some(seeds(&def, |seeds| seed_group(seeds, id, 1.25))));
+    // A seeded scale initializes the bundle learner, not the edge learner.
+    let scale_seeded = state(
+        &def,
+        Some(seeds(&def, |seeds| seed_bundle(seeds, id, 1.25))),
+    );
     assert!(view_edge(&scale_seeded, all[0]).initialized);
     assert!(!view_edge(&scale_seeded, all[1]).initialized);
 
-    // A seeded edge learner initializes itself, not the group learner.
+    // A seeded edge learner initializes itself, not the bundle learner.
     let edge_seeded = state(
         &def,
         Some(seeds(&def, |seeds| seed_edge(seeds, all[1], 0.75))),
@@ -608,8 +617,8 @@ fn the_view_resolves_initialization_and_inheritance_by_scope() {
     visited.learner(0).expect("a learning backend").enter();
     assert!(visited.edges(0).all(|edge| edge.initialized));
 
-    // A Lamarckian group learner inherits through its group alone.
-    def.group_mut(id).set_inherit_scale(false);
+    // A Lamarckian bundle learner inherits through its bundle alone.
+    def.bundle_mut(id).set_inherit_scale(false);
     learn(&mut def, all[0], lamarckian, Scope::Group);
     learn(
         &mut def,
@@ -622,7 +631,7 @@ fn the_view_resolves_initialization_and_inheritance_by_scope() {
     assert!(!view_edge(&darwinian, all[1]).inherits);
 }
 
-/// Counters (invariant 9): a group of two contributors whose scale moves
+/// Counters (invariant 9): a bundle of two contributors whose scale moves
 /// counts two updates and two changes; a scale held at its bound counts
 /// two updates and no change.
 #[test]
@@ -687,20 +696,20 @@ fn ring_sensors(values: [f32; 8]) -> SensorSnapshot {
     }
 }
 
-/// Invariant 3: across an ungrouped learner, an edge learner, a group
+/// Invariant 3: across an ungrouped learner, an edge learner, a bundle
 /// learner and a passive member, the executor's weighing, `applied_weight`,
 /// `applied_weights` and the view's `applied` agree.
 #[test]
 fn applied_weight_agrees_with_the_executor_and_the_view() {
     let (mut def, id) = ring_def(0.5);
-    let silent = def.add_group(
+    let silent = def.add_ring_bundle(
         Shape::Ring { ring_ref: RING_REF },
         DirectedVoteKind::Move,
         1,
     );
-    def.group_mut(silent).set_scale(-0.25);
+    def.bundle_mut(silent).set_scale(-0.25);
     let all = members(&def, id);
-    def.group_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_inherit_scale(true);
     let lamarckian = PlasticityConfig {
         lamarckian: true,
         ..hebbian(HebbianRule::Classic, 0.1, 4.0)
@@ -725,7 +734,7 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     let ungrouped = EdgeOccurrence::new(ungrouped_surface, 0);
     def.edge_mut(ungrouped).set_plasticity(Some(lamarckian));
     let birth = seeds(&def, |seeds| {
-        seed_group(seeds, id, 1.25);
+        seed_bundle(seeds, id, 1.25);
         seed_edge(seeds, all[0], 0.5);
         seed_edge(seeds, ungrouped, -1.5);
     });
@@ -745,7 +754,7 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     for edge in learned.edges(0) {
         assert_eq!(edge.applied, applied(&learned, edge.occurrence));
     }
-    // A static member of a group without a scale slot is no dynamic edge
+    // A static member of a bundle without a scale slot is no dynamic edge
     // and resolves to its genomic weight.
     let silent_member = members(&def, silent)[0];
     assert!(learned
@@ -788,16 +797,16 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
 }
 
 /// T25.F10 invariant 2: a fact member's pattern is 0 by role, so a
-/// `Group`-scope fact learner credits `0 × Δ` and leaves the scale as it
+/// `Bundle`-scope fact learner credits `0 × Δ` and leaves the scale as it
 /// starts, an `Edge`-scope one learns its own correction, and a static fact
-/// member of a group with a scale slot is a passive dynamic edge weighing
+/// member of a bundle with a scale slot is a passive dynamic edge weighing
 /// its own weight alone.
 #[test]
 fn a_fact_member_weighs_and_learns_without_the_scale() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let layout = refs()[usize::from(PAIR_REF)].direction_pairs()[0];
-    let id = def.add_pair_group(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, layout.facts);
-    def.group_mut(id).set_scale(0.5);
+    let id = def.add_pair_bundle(PAIR_REF, 0, layout, DirectedVoteKind::Move, 0, layout.facts);
+    def.bundle_mut(id).set_scale(0.5);
     let facts: Vec<EdgeOccurrence> = members(&def, id)
         .into_iter()
         .filter(|&member| def.is_fact_member(member))

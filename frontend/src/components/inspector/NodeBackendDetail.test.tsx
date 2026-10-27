@@ -38,7 +38,7 @@ describe("NodeBackendDetail", () => {
 	it("returns null for Graph backends (handled by GraphInternalsViz)", () => {
 		const backendDef: BrainBackend = {
 			Graph: {
-				groups: [],
+				bundles: [],
 				compute_nodes: [
 					{
 						kind: "Add",

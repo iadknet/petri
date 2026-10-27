@@ -1296,14 +1296,14 @@ mod tests {
     /// `[25, 19, 19, 11]` -> `[22, 15, 15, 7]`, Selection `[25, 25, 25, 24]`
     /// -> `[22; 4]`); the discard counts stay zero. Rate 0.005 and then the
     /// old size rule with anchor 97 restore the previous values. Re-pinned
-    /// by T25.F03 (ring groups replace ring projections): members enter
-    /// every edge-site draw and recruitment's ring case emits a group, so
+    /// by T25.F03 (ring bundles replace ring projections): members enter
+    /// every edge-site draw and recruitment's ring case emits a bundle, so
     /// proposals on grouped parents draw differently; in Graph Drift lineage
     /// (2, 5) the followup chain diverges on a grouped parent and its
     /// retained discovery stays useful (Graph Drift `[18, 14, 12, 7]` ->
     /// `[18, 14, 12, 8]`). Every other row and the discard counts are
-    /// unchanged. Re-pinned by T25.F04 (direction-pair groups): the
-    /// `AddDirectionPairGroup` entry remaps every default-arm Graph draw
+    /// unchanged. Re-pinned by T25.F04 (direction-pair bundles): the
+    /// `AddDirectionPairBundle` entry remaps every default-arm Graph draw
     /// (invariant 13) and recruitment's `WholeFamily` pair case changes its
     /// draws and plan (invariant 9) (Graph Drift `[18, 14, 12, 8]` ->
     /// `[14, 11, 10, 6]`, Selection `[18; 4]` -> `[14; 4]`; VM Drift
@@ -1486,7 +1486,7 @@ mod tests {
     /// rule): 16/16 graph (censored 9 -> 16) and 20/20 VM (censored 8 -> 12)
     /// retained discoveries remain useful; rate 0.005 and then the old size
     /// rule with anchor 97 restore the previous values. Re-pinned by T25.F04
-    /// (the `AddDirectionPairGroup` entry remaps every default-arm Graph
+    /// (the `AddDirectionPairBundle` entry remaps every default-arm Graph
     /// draw, and recruitment's `WholeFamily` pair case changes its draws and
     /// plan): 15/15 graph (censored 16 -> 17) and 21/21 VM (censored
     /// 12 -> 11) retained discoveries remain useful. Re-pinned by T25.F07

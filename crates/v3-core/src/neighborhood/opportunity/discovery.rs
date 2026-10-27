@@ -545,13 +545,13 @@ mod tests {
     use crate::contracts::{InputReference, NodeId, WorldInputKey};
     use crate::genome::cgp::Shape;
 
-    /// A group's members are vote edges (T25.F03): every channel of the ring
+    /// A bundle's members are vote edges (T25.F03): every channel of the ring
     /// a member reads is on the node's vote surface.
     #[test]
-    fn group_member_channels_are_on_the_vote_surface() {
+    fn bundle_member_channels_are_on_the_vote_surface() {
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+        let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
         // A member lost to deletion leaves its channel off the surface.
         let lost = def.members(id).next().unwrap();
         let GraphSource::InputLeaf {
@@ -587,14 +587,14 @@ mod tests {
         }
     }
 
-    /// A pair group's members are vote edges (T25.F04): its `x` and `y`
+    /// A pair bundle's members are vote edges (T25.F04): its `x` and `y`
     /// fields are on the vote surface, the family's other fields are not.
     #[test]
-    fn pair_group_member_channels_are_on_the_vote_surface() {
+    fn pair_bundle_member_channels_are_on_the_vote_surface() {
         let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
         let layout = area.direction_pairs()[1];
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_pair_group(0, 1, layout, DirectedVoteKind::StealEnergy, 5, &[]);
+        def.add_pair_bundle(0, 1, layout, DirectedVoteKind::StealEnergy, 5, &[]);
         let node = NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![area.clone()],

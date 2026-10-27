@@ -21,12 +21,12 @@ pub const SUMMARY_VERSION_MIN: u32 = 2;
 /// `GiveEffort`); 9 since T27.F03 commit 3 (parameter field 3 is
 /// `StealEffort`, an effort modifier, where `StealEnergyAmount` stood); 8
 /// since T27.F03 commit 1 (a directed vote sink serializes as
-/// `{"Directed":[kind,d]}`); 7 since T27.F01 (colour vision); 6 since T25.F09 (every plastic edge and every group
+/// `{"Directed":[kind,d]}`); 7 since T27.F01 (colour vision); 6 since T25.F09 (every plastic edge and every bundle
 /// carries a `retention`); 5 since T25.F07 (every member carries a `scope`,
-/// every group an `inherit_scale`); 4 since T25.F06 (per-edge plasticity);
+/// every bundle an `inherit_scale`); 4 since T25.F06 (per-edge plasticity);
 /// 3 since T25.F05 (one `NearbyCreature` reference of 36 channels replaces
 /// the three creature families); 2 since T25.F03
-/// (`own_weight`, edge membership and groups replace `weight` and ring
+/// (`own_weight`, edge membership and bundles replace `weight` and ring
 /// projections).
 pub const GENOME_FORMAT: u32 = 10;
 

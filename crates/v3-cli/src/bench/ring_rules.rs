@@ -9,8 +9,8 @@ use v3_core::neighborhood::ring_rules::{RingRuleCensus, RING_RULES_VERSION};
 use super::schema::Indicator;
 use crate::UNDEFINED;
 
-/// The fields of one `ring_group_rows` string, in order.
-pub const RING_GROUP_ROW_FORMAT: &str = "family kind offset count positive negative members";
+/// The fields of one `ring_bundle_rows` string, in order.
+pub const RING_BUNDLE_ROW_FORMAT: &str = "family kind offset count positive negative members";
 /// The fields of one `rule_rows` string, in order: creatures covering the
 /// rule in exactly 1 to 8 directions.
 pub const RULE_ROW_FORMAT: &str = "family kind offset sign n1 n2 n3 n4 n5 n6 n7 n8";
@@ -26,13 +26,13 @@ pub struct RingRules {
     pub creatures: u64,
     pub direction_general: u64,
     pub direction_general_edges_only: u64,
-    pub ring_group_carriers: u64,
-    pub ring_groups: u64,
-    pub ring_groups_nonzero: u64,
-    pub ring_groups_unreachable: u64,
-    pub ring_group_members: u64,
-    pub ring_group_row_format: String,
-    pub ring_group_rows: Vec<String>,
+    pub ring_bundle_carriers: u64,
+    pub ring_bundles: u64,
+    pub ring_bundles_nonzero: u64,
+    pub ring_bundles_unreachable: u64,
+    pub ring_bundle_members: u64,
+    pub ring_bundle_row_format: String,
+    pub ring_bundle_rows: Vec<String>,
     pub rule_row_format: String,
     pub rule_rows: Vec<String>,
 }
@@ -44,13 +44,13 @@ impl From<&RingRuleCensus> for RingRules {
             creatures: census.creatures,
             direction_general: census.direction_general,
             direction_general_edges_only: census.direction_general_edges_only,
-            ring_group_carriers: census.ring_group_carriers,
-            ring_groups: census.ring_groups,
-            ring_groups_nonzero: census.ring_groups_nonzero,
-            ring_groups_unreachable: census.ring_groups_unreachable,
-            ring_group_members: census.ring_group_members,
-            ring_group_row_format: RING_GROUP_ROW_FORMAT.to_string(),
-            ring_group_rows: census.ring_group_rows(),
+            ring_bundle_carriers: census.ring_bundle_carriers,
+            ring_bundles: census.ring_bundles,
+            ring_bundles_nonzero: census.ring_bundles_nonzero,
+            ring_bundles_unreachable: census.ring_bundles_unreachable,
+            ring_bundle_members: census.ring_bundle_members,
+            ring_bundle_row_format: RING_BUNDLE_ROW_FORMAT.to_string(),
+            ring_bundle_rows: census.ring_bundle_rows(),
             rule_row_format: RULE_ROW_FORMAT.to_string(),
             rule_rows: census.rule_rows(),
         }
@@ -88,8 +88,8 @@ mod tests {
                 block.creatures
             )]
         );
-        assert!(block.ring_group_rows.is_empty());
-        assert_eq!(block.ring_groups, 0);
+        assert!(block.ring_bundle_rows.is_empty());
+        assert_eq!(block.ring_bundles, 0);
         assert_eq!(block.direction_general, 0);
         let json = serde_json::to_value(&block).unwrap();
         assert_eq!(serde_json::from_value::<RingRules>(json).unwrap(), block);

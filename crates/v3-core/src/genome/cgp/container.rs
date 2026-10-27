@@ -10,12 +10,12 @@
 use std::fmt;
 use std::ops::Deref;
 
+use super::bundle::{
+    compose, pair_birth_members, plans, ring_birth_members, BirthCoordinate, Bundle, BundleBirth,
+    BundleId, BundleSource, Shape, Site, Wiring,
+};
 use super::edge::{GraphEdge, GraphSource};
 use super::edge::{Membership, Scope};
-use super::group::{
-    compose, pair_birth_members, plans, ring_birth_members, BirthCoordinate, BundleBirth,
-    BundleSource, Group, GroupId, MemberSite, Shape, Wiring,
-};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
@@ -167,12 +167,12 @@ impl EdgeOccurrence {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BirthSeeds {
     /// One row per compute node and one per sink, each sized to that
-    /// container's `inputs`, and one group slot per group record (I11);
-    /// `None` where the edge or the group has no inherited value.
+    /// container's `inputs`, and one bundle slot per bundle record (I11);
+    /// `None` where the edge or the bundle has no inherited value.
     Rows {
         compute: Vec<Vec<Option<f32>>>,
         sinks: Vec<Vec<Option<f32>>>,
-        groups: Vec<Option<f32>>,
+        bundles: Vec<Option<f32>>,
     },
 }
 
@@ -197,17 +197,17 @@ impl BirthSeeds {
             .flatten()
     }
 
-    /// The inherited scale of `group`, if any.
+    /// The inherited scale of `bundle`, if any.
     #[must_use]
-    pub fn group_value(&self, group: GroupId) -> Option<f32> {
-        self.group_slots().get(group.index()).copied().flatten()
+    pub fn bundle_value(&self, bundle: BundleId) -> Option<f32> {
+        self.bundle_slots().get(bundle.index()).copied().flatten()
     }
 
-    /// One slot per group record.
+    /// One slot per bundle record.
     #[must_use]
-    pub fn group_slots(&self) -> &[Option<f32>] {
-        let Self::Rows { groups, .. } = self;
-        groups
+    pub fn bundle_slots(&self) -> &[Option<f32>] {
+        let Self::Rows { bundles, .. } = self;
+        bundles
     }
 
     /// One row per compute node.
@@ -232,9 +232,9 @@ impl BirthSeeds {
         }
     }
 
-    fn groups_mut(&mut self) -> &mut Vec<Option<f32>> {
-        let Self::Rows { groups, .. } = self;
-        groups
+    fn bundles_mut(&mut self) -> &mut Vec<Option<f32>> {
+        let Self::Rows { bundles, .. } = self;
+        bundles
     }
 }
 
@@ -250,10 +250,10 @@ pub struct CgpGraphBackendDef {
     compute_nodes: ComputeNodes,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     output_sinks: OutputSinks,
-    /// Edge-group records (T25.F03), indexed by `GroupId`; omitted from JSON
+    /// Edge-bundle records (T25.F03), indexed by `BundleId`; omitted from JSON
     /// when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    groups: Vec<Group>,
+    bundles: Vec<Bundle>,
 }
 
 // Keep the birth payload out of diagnostic genome identity as well as
@@ -264,7 +264,7 @@ impl fmt::Debug for CgpGraphBackendDef {
         debug
             .field("compute_nodes", &self.compute_nodes)
             .field("output_sinks", &self.output_sinks);
-        debug.field("groups", &self.groups).finish()
+        debug.field("bundles", &self.bundles).finish()
     }
 }
 
@@ -272,7 +272,7 @@ impl PartialEq for CgpGraphBackendDef {
     fn eq(&self, other: &Self) -> bool {
         self.compute_nodes == other.compute_nodes
             && self.output_sinks == other.output_sinks
-            && self.groups == other.groups
+            && self.bundles == other.bundles
     }
 }
 
@@ -297,7 +297,7 @@ impl EdgeMut<'_> {
         let changed = edge.source != source;
         debug_assert!(
             !changed || edge.membership.is_none(),
-            "a member's source changes only through its group or after a detach"
+            "a member's source changes only through its bundle or after a detach"
         );
         edge.source = source;
         if changed {
@@ -344,31 +344,31 @@ impl EdgeMut<'_> {
     }
 }
 
-/// A handle on one group's record.
-pub struct GroupMut<'a> {
+/// A handle on one bundle's record.
+pub struct BundleMut<'a> {
     def: &'a mut CgpGraphBackendDef,
-    group: GroupId,
+    bundle: BundleId,
 }
 
-impl GroupMut<'_> {
+impl BundleMut<'_> {
     /// The record as it stands.
     #[must_use]
-    pub fn group(&self) -> Group {
-        self.def.groups[self.group.index()]
+    pub fn bundle(&self) -> Bundle {
+        self.def.bundles[self.bundle.index()]
     }
 
-    /// Set the group's shared scale; its seed is cleared.
+    /// Set the bundle's shared scale; its seed is cleared.
     pub fn set_scale(&mut self, scale: f32) {
         if let Some(seeds) = &mut self.def.birth_seeds {
-            seeds.groups_mut()[self.group.index()] = None;
+            seeds.bundles_mut()[self.bundle.index()] = None;
         }
-        self.def.groups[self.group.index()].scale = scale;
+        self.def.bundles[self.bundle.index()].scale = scale;
     }
 
     /// Set whether a parent's learned scale seeds the child's (T25.F07),
     /// the only writer; no seed change.
     pub fn set_inherit_scale(&mut self, inherit_scale: bool) {
-        self.def.groups[self.group.index()].inherit_scale = inherit_scale;
+        self.def.bundles[self.bundle.index()].inherit_scale = inherit_scale;
     }
 
     /// Set the learned scale's retention (T25.F09), the only writer; in
@@ -378,7 +378,7 @@ impl GroupMut<'_> {
             (0.0..=1.0).contains(&retention),
             "set_retention: a retention is in [0, 1]"
         );
-        self.def.groups[self.group.index()].retention = retention;
+        self.def.bundles[self.bundle.index()].retention = retention;
     }
 }
 
@@ -387,38 +387,38 @@ impl GroupMut<'_> {
 pub enum GraphInvariantViolation {
     /// I2: a compute-input edge carries a membership.
     MemberOnComputeInput,
-    /// I3: a membership names no group.
-    GroupIdOutOfRange,
-    /// I3: more than `u16::MAX` groups.
-    TooManyGroups,
-    /// I4, I8: a member does not fit its group's shape.
+    /// I3: a membership names no bundle.
+    BundleIdOutOfRange,
+    /// I3: more than `u16::MAX` bundles.
+    TooManyBundles,
+    /// I4, I8: a member does not fit its bundle's shape.
     MemberShape,
-    /// I5: two members of one group share a coordinate.
+    /// I5: two members of one bundle share a coordinate.
     DuplicateMember,
-    /// I6: a group has no member.
-    EmptyGroup,
-    /// I7: a group's offset is not below 8.
+    /// I6: a bundle has no member.
+    EmptyBundle,
+    /// I7: a bundle's offset is not below 8.
     OffsetOutOfRange,
-    /// I7: a group's shape reference is not a ring (`Ring`) or does not
+    /// I7: a bundle's shape reference is not a ring (`Ring`) or does not
     /// declare the named pair (`DirectionPair`).
     ShapeReference,
     /// I10: a sink's members are not after its independent edges in
-    /// `(GroupId, sub_idx)` order.
+    /// `(BundleId, sub_idx)` order.
     SinkOrder,
     /// I1 (T25.F06): a learning attribute is non-finite or out of range.
     PlasticityOutOfRange,
     /// T25.F06 invariant 2, T25.F07 invariant 1: a `ClearSlot` edge is
     /// plastic.
     IneligiblePlasticEdge,
-    /// T25.F09 invariant 1: a group's retention is non-finite or outside
+    /// T25.F09 invariant 1: a bundle's retention is non-finite or outside
     /// `[0, 1]`.
-    GroupRetentionOutOfRange,
+    BundleRetentionOutOfRange,
 }
 
-/// The direction a `Ring` member of `group` on `channel` votes toward:
+/// The direction a `Ring` member of `bundle` on `channel` votes toward:
 /// `(offset + channel) mod 8`.
-fn member_direction(group: &Group, channel: u16) -> u8 {
-    ((u16::from(group.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT)) as u8
+fn member_direction(bundle: &Bundle, channel: u16) -> u8 {
+    ((u16::from(bundle.offset) + channel) % u16::from(VOTE_DIRECTION_COUNT)) as u8
 }
 
 /// Check every graph invariant (I2–I10) of `node`'s graph against its input
@@ -433,13 +433,13 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
         return Ok(());
     };
     def.check_local_invariants()?;
-    for group in &def.groups {
-        let resolves = match group.shape {
+    for bundle in &def.bundles {
+        let resolves = match bundle.shape {
             Shape::Ring { ring_ref } => node
                 .input_refs
                 .get(usize::from(ring_ref))
                 .is_some_and(InputReference::is_ring),
-            Shape::DirectionPair { .. } => group.shape.resolve_pair(&node.input_refs).is_some(),
+            Shape::DirectionPair { .. } => bundle.shape.resolve_pair(&node.input_refs).is_some(),
         };
         if !resolves {
             return Err(GraphInvariantViolation::ShapeReference);
@@ -449,19 +449,19 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
     // `y` field, a fact member one of its pair's `facts`.
     for sink in def.output_sinks.iter() {
         for edge in sink.inputs.iter() {
-            let Some(Membership { group, .. }) = edge.membership else {
+            let Some(Membership { bundle, .. }) = edge.membership else {
                 continue;
             };
-            let record = &def.groups[group.index()];
+            let record = &def.bundles[bundle.index()];
             let Some(pair) = record.shape.resolve_pair(&node.input_refs) else {
                 continue;
             };
             let GraphSource::InputLeaf { sub_idx, .. } = edge.source else {
                 return Err(GraphInvariantViolation::MemberShape);
             };
-            let fits = match MemberSite::of(sink.kind, record.kind) {
-                Some(MemberSite::Direction(_)) => sub_idx == pair.x || sub_idx == pair.y,
-                Some(MemberSite::Drive) => pair.facts.contains(&sub_idx),
+            let fits = match Site::of(sink.kind, record.kind) {
+                Some(Site::Direction(_)) => sub_idx == pair.x || sub_idx == pair.y,
+                Some(Site::Drive) => pair.facts.contains(&sub_idx),
                 None => false,
             };
             if !fits {
@@ -505,7 +505,7 @@ impl CgpGraphBackendDef {
             birth_seeds: None,
             compute_nodes: ComputeNodes::default(),
             output_sinks: OutputSinks(output_sinks),
-            groups: Vec::new(),
+            bundles: Vec::new(),
         }
     }
 
@@ -620,11 +620,11 @@ impl CgpGraphBackendDef {
         }
     }
 
-    /// The edge-group records, indexed by `GroupId`.
+    /// The edge-bundle records, indexed by `BundleId`.
     #[inline]
     #[must_use]
-    pub fn groups(&self) -> &[Group] {
-        &self.groups
+    pub fn bundles(&self) -> &[Bundle] {
+        &self.bundles
     }
 
     /// The genomic weight of the edge at `occurrence`: its own weight when
@@ -657,13 +657,13 @@ impl CgpGraphBackendDef {
             None => edge.own_weight,
             Some(membership) => compose(
                 edge.own_weight,
-                self.groups[membership.group.index()].scale,
+                self.bundles[membership.bundle.index()].scale,
                 self.pattern_at(edge, sink, input_refs),
             ),
         }
     }
 
-    /// The pattern of the edge at `occurrence`: its group's at the member's
+    /// The pattern of the edge at `occurrence`: its bundle's at the member's
     /// field and sink direction, 0 for an ungrouped edge (T25.F07).
     #[must_use]
     pub fn pattern(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32 {
@@ -673,7 +673,7 @@ impl CgpGraphBackendDef {
         self.member_pattern(occurrence, input_refs)
     }
 
-    /// The pattern of the member at `occurrence` (its group's at the
+    /// The pattern of the member at `occurrence` (its bundle's at the
     /// member's field and sink direction).
     pub(super) fn member_pattern(
         &self,
@@ -691,46 +691,46 @@ impl CgpGraphBackendDef {
     }
 
     /// The pattern of member `edge` on a sink of kind `sink`: 0 for a fact
-    /// member, by role, before any geometry (T25.F10); otherwise its group's
+    /// member, by role, before any geometry (T25.F10); otherwise its bundle's
     /// at the member's field and the sink's direction (pattern 0 for a
     /// member that reads no input leaf or sits on no direction sink of its
-    /// group's kind).
+    /// bundle's kind).
     fn pattern_at(
         &self,
         edge: &GraphEdge,
         sink: OutputSinkKind,
         input_refs: &[InputReference],
     ) -> f32 {
-        let Membership { group, .. } = edge.membership.expect("pattern_at: a member");
-        let record = &self.groups[group.index()];
-        let (GraphSource::InputLeaf { sub_idx, .. }, Some(MemberSite::Direction(direction))) =
-            (edge.source, MemberSite::of(sink, record.kind))
+        let Membership { bundle, .. } = edge.membership.expect("pattern_at: a member");
+        let record = &self.bundles[bundle.index()];
+        let (GraphSource::InputLeaf { sub_idx, .. }, Some(Site::Direction(direction))) =
+            (edge.source, Site::of(sink, record.kind))
         else {
             return 0.0;
         };
         record.pattern(input_refs, sub_idx, direction)
     }
 
-    /// The site of the member at `occurrence` relative to its group's kind
+    /// The site of the member at `occurrence` relative to its bundle's kind
     /// (T25.F10); `None` for an ungrouped edge or a member off its kind's
     /// sinks (a broken genome).
     #[must_use]
-    pub fn member_site(&self, occurrence: EdgeOccurrence) -> Option<MemberSite> {
+    pub fn site_of(&self, occurrence: EdgeOccurrence) -> Option<Site> {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             return None;
         };
-        let Membership { group, .. } = self.edge_at(occurrence).membership?;
-        MemberSite::of(
+        let Membership { bundle, .. } = self.edge_at(occurrence).membership?;
+        Site::of(
             self.output_sinks[sink].kind,
-            self.groups[group.index()].kind,
+            self.bundles[bundle.index()].kind,
         )
     }
 
     /// Whether the edge at `occurrence` is a fact member: a member on its
-    /// group's kind's drive sink (T25.F10).
+    /// bundle's kind's drive sink (T25.F10).
     #[must_use]
     pub fn is_fact_member(&self, occurrence: EdgeOccurrence) -> bool {
-        self.member_site(occurrence) == Some(MemberSite::Drive)
+        self.site_of(occurrence) == Some(Site::Drive)
     }
 
     /// One row per sink, one genomic weight per sink edge in order: the
@@ -759,7 +759,7 @@ impl CgpGraphBackendDef {
     /// Whether a visit to this graph enters evaluation and the effects pass.
     ///
     /// True with at least one compute node, and true for a zero-compute graph
-    /// with a wired output sink (a group's members wire their sinks). A graph
+    /// with a wired output sink (a bundle's members wire their sinks). A graph
     /// with neither computes nothing and applies nothing, so its visit is
     /// free. Derived from the genome on every visit and stored nowhere.
     #[must_use]
@@ -961,10 +961,10 @@ impl CgpGraphBackendDef {
             }
         }
         self.debug_assert_seed_shape();
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
     }
 
-    /// Remove the edge at `occurrence` with its seed; a group's last member
+    /// Remove the edge at `occurrence` with its seed; a bundle's last member
     /// takes its record along. Returns whether a record was removed.
     pub fn remove_edge(&mut self, occurrence: EdgeOccurrence) -> bool {
         let EdgeOccurrence { surface, index } = occurrence;
@@ -978,16 +978,16 @@ impl CgpGraphBackendDef {
             }
             EdgeSurface::SinkInput(i) => {
                 let removed = self.output_sinks.0[i].inputs.0.remove(index);
-                if let Some(Membership { group, .. }) = removed.membership {
-                    if self.members(group).next().is_none() {
-                        self.drop_group_record(group);
+                if let Some(Membership { bundle, .. }) = removed.membership {
+                    if self.members(bundle).next().is_none() {
+                        self.drop_bundle_record(bundle);
                         record_removed = true;
                     }
                 }
             }
         }
         self.debug_assert_seed_shape();
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
         record_removed
     }
 
@@ -1058,20 +1058,20 @@ impl CgpGraphBackendDef {
     // ── Input-reference primitives ──────────────────────────────────────────
 
     /// After the input reference at `removed_ref_idx` is pruned, decrement
-    /// every higher `InputLeaf.ref_idx` and group shape reference. `Prune`
+    /// every higher `InputLeaf.ref_idx` and bundle shape reference. `Prune`
     /// removes only an index nothing addresses (`prunable_indices`), so no
-    /// edge or group is removed and the seeds are untouched.
+    /// edge or bundle is removed and the seeds are untouched.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
-        for group in &mut self.groups {
+        for bundle in &mut self.bundles {
             let (Shape::Ring {
                 ring_ref: shape_ref,
             }
             | Shape::DirectionPair {
                 ref_idx: shape_ref, ..
-            }) = &mut group.shape;
+            }) = &mut bundle.shape;
             debug_assert_ne!(
                 *shape_ref, removed_ref_idx,
-                "a pruned input reference is addressed by no group"
+                "a pruned input reference is addressed by no bundle"
             );
             if *shape_ref > removed_ref_idx {
                 *shape_ref -= 1;
@@ -1104,38 +1104,38 @@ impl CgpGraphBackendDef {
         });
     }
 
-    // ── Group primitives (T25.F03, T25.F04) ─────────────────────────────────
+    // ── Bundle primitives (T25.F03, T25.F04) ─────────────────────────────────
 
-    /// Whether a group of either shape can be created: all 24 direction
-    /// sinks are present and the group list is below capacity.
+    /// Whether a bundle of either shape can be created: all 24 direction
+    /// sinks are present and the bundle list is below capacity.
     #[must_use]
-    pub fn can_host_group(&self) -> bool {
-        self.groups.len() < usize::from(u16::MAX)
+    pub fn can_host_bundle(&self) -> bool {
+        self.bundles.len() < usize::from(u16::MAX)
             && Kind::ALL.into_iter().all(|kind| {
                 (0..VOTE_DIRECTION_COUNT)
-                    .all(|d| self.site_sink(kind, MemberSite::Direction(d)).is_some())
+                    .all(|d| self.site_sink(kind, Site::Direction(d)).is_some())
             })
     }
 
     /// Whether a gene of kind `kind` can carry fact members: `kind`'s drive
     /// sink is present (T25.F10). Recruitment's pair preflight and
-    /// `RetargetGroupKind` read it.
+    /// `RetargetBundleKind` read it.
     #[must_use]
     pub fn can_host_facts(&self, kind: Kind) -> bool {
-        self.site_sink(kind, MemberSite::Drive).is_some()
+        self.site_sink(kind, Site::Drive).is_some()
     }
 
-    /// The catalog index of the sink `site` names for a kind-`kind` group,
+    /// The catalog index of the sink `site` names for a kind-`kind` bundle,
     /// when present.
-    fn site_sink(&self, kind: Kind, site: MemberSite) -> Option<usize> {
+    fn site_sink(&self, kind: Kind, site: Site) -> Option<usize> {
         let target = site.sink(kind);
         self.output_sinks
             .iter()
             .position(|sink| sink.kind == target)
     }
 
-    /// Every member of `group`, in canonical edge order.
-    pub fn members(&self, group: GroupId) -> impl Iterator<Item = EdgeOccurrence> + '_ {
+    /// Every member of `bundle`, in canonical edge order.
+    pub fn members(&self, bundle: BundleId) -> impl Iterator<Item = EdgeOccurrence> + '_ {
         self.output_sinks
             .iter()
             .enumerate()
@@ -1144,47 +1144,47 @@ impl CgpGraphBackendDef {
                     .inputs
                     .iter()
                     .enumerate()
-                    .filter(move |(_, edge)| edge.is_member_of(group))
+                    .filter(move |(_, edge)| edge.is_member_of(bundle))
                     .map(move |(index, _)| EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index))
             })
     }
 
-    /// The birth coordinates of `group` with presence (T30.F01): a `Ring`
-    /// group's eight [`ring_birth_members`]; a `DirectionPair` group's
+    /// The birth coordinates of `bundle` with presence (T30.F01): a `Ring`
+    /// bundle's eight [`ring_birth_members`]; a `DirectionPair` bundle's
     /// twelve [`super::pair_birth_members`] then one drive coordinate per
     /// declared fact of its pair, none when the pair no longer resolves. A
-    /// coordinate is present when a member of `group` reads its field of
+    /// coordinate is present when a member of `bundle` reads its field of
     /// the shape's reference on its site.
     #[must_use]
     pub fn birth_coordinates(
         &self,
-        group: GroupId,
+        bundle: BundleId,
         input_refs: &[InputReference],
     ) -> Vec<BirthCoordinate> {
-        let record = &self.groups[group.index()];
+        let record = &self.bundles[bundle.index()];
         let ref_idx = record.shape.ref_idx();
-        let births: Vec<(u16, MemberSite)> = match record.shape {
+        let births: Vec<(u16, Site)> = match record.shape {
             Shape::Ring { .. } => ring_birth_members(record.offset)
-                .map(|(field, d)| (field, MemberSite::Direction(d)))
+                .map(|(field, d)| (field, Site::Direction(d)))
                 .collect(),
             Shape::DirectionPair { .. } => record
                 .shape
                 .resolve_pair(input_refs)
                 .map(|pair| {
                     pair_birth_members(pair, record.offset)
-                        .map(|(field, d)| (field, MemberSite::Direction(d)))
-                        .chain(pair.facts.iter().map(|&field| (field, MemberSite::Drive)))
+                        .map(|(field, d)| (field, Site::Direction(d)))
+                        .chain(pair.facts.iter().map(|&field| (field, Site::Drive)))
                         .collect()
                 })
                 .unwrap_or_default(),
         };
-        let members: Vec<(u16, MemberSite)> = self
-            .members(group)
+        let members: Vec<(u16, Site)> = self
+            .members(bundle)
             .filter_map(|member| match self.edge_at(member).source {
                 GraphSource::InputLeaf {
                     ref_idx: at,
                     sub_idx,
-                } if at == ref_idx => Some((sub_idx, self.member_site(member)?)),
+                } if at == ref_idx => Some((sub_idx, self.site_of(member)?)),
                 _ => None,
             })
             .collect();
@@ -1198,28 +1198,28 @@ impl CgpGraphBackendDef {
             .collect()
     }
 
-    /// Create a `Ring` group reading `input_refs[ring_ref]` into `kind` at
+    /// Create a `Ring` bundle reading `input_refs[ring_ref]` into `kind` at
     /// `offset`: one record at scale 0 and eight members at own weight 0,
-    /// channel `c` on sink `kind[(c + offset) mod 8]`. A new group is silent.
+    /// channel `c` on sink `kind[(c + offset) mod 8]`. A new bundle is silent.
     ///
     /// # Panics
     ///
-    /// If `shape` is not a `Ring` (a pair group is created by
-    /// [`Self::add_pair_group`]), [`Self::can_host_group`] is false or
+    /// If `shape` is not a `Ring` (a pair bundle is created by
+    /// [`Self::add_pair_bundle`]), [`Self::can_host_bundle`] is false or
     /// `offset >= 8`.
-    pub fn add_group(&mut self, shape: Shape, kind: Kind, offset: u8) -> GroupId {
+    pub fn add_ring_bundle(&mut self, shape: Shape, kind: Kind, offset: u8) -> BundleId {
         let Shape::Ring { ring_ref } = shape else {
-            panic!("add_group: a DirectionPair group is created by add_pair_group");
+            panic!("add_bundle: a DirectionPair bundle is created by add_pair_bundle");
         };
-        let id = self.push_group_record(shape, kind, offset);
+        let id = self.push_bundle_record(shape, kind, offset);
         for (channel, direction) in ring_birth_members(offset) {
             self.insert_member(
                 Self::new_member(id, ring_ref, channel),
-                MemberSite::Direction(direction),
+                Site::Direction(direction),
                 None,
             );
         }
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
         id
     }
 
@@ -1229,15 +1229,15 @@ impl CgpGraphBackendDef {
     /// non-zero ([`super::pair_birth_members`]), then one fact member on
     /// `kind`'s drive sink per field of `facts`, in `facts` order (T25.F10):
     /// every member born at own weight 0, static, scope `Edge`, no seed. A
-    /// new gene is silent. `AddDirectionPairGroup` passes no facts;
+    /// new gene is silent. `AddDirectionPairBundle` passes no facts;
     /// recruitment's pair case passes `layout.facts`.
     ///
     /// # Panics
     ///
-    /// If [`Self::can_host_group`] is false, `offset >= 8`, a field of
+    /// If [`Self::can_host_bundle`] is false, `offset >= 8`, a field of
     /// `facts` is not one of `layout.facts`, or `facts` is non-empty and
     /// [`Self::can_host_facts`] is false for `kind`.
-    pub fn add_pair_group(
+    pub fn add_pair_bundle(
         &mut self,
         ref_idx: u16,
         pair: u8,
@@ -1245,31 +1245,27 @@ impl CgpGraphBackendDef {
         kind: Kind,
         offset: u8,
         facts: &[u16],
-    ) -> GroupId {
+    ) -> BundleId {
         assert!(
             facts.iter().all(|field| layout.facts.contains(field)),
-            "add_pair_group: every fact member reads one of the pair's facts"
+            "add_pair_bundle: every fact member reads one of the pair's facts"
         );
         assert!(
             facts.is_empty() || self.can_host_facts(kind),
-            "add_pair_group: fact members need the kind's drive sink"
+            "add_pair_bundle: fact members need the kind's drive sink"
         );
-        let id = self.push_group_record(Shape::DirectionPair { ref_idx, pair }, kind, offset);
+        let id = self.push_bundle_record(Shape::DirectionPair { ref_idx, pair }, kind, offset);
         for (field, direction) in pair_birth_members(layout, offset) {
             self.insert_member(
                 Self::new_member(id, ref_idx, field),
-                MemberSite::Direction(direction),
+                Site::Direction(direction),
                 None,
             );
         }
         for &field in facts {
-            self.insert_member(
-                Self::new_member(id, ref_idx, field),
-                MemberSite::Drive,
-                None,
-            );
+            self.insert_member(Self::new_member(id, ref_idx, field), Site::Drive, None);
         }
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
         id
     }
 
@@ -1289,11 +1285,11 @@ impl CgpGraphBackendDef {
         source: BundleSource,
         set: FieldSet,
         birth: BundleBirth,
-    ) -> Result<GroupId, NodeEditError> {
+    ) -> Result<BundleId, NodeEditError> {
         if !plans(self, &set).contains(&birth.wiring) {
             return Err(NodeEditError::Inadmissible);
         }
-        if self.groups.len() >= usize::from(u16::MAX) {
+        if self.bundles.len() >= usize::from(u16::MAX) {
             return Err(NodeEditError::BundleCapacity);
         }
         let BundleSource::Sensor { ref_idx, field_set } = source else {
@@ -1301,54 +1297,54 @@ impl CgpGraphBackendDef {
         };
         let id = match (set, birth.wiring) {
             (FieldSet::Ring, Wiring::Ring { kind, offset }) => {
-                self.add_group(Shape::Ring { ring_ref: ref_idx }, kind, offset)
+                self.add_ring_bundle(Shape::Ring { ring_ref: ref_idx }, kind, offset)
             }
             (FieldSet::Pair(layout), Wiring::DirectionPair { kind, offset }) => {
-                self.add_pair_group(ref_idx, field_set, layout, kind, offset, layout.facts)
+                self.add_pair_bundle(ref_idx, field_set, layout, kind, offset, layout.facts)
             }
             _ => return Err(NodeEditError::Inadmissible),
         };
-        self.group_mut(id).set_scale(birth.scale);
+        self.bundle_mut(id).set_scale(birth.scale);
         Ok(id)
     }
 
-    fn push_group_record(&mut self, shape: Shape, kind: Kind, offset: u8) -> GroupId {
+    fn push_bundle_record(&mut self, shape: Shape, kind: Kind, offset: u8) -> BundleId {
         assert!(
-            self.can_host_group(),
-            "add_group: the graph cannot host a group"
+            self.can_host_bundle(),
+            "add_bundle: the graph cannot host a bundle"
         );
-        assert!(offset < VOTE_DIRECTION_COUNT, "add_group: offset below 8");
-        let id = GroupId(u16::try_from(self.groups.len()).expect("groups below u16::MAX"));
-        self.groups.push(Group::new(shape, kind, offset));
+        assert!(offset < VOTE_DIRECTION_COUNT, "add_bundle: offset below 8");
+        let id = BundleId(u16::try_from(self.bundles.len()).expect("bundles below u16::MAX"));
+        self.bundles.push(Bundle::new(shape, kind, offset));
         if let Some(seeds) = &mut self.birth_seeds {
-            seeds.groups_mut().push(None);
+            seeds.bundles_mut().push(None);
         }
         id
     }
 
-    fn new_member(group: GroupId, ref_idx: u16, sub_idx: u16) -> GraphEdge {
+    fn new_member(bundle: BundleId, ref_idx: u16, sub_idx: u16) -> GraphEdge {
         GraphEdge {
             source: GraphSource::InputLeaf { ref_idx, sub_idx },
             own_weight: 0.0,
             plasticity: None,
             membership: Some(Membership {
-                group,
+                bundle,
                 scope: Scope::Edge,
             }),
         }
     }
 
-    /// Remove `group`'s record and every member, renumbering every higher
-    /// `GroupId`. Returns the number of members removed.
-    pub fn remove_group(&mut self, group: GroupId) -> usize {
-        let removed = self.take_members(group).len();
-        self.drop_group_record(group);
-        self.debug_assert_groups();
+    /// Remove `bundle`'s record and every member, renumbering every higher
+    /// `BundleId`. Returns the number of members removed.
+    pub fn remove_bundle(&mut self, bundle: BundleId) -> usize {
+        let removed = self.take_members(bundle).len();
+        self.drop_bundle_record(bundle);
+        self.debug_assert_bundles();
         removed
     }
 
-    /// Move `group` to `kind` at `offset` (`ShiftGroupOffset`,
-    /// `RetargetGroupKind`): every member leaves its sink and is re-inserted
+    /// Move `bundle` to `kind` at `offset` (`ShiftBundleOffset`,
+    /// `RetargetBundleKind`): every member leaves its sink and is re-inserted
     /// at its new sink in the I10 position, keeping its own weight. A `Ring`
     /// member moves by its channel; a `DirectionPair` direction member on
     /// direction `d` moves to `(d + offset − old_offset) mod 8`, so every
@@ -1357,44 +1353,44 @@ impl CgpGraphBackendDef {
     ///
     /// # Panics
     ///
-    /// If `offset >= 8`, or the group has a fact member and
+    /// If `offset >= 8`, or the bundle has a fact member and
     /// [`Self::can_host_facts`] is false for `kind`.
-    pub fn relocate_group(&mut self, group: GroupId, kind: Kind, offset: u8) {
+    pub fn relocate_bundle(&mut self, bundle: BundleId, kind: Kind, offset: u8) {
         assert!(
             offset < VOTE_DIRECTION_COUNT,
-            "relocate_group: offset below 8"
+            "relocate_bundle: offset below 8"
         );
         let n = VOTE_DIRECTION_COUNT;
-        let old = self.groups[group.index()];
-        let moved = self.take_members(group);
-        let record = &mut self.groups[group.index()];
+        let old = self.bundles[bundle.index()];
+        let moved = self.take_members(bundle);
+        let record = &mut self.bundles[bundle.index()];
         record.kind = kind;
         record.offset = offset;
         let record = *record;
         for (edge, site, seed) in moved {
             let site = match (record.shape, site) {
-                (_, MemberSite::Drive) => MemberSite::Drive,
-                (Shape::Ring { .. }, MemberSite::Direction(_)) => {
+                (_, Site::Drive) => Site::Drive,
+                (Shape::Ring { .. }, Site::Direction(_)) => {
                     let (_, channel) = Self::member_key(&edge).expect("a member");
-                    MemberSite::Direction(member_direction(&record, channel))
+                    Site::Direction(member_direction(&record, channel))
                 }
-                (Shape::DirectionPair { .. }, MemberSite::Direction(d)) => {
-                    MemberSite::Direction((d + n - old.offset + offset) % n)
+                (Shape::DirectionPair { .. }, Site::Direction(d)) => {
+                    Site::Direction((d + n - old.offset + offset) % n)
                 }
             };
             self.insert_member(edge, site, seed);
         }
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
     }
 
-    /// Detach the member at `occurrence` with its group's `pattern` there:
+    /// Detach the member at `occurrence` with its bundle's `pattern` there:
     /// its own weight becomes its genomic weight
     /// `compose(own, scale, pattern)`, bitwise, its membership is cleared and
     /// it moves to the end of its sink's independent prefix. A fact member
     /// (T25.F10) detaches own-only: its own weight bits and its seed entry
-    /// stay exactly as stored and `pattern` is not read. Detaching a group's
-    /// last member removes the group. Returns the edge's new occurrence and
-    /// whether the group was removed.
+    /// stay exactly as stored and `pattern` is not read. Detaching a bundle's
+    /// last member removes the bundle. Returns the edge's new occurrence and
+    /// whether the bundle was removed.
     pub fn detach_at(
         &mut self,
         occurrence: EdgeOccurrence,
@@ -1409,21 +1405,21 @@ impl CgpGraphBackendDef {
             .birth_seeds
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
-        let Membership { group, .. } = edge.membership.expect("detach_at: the edge is a member");
+        let Membership { bundle, .. } = edge.membership.expect("detach_at: the edge is a member");
         if !fact {
-            let scale = self.groups[group.index()].scale;
+            let scale = self.bundles[bundle.index()].scale;
             // The composed seed (T25.F07 invariant 6): what the detached
-            // edge weighed at the parent, from the edge's and the group's
+            // edge weighed at the parent, from the edge's and the bundle's
             // seeds, each falling back to its genomic value; no flag read and
             // no clamp (`from_seeds` clamps at construction).
-            let group_seed = self
+            let bundle_seed = self
                 .birth_seeds
                 .as_ref()
-                .and_then(|seeds| seeds.group_value(group));
-            seed = (seed.is_some() || group_seed.is_some()).then(|| {
+                .and_then(|seeds| seeds.bundle_value(bundle));
+            seed = (seed.is_some() || bundle_seed.is_some()).then(|| {
                 compose(
                     seed.unwrap_or(edge.own_weight),
-                    group_seed.unwrap_or(scale),
+                    bundle_seed.unwrap_or(scale),
                     pattern,
                 )
             });
@@ -1435,20 +1431,20 @@ impl CgpGraphBackendDef {
         if let Some(seeds) = &mut self.birth_seeds {
             seeds.row_mut(occurrence.surface).insert(at, seed);
         }
-        let removed = self.members(group).next().is_none();
+        let removed = self.members(bundle).next().is_none();
         if removed {
-            self.drop_group_record(group);
+            self.drop_bundle_record(bundle);
         }
-        self.debug_assert_groups();
+        self.debug_assert_bundles();
         (
             EdgeOccurrence::new(EdgeSurface::SinkInput(sink), at),
             removed,
         )
     }
 
-    /// A handle for changing `group`'s record.
-    pub fn group_mut(&mut self, group: GroupId) -> GroupMut<'_> {
-        GroupMut { def: self, group }
+    /// A handle for changing `bundle`'s record.
+    pub fn bundle_mut(&mut self, bundle: BundleId) -> BundleMut<'_> {
+        BundleMut { def: self, bundle }
     }
 
     /// The index of `sink`'s first member, its input count when it has none.
@@ -1460,26 +1456,26 @@ impl CgpGraphBackendDef {
             .unwrap_or(inputs.len())
     }
 
-    /// The I10 sort key of a member: `(GroupId, sub_idx)` (a `Ring`
+    /// The I10 sort key of a member: `(BundleId, sub_idx)` (a `Ring`
     /// member's channel; a pair member's field, `x ≠ y`, so unique within a
     /// sink).
-    fn member_key(edge: &GraphEdge) -> Option<(GroupId, u16)> {
-        let Membership { group, .. } = edge.membership?;
+    fn member_key(edge: &GraphEdge) -> Option<(BundleId, u16)> {
+        let Membership { bundle, .. } = edge.membership?;
         let channel = match edge.source {
             GraphSource::InputLeaf { sub_idx, .. } => sub_idx,
             _ => u16::MAX,
         };
-        Some((group, channel))
+        Some((bundle, channel))
     }
 
     /// Insert member `edge` with `seed` on the sink `site` names for its
-    /// group's kind, in the I10 position.
-    fn insert_member(&mut self, edge: GraphEdge, site: MemberSite, seed: Option<f32>) {
+    /// bundle's kind, in the I10 position.
+    fn insert_member(&mut self, edge: GraphEdge, site: Site, seed: Option<f32>) {
         let key = Self::member_key(&edge);
-        let (group, _) = key.expect("a member");
+        let (bundle, _) = key.expect("a member");
         let sink = self
-            .site_sink(self.groups[group.index()].kind, site)
-            .expect("a group's graph carries every sink its members sit on");
+            .site_sink(self.bundles[bundle.index()].kind, site)
+            .expect("a bundle's graph carries every sink its members sit on");
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
             .iter()
@@ -1491,16 +1487,16 @@ impl CgpGraphBackendDef {
         }
     }
 
-    /// Remove every member of `group` from its sink, in canonical order,
+    /// Remove every member of `bundle` from its sink, in canonical order,
     /// each with its site and its seed.
-    fn take_members(&mut self, group: GroupId) -> Vec<(GraphEdge, MemberSite, Option<f32>)> {
-        let kind = self.groups[group.index()].kind;
+    fn take_members(&mut self, bundle: BundleId) -> Vec<(GraphEdge, Site, Option<f32>)> {
+        let kind = self.bundles[bundle.index()].kind;
         let mut taken = Vec::with_capacity(usize::from(2 * VOTE_DIRECTION_COUNT));
         for (sink_idx, sink) in self.output_sinks.0.iter_mut().enumerate() {
-            let Some(site) = MemberSite::of(sink.kind, kind) else {
+            let Some(site) = Site::of(sink.kind, kind) else {
                 debug_assert!(
-                    !sink.inputs.iter().any(|edge| edge.is_member_of(group)),
-                    "a member sits on a sink of its group's kind"
+                    !sink.inputs.iter().any(|edge| edge.is_member_of(bundle)),
+                    "a member sits on a sink of its bundle's kind"
                 );
                 continue;
             };
@@ -1510,7 +1506,7 @@ impl CgpGraphBackendDef {
                 .map(|seeds| seeds.row_mut(EdgeSurface::SinkInput(sink_idx)));
             let mut index = 0;
             while index < sink.inputs.len() {
-                if sink.inputs[index].is_member_of(group) {
+                if sink.inputs[index].is_member_of(bundle) {
                     let edge = sink.inputs.0.remove(index);
                     let seed = seeds.as_mut().and_then(|row| row.remove(index));
                     taken.push((edge, site, seed));
@@ -1522,17 +1518,17 @@ impl CgpGraphBackendDef {
         taken
     }
 
-    /// Remove `group`'s record and decrement every higher `GroupId`.
-    fn drop_group_record(&mut self, group: GroupId) {
-        self.groups.remove(group.index());
+    /// Remove `bundle`'s record and decrement every higher `BundleId`.
+    fn drop_bundle_record(&mut self, bundle: BundleId) {
+        self.bundles.remove(bundle.index());
         if let Some(seeds) = &mut self.birth_seeds {
-            seeds.groups_mut().remove(group.index());
+            seeds.bundles_mut().remove(bundle.index());
         }
         for sink in &mut self.output_sinks.0 {
             for edge in &mut sink.inputs.0 {
-                if let Some(Membership { group: id, .. }) = &mut edge.membership {
-                    debug_assert_ne!(*id, group, "the dropped group has no member");
-                    if *id > group {
+                if let Some(Membership { bundle: id, .. }) = &mut edge.membership {
+                    debug_assert_ne!(*id, bundle, "the dropped bundle has no member");
+                    if *id > bundle {
                         id.0 -= 1;
                     }
                 }
@@ -1540,10 +1536,10 @@ impl CgpGraphBackendDef {
         }
     }
 
-    /// The def-local group invariants (I2–I6, I10, `offset < 8`), checked
-    /// in debug builds at every group-touching primitive's exit.
-    fn debug_assert_groups(&self) {
-        if cfg!(debug_assertions) && !self.groups.is_empty() {
+    /// The def-local bundle invariants (I2–I6, I10, `offset < 8`), checked
+    /// in debug builds at every bundle-touching primitive's exit.
+    fn debug_assert_bundles(&self) {
+        if cfg!(debug_assertions) && !self.bundles.is_empty() {
             if let Err(violation) = self.check_local_invariants() {
                 panic!("graph invariant violated: {violation:?}");
             }
@@ -1551,14 +1547,14 @@ impl CgpGraphBackendDef {
     }
 
     /// The invariants that need only the def (I2–I6, I10, `offset < 8`). A
-    /// group's member set is keyed by channel for a `Ring` and by
+    /// bundle's member set is keyed by channel for a `Ring` and by
     /// `(sub_idx, site)` for a `DirectionPair` (a drive site only on the
     /// record's kind, T25.F10); the pair's field roles need the input
     /// references ([`validate_graph`]).
     pub(crate) fn check_local_invariants(&self) -> Result<(), GraphInvariantViolation> {
         use GraphInvariantViolation as V;
-        if self.groups.len() > usize::from(u16::MAX) {
-            return Err(V::TooManyGroups);
+        if self.bundles.len() > usize::from(u16::MAX) {
+            return Err(V::TooManyBundles);
         }
         if self
             .compute_nodes
@@ -1568,18 +1564,18 @@ impl CgpGraphBackendDef {
             return Err(V::MemberOnComputeInput);
         }
         if self
-            .groups
+            .bundles
             .iter()
-            .any(|group| group.offset >= VOTE_DIRECTION_COUNT)
+            .any(|bundle| bundle.offset >= VOTE_DIRECTION_COUNT)
         {
             return Err(V::OffsetOutOfRange);
         }
         if self
-            .groups
+            .bundles
             .iter()
-            .any(|group| !(0.0..=1.0).contains(&group.retention))
+            .any(|bundle| !(0.0..=1.0).contains(&bundle.retention))
         {
-            return Err(V::GroupRetentionOutOfRange);
+            return Err(V::BundleRetentionOutOfRange);
         }
         for (occurrence, config) in self.plastic_edges() {
             if !config.in_range() {
@@ -1589,11 +1585,11 @@ impl CgpGraphBackendDef {
                 return Err(V::IneligiblePlasticEdge);
             }
         }
-        let mut members = vec![0u32; self.groups.len()];
-        let mut ring_channels = vec![0u8; self.groups.len()];
+        let mut members = vec![0u32; self.bundles.len()];
+        let mut ring_channels = vec![0u8; self.bundles.len()];
         let mut pair_coordinates = std::collections::HashSet::new();
         for sink in self.output_sinks.iter() {
-            let mut previous: Option<(GroupId, u16)> = None;
+            let mut previous: Option<(BundleId, u16)> = None;
             let mut in_members = false;
             for edge in sink.inputs.iter() {
                 let Some(key) = Self::member_key(edge) else {
@@ -1609,9 +1605,9 @@ impl CgpGraphBackendDef {
                     _ => {}
                 }
                 previous = Some(key);
-                let (group, sub_idx) = key;
-                let Some(record) = self.groups.get(group.index()) else {
-                    return Err(V::GroupIdOutOfRange);
+                let (bundle, sub_idx) = key;
+                let Some(record) = self.bundles.get(bundle.index()) else {
+                    return Err(V::BundleIdOutOfRange);
                 };
                 let reads_shape_ref = matches!(
                     edge.source,
@@ -1620,14 +1616,14 @@ impl CgpGraphBackendDef {
                 // A `Ring` member sits on the direction sink of its channel;
                 // a `DirectionPair` member on a direction sink of its kind
                 // or, as a fact member, on its kind's drive (T25.F10).
-                let site = MemberSite::of(sink.kind, record.kind).filter(|&site| {
+                let site = Site::of(sink.kind, record.kind).filter(|&site| {
                     reads_shape_ref
                         && match (record.shape, site) {
-                            (Shape::Ring { .. }, MemberSite::Direction(d)) => {
+                            (Shape::Ring { .. }, Site::Direction(d)) => {
                                 sub_idx < u16::from(VOTE_DIRECTION_COUNT)
                                     && member_direction(record, sub_idx) == d
                             }
-                            (Shape::Ring { .. }, MemberSite::Drive) => false,
+                            (Shape::Ring { .. }, Site::Drive) => false,
                             (Shape::DirectionPair { .. }, _) => true,
                         }
                 });
@@ -1637,20 +1633,20 @@ impl CgpGraphBackendDef {
                 let fresh = match record.shape {
                     Shape::Ring { .. } => {
                         let bit = 1u8 << sub_idx;
-                        let fresh = ring_channels[group.index()] & bit == 0;
-                        ring_channels[group.index()] |= bit;
+                        let fresh = ring_channels[bundle.index()] & bit == 0;
+                        ring_channels[bundle.index()] |= bit;
                         fresh
                     }
-                    Shape::DirectionPair { .. } => pair_coordinates.insert((group, sub_idx, site)),
+                    Shape::DirectionPair { .. } => pair_coordinates.insert((bundle, sub_idx, site)),
                 };
                 if !fresh {
                     return Err(V::DuplicateMember);
                 }
-                members[group.index()] += 1;
+                members[bundle.index()] += 1;
             }
         }
         if members.contains(&0) {
-            return Err(V::EmptyGroup);
+            return Err(V::EmptyBundle);
         }
         Ok(())
     }
@@ -1677,19 +1673,19 @@ impl CgpGraphBackendDef {
     }
 
     /// I11: when rows are present there is one per compute node and one per
-    /// sink, each sized to that container's inputs, and one group slot per
-    /// group record.
+    /// sink, each sized to that container's inputs, and one bundle slot per
+    /// bundle record.
     fn debug_assert_seed_shape(&self) {
         if let Some(BirthSeeds::Rows {
             compute,
             sinks,
-            groups,
+            bundles,
         }) = &self.birth_seeds
         {
             debug_assert_eq!(
-                groups.len(),
-                self.groups.len(),
-                "one seed slot per group record"
+                bundles.len(),
+                self.bundles.len(),
+                "one seed slot per bundle record"
             );
             debug_assert_eq!(
                 compute.len(),
@@ -1746,26 +1742,26 @@ impl CgpGraphBackendDef {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect();
-        let groups = vec![None; self.groups.len()];
+        let bundles = vec![None; self.bundles.len()];
         self.seed_birth(BirthSeeds::Rows {
             compute,
             sinks,
-            groups,
+            bundles,
         });
     }
 
-    /// Fill the group table to its `u16::MAX`-record limit with memberless
-    /// records, so [`Self::can_host_group`] is false on an otherwise full
-    /// sink catalog (a preflight fixture; such a def fails `EmptyGroup`).
-    pub(crate) fn exhaust_group_capacity(&mut self) {
-        let record = Group::new(Shape::Ring { ring_ref: 0 }, Kind::Move, 0);
-        self.groups = vec![record; usize::from(u16::MAX)];
+    /// Fill the bundle table to its `u16::MAX`-record limit with memberless
+    /// records, so [`Self::can_host_bundle`] is false on an otherwise full
+    /// sink catalog (a preflight fixture; such a def fails `EmptyBundle`).
+    pub(crate) fn exhaust_bundle_capacity(&mut self) {
+        let record = Bundle::new(Shape::Ring { ring_ref: 0 }, Kind::Move, 0);
+        self.bundles = vec![record; usize::from(u16::MAX)];
     }
 
-    /// Drop the last group record (a capacity fixture, after
-    /// [`Self::exhaust_group_capacity`]).
-    pub(crate) fn drop_last_group_record(&mut self) {
-        self.groups.pop();
+    /// Drop the last bundle record (a capacity fixture, after
+    /// [`Self::exhaust_bundle_capacity`]).
+    pub(crate) fn drop_last_bundle_record(&mut self) {
+        self.bundles.pop();
     }
 }
 

@@ -4,7 +4,7 @@ use crate::contracts::votes::VoteSink;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::founder::founder_genome;
 use crate::genome::analysis::mesh_reachable_nodes;
-use crate::genome::cgp::{GraphEdge, GroupId};
+use crate::genome::cgp::{BundleId, GraphEdge};
 use crate::genome::NodeGenome;
 
 fn barrier() -> InputReference {
@@ -39,10 +39,15 @@ fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
     def.push_edge(surface, edge);
 }
 
-/// Add a `Ring` group on reference 0 with `scale`.
-fn group(def: &mut CgpGraphBackendDef, kind: DirectedVoteKind, offset: u8, scale: f32) -> GroupId {
-    let id = def.add_group(Shape::Ring { ring_ref: 0 }, kind, offset);
-    def.group_mut(id).set_scale(scale);
+/// Add a `Ring` bundle on reference 0 with `scale`.
+fn bundle(
+    def: &mut CgpGraphBackendDef,
+    kind: DirectedVoteKind,
+    offset: u8,
+    scale: f32,
+) -> BundleId {
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, offset);
+    def.bundle_mut(id).set_scale(scale);
     id
 }
 
@@ -63,9 +68,9 @@ fn the_founder_carries_one_food_rule_covering_its_four_cardinals() {
     );
     assert_eq!(census.direction_general, 0);
     assert_eq!(census.direction_general_edges_only, 0);
-    assert_eq!(census.ring_groups, 0);
-    assert_eq!(census.ring_group_members, 0);
-    assert!(census.ring_group_rows().is_empty());
+    assert_eq!(census.ring_bundles, 0);
+    assert_eq!(census.ring_bundle_members, 0);
+    assert!(census.ring_bundle_rows().is_empty());
 }
 
 #[test]
@@ -150,7 +155,7 @@ fn a_bus_hop_from_a_sub_index_past_the_ring_carries_no_rule() {
 #[test]
 fn only_ring_references_above_the_weight_floor_carry_a_path() {
     // Arrange: a non-ring world input at full weight, ring edges of either
-    // sign at exactly the floor, and a group whose members weigh exactly the
+    // sign at exactly the floor, and a bundle whose members weigh exactly the
     // floor.
     let food_here = InputReference::World(WorldInputKey::FoodHere {
         type_idx: OrdinaryFoodTypeId::new(0),
@@ -171,32 +176,32 @@ fn only_ring_references_above_the_weight_floor_carry_a_path() {
         OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
         leaf(1, 0, -PATH_WEIGHT_FLOOR),
     );
-    let id = def.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Reproduce, 0);
-    def.group_mut(id).set_scale(PATH_WEIGHT_FLOOR);
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Reproduce, 0);
+    def.bundle_mut(id).set_scale(PATH_WEIGHT_FLOOR);
 
     // Act
     let census = census_of(&[single(def, vec![food_here, barrier()])]);
 
     // Assert
     assert!(census.rule_rows().is_empty());
-    assert_eq!(census.ring_groups, 1);
-    assert_eq!(census.ring_groups_nonzero, 0);
-    assert_eq!(census.ring_group_members, 8);
+    assert_eq!(census.ring_bundles, 1);
+    assert_eq!(census.ring_bundles_nonzero, 0);
+    assert_eq!(census.ring_bundle_members, 8);
     assert_eq!(
-        census.ring_group_rows(),
+        census.ring_bundle_rows(),
         vec!["NeighborBarrierRing Reproduce 0 1 0 0 8".to_string()]
     );
 }
 
 #[test]
-fn ring_group_rows_count_each_sign_only_above_the_weight_floor() {
-    // Arrange: one group class with one carrying scale of each sign and one
-    // sub-floor scale of each sign; one group has lost a member.
+fn ring_bundle_rows_count_each_sign_only_above_the_weight_floor() {
+    // Arrange: one bundle class with one carrying scale of each sign and one
+    // sub-floor scale of each sign; one bundle has lost a member.
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     for scale in [-0.5, -1e-4, 1e-4, 0.5] {
-        group(&mut def, DirectedVoteKind::Move, 2, scale);
+        bundle(&mut def, DirectedVoteKind::Move, 2, scale);
     }
-    let member = def.members(GroupId::new(3)).next().unwrap();
+    let member = def.members(BundleId::new(3)).next().unwrap();
     def.remove_edge(member);
 
     // Act
@@ -204,33 +209,33 @@ fn ring_group_rows_count_each_sign_only_above_the_weight_floor() {
 
     // Assert
     assert_eq!(
-        census.ring_group_rows(),
+        census.ring_bundle_rows(),
         vec!["NeighborBarrierRing Move 2 4 1 1 31".to_string()]
     );
-    assert_eq!(census.ring_groups_nonzero, 2);
-    assert_eq!(census.ring_group_members, 31);
+    assert_eq!(census.ring_bundles_nonzero, 2);
+    assert_eq!(census.ring_bundle_members, 31);
 }
 
-/// ring-rules-v2: a `Ring` group at scale 1 and corrections 0 covers its rule
+/// ring-rules-v2: a `Ring` bundle at scale 1 and corrections 0 covers its rule
 /// in every direction through its members at their genomic weight, so it is
 /// direction-general, but not through independent edges.
 #[test]
-fn a_ring_group_at_scale_one_is_direction_general_but_not_through_independent_edges() {
+fn a_ring_bundle_at_scale_one_is_direction_general_but_not_through_independent_edges() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    group(&mut def, DirectedVoteKind::Move, 0, 1.0);
+    bundle(&mut def, DirectedVoteKind::Move, 0, 1.0);
     let census = census_of(&[single(def.clone(), vec![barrier()])]);
     assert_eq!(census.direction_general, 1);
     assert_eq!(census.direction_general_edges_only, 0);
-    assert_eq!(census.ring_group_carriers, 1);
-    assert_eq!(census.ring_groups, 1);
-    assert_eq!(census.ring_groups_nonzero, 1);
-    assert_eq!(census.ring_group_members, 8);
+    assert_eq!(census.ring_bundle_carriers, 1);
+    assert_eq!(census.ring_bundles, 1);
+    assert_eq!(census.ring_bundles_nonzero, 1);
+    assert_eq!(census.ring_bundle_members, 8);
     assert_eq!(
         census.rule_rows(),
         vec!["NeighborBarrierRing Move 0 + 0 0 0 0 0 0 0 1".to_string()]
     );
     // A correction that cancels one member's weight drops that direction.
-    let member = def.members(GroupId::new(0)).next().unwrap();
+    let member = def.members(BundleId::new(0)).next().unwrap();
     def.edge_mut(member).set_weight(-1.0);
     let census = census_of(&[single(def, vec![barrier()])]);
     assert_eq!(
@@ -241,9 +246,9 @@ fn a_ring_group_at_scale_one_is_direction_general_but_not_through_independent_ed
 }
 
 #[test]
-fn a_ring_group_covers_every_direction_once_it_carries_weight() {
+fn a_ring_bundle_covers_every_direction_once_it_carries_weight() {
     let mut silent = CgpGraphBackendDef::new_with_fixed_outputs();
-    group(&mut silent, DirectedVoteKind::Reproduce, 3, 0.0);
+    bundle(&mut silent, DirectedVoteKind::Reproduce, 3, 0.0);
     let mut weighted = CgpGraphBackendDef::new_with_fixed_outputs();
     // An incumbent edge path for the same rule in one direction.
     wire(
@@ -251,19 +256,19 @@ fn a_ring_group_covers_every_direction_once_it_carries_weight() {
         OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 3)),
         leaf(0, 0, 1.0),
     );
-    group(&mut weighted, DirectedVoteKind::Reproduce, 3, 0.25);
+    bundle(&mut weighted, DirectedVoteKind::Reproduce, 3, 0.25);
     let census = census_of(&[
         single(silent, vec![barrier()]),
         single(weighted, vec![barrier()]),
     ]);
     assert_eq!(census.creatures, 2);
-    assert_eq!(census.ring_group_carriers, 2);
-    assert_eq!(census.ring_groups, 2);
-    assert_eq!(census.ring_groups_nonzero, 1);
-    assert_eq!(census.ring_groups_unreachable, 0);
-    assert_eq!(census.ring_group_members, 16);
+    assert_eq!(census.ring_bundle_carriers, 2);
+    assert_eq!(census.ring_bundles, 2);
+    assert_eq!(census.ring_bundles_nonzero, 1);
+    assert_eq!(census.ring_bundles_unreachable, 0);
+    assert_eq!(census.ring_bundle_members, 16);
     assert_eq!(
-        census.ring_group_rows(),
+        census.ring_bundle_rows(),
         vec!["NeighborBarrierRing Reproduce 3 2 1 0 16".to_string()]
     );
     assert_eq!(
@@ -275,9 +280,9 @@ fn a_ring_group_covers_every_direction_once_it_carries_weight() {
 }
 
 #[test]
-fn a_ring_group_on_an_unreachable_node_is_counted_apart() {
+fn a_ring_bundle_on_an_unreachable_node_is_counted_apart() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    group(&mut def, DirectedVoteKind::Move, 0, 1.0);
+    bundle(&mut def, DirectedVoteKind::Move, 0, 1.0);
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
@@ -286,20 +291,20 @@ fn a_ring_group_on_an_unreachable_node_is_counted_apart() {
         ],
     };
     let census = census_of(&[genome]);
-    assert_eq!(census.ring_groups, 0);
-    assert_eq!(census.ring_group_carriers, 0);
-    assert_eq!(census.ring_groups_unreachable, 1);
+    assert_eq!(census.ring_bundles, 0);
+    assert_eq!(census.ring_bundle_carriers, 0);
+    assert_eq!(census.ring_bundles_unreachable, 1);
     assert!(census.rule_rows().is_empty());
 }
 
-/// A `DirectionPair` group (T25.F04) is no ring group: the census counts
+/// A `DirectionPair` bundle (T25.F04) is no ring bundle: the census counts
 /// neither its record, its members nor a rule from it, reachable or not.
 #[test]
-fn ring_rules_ignore_a_pair_group() {
+fn ring_rules_ignore_a_pair_bundle() {
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let pair_def = || {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_pair_group(
+        let id = def.add_pair_bundle(
             0,
             1,
             area.direction_pairs()[1],
@@ -307,21 +312,21 @@ fn ring_rules_ignore_a_pair_group() {
             0,
             &[],
         );
-        def.group_mut(id).set_scale(1.0);
+        def.bundle_mut(id).set_scale(1.0);
         def
     };
     let census = census_of(&[single(pair_def(), vec![area.clone()])]);
-    assert_eq!(census.ring_groups, 0);
-    assert_eq!(census.ring_group_members, 0);
-    assert_eq!(census.ring_group_carriers, 0);
-    assert!(census.ring_group_rows().is_empty());
+    assert_eq!(census.ring_bundles, 0);
+    assert_eq!(census.ring_bundle_members, 0);
+    assert_eq!(census.ring_bundle_carriers, 0);
+    assert!(census.ring_bundle_rows().is_empty());
     assert!(census.rule_rows().is_empty());
-    // An unreachable node's pair group is not an unreachable ring group.
+    // An unreachable node's pair bundle is not an unreachable ring bundle.
     let mut genome = single(
         CgpGraphBackendDef::new_with_fixed_outputs(),
         vec![area.clone()],
     );
     genome.nodes.push(node(1, vec![area.clone()], pair_def()));
     let census = census_of(&[genome]);
-    assert_eq!(census.ring_groups_unreachable, 0);
+    assert_eq!(census.ring_bundles_unreachable, 0);
 }

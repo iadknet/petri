@@ -26,8 +26,8 @@ pub(crate) struct NodeDraft {
 }
 
 /// Edit `def`'s sink catalog as drafts; the def keeps its compute nodes,
-/// group records and seeds (a member stays a member: the caller keeps the
-/// group invariants).
+/// bundle records and seeds (a member stays a member: the caller keeps the
+/// bundle invariants).
 pub(crate) fn edit_sinks(def: &mut CgpGraphBackendDef, edit: impl FnOnce(&mut Vec<SinkDraft>)) {
     let mut drafts: Vec<SinkDraft> = def
         .output_sinks()

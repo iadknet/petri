@@ -239,7 +239,7 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphRawFieldMutation
             | MutationOperator::GraphCopyInternalNode
             | MutationOperator::GraphCopySubgraph
-            | MutationOperator::GraphCopyEdgeBundle
+            | MutationOperator::GraphCopyNodeInputs
             | MutationOperator::GraphEnableHebbian
             | MutationOperator::GraphDisableHebbian
             | MutationOperator::GraphMutateHebbianRule
@@ -250,22 +250,22 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphMutateRewardSource
             | MutationOperator::GraphMutateTraceDecay
             | MutationOperator::GraphRecruitNeutralInput
-            | MutationOperator::GraphAddRingGroup
-            | MutationOperator::GraphAddDirectionPairGroup
-            | MutationOperator::GraphAlterGroupScale
-            | MutationOperator::GraphShiftGroupOffset
-            | MutationOperator::GraphRetargetGroupKind
-            | MutationOperator::GraphRemoveGroup
+            | MutationOperator::GraphAddRingBundle
+            | MutationOperator::GraphAddDirectionPairBundle
+            | MutationOperator::GraphAlterBundleScale
+            | MutationOperator::GraphShiftBundleOffset
+            | MutationOperator::GraphRetargetBundleKind
+            | MutationOperator::GraphRemoveBundle
             | MutationOperator::GraphSetScope
-            | MutationOperator::GraphAddRandomizedRingGroup
-            | MutationOperator::GraphAddRandomizedDirectionPairGroup
+            | MutationOperator::GraphAddRandomizedRingBundle
+            | MutationOperator::GraphAddRandomizedDirectionPairBundle
             | MutationOperator::GraphDetachGraphEdge
             | MutationOperator::GraphEnableRetention
             | MutationOperator::GraphDisableRetention
             | MutationOperator::GraphMutateRetention
-            | MutationOperator::GraphEnableGroupRetention
-            | MutationOperator::GraphDisableGroupRetention
-            | MutationOperator::GraphMutateGroupRetention => {
+            | MutationOperator::GraphEnableBundleRetention
+            | MutationOperator::GraphDisableBundleRetention
+            | MutationOperator::GraphMutateBundleRetention => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -361,7 +361,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
             GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
             GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
-            GraphOperator::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
+            GraphOperator::CopyNodeInputs => MutationOperator::GraphCopyNodeInputs,
             GraphOperator::EnableHebbian => MutationOperator::GraphEnableHebbian,
             GraphOperator::DisableHebbian => MutationOperator::GraphDisableHebbian,
             GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
@@ -376,24 +376,26 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            GraphOperator::AddRingGroup => MutationOperator::GraphAddRingGroup,
-            GraphOperator::AddDirectionPairGroup => MutationOperator::GraphAddDirectionPairGroup,
-            GraphOperator::AlterGroupScale => MutationOperator::GraphAlterGroupScale,
-            GraphOperator::ShiftGroupOffset => MutationOperator::GraphShiftGroupOffset,
-            GraphOperator::RetargetGroupKind => MutationOperator::GraphRetargetGroupKind,
-            GraphOperator::RemoveGroup => MutationOperator::GraphRemoveGroup,
+            GraphOperator::AddRingBundle => MutationOperator::GraphAddRingBundle,
+            GraphOperator::AddDirectionPairBundle => MutationOperator::GraphAddDirectionPairBundle,
+            GraphOperator::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
+            GraphOperator::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
+            GraphOperator::RetargetBundleKind => MutationOperator::GraphRetargetBundleKind,
+            GraphOperator::RemoveBundle => MutationOperator::GraphRemoveBundle,
             GraphOperator::SetScope => MutationOperator::GraphSetScope,
-            GraphOperator::AddRandomizedRingGroup => MutationOperator::GraphAddRandomizedRingGroup,
-            GraphOperator::AddRandomizedDirectionPairGroup => {
-                MutationOperator::GraphAddRandomizedDirectionPairGroup
+            GraphOperator::AddRandomizedRingBundle => {
+                MutationOperator::GraphAddRandomizedRingBundle
+            }
+            GraphOperator::AddRandomizedDirectionPairBundle => {
+                MutationOperator::GraphAddRandomizedDirectionPairBundle
             }
             GraphOperator::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
             GraphOperator::EnableRetention => MutationOperator::GraphEnableRetention,
             GraphOperator::DisableRetention => MutationOperator::GraphDisableRetention,
             GraphOperator::MutateRetention => MutationOperator::GraphMutateRetention,
-            GraphOperator::EnableGroupRetention => MutationOperator::GraphEnableGroupRetention,
-            GraphOperator::DisableGroupRetention => MutationOperator::GraphDisableGroupRetention,
-            GraphOperator::MutateGroupRetention => MutationOperator::GraphMutateGroupRetention,
+            GraphOperator::EnableBundleRetention => MutationOperator::GraphEnableBundleRetention,
+            GraphOperator::DisableBundleRetention => MutationOperator::GraphDisableBundleRetention,
+            GraphOperator::MutateBundleRetention => MutationOperator::GraphMutateBundleRetention,
         };
         // `complexity_effect` delegates to `operator()`, so pinning the
         // mapping pins the classification.
@@ -454,7 +456,7 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::GraphRawFieldMutation
             | GraphOperator::CopyInternalNode
             | GraphOperator::CopySubgraph
-            | GraphOperator::CopyEdgeBundle
+            | GraphOperator::CopyNodeInputs
             | GraphOperator::EnableHebbian
             | GraphOperator::DisableHebbian
             | GraphOperator::MutateHebbianRule
@@ -465,22 +467,22 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::MutateRewardSource
             | GraphOperator::MutateTraceDecay
             | GraphOperator::RecruitNeutralInput
-            | GraphOperator::AddRingGroup
-            | GraphOperator::AddDirectionPairGroup
-            | GraphOperator::AlterGroupScale
-            | GraphOperator::ShiftGroupOffset
-            | GraphOperator::RetargetGroupKind
-            | GraphOperator::RemoveGroup
+            | GraphOperator::AddRingBundle
+            | GraphOperator::AddDirectionPairBundle
+            | GraphOperator::AlterBundleScale
+            | GraphOperator::ShiftBundleOffset
+            | GraphOperator::RetargetBundleKind
+            | GraphOperator::RemoveBundle
             | GraphOperator::SetScope
-            | GraphOperator::AddRandomizedRingGroup
-            | GraphOperator::AddRandomizedDirectionPairGroup
+            | GraphOperator::AddRandomizedRingBundle
+            | GraphOperator::AddRandomizedDirectionPairBundle
             | GraphOperator::DetachGraphEdge
             | GraphOperator::EnableRetention
             | GraphOperator::DisableRetention
             | GraphOperator::MutateRetention
-            | GraphOperator::EnableGroupRetention
-            | GraphOperator::DisableGroupRetention
-            | GraphOperator::MutateGroupRetention => {}
+            | GraphOperator::EnableBundleRetention
+            | GraphOperator::DisableBundleRetention
+            | GraphOperator::MutateBundleRetention => {}
         }
     }
     assert_eq!(variants.len(), 38);

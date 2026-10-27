@@ -106,14 +106,14 @@ mod tests {
     use crate::contracts::WorldInputKey;
     use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
 
-    /// A node wired only through a group's members writes the action
+    /// A node wired only through a bundle's members writes the action
     /// channel and reads its ring (T25.F03).
     #[test]
     fn a_member_only_node_is_an_action_writer() {
         use crate::contracts::votes::DirectedVoteKind;
         use crate::genome::cgp::Shape;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 5);
+        def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 5);
         let ring = InputReference::World(WorldInputKey::NeighborBarrierRing);
         let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[ring]);
         assert_eq!(writes, vec![MeshWriteClass::Action]);

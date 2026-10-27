@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { graphBrain, ringGroup } from "../../test/brainFixtures.ts";
+import { graphBrain, ringBundle } from "../../test/brainFixtures.ts";
 import type { BrainComputeNode } from "../../types/generated/BrainComputeNode.ts";
 import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
 import type { BrainSink } from "../../types/generated/BrainSink.ts";
@@ -23,8 +23,8 @@ function computeEdge(nodeIdx: number, weight = 1): BrainEdge {
 	return { source: { ComputeNode: nodeIdx }, own: weight, genomic: weight, applied: weight };
 }
 
-describe("buildFullGraphModel edge-group members", () => {
-	/** A Move group member on sink 0 (scale 0.5, correction 0, composed
+describe("buildFullGraphModel edge-bundle members", () => {
+	/** A Move bundle member on sink 0 (scale 0.5, correction 0, composed
 	 * 0.5) beside an independent edge. */
 	function grouped(): GraphBrain {
 		return makeGraphDef({
@@ -38,7 +38,7 @@ describe("buildFullGraphModel edge-group members", () => {
 							genomic: 0.5,
 							applied: 0.5,
 							member: {
-								group: 0,
+								bundle: 0,
 								scope: "Edge",
 								site: { Direction: 0 },
 								field: 0,
@@ -49,19 +49,19 @@ describe("buildFullGraphModel edge-group members", () => {
 					],
 				},
 			],
-			groups: [ringGroup(0, { scale: 0.5 })],
+			bundles: [ringBundle(0, { scale: 0.5 })],
 		});
 	}
 
 	it("draws a listed edge at learning's applied weight: a passive member follows the learned scale", () => {
 		// Preservation case (T30.F01 invariant 5): a static member of a
-		// learning group, genomic 0.5, applied 1.5 through the learned scale.
+		// learning bundle, genomic 0.5, applied 1.5 through the learned scale.
 		const model = buildFullGraphModel(
 			grouped(),
 			[{ family: "world", key: "NeighborBarrierRing" }],
 			{
 				node_id: 0,
-				scales: [{ group: 0, learned: 3, initialized: true }],
+				scales: [{ bundle: 0, learned: 3, initialized: true }],
 				edges: [{ surface: "sink", container: 0, edge: 1, applied: 1.5 }],
 			},
 		);
@@ -88,7 +88,7 @@ describe("buildFullGraphModel edge-group members", () => {
 		expect(member?.own).toBe(0);
 		expect(member?.genomic).toBe(0.5);
 		expect(member?.member).toEqual({
-			group: 0,
+			bundle: 0,
 			scope: "Edge",
 			scale: 0.5,
 			pattern: 1,

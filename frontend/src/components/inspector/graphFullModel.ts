@@ -39,7 +39,7 @@ export interface GraphModelEdge {
 	weight: number;
 	edgeType: "input_to_compute" | "compute_to_compute" | "compute_to_output" | "input_to_output";
 	isBackward: boolean;
-	/** Whether the edge is an edge-group member (T25.F03), drawn dashed. */
+	/** Whether the edge is an edge-bundle member (T25.F03), drawn dashed. */
 	isMember: boolean;
 	/** Whether the edge carries learning attributes (T25.F06). */
 	isPlastic: boolean;
@@ -56,7 +56,7 @@ export interface GraphModelEdge {
 /** A member's composition: `genomic = scale × pattern + own`, each term the
  * server's. */
 export interface MemberComposition {
-	group: number;
+	bundle: number;
 	scope: Scope;
 	scale: number;
 	pattern: number;
@@ -161,7 +161,7 @@ export function buildFullGraphModel(
 		(edge: BrainEdge, index: number): EdgeFacts => {
 			const state = join.edge(surface, container, index, edge);
 			const member = edge.member && {
-				group: edge.member.group,
+				bundle: edge.member.bundle,
 				scope: edge.member.scope,
 				scale: edge.member.scale,
 				pattern: edge.member.pattern,

@@ -6,11 +6,11 @@ use crate::config::test_sensor_context;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{FieldSet, InputReference, SensorDescriptor, WorldInputKey, MEMORY_BANK};
 use crate::genome::cgp::{
-    plans, test_support::edit_sinks, BundleSource, CgpGraphBackendDef, GroupId, OutputSinkKind,
+    plans, test_support::edit_sinks, BundleId, BundleSource, CgpGraphBackendDef, OutputSinkKind,
     Wiring,
 };
 use crate::genome::{BackendDef, NodeGenome};
-use crate::mutation::graph::group::{draw_birth_learning, draw_births, BirthLaw};
+use crate::mutation::graph::bundle::{draw_birth_learning, draw_births, BirthLaw};
 use crate::mutation::graph::operators::{remove_edge, retarget_edge, test_inputs};
 use crate::mutation::types::{BundleEdits, MutationSkipReason};
 
@@ -123,7 +123,7 @@ fn birth_learning_reports_each_creation_by_wiring_and_form() {
         let randomized = replay.gen_bool(0.5);
         assert_eq!(edits, BundleEdits::creation(&wiring, randomized));
         assert_eq!(edits.created[1].iter().sum::<u8>(), 1);
-        assert_eq!(id, GroupId::new(0));
+        assert_eq!(id, BundleId::new(0));
     }
 }
 
@@ -159,11 +159,11 @@ fn edge_operators_report_their_bundle_edits() {
     // Only members are on the graph: every retarget that changes a source
     // detaches one, and the eighth member's removal takes the record.
     let mut seed = 0;
-    while def.groups().len() == 1 {
+    while def.bundles().len() == 1 {
         let members = def.edges().count();
         let edits =
             retarget_edge(def, test_inputs(&refs), &mut SmallRng::seed_from_u64(seed)).unwrap();
-        let detached = members - def.members(GroupId::new(0)).count();
+        let detached = members - def.members(BundleId::new(0)).count();
         assert_eq!(usize::from(edits.detached), detached.min(1));
         seed += 1;
         if detached > 0 {
@@ -171,7 +171,7 @@ fn edge_operators_report_their_bundle_edits() {
         }
     }
     let mut removals = 0;
-    while !def.groups().is_empty() {
+    while !def.bundles().is_empty() {
         let edits = remove_edge(def, &mut SmallRng::seed_from_u64(seed)).unwrap();
         removals += u32::from(edits.removed);
         seed += 1;

@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn birth_edge_operators_reset_only_changed_occurrences_and_copy_bundles() {
         use crate::mutation::graph::operators::{
-            alter_edge_weight_in_def, copy_edge_bundle, raw_field_mutation, remove_edge,
+            alter_edge_weight_in_def, copy_node_inputs, raw_field_mutation, remove_edge,
             retarget_edge,
         };
         use rand::SeedableRng;
@@ -295,7 +295,7 @@ mod tests {
                 3 => {
                     remove_edge(&mut def, &mut rng).unwrap();
                 }
-                _ => copy_edge_bundle(&mut def, &mut rng).unwrap(),
+                _ => copy_node_inputs(&mut def, &mut rng).unwrap(),
             }
             let birth = rows(&def);
             for (idx, node) in def.compute_nodes().iter().enumerate() {

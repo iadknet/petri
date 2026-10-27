@@ -159,7 +159,7 @@ impl From<&InputReference> for InputRef {
 
 // ── Votes ───────────────────────────────────────────────────────────────────
 
-/// A directed vote kind (a group's kind, a directed sink's kind).
+/// A directed vote kind (a bundle's kind, a directed sink's kind).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
 pub enum DirectedVoteKind {
@@ -823,13 +823,13 @@ mod tests {
     /// Every enum this module and `brain` mirror has the core enum's variant
     /// set and serialized names, and every core value an `ALL` list or the
     /// fixed sink catalog enumerates serializes identically through its
-    /// mirror. `MemberSite`, `WeightSurface` and `LearnerScope` are
+    /// mirror. `Site`, `WeightSurface` and `LearnerScope` are
     /// wire-named (their core sources carry no serde form), as are
     /// `InputFamily` and `InputKey` (the flat reference, tested below); their
     /// exhaustive `From` is their pin.
     #[test]
     fn mirrors_serialize_as_the_core_types_do() {
-        use crate::transport::brain::{GroupShape, Scope};
+        use crate::transport::brain::{BundleShape, Scope};
 
         assert_same_variants::<core_vote::DirectedVoteKind, DirectedVoteKind>();
         assert_same_variants::<core_vote::VoteSink, VoteSink>();
@@ -844,7 +844,7 @@ mod tests {
         assert_same_variants::<core_mesh::MeshWriteClass, MeshWriteClass>();
         assert_same_variants::<CoreVmInstruction, VmInstruction>();
         assert_same_variants::<core_cgp::Scope, Scope>();
-        assert_same_variants::<core_cgp::Shape, GroupShape>();
+        assert_same_variants::<core_cgp::Shape, BundleShape>();
 
         assert_mirrors_all::<_, DirectedVoteKind>(&core_vote::DirectedVoteKind::ALL);
         assert_mirrors_all::<_, ActionParamField>(&core_vote::ActionParamField::ALL);

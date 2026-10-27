@@ -271,7 +271,7 @@ pub enum MutationOperator {
     GraphRawFieldMutation,
     GraphCopyInternalNode,
     GraphCopySubgraph,
-    GraphCopyEdgeBundle,
+    GraphCopyNodeInputs,
     GraphEnableHebbian,
     GraphDisableHebbian,
     GraphMutateHebbianRule,
@@ -282,22 +282,22 @@ pub enum MutationOperator {
     GraphMutateRewardSource,
     GraphMutateTraceDecay,
     GraphRecruitNeutralInput,
-    GraphAddRingGroup,
-    GraphAddDirectionPairGroup,
-    GraphAlterGroupScale,
-    GraphShiftGroupOffset,
-    GraphRetargetGroupKind,
-    GraphRemoveGroup,
+    GraphAddRingBundle,
+    GraphAddDirectionPairBundle,
+    GraphAlterBundleScale,
+    GraphShiftBundleOffset,
+    GraphRetargetBundleKind,
+    GraphRemoveBundle,
     GraphSetScope,
-    GraphAddRandomizedRingGroup,
-    GraphAddRandomizedDirectionPairGroup,
+    GraphAddRandomizedRingBundle,
+    GraphAddRandomizedDirectionPairBundle,
     GraphDetachGraphEdge,
     GraphEnableRetention,
     GraphDisableRetention,
     GraphMutateRetention,
-    GraphEnableGroupRetention,
-    GraphDisableGroupRetention,
-    GraphMutateGroupRetention,
+    GraphEnableBundleRetention,
+    GraphDisableBundleRetention,
+    GraphMutateBundleRetention,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -349,7 +349,7 @@ impl MutationOperator {
             Self::GraphRawFieldMutation => "Graph.GraphRawFieldMutation",
             Self::GraphCopyInternalNode => "Graph.CopyInternalNode",
             Self::GraphCopySubgraph => "Graph.CopySubgraph",
-            Self::GraphCopyEdgeBundle => "Graph.CopyEdgeBundle",
+            Self::GraphCopyNodeInputs => "Graph.CopyNodeInputs",
             Self::GraphEnableHebbian => "Graph.EnableHebbian",
             Self::GraphDisableHebbian => "Graph.DisableHebbian",
             Self::GraphMutateHebbianRule => "Graph.MutateHebbianRule",
@@ -360,22 +360,22 @@ impl MutationOperator {
             Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
-            Self::GraphAddRingGroup => "Graph.AddRingGroup",
-            Self::GraphAddDirectionPairGroup => "Graph.AddDirectionPairGroup",
-            Self::GraphAlterGroupScale => "Graph.AlterGroupScale",
-            Self::GraphShiftGroupOffset => "Graph.ShiftGroupOffset",
-            Self::GraphRetargetGroupKind => "Graph.RetargetGroupKind",
-            Self::GraphRemoveGroup => "Graph.RemoveGroup",
+            Self::GraphAddRingBundle => "Graph.AddRingBundle",
+            Self::GraphAddDirectionPairBundle => "Graph.AddDirectionPairBundle",
+            Self::GraphAlterBundleScale => "Graph.AlterBundleScale",
+            Self::GraphShiftBundleOffset => "Graph.ShiftBundleOffset",
+            Self::GraphRetargetBundleKind => "Graph.RetargetBundleKind",
+            Self::GraphRemoveBundle => "Graph.RemoveBundle",
             Self::GraphSetScope => "Graph.SetScope",
-            Self::GraphAddRandomizedRingGroup => "Graph.AddRandomizedRingGroup",
-            Self::GraphAddRandomizedDirectionPairGroup => "Graph.AddRandomizedDirectionPairGroup",
+            Self::GraphAddRandomizedRingBundle => "Graph.AddRandomizedRingBundle",
+            Self::GraphAddRandomizedDirectionPairBundle => "Graph.AddRandomizedDirectionPairBundle",
             Self::GraphDetachGraphEdge => "Graph.DetachGraphEdge",
             Self::GraphEnableRetention => "Graph.EnableRetention",
             Self::GraphDisableRetention => "Graph.DisableRetention",
             Self::GraphMutateRetention => "Graph.MutateRetention",
-            Self::GraphEnableGroupRetention => "Graph.EnableGroupRetention",
-            Self::GraphDisableGroupRetention => "Graph.DisableGroupRetention",
-            Self::GraphMutateGroupRetention => "Graph.MutateGroupRetention",
+            Self::GraphEnableBundleRetention => "Graph.EnableBundleRetention",
+            Self::GraphDisableBundleRetention => "Graph.DisableBundleRetention",
+            Self::GraphMutateBundleRetention => "Graph.MutateBundleRetention",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -426,7 +426,7 @@ impl MutationOperator {
             | Self::GraphRawFieldMutation
             | Self::GraphCopyInternalNode
             | Self::GraphCopySubgraph
-            | Self::GraphCopyEdgeBundle
+            | Self::GraphCopyNodeInputs
             | Self::GraphEnableHebbian
             | Self::GraphDisableHebbian
             | Self::GraphMutateHebbianRule
@@ -437,22 +437,22 @@ impl MutationOperator {
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
             | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingGroup
-            | Self::GraphAddDirectionPairGroup
-            | Self::GraphAlterGroupScale
-            | Self::GraphShiftGroupOffset
-            | Self::GraphRetargetGroupKind
-            | Self::GraphRemoveGroup
+            | Self::GraphAddRingBundle
+            | Self::GraphAddDirectionPairBundle
+            | Self::GraphAlterBundleScale
+            | Self::GraphShiftBundleOffset
+            | Self::GraphRetargetBundleKind
+            | Self::GraphRemoveBundle
             | Self::GraphSetScope
-            | Self::GraphAddRandomizedRingGroup
-            | Self::GraphAddRandomizedDirectionPairGroup
+            | Self::GraphAddRandomizedRingBundle
+            | Self::GraphAddRandomizedDirectionPairBundle
             | Self::GraphDetachGraphEdge
             | Self::GraphEnableRetention
             | Self::GraphDisableRetention
             | Self::GraphMutateRetention
-            | Self::GraphEnableGroupRetention
-            | Self::GraphDisableGroupRetention
-            | Self::GraphMutateGroupRetention => MutationDomain::Graph,
+            | Self::GraphEnableBundleRetention
+            | Self::GraphDisableBundleRetention
+            | Self::GraphMutateBundleRetention => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -503,20 +503,20 @@ impl MutationOperator {
             | Self::GraphAddGraphEdge
             | Self::GraphCopyInternalNode
             | Self::GraphCopySubgraph
-            | Self::GraphCopyEdgeBundle
+            | Self::GraphCopyNodeInputs
             | Self::GraphEnableHebbian
             | Self::GraphEnableRewardModulation
             | Self::GraphRecruitNeutralInput
-            | Self::GraphAddRingGroup
-            | Self::GraphAddDirectionPairGroup
-            | Self::GraphAddRandomizedRingGroup
-            | Self::GraphAddRandomizedDirectionPairGroup => ComplexityEffect::Increasing,
+            | Self::GraphAddRingBundle
+            | Self::GraphAddDirectionPairBundle
+            | Self::GraphAddRandomizedRingBundle
+            | Self::GraphAddRandomizedDirectionPairBundle => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
             | Self::GraphDisableHebbian
             | Self::GraphDisableRewardModulation
-            | Self::GraphRemoveGroup => ComplexityEffect::Decreasing,
+            | Self::GraphRemoveBundle => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
@@ -528,17 +528,17 @@ impl MutationOperator {
             | Self::GraphToggleHebbianLamarckian
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay
-            | Self::GraphAlterGroupScale
-            | Self::GraphShiftGroupOffset
-            | Self::GraphRetargetGroupKind
+            | Self::GraphAlterBundleScale
+            | Self::GraphShiftBundleOffset
+            | Self::GraphRetargetBundleKind
             | Self::GraphSetScope
             | Self::GraphDetachGraphEdge
             | Self::GraphEnableRetention
             | Self::GraphDisableRetention
             | Self::GraphMutateRetention
-            | Self::GraphEnableGroupRetention
-            | Self::GraphDisableGroupRetention
-            | Self::GraphMutateGroupRetention => ComplexityEffect::Neutral,
+            | Self::GraphEnableBundleRetention
+            | Self::GraphDisableBundleRetention
+            | Self::GraphMutateBundleRetention => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefPrune => ComplexityEffect::Decreasing,
@@ -589,7 +589,7 @@ impl MutationOperator {
             Self::GraphRawFieldMutation,
             Self::GraphCopyInternalNode,
             Self::GraphCopySubgraph,
-            Self::GraphCopyEdgeBundle,
+            Self::GraphCopyNodeInputs,
             Self::GraphEnableHebbian,
             Self::GraphDisableHebbian,
             Self::GraphMutateHebbianRule,
@@ -600,22 +600,22 @@ impl MutationOperator {
             Self::GraphMutateRewardSource,
             Self::GraphMutateTraceDecay,
             Self::GraphRecruitNeutralInput,
-            Self::GraphAddRingGroup,
-            Self::GraphAddDirectionPairGroup,
-            Self::GraphAlterGroupScale,
-            Self::GraphShiftGroupOffset,
-            Self::GraphRetargetGroupKind,
-            Self::GraphRemoveGroup,
+            Self::GraphAddRingBundle,
+            Self::GraphAddDirectionPairBundle,
+            Self::GraphAlterBundleScale,
+            Self::GraphShiftBundleOffset,
+            Self::GraphRetargetBundleKind,
+            Self::GraphRemoveBundle,
             Self::GraphSetScope,
-            Self::GraphAddRandomizedRingGroup,
-            Self::GraphAddRandomizedDirectionPairGroup,
+            Self::GraphAddRandomizedRingBundle,
+            Self::GraphAddRandomizedDirectionPairBundle,
             Self::GraphDetachGraphEdge,
             Self::GraphEnableRetention,
             Self::GraphDisableRetention,
             Self::GraphMutateRetention,
-            Self::GraphEnableGroupRetention,
-            Self::GraphDisableGroupRetention,
-            Self::GraphMutateGroupRetention,
+            Self::GraphEnableBundleRetention,
+            Self::GraphDisableBundleRetention,
+            Self::GraphMutateBundleRetention,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,
@@ -724,12 +724,12 @@ pub struct MutationSummary {
     /// The class of each vote-sink edge an applied `AddGraphEdge` or
     /// `InputRef.Add` pushed, in event order (T11.F30).
     pub vote_edge_classes: Vec<BirthEdgeClass>,
-    /// Group members committed events detached (T25.F03): retarget,
+    /// Bundle members committed events detached (T25.F03): retarget,
     /// raw-field step or split of a member.
     pub graph_edges_detached: u32,
-    /// Edge groups committed events removed (T25.F03): `RemoveGroup`, and a
+    /// Edge bundles committed events removed (T25.F03): `RemoveBundle`, and a
     /// last member's removal or detach.
-    pub groups_removed: u32,
+    pub bundles_removed: u32,
     /// Committed attribute changes (the nine plasticity operators and
     /// `SetScope`) by the scope they landed on, indexed by
     /// [`Scope::index`] (T25.F08).
@@ -762,15 +762,15 @@ impl MutationSummary {
             events: Vec::new(),
             vote_edge_classes: Vec::new(),
             graph_edges_detached: 0,
-            groups_removed: 0,
+            bundles_removed: 0,
             attribute_changes_by_scope: [0; 2],
         }
     }
 
-    /// Record the detaches and group removals of a committed event.
+    /// Record the detaches and bundle removals of a committed event.
     pub fn record_bundle_edits(&mut self, edits: BundleEdits) {
         self.graph_edges_detached += u32::from(edits.detached);
-        self.groups_removed += u32::from(edits.removed);
+        self.bundles_removed += u32::from(edits.removed);
     }
 
     /// Record one committed attribute change at the scope it landed on.

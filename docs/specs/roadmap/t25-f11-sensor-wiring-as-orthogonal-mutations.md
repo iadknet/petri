@@ -153,7 +153,7 @@ mechanics change).
       `prune` / `swap`; `BundleEdits` reported by the operators with
       `group_tallies` deleted; the three routes rewired onto the seams with
       every pin held.
-- [ ] Commit 2 (rename): `Group` → `Bundle` everywhere named in invariant 2,
+- [x] Commit 2 (rename): `Group` → `Bundle` everywhere named in invariant 2,
       `CopyEdgeBundle` → `CopyNodeInputs`, wire types, `PROTOCOL_VERSION`,
       generated frontend types, metric and counter names, with the
       predeclared text re-pins.

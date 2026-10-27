@@ -67,7 +67,7 @@
 //! f01286e7...) at the merge base and after the commit, so the commit moved
 //! no simulation; reverting the key rename restores both old digests.
 //! Re-pinned by T25.F03 commit 2 after two agreeing runs: ring projections
-//! become `Ring` edge groups, so a projection-creating draw writes a group of
+//! become `Ring` edge bundles, so a projection-creating draw writes a bundle of
 //! eight members into the genome text, which moves the two sampled digests
 //! (8cad8472... -> 545c5490..., gestation rate 0.0 e46c2e81... ->
 //! b5c8617d...). The sampled digest without genome bytes holds (ef1d2719...,
@@ -75,7 +75,7 @@
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical across the
 //! commit, genome bytes included (a81e66c5..., gestation rate 0.0
 //! 17189f7a...); reverting the commit restores both old digests.
-//! Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+//! Re-pinned by T25.F04 commit 1: `AddDirectionPairBundle` joins the Graph
 //! default arm (weight 56 -> 58) and remaps every Graph draw, moving all four
 //! digests (sampled 545c5490... -> f9778798..., gestation rate 0.0
 //! b5c8617d... -> ac6b54b7...; guard 2d0116fe... -> 45759536..., rate 0.0
@@ -109,15 +109,15 @@
 //! 527a14e0... -> d3b71fcd...), and without them is byte-identical across
 //! the commit (633e120e..., gestation rate 0.0 f49b5c17...).
 //! Re-pinned by T25.F07 commit 1 (text only) after two agreeing runs: every
-//! member's JSON names its `scope` and every group's its `inherit_scale`,
+//! member's JSON names its `scope` and every bundle's its `inherit_scale`,
 //! which moves the two sampled digests (bc6cee03... -> 63d2f57d...,
 //! gestation rate 0.0 bde1dbeb... -> a3b599b9...); the guard digests hold.
 //! The sampled digest without genome bytes is 9e21186e... (rate 0.0
 //! 53b0c507...) at the merge base and after the commit, and with
 //! `mutation.per_unit_rate` 0 the sampled run is byte-identical
 //! (bd8dca14..., gestation rate 0.0 d3b71fcd...).
-//! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned group
-//! creation, the scope coin and `SetScope` change every Graph draw, groups
+//! Re-pinned by T25.F07 commit 2 after two agreeing runs: learned bundle
+//! creation, the scope coin and `SetScope` change every Graph draw, bundles
 //! learn, and the learned row carries the initialized learned scales after
 //! the edge items, which moves all four digests (sampled 63d2f57d... ->
 //! 38f68975..., gestation rate 0.0 a3b599b9... -> 0d037fb0...; guard
@@ -137,7 +137,7 @@
 //! a187a3fe...; guard dc32a1fa... -> 3d299de5..., rate 0.0 d61cf3eb... ->
 //! 7d7ae0e2...).
 //! Re-pinned by T25.F09 commit 1 (text only): every plastic edge's and
-//! every group's JSON names its `retention`, which moves the two sampled
+//! every bundle's JSON names its `retention`, which moves the two sampled
 //! digests (9458abf6... -> 5beb9f71..., gestation rate 0.0 a187a3fe... ->
 //! 23a0754d...); the guard digests hold. The sampled digest without genome
 //! bytes is 146fe823... (rate 0.0 4eb8afe8...) at the merge base and after
@@ -203,6 +203,12 @@
 //! shape restores both old digests, and both guard digests hold. The
 //! state-only sampled digests (log bytes excluded) are 4830c71f... /
 //! 00a1b0bb... at 18342fef^ and after.
+//! Re-pinned by T25.F11 commit 2 (text only): the genome JSON names
+//! `bundles` and a membership's `bundle` where `groups` and `group` stood,
+//! which moves the four sampled digests (5b792ac8... -> dd205579...,
+//! gestation rate 0.0 67dcf4ca... -> d60fedee...; state-only 4830c71f...
+//! -> 68592232..., 00a1b0bb... -> 70f49495...); mapping the genome text
+//! back restores the old digests, and both guard digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -214,19 +220,19 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None, true),
-        "5b792ac8b46bf3c997854eede8686b808ee751e48506ba59ed8b273f1ab38679"
+        "dd205579b71c7b39db75e38dbdf244f1c81773b4838372ca10443579ff58e336"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), true),
-        "67dcf4caa33bd6d13501a4ae56e45dc15cdbe473eb64730863de2075897fe108"
+        "d60fedeee807c78988976f406b649049342b95b90cbb29a92cec0a58f088eeb4"
     );
     assert_eq!(
         sampled_trajectory_digest(None, false),
-        "4830c71f78b9871994a9800617dc733f918ad6738e3201d25d930e843abefe7b"
+        "68592232be7dddd192a99d41aea50dc081efe8b20d64c368f0b6536933515117"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), false),
-        "00a1b0bb349ad0c49d89a685c167ebc75de3cd7bcc139272209bf0d87c92588f"
+        "70f49495dbdba0bb3d2afe1025a8af81d3bc868227f62bd0798afdea17c6fe96"
     );
 }
 
@@ -346,7 +352,7 @@ fn applied_guard_digest(gestation_rate: Option<f32>) -> String {
 /// One row per mesh node of `read` over its initialized plastic edges in
 /// canonical order, through the learned state's view (T25.F06): the learned
 /// values or the traces. The learned row carries the initialized learned
-/// scales after the edge items, in `GroupId` order (T25.F07). Empty for a
+/// scales after the edge items, in `BundleId` order (T25.F07). Empty for a
 /// creature without a plastic edge, as the deleted storage serialized.
 fn learned_rows(
     creature: &v3_core::creature::state::CreatureState,

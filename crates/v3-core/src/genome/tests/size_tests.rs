@@ -1,6 +1,6 @@
 //! T25.F02 unit rule: `genome_size()` charges one unit per edge on both graph
 //! surfaces, nothing for a wired sink itself, and (T25.F03, T25.F10) one unit
-//! per edge-group record and nothing for its members, so a gene of either
+//! per edge-bundle record and nothing for its members, so a gene of either
 //! shape costs one unit.
 use proptest::prelude::*;
 
@@ -88,10 +88,10 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let base = size(&def);
-    let ring = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    let ring = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
     assert_eq!(size(&def), base + 1, "a Ring gene of eight members");
     let layout = area.direction_pairs()[1];
-    let pair = def.add_pair_group(0, 1, layout, DirectedVoteKind::StealEnergy, 4, layout.facts);
+    let pair = def.add_pair_bundle(0, 1, layout, DirectedVoteKind::StealEnergy, 4, layout.facts);
     assert_eq!(def.members(pair).count(), 12 + 3);
     assert_eq!(size(&def), base + 2, "a pair gene with its facts");
     let hole = def.members(pair).next().unwrap();
@@ -110,7 +110,7 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     assert_eq!(size(&def), base + 4, "a detached fact member too");
 
     let mut sole = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = sole.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
+    let id = sole.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 1);
     while sole.members(id).count() > 1 {
         let next = sole.members(id).next().unwrap();
         sole.remove_edge(next);
@@ -118,7 +118,7 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     let units = size(&sole);
     let last = sole.members(id).next().unwrap();
     detach(&mut sole, last, &refs);
-    assert!(sole.groups().is_empty());
+    assert!(sole.bundles().is_empty());
     assert_eq!(
         size(&sole),
         units,
@@ -142,7 +142,7 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
         prop::collection::vec((0usize..24, edges_strategy()), 0..6),
         prop::collection::vec((0usize..3, 0u8..8, 1u16..=u16::MAX, any::<bool>()), 0..4),
     )
-        .prop_map(|(nodes, sinks, groups)| {
+        .prop_map(|(nodes, sinks, bundles)| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(
                 nodes
                     .into_iter()
@@ -156,12 +156,12 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
             }
             let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
             let layout = area.direction_pairs()[0];
-            for (kind, offset, keep, pair) in groups {
+            for (kind, offset, keep, pair) in bundles {
                 let kind = DirectedVoteKind::ALL[kind];
                 let id = if pair {
-                    def.add_pair_group(0, 0, layout, kind, offset, layout.facts)
+                    def.add_pair_bundle(0, 0, layout, kind, offset, layout.facts)
                 } else {
-                    def.add_group(Shape::Ring { ring_ref: 0 }, kind, offset)
+                    def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, kind, offset)
                 };
                 let members: Vec<_> = def.members(id).collect();
                 for (index, occurrence) in members.into_iter().enumerate().rev() {
@@ -177,7 +177,7 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
 proptest! {
     /// `genome_size` is the unit rule's sum: mesh node + input references +
     /// route targets + compute nodes + compute edges + sink edges with no
-    /// membership + 1 per group record (T25.F10), whatever the generated def.
+    /// membership + 1 per bundle record (T25.F10), whatever the generated def.
     #[test]
     fn genome_size_is_the_unit_rule_sum(
         def in def_strategy(),
@@ -192,9 +192,9 @@ proptest! {
             .flat_map(|sink| sink.inputs.iter())
             .filter(|edge| edge.membership().is_none())
             .count();
-        let groups = def.groups().len();
+        let bundles = def.bundles().len();
         let expected = 1 + refs + usize::from(targets) + compute_nodes + compute_edges + sink_edges
-            + groups;
+            + bundles;
         let genome = graph_genome(def, refs, targets);
         prop_assert_eq!(genome.genome_size() as usize, expected);
     }

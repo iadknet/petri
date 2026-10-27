@@ -4027,8 +4027,8 @@
     {
       "id": 76,
       "type": "timeseries",
-      "title": "Edges detached and groups removed (rate)",
-      "description": "Mutations that take groups apart, per second.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **edges detached**: an edge left its group and now carries its own weight.\n- **groups removed**: a whole group was dissolved.",
+      "title": "Edges detached and bundles removed (rate)",
+      "description": "Mutations that take bundles apart, per second.\n\nA **bundle** is a set of brain edges that share one weight, the bundle's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **edges detached**: an edge left its bundle and now carries its own weight.\n- **bundles removed**: a whole bundle was dissolved.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -4058,8 +4058,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(petri_run_groups_removed_total{petri_run_id=\"$run_id\"}[1m]))",
-          "legendFormat": "groups removed",
+          "expr": "sum(rate(petri_run_bundles_removed_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "bundles removed",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -4117,7 +4117,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(petri_run_pair_group_inherited_nonzero_births_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_reproduction_actions_spawned_total{petri_run_id=\"$run_id\"}[1m]))",
+          "expr": "sum(rate(petri_run_pair_bundle_inherited_nonzero_births_total{petri_run_id=\"$run_id\"}[1m])) / sum(rate(petri_run_reproduction_actions_spawned_total{petri_run_id=\"$run_id\"}[1m]))",
           "legendFormat": "inherited nonzero",
           "range": true,
           "instant": false,

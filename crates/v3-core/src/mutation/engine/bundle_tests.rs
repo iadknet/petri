@@ -1,5 +1,5 @@
 //! T25.F03: the mutation gate validates every Graph backend after every
-//! applied event of any domain, and the group operators change
+//! applied event of any domain, and the bundle operators change
 //! `genome_size` by their declared amounts.
 
 use proptest::prelude::*;
@@ -12,7 +12,7 @@ use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::{
-    test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
+    test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind, Scope, Shape,
 };
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
@@ -31,7 +31,7 @@ fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
     }
 }
 
-/// The founder with a barrier ring on its Graph node and one `Ring` group
+/// The founder with a barrier ring on its Graph node and one `Ring` bundle
 /// reading it; returns the genome, the node index and the ring index.
 fn grouped_founder() -> (CreatureGenome, usize, u16) {
     let mut genome = v3alpha1_founder_genome();
@@ -40,8 +40,9 @@ fn grouped_founder() -> (CreatureGenome, usize, u16) {
     let ring = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
         .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-    let id = graph_mut(node).add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 2);
-    graph_mut(node).group_mut(id).set_scale(0.5);
+    let id =
+        graph_mut(node).add_ring_bundle(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 2);
+    graph_mut(node).bundle_mut(id).set_scale(0.5);
     (genome, idx, ring)
 }
 
@@ -74,7 +75,7 @@ fn the_gate_rolls_back_a_graph_event_that_breaks_an_invariant() {
     });
 }
 
-/// An input-reference edit that turns a group's ring into a non-ring is
+/// An input-reference edit that turns a bundle's ring into a non-ring is
 /// rolled back.
 #[test]
 fn the_gate_rolls_back_an_input_ref_event_that_breaks_an_invariant() {
@@ -96,21 +97,21 @@ fn the_gate_rolls_back_a_topology_event_that_breaks_an_invariant() {
     });
 }
 
-/// `RemoveGroup` removes a group and reports it when it commits; when the
-/// gate rolls it back (another node breaks an invariant no group operator
+/// `RemoveBundle` removes a bundle and reports it when it commits; when the
+/// gate rolls it back (another node breaks an invariant no bundle operator
 /// can reach), it reports nothing and the draft is unchanged.
 #[test]
 fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let (valid, idx, _) = grouped_founder();
     let other = (0..valid.nodes.len()).find(|&i| i != idx).unwrap();
     let mut broken = valid.clone();
-    // `other` carries a member whose group record is missing (I3), so no
-    // group operator applies there and every gate check fails.
+    // `other` carries a member whose bundle record is missing (I3), so no
+    // bundle operator applies there and every gate check fails.
     let mut json = serde_json::to_value(&valid.nodes[idx].backend_def).unwrap();
     json["Graph"]
         .as_object_mut()
         .expect("a Graph backend")
-        .remove("groups");
+        .remove("bundles");
     broken.nodes[other].backend_def = serde_json::from_value(json).unwrap();
     broken.nodes[other].input_refs = valid.nodes[idx].input_refs.clone();
     assert!(validate_graph(&broken.nodes[other]).is_err());
@@ -120,7 +121,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         let mut committed = valid.clone();
         let (result, edits, _) = apply_graph_event(
             &mut committed,
-            GraphOperator::RemoveGroup,
+            GraphOperator::RemoveBundle,
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &config,
@@ -132,7 +133,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         let mut rolled_back = broken.clone();
         let (result, edits, scope) = apply_graph_event(
             &mut rolled_back,
-            GraphOperator::RemoveGroup,
+            GraphOperator::RemoveBundle,
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &config,
@@ -147,7 +148,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
 
 /// An attribute operator that reports its scope when it commits (here
 /// `EnableHebbian` and `SetScope`) reports none when the gate rolls it back:
-/// the group's ring reference is no longer a ring, which no attribute
+/// the bundle's ring reference is no longer a ring, which no attribute
 /// operator reads, so the operator applies and only the gate rejects it.
 #[test]
 fn a_rolled_back_attribute_change_reports_no_scope() {
@@ -244,21 +245,21 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
         assert_eq!(scope, None, "a detach reports no attribute scope");
         assert_eq!(detached.genome_size(), genome.genome_size() + 1);
         let def = graph_mut(&mut detached.nodes[idx]);
-        assert_eq!(def.groups().len(), 1);
-        assert_eq!(def.members(GroupId::new(0)).count(), 7);
+        assert_eq!(def.bundles().len(), 1);
+        assert_eq!(def.members(BundleId::new(0)).count(), 7);
     }
 }
 
-/// A last member's `DetachGraphEdge` removes the group: one detach, one
+/// A last member's `DetachGraphEdge` removes the bundle: one detach, one
 /// removal, and the record's genome unit becomes the detached edge's
 /// (T25.F08 invariant 3, T25.F10).
 #[test]
-fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
+fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
     let (mut genome, idx, _) = grouped_founder();
     let refs = genome.nodes[idx].input_refs.clone();
     let def = graph_mut(&mut genome.nodes[idx]);
-    while def.members(GroupId::new(0)).count() > 1 {
-        let member = def.members(GroupId::new(0)).next().unwrap();
+    while def.members(BundleId::new(0)).count() > 1 {
+        let member = def.members(BundleId::new(0)).next().unwrap();
         crate::genome::cgp::detach(def, member, &refs);
     }
     let all = every_node(&genome);
@@ -280,12 +281,12 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
             ..BundleEdits::default()
         }
     );
-    assert!(graph_mut(&mut detached.nodes[idx]).groups().is_empty());
+    assert!(graph_mut(&mut detached.nodes[idx]).bundles().is_empty());
     assert_eq!(detached.genome_size(), genome.genome_size());
     let mut summary = MutationSummary::zero();
     summary.record_bundle_edits(edits);
     assert_eq!(
-        (summary.graph_edges_detached, summary.groups_removed),
+        (summary.graph_edges_detached, summary.bundles_removed),
         (1, 1)
     );
 }
@@ -297,8 +298,8 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     let layout = area.direction_pairs()[0];
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_pair_group(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
-    def.group_mut(id).set_scale(0.5);
+    let id = def.add_pair_bundle(0, 0, layout, DirectedVoteKind::Move, 3, layout.facts);
+    def.bundle_mut(id).set_scale(0.5);
     let keep = if fact {
         def.members(id).last()
     } else {
@@ -376,7 +377,7 @@ fn a_sole_members_detach_moves_genome_size_by_the_unit_rule() {
 
 /// The thirteen attribute operators (T25.F09 adds the three edge retention
 /// operators, `retention.rs`) report the scope their committed change
-/// landed on (T25.F08 invariant 8): `Group` when a member was picked and
+/// landed on (T25.F08 invariant 8): `Bundle` when a member was picked and
 /// the coin was true (the change reaches every admitted member), else
 /// `Edge` (one edge changed: a member with a false coin, or a non-member).
 /// Creation and detach report none.
@@ -436,7 +437,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
     }
     assert_eq!(seen, [true; 3], "every case drawn");
 
-    // SetScope: `Group` flips every member, `Edge` one.
+    // SetScope: `Bundle` flips every member, `Edge` one.
     let mut scopes = [false; 2];
     for seed in 0..64 {
         let mut changed = genome.clone();
@@ -450,19 +451,19 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
         );
         assert!(result.is_ok());
         let def = graph_mut(&mut changed.nodes[idx]);
-        let group_scope = def
-            .members(GroupId::new(0))
+        let bundle_scope = def
+            .members(BundleId::new(0))
             .filter(|&at| def.edge_at(at).membership().unwrap().scope == Scope::Group)
             .count();
         let scope = scope.expect("SetScope reports its scope");
-        assert_eq!(group_scope, if scope == Scope::Group { 8 } else { 1 });
+        assert_eq!(bundle_scope, if scope == Scope::Group { 8 } else { 1 });
         scopes[scope.index()] = true;
     }
     assert_eq!(scopes, [true; 2]);
 
     for op in [
-        GraphOperator::AddRingGroup,
-        GraphOperator::AddRandomizedRingGroup,
+        GraphOperator::AddRingBundle,
+        GraphOperator::AddRandomizedRingBundle,
         GraphOperator::DetachGraphEdge,
         GraphOperator::AlterGraphEdgeWeight,
     ] {
@@ -501,10 +502,10 @@ fn record_bundle_edits_accumulates_across_events() {
         ..BundleEdits::default()
     });
     assert_eq!(summary.graph_edges_detached, 5);
-    assert_eq!(summary.groups_removed, 5);
+    assert_eq!(summary.bundles_removed, 5);
 }
 
-/// The `genome_size` change of one applied group-touching event, read from
+/// The `genome_size` change of one applied bundle-touching event, read from
 /// the target node before and after.
 fn expected_delta(
     op: MutationOperator,
@@ -512,31 +513,33 @@ fn expected_delta(
     after: &CgpGraphBackendDef,
 ) -> Option<Vec<i64>> {
     match op {
-        MutationOperator::GraphAddRingGroup
-        | MutationOperator::GraphAddRandomizedRingGroup
-        | MutationOperator::GraphAddDirectionPairGroup
-        | MutationOperator::GraphAddRandomizedDirectionPairGroup => Some(vec![1]),
+        MutationOperator::GraphAddRingBundle
+        | MutationOperator::GraphAddRandomizedRingBundle
+        | MutationOperator::GraphAddDirectionPairBundle
+        | MutationOperator::GraphAddRandomizedDirectionPairBundle => Some(vec![1]),
         MutationOperator::GraphDetachGraphEdge => {
-            Some(vec![if after.groups().len() < before.groups().len() {
+            Some(vec![if after.bundles().len() < before.bundles().len() {
                 0
             } else {
                 1
             }])
         }
-        MutationOperator::GraphRemoveGroup => Some(vec![-1]),
-        MutationOperator::GraphRemoveGraphEdge if after.groups().len() < before.groups().len() => {
+        MutationOperator::GraphRemoveBundle => Some(vec![-1]),
+        MutationOperator::GraphRemoveGraphEdge
+            if after.bundles().len() < before.bundles().len() =>
+        {
             Some(vec![-1])
         }
         MutationOperator::GraphRemoveGraphEdge if member_removed(before, after) => Some(vec![0]),
-        MutationOperator::GraphAlterGroupScale
-        | MutationOperator::GraphShiftGroupOffset
-        | MutationOperator::GraphRetargetGroupKind
+        MutationOperator::GraphAlterBundleScale
+        | MutationOperator::GraphShiftBundleOffset
+        | MutationOperator::GraphRetargetBundleKind
         | MutationOperator::GraphEnableRetention
         | MutationOperator::GraphDisableRetention
         | MutationOperator::GraphMutateRetention
-        | MutationOperator::GraphEnableGroupRetention
-        | MutationOperator::GraphDisableGroupRetention
-        | MutationOperator::GraphMutateGroupRetention => Some(vec![0]),
+        | MutationOperator::GraphEnableBundleRetention
+        | MutationOperator::GraphDisableBundleRetention
+        | MutationOperator::GraphMutateBundleRetention => Some(vec![0]),
         _ => None,
     }
 }
@@ -553,10 +556,10 @@ fn member_removed(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> bo
     members(after) < members(before)
 }
 
-/// The shape of one generated group.
+/// The shape of one generated bundle.
 #[derive(Clone, Copy, Debug)]
-enum GroupShape {
-    /// A `Ring` group on an appended occupied-ring reference.
+enum BundleShape {
+    /// A `Ring` bundle on an appended occupied-ring reference.
     Ring,
     /// A `DirectionPair` gene on occupancy pair `pair`; `with_facts` adds its
     /// fact members (T25.F10). The last member of a fact-bearing gene is a
@@ -566,27 +569,27 @@ enum GroupShape {
     Pair { pair: u8, with_facts: bool },
 }
 
-/// One generated group: kind, offset, scale, the members to drop (a bit per
+/// One generated bundle: kind, offset, scale, the members to drop (a bit per
 /// member in canonical order, the last always kept) and the shape.
-type GroupSpec = (usize, u8, f32, u16, GroupShape);
+type BundleSpec = (usize, u8, f32, u16, BundleShape);
 
-/// Draws a `GroupSpec` over every shape: a ring, or each occupancy pair with
+/// Draws a `BundleSpec` over every shape: a ring, or each occupancy pair with
 /// and without its fact members.
-fn group_spec() -> impl Strategy<Value = GroupSpec> {
+fn bundle_spec() -> impl Strategy<Value = BundleSpec> {
     let pairs = InputReference::World(WorldInputKey::AreaOccupancySummary)
         .direction_pairs()
         .len();
     let pair = (0..u8::try_from(pairs).unwrap(), any::<bool>())
-        .prop_map(|(pair, with_facts)| GroupShape::Pair { pair, with_facts });
-    let shape = prop_oneof![1 => Just(GroupShape::Ring), 4 => pair];
+        .prop_map(|(pair, with_facts)| BundleShape::Pair { pair, with_facts });
+    let shape = prop_oneof![1 => Just(BundleShape::Ring), 4 => pair];
     (0usize..3, 0u8..8, -2.0f32..2.0, any::<u16>(), shape)
 }
 
-/// Adds one group per entry of `groups` to the Graph `node`: a `Ring` reads
+/// Adds one bundle per entry of `bundles` to the Graph `node`: a `Ring` reads
 /// an appended occupied-ring reference, a `DirectionPair` an appended
-/// occupancy summary; each with members dropped (a group keeps at least
+/// occupancy summary; each with members dropped (a bundle keeps at least
 /// one).
-fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
+fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
     let ring = u16::try_from(node.input_refs.len()).unwrap();
     node.input_refs
         .push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
@@ -594,17 +597,17 @@ fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
     let summary = ring + 1;
     node.input_refs.push(area.clone());
     let def = graph_mut(node);
-    for &(kind, offset, scale, drop, shape) in groups {
+    for &(kind, offset, scale, drop, shape) in bundles {
         let kind = DirectedVoteKind::ALL[kind];
         let id = match shape {
-            GroupShape::Ring => def.add_group(Shape::Ring { ring_ref: ring }, kind, offset),
-            GroupShape::Pair { pair, with_facts } => {
+            BundleShape::Ring => def.add_ring_bundle(Shape::Ring { ring_ref: ring }, kind, offset),
+            BundleShape::Pair { pair, with_facts } => {
                 let layout = area.direction_pairs()[usize::from(pair)];
                 let facts = if with_facts { layout.facts } else { &[] };
-                def.add_pair_group(summary, pair, layout, kind, offset, facts)
+                def.add_pair_bundle(summary, pair, layout, kind, offset, facts)
             }
         };
-        def.group_mut(id).set_scale(scale);
+        def.bundle_mut(id).set_scale(scale);
         let members: Vec<_> = def.members(id).collect();
         let last = members.len() - 1;
         for (index, occurrence) in members.into_iter().enumerate().rev() {
@@ -615,17 +618,17 @@ fn add_groups(node: &mut NodeGenome, groups: &[GroupSpec]) {
     }
 }
 
-/// The founder with ring groups on both Graph nodes — node 1 is routed from
+/// The founder with ring bundles on both Graph nodes — node 1 is routed from
 /// node 0, so Topology copies and swaps reach a grouped backend — and an
 /// appended VM node routed from node 1, so VM events have a target.
-fn grouped_mixed_genome(groups: &[Vec<GroupSpec>; 2]) -> CreatureGenome {
+fn grouped_mixed_genome(bundles: &[Vec<BundleSpec>; 2]) -> CreatureGenome {
     let mut genome = v3alpha1_founder_genome();
     let graphs: Vec<usize> = (0..genome.nodes.len())
         .filter(|&i| matches!(genome.nodes[i].backend_def, BackendDef::Graph(_)))
         .collect();
     assert_eq!(graphs.len(), 2, "the founder carries two Graph nodes");
-    for (&idx, groups) in graphs.iter().zip(groups) {
-        add_groups(&mut genome.nodes[idx], groups);
+    for (&idx, bundles) in graphs.iter().zip(bundles) {
+        add_bundles(&mut genome.nodes[idx], bundles);
     }
     let vm_id = NodeId::new(genome.nodes.iter().map(|n| n.node_id.0).max().unwrap() + 1);
     genome.nodes[graphs[1]].targets.push(RouteTarget {
@@ -650,21 +653,21 @@ proptest! {
     /// Random grouped genomes (two grouped Graph nodes and a VM node) under
     /// random events of all four domains, the mesh layer's share drawn over
     /// [0, 1]: every applied event leaves every Graph backend valid, the gate
-    /// never rejects one, and each group operator changes `genome_size` by
+    /// never rejects one, and each bundle operator changes `genome_size` by
     /// its declared amount under the unit rule (T25.F10): every creation +1,
-    /// `DetachGraphEdge` +1 or 0 when the record goes, `RemoveGroup` −1, a
+    /// `DetachGraphEdge` +1 or 0 when the record goes, `RemoveBundle` −1, a
     /// member's `RemoveGraphEdge` 0 or −1 when the record goes, the record
     /// edits 0).
     #[test]
     fn every_applied_event_keeps_the_graph_invariants(
         seed in any::<u64>(),
         mesh_layer_probability in 0.0f64..=1.0,
-        groups in [
-            prop::collection::vec(group_spec(), 0..4),
-            prop::collection::vec(group_spec(), 0..4),
+        bundles in [
+            prop::collection::vec(bundle_spec(), 0..4),
+            prop::collection::vec(bundle_spec(), 0..4),
         ],
     ) {
-        let mut genome = grouped_mixed_genome(&groups);
+        let mut genome = grouped_mixed_genome(&bundles);
         prop_assert!(ParseabilityGate::validate(&genome).is_ok());
         for node in &genome.nodes {
             prop_assert_eq!(validate_graph(node), Ok(()));
@@ -714,19 +717,19 @@ proptest! {
                 prop_assert!(allowed.contains(&delta), "{:?}: {} not in {:?}", op, delta, allowed);
             }
             let removed = before.nodes.iter().map(|n| match &n.backend_def {
-                BackendDef::Graph(d) => d.groups().len(),
+                BackendDef::Graph(d) => d.bundles().len(),
                 BackendDef::Vm(_) => 0,
             }).sum::<usize>().saturating_sub(genome.nodes.iter().map(|n| match &n.backend_def {
-                BackendDef::Graph(d) => d.groups().len(),
+                BackendDef::Graph(d) => d.bundles().len(),
                 BackendDef::Vm(_) => 0,
             }).sum::<usize>());
             if matches!(
                 op,
-                MutationOperator::GraphRemoveGroup
+                MutationOperator::GraphRemoveBundle
                     | MutationOperator::GraphRemoveGraphEdge
                     | MutationOperator::GraphDetachGraphEdge
             ) {
-                prop_assert_eq!(summary.groups_removed as usize, removed);
+                prop_assert_eq!(summary.bundles_removed as usize, removed);
             }
             if op == MutationOperator::GraphDetachGraphEdge {
                 prop_assert_eq!(summary.graph_edges_detached, 1);

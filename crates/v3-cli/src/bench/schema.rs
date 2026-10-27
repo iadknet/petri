@@ -313,7 +313,7 @@ pub(super) fn undefined_memory_sensitivity() -> Indicator<MemorySensitivity> {
 /// moves the token here, so a stored report names the definition it measured.
 pub const LINEAGE_DIVERSITY_VERSION: &str = "lineage-diversity-v1";
 pub const MEMORY_SENSITIVITY_VERSION: &str = "memory-sensitivity-v1";
-/// `v2` since T25.F03: a group's members are edges in every size count.
+/// `v2` since T25.F03: a bundle's members are edges in every size count.
 pub const REACHABLE_STRUCTURE_VERSION: &str = "reachable-structure-v2";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1073,16 +1073,16 @@ pub struct MutationSupply {
     pub reachable_target_total: u64,
     pub unreachable_target_total: u64,
     pub not_applicable_target_total: u64,
-    /// Group members committed events detached (T25.F03); absent in reports
+    /// Bundle members committed events detached (T25.F03); absent in reports
     /// stored before T25.F03.
     pub graph_edges_detached_total: u64,
-    /// Edge groups committed events removed (T25.F03); absent in reports
+    /// Edge bundles committed events removed (T25.F03); absent in reports
     /// stored before T25.F03.
-    pub groups_removed_total: u64,
-    /// Births whose committed genome holds an inherited `DirectionPair` group
+    pub bundles_removed_total: u64,
+    /// Births whose committed genome holds an inherited `DirectionPair` bundle
     /// with `|scale| > 1e-3` (T25.F04); absent in reports stored before
     /// T25.F04.
-    pub pair_group_inherited_nonzero_births_total: u64,
+    pub pair_bundle_inherited_nonzero_births_total: u64,
     /// Committed attribute changes by the scope they landed on (T25.F08);
     /// absent in reports stored before T25.F08.
     pub attribute_changes_by_scope: AttributeChangesByScope,
@@ -1098,12 +1098,12 @@ pub struct MutationSupply {
 #[serde(default)]
 pub struct AttributeChangesByScope {
     pub edge: u64,
-    pub group: u64,
+    pub bundle: u64,
 }
 
 impl From<[u64; 2]> for AttributeChangesByScope {
-    fn from([edge, group]: [u64; 2]) -> Self {
-        Self { edge, group }
+    fn from([edge, bundle]: [u64; 2]) -> Self {
+        Self { edge, bundle }
     }
 }
 

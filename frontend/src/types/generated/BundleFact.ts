@@ -3,4 +3,4 @@
 /**
  * A declared fact of a pair gene.
  */
-export type GroupFact = { field: number; present: boolean };
+export type BundleFact = { field: number; present: boolean };

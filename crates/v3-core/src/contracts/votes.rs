@@ -198,7 +198,7 @@ impl VoteSink {
 }
 
 /// A directed world-action kind: the kinds with eight direction sinks and a
-/// drive, which a `Ring` edge group (T25.F03) votes for. A new kind is
+/// drive, which a `Ring` edge bundle (T25.F03) votes for. A new kind is
 /// appended to [`Self::ALL`], and the index rule of [`VoteSink::index`]
 /// places its sinks.
 #[derive(
@@ -213,7 +213,7 @@ pub enum DirectedVoteKind {
 }
 
 impl DirectedVoteKind {
-    /// Catalog order, the order `AddRingGroup` and `RetargetGroupKind` draw
+    /// Catalog order, the order `AddRingBundle` and `RetargetBundleKind` draw
     /// over.
     pub const ALL: [Self; 4] = [
         Self::Move,

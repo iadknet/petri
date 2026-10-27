@@ -1,12 +1,12 @@
 //! Edge addressing and the weighted edge (T25.F01, T25.F03).
 //!
 //! A [`GraphEdge`] is built only through [`GraphEdge::new`] (a static,
-//! ungrouped edge) or by the container's group primitives, and read through
+//! ungrouped edge) or by the container's bundle primitives, and read through
 //! its getters; its fields are writable only inside the `cgp` module, where
-//! the container keeps the birth payload and the group invariants aligned
+//! the container keeps the birth payload and the bundle invariants aligned
 //! with every write.
 
-use super::group::GroupId;
+use super::bundle::BundleId;
 use crate::genome::PlasticityConfig;
 
 /// Tagged source for edge addressing. Replaces bare `source_idx: u16`.
@@ -21,7 +21,7 @@ pub enum GraphSource {
 }
 
 /// How a plastic member learns (T25.F07): for itself (`Edge`, its own
-/// correction) or for its group (`Group`, the group's one shared scale).
+/// correction) or for its bundle (`Group`, the bundle's one shared scale).
 /// Every member carries one; a static member's scope is inert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Scope {
@@ -64,18 +64,18 @@ impl Scope {
     }
 }
 
-/// A sink edge's membership in an edge group (T25.F03): the group it
+/// A sink edge's membership in an edge bundle (T25.F03): the bundle it
 /// belongs to and its learning scope (T25.F07). Only sink edges carry one.
-/// A group is identified by `group` alone: scope never splits it.
+/// A bundle is identified by `bundle` alone: scope never splits it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Membership {
-    pub group: GroupId,
+    pub bundle: BundleId,
     pub scope: Scope,
 }
 
-/// Weighted edge in the graph. Inside a group, `own_weight` is a correction
-/// on top of the group term, born 0; outside one it is the genomic weight.
+/// Weighted edge in the graph. Inside a bundle, `own_weight` is a correction
+/// on top of the bundle term, born 0; outside one it is the genomic weight.
 /// `plasticity` is the edge's learning attributes (T25.F06): `None` for a
 /// static edge.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -92,7 +92,7 @@ pub struct GraphEdge {
 }
 
 // A 6-byte source, a 4-byte weight, a 24-byte plasticity and a 4-byte
-// membership (a 2-byte group and a 1-byte scope), 40 bytes at 4-byte
+// membership (a 2-byte bundle and a 1-byte scope), 40 bytes at 4-byte
 // alignment (T25.F03, T25.F06, T25.F07, T25.F09).
 const _: () = assert!(std::mem::size_of::<GraphEdge>() == 40);
 
@@ -117,7 +117,7 @@ impl GraphEdge {
     }
 
     /// The edge's own weight: its genomic weight when ungrouped, its
-    /// correction on top of the group term when a member.
+    /// correction on top of the bundle term when a member.
     #[inline]
     #[must_use]
     pub const fn own_weight(&self) -> f32 {
@@ -131,18 +131,18 @@ impl GraphEdge {
         self.plasticity
     }
 
-    /// The group this edge belongs to, if any.
+    /// The bundle this edge belongs to, if any.
     #[inline]
     #[must_use]
     pub const fn membership(&self) -> Option<Membership> {
         self.membership
     }
 
-    /// Whether this edge is a member of `group`, whatever its scope.
+    /// Whether this edge is a member of `bundle`, whatever its scope.
     #[inline]
     #[must_use]
-    pub fn is_member_of(&self, group: GroupId) -> bool {
+    pub fn is_member_of(&self, bundle: BundleId) -> bool {
         self.membership
-            .is_some_and(|membership| membership.group == group)
+            .is_some_and(|membership| membership.bundle == bundle)
     }
 }

@@ -1,5 +1,5 @@
+import type { BrainBundle } from "../../types/generated/BrainBundle.ts";
 import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
-import type { BrainGroup } from "../../types/generated/BrainGroup.ts";
 import type { LearningEdge } from "../../types/generated/LearningEdge.ts";
 import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
@@ -25,8 +25,8 @@ export interface EdgeState {
 export interface LearningJoin {
 	/** The runtime state of `edge` at `(surface, container, index)`. */
 	edge(surface: WeightSurface, container: number, index: number, edge: BrainEdge): EdgeState;
-	/** The learned scale of group `index`, when its scale slot is initialized. */
-	learnedScale(index: number, group: BrainGroup | undefined): number | undefined;
+	/** The learned scale of bundle `index`, when its scale slot is initialized. */
+	learnedScale(index: number, bundle: BrainBundle | undefined): number | undefined;
 }
 
 /** An edge's state from its weight in force and its learner facts, if any. */
@@ -46,7 +46,7 @@ export function joinLearning(learning: NodeLearning | null): LearningJoin {
 			entry,
 		]),
 	);
-	const scales = new Map((learning?.scales ?? []).map((scale) => [scale.group, scale]));
+	const scales = new Map((learning?.scales ?? []).map((scale) => [scale.bundle, scale]));
 	return {
 		edge(surface, container, index, edge) {
 			const entry = entries.get(`${surface}:${container}:${index}`);
@@ -54,9 +54,9 @@ export function joinLearning(learning: NodeLearning | null): LearningJoin {
 				? edgeState(edge.applied, edge.learner)
 				: edgeState(entry.applied, entry);
 		},
-		learnedScale(index, group) {
+		learnedScale(index, bundle) {
 			const scale = scales.get(index);
-			return scale === undefined ? group?.learned_scale : scale.learned;
+			return scale === undefined ? bundle?.learned_scale : scale.learned;
 		},
 	};
 }

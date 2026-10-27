@@ -127,11 +127,11 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // commit 2 (default rate 0.005 -> 0.0060625): seed 19 goes extinct at
     // tick 159; seed 59 is the only one of 0..=60 that survives the horizon.
     // Rate 0.005 restores seed 19. Moved from 59 to 14 by T25.F04 commit 1:
-    // `AddDirectionPairGroup` remaps every Graph draw and seed 59 goes extinct
+    // `AddDirectionPairBundle` remaps every Graph draw and seed 59 goes extinct
     // before the horizon; 14 is the lowest of 0..=400 that survives it (14,
     // 42, 93, 158, 175 and 201 are the first six), and removing the catalog
     // entry restores seed 59. Moved from 14 to 129 by T25.F07 commit 2:
-    // learned group creation, the scope coin and `SetScope` remap every Graph
+    // learned bundle creation, the scope coin and `SetScope` remap every Graph
     // draw and seed 14 goes extinct at tick 132; 129 is the lowest of 0..=400
     // that survives the horizon (129, 164 and 175 do). Moved from 129 to 73
     // by T25.F08 commit 1: deleting `RefineHeritableStructure` remaps every

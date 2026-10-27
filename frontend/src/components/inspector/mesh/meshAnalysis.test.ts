@@ -36,7 +36,7 @@ function makeGenome(): BrainView {
 				targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
 				backend: {
 					Graph: {
-						groups: [],
+						bundles: [],
 						compute_nodes: [
 							{
 								kind: "Add",
@@ -79,7 +79,7 @@ function makeGenome(): BrainView {
 				targets: [],
 				backend: {
 					Graph: {
-						groups: [],
+						bundles: [],
 						compute_nodes: [{ kind: { Constant: 1 }, edges: [] }],
 						output_sinks: [],
 					},

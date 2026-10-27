@@ -217,13 +217,13 @@ pub(super) fn apply_copy_subgraph(
     copy_cgp_subgraph(def, rng)
 }
 
-pub(super) fn apply_copy_edge_bundle(
+pub(super) fn apply_copy_node_inputs(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
-    copy_edge_bundle(def, rng)
+    copy_node_inputs(def, rng)
 }
 
 // ─── Random source generation ───────────────────────────────────────────────
@@ -354,9 +354,9 @@ pub(crate) fn add_compute_node(
     }
 }
 
-/// Detach the edge at `occurrence` when it is a group member (T25.F03), so
+/// Detach the edge at `occurrence` when it is a bundle member (T25.F03), so
 /// an edit that changes its source keeps its genomic weight and leaves its
-/// group; returns the occurrence the edit continues on. No draw.
+/// bundle; returns the occurrence the edit continues on. No draw.
 fn detached(
     def: &mut CgpGraphBackendDef,
     occurrence: EdgeOccurrence,
@@ -627,7 +627,7 @@ pub(crate) fn alter_edge_weight_in_def(
 }
 
 /// `AlterGraphEdgeWeight`'s weight law, shared with
-/// `AlterGroupScale` (T11.F31): `|w| > 0.01` scales by
+/// `AlterBundleScale` (T11.F31): `|w| > 0.01` scales by
 /// `1 + U[−0.2, 0.2]`, otherwise adds `U[−0.1, 0.1]`. One draw.
 pub(crate) fn perturb_weight(w: &mut f32, rng: &mut impl Rng) {
     if w.abs() > 0.01 {
@@ -637,7 +637,7 @@ pub(crate) fn perturb_weight(w: &mut f32, rng: &mut impl Rng) {
     }
 }
 
-/// The compute nodes `copy_edge_bundle` can copy a bundle from: those that
+/// The compute nodes `copy_node_inputs` can copy a bundle from: those that
 /// have at least one edge to copy.
 fn bundle_source_indices(def: &CgpGraphBackendDef) -> impl Iterator<Item = usize> + '_ {
     def.compute_nodes()
@@ -650,7 +650,7 @@ fn bundle_source_indices(def: &CgpGraphBackendDef) -> impl Iterator<Item = usize
 /// Copy all edges from one compute node to another. The source is drawn
 /// from [`bundle_source_indices`], so a def with an edge-bearing node never
 /// skips here.
-pub(crate) fn copy_edge_bundle(
+pub(crate) fn copy_node_inputs(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
@@ -927,9 +927,9 @@ pub(super) fn can_copy_subgraph(def: &CgpGraphBackendDef) -> bool {
             .is_ok()
 }
 
-/// `CopyEdgeBundle`: a compute node with edges to copy, plus a second node
+/// `CopyNodeInputs`: a compute node with edges to copy, plus a second node
 /// to receive them.
-pub(super) fn can_copy_edge_bundle(def: &CgpGraphBackendDef) -> bool {
+pub(super) fn can_copy_node_inputs(def: &CgpGraphBackendDef) -> bool {
     def.compute_nodes().len() >= 2 && bundle_source_indices(def).next().is_some()
 }
 
@@ -1368,18 +1368,18 @@ mod tests {
     }
 
     #[test]
-    fn copy_edge_bundle_extends_target() {
+    fn copy_node_inputs_extends_target() {
         let mut def = minimal_def();
         let before = total_edge_count(&def);
         // Try multiple seeds — source node may have empty inputs causing skip
         for seed in 0u64..20 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let _ = copy_edge_bundle(&mut def, &mut rng);
+            let _ = copy_node_inputs(&mut def, &mut rng);
         }
         // At least one successful copy should have increased total edges
         assert!(
             total_edge_count(&def) > before,
-            "at least one copy_edge_bundle should succeed"
+            "at least one copy_node_inputs should succeed"
         );
     }
 

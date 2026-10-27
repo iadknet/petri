@@ -2,7 +2,7 @@
 use super::*;
 use crate::config::{MutationConfig, NeutralInputRecruitment as Arm};
 use crate::contracts::votes::DirectedVoteKind;
-use crate::mutation::graph::group;
+use crate::mutation::graph::bundle;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
@@ -46,14 +46,14 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                 let ring = matches!(&family, SourceFamily::Input(reference) if reference.is_ring());
                 if let (true, Some((kind, _))) = (ring, DirectedVoteKind::of_sink(vote)) {
                     // A ring landing on a directed sink is one silent `Ring`
-                    // group (T25.F03), refined through its scale: one step
+                    // bundle (T25.F03), refined through its scale: one step
                     // moves the kind's vote in every direction.
                     assert_eq!(graph(&node).edges().count(), 8);
                     assert!(graph(&node).edges().all(|edge| edge.membership().is_some()));
-                    assert_eq!(graph(&node).groups().len(), 1);
-                    assert_eq!(graph(&node).groups()[0].scale(), 0.0);
+                    assert_eq!(graph(&node).bundles().len(), 1);
+                    assert_eq!(graph(&node).bundles()[0].scale(), 0.0);
                     let mut refined = node.clone();
-                    group::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
+                    bundle::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                         .unwrap();
                     let votes = effects(graph(&refined), &refined.input_refs, 0.5)
                         .side
@@ -74,15 +74,15 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                     // through the scale: one step moves only the kind's
                     // direction votes (a fact member's pattern is 0).
                     let def = graph(&node);
-                    assert_eq!(def.groups().len(), 1);
-                    assert_eq!(def.groups()[0].scale(), 0.0);
+                    assert_eq!(def.bundles().len(), 1);
+                    assert_eq!(def.bundles()[0].scale(), 0.0);
                     assert_eq!(def.edges().filter(|e| e.membership().is_some()).count(), 15);
                     let drive = def.sink(OutputSinkKind::ActionVote(kind.drive())).unwrap();
                     assert_eq!(drive.inputs.len(), 3);
                     assert!(drive.inputs.iter().all(|e| e.membership().is_some()));
                     assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
                     let mut refined = node.clone();
-                    group::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
+                    bundle::alter_scale(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                         .unwrap();
                     let votes = effects(graph(&refined), &refined.input_refs, 0.5)
                         .side
@@ -95,7 +95,7 @@ fn recruited_examples_are_exactly_neutral_then_independently_refinable_at_every_
                         .all(|&i| (0..8).any(|d| kind.sink(d).index() == i)));
                     continue;
                 }
-                assert!(graph(&node).groups().is_empty());
+                assert!(graph(&node).bundles().is_empty());
                 let mut refined = node.clone();
                 alter_edge_weight_in_def(graph_mut(&mut refined), &mut SmallRng::seed_from_u64(11))
                     .unwrap();

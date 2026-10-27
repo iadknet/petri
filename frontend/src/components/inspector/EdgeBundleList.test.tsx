@@ -1,18 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { graphBrain, ringGroup } from "../../test/brainFixtures.ts";
+import { graphBrain, ringBundle } from "../../test/brainFixtures.ts";
+import type { BrainBundle } from "../../types/generated/BrainBundle.ts";
 import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
-import type { BrainGroup } from "../../types/generated/BrainGroup.ts";
 import type { BrainSink } from "../../types/generated/BrainSink.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
-import type { MemberSite } from "../../types/generated/MemberSite.ts";
-import { EdgeGroupList } from "./EdgeGroupList.tsx";
+import type { Site } from "../../types/generated/Site.ts";
+import { EdgeBundleList } from "./EdgeBundleList.tsx";
 
-/** A member of group 0 as the brain view resolves it: every number given,
+/** A member of bundle 0 as the brain view resolves it: every number given,
  * none composed here. */
 function member(
 	field: number,
-	site: MemberSite,
+	site: Site,
 	terms: { own: number; genomic: number; pattern: number; scale: number },
 ): BrainEdge {
 	return {
@@ -20,7 +20,7 @@ function member(
 		own: terms.own,
 		genomic: terms.genomic,
 		applied: terms.genomic,
-		member: { group: 0, scope: "Edge", site, field, pattern: terms.pattern, scale: terms.scale },
+		member: { bundle: 0, scope: "Edge", site, field, pattern: terms.pattern, scale: terms.scale },
 	};
 }
 
@@ -32,7 +32,7 @@ function directionSinks(kind: "Move" | "StealEnergy"): BrainSink[] {
 	}));
 }
 
-/** A Move ring group at offset 1 on ring 1, missing its channel-3 member. */
+/** A Move ring bundle at offset 1 on ring 1, missing its channel-3 member. */
 function grouped(): GraphBrain {
 	const sinks = directionSinks("Move");
 	for (let channel = 0; channel < 8; channel++) {
@@ -53,8 +53,8 @@ function grouped(): GraphBrain {
 	}
 	return graphBrain({
 		output_sinks: sinks,
-		groups: [
-			ringGroup(1, {
+		bundles: [
+			ringBundle(1, {
 				offset: 1,
 				scale: 0.5,
 				coordinates: Array.from({ length: 8 }, (_, c) => ({
@@ -75,16 +75,16 @@ const refs = [
 /** The pair coordinates the view lists for a Move gene at offset 2 on
  * AreaFoodSummary pair 1 (x field 3, y field 4), in birth order, with the
  * x coordinate on direction 4 absent. */
-function pairCoordinates(offset: number, missing?: number): BrainGroup["coordinates"] {
+function pairCoordinates(offset: number, missing?: number): BrainBundle["coordinates"] {
 	const x = [1, 2, 3, 5, 6, 7].map((r) => ({ field: 3, direction: (r + offset) % 8 }));
 	const y = [0, 1, 3, 4, 5, 7].map((r) => ({ field: 4, direction: (r + offset) % 8 }));
 	return [...x, ...y].map((c) => ({ ...c, present: !(c.field === 3 && c.direction === missing) }));
 }
 
-describe("EdgeGroupList", () => {
-	it("lists each group's ring, kind, offset, scale and members present with holes", () => {
+describe("EdgeBundleList", () => {
+	it("lists each bundle's ring, kind, offset, scale and members present with holes", () => {
 		render(
-			<EdgeGroupList
+			<EdgeBundleList
 				graphDef={grouped()}
 				inputRefs={[...refs]}
 				learning={{
@@ -94,12 +94,12 @@ describe("EdgeGroupList", () => {
 				}}
 			/>,
 		);
-		const row = screen.getByTestId("edge-group");
+		const row = screen.getByTestId("edge-bundle");
 		expect(row).toHaveTextContent("Move");
 		expect(row).toHaveTextContent("offset 1");
 		expect(row).toHaveTextContent("scale=0.500");
-		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("7/8 ●●●○●●●●");
-		const members = screen.getAllByTestId("edge-group-member");
+		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("7/8 ●●●○●●●●");
+		const members = screen.getAllByTestId("edge-bundle-member");
 		expect(members).toHaveLength(7);
 		expect(members[0]).toHaveTextContent("cell N → Move[NE] own=0.250 genomic=0.750");
 		fireEvent.mouseEnter(screen.getAllByText(/own=0\.250/)[0] as HTMLElement);
@@ -110,53 +110,53 @@ describe("EdgeGroupList", () => {
 
 	it("shows the learned scale, inherit_scale, and each member's scope and applied weight", () => {
 		const def = grouped();
-		const group = def.groups[0];
-		if (group) group.inherit_scale = true;
+		const bundle = def.bundles[0];
+		if (bundle) bundle.inherit_scale = true;
 		const first = def.output_sinks[1]?.edges[0]?.member;
 		if (first) first.scope = "Group";
 		render(
-			<EdgeGroupList
+			<EdgeBundleList
 				graphDef={def}
 				inputRefs={[...refs]}
 				learning={{
 					node_id: 0,
-					scales: [{ group: 0, learned: 1.25, initialized: true }],
+					scales: [{ bundle: 0, learned: 1.25, initialized: true }],
 					edges: [{ surface: "sink", container: 1, edge: 0, applied: 1.5 }],
 				}}
 			/>,
 		);
-		expect(screen.getByTestId("edge-group")).toHaveTextContent("scale=0.500");
-		expect(screen.getByTestId("edge-group-learned-scale")).toHaveTextContent("learned=1.250");
-		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent("inherits scale");
-		expect(screen.queryByTestId("edge-group-retention")).toBeNull();
-		const members = screen.getAllByTestId("edge-group-member");
+		expect(screen.getByTestId("edge-bundle")).toHaveTextContent("scale=0.500");
+		expect(screen.getByTestId("edge-bundle-learned-scale")).toHaveTextContent("learned=1.250");
+		expect(screen.getByTestId("edge-bundle-inherit-scale")).toHaveTextContent("inherits scale");
+		expect(screen.queryByTestId("edge-bundle-retention")).toBeNull();
+		const members = screen.getAllByTestId("edge-bundle-member");
 		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 group scope");
 		expect(members[1]).toHaveTextContent("applied=0.500 edge scope");
 	});
 
-	it("shows a group's retention when it decays (T25.F09)", () => {
+	it("shows a bundle's retention when it decays (T25.F09)", () => {
 		const def = grouped();
-		const group = def.groups[0];
-		if (group) group.retention = 0.99;
-		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
-		expect(screen.getByTestId("edge-group-retention")).toHaveTextContent("retention=0.9900");
+		const bundle = def.bundles[0];
+		if (bundle) bundle.retention = 0.99;
+		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
+		expect(screen.getByTestId("edge-bundle-retention")).toHaveTextContent("retention=0.9900");
 	});
 
 	it("takes the learned scale from the brain when the poll lists none", () => {
 		const def = grouped();
-		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
-		expect(screen.queryByTestId("edge-group-learned-scale")).toBeNull();
-		expect(screen.getByTestId("edge-group-inherit-scale")).toHaveTextContent(
+		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
+		expect(screen.queryByTestId("edge-bundle-learned-scale")).toBeNull();
+		expect(screen.getByTestId("edge-bundle-inherit-scale")).toHaveTextContent(
 			"genomic scale at birth",
 		);
-		const group = def.groups[0];
-		if (group) group.learned_scale = 2;
-		render(<EdgeGroupList graphDef={def} inputRefs={[]} learning={null} />);
-		expect(screen.getByTestId("edge-group-learned-scale")).toHaveTextContent("learned=2.000");
+		const bundle = def.bundles[0];
+		if (bundle) bundle.learned_scale = 2;
+		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
+		expect(screen.getByTestId("edge-bundle-learned-scale")).toHaveTextContent("learned=2.000");
 	});
 
 	it("explains the offset and the members glyphs in tooltips, outside the toggle", () => {
-		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} learning={null} />);
+		render(<EdgeBundleList graphDef={grouped()} inputRefs={[]} learning={null} />);
 		const toggle = screen.getByRole("button");
 		const offset = screen.getByText("offset 1");
 		expect(toggle).not.toContainElement(offset);
@@ -164,21 +164,21 @@ describe("EdgeGroupList", () => {
 		fireEvent.mouseEnter(offset);
 		expect(screen.getByTestId("tooltip")).toHaveTextContent(/1 step clockwise/);
 		fireEvent.mouseLeave(offset);
-		fireEvent.focus(screen.getByTestId("edge-group-members"));
+		fireEvent.focus(screen.getByTestId("edge-bundle-members"));
 		expect(screen.getByTestId("tooltip")).toHaveTextContent(/by ring cell/);
 	});
 
-	it("collapses and reopens a group's member rows, open by default", () => {
-		render(<EdgeGroupList graphDef={grouped()} inputRefs={[]} learning={null} />);
+	it("collapses and reopens a bundle's member rows, open by default", () => {
+		render(<EdgeBundleList graphDef={grouped()} inputRefs={[]} learning={null} />);
 		const toggle = screen.getByRole("button");
 		expect(toggle).toHaveAttribute("aria-expanded", "true");
-		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(7);
-		expect(screen.getByTestId("edge-group")).toHaveTextContent("ref 1 (missing)");
+		expect(screen.getAllByTestId("edge-bundle-member")).toHaveLength(7);
+		expect(screen.getByTestId("edge-bundle")).toHaveTextContent("ref 1 (missing)");
 		fireEvent.click(toggle);
 		expect(toggle).toHaveAttribute("aria-expanded", "false");
-		expect(screen.queryAllByTestId("edge-group-member")).toHaveLength(0);
+		expect(screen.queryAllByTestId("edge-bundle-member")).toHaveLength(0);
 		fireEvent.click(toggle);
-		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(7);
+		expect(screen.getAllByTestId("edge-bundle-member")).toHaveLength(7);
 	});
 
 	it("renders a pair gene's coordinates from the view and a zero-pattern member outside them", () => {
@@ -198,8 +198,8 @@ describe("EdgeGroupList", () => {
 		sinks[2]?.edges.push(
 			member(3, { Direction: 2 }, { own: 0.125, genomic: 0.125, pattern: 0, scale: 1 }),
 		);
-		const group: BrainGroup = {
-			...ringGroup(0),
+		const bundle: BrainBundle = {
+			...ringBundle(0),
 			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
 			offset: 2,
 			scale: 1,
@@ -211,19 +211,19 @@ describe("EdgeGroupList", () => {
 			],
 		};
 		render(
-			<EdgeGroupList
-				graphDef={graphBrain({ output_sinks: sinks, groups: [group] })}
+			<EdgeBundleList
+				graphDef={graphBrain({ output_sinks: sinks, bundles: [bundle] })}
 				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
 				learning={null}
 			/>,
 		);
-		const row = screen.getByTestId("edge-group");
+		const row = screen.getByTestId("edge-bundle");
 		expect(row).toHaveTextContent("Pair");
 		expect(row).toHaveTextContent("nearestDx/nearestDy #0");
 		expect(row).toHaveTextContent("offset 2");
 		expect(row).toHaveTextContent("scale=1.000");
-		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("11/12 ●○●●●●●●●●●● +1");
-		const members = screen.getAllByTestId("edge-group-member");
+		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("11/12 ●○●●●●●●●●●● +1");
+		const members = screen.getAllByTestId("edge-bundle-member");
 		expect(members).toHaveLength(12);
 		const zero = members.filter((m) => m.textContent?.includes("(zero pattern)"));
 		expect(zero).toHaveLength(1);
@@ -250,8 +250,8 @@ describe("EdgeGroupList", () => {
 				member(5, "Drive", { own: 0.25, genomic: 0.25, pattern: 0, scale: 2 }),
 			],
 		});
-		const group: BrainGroup = {
-			...ringGroup(0),
+		const bundle: BrainBundle = {
+			...ringBundle(0),
 			shape: { DirectionPair: { ref_idx: 0, pair: 1 } },
 			kind: "StealEnergy",
 			scale: 2,
@@ -263,16 +263,16 @@ describe("EdgeGroupList", () => {
 			],
 		};
 		render(
-			<EdgeGroupList
-				graphDef={graphBrain({ output_sinks: sinks, groups: [group] })}
+			<EdgeBundleList
+				graphDef={graphBrain({ output_sinks: sinks, bundles: [bundle] })}
 				inputRefs={[{ family: "world", key: "AreaFoodSummary", food_type: 0 }]}
 				learning={null}
 			/>,
 		);
-		expect(screen.getByTestId("edge-group-members")).toHaveTextContent("12/12 ●●●●●●●●●●●●");
-		expect(screen.getByTestId("edge-group-facts")).toHaveTextContent("facts 2/3 ●●○");
-		expect(screen.getAllByTestId("edge-group-member")).toHaveLength(12);
-		const facts = screen.getAllByTestId("edge-group-fact");
+		expect(screen.getByTestId("edge-bundle-members")).toHaveTextContent("12/12 ●●●●●●●●●●●●");
+		expect(screen.getByTestId("edge-bundle-facts")).toHaveTextContent("facts 2/3 ●●○");
+		expect(screen.getAllByTestId("edge-bundle-member")).toHaveLength(12);
+		const facts = screen.getAllByTestId("edge-bundle-fact");
 		expect(facts).toHaveLength(2);
 		expect(facts[0]).toHaveTextContent("amount → StealEnergy drive own=0.000");
 		expect(facts[1]).toHaveTextContent("nearestDist → StealEnergy drive own=0.250 genomic=0.250");
@@ -280,9 +280,9 @@ describe("EdgeGroupList", () => {
 		expect(screen.getByTestId("tooltip")).toHaveTextContent("2.000 × 0.00 + 0.250 = 0.250");
 	});
 
-	it("renders nothing without groups", () => {
+	it("renders nothing without bundles", () => {
 		const { container } = render(
-			<EdgeGroupList graphDef={graphBrain()} inputRefs={[]} learning={null} />,
+			<EdgeBundleList graphDef={graphBrain()} inputRefs={[]} learning={null} />,
 		);
 		expect(container.innerHTML).toBe("");
 	});

@@ -1,10 +1,10 @@
-//! T25.F03: `Ring` edge groups through the native effects pass. Members are
+//! T25.F03: `Ring` edge bundles through the native effects pass. Members are
 //! ordinary sink edges at their genomic weight, so equality with the
 //! equivalent ungrouped edges is bitwise.
 use super::*;
 use crate::contracts::votes::DirectedVoteKind;
-use crate::genome::cgp::{EdgeSurface, GroupId, Shape};
-use crate::mutation::graph::group;
+use crate::genome::cgp::{BundleId, EdgeSurface, Shape};
+use crate::mutation::graph::bundle;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::types::sanitize_f32;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -94,18 +94,18 @@ fn corrections_strategy() -> impl Strategy<Value = Vec<f32>> {
     prop::collection::vec(prop_oneof![-4.0f32..-1e-3, 1e-3f32..4.0], 8)
 }
 
-/// Add a `Ring` group on `ring_ref` with `scale` and one correction per
+/// Add a `Ring` bundle on `ring_ref` with `scale` and one correction per
 /// member, in member order.
-fn add_group(
+fn add_bundle(
     def: &mut CgpGraphBackendDef,
     ring_ref: u16,
     kind: DirectedVoteKind,
     offset: u8,
     scale: f32,
     corrections: &[f32],
-) -> GroupId {
-    let id = def.add_group(Shape::Ring { ring_ref }, kind, offset);
-    def.group_mut(id).set_scale(scale);
+) -> BundleId {
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
+    def.bundle_mut(id).set_scale(scale);
     let members: Vec<_> = def.members(id).collect();
     for (occurrence, &own) in members.into_iter().zip(corrections) {
         def.edge_mut(occurrence).set_weight(own);
@@ -113,12 +113,12 @@ fn add_group(
     id
 }
 
-/// The eight ungrouped edges `grouped`'s group `id` is equivalent to: per
+/// The eight ungrouped edges `grouped`'s bundle `id` is equivalent to: per
 /// member, an edge from the same leaf into the same sink at weight
 /// `scale + own_weight`, appended after the sink's incumbents (the member's
-/// I10 position when the group is the sink's only one).
-fn eight_edges(base: &mut CgpGraphBackendDef, grouped: &CgpGraphBackendDef, id: GroupId) {
-    let scale = grouped.groups()[id.index()].scale();
+/// I10 position when the bundle is the sink's only one).
+fn eight_edges(base: &mut CgpGraphBackendDef, grouped: &CgpGraphBackendDef, id: BundleId) {
+    let scale = grouped.bundles()[id.index()].scale();
     for occurrence in grouped.members(id) {
         let member = grouped.edge_at(occurrence);
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
@@ -133,10 +133,10 @@ fn eight_edges(base: &mut CgpGraphBackendDef, grouped: &CgpGraphBackendDef, id: 
 }
 
 proptest! {
-    /// A new group (scale 0, corrections 0) on a valid ring is exactly
+    /// A new bundle (scale 0, corrections 0) on a valid ring is exactly
     /// neutral to every vote, result and memory.
     #[test]
-    fn a_new_group_is_exactly_neutral(
+    fn a_new_bundle_is_exactly_neutral(
         food in ring_strategy(),
         barrier in ring_strategy(),
         occupied in ring_strategy(),
@@ -152,7 +152,7 @@ proptest! {
             wire(&mut def, OutputSinkKind::ActionVote(vote), edge(memory(0, true), weight));
         }
         let before = effects_at(&def, &rings(), &sensors);
-        def.add_group(Shape::Ring { ring_ref }, kind, offset);
+        def.add_ring_bundle(Shape::Ring { ring_ref }, kind, offset);
         let after = effects_at(&def, &rings(), &sensors);
         prop_assert_eq!(after.side.dispatch_effects(), before.side.dispatch_effects());
         prop_assert_eq!(after.result, before.result);
@@ -160,11 +160,11 @@ proptest! {
         prop_assert_eq!(after.side.work_counters, before.side.work_counters);
     }
 
-    /// The `eight_edges` oracle: a group (scale `s`, corrections `c_i` drawn
+    /// The `eight_edges` oracle: a bundle (scale `s`, corrections `c_i` drawn
     /// nonzero) votes bitwise as its eight ungrouped edges of weight
     /// `s + c_i` on a kind without other edges.
     #[test]
-    fn a_group_equals_its_eight_edges_on_a_kind_without_edges(
+    fn a_bundle_equals_its_eight_edges_on_a_kind_without_edges(
         food in ring_strategy(),
         barrier in ring_strategy(),
         kind in kind_strategy(),
@@ -184,17 +184,17 @@ proptest! {
             wire(&mut base, OutputSinkKind::ActionVote(vote), edge(memory(0, true), w));
         }
         let mut grouped = base.clone();
-        let id = add_group(&mut grouped, ring_ref, kind, offset, scale, &corrections);
+        let id = add_bundle(&mut grouped, ring_ref, kind, offset, scale, &corrections);
         let mut wired = base;
         eight_edges(&mut wired, &grouped, id);
         let (a, b) = (votes(&grouped, &sensors), votes(&wired, &sensors));
         prop_assert_eq!(a.map(f32::to_bits), b.map(f32::to_bits));
     }
 
-    /// With incumbent edges, a group's members sum after them like appended
+    /// With incumbent edges, a bundle's members sum after them like appended
     /// edges, nonfinite scales and ring values included.
     #[test]
-    fn a_group_sums_after_incumbent_edges_like_appended_edges(
+    fn a_bundle_sums_after_incumbent_edges_like_appended_edges(
         mut food in ring_strategy(),
         nan_channel in prop::option::of(0usize..8),
         kind in kind_strategy(),
@@ -218,7 +218,7 @@ proptest! {
             wire(&mut base, OutputSinkKind::ActionVote(kind.sink(d)), edge(memory(1, false), w));
         }
         let mut grouped = base.clone();
-        let id = add_group(&mut grouped, 0, kind, offset, scale, &corrections);
+        let id = add_bundle(&mut grouped, 0, kind, offset, scale, &corrections);
         let mut wired = base;
         eight_edges(&mut wired, &grouped, id);
         let (a, b) = (votes(&grouped, &sensors), votes(&wired, &sensors));
@@ -237,11 +237,11 @@ proptest! {
     ) {
         let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        add_group(&mut def, 0, kind, offset, scale, &[0.0; 8]);
+        add_bundle(&mut def, 0, kind, offset, scale, &[0.0; 8]);
         let before = votes(&def, &sensors);
-        group::shift_offset(&mut def, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        bundle::shift_offset(&mut def, &mut SmallRng::seed_from_u64(seed)).unwrap();
         let after = votes(&def, &sensors);
-        let step = (def.groups()[0].offset() + 8 - offset) % 8;
+        let step = (def.bundles()[0].offset() + 8 - offset) % 8;
         prop_assert!(step == 1 || step == 7);
         for d in 0..8u8 {
             let from = (d + 8 - step) % 8;
@@ -261,7 +261,7 @@ proptest! {
         scale in -4.0f32..4.0,
     ) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        add_group(&mut def, 0, kind, offset, scale, &[0.0; 8]);
+        add_bundle(&mut def, 0, kind, offset, scale, &[0.0; 8]);
         let mut zeroed = food;
         zeroed[usize::from(channel)] = 0.0;
         let expected = votes(&def, &ring_sensors(zeroed, ramp(0.0), ramp(0.25)));
@@ -271,11 +271,11 @@ proptest! {
     }
 }
 
-/// Two groups of one kind and offset and an incumbent edge sum sequentially
-/// in the sink's I10 order: the incumbent, then the first group's member,
+/// Two bundles of one kind and offset and an incumbent edge sum sequentially
+/// in the sink's I10 order: the incumbent, then the first bundle's member,
 /// then the second's.
 #[test]
-fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
+fn duplicate_bundles_and_incumbent_edges_sum_in_sink_order() {
     let food = [0.5, -1.25, 3.0, 0.125, 7.5, -0.75, 2.0, 1e-3];
     let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -286,8 +286,8 @@ fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
         edge(memory(1, false), edge_weight),
     );
     let (w1, k1, w2, k2) = (0.7f32, 3u8, -1.9f32, 3u8);
-    add_group(&mut def, 0, DirectedVoteKind::Move, k1, w1, &[0.0; 8]);
-    add_group(&mut def, 0, DirectedVoteKind::Move, k2, w2, &[0.0; 8]);
+    add_bundle(&mut def, 0, DirectedVoteKind::Move, k1, w1, &[0.0; 8]);
+    add_bundle(&mut def, 0, DirectedVoteKind::Move, k2, w2, &[0.0; 8]);
     let votes = votes(&def, &sensors);
     let memory_value = ramp::<16>(0.0)[1];
     for d in 0..8u8 {
@@ -309,15 +309,15 @@ fn duplicate_groups_and_incumbent_edges_sum_in_sink_order() {
 }
 
 /// An unresolvable `ring_ref` (out of range or not a ring) reads pattern 0:
-/// every member weighs its own correction, so a group at any finite scale
-/// with zero corrections contributes nothing. Such a group fails
+/// every member weighs its own correction, so a bundle at any finite scale
+/// with zero corrections contributes nothing. Such a bundle fails
 /// `validate_graph` (I7) and never reaches a live genome.
 #[test]
 fn an_unresolvable_ring_ref_reads_pattern_zero() {
     let sensors = ring_sensors(ramp(0.0), ramp(0.0), ramp(0.25));
     for ring_ref in [3, 4, u16::MAX] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        add_group(
+        add_bundle(
             &mut def,
             ring_ref,
             DirectedVoteKind::Reproduce,
@@ -348,7 +348,7 @@ fn an_unresolvable_ring_ref_reads_pattern_zero() {
 }
 
 /// With pattern 0 a member's genomic weight is its correction, so an
-/// unresolvable group beside the kind's incumbent edges leaves their votes
+/// unresolvable bundle beside the kind's incumbent edges leaves their votes
 /// unchanged at any finite scale.
 #[test]
 fn an_unresolvable_ring_ref_leaves_incumbent_votes_unchanged() {
@@ -366,7 +366,7 @@ fn an_unresolvable_ring_ref_leaves_incumbent_votes_unchanged() {
     for ring_ref in [3, 4, u16::MAX] {
         for scale in [-3.0e38, -2.0, 7.5, 3.0e38] {
             let mut def = base.clone();
-            add_group(
+            add_bundle(
                 &mut def,
                 ring_ref,
                 DirectedVoteKind::Move,
@@ -387,10 +387,10 @@ fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
     }
     let sensors = ring_sensors(food, ramp(0.0), ramp(0.25));
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     assert!(votes(&def, &sensors).iter().all(|&v| v == 0.0));
-    group::alter_scale(&mut def, &mut SmallRng::seed_from_u64(5)).unwrap();
-    let scale = def.groups()[0].scale();
+    bundle::alter_scale(&mut def, &mut SmallRng::seed_from_u64(5)).unwrap();
+    let scale = def.bundles()[0].scale();
     assert_ne!(scale, 0.0);
     let votes = votes(&def, &sensors);
     for (index, &vote) in votes.iter().enumerate() {
@@ -466,9 +466,9 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
     (side, energy, applied)
 }
 
-fn group_only() -> CgpGraphBackendDef {
+fn bundle_only() -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    add_group(
+    add_bundle(
         &mut def,
         1,
         DirectedVoteKind::StealEnergy,
@@ -481,7 +481,7 @@ fn group_only() -> CgpGraphBackendDef {
 
 #[test]
 fn production_and_traced_visits_agree_and_the_trace_carries_member_terms() {
-    let def = group_only();
+    let def = bundle_only();
     assert!(def.enters_visit());
     let (production, energy_a, _) = visit(&def, 100.0, false);
     let (traced, energy_b, applied) = visit(&def, 100.0, true);
@@ -495,10 +495,10 @@ fn production_and_traced_visits_agree_and_the_trace_carries_member_terms() {
 }
 
 #[test]
-fn a_group_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
+fn a_bundle_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
     let (_, untouched, _) = visit(&CgpGraphBackendDef::new_with_fixed_outputs(), 100.0, false);
     assert_eq!(untouched, 100.0, "a dormant graph's visit is free");
-    let (side_a, grouped, _) = visit(&group_only(), 100.0, false);
+    let (side_a, grouped, _) = visit(&bundle_only(), 100.0, false);
     let mut zero_edge = CgpGraphBackendDef::new_with_fixed_outputs();
     wire(
         &mut zero_edge,
@@ -516,11 +516,11 @@ fn a_group_on_a_dormant_graph_pays_as_its_first_zero_vote_edge_does() {
 
 #[test]
 fn an_exhausted_visit_stages_no_member_term() {
-    let (side, _, _) = visit(&group_only(), 0.0, false);
+    let (side, _, _) = visit(&bundle_only(), 0.0, false);
     assert!(side.dispatch_effects().0.iter().all(|&v| v == 0.0));
 }
 
-// ── Direction-pair groups (T25.F04) ─────────────────────────────────────────
+// ── Direction-pair bundles (T25.F04) ─────────────────────────────────────────
 
 mod pair {
     use super::*;
@@ -609,7 +609,7 @@ mod pair {
         sensors
     }
 
-    /// `kind`'s eight direction votes of a graph holding one pair group on
+    /// `kind`'s eight direction votes of a graph holding one pair bundle on
     /// `refs[0]`'s pair `pair` at `offset`, scale 1.
     fn direction_votes(
         reference: &InputReference,
@@ -620,8 +620,8 @@ mod pair {
     ) -> [f32; 8] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let layout = reference.direction_pairs()[usize::from(pair)];
-        let id = def.add_pair_group(0, pair, layout, kind, offset, &[]);
-        def.group_mut(id).set_scale(1.0);
+        let id = def.add_pair_bundle(0, pair, layout, kind, offset, &[]);
+        def.bundle_mut(id).set_scale(1.0);
         let votes = effects_at(&def, std::slice::from_ref(reference), sensors)
             .side
             .dispatch_effects()
@@ -671,12 +671,12 @@ mod pair {
     }
 
     #[test]
-    fn a_pair_group_at_offset_0_votes_toward_a_thing_at_each_direction() {
+    fn a_pair_bundle_at_offset_0_votes_toward_a_thing_at_each_direction() {
         check_each_direction(0);
     }
 
     #[test]
-    fn a_pair_group_at_offset_4_votes_away_from_a_thing_at_each_direction() {
+    fn a_pair_bundle_at_offset_4_votes_away_from_a_thing_at_each_direction() {
         check_each_direction(4);
     }
 
@@ -717,11 +717,11 @@ mod pair {
     }
 
     proptest! {
-        /// A pair group (scale `s`, corrections `c_i`) votes bitwise as its
+        /// A pair bundle (scale `s`, corrections `c_i`) votes bitwise as its
         /// twelve ungrouped edges of weight `compose(c_i, s, pattern_i)` in
         /// the I10 position, beside edges of other kinds.
         #[test]
-        fn a_pair_group_equals_its_twelve_edges(
+        fn a_pair_bundle_equals_its_twelve_edges(
             area in perception_strategy(),
             kind in kind_strategy(),
             offset in 0u8..8,
@@ -743,8 +743,8 @@ mod pair {
             }
             let mut grouped = base.clone();
             let layout = refs[0].direction_pairs()[usize::from(pair)];
-            let id = grouped.add_pair_group(0, pair, layout, kind, offset, &[]);
-            grouped.group_mut(id).set_scale(scale);
+            let id = grouped.add_pair_bundle(0, pair, layout, kind, offset, &[]);
+            grouped.bundle_mut(id).set_scale(scale);
             let members: Vec<_> = grouped.members(id).collect();
             prop_assert_eq!(members.len(), 12);
             for (occurrence, &own) in members.iter().zip(&corrections) {

@@ -2,7 +2,7 @@ import { type EdgeProps, getBezierPath } from "@xyflow/react";
 import type { MouseEvent, PointerEvent } from "react";
 import { TipBubble, useTipAnchor } from "../config-panel/shared/Tooltip.tsx";
 import { plasticityDetail } from "./PlasticEdgeList.tsx";
-import { composeTerms } from "./edgeGroupWeights.ts";
+import { composeTerms } from "./edgeBundleWeights.ts";
 import type { GraphModelEdge } from "./graphFullModel.ts";
 
 /** An edge's tooltip facts: its endpoints' labels and the model's weights. */
@@ -28,7 +28,7 @@ function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
 }
 
 /** A member's weight in force and scope (T25.F07): a static member of a
- * learning group weighs through the learned scale. */
+ * learning bundle weighs through the learned scale. */
 export function memberApplied(member: NonNullable<EdgeTip["member"]>): string {
 	return `applied ${member.applied.toFixed(3)} · scope ${member.scope}`;
 }
@@ -44,7 +44,7 @@ function EdgeTipContent({ tip }: { tip: EdgeTip }) {
 			{tip.member ? (
 				<>
 					<span className={`${line} text-slate-400`}>
-						group #{tip.member.group} member: scale × pattern + correction
+						bundle #{tip.member.bundle} member: scale × pattern + correction
 					</span>
 					<span className={`${line} font-mono`}>
 						{composeTerms({

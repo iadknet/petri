@@ -56,22 +56,22 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // without the genome JSON is 8964731210341994819 at the merge base and
     // after the commit, and reverting the key rename restores.
     // Re-pinned by T25.F03 commit 2: the five projection operators become
-    // the edge-group operators at the same catalog positions and weights, so
-    // the event keys and the genome text of every group-creating draw change
+    // the edge-bundle operators at the same catalog positions and weights, so
+    // the event keys and the genome text of every bundle-creating draw change
     // (12816372541544823979 -> 7833229115364439623); reverting the commit
     // restores.
-    // Re-pinned by T25.F04 commit 1: `AddDirectionPairGroup` joins the Graph
+    // Re-pinned by T25.F04 commit 1: `AddDirectionPairBundle` joins the Graph
     // default arm (weight 56 -> 58) and remaps every Graph draw
     // (7833229115364439623 -> 4902026005096458209); removing the catalog
     // entry alone restores.
     // Re-pinned by T25.F07 commit 1 (text only): every member's JSON names
-    // its `scope` and every group's its `inherit_scale`
+    // its `scope` and every bundle's its `inherit_scale`
     // (4902026005096458209 -> 11853091526805612651); the hash without the
     // genome JSON is 14048641739953688336 at the merge base and after the
     // commit.
     // Re-pinned by T25.F07 commit 2: `SetScope` joins the Graph default arm
     // (weight 58 -> 60), the plasticity operators admit members and draw the
-    // scope coin, and group creation draws its learning
+    // scope coin, and bundle creation draws its learning
     // (11853091526805612651 -> 6729442929459510286).
     // Held by T25.F08 commit 1: this path never enabled refinement, so its
     // enabled set did not change. Re-pinned by T25.F08 commit 2: the two
@@ -79,7 +79,7 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // catalog (enabled weight 60 -> 66) and remap every Graph draw
     // (6729442929459510286 -> 1771622774480443924).
     // Re-pinned by T25.F09 commit 1 (text only): every plastic edge's JSON
-    // names its `retention` and every group's its `retention`
+    // names its `retention` and every bundle's its `retention`
     // (1771622774480443924 -> 2113204031778778398); the hash without the
     // genome JSON is 8882269626750794464 at the merge base and after the
     // commit.
@@ -103,7 +103,14 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Re-pinned by T27.F03 commit 4 after two agreeing runs: the
     // `GiveEnergy` kind and `GiveEffort` widen the kind, sink and field
     // draws (1565583786713441820 -> 6751617150376296849).
-    assert_eq!(hash, 6751617150376296849, "pin of the recruitment-Off path");
+    // Re-pinned by T25.F11 commit 2 (text only): edge groups are bundles in
+    // the genome JSON and the operator keys, and `CopyEdgeBundle` is
+    // `CopyNodeInputs` (6751617150376296849 -> 11948392547720171289);
+    // mapping the names back restores the old value.
+    assert_eq!(
+        hash, 11948392547720171289,
+        "pin of the recruitment-Off path"
+    );
 }
 
 #[test]

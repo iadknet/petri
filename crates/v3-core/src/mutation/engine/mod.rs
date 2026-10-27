@@ -644,7 +644,7 @@ fn apply_vm_event(
     })
 }
 
-/// Apply one graph mutation event with the gate, and the detaches and group
+/// Apply one graph mutation event with the gate, and the detaches and bundle
 /// removals it made, counted only when it commits: a rolled-back event
 /// reports none (T25.F03), nor an attribute scope (T25.F08).
 fn apply_graph_event(
@@ -748,4 +748,4 @@ mod recruitment_tests;
 mod membership_tests;
 
 #[cfg(test)]
-mod group_tests;
+mod bundle_tests;

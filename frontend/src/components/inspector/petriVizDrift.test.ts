@@ -18,11 +18,11 @@ const SKILL = join(ROOT, ".agents/skills/petri-visuals/viz");
 // expectations below were last checked against it. When eval.rs changes, review
 // both, then update this fingerprint.
 const EVAL_RS_SHA256 = "fde4089551ef272cec1ecbcdbff439dff308a7c9cdc5a0edda194719aa64478f";
-// sha256 of crates/v3-core/src/genome/cgp/group.rs, the composition
+// sha256 of crates/v3-core/src/genome/cgp/bundle.rs, the composition
 // source (`compose(own, scale, pattern)`, the ring and pair birth members)
-// the renderer's edgeGroups mirrors. When group.rs changes, review it, then
+// the renderer's edgeGroups mirrors. When bundle.rs changes, review it, then
 // update this fingerprint.
-const GROUP_RS_SHA256 = "09886b5facaeee35ff4b68f0186a9595b7dfdcdcbd4b48a988defd39b1772fd4";
+const BUNDLE_RS_SHA256 = "df5534cddacdd18d1d94f97a88f8c0498b3834f360a56c255495399d0e998afb";
 
 type Rgb = [number, number, number];
 interface PetriViz {
@@ -69,9 +69,9 @@ describe("petri-visuals renderer sources", () => {
 		expect(createHash("sha256").update(evalRs).digest("hex")).toBe(EVAL_RS_SHA256);
 	});
 
-	it("checked its member composition against the current group source", () => {
-		const groupRs = readFileSync(join(ROOT, "crates/v3-core/src/genome/cgp/group.rs"));
-		expect(createHash("sha256").update(groupRs).digest("hex")).toBe(GROUP_RS_SHA256);
+	it("checked its member composition against the current bundle source", () => {
+		const bundleRs = readFileSync(join(ROOT, "crates/v3-core/src/genome/cgp/bundle.rs"));
+		expect(createHash("sha256").update(bundleRs).digest("hex")).toBe(BUNDLE_RS_SHA256);
 	});
 
 	it("ships a minified copy built from the current source (sh viz/build.sh)", () => {

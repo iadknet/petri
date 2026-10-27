@@ -553,7 +553,7 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 /// mutation's draws before the phenotype step (channels
 /// `[0, 0, 92, 91, 138, 138]`, active 3 -> `[0, 0, 93, 92, 138, 138]`,
 /// active 2, polarity all adding); the kin tag holds. Re-pinned by T27.F03
-/// commit 3: the four-kind group draws, the 39 / 106 sink draws and the
+/// commit 3: the four-kind bundle draws, the 39 / 106 sink draws and the
 /// widened decision sub-index draws change the genome mutation's draws
 /// (channels `[0, 0, 93, 92, 138, 138]` -> `[0, 0, 91, 92, 138, 138]`, the
 /// third polarity subtracting, kin tag 3_756_156_572 -> 3_756_156_052).

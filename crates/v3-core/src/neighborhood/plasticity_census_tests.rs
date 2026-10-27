@@ -312,11 +312,11 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
     assert_eq!(totals, vec![("compute", 0.625, 7), ("sink", 2.25, 10)]);
 }
 
-/// T25.F07 invariant 10: a group learner adds no edge drift, an unchanged
+/// T25.F07 invariant 10: a bundle learner adds no edge drift, an unchanged
 /// correction under a nonzero genomic scale drifts 0, and a learned scale
-/// counts once per group by its `inherit_scale`, with its drift and bound.
+/// counts once per bundle by its `inherit_scale`, with its drift and bound.
 #[test]
-fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
+fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::WorldInputKey;
     use crate::genome::cgp::{BirthSeeds, EdgeSurface, Scope, Shape};
@@ -331,9 +331,9 @@ fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
         retention: 1.0,
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
-    def.group_mut(id).set_scale(0.5);
-    def.group_mut(id).set_inherit_scale(true);
+    let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    def.bundle_mut(id).set_scale(0.5);
+    def.bundle_mut(id).set_inherit_scale(true);
     let members: Vec<EdgeOccurrence> = def.members(id).collect();
     def.edge_mut(members[0]).set_weight(0.25);
     for (k, scope) in [Scope::Edge, Scope::Group, Scope::Group]
@@ -358,7 +358,7 @@ fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     let seeds = BirthSeeds::Rows {
         compute: Vec::new(),
         sinks,
-        groups: vec![Some(4.0)],
+        bundles: vec![Some(4.0)],
     };
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -381,7 +381,7 @@ fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     assert_eq!(sink_cell.at_clamp, 0);
     let [darwinian, lamarckian_scales] = census.scales;
     assert_eq!(darwinian, LearnedScales::default());
-    assert_eq!(lamarckian_scales.scales, 1, "once per group");
+    assert_eq!(lamarckian_scales.scales, 1, "once per bundle");
     // Seeded at 4, clamped to the bound 1.5 at construction: its birth
     // value, so no lifetime drift (T25.F09).
     assert_eq!(lamarckian_scales.drift_sum, 0.0);
@@ -434,9 +434,9 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         (0.0, 4),
     ] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let id = def.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
-        def.group_mut(id).set_scale(0.5);
-        def.group_mut(id).set_retention(retention);
+        let id = def.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+        def.bundle_mut(id).set_scale(0.5);
+        def.bundle_mut(id).set_retention(retention);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();
         let config = PlasticityConfig {
             retention,
@@ -472,7 +472,7 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         visited.learned.set_scale(0, 0, 1.25);
         let census = PlasticityCensus::observe([(&[0usize][..], visited.learned())]);
         let edges = census.edges_by_retention[bin];
-        // The group learner counts but has no learned own quantity.
+        // The bundle learner counts but has no learned own quantity.
         assert_eq!((edges.count, edges.initialized, edges.at_bound), (2, 1, 1));
         assert_eq!(edges.drift_sum, 2.0, "|-2 - 0| from the birth correction");
         let scales = census.scales_by_retention[bin];

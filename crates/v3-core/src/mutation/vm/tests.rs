@@ -1900,7 +1900,7 @@ fn paired_slot_address_handles_maximum_encoded_slot_after_single_field_nudge() {
 }
 
 #[test]
-fn vm_mutate_paired_slot_address_skips_when_no_paired_group() {
+fn vm_mutate_paired_slot_address_skips_when_no_paired_bundle() {
     // Use founder genome without slot instructions — should skip.
     let genome = v3alpha1_founder_genome();
     let mut skipped = false;
@@ -2058,7 +2058,7 @@ fn slot_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     }
 }
 
-/// One paired slot group per entry of `slots`: each slot gets both a load and
+/// One paired slot bundle per entry of `slots`: each slot gets both a load and
 /// a store, which is what makes it an eligible `VmMutatePairedSlotAddress`
 /// candidate.
 fn paired_slot_program(slots: &[u8]) -> Vec<VmInstruction> {
@@ -2085,7 +2085,7 @@ fn apply_paired_slot_address(genome: &CreatureGenome, seed: u64) -> CreatureGeno
         &mut r,
         &MutationConfig::default(),
     )
-    .expect("a genome with a paired slot group must be an applicable target");
+    .expect("a genome with a paired slot bundle must be an applicable target");
     mutated
 }
 
@@ -2098,11 +2098,11 @@ fn vm_mutate_paired_slot_address_is_reproducible_for_a_seed() {
     for (i, mutated) in results.iter().enumerate() {
         assert_ne!(
             mutated, &genome,
-            "application {i} must re-address the slot group it picked"
+            "application {i} must re-address the slot bundle it picked"
         );
         assert_eq!(
             mutated, &results[0],
-            "application {i} picked a different slot group than application 0 for the \
+            "application {i} picked a different slot bundle than application 0 for the \
              same seed: the candidate order is not a function of the genome"
         );
     }

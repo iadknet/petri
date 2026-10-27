@@ -208,17 +208,18 @@ fn a_weight_exactly_at_the_floor_carries_no_path() {
     );
 }
 
-/// A group is not a fan-out (T25.F03): two `Move` groups reading the same
+/// A bundle is not a fan-out (T25.F03): two `Move` bundles reading the same
 /// ring channels at different offsets send each channel to two directions,
 /// which as independent edges is eight fan-outs, and as members is none.
 #[test]
-fn a_group_is_not_a_fanout() {
+fn a_bundle_is_not_a_fanout() {
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::genome::cgp::Shape;
     let mut grouped = CgpGraphBackendDef::new_with_fixed_outputs();
     for offset in [0, 3] {
-        let id = grouped.add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);
-        grouped.group_mut(id).set_scale(1.0);
+        let id =
+            grouped.add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, offset);
+        grouped.bundle_mut(id).set_scale(1.0);
     }
     let mut independent = CgpGraphBackendDef::new_with_fixed_outputs();
     for offset in [0u8, 3] {
@@ -247,7 +248,7 @@ fn a_group_is_not_a_fanout() {
     assert_eq!((members.fanouts, members.fanout_edges), (0, 0));
 }
 
-/// A `DirectionPair` group's members (T25.F04) send one source to six
+/// A `DirectionPair` bundle's members (T25.F04) send one source to six
 /// directions each, yet are no fan-out; its facts edges into a drive are
 /// drive edges once they carry.
 #[test]
@@ -255,7 +256,7 @@ fn pair_members_are_not_a_fanout() {
     use crate::contracts::{InputReference, WorldInputKey};
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let id = def.add_pair_group(
+    let id = def.add_pair_bundle(
         0,
         0,
         area.direction_pairs()[0],
@@ -263,7 +264,7 @@ fn pair_members_are_not_a_fanout() {
         2,
         &[],
     );
-    def.group_mut(id).set_scale(1.0);
+    def.bundle_mut(id).set_scale(1.0);
     let mut genome = graph_genome(def);
     genome.nodes[0].input_refs = vec![area];
     let moves = census_of(&[genome]).kinds[DirectedVoteKind::Move.index()];

@@ -1,7 +1,7 @@
 //! The inspector's brain view and learning payload (T30.F01 invariants 2–5):
 //! the genome as the simulation applies it, resolved by the genome's and the
 //! runtime's read APIs. `brain` carries the structure and every resolved
-//! edge, member, learner and group fact; `learning`, refreshed on every
+//! edge, member, learner and bundle fact; `learning`, refreshed on every
 //! poll, carries the weights in force of the dynamic edges and the learned
 //! scales. Neither composes a weight, a pattern or a coordinate: each
 //! number is read, never recomputed.
@@ -95,13 +95,13 @@ impl From<&VmBackendDef> for VmBrain {
 }
 
 /// A Graph backend: its compute nodes and output sinks with their edges and
-/// its edge groups in `GroupId` order.
+/// its edge bundles in `BundleId` order.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct GraphBrain {
     pub compute_nodes: Vec<BrainComputeNode>,
     pub output_sinks: Vec<BrainSink>,
-    pub groups: Vec<BrainGroup>,
+    pub bundles: Vec<BrainBundle>,
 }
 
 /// A compute node and its input edges.
@@ -121,14 +121,14 @@ pub struct BrainSink {
 }
 
 /// One edge: its source, its own weight, its genomic (composed) weight, the
-/// weight in force and, when a member, its group facts and, when plastic,
+/// weight in force and, when a member, its bundle facts and, when plastic,
 /// its learner.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BrainEdge {
     pub source: GraphSource,
     /// The edge's own weight: its genomic weight when ungrouped, its
-    /// correction on top of the group term when a member.
+    /// correction on top of the bundle term when a member.
     pub own: f32,
     /// The genomic weight (`genomic_weight`): `own` when ungrouped, the
     /// composed weight of a member.
@@ -143,19 +143,19 @@ pub struct BrainEdge {
     pub learner: Option<EdgeLearner>,
 }
 
-/// A member's group facts: its group, scope, site, field, pattern and its
-/// group's genomic scale.
+/// A member's bundle facts: its bundle, scope, site, field, pattern and its
+/// bundle's genomic scale.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct EdgeMember {
-    /// The group's index in `groups`.
-    pub group: usize,
+    /// The bundle's index in `bundles`.
+    pub bundle: usize,
     pub scope: Scope,
-    /// The member's site relative to its group's kind; omitted for a member
+    /// The member's site relative to its bundle's kind; omitted for a member
     /// off its kind's sinks.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
-    pub site: Option<MemberSite>,
+    pub site: Option<Site>,
     /// The input field the member reads; omitted when it reads no input leaf.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
@@ -181,20 +181,20 @@ impl From<core_cgp::Scope> for Scope {
     }
 }
 
-/// Where a member sits relative to its group's kind: a direction sink or
+/// Where a member sits relative to its bundle's kind: a direction sink or
 /// the kind's drive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub enum MemberSite {
+pub enum Site {
     Direction(u8),
     Drive,
 }
 
-impl From<core_cgp::MemberSite> for MemberSite {
-    fn from(site: core_cgp::MemberSite) -> Self {
+impl From<core_cgp::Site> for Site {
+    fn from(site: core_cgp::Site) -> Self {
         match site {
-            core_cgp::MemberSite::Direction(d) => Self::Direction(d),
-            core_cgp::MemberSite::Drive => Self::Drive,
+            core_cgp::Site::Direction(d) => Self::Direction(d),
+            core_cgp::Site::Drive => Self::Drive,
         }
     }
 }
@@ -243,7 +243,7 @@ pub struct EdgeLearner {
     pub scope: LearnerScope,
     pub initialized: bool,
     /// Whether a child inherits what this learner learns: its `lamarckian`
-    /// flag, or its group's `inherit_scale` at group scope.
+    /// flag, or its bundle's `inherit_scale` at group scope.
     pub inherits: bool,
     /// The learned own quantity, when initialized; never at group scope.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -255,12 +255,12 @@ pub struct EdgeLearner {
     pub trace: Option<f32>,
 }
 
-/// One edge group: its record, its learned scale and its birth coordinates
+/// One edge bundle: its record, its learned scale and its birth coordinates
 /// with presence.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub struct BrainGroup {
-    pub shape: GroupShape,
+pub struct BrainBundle {
+    pub shape: BundleShape,
     pub kind: DirectedVoteKind,
     pub offset: u8,
     pub scale: f32,
@@ -271,20 +271,20 @@ pub struct BrainGroup {
     #[cfg_attr(test, ts(optional))]
     pub learned_scale: Option<f32>,
     /// The direction coordinates a member is born on.
-    pub coordinates: Vec<GroupCoordinate>,
+    pub coordinates: Vec<BundleCoordinate>,
     /// A pair gene's declared facts on its kind's drive; empty for a ring.
-    pub facts: Vec<GroupFact>,
+    pub facts: Vec<BundleFact>,
 }
 
-/// The geometry a group's members fit.
+/// The geometry a bundle's members fit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
-pub enum GroupShape {
+pub enum BundleShape {
     Ring { ring_ref: u16 },
     DirectionPair { ref_idx: u16, pair: u8 },
 }
 
-impl From<core_cgp::Shape> for GroupShape {
+impl From<core_cgp::Shape> for BundleShape {
     fn from(shape: core_cgp::Shape) -> Self {
         match shape {
             core_cgp::Shape::Ring { ring_ref } => Self::Ring { ring_ref },
@@ -298,7 +298,7 @@ impl From<core_cgp::Shape> for GroupShape {
 /// A birth coordinate on a direction sink.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub struct GroupCoordinate {
+pub struct BundleCoordinate {
     pub field: u16,
     pub direction: u8,
     pub present: bool,
@@ -307,7 +307,7 @@ pub struct GroupCoordinate {
 /// A declared fact of a pair gene.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub struct GroupFact {
+pub struct BundleFact {
     pub field: u16,
     pub present: bool,
 }
@@ -354,12 +354,12 @@ pub struct LearningEdge {
     pub initialized: Option<bool>,
 }
 
-/// One scale slot: its group, learned value when initialized, and
+/// One scale slot: its bundle, learned value when initialized, and
 /// initialization.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LearningScale {
-    pub group: usize,
+    pub bundle: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub learned: Option<f32>,
@@ -466,33 +466,33 @@ fn graph_brain(
         }
     }
     let mut scales = learned.scales(node_idx).peekable();
-    let groups = def
-        .groups()
+    let bundles = def
+        .bundles()
         .iter()
         .enumerate()
         .map(|(index, record)| {
-            let id = core_cgp::GroupId::new(u16::try_from(index).expect("groups below u16::MAX"));
+            let id = core_cgp::BundleId::new(u16::try_from(index).expect("bundles below u16::MAX"));
             let learned_scale = scales
-                .next_if(|scale| scale.group == id)
+                .next_if(|scale| scale.bundle == id)
                 .and_then(|scale| scale.learned);
             let mut coordinates = Vec::new();
             let mut facts = Vec::new();
             for coordinate in def.birth_coordinates(id, input_refs) {
                 match coordinate.site {
-                    core_cgp::MemberSite::Direction(direction) => {
-                        coordinates.push(GroupCoordinate {
+                    core_cgp::Site::Direction(direction) => {
+                        coordinates.push(BundleCoordinate {
                             field: coordinate.field,
                             direction,
                             present: coordinate.present,
                         });
                     }
-                    core_cgp::MemberSite::Drive => facts.push(GroupFact {
+                    core_cgp::Site::Drive => facts.push(BundleFact {
                         field: coordinate.field,
                         present: coordinate.present,
                     }),
                 }
             }
-            BrainGroup {
+            BrainBundle {
                 shape: record.shape().into(),
                 kind: record.kind().into(),
                 offset: record.offset(),
@@ -508,7 +508,7 @@ fn graph_brain(
     GraphBrain {
         compute_nodes,
         output_sinks,
-        groups,
+        bundles,
     }
 }
 
@@ -520,15 +520,15 @@ fn brain_edge(
     let edge = def.edge_at(walked.occurrence);
     let genomic = def.genomic_weight(walked.occurrence, input_refs);
     let member = edge.membership().map(|membership| EdgeMember {
-        group: membership.group.index(),
+        bundle: membership.bundle.index(),
         scope: membership.scope.into(),
-        site: def.member_site(walked.occurrence).map(MemberSite::from),
+        site: def.site_of(walked.occurrence).map(Site::from),
         field: match edge.source() {
             core_cgp::GraphSource::InputLeaf { sub_idx, .. } => Some(sub_idx),
             _ => None,
         },
         pattern: def.pattern(walked.occurrence, input_refs),
-        scale: def.groups()[membership.group.index()].scale(),
+        scale: def.bundles()[membership.bundle.index()].scale(),
     });
     let learner = edge
         .plasticity()
@@ -592,7 +592,7 @@ pub fn learning_view(genome: &CreatureGenome, learned: &LearnedState) -> Option<
                 scales: learned
                     .scales(node_idx)
                     .map(|scale| LearningScale {
-                        group: scale.group.index(),
+                        bundle: scale.bundle.index(),
                         learned: scale.learned,
                         initialized: scale.learned.is_some(),
                     })

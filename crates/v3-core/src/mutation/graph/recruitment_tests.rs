@@ -235,16 +235,16 @@ proptest! {
             prop_assert!(new.inputs[old.inputs.len()..].iter().all(|edge| edge.own_weight() == 0.0));
         }
         // A ring family landing on a directed vote sink becomes one silent
-        // `Ring` group of eight born-0 members in place of its edges
+        // `Ring` bundle of eight born-0 members in place of its edges
         // (T25.F03); a pair family under WholeFamily, one silent
         // `DirectionPair` gene of twelve born-0 direction members over the
         // kind's eight direction sinks plus its fact members on the kind's
         // drive (T25.F10), every edge a member: 15 for an area family
         // (T25.F04), 20 for a creature slot (T25.F05, ten fields since
         // T27.F01).
-        let grouped = after_graph.groups().len() - before_graph.groups().len();
-        prop_assert_eq!(&after_graph.groups()[..before_graph.groups().len()], before_graph.groups());
-        prop_assert!(after_graph.groups().iter().all(|group| group.scale() == 0.0));
+        let grouped = after_graph.bundles().len() - before_graph.bundles().len();
+        prop_assert_eq!(&after_graph.bundles()[..before_graph.bundles().len()], before_graph.bundles());
+        prop_assert!(after_graph.bundles().iter().all(|bundle| bundle.scale() == 0.0));
         if grouped == 0 {
             prop_assert_eq!(changed, 1);
             prop_assert!((1..=VOTE_SINK_COUNT).contains(&added));
@@ -252,8 +252,8 @@ proptest! {
             prop_assert!(after_graph.edges().all(|edge| edge.membership().is_none()));
         } else {
             prop_assert_eq!(grouped, 1);
-            let id = crate::genome::cgp::GroupId::new(0);
-            match after_graph.groups()[0].shape() {
+            let id = crate::genome::cgp::BundleId::new(0);
+            match after_graph.bundles()[0].shape() {
                 crate::genome::cgp::Shape::Ring { .. } => {
                     prop_assert_eq!((changed, added), (8, 8));
                     prop_assert_eq!(after_graph.members(id).count(), 8);
@@ -414,9 +414,9 @@ proptest! {
 }
 
 #[test]
-fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
+fn a_ring_on_a_directed_sink_becomes_one_silent_bundle() {
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{GroupId, Shape};
+    use crate::genome::cgp::{BundleId, Shape};
     let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
     let family = SourceFamily::Input(ring.clone());
     // SingleChannel: channel 5 into Move(3) is offset (3 - 5) mod 8 = 6.
@@ -431,15 +431,20 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
     let def = graph(&fixture);
-    assert_eq!(def.groups().len(), 1);
-    let group = def.groups()[0];
+    assert_eq!(def.bundles().len(), 1);
+    let bundle = def.bundles()[0];
     assert_eq!(
-        (group.shape(), group.kind(), group.offset(), group.scale()),
+        (
+            bundle.shape(),
+            bundle.kind(),
+            bundle.offset(),
+            bundle.scale()
+        ),
         (Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 6, 0.0)
     );
     assert_eq!(def.edges().count(), 8);
     assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
-    assert_eq!(def.members(GroupId::new(0)).count(), 8);
+    assert_eq!(def.members(BundleId::new(0)).count(), 8);
     // WholeFamily reads channel 0, and an existing declaration is reused.
     recruit_source(
         &mut fixture,
@@ -450,14 +455,14 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
     )
     .unwrap();
     assert_eq!(fixture.input_refs, vec![ring.clone()]);
-    let group = graph(&fixture).groups()[1];
+    let bundle = graph(&fixture).bundles()[1];
     assert_eq!(
-        (group.kind(), group.offset()),
+        (bundle.kind(), bundle.offset()),
         (DirectedVoteKind::StealEnergy, 7)
     );
     // An undirected destination keeps today's edges.
     recruit_source(&mut fixture, &family, Arm::SingleChannel, 2, VoteSink::Eat).unwrap();
-    assert_eq!(graph(&fixture).groups().len(), 2);
+    assert_eq!(graph(&fixture).bundles().len(), 2);
     assert_eq!(graph(&fixture).edges().count(), 17);
     // A non-ring family on a directed sink keeps today's edge.
     let mut other = node();
@@ -469,7 +474,7 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
         VoteSink::Directed(DirectedVoteKind::Move, 0),
     )
     .unwrap();
-    assert!(graph(&other).groups().is_empty());
+    assert!(graph(&other).bundles().is_empty());
     assert_eq!(graph(&other).edges().count(), 1);
 }
 
@@ -478,7 +483,7 @@ fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::Shape;
     let mut fixture = node();
-    graph_mut(&mut fixture).add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    graph_mut(&mut fixture).add_ring_bundle(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
     let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(
@@ -493,14 +498,14 @@ fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
 }
 
 /// Ring families leave recruitment's universe exactly when the graph cannot
-/// host a group, so a drawn ring plan always completes; every other family
+/// host a bundle, so a drawn ring plan always completes; every other family
 /// is unchanged.
 #[test]
-fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
+fn ring_families_leave_the_universe_when_no_bundle_can_be_hosted() {
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
         let full = node();
         let hosting = Admission::new(&full.input_refs, graph(&full), &CTX2).families(arm);
-        assert!(graph(&full).can_host_group());
+        assert!(graph(&full).can_host_bundle());
         let mut partial = node();
         edit_sinks(graph_mut(&mut partial), |sinks| {
             sinks.retain(|sink| {
@@ -511,7 +516,7 @@ fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
                     ))
             });
         });
-        assert!(!graph(&partial).can_host_group());
+        assert!(!graph(&partial).can_host_bundle());
         let without = Admission::new(&partial.input_refs, graph(&partial), &CTX2).families(arm);
         let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
         // Under WholeFamily the pair case's preflight drops pair-declaring
@@ -556,7 +561,7 @@ fn drive_edges(
 #[test]
 fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive() {
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{GroupId, Membership, Scope, Shape};
+    use crate::genome::cgp::{BundleId, Membership, Scope, Shape};
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
         (nearby(), 2, vec![20, 23, 24, 25, 26, 27, 28, 29]),
@@ -572,10 +577,15 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
         .unwrap();
         assert_eq!(fixture.input_refs, vec![reference.clone()]);
         let def = graph(&fixture);
-        assert_eq!(def.groups().len(), 1);
-        let group = def.groups()[0];
+        assert_eq!(def.bundles().len(), 1);
+        let bundle = def.bundles()[0];
         assert_eq!(
-            (group.shape(), group.kind(), group.offset(), group.scale()),
+            (
+                bundle.shape(),
+                bundle.kind(),
+                bundle.offset(),
+                bundle.scale()
+            ),
             (
                 Shape::DirectionPair { ref_idx: 0, pair },
                 DirectedVoteKind::StealEnergy,
@@ -583,7 +593,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
                 0.0
             )
         );
-        assert_eq!(def.members(GroupId::new(0)).count(), 12 + facts.len());
+        assert_eq!(def.members(BundleId::new(0)).count(), 12 + facts.len());
         let drive: Vec<_> = drive_edges(def, DirectedVoteKind::StealEnergy);
         let want: Vec<_> = facts
             .iter()
@@ -594,7 +604,7 @@ fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive
                         sub_idx,
                     },
                     Some(Membership {
-                        group: GroupId::new(0),
+                        bundle: BundleId::new(0),
                         scope: Scope::Edge,
                     }),
                 )
@@ -628,7 +638,7 @@ fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family
         VoteSink::Directed(DirectedVoteKind::Move, 2),
     )
     .unwrap();
-    assert!(graph(&single).groups().is_empty());
+    assert!(graph(&single).bundles().is_empty());
     assert_eq!(graph(&single).edges().count(), 1);
     // WholeFamily on an undirected destination: the whole-family edges.
     let mut whole = node();
@@ -640,7 +650,7 @@ fn single_channel_and_undirected_destinations_keep_their_plans_for_a_pair_family
         VoteSink::Eat,
     )
     .unwrap();
-    assert!(graph(&whole).groups().is_empty());
+    assert!(graph(&whole).bundles().is_empty());
     assert_eq!(graph(&whole).edges().count(), 7);
 }
 
@@ -661,7 +671,7 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
         .unwrap();
         assert_eq!(whole.input_refs, vec![nearby()]);
         let def = graph(&whole);
-        assert!(def.groups().is_empty());
+        assert!(def.bundles().is_empty());
         let eat: Vec<_> = def
             .sink(OutputSinkKind::ActionVote(VoteSink::Eat))
             .unwrap()
@@ -776,10 +786,10 @@ fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
 }
 
 /// The preflight: under `WholeFamily`, pair-declaring families leave the
-/// universe when the graph cannot host a group or any kind's drive sink is
+/// universe when the graph cannot host a bundle or any kind's drive sink is
 /// absent; under `SingleChannel` they stay. All three entries of the merged
 /// family leave together, on a partial sink catalog and on an exhausted
-/// group table alike (T25.F05).
+/// bundle table alike (T25.F05).
 #[test]
 fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
     use crate::contracts::votes::DirectedVoteKind;
@@ -802,7 +812,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
         edit_sinks(graph_mut(&mut no_drive), |sinks| {
             sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(kind.drive()));
         });
-        assert!(graph(&no_drive).can_host_group());
+        assert!(graph(&no_drive).can_host_bundle());
         for fixture in [&no_drive, &no_direction] {
             let whole = Admission::new(&fixture.input_refs, graph(fixture), &CTX2)
                 .families(Arm::WholeFamily);
@@ -811,7 +821,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
                 .iter()
                 .filter(|family| !declares(family))
                 .filter(|family| {
-                    graph(fixture).can_host_group()
+                    graph(fixture).can_host_bundle()
                         || !matches!(family, SourceFamily::Input(reference) if reference.is_ring())
                 })
                 .cloned()
@@ -823,8 +833,8 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
         }
     }
     let mut exhausted = node();
-    graph_mut(&mut exhausted).exhaust_group_capacity();
-    assert!(!graph(&exhausted).can_host_group());
+    graph_mut(&mut exhausted).exhaust_bundle_capacity();
+    assert!(!graph(&exhausted).can_host_bundle());
     let nearby_family = SourceFamily::Input(nearby());
     for fixture in [&no_direction, &exhausted] {
         let whole =
@@ -838,7 +848,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
 }
 
 /// F03's ring admission is untouched by the pair case: ring families stay in
-/// the universe whenever the graph can host a group, a missing drive sink
+/// the universe whenever the graph can host a bundle, a missing drive sink
 /// included.
 #[test]
 fn ring_admission_is_unchanged_by_the_pair_case() {

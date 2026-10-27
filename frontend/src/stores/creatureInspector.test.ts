@@ -94,7 +94,7 @@ const learningFixture: NodeLearning[] = [
 	{
 		node_id: 0,
 		edges: [{ surface: "sink", container: 3, edge: 0, applied: 1.5 }],
-		scales: [{ group: 0, learned: 1.5, initialized: true }],
+		scales: [{ bundle: 0, learned: 1.5, initialized: true }],
 	},
 ];
 

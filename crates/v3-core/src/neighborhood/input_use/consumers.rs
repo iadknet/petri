@@ -125,7 +125,7 @@ fn graph_consumers(
             .map(|(index, compute)| consumers(&compute.inputs, live.contains(&index)))
             .collect(),
         // Every sink edge is on the wired surface: an unwired sink has none.
-        // A group's members are sink edges (T25.F03).
+        // A bundle's members are sink edges (T25.F03).
         sinks: graph
             .output_sinks()
             .iter()
@@ -228,9 +228,9 @@ pub(super) fn declarations(genome: &CreatureGenome, reachable: &[usize]) -> BTre
 /// `genome` with every read of a channel `ablate` selects returning 0.0:
 /// each such Graph input leaf and VM `ReadInput` has its `ref_idx` moved out
 /// of range, which both backends already resolve to 0.0
-/// (`runtime/cgp/sources.rs`, `runtime/vm.rs`); a group member is such a leaf
-/// and keeps its genomic weight, which resolves from its group's ring
-/// (T25.F03). Nothing else changes: the same edges, weights, groups,
+/// (`runtime/cgp/sources.rs`, `runtime/vm.rs`); a bundle member is such a leaf
+/// and keeps its genomic weight, which resolves from its bundle's ring
+/// (T25.F03). Nothing else changes: the same edges, weights, bundles,
 /// memberships, instructions and `genome_size()`, so execution keeps its
 /// native semantics and charges.
 pub(in crate::neighborhood) fn ablated(

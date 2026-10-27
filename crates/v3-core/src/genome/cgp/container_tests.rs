@@ -5,7 +5,7 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
-    compose, detach, GroupId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
+    compose, detach, BundleId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
 };
 use crate::genome::HebbianRule;
 
@@ -17,7 +17,7 @@ fn def_fields_are_exhaustively_accounted_for() {
         birth_seeds: _,
         compute_nodes: _,
         output_sinks: _,
-        groups: _,
+        bundles: _,
     } = CgpGraphBackendDef::new_with_fixed_outputs();
     let GraphEdge {
         source: _,
@@ -25,16 +25,19 @@ fn def_fields_are_exhaustively_accounted_for() {
         plasticity: _,
         membership: _,
     } = GraphEdge::new(leaf(0), 0.0);
-    let Group {
+    let Bundle {
         shape: _,
         kind: _,
         offset: _,
         scale: _,
         inherit_scale: _,
         retention: _,
-    } = Group::new(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
-    let Membership { group: _, scope: _ } = Membership {
-        group: GroupId::new(0),
+    } = Bundle::new(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
+    let Membership {
+        bundle: _,
+        scope: _,
+    } = Membership {
+        bundle: BundleId::new(0),
         scope: Scope::Edge,
     };
 }
@@ -44,11 +47,11 @@ fn a_graph_edge_is_forty_bytes() {
     assert_eq!(std::mem::size_of::<GraphEdge>(), 40);
 }
 
-/// `Group::new` builds the silent record: scale 0, no `inherit_scale`,
+/// `Bundle::new` builds the silent record: scale 0, no `inherit_scale`,
 /// retention 1 (T25.F09 invariant 1).
 #[test]
-fn a_new_group_record_is_silent_with_retention_one() {
-    let record = Group::new(Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2);
+fn a_new_bundle_record_is_silent_with_retention_one() {
+    let record = Bundle::new(Shape::Ring { ring_ref: 3 }, DirectedVoteKind::Move, 2);
     assert_eq!(
         (record.scale(), record.inherit_scale(), record.retention()),
         (0.0, false, 1.0)
@@ -59,7 +62,7 @@ fn a_new_group_record_is_silent_with_retention_one() {
     );
 }
 
-/// An edge's and a group's `retention` are always written and required
+/// An edge's and a bundle's `retention` are always written and required
 /// (T25.F09 invariant 1, `GENOME_FORMAT` 6).
 #[test]
 fn retention_is_always_written_and_required() {
@@ -70,12 +73,12 @@ fn retention_is_always_written_and_required() {
     let without = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without).is_err());
 
-    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
-    let record: Group = serde_json::from_str(group).unwrap();
+    let bundle = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
+    let record: Bundle = serde_json::from_str(bundle).unwrap();
     assert_eq!(record.retention(), 0.5);
-    assert_eq!(serde_json::to_string(&record).unwrap(), group);
+    assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
     let without = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":false}"#;
-    assert!(serde_json::from_str::<Group>(without).is_err());
+    assert!(serde_json::from_str::<Bundle>(without).is_err());
 }
 
 /// I1 (T25.F09): an edge retention outside `[0, 1]` or non-finite is out of
@@ -123,44 +126,44 @@ fn edge_plasticity_round_trips_and_is_omitted_when_none() {
     assert_eq!(serde_json::to_string(&edge).unwrap(), plastic_json);
 }
 
-/// A member's `scope` and a group's `inherit_scale` are always written and
-/// required: a membership or a group record without them is refused at the
+/// A member's `scope` and a bundle's `inherit_scale` are always written and
+/// required: a membership or a bundle record without them is refused at the
 /// load boundary (T25.F07 invariant 1, `GENOME_FORMAT` 5).
 #[test]
 fn scope_and_inherit_scale_are_always_written_and_required() {
-    let member = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"group":0,"scope":"Group"}}"#;
+    let member = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0,"scope":"Group"}}"#;
     let edge: GraphEdge = serde_json::from_str(member).unwrap();
     assert_eq!(
         edge.membership(),
         Some(Membership {
-            group: GroupId::new(0),
+            bundle: BundleId::new(0),
             scope: Scope::Group,
         })
     );
     assert_eq!(serde_json::to_string(&edge).unwrap(), member);
-    let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"group":0}}"#;
+    let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without_scope).is_err());
 
-    let group = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
-    let record: Group = serde_json::from_str(group).unwrap();
+    let bundle = r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
+    let record: Bundle = serde_json::from_str(bundle).unwrap();
     assert!(record.inherit_scale());
-    assert_eq!(serde_json::to_string(&record).unwrap(), group);
+    assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
     let without_flag =
         r#"{"shape":{"Ring":{"ring_ref":0}},"kind":"Move","offset":0,"scale":0.0,"retention":1.0}"#;
-    assert!(serde_json::from_str::<Group>(without_flag).is_err());
+    assert!(serde_json::from_str::<Bundle>(without_flag).is_err());
 }
 
-/// Group identity is the `GroupId` alone (R5): a member at scope `Group`
-/// is still a member of its group.
+/// Bundle identity is the `BundleId` alone (R5): a member at scope `Bundle`
+/// is still a member of its bundle.
 #[test]
 fn is_member_of_ignores_scope() {
     let mut edge = GraphEdge::new(leaf(0), 0.0);
     edge.membership = Some(Membership {
-        group: GroupId::new(2),
+        bundle: BundleId::new(2),
         scope: Scope::Group,
     });
-    assert!(edge.is_member_of(GroupId::new(2)));
-    assert!(!edge.is_member_of(GroupId::new(1)));
+    assert!(edge.is_member_of(BundleId::new(2)));
+    assert!(!edge.is_member_of(BundleId::new(1)));
 }
 
 /// A scope's transport key is the genome JSON spelling of that scope, and
@@ -263,7 +266,7 @@ fn compute(node: usize, index: usize) -> EdgeOccurrence {
 }
 
 #[test]
-fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
+fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_bundles() {
     let def = CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Add,
@@ -283,7 +286,7 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_groups() {
          [GraphEdge { source: ComputeNode(0), own_weight: 0.5, plasticity: None, \
          membership: None }] }], output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
          [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
-         plasticity: None, membership: None }] }], groups: [] }"
+         plasticity: None, membership: None }] }], bundles: [] }"
     );
 }
 
@@ -506,7 +509,7 @@ proptest! {
     }
 }
 
-// ── Edge groups (T25.F03) ───────────────────────────────────────────────────
+// ── Edge bundles (T25.F03) ───────────────────────────────────────────────────
 
 const RING: u16 = 1;
 
@@ -529,18 +532,18 @@ fn sink_occurrence(sink: usize, index: usize) -> EdgeOccurrence {
     EdgeOccurrence::new(EdgeSurface::SinkInput(sink), index)
 }
 
-/// A full catalog with an independent edge on `Move(0)` and a group.
-fn grouped(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
+/// A full catalog with an independent edge on `Move(0)` and a bundle.
+fn grouped(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.push_edge(
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.5),
     );
-    let id = def.add_group(ring(), kind, offset);
+    let id = def.add_ring_bundle(ring(), kind, offset);
     (def, id)
 }
 
-fn group_strategy() -> impl Strategy<Value = (usize, u8, f32, Vec<f32>)> {
+fn bundle_strategy() -> impl Strategy<Value = (usize, u8, f32, Vec<f32>)> {
     (
         0usize..3,
         0u8..8,
@@ -549,9 +552,9 @@ fn group_strategy() -> impl Strategy<Value = (usize, u8, f32, Vec<f32>)> {
     )
 }
 
-/// Set a group's scale and each member's correction (in member order).
-fn weigh(def: &mut CgpGraphBackendDef, id: GroupId, scale: f32, corrections: &[f32]) {
-    def.group_mut(id).set_scale(scale);
+/// Set a bundle's scale and each member's correction (in member order).
+fn weigh(def: &mut CgpGraphBackendDef, id: BundleId, scale: f32, corrections: &[f32]) {
+    def.bundle_mut(id).set_scale(scale);
     let members: Vec<_> = def.members(id).collect();
     for (occurrence, &own) in members.into_iter().zip(corrections) {
         def.edge_mut(occurrence).set_weight(own);
@@ -559,10 +562,10 @@ fn weigh(def: &mut CgpGraphBackendDef, id: GroupId, scale: f32, corrections: &[f
 }
 
 #[test]
-fn a_new_ring_group_is_eight_silent_members_on_its_rotated_sinks() {
+fn a_new_ring_bundle_is_eight_silent_members_on_its_rotated_sinks() {
     let (def, id) = grouped(DirectedVoteKind::Reproduce, 3);
-    assert_eq!(def.groups().len(), 1);
-    assert_eq!(def.groups()[0].scale(), 0.0);
+    assert_eq!(def.bundles().len(), 1);
+    assert_eq!(def.bundles()[0].scale(), 0.0);
     let members: Vec<_> = def.members(id).collect();
     assert_eq!(members.len(), 8);
     for occurrence in members {
@@ -593,45 +596,45 @@ fn push_edge_inserts_an_independent_edge_before_the_first_member() {
     assert_eq!(
         inputs[2].membership(),
         Some(Membership {
-            group: id,
+            bundle: id,
             scope: Scope::Edge
         })
     );
 }
 
 #[test]
-fn remove_group_leaves_no_member_and_renumbers_higher_groups() {
+fn remove_bundle_leaves_no_member_and_renumbers_higher_bundles() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let first = def.add_group(ring(), DirectedVoteKind::Move, 0);
-    let second = def.add_group(ring(), DirectedVoteKind::StealEnergy, 2);
-    let third = def.add_group(ring(), DirectedVoteKind::Move, 5);
-    assert_eq!(def.remove_group(second), 8);
-    assert_eq!(def.groups().len(), 2);
+    let first = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
+    let second = def.add_ring_bundle(ring(), DirectedVoteKind::StealEnergy, 2);
+    let third = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 5);
+    assert_eq!(def.remove_bundle(second), 8);
+    assert_eq!(def.bundles().len(), 2);
     assert!(def.edges().all(|edge| edge.membership()
         != Some(Membership {
-            group: third,
+            bundle: third,
             scope: Scope::Edge
         })));
-    // The third group is now `GroupId(1)`, its members with it.
-    let renumbered = GroupId::new(1);
-    assert_eq!(def.groups()[1].offset(), 5);
+    // The third bundle is now `BundleId(1)`, its members with it.
+    let renumbered = BundleId::new(1);
+    assert_eq!(def.bundles()[1].offset(), 5);
     assert_eq!(def.members(renumbered).count(), 8);
     assert_eq!(def.members(first).count(), 8);
     assert!(def.check_local_invariants().is_ok());
 }
 
 #[test]
-fn a_last_member_removed_or_detached_removes_its_group() {
+fn a_last_member_removed_or_detached_removes_its_bundle() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
     for _ in 0..7 {
         let occurrence = def.members(id).next().unwrap();
         def.remove_edge(occurrence);
-        assert_eq!(def.groups().len(), 1);
+        assert_eq!(def.bundles().len(), 1);
     }
     let last = def.members(id).next().unwrap();
     let (_, removed) = detach(&mut def, last, &ring_refs());
     assert!(removed);
-    assert!(def.groups().is_empty());
+    assert!(def.bundles().is_empty());
     assert!(def.edges().all(|edge| edge.membership().is_none()));
 
     let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
@@ -641,22 +644,22 @@ fn a_last_member_removed_or_detached_removes_its_group() {
     }
     let last = def.members(id).next().unwrap();
     def.remove_edge(last);
-    assert!(def.groups().is_empty());
+    assert!(def.bundles().is_empty());
 }
 
 #[test]
-fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the_detached_edge() {
+fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_the_detached_edge() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let first = def.add_group(ring(), DirectedVoteKind::Move, 0);
-    let second = def.add_group(ring(), DirectedVoteKind::Move, 0);
+    let first = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
+    let second = def.add_ring_bundle(ring(), DirectedVoteKind::Move, 0);
     weigh(&mut def, second, 0.5, &[0.25; 8]);
     let sink = vote_sink(DirectedVoteKind::Move, 0);
-    // The sink holds the first group's member, then the second's.
+    // The sink holds the first bundle's member, then the second's.
     let later = sink_occurrence(sink, 1);
     assert_eq!(
         def.edge_at(later).membership(),
         Some(Membership {
-            group: second,
+            bundle: second,
             scope: Scope::Edge
         })
     );
@@ -672,7 +675,7 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
     assert_eq!(
         def.edge_at(sink_occurrence(sink, 1)).membership(),
         Some(Membership {
-            group: first,
+            bundle: first,
             scope: Scope::Edge
         })
     );
@@ -680,11 +683,11 @@ fn detaching_a_later_groups_member_ahead_of_another_member_keeps_the_edit_on_the
 }
 
 #[test]
-fn can_host_group_needs_every_direction_sink_and_capacity() {
+fn can_host_bundle_needs_every_direction_sink_and_capacity() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert!(def.can_host_group());
-    def.exhaust_group_capacity();
-    assert!(!def.can_host_group());
+    assert!(def.can_host_bundle());
+    def.exhaust_bundle_capacity();
+    assert!(!def.can_host_bundle());
     let mut partial = CgpGraphBackendDef::new_with_fixed_outputs();
     crate::genome::cgp::test_support::edit_sinks(&mut partial, |sinks| {
         sinks.retain(|sink| {
@@ -692,7 +695,7 @@ fn can_host_group_needs_every_direction_sink_and_capacity() {
                 != OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 7))
         });
     });
-    assert!(!partial.can_host_group());
+    assert!(!partial.can_host_bundle());
 }
 
 #[test]
@@ -712,34 +715,34 @@ fn validate_graph_rejects_each_broken_invariant() {
     );
     // I6: a record without members.
     let mut empty = def.clone();
-    empty.groups.push(empty.groups[0]);
+    empty.bundles.push(empty.bundles[0]);
     assert_eq!(
         validate_graph(&node(empty, ring_refs())),
-        Err(GraphInvariantViolation::EmptyGroup)
+        Err(GraphInvariantViolation::EmptyBundle)
     );
     // I7: offset out of range.
     let mut offset = def.clone();
-    offset.groups[0].offset = 8;
+    offset.bundles[0].offset = 8;
     assert_eq!(
         offset.check_local_invariants(),
         Err(GraphInvariantViolation::OffsetOutOfRange)
     );
-    // T25.F09 invariant 1: a group retention outside [0, 1] or non-finite;
+    // T25.F09 invariant 1: a bundle retention outside [0, 1] or non-finite;
     // 0 is in range.
     for retention in [-0.5, 1.5, f32::NAN] {
         let mut out = def.clone();
-        out.groups[0].retention = retention;
+        out.bundles[0].retention = retention;
         assert_eq!(
             out.check_local_invariants(),
-            Err(GraphInvariantViolation::GroupRetentionOutOfRange)
+            Err(GraphInvariantViolation::BundleRetentionOutOfRange)
         );
     }
     let mut zero = def.clone();
-    zero.groups[0].retention = 0.0;
+    zero.bundles[0].retention = 0.0;
     assert_eq!(zero.check_local_invariants(), Ok(()));
     // I4: a member on the wrong sink.
     let mut shifted = def.clone();
-    shifted.groups[0].offset = 2;
+    shifted.bundles[0].offset = 2;
     assert_eq!(
         shifted.check_local_invariants(),
         Err(GraphInvariantViolation::MemberShape)
@@ -756,7 +759,7 @@ fn validate_graph_rejects_each_broken_invariant() {
         Err(GraphInvariantViolation::SinkOrder)
     );
     // I2: a compute-input member.
-    let member = *def.edge_at(def.members(GroupId::new(0)).next().unwrap());
+    let member = *def.edge_at(def.members(BundleId::new(0)).next().unwrap());
     let compute = def
         .clone()
         .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, vec![member])]);
@@ -764,13 +767,13 @@ fn validate_graph_rejects_each_broken_invariant() {
         compute.check_local_invariants(),
         Err(GraphInvariantViolation::MemberOnComputeInput)
     );
-    // I3: a membership naming no group.
+    // I3: a membership naming no bundle.
     let mut dangling = def;
     for sink in &mut dangling.output_sinks.0 {
         for edge in &mut sink.inputs.0 {
             if edge.membership.is_some() {
                 edge.membership = Some(Membership {
-                    group: GroupId::new(4),
+                    bundle: BundleId::new(4),
                     scope: Scope::Edge,
                 });
             }
@@ -778,25 +781,25 @@ fn validate_graph_rejects_each_broken_invariant() {
     }
     assert_eq!(
         dangling.check_local_invariants(),
-        Err(GraphInvariantViolation::GroupIdOutOfRange)
+        Err(GraphInvariantViolation::BundleIdOutOfRange)
     );
 }
 
-/// `u16::MAX` group records are the most a def may hold; one more is
-/// `TooManyGroups`. Records without members fail only later, as `EmptyGroup`.
+/// `u16::MAX` bundle records are the most a def may hold; one more is
+/// `TooManyBundles`. Records without members fail only later, as `EmptyBundle`.
 #[test]
-fn the_group_count_limit_is_u16_max_records() {
+fn the_bundle_count_limit_is_u16_max_records() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let record = Group::new(ring(), DirectedVoteKind::Move, 0);
-    def.groups = vec![record; usize::from(u16::MAX)];
+    let record = Bundle::new(ring(), DirectedVoteKind::Move, 0);
+    def.bundles = vec![record; usize::from(u16::MAX)];
     assert_eq!(
         def.check_local_invariants(),
-        Err(GraphInvariantViolation::EmptyGroup)
+        Err(GraphInvariantViolation::EmptyBundle)
     );
-    def.groups.push(record);
+    def.bundles.push(record);
     assert_eq!(
         def.check_local_invariants(),
-        Err(GraphInvariantViolation::TooManyGroups)
+        Err(GraphInvariantViolation::TooManyBundles)
     );
 }
 
@@ -818,7 +821,7 @@ fn a_member_reading_channel_eight_is_out_of_shape() {
                         sub_idx: 0,
                     }
         })
-        .expect("the group's channel-0 member");
+        .expect("the bundle's channel-0 member");
     edge.source = GraphSource::InputLeaf {
         ref_idx: RING,
         sub_idx: 8,
@@ -829,13 +832,13 @@ fn a_member_reading_channel_eight_is_out_of_shape() {
     );
 }
 
-/// A group-touching primitive checks the local invariants of a def with
-/// groups at its exit in debug builds.
+/// A bundle-touching primitive checks the local invariants of a def with
+/// bundles at its exit in debug builds.
 #[test]
 #[should_panic(expected = "graph invariant violated")]
 fn a_primitive_on_a_broken_grouped_def_is_a_debug_assertion() {
     let (mut def, _) = grouped(DirectedVoteKind::Move, 1);
-    def.groups[0].offset = 2;
+    def.bundles[0].offset = 2;
     def.push_edge(
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.25),
@@ -847,7 +850,7 @@ fn a_grouped_def_round_trips_json_and_identity_both_ways() {
     let (mut def, id) = grouped(DirectedVoteKind::StealEnergy, 6);
     weigh(&mut def, id, -0.5, &[0.125; 8]);
     let json = serde_json::to_string(&def).unwrap();
-    assert!(json.contains("\"groups\"") && json.contains("\"membership\""));
+    assert!(json.contains("\"bundles\"") && json.contains("\"membership\""));
     let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, def);
     assert_eq!(format!("{decoded:?}"), format!("{def:?}"));
@@ -855,9 +858,9 @@ fn a_grouped_def_round_trips_json_and_identity_both_ways() {
     // correction or membership is a different def, in `PartialEq`, `Debug`
     // and JSON alike.
     let mut scaled = def.clone();
-    scaled.group_mut(id).set_scale(0.5);
+    scaled.bundle_mut(id).set_scale(0.5);
     let mut moved = def.clone();
-    moved.relocate_group(id, DirectedVoteKind::StealEnergy, 5);
+    moved.relocate_bundle(id, DirectedVoteKind::StealEnergy, 5);
     let mut corrected = def.clone();
     let first = corrected.members(id).next().unwrap();
     corrected.edge_mut(first).set_weight(1.0);
@@ -868,11 +871,11 @@ fn a_grouped_def_round_trips_json_and_identity_both_ways() {
         assert_ne!(format!("{other:?}"), format!("{def:?}"));
         assert_ne!(serde_json::to_string(&other).unwrap(), json);
     }
-    // An ungrouped def omits both keys and prints `groups: []`.
+    // An ungrouped def omits both keys and prints `bundles: []`.
     let plain = CgpGraphBackendDef::new_with_fixed_outputs();
     let json = serde_json::to_string(&plain).unwrap();
-    assert!(!json.contains("groups") && !json.contains("membership"));
-    assert!(format!("{plain:?}").ends_with("groups: [] }"));
+    assert!(!json.contains("bundles") && !json.contains("membership"));
+    assert!(format!("{plain:?}").ends_with("bundles: [] }"));
 }
 
 proptest! {
@@ -880,7 +883,7 @@ proptest! {
     /// bitwise, whatever the scale and correction.
     #[test]
     fn detach_preserves_genomic_weight_bitwise(
-        (kind, offset, scale, corrections) in group_strategy(),
+        (kind, offset, scale, corrections) in bundle_strategy(),
         pick in 0usize..8,
         resolves in any::<bool>(),
     ) {
@@ -903,20 +906,20 @@ proptest! {
     /// under I10.
     #[test]
     fn shift_then_unshift_is_identity(
-        (kind, offset, scale, corrections) in group_strategy(),
+        (kind, offset, scale, corrections) in bundle_strategy(),
         step in 1u8..8,
         other_kind in 0usize..3,
         second in any::<bool>(),
     ) {
         let (mut def, id) = grouped(DirectedVoteKind::ALL[kind], offset);
         if second {
-            def.add_group(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
+            def.add_ring_bundle(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
         }
         weigh(&mut def, id, scale, &corrections);
         let original = def.clone();
-        def.relocate_group(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
+        def.relocate_bundle(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
         prop_assert!(def.check_local_invariants().is_ok());
-        def.relocate_group(id, DirectedVoteKind::ALL[kind], offset);
+        def.relocate_bundle(id, DirectedVoteKind::ALL[kind], offset);
         prop_assert_eq!(&def, &original);
         prop_assert_eq!(format!("{def:?}"), format!("{original:?}"));
     }
@@ -925,7 +928,7 @@ proptest! {
     /// and `own` when it does not.
     #[test]
     fn a_member_weighs_scale_plus_correction_when_its_ring_resolves(
-        (kind, offset, scale, corrections) in group_strategy(),
+        (kind, offset, scale, corrections) in bundle_strategy(),
     ) {
         let (mut def, id) = grouped(DirectedVoteKind::ALL[kind], offset);
         weigh(&mut def, id, scale, &corrections);
@@ -944,7 +947,7 @@ proptest! {
     }
 }
 
-// ── Direction-pair groups (T25.F04) ─────────────────────────────────────────
+// ── Direction-pair bundles (T25.F04) ─────────────────────────────────────────
 
 /// `input_refs[PAIR_REF]` is `AreaFoodSummary`; its pair 1 is
 /// `(nearest_dx, nearest_dy)`, fields `(3, 4)`.
@@ -966,13 +969,13 @@ fn pair_layout() -> crate::contracts::DirectionPair {
     pair_refs()[usize::from(PAIR_REF)].direction_pairs()[1]
 }
 
-fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
+fn paired(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.push_edge(
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
         GraphEdge::new(leaf(0), 0.5),
     );
-    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset, &[]);
+    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset, &[]);
     (def, id)
 }
 
@@ -991,7 +994,7 @@ fn coordinates_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> (u16,
     (sub_idx, d)
 }
 
-fn coordinates(def: &CgpGraphBackendDef, id: GroupId) -> Vec<(u16, u8)> {
+fn coordinates(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, u8)> {
     def.members(id).map(|o| coordinates_of(def, o)).collect()
 }
 
@@ -1026,7 +1029,7 @@ fn pair_creation_materializes_12_members_not_16() {
             .collect();
         want.sort_unstable();
         assert_eq!(got, want, "offset {offset}");
-        assert_eq!(def.groups()[0].scale(), 0.0);
+        assert_eq!(def.bundles()[0].scale(), 0.0);
         for occurrence in def.members(id) {
             assert_eq!(def.edge_at(occurrence).own_weight(), 0.0);
             assert_eq!(def.genomic_weight(occurrence, &pair_refs()), 0.0);
@@ -1049,7 +1052,7 @@ fn pair_birth_members_reduce_every_offset_mod_8() {
 #[test]
 fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 3);
-    def.group_mut(id).set_scale(1.0);
+    def.bundle_mut(id).set_scale(1.0);
     for occurrence in def.members(id).collect::<Vec<_>>() {
         let (field, d) = coordinates_of(&def, occurrence);
         let relative = (d + 8 - 3) % 8;
@@ -1068,9 +1071,9 @@ fn a_pair_member_weighs_the_compass_pattern_at_its_relative_direction() {
 #[test]
 fn an_unresolvable_or_non_pair_reference_reads_pattern_zero() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 0);
-    def.group_mut(id).set_scale(2.0);
+    def.bundle_mut(id).set_scale(2.0);
     let occurrence = def.members(id).next().unwrap();
-    let group = def.groups()[0];
+    let bundle = def.bundles()[0];
     // Too short, a non-pair world key, a non-world reference.
     let short = ring_refs();
     let mut ring_at = pair_refs();
@@ -1083,25 +1086,25 @@ fn an_unresolvable_or_non_pair_reference_reads_pattern_zero() {
         assert_eq!(def.genomic_weight(occurrence, &refs), 0.0);
     }
     // A pair index beyond the declared ones.
-    let beyond = Group {
+    let beyond = Bundle {
         shape: Shape::DirectionPair {
             ref_idx: PAIR_REF,
             pair: 2,
         },
-        ..group
+        ..bundle
     };
     for d in 0..8 {
         assert_eq!(beyond.pattern(&pair_refs(), PX, d), 0.0);
     }
     // A field that is neither x nor y, and a direction past the compass.
-    assert_eq!(group.pattern(&pair_refs(), 0, 2), 0.0);
-    assert_eq!(group.pattern(&pair_refs(), PX, 8), 0.0);
+    assert_eq!(bundle.pattern(&pair_refs(), 0, 2), 0.0);
+    assert_eq!(bundle.pattern(&pair_refs(), PX, 8), 0.0);
 }
 
 #[test]
 fn identical_source_members_on_different_sinks_resolve_different_weights() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 0);
-    def.group_mut(id).set_scale(1.0);
+    def.bundle_mut(id).set_scale(1.0);
     let x_members: Vec<_> = def
         .members(id)
         .filter(|&o| coordinates_of(&def, o).0 == PX)
@@ -1129,24 +1132,24 @@ fn identical_source_members_on_different_sinks_resolve_different_weights() {
 }
 
 #[test]
-fn a_pair_groups_last_member_removed_removes_the_group() {
+fn a_pair_bundles_last_member_removed_removes_the_bundle() {
     let (mut def, id) = paired(DirectedVoteKind::Reproduce, 5);
     for remaining in (1..12).rev() {
         let occurrence = def.members(id).next().unwrap();
         def.remove_edge(occurrence);
         assert_eq!(def.members(id).count(), remaining);
-        assert_eq!(def.groups().len(), 1);
+        assert_eq!(def.bundles().len(), 1);
     }
     let last = def.members(id).next().unwrap();
     def.remove_edge(last);
-    assert!(def.groups().is_empty());
+    assert!(def.bundles().is_empty());
     assert!(def.edges().all(|edge| edge.membership().is_none()));
 }
 
 /// Relocation preserves every member's relative coordinate, holes and a
 /// hand-built zero-pattern member included.
 #[test]
-fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coordinate() {
+fn a_pair_bundle_with_holes_and_a_zero_pattern_member_relocates_by_relative_coordinate() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 2);
     // A hole: the x member at relative E (direction 4).
     let hole = def
@@ -1164,7 +1167,7 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
         own_weight: 0.25,
         plasticity: None,
         membership: Some(Membership {
-            group: id,
+            bundle: id,
             scope: Scope::Edge,
         }),
     });
@@ -1177,7 +1180,7 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
         .unwrap();
     assert_eq!(def.member_pattern(zero, &pair_refs()), 0.0);
     let relative = |def: &CgpGraphBackendDef| {
-        let offset = def.groups()[0].offset();
+        let offset = def.bundles()[0].offset();
         let mut set: Vec<_> = coordinates(def, id)
             .into_iter()
             .map(|(field, d)| (field, (d + 8 - offset) % 8))
@@ -1188,10 +1191,10 @@ fn a_pair_group_with_holes_and_a_zero_pattern_member_relocates_by_relative_coord
     let before = relative(&def);
     assert_eq!(before.len(), 12);
     let original = def.clone();
-    def.relocate_group(id, DirectedVoteKind::StealEnergy, 7);
+    def.relocate_bundle(id, DirectedVoteKind::StealEnergy, 7);
     assert_eq!(relative(&def), before);
     assert_eq!(def.check_local_invariants(), Ok(()));
-    def.relocate_group(id, DirectedVoteKind::Move, 2);
+    def.relocate_bundle(id, DirectedVoteKind::Move, 2);
     assert_eq!(def, original);
 }
 
@@ -1201,7 +1204,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
     // I7: the pair index is out of range for the reference.
     let mut range = def.clone();
-    range.groups[0].shape = Shape::DirectionPair {
+    range.bundles[0].shape = Shape::DirectionPair {
         ref_idx: PAIR_REF,
         pair: 2,
     };
@@ -1308,7 +1311,7 @@ fn a_pair_gene_adds_one_unit() {
     };
     for facts in [&[][..], pair_layout().facts] {
         let mut grouped = base.clone();
-        grouped.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, facts);
+        grouped.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0, facts);
         assert_eq!(
             genome(grouped).genome_size() - genome(base.clone()).genome_size(),
             1
@@ -1319,7 +1322,7 @@ fn a_pair_gene_adds_one_unit() {
 #[test]
 fn a_pair_shape_round_trips_json_with_its_external_tag() {
     let (mut def, id) = paired(DirectedVoteKind::StealEnergy, 6);
-    def.group_mut(id).set_scale(-0.5);
+    def.bundle_mut(id).set_scale(-0.5);
     let json = serde_json::to_string(&def).unwrap();
     assert!(
         json.contains(r#"{"DirectionPair":{"ref_idx":2,"pair":1}}"#),
@@ -1328,7 +1331,7 @@ fn a_pair_shape_round_trips_json_with_its_external_tag() {
     let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded, def);
     assert_eq!(format!("{decoded:?}"), format!("{def:?}"));
-    // A ring group's text is unchanged by the new variant.
+    // A ring bundle's text is unchanged by the new variant.
     let (ring_def, _) = grouped(DirectedVoteKind::Move, 0);
     assert!(serde_json::to_string(&ring_def)
         .unwrap()
@@ -1346,7 +1349,7 @@ proptest! {
         pick in 0usize..12,
     ) {
         let (mut def, id) = paired(DirectedVoteKind::ALL[kind], offset);
-        def.group_mut(id).set_scale(scale);
+        def.bundle_mut(id).set_scale(scale);
         let occurrence = def.members(id).nth(pick).unwrap();
         def.edge_mut(occurrence).set_weight(own);
         let pattern = def.member_pattern(occurrence, &pair_refs());
@@ -1362,9 +1365,9 @@ proptest! {
         prop_assert_eq!(def.members(id).count(), 11);
     }
 
-    /// A pair group's shift or retarget followed by its inverse returns an
+    /// A pair bundle's shift or retarget followed by its inverse returns an
     /// equal def, direction and fact holes, fact members (T25.F10) and a
-    /// ring group beside it included.
+    /// ring bundle beside it included.
     #[test]
     fn pair_shift_then_unshift_is_identity(
         kind in 0usize..3,
@@ -1379,7 +1382,7 @@ proptest! {
         } else {
             paired(DirectedVoteKind::ALL[kind], offset)
         };
-        def.add_group(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
+        def.add_ring_bundle(ring(), DirectedVoteKind::ALL[other_kind], (offset + 3) % 8);
         let members: Vec<_> = def.members(id).collect();
         // Punch holes, keeping the first member.
         for (i, occurrence) in members.into_iter().enumerate().skip(1).rev() {
@@ -1388,10 +1391,10 @@ proptest! {
             }
         }
         let original = def.clone();
-        def.relocate_group(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
+        def.relocate_bundle(id, DirectedVoteKind::ALL[other_kind], (offset + step) % 8);
         prop_assert!(def.check_local_invariants().is_ok());
         prop_assert!(validate_graph(&pair_node(def.clone(), pair_refs())).is_ok());
-        def.relocate_group(id, DirectedVoteKind::ALL[kind], offset);
+        def.relocate_bundle(id, DirectedVoteKind::ALL[kind], offset);
         prop_assert_eq!(&def, &original);
     }
 }
@@ -1531,11 +1534,11 @@ enum SeedOp {
     SetWeight(usize),
     SetSource(usize, bool),
     SetPlasticity(usize),
-    AddGroup(u8),
+    AddBundle(u8),
     AddPairGene(u8),
     Relocate(u8),
     Detach(usize),
-    RemoveGroup,
+    RemoveBundle,
     SetScope(usize),
     SetInheritScale,
     SetScale,
@@ -1552,11 +1555,11 @@ fn seed_op_strategy() -> impl Strategy<Value = SeedOp> {
         (0usize..64).prop_map(SeedOp::SetWeight),
         (0usize..64, any::<bool>()).prop_map(|(i, same)| SeedOp::SetSource(i, same)),
         (0usize..64).prop_map(SeedOp::SetPlasticity),
-        (0u8..8).prop_map(SeedOp::AddGroup),
+        (0u8..8).prop_map(SeedOp::AddBundle),
         (0u8..8).prop_map(SeedOp::AddPairGene),
         (0u8..8).prop_map(SeedOp::Relocate),
         (0usize..64).prop_map(SeedOp::Detach),
-        Just(SeedOp::RemoveGroup),
+        Just(SeedOp::RemoveBundle),
         (0usize..64).prop_map(SeedOp::SetScope),
         Just(SeedOp::SetInheritScale),
         Just(SeedOp::SetScale),
@@ -1579,18 +1582,18 @@ fn model_sinks() -> [usize; 6] {
 
 proptest! {
     /// T25.F06 invariant 8, T25.F07 invariant 6, model-based: every edge
-    /// carries a unique tag as its own weight and every group a unique tag
+    /// carries a unique tag as its own weight and every bundle a unique tag
     /// as its scale (in `(0.9, 1.5)`, so an integer own tag plus a scale tag
     /// is unique too) and, when seeded, the tag as its seed. Through any
     /// sequence of primitives on both surfaces (push, remove, split, the
     /// source and weight writes, `Ring` and fact-bearing pair gene creation
     /// (T25.F10), relocation, detach and removal, scope, `inherit_scale` and
-    /// scale writes, node removal, a draft's clone) each row and the group
+    /// scale writes, node removal, a draft's clone) each row and the bundle
     /// slots stay aligned with their edges and records (node duplication
     /// copies rows and is pinned by `cgp_reproduction`'s copy-remove
     /// property): a seed is its own tag exactly while the model keeps the
     /// tag seeded, `None` otherwise; a detached direction member's seed is
-    /// its composed weight when its edge or its group was seeded, a detached
+    /// its composed weight when its edge or its bundle was seeded, a detached
     /// fact member keeps its own bits and seed entry.
     #[test]
     fn seed_rows_follow_their_edges_through_every_primitive(
@@ -1610,18 +1613,18 @@ proptest! {
         for sink in model_sinks() {
             def.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(GraphSource::ComputeNode(2), fresh()));
         }
-        // Two groups, every member and record tagged.
-        let tag_group = |def: &mut CgpGraphBackendDef, id: GroupId, fresh: &mut dyn FnMut() -> f32| {
+        // Two bundles, every member and record tagged.
+        let tag_bundle = |def: &mut CgpGraphBackendDef, id: BundleId, fresh: &mut dyn FnMut() -> f32| {
             for member in def.members(id).collect::<Vec<_>>() {
                 def.edge_mut(member).set_weight(fresh());
             }
-            def.group_mut(id).set_scale(fresh() / 1024.0);
+            def.bundle_mut(id).set_scale(fresh() / 1024.0);
         };
         for (kind, offset) in [(DirectedVoteKind::Move, 2), (DirectedVoteKind::StealEnergy, 5)] {
-            let id = def.add_group(ring(), kind, offset);
-            tag_group(&mut def, id, &mut fresh);
+            let id = def.add_ring_bundle(ring(), kind, offset);
+            tag_bundle(&mut def, id, &mut fresh);
         }
-        // Seed every edge and group with its tag.
+        // Seed every edge and bundle with its tag.
         let tag_rows = |def: &CgpGraphBackendDef, surface_count: usize, surface: fn(usize) -> EdgeSurface| -> Vec<Vec<Option<f32>>> {
             (0..surface_count)
                 .map(|i| def.surface_edges(surface(i)).iter().map(|e| Some(e.own_weight())).collect())
@@ -1629,13 +1632,13 @@ proptest! {
         };
         let compute = tag_rows(&def, def.compute_nodes().len(), EdgeSurface::ComputeInput);
         let sinks = tag_rows(&def, def.output_sinks().len(), EdgeSurface::SinkInput);
-        let groups = def.groups().iter().map(|group| Some(group.scale())).collect();
-        def.seed_birth(BirthSeeds::Rows { compute, sinks, groups });
+        let bundles = def.bundles().iter().map(|bundle| Some(bundle.scale())).collect();
+        def.seed_birth(BirthSeeds::Rows { compute, sinks, bundles });
         for edge in def.edges() {
             seeded_tags.insert(edge.own_weight().to_bits());
         }
         let mut seeded_scales: std::collections::BTreeSet<u32> =
-            def.groups().iter().map(|group| group.scale().to_bits()).collect();
+            def.bundles().iter().map(|bundle| bundle.scale().to_bits()).collect();
         let refs = pair_refs();
         for op in ops {
             let sites: Vec<EdgeOccurrence> = def.edge_sites().collect();
@@ -1690,36 +1693,36 @@ proptest! {
                         def.edge_mut(site).set_plasticity(config);
                     }
                 }
-                SeedOp::AddGroup(offset) => {
-                    if def.can_host_group() && def.groups().len() < 3 {
-                        let id = def.add_group(ring(), DirectedVoteKind::Move, offset);
-                        prop_assert_eq!(def.birth_seeds().unwrap().group_value(id), None);
-                        tag_group(&mut def, id, &mut fresh);
+                SeedOp::AddBundle(offset) => {
+                    if def.can_host_bundle() && def.bundles().len() < 3 {
+                        let id = def.add_ring_bundle(ring(), DirectedVoteKind::Move, offset);
+                        prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
+                        tag_bundle(&mut def, id, &mut fresh);
                     }
                 }
                 SeedOp::AddPairGene(offset) => {
-                    if def.can_host_group() && def.groups().len() < 3 {
-                        let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset, facts());
-                        prop_assert_eq!(def.birth_seeds().unwrap().group_value(id), None);
-                        tag_group(&mut def, id, &mut fresh);
+                    if def.can_host_bundle() && def.bundles().len() < 3 {
+                        let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset, facts());
+                        prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
+                        tag_bundle(&mut def, id, &mut fresh);
                     }
                 }
                 SeedOp::Relocate(offset) => {
-                    if !def.groups().is_empty() {
-                        def.relocate_group(GroupId::new(0), DirectedVoteKind::Reproduce, offset);
+                    if !def.bundles().is_empty() {
+                        def.relocate_bundle(BundleId::new(0), DirectedVoteKind::Reproduce, offset);
                     }
                 }
                 SeedOp::Detach(i) => {
-                    let members: Vec<EdgeOccurrence> = if def.groups().is_empty() { Vec::new() } else { def.members(GroupId::new(0)).collect() };
+                    let members: Vec<EdgeOccurrence> = if def.bundles().is_empty() { Vec::new() } else { def.members(BundleId::new(0)).collect() };
                     if let Some(&member) = members.get(i % members.len().max(1)) {
                         let fact = def.is_fact_member(member);
                         let pattern = def.member_pattern(member, &refs);
                         let own = def.edge_at(member).own_weight();
-                        let scale = def.groups()[0].scale();
+                        let scale = def.bundles()[0].scale();
                         let edge_seeded = seeded_tags.remove(&own.to_bits());
                         // A fact member detaches own-only (T25.F10): its bits
                         // and its seed entry stay; a direction member's seed
-                        // composes when its edge or its group was seeded.
+                        // composes when its edge or its bundle was seeded.
                         let seeded = edge_seeded || (!fact && seeded_scales.contains(&scale.to_bits()));
                         let (detached, _) = def.detach_at(member, pattern);
                         let composed = def.edge_at(detached).own_weight();
@@ -1733,9 +1736,9 @@ proptest! {
                         }
                     }
                 }
-                SeedOp::RemoveGroup => {
-                    if !def.groups().is_empty() {
-                        def.remove_group(GroupId::new(0));
+                SeedOp::RemoveBundle => {
+                    if !def.bundles().is_empty() {
+                        def.remove_bundle(BundleId::new(0));
                     }
                 }
                 SeedOp::SetScope(i) => {
@@ -1746,14 +1749,14 @@ proptest! {
                     }
                 }
                 SeedOp::SetInheritScale => {
-                    if let Some(group) = def.groups().first().copied() {
-                        def.group_mut(GroupId::new(0)).set_inherit_scale(!group.inherit_scale());
+                    if let Some(bundle) = def.bundles().first().copied() {
+                        def.bundle_mut(BundleId::new(0)).set_inherit_scale(!bundle.inherit_scale());
                     }
                 }
                 SeedOp::SetScale => {
-                    if let Some(group) = def.groups().first().copied() {
-                        seeded_scales.remove(&group.scale().to_bits());
-                        def.group_mut(GroupId::new(0)).set_scale(fresh() / 1024.0);
+                    if let Some(bundle) = def.bundles().first().copied() {
+                        seeded_scales.remove(&bundle.scale().to_bits());
+                        def.bundle_mut(BundleId::new(0)).set_scale(fresh() / 1024.0);
                     }
                 }
                 SeedOp::RemoveNode(i) => {
@@ -1776,11 +1779,11 @@ proptest! {
             let seeds = def.birth_seeds().expect("the draft keeps its seeds").clone();
             prop_assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
             prop_assert_eq!(seeds.sink_rows().len(), def.output_sinks().len());
-            prop_assert_eq!(seeds.group_slots().len(), def.groups().len());
-            for (index, group) in def.groups().iter().enumerate() {
-                let tag = group.scale();
+            prop_assert_eq!(seeds.bundle_slots().len(), def.bundles().len());
+            for (index, bundle) in def.bundles().iter().enumerate() {
+                let tag = bundle.scale();
                 let expected = seeded_scales.contains(&tag.to_bits()).then_some(tag);
-                prop_assert_eq!(seeds.group_slots()[index], expected, "group {}", index);
+                prop_assert_eq!(seeds.bundle_slots()[index], expected, "bundle {}", index);
             }
             for site in def.edge_sites() {
                 let tag = def.edge_at(site).own_weight();
@@ -1792,11 +1795,11 @@ proptest! {
     }
 }
 
-/// Seed `def`'s draft: every edge row empty, `edges` and `groups` set.
+/// Seed `def`'s draft: every edge row empty, `edges` and `bundles` set.
 fn seed_with(
     def: &mut CgpGraphBackendDef,
     edges: &[(EdgeOccurrence, f32)],
-    groups: &[(GroupId, f32)],
+    bundles: &[(BundleId, f32)],
 ) {
     let mut compute: Vec<Vec<Option<f32>>> = def
         .compute_nodes()
@@ -1815,25 +1818,25 @@ fn seed_with(
         };
         row[at.index] = Some(value);
     }
-    let mut slots = vec![None; def.groups().len()];
-    for &(group, value) in groups {
-        slots[group.index()] = Some(value);
+    let mut slots = vec![None; def.bundles().len()];
+    for &(bundle, value) in bundles {
+        slots[bundle.index()] = Some(value);
     }
     def.seed_birth(BirthSeeds::Rows {
         compute,
         sinks,
-        groups: slots,
+        bundles: slots,
     });
 }
 
 /// Invariant 6: a detached member's seed composes the edge's seed (or its
-/// own weight) with the group's seed (or its scale) at its pattern, with no
+/// own weight) with the bundle's seed (or its scale) at its pattern, with no
 /// clamp; with neither seed it keeps none; a last-member detach drops the
-/// group's slot.
+/// bundle's slot.
 #[test]
 fn a_detached_member_composes_its_seed_with_the_learned_scale() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 0);
-    def.group_mut(id).set_scale(0.5);
+    def.bundle_mut(id).set_scale(0.5);
     let refs = pair_refs();
     let all: Vec<EdgeOccurrence> = def.members(id).collect();
     let (first, second) = (all[0], all[1]);
@@ -1850,40 +1853,40 @@ fn a_detached_member_composes_its_seed_with_the_learned_scale() {
     );
     assert_eq!(def.edge_at(at).own_weight(), compose(0.25, 0.5, pattern));
 
-    let mut group_only = def.clone();
-    let second_at = group_only.members(id).next().unwrap();
+    let mut bundle_only = def.clone();
+    let second_at = bundle_only.members(id).next().unwrap();
     assert_eq!(second_at, def.members(id).next().unwrap());
-    let pattern = group_only.member_pattern(second_at, &refs);
-    let own = group_only.edge_at(second_at).own_weight();
-    let (at, _) = group_only.detach_at(second_at, pattern);
+    let pattern = bundle_only.member_pattern(second_at, &refs);
+    let own = bundle_only.edge_at(second_at).own_weight();
+    let (at, _) = bundle_only.detach_at(second_at, pattern);
     assert_eq!(
-        group_only.birth_seeds().unwrap().value(at),
+        bundle_only.birth_seeds().unwrap().value(at),
         Some(compose(own, 12.0, pattern)),
-        "the group seed with the edge's own weight"
+        "the bundle seed with the edge's own weight"
     );
 
     let mut neither = def.clone();
-    neither.group_mut(id).set_scale(0.5);
-    assert_eq!(neither.birth_seeds().unwrap().group_value(id), None);
+    neither.bundle_mut(id).set_scale(0.5);
+    assert_eq!(neither.birth_seeds().unwrap().bundle_value(id), None);
     let member = neither.members(id).next().unwrap();
     let pattern = neither.member_pattern(member, &refs);
     let (at, _) = neither.detach_at(member, pattern);
     assert_eq!(neither.birth_seeds().unwrap().value(at), None);
 
-    // Detaching every member drops the group and its slot.
+    // Detaching every member drops the bundle and its slot.
     let mut last = def.clone();
-    while let Some(member) = last.groups().first().and_then(|_| last.members(id).next()) {
+    while let Some(member) = last.bundles().first().and_then(|_| last.members(id).next()) {
         let pattern = last.member_pattern(member, &refs);
         last.detach_at(member, pattern);
     }
-    assert!(last.groups().is_empty());
-    assert!(last.birth_seeds().unwrap().group_slots().is_empty());
+    assert!(last.bundles().is_empty());
+    assert!(last.birth_seeds().unwrap().bundle_slots().is_empty());
 }
 
-/// R5: a group with members at both scopes, distinct edge seeds and a group
+/// R5: a bundle with members at both scopes, distinct edge seeds and a bundle
 /// seed survives a relocation and its inverse unchanged, seeds included.
 #[test]
-fn a_mixed_scope_group_survives_a_relocation_and_its_inverse() {
+fn a_mixed_scope_bundle_survives_a_relocation_and_its_inverse() {
     let (mut def, id) = paired(DirectedVoteKind::Move, 3);
     let all: Vec<EdgeOccurrence> = def.members(id).collect();
     for (k, &member) in all.iter().enumerate() {
@@ -1900,38 +1903,38 @@ fn a_mixed_scope_group_survives_a_relocation_and_its_inverse() {
     seed_with(&mut def, &edge_seeds, &[(id, 7.5)]);
     let before = def.clone();
     let seeds_before = def.birth_seeds().unwrap().clone();
-    def.relocate_group(id, DirectedVoteKind::Reproduce, 6);
+    def.relocate_bundle(id, DirectedVoteKind::Reproduce, 6);
     assert_eq!(
         def.members(id).count(),
         all.len(),
-        "scope never splits a group"
+        "scope never splits a bundle"
     );
-    def.relocate_group(id, DirectedVoteKind::Move, 3);
+    def.relocate_bundle(id, DirectedVoteKind::Move, 3);
     assert_eq!(def, before);
     assert_eq!(def.birth_seeds().unwrap(), &seeds_before);
 }
 
 /// `set_scope`, `set_inherit_scale` and `set_retention` (T25.F09) keep
-/// every seed; `set_scale` clears the group's.
+/// every seed; `set_scale` clears the bundle's.
 #[test]
-fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_group_seed() {
+fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_bundle_seed() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
     let member = def.members(id).next().unwrap();
     seed_with(&mut def, &[(member, 2.0)], &[(id, 3.0)]);
     def.edge_mut(member).set_scope(Scope::Group);
-    def.group_mut(id).set_inherit_scale(true);
-    def.group_mut(id).set_retention(0.25);
-    assert_eq!(def.groups()[id.index()].retention(), 0.25);
+    def.bundle_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_retention(0.25);
+    assert_eq!(def.bundles()[id.index()].retention(), 0.25);
     let seeds = def.birth_seeds().unwrap();
     assert_eq!(
-        (seeds.value(member), seeds.group_value(id)),
+        (seeds.value(member), seeds.bundle_value(id)),
         (Some(2.0), Some(3.0))
     );
-    assert!(def.groups()[id.index()].inherit_scale());
-    def.group_mut(id).set_scale(0.5);
+    assert!(def.bundles()[id.index()].inherit_scale());
+    def.bundle_mut(id).set_scale(0.5);
     let seeds = def.birth_seeds().unwrap();
     assert_eq!(
-        (seeds.value(member), seeds.group_value(id)),
+        (seeds.value(member), seeds.bundle_value(id)),
         (Some(2.0), None)
     );
 }
@@ -1945,7 +1948,7 @@ fn facts() -> &'static [u16] {
 
 /// `paired` with the pair's fact members, after an independent edge on the
 /// kind's drive: one gene, twelve direction members and three facts.
-fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId) {
+fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, BundleId) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.push_edge(
         EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 0)),
@@ -1953,12 +1956,12 @@ fn fact_gene(kind: DirectedVoteKind, offset: u8) -> (CgpGraphBackendDef, GroupId
     );
     let drive = drive_sink(&def, kind);
     def.push_edge(drive, GraphEdge::new(leaf(0), -0.5));
-    let id = def.add_pair_group(PAIR_REF, 1, pair_layout(), kind, offset, facts());
+    let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), kind, offset, facts());
     (def, id)
 }
 
 /// The fact members of `id`, in canonical order.
-fn fact_members(def: &CgpGraphBackendDef, id: GroupId) -> Vec<EdgeOccurrence> {
+fn fact_members(def: &CgpGraphBackendDef, id: BundleId) -> Vec<EdgeOccurrence> {
     def.members(id)
         .filter(|&member| def.is_fact_member(member))
         .collect()
@@ -2003,7 +2006,7 @@ fn a_pair_gene_places_one_fact_member_per_fact_on_its_kinds_drive() {
             assert_eq!(def.member_pattern(member, &pair_refs()), 0.0);
         }
         // Pattern 0 by role: the scale never reaches a fact member.
-        def.group_mut(id).set_scale(3.0);
+        def.bundle_mut(id).set_scale(3.0);
         for &member in &found {
             def.edge_mut(member).set_weight(0.25);
             assert_eq!(def.genomic_weight(member, &pair_refs()), 0.25);
@@ -2024,9 +2027,9 @@ fn can_host_facts_needs_the_kinds_drive_sink() {
     def.output_sinks.0.retain(|sink| sink.kind != drive);
     assert!(!def.can_host_facts(DirectedVoteKind::Reproduce));
     assert!(def.can_host_facts(DirectedVoteKind::Move));
-    assert!(def.can_host_group());
+    assert!(def.can_host_bundle());
     let result = std::panic::catch_unwind(move || {
-        def.add_pair_group(
+        def.add_pair_bundle(
             PAIR_REF,
             1,
             pair_layout(),
@@ -2070,14 +2073,14 @@ fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
     let original = def.clone();
     let original_seeds = def.birth_seeds().unwrap().clone();
 
-    def.relocate_group(id, DirectedVoteKind::Move, 3);
+    def.relocate_bundle(id, DirectedVoteKind::Move, 3);
     let move_drive = drive_sink(&def, DirectedVoteKind::Move);
     assert!(fact_members(&def, id)
         .iter()
         .all(|member| member.surface == move_drive));
     assert_eq!(snapshot(&def), facts_before);
 
-    def.relocate_group(id, DirectedVoteKind::StealEnergy, 3);
+    def.relocate_bundle(id, DirectedVoteKind::StealEnergy, 3);
     let steal_drive = drive_sink(&def, DirectedVoteKind::StealEnergy);
     let moved = fact_members(&def, id);
     assert_eq!(moved.len(), facts().len());
@@ -2085,7 +2088,7 @@ fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
     assert_eq!(snapshot(&def), facts_before);
     assert_eq!(validate_graph(&pair_node(def.clone(), pair_refs())), Ok(()));
 
-    def.relocate_group(id, DirectedVoteKind::Move, 2);
+    def.relocate_bundle(id, DirectedVoteKind::Move, 2);
     assert_eq!(def, original);
     assert_eq!(def.birth_seeds().unwrap(), &original_seeds);
 }
@@ -2187,27 +2190,27 @@ fn a_fact_only_survivor_is_a_valid_gene_until_its_last_member_goes() {
         let Some(direction) = direction else { break };
         def.remove_edge(direction);
     }
-    assert_eq!(def.groups().len(), 1);
+    assert_eq!(def.bundles().len(), 1);
     assert_eq!(def.members(id).count(), facts().len() - 1);
     let node = pair_node(def.clone(), pair_refs());
     assert_eq!(validate_graph(&node), Ok(()));
     let loaded: NodeGenome = serde_json::from_str(&serde_json::to_string(&node).unwrap()).unwrap();
     assert_eq!(loaded, node);
     assert_eq!(validate_graph(&loaded), Ok(()));
-    while let Some(member) = def.groups().first().and_then(|_| def.members(id).next()) {
+    while let Some(member) = def.bundles().first().and_then(|_| def.members(id).next()) {
         def.remove_edge(member);
     }
-    assert!(def.groups().is_empty());
+    assert!(def.bundles().is_empty());
 }
 
 /// R8: a fact member detaches own-only: its bits (`-0.0` included) and its
-/// seed entry stay as stored, `None` staying `None` beside a group seed;
+/// seed entry stay as stored, `None` staying `None` beside a bundle seed;
 /// it moves to the independent prefix of its drive; the last member's
 /// detach drops the record.
 #[test]
 fn a_fact_member_detaches_own_only() {
     let (mut def, id) = fact_gene(DirectedVoteKind::Move, 0);
-    def.group_mut(id).set_scale(0.5);
+    def.bundle_mut(id).set_scale(0.5);
     let found = fact_members(&def, id);
     def.edge_mut(found[0]).set_weight(-0.0);
     def.edge_mut(found[1]).set_weight(0.75);
@@ -2225,7 +2228,7 @@ fn a_fact_member_detaches_own_only() {
     assert_eq!(
         def.birth_seeds().unwrap().value(at),
         None,
-        "no seed manufactured from the group seed"
+        "no seed manufactured from the bundle seed"
     );
 
     let seeded = fact_members(&def, id)[0];
@@ -2238,42 +2241,39 @@ fn a_fact_member_detaches_own_only() {
         Ok(())
     );
 
-    while let Some(member) = def.groups().first().and_then(|_| def.members(id).next()) {
+    while let Some(member) = def.bundles().first().and_then(|_| def.members(id).next()) {
         detach(&mut def, member, &refs);
     }
-    assert!(def.groups().is_empty());
-    assert!(def.birth_seeds().unwrap().group_slots().is_empty());
+    assert!(def.bundles().is_empty());
+    assert!(def.birth_seeds().unwrap().bundle_slots().is_empty());
 }
 
 // ── Birth coordinates (T30.F01) ─────────────────────────────────────────────
 
 /// The `(field, site)` of every member of `id`.
-fn member_sites(def: &CgpGraphBackendDef, id: GroupId) -> Vec<(u16, MemberSite)> {
+fn site_ofs(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, Site)> {
     def.members(id)
         .map(|member| {
             let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(member).source() else {
                 unreachable!("members read leaves")
             };
-            (
-                sub_idx,
-                def.member_site(member).expect("a member on its kind"),
-            )
+            (sub_idx, def.site_of(member).expect("a member on its kind"))
         })
         .collect()
 }
 
 /// The `(field, site)` of every coordinate, in the API's order.
-fn coordinate_sites(coordinates: &[BirthCoordinate]) -> Vec<(u16, MemberSite)> {
+fn coordinate_sites(coordinates: &[BirthCoordinate]) -> Vec<(u16, Site)> {
     coordinates.iter().map(|c| (c.field, c.site)).collect()
 }
 
 proptest! {
-    /// A new group's birth coordinates are exactly its members, each
+    /// A new bundle's birth coordinates are exactly its members, each
     /// present: a ring's eight channels on `(channel + offset) mod 8`, a
     /// pair's twelve direction members, then its declared facts on the
     /// drive.
     #[test]
-    fn a_new_groups_coordinates_are_its_members_all_present(
+    fn a_new_bundles_coordinates_are_its_members_all_present(
         kind in 0usize..4,
         offset in 0u8..8,
         pair in any::<bool>(),
@@ -2294,10 +2294,10 @@ proptest! {
         if !pair {
             for c in &coordinates {
                 let channel = u8::try_from(c.field).expect("a ring channel");
-                prop_assert_eq!(c.site, MemberSite::Direction((channel + offset) % 8));
+                prop_assert_eq!(c.site, Site::Direction((channel + offset) % 8));
             }
         }
-        let mut members = member_sites(&def, id);
+        let mut members = site_ofs(&def, id);
         sites.sort_unstable();
         members.sort_unstable();
         prop_assert_eq!(sites, members);
@@ -2310,7 +2310,7 @@ proptest! {
         let refs = pair_refs();
         let members: Vec<_> = def.members(id).collect();
         let pick = pick % members.len();
-        let site = member_sites(&def, id)[pick];
+        let site = site_ofs(&def, id)[pick];
         def.remove_edge(members[pick]);
         let absent: Vec<_> = def
             .birth_coordinates(id, &refs)
@@ -2330,7 +2330,7 @@ fn an_unresolvable_pair_has_no_coordinates() {
     let coordinates = def.birth_coordinates(id, &pair_refs());
     let (directions, drives): (Vec<&BirthCoordinate>, Vec<_>) = coordinates
         .iter()
-        .partition(|c| matches!(c.site, MemberSite::Direction(_)));
+        .partition(|c| matches!(c.site, Site::Direction(_)));
     assert_eq!(directions.len(), 12);
     assert!(directions.iter().all(|c| c.present));
     let fields: Vec<u16> = drives.iter().map(|c| c.field).collect();

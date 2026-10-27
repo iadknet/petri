@@ -783,7 +783,7 @@ fn a_mixed_seed_backend_initializes_only_its_seeded_slot() {
             .iter()
             .map(|sink| vec![None; sink.inputs.len()])
             .collect(),
-        groups: Vec::new(),
+        bundles: Vec::new(),
     };
     let BirthSeeds::Rows { sinks, .. } = &mut seeds;
     sinks[vote_index][1] = Some(-0.75);

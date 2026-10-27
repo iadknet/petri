@@ -7,8 +7,8 @@ use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GroupId, OutputSink,
-    Shape as GroupShape,
+    BundleId, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, OutputSink,
+    Shape as BundleShape,
 };
 use v3_core::genome::VmBackendDef;
 
@@ -496,7 +496,7 @@ fn graph(genome: &CreatureGenome, node: usize) -> &CgpGraphBackendDef {
 }
 
 /// The founder with a barrier and an occupied ring on its entry node, each
-/// read by a `Ring` group: `(genome, entry, barrier, occupied)`.
+/// read by a `Ring` bundle: `(genome, entry, barrier, occupied)`.
 fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
@@ -506,17 +506,17 @@ fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
         panic!("the founder entry is a graph node");
     };
     for (ring_ref, offset, scale) in [(barrier, 0, 0.5), (occupied, 3, -0.5)] {
-        let id = graph.add_group(
-            GroupShape::Ring { ring_ref },
+        let id = graph.add_ring_bundle(
+            BundleShape::Ring { ring_ref },
             DirectedVoteKind::Move,
             offset,
         );
-        graph.group_mut(id).set_scale(scale);
+        graph.bundle_mut(id).set_scale(scale);
     }
     (genome, entry, barrier, occupied)
 }
 
-/// The lab's sentinel scheme masks a ring family through its group's
+/// The lab's sentinel scheme masks a ring family through its bundle's
 /// members: each member reading the family reads a sentinel out of range
 /// (0.0), and the other ring's members are untouched.
 #[test]
@@ -529,9 +529,9 @@ fn masking_a_ring_reference_zeroes_every_member_read() {
     let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
     let len = genome.nodes[entry].input_refs.len();
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
-    for (group, ring) in [(GroupId::new(0), barrier), (GroupId::new(1), occupied)] {
+    for (bundle, ring) in [(BundleId::new(0), barrier), (BundleId::new(1), occupied)] {
         let reads: Vec<u16> = after
-            .members(group)
+            .members(bundle)
             .map(|occurrence| match after.edge_at(occurrence).source() {
                 GraphSource::InputLeaf { ref_idx, .. } => ref_idx,
                 other => panic!("a member reads a leaf, not {other:?}"),
@@ -543,18 +543,21 @@ fn masking_a_ring_reference_zeroes_every_member_read() {
         } else {
             assert!(reads.iter().all(|&ref_idx| ref_idx == occupied));
         }
-        assert_eq!(after.members(group).count(), before.members(group).count());
+        assert_eq!(
+            after.members(bundle).count(),
+            before.members(bundle).count()
+        );
     }
     let left = consumers(&ablated);
     assert!(!left.contains_key(&Family::NeighborBarrierRing));
     assert!(left[&Family::NeighborOccupiedRing].contains(&entry));
 }
 
-/// The sentinel rewrite is an observation copy: size, complexity, the group
+/// The sentinel rewrite is an observation copy: size, complexity, the bundle
 /// records, every membership and every member's genomic weight are the
 /// original's.
 #[test]
-fn ablating_a_grouped_genome_leaves_size_complexity_groups_memberships_and_member_weights_unchanged(
+fn ablating_a_grouped_genome_leaves_size_complexity_bundles_memberships_and_member_weights_unchanged(
 ) {
     let (genome, entry, _, _) = grouped_founder();
     let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
@@ -562,7 +565,7 @@ fn ablating_a_grouped_genome_leaves_size_complexity_groups_memberships_and_membe
     assert_eq!(ablated.complexity(), genome.complexity());
     let refs = &genome.nodes[entry].input_refs;
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
-    assert_eq!(after.groups(), before.groups());
+    assert_eq!(after.bundles(), before.bundles());
     let memberships =
         |def: &CgpGraphBackendDef| -> Vec<_> { def.edges().map(GraphEdge::membership).collect() };
     assert_eq!(memberships(after), memberships(before));
@@ -570,11 +573,11 @@ fn ablating_a_grouped_genome_leaves_size_complexity_groups_memberships_and_membe
 }
 
 /// `GenomeFile::load` accepts a valid grouped genome and refuses one whose
-/// group no longer reads a ring (I7).
+/// bundle no longer reads a ring (I7).
 #[test]
 fn a_genome_file_breaking_a_graph_invariant_is_refused() {
     let (genome, entry, barrier, _) = grouped_founder();
-    let dir = std::env::temp_dir().join(format!("petri-lab-groups-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("petri-lab-bundles-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("grouped.json");
     std::fs::write(
@@ -624,10 +627,10 @@ fn a_genome_file_of_an_earlier_format_is_refused() {
 }
 
 #[test]
-fn a_ring_read_only_through_a_group_is_causal() {
+fn a_ring_read_only_through_a_bundle_is_causal() {
     let setup = setup(100, 100.0);
     let mut genome = founder(&setup);
-    // Move every founder food-ring read from its edges onto a Move group of
+    // Move every founder food-ring read from its edges onto a Move bundle of
     // the same reference at scale 1.
     let mut moved = 0;
     for node in &mut genome.nodes {
@@ -671,15 +674,16 @@ fn a_ring_read_only_through_a_group_is_causal() {
             .with_output_sinks(sinks);
         moved += rings.len();
         for ring_ref in rings {
-            let id = graph.add_group(GroupShape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-            graph.group_mut(id).set_scale(1.0);
+            let id =
+                graph.add_ring_bundle(BundleShape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            graph.bundle_mut(id).set_scale(1.0);
         }
     }
     assert!(moved > 0, "the founder reads its food ring");
     let family = *consumers(&genome)
         .keys()
         .find(|family| matches!(family, Family::NeighborFoodRing(_)))
-        .expect("the group's members consume the ring");
+        .expect("the bundle's members consume the ring");
     let scenes = scenes(2);
     let run = observe(&setup, &genome, &scenes);
     let ancestry = Ancestry::default();
@@ -1026,7 +1030,7 @@ fn read_charges_the_ablated_copies_and_the_mutants() {
 }
 
 /// The founder with an area-barrier summary on its entry node read by one
-/// `DirectionPair` group (T25.F04): `(genome, entry)`.
+/// `DirectionPair` bundle (T25.F04): `(genome, entry)`.
 fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
@@ -1035,24 +1039,24 @@ fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
         panic!("the founder entry is a graph node");
     };
-    let id = graph.add_pair_group(summary, 1, layout, DirectedVoteKind::Move, 2, &[]);
-    graph.group_mut(id).set_scale(0.75);
+    let id = graph.add_pair_bundle(summary, 1, layout, DirectedVoteKind::Move, 2, &[]);
+    graph.bundle_mut(id).set_scale(0.75);
     (genome, entry)
 }
 
-/// The lab's sentinel scheme masks a pair family through its group's
-/// members, and the observation copy keeps size, complexity, the group,
+/// The lab's sentinel scheme masks a pair family through its bundle's
+/// members, and the observation copy keeps size, complexity, the bundle,
 /// every membership and every member's genomic weight (T25.F04).
 #[test]
-fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_group() {
+fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
     let (genome, entry) = pair_grouped_founder();
     assert!(consumers(&genome)[&Family::AreaBarrierSummary].contains(&entry));
     let ablated = ablate(&genome, Family::AreaBarrierSummary).unwrap();
     let len = genome.nodes[entry].input_refs.len();
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
-    let group = GroupId::new(0);
+    let bundle = BundleId::new(0);
     let reads: Vec<u16> = after
-        .members(group)
+        .members(bundle)
         .map(|occurrence| match after.edge_at(occurrence).source() {
             GraphSource::InputLeaf { ref_idx, .. } => ref_idx,
             other => panic!("a member reads a leaf, not {other:?}"),
@@ -1064,14 +1068,14 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_group() {
 
     assert_eq!(ablated.genome_size(), genome.genome_size());
     assert_eq!(ablated.complexity(), genome.complexity());
-    assert_eq!(after.groups(), before.groups());
+    assert_eq!(after.bundles(), before.bundles());
     let memberships =
         |def: &CgpGraphBackendDef| -> Vec<_> { def.edges().map(GraphEdge::membership).collect() };
     assert_eq!(memberships(after), memberships(before));
     let refs = &genome.nodes[entry].input_refs;
     assert_eq!(after.sink_weight_rows(refs), before.sink_weight_rows(refs));
     assert_ne!(
-        before.genomic_weight(before.members(group).next().unwrap(), refs),
+        before.genomic_weight(before.members(bundle).next().unwrap(), refs),
         0.0
     );
 }

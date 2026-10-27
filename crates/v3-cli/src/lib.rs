@@ -169,7 +169,7 @@ pub fn run_simulation<W: std::io::Write>(
 
 /// Means of the living population's structure and lineage depth: total
 /// genome size (junk included), mesh node count, generation, wired output
-/// sinks (sinks with at least one edge) and `Ring` edge groups. All `0.0` for
+/// sinks (sinks with at least one edge) and `Ring` edge bundles. All `0.0` for
 /// an empty population, like `Simulation::mean_energy`.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct StructureMeans {
@@ -178,11 +178,11 @@ pub(crate) struct StructureMeans {
     pub(crate) generation: f64,
     /// T25.F02: the sinks the unit rule stopped charging a unit for.
     pub(crate) wired_sinks: f64,
-    /// T25.F03: `Ring` edge groups per creature.
-    pub(crate) ring_groups: f64,
-    /// T25.F03: members present per group across the population; `None`
-    /// when the population carries no group.
-    pub(crate) ring_group_members: Option<f64>,
+    /// T25.F03: `Ring` edge bundles per creature.
+    pub(crate) ring_bundles: f64,
+    /// T25.F03: members present per bundle across the population; `None`
+    /// when the population carries no bundle.
+    pub(crate) ring_bundle_members: Option<f64>,
 }
 
 pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> StructureMeans {
@@ -192,7 +192,7 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
     if population == 0 {
         return StructureMeans::default();
     }
-    let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut groups, mut members] =
+    let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut bundles, mut members] =
         [0u64; 6];
     for creature in sim.creatures.values() {
         genome_size += u64::from(creature.genome_size());
@@ -205,21 +205,21 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
                     .iter()
                     .filter(|sink| !sink.inputs.is_empty())
                     .count() as u64;
-                // `Ring` groups only (T25.F04: a pair group is read by the
-                // `pair_groups` block).
+                // `Ring` bundles only (T25.F04: a pair bundle is read by the
+                // `pair_bundles` block).
                 let ring = |id: usize| {
                     matches!(
-                        graph.groups()[id].shape(),
+                        graph.bundles()[id].shape(),
                         v3_core::genome::cgp::Shape::Ring { .. }
                     )
                 };
-                groups += (0..graph.groups().len()).filter(|&id| ring(id)).count() as u64;
+                bundles += (0..graph.bundles().len()).filter(|&id| ring(id)).count() as u64;
                 members += graph
                     .output_sinks()
                     .iter()
                     .flat_map(|sink| sink.inputs.iter())
                     .filter_map(|edge| edge.membership())
-                    .filter(|membership| ring(membership.group.index()))
+                    .filter(|membership| ring(membership.bundle.index()))
                     .count() as u64;
             }
         }
@@ -230,8 +230,8 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
         mesh_nodes: mean(mesh_nodes),
         generation: mean(generation),
         wired_sinks: mean(wired_sinks),
-        ring_groups: mean(groups),
-        ring_group_members: (groups > 0).then(|| members as f64 / groups as f64),
+        ring_bundles: mean(bundles),
+        ring_bundle_members: (bundles > 0).then(|| members as f64 / bundles as f64),
     }
 }
 
@@ -312,8 +312,8 @@ mod tests {
                 mesh_nodes: 0.0,
                 generation: 0.0,
                 wired_sinks: 0.0,
-                ring_groups: 0.0,
-                ring_group_members: None,
+                ring_bundles: 0.0,
+                ring_bundle_members: None,
             }
         );
     }
@@ -336,16 +336,16 @@ mod tests {
                 mesh_nodes: 2.0,
                 generation: 0.0,
                 wired_sinks: 17.0,
-                ring_groups: 0.0,
-                ring_group_members: None,
+                ring_bundles: 0.0,
+                ring_bundle_members: None,
             },
             "founders carry two mesh nodes, generation zero, 6 + 11 wired sinks \
-             and no group"
+             and no bundle"
         );
     }
 
     #[test]
-    fn structure_means_count_ring_groups_and_their_members_across_the_population() {
+    fn structure_means_count_ring_bundles_and_their_members_across_the_population() {
         use v3_core::contracts::votes::DirectedVoteKind;
         use v3_core::contracts::{InputReference, WorldInputKey};
         use v3_core::genome::cgp::{EdgeSurface, Shape};
@@ -355,8 +355,8 @@ mod tests {
         cfg.world.width = 32;
         cfg.world.height = 32;
         cfg.population.initial_creatures = 4;
-        // Two groups on one creature's first graph, one of them missing a
-        // member: 2 / 4 = 0.5 groups per creature, 15 / 2 members per group.
+        // Two bundles on one creature's first graph, one of them missing a
+        // member: 2 / 4 = 0.5 bundles per creature, 15 / 2 members per bundle.
         let sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
             cfg,
             42,
@@ -375,9 +375,9 @@ mod tests {
                 let BackendDef::Graph(graph) = &mut node.backend_def else {
                     unreachable!()
                 };
-                graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+                graph.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
                 let second =
-                    graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Reproduce, 1);
+                    graph.add_ring_bundle(Shape::Ring { ring_ref }, DirectedVoteKind::Reproduce, 1);
                 let member = graph.members(second).next().unwrap();
                 assert!(matches!(member.surface, EdgeSurface::SinkInput(_)));
                 graph.remove_edge(member);
@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(sim.creatures.len(), 4);
 
         let means = structure_means(&sim);
-        assert_eq!(means.ring_groups, 0.5);
-        assert_eq!(means.ring_group_members, Some(7.5));
+        assert_eq!(means.ring_bundles, 0.5);
+        assert_eq!(means.ring_bundle_members, Some(7.5));
     }
 }

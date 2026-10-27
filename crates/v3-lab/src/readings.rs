@@ -397,7 +397,7 @@ fn shared_memory_family(previous: bool) -> Family {
 }
 
 /// Every catalog family with a consumer, and the node indices holding one.
-/// A consumer is an `InputLeaf` edge (group members included) or `ReadInput`
+/// A consumer is an `InputLeaf` edge (bundle members included) or `ReadInput`
 /// instruction whose in-range `ref_idx` names a reference of the family, a
 /// `SharedMemory` source or a `LoadSlot*` instruction. No liveness filter.
 #[must_use]
@@ -589,7 +589,7 @@ pub fn ablation_supported(genome: &CreatureGenome) -> bool {
 }
 
 /// Hand every input-reference index of `backend` (`InputLeaf` edges and
-/// `ReadInput` instructions) to `visit`. A group's shape reference is not an
+/// `ReadInput` instructions) to `visit`. A bundle's shape reference is not an
 /// edge and keeps its index; see [`ablate`].
 fn for_each_ref_idx(backend: &mut BackendDef, mut visit: impl FnMut(&mut u16)) {
     match backend {
@@ -613,9 +613,9 @@ fn for_each_ref_idx(backend: &mut BackendDef, mut visit: impl FnMut(&mut u16)) {
 /// backends resolve to 0.0. Each distinct ablated index gets its own
 /// sentinel (from [`ABLATED_REF`] down, skipping indices the node already
 /// uses), so the distinct consumed indices `functional_complexity` counts,
-/// and with them every charge, are unchanged. A group member is such an edge:
+/// and with them every charge, are unchanged. A bundle member is such an edge:
 /// it reads 0.0 and keeps its genomic weight, which resolves from its
-/// group's ring reference, never its own (T25.F03). `None` when the rewrite
+/// bundle's ring reference, never its own (T25.F03). `None` when the rewrite
 /// is unsound: a node without the headroom.
 #[must_use]
 pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome> {

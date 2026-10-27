@@ -29,7 +29,7 @@ use crate::simulation::tick::advance_shared_memory;
 use proptest::prelude::*;
 
 mod boundaries;
-mod group;
+mod bundle;
 mod lifecycle;
 mod offspring;
 mod recruitment;

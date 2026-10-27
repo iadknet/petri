@@ -3,4 +3,4 @@
 /**
  * A birth coordinate on a direction sink.
  */
-export type GroupCoordinate = { field: number; direction: number; present: boolean };
+export type BundleCoordinate = { field: number; direction: number; present: boolean };

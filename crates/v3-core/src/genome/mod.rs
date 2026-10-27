@@ -204,7 +204,7 @@ impl PlasticityConfig {
 }
 
 /// Whether a learned-weight retention (a [`PlasticityConfig`]'s or a
-/// group's) decays: below 1, compared exactly so that 1 is an exact no-op
+/// bundle's) decays: below 1, compared exactly so that 1 is an exact no-op
 /// (T25.F09 invariant 3).
 #[inline]
 #[must_use]
@@ -279,7 +279,7 @@ impl CreatureGenome {
     ///
     /// Counts every mesh node, input ref, route target, VM instruction and
     /// constant, graph compute node, compute edge and sink edge with no
-    /// membership, plus one unit per edge-group record (T25.F03, T25.F10):
+    /// membership, plus one unit per edge-bundle record (T25.F03, T25.F10):
     /// a gene costs one unit and its members of either role nothing,
     /// whatever their corrections, learning configuration, scope or
     /// retention (the genomic bottleneck, an explicit economic discount); a
@@ -315,7 +315,7 @@ impl CreatureGenome {
                             .count() as u32;
                     }
                     // One unit per gene (T25.F03, T25.F10).
-                    score += graph.groups().len() as u32;
+                    score += graph.bundles().len() as u32;
                 }
             }
         }
@@ -334,8 +334,8 @@ impl CreatureGenome {
 }
 
 #[cfg(test)]
-#[path = "tests/group_tests.rs"]
-mod group_tests;
+#[path = "tests/bundle_tests.rs"]
+mod bundle_tests;
 
 #[cfg(test)]
 #[path = "tests/size_tests.rs"]

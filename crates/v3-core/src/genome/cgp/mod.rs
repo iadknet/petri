@@ -9,21 +9,21 @@ use crate::contracts::votes::{
 };
 use crate::contracts::MAX_GATE_SLOTS;
 
+mod bundle;
 mod container;
 mod edge;
-mod group;
 #[cfg(test)]
 pub(crate) mod test_support;
 
+pub use bundle::{
+    compose, detach, pair_birth_members, pair_relative, plans, ring_birth_members, ring_offset,
+    BirthCoordinate, Bundle, BundleBirth, BundleId, BundleSource, Shape, Site, Wiring,
+};
 pub use container::{
-    validate_graph, BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList, EdgeMut,
-    EdgeOccurrence, EdgeSurface, GraphInvariantViolation, GroupMut, OutputSink, OutputSinks,
+    validate_graph, BirthSeeds, BundleMut, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList,
+    EdgeMut, EdgeOccurrence, EdgeSurface, GraphInvariantViolation, OutputSink, OutputSinks,
 };
 pub use edge::{GraphEdge, GraphSource, Membership, Scope};
-pub use group::{
-    compose, detach, pair_birth_members, pair_relative, plans, ring_birth_members, ring_offset,
-    BirthCoordinate, BundleBirth, BundleSource, Group, GroupId, MemberSite, Shape, Wiring,
-};
 
 // ── Compute layer ───────────────────────────────────────────────────────────
 

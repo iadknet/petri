@@ -96,7 +96,7 @@ pub mod nearby_idx {
 
 /// One `(x, y)` offset a world family senses toward a thing, and the thing's
 /// plain facts (amount, distance, presence): what a `DirectionPair` edge
-/// group reads and recruitment's pair case wires (T25.F04). Field indices of
+/// bundle reads and recruitment's pair case wires (T25.F04). Field indices of
 /// the family's compound layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct DirectionPair {
@@ -282,7 +282,7 @@ impl WorldInputKey {
     }
 
     /// Whether this is one of the three neighbor rings: width 8, sub-value `c`
-    /// the neighbor in `Direction::ALL[c]` (the shape `Ring` edge groups read).
+    /// the neighbor in `Direction::ALL[c]` (the shape `Ring` edge bundles read).
     #[must_use]
     pub const fn is_neighbor_ring(self) -> bool {
         matches!(
@@ -461,7 +461,7 @@ pub enum InputReference {
 }
 
 impl InputReference {
-    /// Whether this reference is a neighbor ring a `Ring` edge group can read
+    /// Whether this reference is a neighbor ring a `Ring` edge bundle can read
     /// (T25.F03): `World` of one of [`WorldInputKey::is_neighbor_ring`].
     #[must_use]
     pub const fn is_ring(&self) -> bool {
