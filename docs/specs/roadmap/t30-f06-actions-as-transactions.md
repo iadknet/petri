@@ -1,6 +1,6 @@
 # T30.F06 — Actions as Transactions
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F06
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -211,7 +211,7 @@ Pass 2 (the one applied result and the records derived from it):
 - [x] `ActionLogEntry.outcome`; the wire enum, entry and `From`; generated
       files rewritten with `PETRI_WRITE_TS_TYPES=1`; frontend readers on
       `outcome`; diagnostics keys (R5; invariant 8).
-- [ ] At closure: the G18, G19 and G22 rows deleted; the gate summary
+- [x] At closure: the G18, G19 and G22 rows deleted; the gate summary
       recorded.
 
 ## Verification
@@ -224,7 +224,7 @@ Pass 2 (the one applied result and the records derived from it):
       check pass.
 - [x] `applied_trajectory` state-only digests (no log bytes) equal at
       `18342fef^` and after, pinned: `4830c71f...` / `00a1b0bb...`.
-- [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
+- [x] `make check` -> exit 0 at tested ffc5b1cc; `make rust-test-slow` ->
       exit 0.
 - [x] Gate after pass 1 (readings only) and after pass 2 (summary at
       `docs/progress/features/t30-f06.json`, raw hash and byte counts, series
@@ -259,20 +259,20 @@ re-pinned.
 
 ## Success Criteria
 
-- [ ] `contracts/actions.rs` holds `ActionOutcome` and `ActionResult`;
+- [x] `contracts/actions.rs` holds `ActionOutcome` and `ActionResult`;
       `simulation/actions/transaction.rs` and `simulation/tick/actions.rs`
       exist with the contents of invariants 2 and 4; `creature::action_log::ActionResult`,
       `TransferOutcome` and `CreatureState::move_effort` do not.
-- [ ] No file under `simulation/actions/` imports `Simulation` except the
+- [x] No file under `simulation/actions/` imports `Simulation` except the
       birth path of invariant 7, and no action-resolution code there writes
       a `SimStats` field; the birth helpers keep their lifecycle bookings.
-- [ ] The wire enum pins to `contracts::ActionOutcome::ALL`; the generated
+- [x] The wire enum pins to `contracts::ActionOutcome::ALL`; the generated
       files match the generator test.
-- [ ] The tests of the Verification section pass; `make check` and
+- [x] The tests of the Verification section pass; `make check` and
       `make rust-test-slow` exit 0.
-- [ ] Both gates' `deterministic` values and work counters equal the
+- [x] Both gates' `deterministic` values and work counters equal the
       reference's.
-- [ ] `docs/architecture.md` section 5 no longer lists G18, G19 or G22.
+- [x] `docs/architecture.md` section 5 no longer lists G18, G19 or G22.
 
 ## Notes for AI Agents
 
@@ -286,11 +286,12 @@ re-pinned.
   so the log and the wire gain `NothingToTake`, `NothingToGive` and
   `LitterTooSmall` for the cases the log classed `NoVictim` and
   `EnergyConstraints`; every exported run-total key is unchanged.
-- Decision: the sampled `applied_trajectory` digests hash the log text and
-  follow its vocabulary; state-only digests pinned beside them enforce the
-  unchanged histories; no test maps the new vocabulary to the old.
+- Decision: `applied_trajectory`'s log-text digests follow the new
+  vocabulary; pinned state-only digests enforce unchanged histories.
 - Exception: `osv-scanner.toml` ignores GHSA-qwgh-2vcv-g2f7 (block-buffer
   0.10.4, no fix) until 2027-01-26 (7053017d), user-reviewed
   2026-10-26; answers the correctness P1.
 - Deferred: audit R8, the birth path on `&mut Simulation`, is paid by
   T29.F01 (G4); the `WORKAROUND(G4)` comments mark both sites.
+- Cost: no /usage; 4 passes, advisor 2 each; 4 resumes; 2 rounds,
+  ready; review 2 P1/0/1 P2.

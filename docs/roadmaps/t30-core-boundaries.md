@@ -30,7 +30,7 @@ behavior.
   - Goal: Worlds are configured, painted and stocked with food exactly as before, by layers that build on each other in one direction, with no behavior change.
 - [ ] **T30.F05 — Genome Owns Its Analysis** — Depends on: None
   - Goal: Offspring mutate exactly as before, with every random choice drawn by mutation and every structural fact read from the genome's own analysis, with no behavior change.
-- [ ] **T30.F06 — Actions as Transactions** — Depends on: None
+- [x] **T30.F06 — Actions as Transactions** — Depends on: None
   - Goal: Creatures act exactly as before, each action resolved as one transaction whose single outcome the creature's history, its learning reward and the run's totals all read, with no behavior change.
 - [x] **T30.F07 — The Genome Stands on Its Own** — Depends on: None
   - Goal: Offspring inherit and brains run exactly as before, with the genome a domain of its own beside the creature record rather than inside it, with no behavior change.
