@@ -2569,7 +2569,7 @@ async fn get_creature_exclude_omits_fields() {
 }
 
 #[tokio::test]
-async fn get_creature_brain_annotations_use_the_records_reachable_nodes() {
+async fn get_creature_brain_annotates_every_node_unreachable_when_none_is_reachable() {
     let state = test_state();
     let creature_id = {
         let mut handle = state.sim.lock().await;
@@ -2603,7 +2603,7 @@ async fn get_creature_brain_annotations_use_the_records_reachable_nodes() {
         nodes
             .iter()
             .all(|node| node["annotation"]["reachable"].as_bool() == Some(false)),
-        "handler should trust cached reachable indices, body: {body}"
+        "every node should be annotated unreachable when the record reaches none, body: {body}"
     );
 }
 
