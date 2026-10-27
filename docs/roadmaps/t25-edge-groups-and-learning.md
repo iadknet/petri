@@ -176,6 +176,12 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   [sensor wiring note](../strategy/group-creation-unification-2026-10-22.md).
   Verification: viability first, gate + goal; slow tests run; no goal-long
   (T25's allowance is spent).
+- Decided (user, 2026-10-27, "B"): in F11 the `ActionQueue` input width
+  follows `max_actions_per_turn` (`3 ×` the normalized value, bounded by the
+  `u16` address space) instead of staying a constant, reversing T19.F06's
+  constant-width premise, after the Codex rounds upheld that a static width
+  leaves queue slots unaddressable; the queue size reaches every width
+  reader through a `SensorContext`, and no config cap is added.
 - Decided (user, 2026-10-22): F12 follows F11, after the user asked whether
   sensors, sinks, edges and bundles keep clean layers around learning. The
   [bundle learning note](../strategy/bundle-learning-ownership-2026-10-22.md)
