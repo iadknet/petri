@@ -198,7 +198,7 @@ Pass 1 (executors with narrow inputs and the cost composition):
       `WORKAROUND(G4)` comments).
 - [x] `simulation/tick/actions.rs` with the loop, the log push and the
       settlement; `tick.rs` without the executors (R1; invariant 4).
-- [ ] Gate run; `deterministic` values and work counters equal.
+- [x] Gate run; `deterministic` values and work counters equal.
 
 Pass 2 (the one applied result and the records derived from it):
 
@@ -226,7 +226,7 @@ Pass 2 (the one applied result and the records derived from it):
       `18342fef^` and after, pinned: `4830c71f...` / `00a1b0bb...`.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0.
-- [ ] Gate after pass 1 (readings only) and after pass 2 (summary at
+- [x] Gate after pass 1 (readings only) and after pass 2 (summary at
       `docs/progress/features/t30-f06.json`, raw hash and byte counts, series
       entry, no raw staged); every `deterministic` value and work counter
       equal in both. Goal: `Not run: Verification Plan`.
@@ -243,7 +243,16 @@ identical after each pass; wall clock neutral within the gate's noise, a
 regression attributed before closure. No indicator can move; nothing is
 re-pinned.
 
-**Measured verdict.** Pending.
+**Measured verdict.**
+
+| Reading | Value |
+| --- | --- |
+| Gate | exit 0, severe `false` |
+| Wall clock | flag, unattributed |
+| Work counters vs t30-f07 | 0.000000% each |
+| Wall clock ms/creature-tick | 0.004129 vs 0.002409 (+71.40%, flag) |
+| `deterministic`, nine counters | equal to t30-f07 |
+| Raw | 134,962 bytes, sha256 `ac344487...ef385` |
 
 - Summary: [gate](../../progress/features/t30-f06.json).
 - Readings: [`t30-f06.md`](../../progress/readings/t30-f06.md).
