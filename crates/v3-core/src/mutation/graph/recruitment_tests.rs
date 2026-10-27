@@ -1,13 +1,16 @@
 use super::*;
 use crate::config::NeutralInputRecruitment as Arm;
+use crate::contracts::votes::{VoteSink, VOTE_SINK_COUNT};
 use crate::contracts::NodeId;
 use crate::genome::cgp::test_support::{edit_sinks, push_sink};
 use crate::genome::cgp::{EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind};
-use crate::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::genome::NodeGenome;
 use crate::mutation::input_ref::input_reference_universe;
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+/// The default run's sensor context at two food types.
+static CTX2: SensorContext = SensorContext::new(2, 10);
 
 fn node() -> NodeGenome {
     NodeGenome {
@@ -37,7 +40,12 @@ fn recruitment_off_rejects_an_eligible_vote_sink_without_editing() {
     let mut fixture = node();
     let before = fixture.clone();
 
-    let result = recruit(&mut fixture, Arm::Off, 2, &mut SmallRng::seed_from_u64(0));
+    let result = recruit(
+        &mut fixture,
+        Arm::Off,
+        &CTX2,
+        &mut SmallRng::seed_from_u64(0),
+    );
 
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
     assert_eq!(fixture, before);
@@ -45,15 +53,15 @@ fn recruitment_off_rejects_an_eligible_vote_sink_without_editing() {
 
 #[test]
 fn every_legal_reference_and_memory_bank_has_canonical_access() {
-    for reference in input_reference_universe(2) {
+    for reference in input_reference_universe(&crate::config::test_sensor_context(2)) {
         let width = if reference == InputReference::ActionQueue {
             65536u32
         } else {
-            u32::from(crate::mutation::compound::sub_value_count(&reference))
+            SensorDescriptor::of(&reference, &CTX2).width()
         };
         let family = SourceFamily::Input(reference.clone());
         let fixture = node();
-        let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+        let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
         for channel in 0..width {
             let plan = admission
                 .plan(&family, Arm::SingleChannel, u16::try_from(channel).unwrap())
@@ -81,7 +89,7 @@ fn every_legal_reference_and_memory_bank_has_canonical_access() {
         }
     }
     let fixture = node();
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     let upstream = admission
         .plan(&SourceFamily::Upstream, Arm::WholeFamily, 0)
         .unwrap();
@@ -105,7 +113,7 @@ fn every_legal_reference_and_memory_bank_has_canonical_access() {
         );
     }
     assert!(!admission
-        .families(Arm::WholeFamily, 2)
+        .families(Arm::WholeFamily)
         .contains(&SourceFamily::Input(InputReference::ActionQueue)));
 }
 
@@ -113,7 +121,7 @@ fn every_legal_reference_and_memory_bank_has_canonical_access() {
 fn reference_capacity_and_dangling_incumbents_are_preflighted() {
     let mut fixture = node();
     fixture.input_refs = vec![InputReference::ActionVotes; 65536];
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(
             &SourceFamily::Input(InputReference::ActionVotes),
@@ -133,7 +141,7 @@ fn reference_capacity_and_dangling_incumbents_are_preflighted() {
         .is_some());
     fixture.input_refs = vec![InputReference::ActionVotes; 65513];
     let before = fixture.clone();
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(&SourceFamily::Upstream, Arm::WholeFamily, 0)
         .is_none());
@@ -149,7 +157,7 @@ fn reference_capacity_and_dangling_incumbents_are_preflighted() {
             3.0,
         ),
     );
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(
             &SourceFamily::Input(InputReference::ActionVotes),
@@ -161,7 +169,7 @@ fn reference_capacity_and_dangling_incumbents_are_preflighted() {
         .plan(&SourceFamily::Upstream, Arm::WholeFamily, 0)
         .is_none());
     fixture.input_refs.push(InputReference::ActionVotes);
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(
             &SourceFamily::Input(InputReference::PreviousPassVotes),
@@ -212,7 +220,7 @@ proptest! {
         edit_sinks(graph_mut(&mut fixture), |sinks| sinks[64].inputs = vec![GraphEdge::new(GraphSource::SharedMemory { slot: 3, previous: true }, weight); 2]);
         let before = fixture.clone();
         let arm = if whole { Arm::WholeFamily } else { Arm::SingleChannel };
-        recruit(&mut fixture, arm, 2, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        recruit(&mut fixture, arm, &CTX2, &mut SmallRng::seed_from_u64(seed)).unwrap();
         prop_assert_eq!(&fixture.input_refs[..declarations], &before.input_refs);
         prop_assert!(fixture.input_refs.len() - declarations <= 24);
         let before_graph = graph(&before);
@@ -270,7 +278,7 @@ proptest! {
         if full { fixture.input_refs = vec![InputReference::ActionVotes; 65537]; }
         else { graph_mut(&mut fixture).push_edge(EdgeSurface::SinkInput(0), GraphEdge::new(GraphSource::InputLeaf { ref_idx: 0, sub_idx: 0 }, 1.0)); }
         let before = fixture.input_refs.clone();
-        recruit(&mut fixture, if whole { Arm::WholeFamily } else { Arm::SingleChannel }, 2, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        recruit(&mut fixture, if whole { Arm::WholeFamily } else { Arm::SingleChannel }, &CTX2, &mut SmallRng::seed_from_u64(seed)).unwrap();
         prop_assert_eq!(&fixture.input_refs, &before);
     }
 }
@@ -278,13 +286,13 @@ proptest! {
 #[test]
 fn admissible_sampling_pool_contains_all_declared_families_and_channels() {
     let fixture = node();
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
-    let single = admission.families(Arm::SingleChannel, 2);
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
+    let single = admission.families(Arm::SingleChannel);
     // The three own-colour keys join both universes (T27.F01).
     assert_eq!(single.len(), 51);
-    let whole = admission.families(Arm::WholeFamily, 2);
+    let whole = admission.families(Arm::WholeFamily);
     assert_eq!(whole.len(), 27);
-    for reference in input_reference_universe(2) {
+    for reference in input_reference_universe(&crate::config::test_sensor_context(2)) {
         assert!(single.contains(&SourceFamily::Input(reference.clone())));
         if !matches!(
             reference,
@@ -407,8 +415,8 @@ proptest! {
 
 #[test]
 fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::{GroupId, Shape};
-    use crate::genome::vote::DirectedVoteKind;
     let ring = InputReference::World(crate::contracts::WorldInputKey::NeighborBarrierRing);
     let family = SourceFamily::Input(ring.clone());
     // SingleChannel: channel 5 into Move(3) is offset (3 - 5) mod 8 = 6.
@@ -467,11 +475,11 @@ fn a_ring_on_a_directed_sink_becomes_one_silent_group() {
 
 #[test]
 fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::Shape;
-    use crate::genome::vote::DirectedVoteKind;
     let mut fixture = node();
     graph_mut(&mut fixture).add_group(Shape::Ring { ring_ref: 0 }, DirectedVoteKind::Move, 0);
-    let admission = Admission::new(&fixture.input_refs, graph(&fixture));
+    let admission = Admission::new(&fixture.input_refs, graph(&fixture), &CTX2);
     assert!(admission
         .plan(
             &SourceFamily::Input(InputReference::ActionVotes),
@@ -491,7 +499,7 @@ fn a_dangling_member_reference_bounds_admission_like_a_dangling_leaf() {
 fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
         let full = node();
-        let hosting = Admission::new(&full.input_refs, graph(&full)).families(arm, 2);
+        let hosting = Admission::new(&full.input_refs, graph(&full), &CTX2).families(arm);
         assert!(graph(&full).can_host_group());
         let mut partial = node();
         edit_sinks(graph_mut(&mut partial), |sinks| {
@@ -504,7 +512,7 @@ fn ring_families_leave_the_universe_when_no_group_can_be_hosted() {
             });
         });
         assert!(!graph(&partial).can_host_group());
-        let without = Admission::new(&partial.input_refs, graph(&partial)).families(arm, 2);
+        let without = Admission::new(&partial.input_refs, graph(&partial), &CTX2).families(arm);
         let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
         // Under WholeFamily the pair case's preflight drops pair-declaring
         // families too (T25.F04, `pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive`).
@@ -537,7 +545,7 @@ fn nearby() -> InputReference {
 /// The edges of `kind`'s drive sink.
 fn drive_edges(
     def: &CgpGraphBackendDef,
-    kind: crate::genome::vote::DirectedVoteKind,
+    kind: crate::contracts::votes::DirectedVoteKind,
 ) -> Vec<GraphEdge> {
     def.sink(OutputSinkKind::ActionVote(kind.drive()))
         .unwrap()
@@ -547,8 +555,8 @@ fn drive_edges(
 
 #[test]
 fn a_pair_family_on_a_directed_sink_becomes_one_gene_with_its_facts_on_the_drive() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::{GroupId, Membership, Scope, Shape};
-    use crate::genome::vote::DirectedVoteKind;
     for (reference, pair, facts) in [
         (area_food(), 1u8, vec![0u16, 5, 6]),
         (nearby(), 2, vec![20, 23, 24, 25, 26, 27, 28, 29]),
@@ -692,18 +700,18 @@ fn a_slot_family_on_an_undirected_destination_wires_one_slot() {
 /// landing anywhere (T25.F05), one pair `gen_range(0..pairs)`; nothing after.
 #[test]
 fn the_pair_case_draws_family_then_destination_then_pair() {
-    use crate::genome::vote::DirectedVoteKind;
+    use crate::contracts::votes::DirectedVoteKind;
     let mut paired = 0;
     let mut undirected_slots = 0;
     for seed in 0..512 {
         let mut fixture = node();
         let mut rng = SmallRng::seed_from_u64(seed);
-        recruit(&mut fixture, Arm::WholeFamily, 2, &mut rng).unwrap();
+        recruit(&mut fixture, Arm::WholeFamily, &CTX2, &mut rng).unwrap();
 
         let mut replay = SmallRng::seed_from_u64(seed);
         let base = node();
-        let admission = Admission::new(&base.input_refs, graph(&base));
-        let families = admission.families(Arm::WholeFamily, 2);
+        let admission = Admission::new(&base.input_refs, graph(&base), &CTX2);
+        let families = admission.families(Arm::WholeFamily);
         let family = families.choose(&mut replay).unwrap().clone();
         let sites = destinations(graph(&base));
         let destination = *sites.choose(&mut replay).unwrap();
@@ -743,7 +751,7 @@ fn the_pair_case_draws_family_then_destination_then_pair() {
 fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
     let nearby_family = SourceFamily::Input(nearby());
     assert_eq!(
-        input_reference_universe(2)
+        input_reference_universe(&crate::config::test_sensor_context(2))
             .iter()
             .filter(|reference| **reference == nearby())
             .count(),
@@ -751,7 +759,7 @@ fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
     );
     let full = node();
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
-        let families = Admission::new(&full.input_refs, graph(&full)).families(arm, 2);
+        let families = Admission::new(&full.input_refs, graph(&full), &CTX2).families(arm);
         assert_eq!(
             families.iter().filter(|f| **f == nearby_family).count(),
             3,
@@ -774,10 +782,10 @@ fn the_merged_family_is_three_entries_of_the_recruitment_universe() {
 /// group table alike (T25.F05).
 #[test]
 fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
-    use crate::genome::vote::DirectedVoteKind;
+    use crate::contracts::votes::DirectedVoteKind;
     let declares = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if !reference.direction_pairs().is_empty());
     let full = node();
-    let hosting = Admission::new(&full.input_refs, graph(&full)).families(Arm::WholeFamily, 2);
+    let hosting = Admission::new(&full.input_refs, graph(&full), &CTX2).families(Arm::WholeFamily);
     assert!(hosting.iter().any(declares));
     let no_direction = {
         let mut partial = node();
@@ -796,8 +804,8 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
         });
         assert!(graph(&no_drive).can_host_group());
         for fixture in [&no_drive, &no_direction] {
-            let whole =
-                Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::WholeFamily, 2);
+            let whole = Admission::new(&fixture.input_refs, graph(fixture), &CTX2)
+                .families(Arm::WholeFamily);
             assert!(!whole.iter().any(declares), "{kind:?}");
             let others: Vec<_> = hosting
                 .iter()
@@ -809,8 +817,8 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
                 .cloned()
                 .collect();
             assert_eq!(whole, others);
-            let single =
-                Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::SingleChannel, 2);
+            let single = Admission::new(&fixture.input_refs, graph(fixture), &CTX2)
+                .families(Arm::SingleChannel);
             assert!(single.iter().any(declares));
         }
     }
@@ -820,11 +828,11 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
     let nearby_family = SourceFamily::Input(nearby());
     for fixture in [&no_direction, &exhausted] {
         let whole =
-            Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::WholeFamily, 2);
+            Admission::new(&fixture.input_refs, graph(fixture), &CTX2).families(Arm::WholeFamily);
         assert!(!whole.contains(&nearby_family), "no merged entry remains");
         assert!(!whole.iter().any(declares));
         let single =
-            Admission::new(&fixture.input_refs, graph(fixture)).families(Arm::SingleChannel, 2);
+            Admission::new(&fixture.input_refs, graph(fixture), &CTX2).families(Arm::SingleChannel);
         assert_eq!(single.iter().filter(|f| **f == nearby_family).count(), 3);
     }
 }
@@ -834,7 +842,7 @@ fn pair_families_leave_the_whole_family_universe_without_a_host_or_a_drive() {
 /// included.
 #[test]
 fn ring_admission_is_unchanged_by_the_pair_case() {
-    use crate::genome::vote::DirectedVoteKind;
+    use crate::contracts::votes::DirectedVoteKind;
     let is_ring = |family: &SourceFamily| matches!(family, SourceFamily::Input(reference) if reference.is_ring());
     for arm in [Arm::SingleChannel, Arm::WholeFamily] {
         let mut no_drive = node();
@@ -843,7 +851,7 @@ fn ring_admission_is_unchanged_by_the_pair_case() {
                 sink.kind != OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive())
             });
         });
-        let families = Admission::new(&no_drive.input_refs, graph(&no_drive)).families(arm, 2);
+        let families = Admission::new(&no_drive.input_refs, graph(&no_drive), &CTX2).families(arm);
         assert_eq!(families.iter().filter(|f| is_ring(f)).count(), 4, "{arm:?}");
     }
 }

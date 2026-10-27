@@ -46,6 +46,8 @@ use common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
 use proptest::prelude::*;
 use slotmap::SlotMap;
 use v3_core::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
+use v3_core::contracts::votes::VoteSink;
+use v3_core::contracts::OutcomeChannel;
 use v3_core::contracts::{
     CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
     WorldAction, WorldInputKey,
@@ -54,10 +56,9 @@ use v3_core::creature::state::CreatureState;
 use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use v3_core::genome::vote::VoteSink;
 use v3_core::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    VmBackendDef, VmInstruction,
 };
 use v3_core::kernel::WorldState;
 use v3_core::runtime::mesh::execute_creature_mesh;

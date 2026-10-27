@@ -6,12 +6,12 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     validate_graph, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, GroupId, Scope,
     Shape,
 };
-use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
 use crate::mutation::graph::hebbian::{
     disable_retention_in_def, draw_retention, enable_retention_in_def, mutate_retention_in_def,
@@ -155,7 +155,14 @@ fn the_retention_operators_apply_exactly_where_their_predicate_admits() {
         };
         RETENTION_OPERATORS
             .iter()
-            .map(|&op| !GraphMutator::applicable_indices(&genome, op).is_empty())
+            .map(|&op| {
+                !GraphMutator::applicable_indices(
+                    &genome,
+                    op,
+                    &crate::config::test_sensor_context(1),
+                )
+                .is_empty()
+            })
             .collect()
     };
     // No plastic edge decays; the group retains: enable only.
@@ -368,7 +375,7 @@ fn the_dispatch_reports_edge_scopes_and_keeps_the_graph_valid() {
                 0,
                 &mut rng(seed),
                 &MutationConfig::default(),
-                1,
+                &crate::config::test_sensor_context(1),
             )
             .unwrap();
             let edge_layer = matches!(

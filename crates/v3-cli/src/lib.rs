@@ -346,9 +346,9 @@ mod tests {
 
     #[test]
     fn structure_means_count_ring_groups_and_their_members_across_the_population() {
+        use v3_core::contracts::votes::DirectedVoteKind;
         use v3_core::contracts::{InputReference, WorldInputKey};
         use v3_core::genome::cgp::{EdgeSurface, Shape};
-        use v3_core::genome::vote::DirectedVoteKind;
         use v3_core::genome::BackendDef;
 
         let mut cfg = SimulationConfig::default();

@@ -1,11 +1,11 @@
 use rand::Rng;
 
 use super::{birth, structural::next_node_id};
-use crate::contracts::{InputReference, NodeId, RouteTarget, MAX_GATE_SLOTS};
+use crate::contracts::{InputReference, NodeId, RouteTarget, SensorContext, MAX_GATE_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::genome::CreatureGenome;
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
-use crate::mutation::graph::operators::random_graph_source;
+use crate::mutation::graph::operators::{random_graph_source, NodeInputs};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 use crate::mutation::vm::operators::insert_new_instruction_with_reference_repair;
@@ -57,6 +57,7 @@ fn gate_sink(graph: &CgpGraphBackendDef, slot: u8) -> Option<usize> {
 fn add_gate_write(
     backend: &mut BackendDef,
     input_refs: &[InputReference],
+    context: &SensorContext,
     slot: u8,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
@@ -78,7 +79,14 @@ fn add_gate_write(
         }
         BackendDef::Graph(graph) => {
             let sink = gate_sink(graph, slot).ok_or(MutationSkipReason::NoApplicableTarget)?;
-            let source = random_graph_source(graph.compute_nodes().len() as u16, input_refs, rng);
+            let source = random_graph_source(
+                graph.compute_nodes().len() as u16,
+                NodeInputs {
+                    refs: input_refs,
+                    context,
+                },
+                rng,
+            );
             graph.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(source, 1.0));
             Ok(())
         }
@@ -131,6 +139,7 @@ pub(super) fn apply_add_route_target(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
+    context: &SensorContext,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = genome
         .nodes
@@ -152,7 +161,13 @@ pub(super) fn apply_add_route_target(
     let slot = lowest_unused_slot(&genome.nodes[idx].targets)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let mut backend = genome.nodes[idx].backend_def.clone();
-    add_gate_write(&mut backend, &genome.nodes[idx].input_refs, slot, rng)?;
+    add_gate_write(
+        &mut backend,
+        &genome.nodes[idx].input_refs,
+        context,
+        slot,
+        rng,
+    )?;
     let old = genome.nodes[idx].targets[0];
     let new_id = next_node_id(genome);
     genome.nodes[idx].backend_def = backend;
@@ -246,6 +261,7 @@ pub(super) fn apply_add_feedback_route(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
+    context: &SensorContext,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let executed = targets.executed();
     let eligible: Vec<_> = (0..genome.nodes.len())
@@ -260,7 +276,7 @@ pub(super) fn apply_add_feedback_route(
     let incumbent = static_incumbent(&node.targets).expect("eligible source has an incumbent");
     let gate_bias = losing_bias(node.targets[incumbent].gate_bias);
     let mut backend = node.backend_def.clone();
-    add_gate_write(&mut backend, &node.input_refs, slot, rng)?;
+    add_gate_write(&mut backend, &node.input_refs, context, slot, rng)?;
     let candidates = feedback_destinations(genome, executed, idx);
     let target_id = candidates[rng.gen_range(0..candidates.len())];
     let node = &mut genome.nodes[idx];
@@ -459,6 +475,7 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&reachable, 1.0),
             &mut r,
+            &crate::config::test_sensor_context(1),
         );
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
 
@@ -498,6 +515,7 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&[0, 1], 1.0),
             &mut r,
+            &crate::config::test_sensor_context(1),
         );
         assert_eq!(
             result,
@@ -641,6 +659,7 @@ mod tests {
                     &mut g,
                     &mut TargetSelector::reachable_only(&reachable, 1.0),
                     &mut r,
+                    &crate::config::test_sensor_context(1),
                 )
                 .unwrap();
                 calls[2 + slot] = r.calls;
@@ -663,6 +682,7 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&reachable, 1.0),
             &mut r,
+            &crate::config::test_sensor_context(1),
         )
         .unwrap();
         assert_eq!(genome.nodes[0].targets.len(), 2);

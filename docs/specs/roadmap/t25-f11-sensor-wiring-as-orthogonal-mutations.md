@@ -145,7 +145,7 @@ mechanics change).
 
 ## Implementation Tasks
 
-- [ ] Commit 1 (seams, no pin moves): the descriptor with `UpstreamBus` and
+- [x] Commit 1 (seams, no pin moves): the descriptor with `UpstreamBus` and
       the memory-bank field sets and the `SensorContext` (`ActionQueue`
       still 12 here; the width follows the context from commit 3); `genome/vote.rs`, `OutcomeChannel` and
       `OUTPUT_SLOT_COUNT` into `contracts` with the five debt lines deleted;

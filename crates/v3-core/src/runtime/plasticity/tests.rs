@@ -1,4 +1,7 @@
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::VoteSink;
+use crate::contracts::OutcomeChannel;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
 use crate::genome::cgp::test_support::{
     plastic_node, push_sink, set_compute_inputs, set_surface_plasticity,
@@ -7,14 +10,12 @@ use crate::genome::cgp::{
     validate_graph, BirthSeeds, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence,
     EdgeSurface, GraphEdge, GraphInvariantViolation, GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::genome::vote::VoteSink;
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
 };
 use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::state::GraphRuntimeState;
-use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::MeshSideOutputs;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -968,7 +969,7 @@ fn a_sink_energy_current_edge_samples_its_evaluation_read() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     push_plastic_sink_edge(
         &mut def,
-        OutputSinkKind::ActionParam(crate::genome::vote::ActionParamField::ALL[0]),
+        OutputSinkKind::ActionParam(crate::contracts::votes::ActionParamField::ALL[0]),
         GraphEdge::new(
             GraphSource::InputLeaf {
                 ref_idx: 0,

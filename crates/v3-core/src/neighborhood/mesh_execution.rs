@@ -417,8 +417,8 @@ impl Battery {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{NodeId, RouteTarget};
-    use crate::genome::vote::DirectedVoteKind;
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::neighborhood::Battery;
     use proptest::prelude::*;
@@ -426,7 +426,7 @@ mod tests {
     /// A halting node; with `action`, it votes `Eat` 1.0 and `Decide` 1.0,
     /// so the pass that commits the `Eat` ends at it.
     fn node(id: u32, targets: &[u32], action: bool) -> NodeGenome {
-        use crate::genome::vote::VoteSink;
+        use crate::contracts::votes::VoteSink;
         NodeGenome {
             node_id: NodeId::new(id),
             input_refs: vec![],
@@ -1158,7 +1158,7 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    field_idx: crate::genome::vote::ActionParamField::StealEffort.index() as u8,
+                    field_idx: crate::contracts::votes::ActionParamField::StealEffort.index() as u8,
                     src: 0,
                 },
                 VmInstruction::LoadConst {
@@ -1166,8 +1166,11 @@ mod tests {
                     const_idx: 0,
                 },
                 VmInstruction::AddVote {
-                    sink: crate::genome::vote::VoteSink::Directed(DirectedVoteKind::StealEnergy, 0)
-                        .index() as u8,
+                    sink: crate::contracts::votes::VoteSink::Directed(
+                        DirectedVoteKind::StealEnergy,
+                        0,
+                    )
+                    .index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,

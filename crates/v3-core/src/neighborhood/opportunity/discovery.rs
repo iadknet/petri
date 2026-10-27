@@ -4,19 +4,19 @@
 //! parameter sink, the Graph cost of the authored controller, and the VM
 //! instructions a hand translation would take (counted, not run).
 
-use crate::genome::vote::DirectedVoteKind;
+use crate::contracts::votes::DirectedVoteKind;
 use std::collections::BTreeSet;
 
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::config::{MutationConfig, SimulationConfig};
-use crate::contracts::{NodeId, SHARED_MEMORY_SLOTS};
+use crate::contracts::votes::{ActionParamField, VoteSink};
+use crate::contracts::{NodeId, SensorContext, SHARED_MEMORY_SLOTS};
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::genome::analysis::{mesh_reachable_nodes, vm_backward_slice};
 use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
 use crate::genome::sensor_analysis::perception_requirements;
-use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
@@ -83,11 +83,11 @@ fn declares(node: &NodeGenome, family: Family) -> bool {
 /// the sink's own edges and the inputs of every compute node a backward walk
 /// from those sinks reaches (Graph), or the `ReadInput`s in the backward
 /// slices of `AddVote` and `WriteActionParam` (VM).
-fn vote_surface_channels(node: &NodeGenome) -> BTreeSet<Channel> {
+fn vote_surface_channels(node: &NodeGenome, context: &SensorContext) -> BTreeSet<Channel> {
     let channel = |ref_idx: u16, sub_idx: u16| {
         node.input_refs
             .get(usize::from(ref_idx))
-            .and_then(|reference| match addressed(reference, sub_idx) {
+            .and_then(|reference| match addressed(reference, sub_idx, context) {
                 Addressed::Channel(channel) => Some(channel),
                 Addressed::OutOfWidth(_) => None,
             })
@@ -196,7 +196,7 @@ fn step(
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
-                DISCOVERY_FOOD_TYPES,
+                &config.sensor_context(DISCOVERY_FOOD_TYPES),
             );
             judge(&child)
         })
@@ -242,7 +242,8 @@ pub fn discovery(
             (on_vote, elsewhere)
         },
     );
-    let authored: BTreeSet<Channel> = family.authored_channels().into_iter().collect();
+    let context = config.sensor_context(DISCOVERY_FOOD_TYPES);
+    let authored: BTreeSet<Channel> = family.authored_channels(&context).into_iter().collect();
     let family_key = CatalogFamily::of(&family.reference());
     let parent = intermediate(founder, family);
     let connect = step(
@@ -253,7 +254,7 @@ pub fn discovery(
         proposals,
         |child| {
             let channels = vote_node(child, vote_id)
-                .map(vote_surface_channels)
+                .map(|node| vote_surface_channels(node, &context))
                 .unwrap_or_default();
             (
                 channels.iter().any(|channel| authored.contains(channel)),
@@ -540,9 +541,9 @@ pub fn vm_concern(family: Family, config: &SimulationConfig, after_steps: u32) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, NodeId, WorldInputKey};
     use crate::genome::cgp::Shape;
-    use crate::genome::vote::DirectedVoteKind;
 
     /// A group's members are vote edges (T25.F03): every channel of the ring
     /// a member reads is on the node's vote surface.
@@ -567,10 +568,15 @@ mod tests {
             backend_def: BackendDef::Graph(def),
             targets: Vec::new(),
         };
-        let surface = vote_surface_channels(&node);
+        let surface = vote_surface_channels(
+            &node,
+            &crate::config::test_sensor_context(DISCOVERY_FOOD_TYPES),
+        );
         assert_eq!(surface.len(), 7);
         for channel in 0..8u16 {
-            let Addressed::Channel(addressed) = addressed(&ring, channel) else {
+            let Addressed::Channel(addressed) =
+                addressed(&ring, channel, &crate::config::test_sensor_context(1))
+            else {
                 panic!("a ring channel is in width")
             };
             assert_eq!(
@@ -595,9 +601,14 @@ mod tests {
             backend_def: BackendDef::Graph(def),
             targets: Vec::new(),
         };
-        let surface = vote_surface_channels(&node);
+        let surface = vote_surface_channels(
+            &node,
+            &crate::config::test_sensor_context(DISCOVERY_FOOD_TYPES),
+        );
         for field in 0..area_width(&area) {
-            let Addressed::Channel(addressed) = addressed(&area, field) else {
+            let Addressed::Channel(addressed) =
+                addressed(&area, field, &crate::config::test_sensor_context(1))
+            else {
                 panic!("a summary field is in width")
             };
             assert_eq!(

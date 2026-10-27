@@ -12,7 +12,7 @@ pub mod types;
 pub mod vm;
 pub mod vote_select;
 pub use mesh::execute_creature_mesh;
-pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
+pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs};
 
 #[cfg(test)]
 mod cycle_tests;

@@ -11,12 +11,12 @@
 //! `Move` and `Reproduce` sinks, and `Terminate`, so the pass loop commits
 //! exactly the queue the VM decision node emitted before votes existed.
 
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{ActionParamField, VoteSink};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSinkKind,
 };
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{ActionParamField, VoteSink};
 
 /// The founder's age gate on the unit scale the brain reads `AgeTicks` on:
 /// `(min_reproduce_age - 0.5) / age_reference_ticks`. Threshold uses strict

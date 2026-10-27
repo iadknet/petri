@@ -193,13 +193,13 @@ fn lineage_match_exists(predicate: impl Fn(&CreatureGenome) -> bool) -> bool {
 
         for _generation in 1..=SEARCH_GENERATIONS {
             let reachable_nodes = mesh_reachable_nodes(&genome);
-            MutationEngine::apply_mutations_with_food_type_count(
+            MutationEngine::apply_mutations_in(
                 &mut genome,
                 &config,
                 &reachable_nodes,
                 ParentExecuted::NONE,
                 &mut rng,
-                1,
+                &v3_core::config::SimulationConfig::default().sensor_context(1),
             );
 
             if predicate(&genome) {

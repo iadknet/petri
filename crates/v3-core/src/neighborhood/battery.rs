@@ -647,14 +647,14 @@ mod drift_characterization {
             let mut rng = SmallRng::seed_from_u64(seed);
             for generation in 1..=1000 {
                 let reachable = mesh_reachable_nodes(&genome);
-                MutationEngine::apply_mutations_with_food_type_count(
+                MutationEngine::apply_mutations_in(
                     &mut genome,
                     &config.mutation,
                     &reachable,
                     // Historical pre-T11.F17 characterization: no executed layer.
                     ParentExecuted::NONE,
                     &mut rng,
-                    config.world.food.types.len(),
+                    &crate::config::test_sensor_context(config.world.food.types.len()),
                 );
                 if let Some(index) = [50, 250, 1000].iter().position(|&g| g == generation) {
                     let mut executed = BTreeSet::new();

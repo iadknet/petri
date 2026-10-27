@@ -1,114 +1,69 @@
-use std::collections::BTreeSet;
-
 use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
-use crate::contracts::{InputReference, WorldInputKey};
+use crate::contracts::votes::{VoteSink, VOTE_SINK_COUNT};
+use crate::contracts::{
+    InputReference, SensorContext, SensorDescriptor, WorldInputKey, OUTPUT_SLOT_COUNT,
+};
 use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
-use crate::genome::vote::{VoteSink, VOTE_SINK_COUNT};
-use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
-use crate::mutation::compound::sub_value_count;
+use crate::genome::{input_ref_kind, BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
 use crate::mutation::types::{BirthEdgeClass, MutationSkipReason, TargetReachability};
-use crate::runtime::OUTPUT_SLOT_COUNT;
-
-/// The kind of an `input_refs` entry: its mesh read class and compound
-/// width. A `Swap` only ever replaces an entry with another member of the
-/// same kind, so a consumer keeps reading the same modality at the same
-/// width for the node's life and its copies' (T11.F22).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InputRefKind {
-    pub class: MeshReadClass,
-    pub width: u16,
-}
-
-/// The kind partition every within-kind rule reads: the operator, its
-/// applicability predicate, and the probes all call this one function.
-#[must_use]
-pub fn input_ref_kind(reference: &InputReference) -> InputRefKind {
-    InputRefKind {
-        class: classify_input_ref(reference),
-        width: sub_value_count(reference),
-    }
-}
 
 /// Every `InputReference` a genome can carry in a world with
-/// `food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
+/// `context.food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
 /// expanded over the food types and every upstream slot, deduplicated in
 /// table order (T27.F01).
-pub(crate) fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
-    sampling::bucket_references(food_type_count)
+pub(crate) fn input_reference_universe(context: &SensorContext) -> Vec<InputReference> {
+    sampling::bucket_references(context.food_type_count)
 }
 
 /// The members of `universe` that share `entry`'s kind, `entry` excluded.
 fn alternatives_in<'a>(
     universe: &'a [InputReference],
     entry: &'a InputReference,
+    context: &'a SensorContext,
 ) -> impl Iterator<Item = &'a InputReference> + 'a {
-    let kind = input_ref_kind(entry);
+    let kind = input_ref_kind(entry, context);
     universe
         .iter()
-        .filter(move |candidate| *candidate != entry && input_ref_kind(candidate) == kind)
+        .filter(move |candidate| *candidate != entry && input_ref_kind(candidate, context) == kind)
 }
 
 /// The other members of `entry`'s kind: what a `Swap` may replace it with.
-/// Empty when the entry is the only member of its kind at this food type
-/// count (every ring, summary, neighbor and queue reference, `CommitCounts`
+/// Empty when the entry is the only member of its kind under `context`
+/// (every ring, summary, neighbor and queue reference, `CommitCounts`
 /// and `PreviousOutcome`; typed food at
 /// one food type), so such an entry is not swappable.
 #[must_use]
-pub fn swap_alternatives(entry: &InputReference, food_type_count: usize) -> Vec<InputReference> {
-    alternatives_in(&input_reference_universe(food_type_count), entry)
+pub fn swap_alternatives(entry: &InputReference, context: &SensorContext) -> Vec<InputReference> {
+    alternatives_in(&input_reference_universe(context), entry, context)
         .cloned()
         .collect()
 }
 
 /// Indices of the node's swappable entries. The universe is enumerated once
 /// per node, not once per entry.
-fn swappable_indices(node: &NodeGenome, food_type_count: usize) -> Vec<usize> {
-    let universe = input_reference_universe(food_type_count);
+fn swappable_indices(node: &NodeGenome, context: &SensorContext) -> Vec<usize> {
+    let universe = input_reference_universe(context);
     node.input_refs
         .iter()
         .enumerate()
-        .filter(|(_, entry)| alternatives_in(&universe, entry).next().is_some())
+        .filter(|(_, entry)| alternatives_in(&universe, entry, context).next().is_some())
         .map(|(idx, _)| idx)
         .collect()
 }
 
-/// The `input_refs` indices some consumer on the node's backend addresses:
-/// a `GraphSource::InputLeaf` on any edge container (a group's members
-/// address its ring), or a VM `ReadInput` anywhere in the program, live or
-/// not.
-fn referenced_indices(node: &NodeGenome) -> BTreeSet<u16> {
-    match &node.backend_def {
-        BackendDef::Graph(def) => def
-            .edges()
-            .filter_map(|edge| match edge.source() {
-                GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
-                GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
-            })
-            .collect(),
-        BackendDef::Vm(vm) => vm
-            .program
-            .iter()
-            .filter_map(|instruction| match instruction {
-                VmInstruction::ReadInput { ref_idx, .. } => Some(*ref_idx),
-                _ => None,
-            })
-            .collect(),
-    }
-}
-
-/// Indices of the node's entries no consumer addresses: what a `Prune` may
-/// delete without any consumer losing its sensor.
+/// Indices of the node's entries no consumer addresses
+/// ([`NodeGenome::addressed_input_refs`]): what a `Prune` may delete
+/// without any consumer losing its sensor.
 #[must_use]
 pub fn prunable_indices(node: &NodeGenome) -> Vec<usize> {
-    let referenced = referenced_indices(node);
+    let addressed = node.addressed_input_refs();
     (0..node.input_refs.len())
-        .filter(|&idx| u16::try_from(idx).is_ok_and(|idx| !referenced.contains(&idx)))
+        .filter(|&idx| u16::try_from(idx).is_ok_and(|idx| !addressed.contains(&idx)))
         .collect()
 }
 
@@ -130,11 +85,11 @@ impl InputRefOperator {
     /// Whether the operator has a site on `node` (T13.F03 applicability
     /// predicate; the single source of truth `apply` draws from).
     #[must_use]
-    pub fn applies_to(self, node: &NodeGenome, food_type_count: usize) -> bool {
+    pub fn applies_to(self, node: &NodeGenome, context: &SensorContext) -> bool {
         match self {
             Self::Add => true,
             Self::Prune => !prunable_indices(node).is_empty(),
-            Self::Swap => !swappable_indices(node, food_type_count).is_empty(),
+            Self::Swap => !swappable_indices(node, context).is_empty(),
             Self::RawFieldMutation => node.input_refs.iter().any(is_raw_mutable),
         }
     }
@@ -203,41 +158,48 @@ impl InputRefMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
+        Self::apply_in(
+            genome,
+            op,
+            targets,
+            rng,
+            config,
+            &crate::config::SimulationConfig::default().sensor_context(1),
+        )
     }
 
-    /// Apply an input ref operator with typed-food mutation context.
-    pub fn apply_with_food_type_count(
+    /// Apply an input ref operator under the run's sensor context.
+    pub fn apply_in(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_classified(genome, op, targets, rng, config, food_type_count)
+        Self::apply_classified(genome, op, targets, rng, config, context)
             .map(|(reachability, _)| reachability)
     }
 
-    /// [`Self::apply_with_food_type_count`] with the class of the vote-sink
+    /// [`Self::apply_in`] with the class of the vote-sink
     /// edge an `Add` on a Graph node pushed (T11.F30); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
-        config: &MutationConfig,
-        food_type_count: usize,
+        _config: &MutationConfig,
+        context: &SensorContext,
     ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         if op == InputRefOperator::RawFieldMutation {
-            return apply_raw_field_mutation(genome, rng, config, food_type_count)
+            return apply_raw_field_mutation(genome, rng, context)
                 .map(|reachability| (reachability, None));
         }
-        let eligible = Self::applicable_indices(genome, op, food_type_count);
+        let eligible = Self::applicable_indices(genome, op, context);
         if eligible.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -245,9 +207,9 @@ impl InputRefMutator {
             .select(&eligible, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
         let class = if op == InputRefOperator::Add {
-            apply_add(&mut genome.nodes[node_idx], rng, food_type_count)
+            apply_add(&mut genome.nodes[node_idx], rng, context)?
         } else {
-            Self::apply_to_node(genome, op, node_idx, rng, food_type_count)?;
+            Self::apply_to_node(genome, op, node_idx, rng, context)?;
             None
         };
         Ok((reachability, class))
@@ -258,13 +220,13 @@ impl InputRefMutator {
     pub(crate) fn applicable_indices(
         genome: &CreatureGenome,
         op: InputRefOperator,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Vec<usize> {
         genome
             .nodes
             .iter()
             .enumerate()
-            .filter(|(_, node)| op.applies_to(node, food_type_count))
+            .filter(|(_, node)| op.applies_to(node, context))
             .map(|(idx, _)| idx)
             .collect()
     }
@@ -277,16 +239,13 @@ impl InputRefMutator {
         op: InputRefOperator,
         node_idx: usize,
         rng: &mut impl Rng,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<(), MutationSkipReason> {
         let node = &mut genome.nodes[node_idx];
         match op {
-            InputRefOperator::Add => {
-                apply_add(node, rng, food_type_count);
-                Ok(())
-            }
+            InputRefOperator::Add => apply_add(node, rng, context).map(|_| ()),
             InputRefOperator::Prune => apply_prune(node, rng),
-            InputRefOperator::Swap => apply_swap(node, rng, food_type_count),
+            InputRefOperator::Swap => apply_swap(node, rng, context),
             InputRefOperator::RawFieldMutation => {
                 unreachable!("RawFieldMutation is genome-wide and never node-targeted")
             }
@@ -294,7 +253,8 @@ impl InputRefMutator {
     }
 }
 
-/// Push a new input reference onto the target node.
+/// Declare a new input reference on the target node through
+/// [`NodeGenome::add_sensor`].
 ///
 /// On a VM node the reference is wired into nothing: no `ReadInput` is
 /// inserted, nothing else is drawn, and the reference becomes addressable
@@ -306,24 +266,22 @@ impl InputRefMutator {
 /// node's `ActionVote` sinks by [`connect_declared_input`], so it is live and
 /// exposed to selection at birth (`docs/reference/v3-mutation-spec.md`'s
 /// InputRef domain). Returns the class of the vote sink the born edge lands
-/// on (T11.F30).
+/// on (T11.F30). A declaration the node cannot hold skips the event after
+/// every draw.
 fn apply_add(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
-    food_type_count: usize,
-) -> Option<BirthEdgeClass> {
-    let new_ref = if food_type_count <= 1 {
-        sampling::random_input_reference(rng)
-    } else {
-        sampling::random_input_reference_for_food_types(rng, food_type_count)
-    };
-    let width = sub_value_count(&new_ref);
-    node.input_refs.push(new_ref);
-    let ref_idx = u16::try_from(node.input_refs.len() - 1).ok();
-    match &mut node.backend_def {
-        BackendDef::Graph(def) => connect_declared_input(def, ref_idx, width, rng),
+    context: &SensorContext,
+) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
+    let new_ref = sampling::random_input_reference(rng, context);
+    let width = SensorDescriptor::of(&new_ref, context).width();
+    let declared = node.add_sensor(new_ref, &[], context);
+    let class = match &mut node.backend_def {
+        BackendDef::Graph(def) => connect_declared_input(def, declared.ok(), width, rng),
         BackendDef::Vm(_) => None,
-    }
+    };
+    declared.map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+    Ok(class)
 }
 
 /// Wire the just-declared reference `ref_idx` into one `ActionVote` sink.
@@ -331,16 +289,17 @@ fn apply_add(
 /// Three draws in this order: the sub-value uniformly under `width`, the
 /// sink uniformly by index over all `VOTE_SINK_COUNT`, and the weight from
 /// `AddGraphEdge`'s new-edge law (uniform on [-1, 1]). The draws are always
-/// taken; the edge is pushed only when the index fits `u16` (`ref_idx` is
-/// `Some`) and the node carries the drawn sink, otherwise the event stays a
-/// plain declaration with the same draw stream. Returns the class of the
+/// taken; the edge is pushed only when the reference was declared (`ref_idx`
+/// is `Some`) and the node carries the drawn sink, otherwise the event stays
+/// a plain declaration with the same draw stream. Returns the class of the
 /// sink the edge was pushed onto (T11.F30), `None` when none was pushed.
 pub(crate) fn connect_declared_input(
     def: &mut CgpGraphBackendDef,
     ref_idx: Option<u16>,
-    width: u16,
+    width: u32,
     rng: &mut impl Rng,
 ) -> Option<BirthEdgeClass> {
+    let width = u16::try_from(width).expect("a declared width below u16::MAX");
     debug_assert!(
         width > 0,
         "every input reference has at least one sub-value"
@@ -359,84 +318,79 @@ pub(crate) fn connect_declared_input(
     BirthEdgeClass::of_sink(vote)
 }
 
-/// Delete one entry drawn uniformly among those no consumer addresses, then
-/// renumber the higher indices. Every consumer resolves to the same
-/// `InputReference` afterwards and none is removed or rewritten, so the
-/// event is neutral at birth.
+/// Delete one entry drawn uniformly among those no consumer addresses
+/// ([`NodeGenome::prune`] renumbers the higher indices). Every consumer
+/// resolves to the same `InputReference` afterwards and none is removed or
+/// rewritten, so the event is neutral at birth.
 fn apply_prune(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let ref_idx = *prunable_indices(node)
         .choose(rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    node.input_refs.remove(ref_idx);
-    let ref_idx = u16::try_from(ref_idx).expect("input_refs index exceeds u16");
-    node.backend_def.reindex_input_refs_after_removal(ref_idx);
-    Ok(())
+    let ref_idx = u16::try_from(ref_idx).expect("a prunable index fits u16");
+    node.prune(ref_idx)
+        .map_err(|_| MutationSkipReason::NoApplicableTarget)
 }
 
 /// Replace one entry, drawn uniformly among the node's swappable entries,
-/// with another member of its kind drawn uniformly from the others. The
-/// width is unchanged by construction, so no edge falls out of range.
+/// with another member of its kind drawn uniformly from the others
+/// ([`NodeGenome::swap`]). The width is unchanged by construction, so no
+/// edge falls out of range.
 fn apply_swap(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
-    food_type_count: usize,
+    context: &SensorContext,
 ) -> Result<(), MutationSkipReason> {
-    let ref_idx = *swappable_indices(node, food_type_count)
+    let ref_idx = *swappable_indices(node, context)
         .choose(rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let old_ref = &node.input_refs[ref_idx];
-    let new_ref = swap_alternatives(old_ref, food_type_count)
+    let new_ref = swap_alternatives(&node.input_refs[ref_idx], context)
         .choose(rng)
         .cloned()
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    debug_assert_eq!(
-        sub_value_count(&new_ref),
-        sub_value_count(old_ref),
-        "a within-kind swap keeps the width, so every edge stays in range"
-    );
-    node.input_refs[ref_idx] = new_ref;
-    Ok(())
+    let ref_idx = u16::try_from(ref_idx).map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+    node.swap(ref_idx, new_ref, context)
+        .map_err(|_| MutationSkipReason::NoApplicableTarget)
 }
 
+/// One raw-mutable entry, uniformly over the genome's table in node then
+/// index order, replaced through [`NodeGenome::swap`]: an `UpstreamSlot`
+/// by a fresh slot draw, a food-typed key by another food type.
 fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
-    _config: &MutationConfig,
-    food_type_count: usize,
+    context: &SensorContext,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    // Count eligible targets: UpstreamSlot refs + typed food world refs.
-    let total = genome
+    let sites: Vec<(usize, usize)> = genome
         .nodes
         .iter()
-        .flat_map(|node| &node.input_refs)
-        .filter(|r| is_raw_mutable(r))
-        .count();
-    if total == 0 {
+        .enumerate()
+        .flat_map(|(node_idx, node)| {
+            node.input_refs
+                .iter()
+                .enumerate()
+                .filter(|(_, reference)| is_raw_mutable(reference))
+                .map(move |(ref_idx, _)| (node_idx, ref_idx))
+        })
+        .collect();
+    if sites.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-
-    let mut pick = rng.gen_range(0..total);
-
-    for node in &mut genome.nodes {
-        for input_ref in &mut node.input_refs {
-            if matches!(input_ref, InputReference::UpstreamSlot(_)) {
-                if pick == 0 {
-                    *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT));
-                    return Ok(TargetReachability::NotApplicable);
-                }
-                pick -= 1;
-                continue;
-            }
-
-            if let Some(type_idx) = food_type_idx_mut(input_ref) {
-                if pick == 0 {
-                    *type_idx = sample_new_food_type_idx(*type_idx, food_type_count, rng);
-                    return Ok(TargetReachability::NotApplicable);
-                }
-                pick -= 1;
-            }
+    let (node_idx, ref_idx) = sites[rng.gen_range(0..sites.len())];
+    let node = &mut genome.nodes[node_idx];
+    let replacement = match &node.input_refs[ref_idx] {
+        InputReference::UpstreamSlot(_) => {
+            InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT))
         }
-    }
+        other => {
+            let mut replacement = other.clone();
+            let type_idx = food_type_idx_mut(&mut replacement).expect("a raw-mutable food key");
+            *type_idx = sample_new_food_type_idx(*type_idx, context.food_type_count, rng);
+            replacement
+        }
+    };
+    let ref_idx = u16::try_from(ref_idx).map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+    node.swap(ref_idx, replacement, context)
+        .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     Ok(TargetReachability::NotApplicable)
 }
 

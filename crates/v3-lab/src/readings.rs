@@ -765,13 +765,13 @@ fn mutants(
         .into_par_iter()
         .map(|k| {
             let mut child = elite.genome.clone();
-            MutationEngine::apply_mutations_with_food_type_count(
+            MutationEngine::apply_mutations_in(
                 &mut child,
                 &config.mutation,
                 reachable,
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut seed.rng(k),
-                config.world.food.types.len(),
+                &config.sensor_context(config.world.food.types.len()),
             );
             child
         })

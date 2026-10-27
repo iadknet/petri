@@ -20,9 +20,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::genome::cgp::{ring_offset, CgpGraphBackendDef, GraphSource, OutputSinkKind, Shape};
-use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::neighborhood::sensor_census::world_input_key_label;
 

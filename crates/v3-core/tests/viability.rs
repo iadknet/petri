@@ -659,7 +659,7 @@ fn mutation_accounting_invariant_in_viability() {
             &[],
             ParentExecuted::NONE,
             &mut rng,
-            1,
+            &v3_core::config::SimulationConfig::default().sensor_context(1),
         );
         assert_eq!(
             summary.attempted_events,
@@ -696,13 +696,13 @@ fn mutation_reachability_telemetry_accumulates() {
     for seed in 0u64..500 {
         let mut g = genome.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_in(
             &mut g,
             &cfg,
             &reachable,
             ParentExecuted::NONE,
             &mut rng,
-            1,
+            &v3_core::config::SimulationConfig::default().sensor_context(1),
         );
         total_reachable += summary.reachable_target_events;
         total_unreachable += summary.unreachable_target_events;

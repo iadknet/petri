@@ -14,13 +14,13 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     for seed in 0..256 {
         let mut genome = v3alpha1_founder_genome();
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_in(
             &mut genome,
             &config,
             &[0, 1, 2],
             ParentExecuted::NONE,
             &mut rng,
-            2,
+            &crate::config::test_sensor_context(2),
         );
         let bytes = format!(
             "{}{:?}{}",
@@ -140,7 +140,7 @@ proptest::proptest! {
         use crate::config::NeutralInputRecruitment as Arm;
         let mut config = MutationConfig { neutral_input_recruitment: if whole { Arm::WholeFamily } else { Arm::SingleChannel }, per_unit_rate: 1.0, mesh_layer_probability: 0.0, ..MutationConfig::default() };
         let mut genome = v3alpha1_founder_genome();
-        let summary = MutationEngine::apply_mutations_on_units(&mut genome, 64, &config, &[0, 1, 2], ParentExecuted::NONE, &mut SmallRng::seed_from_u64(seed), 2);
+        let summary = MutationEngine::apply_mutations_on_units(&mut genome, 64, &config, &[0, 1, 2], ParentExecuted::NONE, &mut SmallRng::seed_from_u64(seed), &crate::config::test_sensor_context(2));
         proptest::prop_assert_eq!(summary.attempted_events, 64);
         proptest::prop_assert_eq!(summary.applied_events + summary.skipped_events, 64);
         let key = MutationOperator::GraphRecruitNeutralInput;
@@ -151,7 +151,7 @@ proptest::proptest! {
         config.genome_size_pressure_enabled = true;
         config.genome_size_cap = 1;
         let mut genome = v3alpha1_founder_genome();
-        let summary = MutationEngine::apply_mutations_on_units(&mut genome, 1, &config, &[], ParentExecuted::NONE, &mut SmallRng::seed_from_u64(seed), 2);
+        let summary = MutationEngine::apply_mutations_on_units(&mut genome, 1, &config, &[], ParentExecuted::NONE, &mut SmallRng::seed_from_u64(seed), &crate::config::test_sensor_context(2));
         proptest::prop_assert!(!summary.operator_funnel_by_operator.contains_key(&key));
     }
 }

@@ -8,9 +8,9 @@ use std::collections::BTreeSet;
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
+use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
 use crate::genome::cgp::{CgpGraphBackendDef, OutputSinkKind};
-use crate::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::genome::VmInstruction;
 use crate::mutation::graph::operators::add_edge;
 use crate::mutation::input_ref::connect_declared_input;
@@ -45,7 +45,12 @@ fn add_graph_edge_and_input_ref_add_reach_every_drive() {
     for seed in 0..4_096 {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let before = def.clone();
-        let class = add_edge(&mut def, &refs, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        let class = add_edge(
+            &mut def,
+            crate::mutation::graph::operators::test_inputs(&refs),
+            &mut SmallRng::seed_from_u64(seed),
+        )
+        .unwrap();
         if let Some(sink @ VoteSink::Drive(_)) = grown_vote_sink(&before, &def) {
             assert_eq!(class, Some(BirthEdgeClass::Drive));
             by_edge.insert(sink.index());
@@ -85,7 +90,7 @@ fn a_dispatched_add_graph_edge_reports_its_vote_sink_class() {
             &mut targets,
             &mut SmallRng::seed_from_u64(seed),
             &config,
-            1,
+            &crate::config::test_sensor_context(1),
         ) else {
             continue;
         };
@@ -114,7 +119,7 @@ fn vm_add_vote_reaches_every_drive() {
     let mut reached = BTreeSet::new();
     for _ in 0..20_000 {
         if let VmInstruction::AddVote { sink, .. } = random_vm_instruction(&mut rng, 4, 1, 1) {
-            assert!(usize::from(sink) < crate::genome::vote::VOTE_SINK_COUNT);
+            assert!(usize::from(sink) < crate::contracts::votes::VOTE_SINK_COUNT);
             if let Some(VoteSink::Drive(kind)) = VoteSink::from_index(usize::from(sink)) {
                 reached.insert(kind.drive().index());
             }
@@ -130,11 +135,11 @@ proptest! {
     fn the_reported_class_is_the_class_of_the_pushed_sink(seed in any::<u64>(), width in 1u16..40) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let before = def.clone();
-        let class = add_edge(&mut def, &[InputReference::ActionVotes], &mut SmallRng::seed_from_u64(seed)).unwrap();
+        let class = add_edge(&mut def, crate::mutation::graph::operators::test_inputs(&[InputReference::ActionVotes]), &mut SmallRng::seed_from_u64(seed)).unwrap();
         prop_assert_eq!(class, grown_vote_sink(&before, &def).and_then(BirthEdgeClass::of_sink));
 
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let class = connect_declared_input(&mut def, Some(0), width, &mut SmallRng::seed_from_u64(seed));
+        let class = connect_declared_input(&mut def, Some(0), u32::from(width), &mut SmallRng::seed_from_u64(seed));
         let grown = grown_vote_sink(&before, &def);
         prop_assert!(grown.is_some(), "a full catalog carries every drawn sink");
         prop_assert_eq!(class, grown.and_then(BirthEdgeClass::of_sink));

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{NodeId, SensorContext};
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::{validate_graph, Scope};
 use crate::genome::{BackendDef, CreatureGenome};
@@ -13,7 +13,7 @@ use crate::mutation::pressure;
 use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    BirthEdgeClass, GroupEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    BirthEdgeClass, BundleEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
@@ -41,9 +41,9 @@ struct SelectedEvent {
     /// The reachability and, for `AddGraphEdge` and `InputRef.Add`, the class
     /// of the vote-sink edge the event pushed (T11.F30).
     result: ClassifiedResult,
-    /// The detaches and group removals the event made, counted when it
+    /// What the event did to bundles, reported by the operator and counted when it
     /// commits (T25.F03); zero outside the Graph domain.
-    group_edits: GroupEdits,
+    bundle_edits: BundleEdits,
     /// The scope an attribute operator's change landed on, when it commits
     /// (T25.F08).
     attribute_scope: Option<Scope>,
@@ -71,13 +71,13 @@ impl MutationEngine {
         parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
     ) -> MutationSummary {
-        Self::apply_mutations_with_food_type_count(
+        Self::apply_mutations_in(
             genome,
             config,
             parent_reachable_nodes,
             ParentExecuted::NONE,
             rng,
-            1,
+            &crate::config::SimulationConfig::default().sensor_context(1),
         )
     }
 
@@ -87,13 +87,13 @@ impl MutationEngine {
     /// Every production birth and reading comes through here: the supply draw
     /// runs on the genome's own `genome_size()`, read once before any event.
     /// The child starts as the parent's copy, so this is the parent's size.
-    pub fn apply_mutations_with_food_type_count(
+    pub fn apply_mutations_in(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
         parent_reachable_nodes: &[usize],
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> MutationSummary {
         let units = genome.genome_size();
         Self::apply_mutations_on_units(
@@ -103,11 +103,11 @@ impl MutationEngine {
             parent_reachable_nodes,
             parent_executed,
             rng,
-            food_type_count,
+            context,
         )
     }
 
-    /// [`Self::apply_mutations_with_food_type_count`] with the supply draw on
+    /// [`Self::apply_mutations_in`] with the supply draw on
     /// a caller-supplied unit count: `Binomial(units, per_unit_rate)`
     /// requested events. The drift walk and `recruitment_paths` pass the
     /// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
@@ -129,7 +129,7 @@ impl MutationEngine {
         parent_reachable_nodes: &[usize],
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> MutationSummary {
         let event_count = requested_event_count(config, units, rng);
         if event_count == 0 {
@@ -204,15 +204,9 @@ impl MutationEngine {
                         None
                     };
                     let mut targets = selector(rb.topology);
-                    let result = apply_topology_event(
-                        genome,
-                        op,
-                        &mut targets,
-                        rng,
-                        config,
-                        food_type_count,
-                    )
-                    .map(|reachability| (reachability, None));
+                    let result =
+                        apply_topology_event(genome, op, &mut targets, rng, config, context)
+                            .map(|reachability| (reachability, None));
                     if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                         discarded.push((
                             operator,
@@ -225,7 +219,7 @@ impl MutationEngine {
                         operator,
                         tracked_before,
                         result,
-                        group_edits: GroupEdits::default(),
+                        bundle_edits: BundleEdits::default(),
                         attribute_scope: None,
                         executed_hits: targets.executed_hits(),
                         first_pick: targets.first_pick(),
@@ -270,7 +264,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
-                                group_edits: GroupEdits::default(),
+                                bundle_edits: BundleEdits::default(),
                                 attribute_scope: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
@@ -302,14 +296,8 @@ impl MutationEngine {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let (result, group_edits, attribute_scope) = apply_graph_event(
-                                genome,
-                                op,
-                                &mut targets,
-                                rng,
-                                config,
-                                food_type_count,
-                            );
+                            let (result, bundle_edits, attribute_scope) =
+                                apply_graph_event(genome, op, &mut targets, rng, config, context);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 discarded.push((
                                     operator,
@@ -322,7 +310,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
-                                group_edits,
+                                bundle_edits,
                                 attribute_scope,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
@@ -357,7 +345,7 @@ impl MutationEngine {
                                 &mut targets,
                                 rng,
                                 config,
-                                food_type_count,
+                                context,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 discarded.push((
@@ -371,7 +359,7 @@ impl MutationEngine {
                                 operator,
                                 tracked_before,
                                 result,
-                                group_edits: GroupEdits::default(),
+                                bundle_edits: BundleEdits::default(),
                                 attribute_scope: None,
                                 executed_hits: targets.executed_hits(),
                                 first_pick: targets.first_pick(),
@@ -385,7 +373,7 @@ impl MutationEngine {
                 operator,
                 tracked_before,
                 result,
-                group_edits,
+                bundle_edits,
                 attribute_scope,
                 executed_hits,
                 first_pick,
@@ -421,7 +409,7 @@ impl MutationEngine {
             match result {
                 Ok((reachability, edge_class)) => {
                     summary.record_applied(domain, operator);
-                    summary.record_group_edits(group_edits);
+                    summary.record_bundle_edits(bundle_edits);
                     if let Some(scope) = attribute_scope {
                         summary.record_attribute_scope(scope);
                     }
@@ -598,61 +586,6 @@ fn select_weighted_index<T: Copy>(
     unreachable!("weight draw must return an index");
 }
 
-/// The genome's group members and group records, summed over its Graph
-/// backends.
-fn group_tallies(genome: &CreatureGenome) -> (u32, u32) {
-    genome
-        .nodes
-        .iter()
-        .filter_map(|node| match &node.backend_def {
-            BackendDef::Graph(def) => Some(def),
-            BackendDef::Vm(_) => None,
-        })
-        .fold((0, 0), |(members, groups), def| {
-            let present = def
-                .output_sinks()
-                .iter()
-                .flat_map(|sink| sink.inputs.iter())
-                .filter(|edge| edge.membership().is_some())
-                .count();
-            (members + present as u32, groups + def.groups().len() as u32)
-        })
-}
-
-/// What a committed Graph event `op` did to groups, from the tallies before
-/// and after it. Only retarget, a raw-field step, a split and
-/// `DetachGraphEdge` detach (each at most one member, and nothing else they
-/// do loses one); `RemoveGroup` and `RemoveGraphEdge` remove groups, as does
-/// a last member's detach.
-// WORKAROUND(T25.F08): operators report their group edits; the container's
-// detach_at already returns whether the record went.
-fn group_edits(op: GraphOperator, before: (u32, u32), after: (u32, u32)) -> GroupEdits {
-    let detaches = matches!(
-        op,
-        GraphOperator::RetargetGraphEdge
-            | GraphOperator::GraphRawFieldMutation
-            | GraphOperator::AddInternalGraphNode
-            | GraphOperator::DetachGraphEdge
-    );
-    let removes = detaches
-        || matches!(
-            op,
-            GraphOperator::RemoveGroup | GraphOperator::RemoveGraphEdge
-        );
-    GroupEdits {
-        detached: if detaches {
-            before.0.saturating_sub(after.0)
-        } else {
-            0
-        },
-        groups_removed: if removes {
-            before.1.saturating_sub(after.1)
-        } else {
-            0
-        },
-    }
-}
-
 /// Apply one mutation event with the parseability and graph-invariant gate:
 /// snapshot the genome (birth seeds included), apply, and commit when the
 /// event applied, the genome still parses and every Graph backend passes
@@ -691,17 +624,10 @@ fn apply_topology_event(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
-    food_type_count: usize,
+    context: &SensorContext,
 ) -> Result<TargetReachability, MutationSkipReason> {
     apply_gated(genome, |genome| {
-        TopologyMutator::apply_with_food_type_count(
-            genome,
-            op,
-            targets,
-            rng,
-            config,
-            food_type_count,
-        )
+        TopologyMutator::apply_in(genome, op, targets, rng, config, context)
     })
 }
 
@@ -727,17 +653,14 @@ fn apply_graph_event(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
-    food_type_count: usize,
-) -> (ClassifiedResult, GroupEdits, Option<Scope>) {
-    let before = group_tallies(genome);
+    context: &SensorContext,
+) -> (ClassifiedResult, BundleEdits, Option<Scope>) {
     let result = apply_gated(genome, |genome| {
-        GraphMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
+        GraphMutator::apply_classified(genome, op, targets, rng, config, context)
     });
-    let edits = if result.is_ok() {
-        group_edits(op, before, group_tallies(genome))
-    } else {
-        GroupEdits::default()
-    };
+    let edits = result
+        .as_ref()
+        .map_or(BundleEdits::default(), |(_, report)| report.bundle_edits);
     let attribute_scope = result
         .as_ref()
         .ok()
@@ -756,10 +679,10 @@ fn apply_input_ref_event(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
-    food_type_count: usize,
+    context: &SensorContext,
 ) -> Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason> {
     apply_gated(genome, |genome| {
-        InputRefMutator::apply_classified(genome, op, targets, rng, config, food_type_count)
+        InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
     })
 }
 

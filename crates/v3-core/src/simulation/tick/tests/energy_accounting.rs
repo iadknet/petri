@@ -375,9 +375,10 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
 /// `reward` it is reward-modulated on `EnergyDelta`.
 fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
     use crate::contracts::NodeId;
+    use crate::contracts::OutcomeChannel;
     use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
     use crate::genome::{
-        BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
+        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
         RewardModulationConfig,
     };
     CreatureGenome {
@@ -458,13 +459,12 @@ fn reward_phase_zero_floor_reaches_only_reward_learners_with_an_outcome_bank() {
 /// One Graph node with no compute node whose one `Eat` vote edge reads
 /// shared memory and is reward-modulated on `EnergyDelta` (T25.F06).
 fn sink_learning_genome() -> crate::genome::CreatureGenome {
+    use crate::contracts::votes::VoteSink;
+    use crate::contracts::OutcomeChannel;
     use crate::genome::cgp::{
         CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, OutputSinkKind,
     };
-    use crate::genome::vote::VoteSink;
-    use crate::genome::{
-        BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
-    };
+    use crate::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
     let mut genome = learning_genome(true);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let eat = def

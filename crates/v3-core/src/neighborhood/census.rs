@@ -15,10 +15,10 @@
 
 use rayon::prelude::*;
 
+use crate::contracts::votes::VoteSink;
+use crate::contracts::{SensorContext, SensorDescriptor};
 use crate::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-use crate::genome::vote::VoteSink;
 use crate::genome::{BackendDef, CreatureGenome};
-use crate::mutation::compound::sub_value_count;
 use crate::neighborhood::battery::Battery;
 use crate::neighborhood::classify::{classify, Tally};
 use crate::neighborhood::EvalContext;
@@ -41,16 +41,16 @@ pub struct OneEdgeCensus {
 }
 
 /// Every input-leaf source of `node`, in reference then sub-value order.
-fn input_leaves(genome: &CreatureGenome, node: usize) -> Vec<GraphSource> {
+fn input_leaves(genome: &CreatureGenome, node: usize, context: &SensorContext) -> Vec<GraphSource> {
     genome.nodes[node]
         .input_refs
         .iter()
         .enumerate()
         .flat_map(|(ref_idx, reference)| {
-            let width = sub_value_count(reference).max(1);
+            let width = SensorDescriptor::of(reference, context).width().max(1);
             (0..width).map(move |sub_idx| GraphSource::InputLeaf {
                 ref_idx: ref_idx as u16,
-                sub_idx,
+                sub_idx: u16::try_from(sub_idx).expect("a sub-value index fits u16"),
             })
         })
         .collect()
@@ -88,7 +88,7 @@ pub fn one_edge_census(
     context: &EvalContext,
 ) -> OneEdgeCensus {
     let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-    let leaves = input_leaves(genome, node);
+    let leaves = input_leaves(genome, node, &context.sensors);
     let rows: Vec<SinkRow> = VoteSink::all()
         .collect::<Vec<_>>()
         .into_par_iter()
@@ -117,14 +117,14 @@ mod tests {
     use super::*;
     use crate::config::FounderProfile;
     use crate::config::SimulationConfig;
+    use crate::contracts::votes::DirectedVoteKind;
+    use crate::contracts::votes::VOTE_SINK_COUNT;
     use crate::creature::founder::founder_genome;
-    use crate::genome::vote::DirectedVoteKind;
-    use crate::genome::vote::VOTE_SINK_COUNT;
 
     fn founder_census() -> OneEdgeCensus {
         let config = SimulationConfig::default();
         let context = EvalContext::from_config(&config);
-        let battery = Battery::generate(context.food_type_count);
+        let battery = Battery::generate(context.sensors.food_type_count);
         one_edge_census(
             &founder_genome(FounderProfile::V3Alpha1),
             1,

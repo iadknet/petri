@@ -1,15 +1,15 @@
 use super::*;
-use crate::config::MutationConfig;
+use crate::config::{MutationConfig, SimulationConfig};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, RouteTarget, WorldInputKey};
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::VoteSink;
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-use crate::mutation::graph::operators::split_existing_edge;
+use crate::mutation::graph::operators::{split_existing_edge, NodeInputs};
 use crate::mutation::reachability::TargetSets;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::{
@@ -229,13 +229,13 @@ pub(super) fn topology(
 ) -> MutationSummary {
     let reachable = mesh_reachable_nodes(genome);
     let mut selector = TargetSets::new(&reachable, &[]).selector(0.0, 0.0);
-    let result = TopologyMutator::apply_with_food_type_count(
+    let result = TopologyMutator::apply_in(
         genome,
         operator,
         &mut selector,
         &mut SmallRng::seed_from_u64(seed),
         &MutationConfig::default(),
-        1,
+        &crate::config::SimulationConfig::default().sensor_context(1),
     )
     .expect("fixed constructed topology operator applies");
     let operator = match operator {
@@ -329,7 +329,7 @@ pub fn constructed_paths() -> Vec<ConstructedPath> {
             let mut split = copied.clone();
             let node = &mut split.nodes[2];
             let BackendDef::Graph(graph) = &mut node.backend_def else { unreachable!() };
-            split_existing_edge(graph, &[], &mut SmallRng::seed_from_u64(7)).expect("constructed graph has splittable edges");
+            split_existing_edge(graph, NodeInputs { refs: &[], context: &SimulationConfig::default().sensor_context(1) }, &mut SmallRng::seed_from_u64(7)).expect("constructed graph has splittable edges");
             Some(stage("neutral_split", "constructed mutation::graph::operators::split_existing_edge", Some(7), &copied, split))
         } else { None };
         let mut blank_genome = base.clone();

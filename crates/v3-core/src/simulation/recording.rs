@@ -9,11 +9,11 @@ use std::mem::size_of;
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 #[cfg(feature = "telemetry-seams")]
+use crate::contracts::OUTCOME_CHANNEL_COUNT;
+#[cfg(feature = "telemetry-seams")]
 use crate::contracts::{Position, WorldAction, SHARED_MEMORY_SLOTS};
 #[cfg(feature = "telemetry-seams")]
 use crate::creature::action_log::ActionLogEntry;
-#[cfg(feature = "telemetry-seams")]
-use crate::genome::OUTCOME_CHANNEL_COUNT;
 #[cfg(feature = "telemetry-seams")]
 use crate::ledger::DeathCause;
 #[cfg(feature = "telemetry-seams")]

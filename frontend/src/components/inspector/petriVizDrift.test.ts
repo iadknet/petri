@@ -22,7 +22,7 @@ const EVAL_RS_SHA256 = "fde4089551ef272cec1ecbcdbff439dff308a7c9cdc5a0edda194719
 // source (`compose(own, scale, pattern)`, the ring and pair birth members)
 // the renderer's edgeGroups mirrors. When group.rs changes, review it, then
 // update this fingerprint.
-const GROUP_RS_SHA256 = "ca210dba88e56a68ee6db2638e009996398996e80116fea8ae8a7f15f0433d29";
+const GROUP_RS_SHA256 = "09886b5facaeee35ff4b68f0186a9595b7dfdcdcbd4b48a988defd39b1772fd4";
 
 type Rgb = [number, number, number];
 interface PetriViz {

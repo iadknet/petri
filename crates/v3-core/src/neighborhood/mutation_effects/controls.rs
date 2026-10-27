@@ -2,11 +2,11 @@
 //! is a fixed parent/child pair run in the same code as every sampled pair,
 //! on every report.
 
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::VoteSink;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
 /// A one-node Graph genome with `compute_nodes` and the given `Eat` vote

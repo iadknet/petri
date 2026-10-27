@@ -92,7 +92,7 @@ fn birth(
         reachable,
         ParentExecuted::Indices(executed),
         &mut random,
-        1,
+        &crate::config::test_sensor_context(1),
     );
     Birth {
         genome,
@@ -455,7 +455,7 @@ fn grown_parent(seed: u64, growth: u8) -> CreatureGenome {
             &[],
             ParentExecuted::NONE,
             &mut random,
-            1,
+            &crate::config::test_sensor_context(1),
         );
     }
     genome
@@ -582,7 +582,7 @@ fn every_topology_event_removes_one_node_or_appends_fresh_ones() {
                     &mut sets.selector(0.5, 0.0),
                     &mut rng(seed),
                     &config,
-                    1,
+                    &crate::config::test_sensor_context(1),
                 );
                 let after: Vec<NodeId> = genome.nodes.iter().map(|node| node.node_id).collect();
                 let unique: BTreeSet<NodeId> = after.iter().copied().collect();

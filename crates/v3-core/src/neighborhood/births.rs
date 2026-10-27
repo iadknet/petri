@@ -1,6 +1,6 @@
 //! Per-birth treatment (T11.F01 Battery, "Per-birth treatment"): run the
 //! production mutation engine on fresh copies of the subject through
-//! [`MutationEngine::apply_mutations_with_food_type_count`], bucketed by
+//! [`MutationEngine::apply_mutations_in`], bucketed by
 //! `applied_events`. Zero-event births (the mutation gate did not fire, or
 //! every drawn event skipped) are counted, not evaluated — they are
 //! identical to the base by construction.
@@ -324,7 +324,7 @@ pub fn per_birth_reading_on_units(
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
-                context.food_type_count,
+                &context.sensors,
             );
             let cycle_carrying = !mesh_cycle_nodes(&genome).is_empty();
             if summary.applied_events == 0 {
@@ -483,13 +483,13 @@ mod tests {
             let mut genome = subject.clone();
             let mut rng =
                 SmallRng::seed_from_u64(seed_offset + BIRTH_SEED_BASE + u64::from(birth_index));
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_in(
                 &mut genome,
                 &config.mutation,
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
-                context.food_type_count,
+                &context.sensors,
             );
             *expected
                 .by_requested_events

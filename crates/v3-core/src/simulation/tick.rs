@@ -6,9 +6,9 @@ use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 
+use crate::contracts::OUTCOME_CHANNEL_COUNT;
 use crate::contracts::{CreatureId, PerceptionRequirements, WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::state::CreatureState;
-use crate::genome::OUTCOME_CHANNEL_COUNT;
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::trace::domain::{
     PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
@@ -976,7 +976,7 @@ mod final_action_observation_tests {
                         VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                         VmInstruction::WriteActionParam {
                             field_idx:
-                                crate::genome::vote::ActionParamField::ReproduceTransferFraction
+                                crate::contracts::votes::ActionParamField::ReproduceTransferFraction
                                     .index() as u8,
                             src: 0,
                         },
@@ -1010,7 +1010,7 @@ mod final_action_observation_tests {
                         )])
                         .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
                             crate::genome::cgp::OutputSinkKind::ActionVote(
-                                crate::genome::vote::VoteSink::Eat,
+                                crate::contracts::votes::VoteSink::Eat,
                             ),
                             vec![runtime_output],
                         )]),
@@ -1194,7 +1194,7 @@ mod final_action_observation_tests {
                     weight_clamp: 2.0,
                     lamarckian: false,
                     modulation: Some(crate::genome::RewardModulationConfig {
-                        reward_source: crate::genome::OutcomeChannel::EnergyDelta,
+                        reward_source: crate::contracts::OutcomeChannel::EnergyDelta,
                         trace_decay: 0.5,
                     }),
                     retention: 1.0,

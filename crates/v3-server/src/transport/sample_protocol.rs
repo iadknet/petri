@@ -1,10 +1,10 @@
 //! HTTP sampler response DTOs owned by the transport layer.
 
 use serde::Serialize;
+use v3_core::contracts::votes::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
 use v3_core::contracts::Direction;
-use v3_core::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
-use v3_core::genome::OUTCOME_CHANNEL_COUNT;
-use v3_core::runtime::OUTPUT_SLOT_COUNT;
+use v3_core::contracts::OUTCOME_CHANNEL_COUNT;
+use v3_core::contracts::OUTPUT_SLOT_COUNT;
 
 use crate::transport::genome_wire::{InputRef, VmInstruction, VoteSink, WorldAction};
 

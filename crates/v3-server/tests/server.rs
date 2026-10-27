@@ -2661,9 +2661,9 @@ fn learning_edge(
 /// has its own `exclude` token.
 #[tokio::test]
 async fn get_creature_brain_resolves_ring_members_and_their_group() {
+    use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::Shape;
-    use v3_core::genome::vote::DirectedVoteKind;
     use v3_core::genome::BackendDef;
 
     let state = test_state();
@@ -2753,11 +2753,11 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
 /// the runtime resolves it (preservation case: the uninitialized learner).
 #[tokio::test]
 async fn get_creature_learning_and_learners_follow_the_runtime() {
+    use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::{
         BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
     };
-    use v3_core::genome::vote::{DirectedVoteKind, VoteSink};
     use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig};
 
     let state = test_state();
@@ -2908,12 +2908,11 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
 /// applied 1.5); only an edge-scope learner's correction is `learned`.
 #[tokio::test]
 async fn get_creature_learning_lists_learned_scales_and_passive_members() {
+    use v3_core::contracts::votes::DirectedVoteKind;
+    use v3_core::contracts::OutcomeChannel;
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope, Shape};
-    use v3_core::genome::vote::DirectedVoteKind;
-    use v3_core::genome::{
-        BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
-    };
+    use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
 
     let state = test_state();
     let creature_id = {
@@ -3060,9 +3059,9 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
 /// outside the coordinates (preservation case).
 #[tokio::test]
 async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_members() {
+    use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::CgpGraphBackendDef;
-    use v3_core::genome::vote::DirectedVoteKind;
     use v3_core::genome::BackendDef;
 
     let state = test_state();

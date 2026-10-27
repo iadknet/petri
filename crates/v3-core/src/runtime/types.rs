@@ -1,12 +1,10 @@
-use crate::contracts::{ActionQueue, WorldAction};
-use crate::genome::cgp::CUSTOM_OUTPUT_COUNT;
-use crate::genome::vote::{VoteVector, ACTION_PARAM_FIELD_COUNT, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+use crate::contracts::votes::{
+    VoteVector, ACTION_PARAM_FIELD_COUNT, VOTE_KIND_COUNT, VOTE_SINK_COUNT,
+};
+use crate::contracts::{ActionQueue, WorldAction, OUTPUT_SLOT_COUNT};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::TerminationReason;
-
-/// Number of output slots produced by an evaluated cognition node.
-pub const OUTPUT_SLOT_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize;
 
 /// Result returned by a single node evaluation.
 /// The mesh executor uses this to decide routing. Action queue lives in the

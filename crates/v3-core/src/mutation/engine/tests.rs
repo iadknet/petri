@@ -39,7 +39,7 @@ fn apply_events(
         parent_reachable_nodes,
         ParentExecuted::NONE,
         rng,
-        1,
+        &crate::config::test_sensor_context(1),
     )
 }
 
@@ -190,7 +190,7 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
             &[],
             ParentExecuted::NONE,
             &mut r,
-            3,
+            &crate::config::test_sensor_context(3),
         );
         if summary
             .applied_by_domain
@@ -688,7 +688,7 @@ fn apply_topology_event_adds_pass_through_detour() {
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &config,
-        1,
+        &crate::config::test_sensor_context(1),
     )
     .expect("AddNode should apply");
 
@@ -1157,11 +1157,11 @@ proptest::proptest! {
         let founder = v3alpha1_founder_genome();
         let (mut own, mut explicit) = (founder.clone(), founder.clone());
         let (mut own_rng, mut explicit_rng) = (rng(seed), rng(seed));
-        let own_summary = MutationEngine::apply_mutations_with_food_type_count(
-            &mut own, &config, &[], ParentExecuted::NONE, &mut own_rng, 1,
+        let own_summary = MutationEngine::apply_mutations_in(
+            &mut own, &config, &[], ParentExecuted::NONE, &mut own_rng, &crate::config::test_sensor_context(1),
         );
         let explicit_summary = MutationEngine::apply_mutations_on_units(
-            &mut explicit, founder.genome_size(), &config, &[], ParentExecuted::NONE, &mut explicit_rng, 1,
+            &mut explicit, founder.genome_size(), &config, &[], ParentExecuted::NONE, &mut explicit_rng, &crate::config::test_sensor_context(1),
         );
         proptest::prop_assert_eq!(own_summary.attempted_events, explicit_summary.attempted_events);
         proptest::prop_assert_eq!(own_summary.applied_events, explicit_summary.applied_events);
@@ -1181,7 +1181,7 @@ proptest::proptest! {
         let expected = requested_event_count(&config, units, &mut rng(seed));
         for mut genome in [v3alpha1_founder_genome(), core_and_junk_genome()] {
             let summary = MutationEngine::apply_mutations_on_units(
-                &mut genome, units, &config, &[], ParentExecuted::NONE, &mut rng(seed), 1,
+                &mut genome, units, &config, &[], ParentExecuted::NONE, &mut rng(seed), &crate::config::test_sensor_context(1),
             );
             proptest::prop_assert_eq!(summary.attempted_events, expected);
         }
@@ -1278,7 +1278,7 @@ fn full_executed_bias_leaves_junk_nodes_untouched_and_counts_every_target() {
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
-            1,
+            &crate::config::test_sensor_context(1),
         );
         assert_eq!(
             genome.nodes[2..],
@@ -1313,7 +1313,7 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
-            1,
+            &crate::config::test_sensor_context(1),
         );
         junk_hits += u32::from(genome.nodes[2..] != subject.nodes[2..]);
         // The counter reports membership, so without the layer some targeted
@@ -1371,7 +1371,7 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 &reachable,
                 ParentExecuted::Indices(&all_nodes),
                 &mut layer_rng,
-                1,
+                &crate::config::test_sensor_context(1),
             );
 
             let mut without_layer = founder.clone();
@@ -1383,7 +1383,7 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 &reachable,
                 ParentExecuted::NONE,
                 &mut plain_rng,
-                1,
+                &crate::config::test_sensor_context(1),
             );
             // Same offspring *and* the same position in the RNG stream.
             let identical =
@@ -1439,7 +1439,7 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut restricted_rng,
-            1,
+            &crate::config::test_sensor_context(1),
         );
         let mut reference_child = subject.clone();
         let mut reference_rng = rng(seed);
@@ -1450,7 +1450,7 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut reference_rng,
-            1,
+            &crate::config::test_sensor_context(1),
         );
         assert_eq!(
             restricted_child, reference_child,
@@ -1471,7 +1471,7 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
-            1,
+            &crate::config::test_sensor_context(1),
         );
         differed_without_pressure += u32::from(unpressured != restricted_child);
     }
@@ -1493,13 +1493,13 @@ fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
         ..SimulationConfig::default().mutation
     };
     let mut genome = v3alpha1_founder_genome();
-    let summary = MutationEngine::apply_mutations_with_food_type_count(
+    let summary = MutationEngine::apply_mutations_in(
         &mut genome,
         &config,
         &[0],
         ParentExecuted::Query(&query),
         &mut rng(1),
-        1,
+        &crate::config::test_sensor_context(1),
     );
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.executed_target_events, 0);
@@ -1518,13 +1518,13 @@ fn a_birth_with_events_asks_the_parent_query_once_for_the_configured_window() {
         ..SimulationConfig::default().mutation
     };
     let mut genome = v3alpha1_founder_genome();
-    let summary = MutationEngine::apply_mutations_with_food_type_count(
+    let summary = MutationEngine::apply_mutations_in(
         &mut genome,
         &config,
         &[0],
         ParentExecuted::Query(&query),
         &mut rng(1),
-        1,
+        &crate::config::test_sensor_context(1),
     );
     assert!(summary.attempted_events > 0);
     assert_eq!(*windows.borrow(), vec![config.executed_window_ticks]);
@@ -1913,7 +1913,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
             &mut TargetSelector::reachable_only(&[0], 1.0),
             &mut rng(9),
             &config,
-            1
+            &crate::config::test_sensor_context(1)
         )
         .0,
         Err(MutationSkipReason::ParseabilityViolation)

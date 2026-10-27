@@ -5,6 +5,8 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
+use crate::contracts::votes::{DirectedVoteKind, VoteSink};
+use crate::contracts::OutcomeChannel;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::test_support::edit_sinks;
@@ -12,10 +14,9 @@ use crate::genome::cgp::{
     compose, detach, validate_graph, BirthSeeds, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
     GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig, VmBackendDef,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    VmBackendDef,
 };
 use crate::mutation::graph::{group, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
@@ -290,7 +291,10 @@ fn applicability_follows_rings_groups_and_hosting() {
     assert!(!partial.can_host_group());
     let unhosted = genome(refs(), partial);
     for op in GROUP_OPERATORS {
-        let applies = |g: &CreatureGenome| !GraphMutator::applicable_indices(g, op).is_empty();
+        let applies = |g: &CreatureGenome| {
+            !GraphMutator::applicable_indices(g, op, &crate::config::test_sensor_context(1))
+                .is_empty()
+        };
         let add_ring = op == GraphOperator::AddRingGroup;
         let add_pair = op == GraphOperator::AddDirectionPairGroup;
         assert!(!applies(&none), "{op:?}");
@@ -313,7 +317,10 @@ fn applicability_follows_rings_groups_and_hosting() {
         }],
     };
     for op in GROUP_OPERATORS {
-        assert!(GraphMutator::applicable_indices(&vm, op).is_empty());
+        assert!(
+            GraphMutator::applicable_indices(&vm, op, &crate::config::test_sensor_context(1))
+                .is_empty()
+        );
     }
 }
 
@@ -325,7 +332,13 @@ fn add_draws_ring_then_kind_then_offset_then_learning_and_is_born_silent() {
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
+        group::add_in_form(
+            &mut node,
+            group::CreationForm::Uniform,
+            &crate::config::test_sensor_context(1),
+            &mut rng,
+        )
+        .unwrap();
         let rings = [1u16, 2, 3];
         let ring_ref = rings[expected.gen_range(0..rings.len())];
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..DirectedVoteKind::ALL.len())];
@@ -430,7 +443,14 @@ fn add_is_unchanged_by_groups() {
 
         let mut rngs = [SmallRng::seed_from_u64(seed), SmallRng::seed_from_u64(seed)];
         for (genome, rng) in [&mut plain, &mut grouped].into_iter().zip(&mut rngs) {
-            InputRefMutator::apply_to_node(genome, InputRefOperator::Add, idx, rng, 2).unwrap();
+            InputRefMutator::apply_to_node(
+                genome,
+                InputRefOperator::Add,
+                idx,
+                rng,
+                &crate::config::test_sensor_context(2),
+            )
+            .unwrap();
         }
         let [a, b] = &mut rngs;
         assert_eq!(a.gen::<u64>(), b.gen::<u64>(), "seed {seed}");
@@ -457,7 +477,9 @@ fn the_mutator_dispatches_each_unit_operator_to_its_group_edit() {
         (GraphOperator::AlterGroupScale, group::alter_scale),
         (GraphOperator::ShiftGroupOffset, group::shift_offset),
         (GraphOperator::RetargetGroupKind, group::retarget_kind),
-        (GraphOperator::RemoveGroup, group::remove),
+        (GraphOperator::RemoveGroup, |def, rng| {
+            group::remove(def, rng).map(|_| ())
+        }),
     ];
     let config = MutationConfig::default();
     for (op, edit) in cases {
@@ -476,7 +498,7 @@ fn the_mutator_dispatches_each_unit_operator_to_its_group_edit() {
                 0,
                 &mut SmallRng::seed_from_u64(seed),
                 &config,
-                1,
+                &crate::config::test_sensor_context(1),
             )
             .unwrap();
             edit(graph_mut(&mut direct), &mut SmallRng::seed_from_u64(seed)).unwrap();
@@ -505,16 +527,18 @@ fn add_reaches_a_ring_at_the_last_u16_index_and_none_past_it() {
     let added = group::add_in_form(
         &mut last,
         group::CreationForm::Uniform,
+        &crate::config::test_sensor_context(1),
         &mut SmallRng::seed_from_u64(0),
     );
     let skipped = group::add_in_form(
         &mut past,
         group::CreationForm::Uniform,
+        &crate::config::test_sensor_context(1),
         &mut SmallRng::seed_from_u64(0),
     );
 
     // Assert
-    assert_eq!(added, Ok(()));
+    assert!(added.is_ok());
     assert_eq!(graph(&last).groups().len(), 1);
     assert_eq!(
         graph(&last).groups()[0].shape(),
@@ -540,7 +564,12 @@ fn add_skips_without_a_draw_when_the_graph_cannot_host_a_group() {
     let mut rng = SmallRng::seed_from_u64(9);
     let mut untouched = SmallRng::seed_from_u64(9);
     assert_eq!(
-        group::add_in_form(&mut node, group::CreationForm::Uniform, &mut rng),
+        group::add_in_form(
+            &mut node,
+            group::CreationForm::Uniform,
+            &crate::config::test_sensor_context(1),
+            &mut rng
+        ),
         Err(MutationSkipReason::NoApplicableTarget)
     );
     assert_eq!(node, before);
@@ -575,7 +604,13 @@ fn add_pair_draws_pair_then_kind_then_offset_then_learning_and_is_born_silent() 
         let mut node = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut expected = SmallRng::seed_from_u64(seed);
-        group::add_pair_in_form(&mut node, group::CreationForm::Uniform, &mut rng).unwrap();
+        group::add_pair_in_form(
+            &mut node,
+            group::CreationForm::Uniform,
+            &crate::config::test_sensor_context(1),
+            &mut rng,
+        )
+        .unwrap();
         let (ref_idx, pair) = flat[expected.gen_range(0..flat.len())];
         let kind = DirectedVoteKind::ALL[expected.gen_range(0..DirectedVoteKind::ALL.len())];
         let offset = expected.gen_range(0..8u8);
@@ -613,7 +648,12 @@ fn add_pair_skips_without_a_draw_without_a_site() {
         let mut rng = SmallRng::seed_from_u64(9);
         let mut untouched = SmallRng::seed_from_u64(9);
         assert_eq!(
-            group::add_pair_in_form(&mut node, group::CreationForm::Uniform, &mut rng),
+            group::add_pair_in_form(
+                &mut node,
+                group::CreationForm::Uniform,
+                &crate::config::test_sensor_context(1),
+                &mut rng
+            ),
             Err(MutationSkipReason::NoApplicableTarget)
         );
         assert_eq!(node, before);
@@ -637,12 +677,13 @@ fn the_mutator_dispatches_add_direction_pair_group() {
             0,
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
-            1,
+            &crate::config::test_sensor_context(1),
         )
         .unwrap();
         group::add_pair_in_form(
             &mut direct,
             group::CreationForm::Uniform,
+            &crate::config::test_sensor_context(1),
             &mut SmallRng::seed_from_u64(seed),
         )
         .unwrap();
@@ -717,19 +758,19 @@ fn add_pair_reaches_a_pair_at_the_last_u16_index_and_none_past_it() {
     let mut last = graph_node(refs.clone(), CgpGraphBackendDef::new_with_fixed_outputs());
     refs.insert(0, InputReference::ActionVotes);
     let mut past = graph_node(refs, CgpGraphBackendDef::new_with_fixed_outputs());
-    assert_eq!(
-        group::add_pair_in_form(
-            &mut last,
-            group::CreationForm::Uniform,
-            &mut SmallRng::seed_from_u64(0)
-        ),
-        Ok(())
-    );
+    assert!(group::add_pair_in_form(
+        &mut last,
+        group::CreationForm::Uniform,
+        &crate::config::test_sensor_context(1),
+        &mut SmallRng::seed_from_u64(0)
+    )
+    .is_ok());
     assert_eq!(graph(&last).groups()[0].shape().ref_idx(), u16::MAX);
     assert_eq!(
         group::add_pair_in_form(
             &mut past,
             group::CreationForm::Uniform,
+            &crate::config::test_sensor_context(1),
             &mut SmallRng::seed_from_u64(0)
         ),
         Err(MutationSkipReason::NoApplicableTarget)
@@ -774,8 +815,15 @@ fn create(op: GraphOperator, seed: u64) -> (NodeGenome, SmallRng) {
         )],
     };
     let mut rng = SmallRng::seed_from_u64(seed);
-    GraphMutator::apply_to_node(&mut genome, op, 0, &mut rng, &MutationConfig::default(), 2)
-        .unwrap();
+    GraphMutator::apply_to_node(
+        &mut genome,
+        op,
+        0,
+        &mut rng,
+        &MutationConfig::default(),
+        &crate::config::test_sensor_context(2),
+    )
+    .unwrap();
     (genome.nodes.remove(0), rng)
 }
 
@@ -972,14 +1020,25 @@ fn applicability_follows_members_for_detach() {
     };
     let op = GraphOperator::DetachGraphEdge;
     let plain = genome(CgpGraphBackendDef::new_with_fixed_outputs());
-    assert!(GraphMutator::applicable_indices(&plain, op).is_empty());
+    assert!(
+        GraphMutator::applicable_indices(&plain, op, &crate::config::test_sensor_context(1))
+            .is_empty()
+    );
     let grouped = genome(three());
-    assert_eq!(GraphMutator::applicable_indices(&grouped, op), vec![0]);
+    assert_eq!(
+        GraphMutator::applicable_indices(&grouped, op, &crate::config::test_sensor_context(1)),
+        vec![0]
+    );
     let mut emptied = three();
     while !emptied.groups().is_empty() {
         emptied.remove_group(id(0));
     }
-    assert!(GraphMutator::applicable_indices(&genome(emptied), op).is_empty());
+    assert!(GraphMutator::applicable_indices(
+        &genome(emptied),
+        op,
+        &crate::config::test_sensor_context(1)
+    )
+    .is_empty());
 
     let mut node = graph_node(refs(), CgpGraphBackendDef::new_with_fixed_outputs());
     let before = node.clone();
@@ -1008,7 +1067,16 @@ fn add_graph_edge_never_joins_a_group() {
         let mut rng = SmallRng::seed_from_u64(seed);
         let config = MutationConfig::default();
         let op = GraphOperator::AddGraphEdge;
-        if GraphMutator::apply_to_node(&mut genome, op, 0, &mut rng, &config, 2).is_err() {
+        if GraphMutator::apply_to_node(
+            &mut genome,
+            op,
+            0,
+            &mut rng,
+            &config,
+            &crate::config::test_sensor_context(2),
+        )
+        .is_err()
+        {
             continue;
         }
         let after = graph(&genome.nodes[0]);

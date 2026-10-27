@@ -4,13 +4,8 @@
 # code no longer needs, and on a debt ID section 5 no longer lists. Paying a
 # debt deletes its lines here and its row there.
 
-G2 mutation/sampling.rs runtime::OUTPUT_SLOT_COUNT
-G2 mutation/graph/recruitment.rs runtime::OUTPUT_SLOT_COUNT
-G2 mutation/input_ref/mod.rs runtime::OUTPUT_SLOT_COUNT
 G2 mutation/topology/routing.rs runtime::routing
 G2 mutation/vm/operators.rs runtime::vm
-G2 sensors/static_inputs.rs genome::OUTCOME_CHANNEL_COUNT
-G2 sensors/static_inputs.rs genome::OutcomeChannel
 G5 mutation/phenotype.rs creature::phenotype
 G12 mutation/engine/mod.rs creature::parseability
 G14 simulation/actions/reproduction.rs neighborhood::drives

@@ -320,13 +320,13 @@ pub fn competence(
                 sub,
                 &crate::runtime::inputs::ResolveCtx {
                     sensors: &scenario.sensors,
-                    upstream_slots: &[0.0; crate::runtime::OUTPUT_SLOT_COUNT],
+                    upstream_slots: &[0.0; crate::contracts::OUTPUT_SLOT_COUNT],
                     energy: scenario.energy,
                     energy_consumed: 0.0,
                     action_queue: &crate::contracts::ActionQueue::new(1),
-                    votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
-                    previous_pass_votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
-                    commit_counts: &[0; crate::genome::vote::VOTE_KIND_COUNT],
+                    votes: &[0.0; crate::contracts::votes::VOTE_SINK_COUNT],
+                    previous_pass_votes: &[0.0; crate::contracts::votes::VOTE_SINK_COUNT],
+                    commit_counts: &[0; crate::contracts::votes::VOTE_KIND_COUNT],
                     mesh_hops: 0,
                 },
             ) == 0.0

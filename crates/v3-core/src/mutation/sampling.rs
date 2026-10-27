@@ -1,10 +1,10 @@
 use rand::Rng;
 
 use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, SensorContext, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::runtime::OUTPUT_SLOT_COUNT;
 
 /// A food-typed world family: its food type is a second draw when the
 /// world has more than one food type.
@@ -116,9 +116,13 @@ pub(crate) fn bucket_references(food_type_count: usize) -> Vec<InputReference> {
     references
 }
 
-/// Generate a random input reference from the one-food-type table.
-pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
-    random_input_reference_for_food_types(rng, 1)
+/// Generate a random input reference under `context`: the food-typed draw
+/// over its food types.
+pub(crate) fn random_input_reference(
+    rng: &mut impl Rng,
+    context: &SensorContext,
+) -> InputReference {
+    random_input_reference_for_food_types(rng, context.food_type_count)
 }
 
 /// Generate a random input reference: one key draw into [`INPUT_BUCKETS`],
@@ -371,7 +375,8 @@ mod tests {
     #[test]
     fn the_sampler_and_the_universe_agree() {
         for food_type_count in [1_usize, 3] {
-            let universe = input_reference_universe(food_type_count);
+            let universe =
+                input_reference_universe(&crate::config::test_sensor_context(food_type_count));
             let as_set: BTreeSet<_> = universe.iter().map(|r| format!("{r:?}")).collect();
             assert_eq!(as_set.len(), universe.len(), "no duplicate");
 
@@ -412,7 +417,7 @@ mod tests {
             let mut rng = SmallRng::seed_from_u64(seed);
             let reference = random_input_reference_for_food_types(&mut rng, food_type_count);
             prop_assert!(
-                input_reference_universe(food_type_count).contains(&reference),
+                input_reference_universe(&crate::config::test_sensor_context(food_type_count)).contains(&reference),
                 "{reference:?}"
             );
         }
@@ -423,7 +428,7 @@ mod tests {
     #[test]
     fn the_universe_is_the_table_in_order() {
         use StaticIntrospectionKey as S;
-        let universe = input_reference_universe(1);
+        let universe = input_reference_universe(&crate::config::test_sensor_context(1));
         let at = |reference: &InputReference| universe.iter().position(|r| r == reference);
         let order: Vec<_> = [
             InputReference::StaticIntrospection(S::AgeTicks),

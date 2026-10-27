@@ -1,12 +1,13 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::contracts::NodeId;
+use crate::contracts::OutcomeChannel;
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig, VmInstruction,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    VmInstruction,
 };
 
 /// A single creature running a known 3-opcode program (Noop, Noop, Halt)

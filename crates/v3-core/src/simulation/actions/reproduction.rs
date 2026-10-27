@@ -395,13 +395,13 @@ pub(crate) fn spawn_child(
     // Step 10: Apply genome mutations to the draft, which carries the
     // parent's learned weights as birth seeds (T25.F01).
     cgp_reproduction::capture_birth_seeds(&mut child_genome, parent.graph_runtime().learned());
-    let summary = MutationEngine::apply_mutations_with_food_type_count(
+    let summary = MutationEngine::apply_mutations_in(
         &mut child_genome,
         &sim.config.mutation,
         parent.reachable_nodes(),
         parent_executed,
         rng,
-        sim.config.world.food.types.len(),
+        &sim.config.sensor_context(sim.config.world.food.types.len()),
     );
 
     // Update mutation stats.
@@ -1210,10 +1210,10 @@ mod tests {
     /// Returns the run's `(graph_edges_detached_total, groups_removed_total)`.
     fn grouped_birth_totals(seed: u64) -> (u64, u64) {
         use crate::config::SimulationConfig;
+        use crate::contracts::votes::DirectedVoteKind;
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::creature::founder::v3alpha1_founder_genome;
         use crate::genome::cgp::Shape;
-        use crate::genome::vote::DirectedVoteKind;
         use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
@@ -1287,9 +1287,9 @@ mod tests {
     /// The founder with an area-barrier reference and one `DirectionPair`
     /// group at `scale` on its Graph node.
     fn pair_grouped_founder(scale: f32) -> crate::genome::CreatureGenome {
+        use crate::contracts::votes::DirectedVoteKind;
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::creature::founder::v3alpha1_founder_genome;
-        use crate::genome::vote::DirectedVoteKind;
 
         let mut genome = v3alpha1_founder_genome();
         let node = genome

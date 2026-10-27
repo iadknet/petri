@@ -13,18 +13,18 @@ use std::ops::Deref;
 use super::edge::{GraphEdge, GraphSource};
 use super::edge::{Membership, Scope};
 use super::group::{
-    compose, pair_birth_members, ring_birth_members, BirthCoordinate, Group, GroupId, MemberSite,
-    Shape,
+    compose, pair_birth_members, plans, ring_birth_members, BirthCoordinate, BundleBirth,
+    BundleSource, Group, GroupId, MemberSite, Shape, Wiring,
 };
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
-use crate::contracts::MAX_GATE_SLOTS;
-use crate::contracts::{DirectionPair, InputReference};
-use crate::genome::vote::{
+use crate::contracts::votes::{
     ActionParamField, DirectedVoteKind as Kind, VoteSink, VOTE_DIRECTION_COUNT,
 };
-use crate::genome::{BackendDef, NodeGenome, PlasticityConfig};
+use crate::contracts::MAX_GATE_SLOTS;
+use crate::contracts::{DirectionPair, FieldSet, InputReference};
+use crate::genome::{BackendDef, NodeEditError, NodeGenome, PlasticityConfig};
 
 // ── Read-only list newtypes ─────────────────────────────────────────────────
 
@@ -964,9 +964,11 @@ impl CgpGraphBackendDef {
         self.debug_assert_groups();
     }
 
-    /// Remove the edge at `occurrence` with its seed.
-    pub fn remove_edge(&mut self, occurrence: EdgeOccurrence) {
+    /// Remove the edge at `occurrence` with its seed; a group's last member
+    /// takes its record along. Returns whether a record was removed.
+    pub fn remove_edge(&mut self, occurrence: EdgeOccurrence) -> bool {
         let EdgeOccurrence { surface, index } = occurrence;
+        let mut record_removed = false;
         if let Some(seeds) = &mut self.birth_seeds {
             seeds.row_mut(surface).remove(index);
         }
@@ -979,12 +981,14 @@ impl CgpGraphBackendDef {
                 if let Some(Membership { group, .. }) = removed.membership {
                     if self.members(group).next().is_none() {
                         self.drop_group_record(group);
+                        record_removed = true;
                     }
                 }
             }
         }
         self.debug_assert_seed_shape();
         self.debug_assert_groups();
+        record_removed
     }
 
     /// Append copies of compute node `from`'s edges, with their seeds, to
@@ -1267,6 +1271,45 @@ impl CgpGraphBackendDef {
         }
         self.debug_assert_groups();
         id
+    }
+
+    /// Build one bundle reading `source`, whose field set the node resolved
+    /// to `set`, with `birth`'s wiring and scale: every member of the set
+    /// at own weight 0, static, scope `Edge`, no seed, in one edit.
+    ///
+    /// # Errors
+    ///
+    /// The wiring is not admissible for `set` ([`plans`]) or the graph holds
+    /// `u16::MAX` records; nothing is written.
+    // Commit 1 of T25.F11: a record holds a sensor's `Ring` or `Pair` set
+    // only; any other source or set is `Inadmissible` until the record
+    // carries its source and wiring.
+    pub fn add_bundle(
+        &mut self,
+        source: BundleSource,
+        set: FieldSet,
+        birth: BundleBirth,
+    ) -> Result<GroupId, NodeEditError> {
+        if !plans(self, &set).contains(&birth.wiring) {
+            return Err(NodeEditError::Inadmissible);
+        }
+        if self.groups.len() >= usize::from(u16::MAX) {
+            return Err(NodeEditError::BundleCapacity);
+        }
+        let BundleSource::Sensor { ref_idx, field_set } = source else {
+            return Err(NodeEditError::Inadmissible);
+        };
+        let id = match (set, birth.wiring) {
+            (FieldSet::Ring, Wiring::Ring { kind, offset }) => {
+                self.add_group(Shape::Ring { ring_ref: ref_idx }, kind, offset)
+            }
+            (FieldSet::Pair(layout), Wiring::DirectionPair { kind, offset }) => {
+                self.add_pair_group(ref_idx, field_set, layout, kind, offset, layout.facts)
+            }
+            _ => return Err(NodeEditError::Inadmissible),
+        };
+        self.group_mut(id).set_scale(birth.scale);
+        Ok(id)
     }
 
     fn push_group_record(&mut self, shape: Shape, kind: Kind, offset: u8) -> GroupId {
@@ -1717,6 +1760,12 @@ impl CgpGraphBackendDef {
     pub(crate) fn exhaust_group_capacity(&mut self) {
         let record = Group::new(Shape::Ring { ring_ref: 0 }, Kind::Move, 0);
         self.groups = vec![record; usize::from(u16::MAX)];
+    }
+
+    /// Drop the last group record (a capacity fixture, after
+    /// [`Self::exhaust_group_capacity`]).
+    pub(crate) fn drop_last_group_record(&mut self) {
+        self.groups.pop();
     }
 }
 

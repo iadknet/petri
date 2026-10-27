@@ -11,10 +11,11 @@ use super::operators::mutate_one_instruction_field;
 use super::{VmMutator, VmOperator};
 use crate::config::{MutationConfig, RuntimeConfig};
 use crate::contracts::NodeId;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::reachability::TargetSelector;
 use crate::neighborhood::battery::{Battery, Signature};
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
@@ -107,7 +108,7 @@ struct Run {
     result: NodeResult,
     /// The dispatch's committed vote contribution and parameter surface.
     actions: (
-        crate::genome::vote::VoteVector,
+        crate::contracts::votes::VoteVector,
         crate::runtime::action_decode::ActionParams,
     ),
     memory: [f32; 16],

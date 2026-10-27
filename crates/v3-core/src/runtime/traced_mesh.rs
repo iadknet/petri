@@ -1,10 +1,11 @@
 //! Trace recording adapter for the shared mesh routing loop.
 
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::VoteVector;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, SHARED_MEMORY_SLOTS,
 };
-use crate::genome::vote::VoteVector;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
@@ -14,7 +15,7 @@ use crate::runtime::trace::domain::{
     BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
-use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh with trace recording: the output, every hop
@@ -403,6 +404,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
+    use crate::contracts::votes::{ActionParamField, VoteKind, VoteSink};
     use crate::contracts::{
         DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldAction,
     };
@@ -410,7 +412,6 @@ mod tests {
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::genome::vote::{ActionParamField, VoteKind, VoteSink};
     use crate::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,

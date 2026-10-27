@@ -5,12 +5,11 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::VoteSink;
+use crate::contracts::OutcomeChannel;
 use crate::contracts::{Direction, InputReference, NodeId};
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::VoteSink;
-use crate::genome::{
-    BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, VmBackendDef, VmInstruction,
-};
+use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::sensors::static_inputs::assemble_static_inputs;
 
 /// A one-node VM genome over `PreviousOutcome` running `program` with the
@@ -133,7 +132,7 @@ fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
             const_idx: 0,
         },
         VmInstruction::WriteActionParam {
-            field_idx: crate::genome::vote::ActionParamField::ReproduceTransferFraction.index()
+            field_idx: crate::contracts::votes::ActionParamField::ReproduceTransferFraction.index()
                 as u8,
             src: 0,
         },

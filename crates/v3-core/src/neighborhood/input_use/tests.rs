@@ -3,6 +3,7 @@ use proptest::prelude::*;
 use super::catalog::ACTION_QUEUE_DRAW_WIDTH;
 use super::*;
 use crate::config::{FounderProfile, OrdinaryFoodTypeId, RuntimeConfig, SimulationConfig};
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldInputKey,
 };
@@ -10,7 +11,6 @@ use crate::creature::founder::founder_genome;
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::VoteSink;
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
 const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
@@ -28,7 +28,7 @@ fn leaf(ref_idx: u16, sub_idx: u16) -> GraphEdge {
 }
 
 fn channel(reference: &InputReference, sub_idx: u16) -> Channel {
-    match addressed(reference, sub_idx) {
+    match addressed(reference, sub_idx, &crate::config::test_sensor_context(1)) {
         Addressed::Channel(channel) => channel,
         Addressed::OutOfWidth(family) => panic!("{family:?} read out of width"),
     }
@@ -108,7 +108,9 @@ impl Fixture {
         let context = EvalContext {
             runtime: &self.runtime,
             shared_memory_decay_rate: self.config.shared_memory.decay_rate,
-            food_type_count: self.config.world.food.types.len(),
+            sensors: self
+                .config
+                .sensor_context(self.config.world.food.types.len()),
         };
         let scenes = Scenes {
             battery: &self.battery,
@@ -291,7 +293,14 @@ fn action_queue_channels_past_the_draw_width_are_kept_and_labelled() {
 
 #[test]
 fn decision_reads_past_their_width_count_as_out_of_width_consumers() {
-    let width = sub_value_count(&InputReference::CommitCounts);
+    let width = u16::try_from(
+        crate::contracts::SensorDescriptor::of(
+            &InputReference::CommitCounts,
+            &crate::config::test_sensor_context(1),
+        )
+        .width(),
+    )
+    .unwrap();
     let parent = Fixture::new().read(&eat_from(InputReference::CommitCounts, width + 1));
     assert_eq!(parent.out_of_width.get(&Family::CommitCounts), Some(&1));
     assert!(parent.connected.is_empty() && parent.executed.is_empty());
@@ -349,15 +358,25 @@ fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
     let fixture = Fixture::new();
     let founder = founder_genome(FounderProfile::V3Alpha1);
     let unread = channel(&barriers(), 0);
-    assert_eq!(ablated(&founder, |c| c == unread), founder);
+    assert_eq!(
+        ablated(
+            &founder,
+            |c| c == unread,
+            &crate::config::test_sensor_context(1)
+        ),
+        founder
+    );
     let vm = crate::creature::founder::vm_decision_founder_genome();
-    assert_eq!(ablated(&vm, |c| c == unread), vm);
+    assert_eq!(
+        ablated(&vm, |c| c == unread, &crate::config::test_sensor_context(1)),
+        vm
+    );
 
     // Barriers are zero on the original battery.
     let context = EvalContext {
         runtime: &fixture.runtime,
         shared_memory_decay_rate: fixture.config.shared_memory.decay_rate,
-        food_type_count: 1,
+        sensors: crate::config::test_sensor_context(1),
     };
     let scenes = Scenes {
         battery: &fixture.battery,
@@ -389,7 +408,11 @@ fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
         }]),
     ] {
         let base = scenes.actions(&reader);
-        let zeroed = scenes.actions(&ablated(&reader, |c| c == channel(&barriers(), 0)));
+        let zeroed = scenes.actions(&ablated(
+            &reader,
+            |c| c == channel(&barriers(), 0),
+            &crate::config::test_sensor_context(1),
+        ));
         assert_eq!(base[..split], zeroed[..split]);
         assert_ne!(
             base, zeroed,
@@ -577,7 +600,7 @@ fn mutated_founder(seed: u64, events: u32) -> CreatureGenome {
             &reachable,
             crate::mutation::reachability::ParentExecuted::Indices(&reachable),
             &mut rng,
-            config.world.food.types.len(),
+            &config.sensor_context(config.world.food.types.len()),
         );
     }
     genome
@@ -617,13 +640,13 @@ proptest! {
     fn ablation_preserves_structure(channels in proptest::collection::btree_set(0u16..8, 0..8)) {
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let pick = |c: Channel| c.family == Family::UpstreamSlot && channels.contains(&c.channel);
-        let once = ablated(&founder, pick);
+        let once = ablated(&founder, pick, &crate::config::test_sensor_context(1));
         prop_assert_eq!(once.genome_size(), founder.genome_size());
         prop_assert_eq!(once.nodes.len(), founder.nodes.len());
-        prop_assert_eq!(ablated(&once, pick), once.clone());
+        prop_assert_eq!(ablated(&once, pick, &crate::config::test_sensor_context(1)), once.clone());
         let reachable = mesh_reachable_nodes(&founder);
-        let before = Inventory::new(&founder, &reachable).input_channels();
-        let after = Inventory::new(&once, &reachable).input_channels();
+        let before = Inventory::new(&founder, &reachable, &crate::config::test_sensor_context(1)).input_channels();
+        let after = Inventory::new(&once, &reachable, &crate::config::test_sensor_context(1)).input_channels();
         let expected: BTreeSet<Channel> = before.iter().copied().filter(|&c| !pick(c)).collect();
         prop_assert_eq!(after, expected);
     }
@@ -633,8 +656,8 @@ proptest! {
 /// read whenever its node's effects pass runs (T25.F03).
 #[test]
 fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::Shape;
-    use crate::genome::vote::DirectedVoteKind;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
     let BackendDef::Graph(def) = &mut node.backend_def else {
         unreachable!()
@@ -655,8 +678,8 @@ fn a_ring_group_consumes_all_eight_channels_of_its_ring() {
 /// from its group's ring (T25.F03).
 #[test]
 fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::{GraphSource, Shape};
-    use crate::genome::vote::DirectedVoteKind;
     let refs = vec![barriers(), food_here(), barriers()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
     let BackendDef::Graph(def) = &mut node.backend_def else {
@@ -671,7 +694,11 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
     }
     let genome = genome(vec![node]);
     let target = channel(&barriers(), 3);
-    let ablated = super::consumers::ablated(&genome, |c| c == target);
+    let ablated = super::consumers::ablated(
+        &genome,
+        |c| c == target,
+        &crate::config::test_sensor_context(1),
+    );
     assert_eq!(ablated.genome_size(), genome.genome_size());
     let (BackendDef::Graph(before), BackendDef::Graph(after)) =
         (&genome.nodes[0].backend_def, &ablated.nodes[0].backend_def)
@@ -715,8 +742,8 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
 /// bitwise: the pattern resolves from the group's reference (T25.F04).
 #[test]
 fn masking_a_pair_reference_zeroes_every_member_read() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::GraphSource;
-    use crate::genome::vote::DirectedVoteKind;
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let refs = vec![area.clone(), food_here()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
@@ -734,7 +761,11 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     def.group_mut(id).set_scale(0.75);
     let genome = genome(vec![node]);
     let family = channel(&area, 0).family;
-    let ablated = super::consumers::ablated(&genome, |c| c.family == family);
+    let ablated = super::consumers::ablated(
+        &genome,
+        |c| c.family == family,
+        &crate::config::test_sensor_context(1),
+    );
     assert_eq!(ablated.genome_size(), genome.genome_size());
     assert_eq!(ablated.complexity(), genome.complexity());
     let (BackendDef::Graph(before), BackendDef::Graph(after)) =

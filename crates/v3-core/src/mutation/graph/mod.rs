@@ -6,12 +6,12 @@ pub(crate) mod recruitment;
 use rand::Rng;
 
 use crate::config::{MutationConfig, NeutralInputRecruitment};
-use crate::contracts::InputReference;
+use crate::contracts::SensorContext;
 use crate::genome::cgp::{CgpGraphBackendDef, Scope};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
-    BirthEdgeClass, MutationOperator, MutationSkipReason, TargetReachability,
+    BirthEdgeClass, BundleEdits, MutationOperator, MutationSkipReason, TargetReachability,
 };
 
 /// What an applied Graph event reports beside its reachability.
@@ -23,6 +23,9 @@ pub(crate) struct GraphEventReport {
     /// nine plasticity operators, `SetScope` and the three edge retention
     /// operators) landed on (T25.F08, T25.F09).
     pub attribute_scope: Option<Scope>,
+    /// What the event did to bundles (T25.F11), from the container's
+    /// return values.
+    pub bundle_edits: BundleEdits,
 }
 
 /// Graph mutation operator variants.
@@ -268,7 +271,7 @@ impl GraphOperator {
     /// Whether this operator has a site to apply to on one Graph-backend
     /// node. Each arm delegates to the same enumeration the operator draws
     /// its target from. Numeric proposal rejection can still skip atomically.
-    fn applies_to(self, def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
+    fn applies_to(self, def: &CgpGraphBackendDef, inputs: operators::NodeInputs<'_>) -> bool {
         match self {
             Self::AlterGraphEdgeWeight | Self::RetargetGraphEdge | Self::RemoveGraphEdge => {
                 operators::has_edge_site(def)
@@ -280,7 +283,7 @@ impl GraphOperator {
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
             Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
-            Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
+            Self::GraphRawFieldMutation => operators::has_raw_field_site(def, inputs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
             Self::CopyEdgeBundle => operators::can_copy_edge_bundle(def),
@@ -295,9 +298,9 @@ impl GraphOperator {
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
                 hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
-            Self::AddRingGroup | Self::AddRandomizedRingGroup => group::can_add(def, input_refs),
+            Self::AddRingGroup | Self::AddRandomizedRingGroup => group::can_add(def, inputs.refs),
             Self::AddDirectionPairGroup | Self::AddRandomizedDirectionPairGroup => {
-                group::can_add_pair(def, input_refs)
+                group::can_add_pair(def, inputs.refs)
             }
             Self::AlterGroupScale
             | Self::ShiftGroupOffset
@@ -325,13 +328,23 @@ impl GraphMutator {
     /// Selection draws from this set rather than from every Graph-backend
     /// node, so a refinement operator reaches a module that has a suitable
     /// site instead of landing on one that does not (T13.F03).
-    pub(crate) fn applicable_indices(genome: &CreatureGenome, op: GraphOperator) -> Vec<usize> {
+    pub(crate) fn applicable_indices(
+        genome: &CreatureGenome,
+        op: GraphOperator,
+        context: &SensorContext,
+    ) -> Vec<usize> {
         genome
             .nodes
             .iter()
             .enumerate()
             .filter(|(_, n)| match &n.backend_def {
-                BackendDef::Graph(def) => op.applies_to(def, &n.input_refs),
+                BackendDef::Graph(def) => op.applies_to(
+                    def,
+                    operators::NodeInputs {
+                        refs: &n.input_refs,
+                        context,
+                    },
+                ),
                 BackendDef::Vm(_) => false,
             })
             .map(|(i, _)| i)
@@ -351,22 +364,29 @@ impl GraphMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
+        Self::apply_in(
+            genome,
+            op,
+            targets,
+            rng,
+            config,
+            &crate::config::SimulationConfig::default().sensor_context(1),
+        )
     }
 
-    pub fn apply_with_food_type_count(
+    pub fn apply_in(
         genome: &mut CreatureGenome,
         op: GraphOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_classified(genome, op, targets, rng, config, food_type_count)
+        Self::apply_classified(genome, op, targets, rng, config, context)
             .map(|(reachability, _)| reachability)
     }
 
-    /// [`Self::apply_with_food_type_count`] with what the event reports
+    /// [`Self::apply_in`] with what the event reports
     /// beside its reachability ([`GraphEventReport`]); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
@@ -374,12 +394,12 @@ impl GraphMutator {
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<(TargetReachability, GraphEventReport), MutationSkipReason> {
         if !op.enabled(config) {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        let applicable = Self::applicable_indices(genome, op);
+        let applicable = Self::applicable_indices(genome, op, context);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -387,7 +407,7 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        let report = Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
+        let report = Self::apply_to_node(genome, op, node_idx, rng, config, context)?;
         Ok((reachability, report))
     }
 
@@ -401,21 +421,13 @@ impl GraphMutator {
         node_idx: usize,
         rng: &mut impl Rng,
         config: &MutationConfig,
-        food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<GraphEventReport, MutationSkipReason> {
-        let unreported =
-            |result: Result<(), MutationSkipReason>| result.map(|()| GraphEventReport::default());
-        let scoped = |result: Result<Scope, MutationSkipReason>| {
-            result.map(|scope| GraphEventReport {
-                class: None,
-                attribute_scope: Some(scope),
-            })
-        };
         match op {
             GraphOperator::RecruitNeutralInput => unreported(recruitment::recruit(
                 node_mut(genome, node_idx)?,
                 config.neutral_input_recruitment,
-                food_type_count,
+                context,
                 rng,
             )),
             GraphOperator::AlterGraphEdgeWeight => {
@@ -428,23 +440,23 @@ impl GraphMutator {
                 unreported(operators::mutate_operator_param(genome, node_idx, rng))
             }
             GraphOperator::AddInternalGraphNode => {
-                unreported(operators::add_internal_node(genome, node_idx, rng))
+                edited(operators::add_internal_node(genome, node_idx, context, rng))
             }
             GraphOperator::RemoveInternalGraphNode => {
                 unreported(operators::remove_internal_node(genome, node_idx, rng))
             }
             GraphOperator::AddGraphEdge => Ok(GraphEventReport {
-                class: operators::add_graph_edge(genome, node_idx, rng)?,
-                attribute_scope: None,
+                class: operators::add_graph_edge(genome, node_idx, context, rng)?,
+                ..GraphEventReport::default()
             }),
-            GraphOperator::RetargetGraphEdge => {
-                unreported(operators::retarget_graph_edge(genome, node_idx, rng))
-            }
+            GraphOperator::RetargetGraphEdge => edited(operators::retarget_graph_edge(
+                genome, node_idx, context, rng,
+            )),
             GraphOperator::RemoveGraphEdge => {
-                unreported(operators::remove_graph_edge(genome, node_idx, rng))
+                edited(operators::remove_graph_edge(genome, node_idx, rng))
             }
-            GraphOperator::GraphRawFieldMutation => unreported(
-                operators::apply_graph_raw_field_mutation(genome, node_idx, rng),
+            GraphOperator::GraphRawFieldMutation => edited(
+                operators::apply_graph_raw_field_mutation(genome, node_idx, context, rng),
             ),
             GraphOperator::CopyInternalNode => {
                 unreported(operators::apply_copy_internal_node(genome, node_idx, rng))
@@ -509,7 +521,7 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::RemoveGroup => unreported(group::remove(
+            GraphOperator::RemoveGroup => edited(group::remove(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -517,28 +529,32 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::AddRingGroup => unreported(group::add_in_form(
+            GraphOperator::AddRingGroup => edited(group::add_in_form(
                 node_mut(genome, node_idx)?,
                 group::CreationForm::Uniform,
+                context,
                 rng,
             )),
-            GraphOperator::AddRandomizedRingGroup => unreported(group::add_in_form(
+            GraphOperator::AddRandomizedRingGroup => edited(group::add_in_form(
                 node_mut(genome, node_idx)?,
                 group::CreationForm::Randomized,
+                context,
                 rng,
             )),
-            GraphOperator::AddDirectionPairGroup => unreported(group::add_pair_in_form(
+            GraphOperator::AddDirectionPairGroup => edited(group::add_pair_in_form(
                 node_mut(genome, node_idx)?,
                 group::CreationForm::Uniform,
+                context,
                 rng,
             )),
-            GraphOperator::AddRandomizedDirectionPairGroup => unreported(group::add_pair_in_form(
+            GraphOperator::AddRandomizedDirectionPairGroup => edited(group::add_pair_in_form(
                 node_mut(genome, node_idx)?,
                 group::CreationForm::Randomized,
+                context,
                 rng,
             )),
             GraphOperator::DetachGraphEdge => {
-                unreported(group::detach_member(node_mut(genome, node_idx)?, rng))
+                edited(group::detach_member(node_mut(genome, node_idx)?, rng))
             }
             GraphOperator::EnableRetention => scoped(hebbian::enable_retention_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
@@ -566,6 +582,33 @@ impl GraphMutator {
             )),
         }
     }
+}
+
+/// An event that reports nothing beside its reachability.
+fn unreported(
+    result: Result<(), MutationSkipReason>,
+) -> Result<GraphEventReport, MutationSkipReason> {
+    result.map(|()| GraphEventReport::default())
+}
+
+/// An attribute change reporting the scope it landed on.
+fn scoped(
+    result: Result<Scope, MutationSkipReason>,
+) -> Result<GraphEventReport, MutationSkipReason> {
+    result.map(|scope| GraphEventReport {
+        attribute_scope: Some(scope),
+        ..GraphEventReport::default()
+    })
+}
+
+/// A bundle-touching event reporting its edits.
+fn edited(
+    result: Result<BundleEdits, MutationSkipReason>,
+) -> Result<GraphEventReport, MutationSkipReason> {
+    result.map(|bundle_edits| GraphEventReport {
+        bundle_edits,
+        ..GraphEventReport::default()
+    })
 }
 
 /// The node at `node_idx`, or `NoApplicableTarget` past the end.

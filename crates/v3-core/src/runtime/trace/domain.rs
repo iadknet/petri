@@ -1,10 +1,10 @@
 //! Passive trace-domain data structures for the Execution Sampler.
 
+use crate::contracts::votes::{VoteSink, VoteVector, VOTE_KIND_COUNT};
+use crate::contracts::OUTCOME_CHANNEL_COUNT;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::genome::cgp::ComputeNodeKind;
-use crate::genome::vote::{VoteSink, VoteVector, VOTE_KIND_COUNT};
-use crate::genome::OUTCOME_CHANNEL_COUNT;
-use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;

@@ -2,8 +2,8 @@
 //! ordinary sink edges at their genomic weight, so equality with the
 //! equivalent ungrouped edges is bitwise.
 use super::*;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::genome::cgp::{EdgeSurface, GroupId, Shape};
-use crate::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::group;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::types::sanitize_f32;

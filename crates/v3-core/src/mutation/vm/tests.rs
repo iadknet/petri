@@ -3,11 +3,11 @@ use super::operators::{
     splice_program_with_reference_repair, SpliceInstruction,
 };
 use super::*;
+use crate::contracts::votes::{ActionParamField, VOTE_SINK_COUNT};
 use crate::contracts::NodeId;
 use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::analysis::vm_forward_slice;
-use crate::genome::vote::{ActionParamField, VOTE_SINK_COUNT};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 use proptest::prelude::*;
@@ -1977,7 +1977,6 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
 #[test]
 fn vm_raw_field_mutation_sub_idx_bounded() {
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::mutation::compound;
     let mut genome = v3alpha1_founder_genome();
     // Set up a compound ring sensor so sub_idx has a meaningful bound (8).
     genome.nodes[1].input_refs = vec![
@@ -2015,7 +2014,16 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
                     let width = g.nodes[1]
                         .input_refs
                         .get(*ref_idx as usize)
-                        .map(compound::sub_value_count)
+                        .map(|reference| {
+                            u16::try_from(
+                                crate::contracts::SensorDescriptor::of(
+                                    reference,
+                                    &crate::config::test_sensor_context(1),
+                                )
+                                .width(),
+                            )
+                            .unwrap()
+                        })
                         .unwrap_or(1);
                     assert!(
                         *sub_idx < width,

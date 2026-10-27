@@ -7,6 +7,8 @@ mod terrain;
 
 pub use crate::contracts::OrdinaryFoodTypeId;
 #[cfg(test)]
+pub(crate) use simulation::test_sensor_context;
+#[cfg(test)]
 pub(crate) use simulation::MAX_GRAZING_RECOVERY_TICKS;
 pub use simulation::{
     AnnealingConfig, EnergyCapacityConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig,

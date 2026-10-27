@@ -1,13 +1,13 @@
 use super::controls::graph_genome;
 use super::*;
 use crate::config::{FounderProfile, SimulationConfig};
+use crate::contracts::votes::ActionParamField;
 use crate::creature::founder::founder_genome;
 use crate::genome::cgp::test_support::set_sink_inputs;
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSinkKind,
 };
-use crate::genome::vote::ActionParamField;
 use crate::genome::{BackendDef, NodeGenome};
 use proptest::prelude::*;
 
@@ -185,13 +185,13 @@ fn a_dispatched_edit_nothing_records_is_unresolved() {
     };
     set_sink_inputs(
         graph_def(&mut parent, 0),
-        OutputSinkKind::ActionVote(crate::genome::vote::VoteSink::Eat),
+        OutputSinkKind::ActionVote(crate::contracts::votes::VoteSink::Eat),
         vec![barrier(1.0)],
     );
     let mut child = parent.clone();
     set_sink_inputs(
         graph_def(&mut child, 0),
-        OutputSinkKind::ActionVote(crate::genome::vote::VoteSink::Eat),
+        OutputSinkKind::ActionVote(crate::contracts::votes::VoteSink::Eat),
         vec![barrier(2.0)],
     );
     let result = attribution(&parent, &child);
@@ -639,7 +639,7 @@ fn exhausted_domains_count_as_skips_and_pairs_are_the_first_qualifying_proposals
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut SmallRng::seed_from_u64(seed + proposal as u64),
-                context.food_type_count,
+                &context.sensors,
             );
             child
         })

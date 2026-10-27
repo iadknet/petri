@@ -4,7 +4,7 @@
 //! `split_existing_edge` splits every introspection edge function-preservingly
 //! (T25.F02 retired the T11.F08 exclusion with the learning charge).
 
-use crate::genome::vote::DirectedVoteKind;
+use crate::contracts::votes::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -14,19 +14,20 @@ use super::operators::{
     plasticity_input_refs, scenarios,
 };
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{ActionParamField, VoteSink};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::genome::PlasticityConfig;
 use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
 };
 use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::execute_graph_node;
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 
 /// World ticks per scenario. Backward and self edges read frozen tick-start
 /// outputs (T11.F06), which are all zero on the first tick, so a phase error
@@ -483,8 +484,12 @@ fn split_preserves_a_live_introspection_sink_edge_under_plasticity() {
     for seed in 0u64..16 {
         let mut child = parent.clone();
         assert_eq!(
-            split_existing_edge(&mut child, &[], &mut SmallRng::seed_from_u64(seed)),
-            Ok(()),
+            split_existing_edge(
+                &mut child,
+                crate::mutation::graph::operators::test_inputs(&[]),
+                &mut SmallRng::seed_from_u64(seed)
+            ),
+            Ok(crate::mutation::types::BundleEdits::default()),
             "seed {seed}"
         );
         assert_eq!(child.compute_nodes().len(), 2, "seed {seed}");
@@ -558,8 +563,12 @@ fn split_applies_to_every_introspection_edge_shape() {
     ] {
         let mut child = def.clone();
         assert_eq!(
-            split_existing_edge(&mut child, &[], &mut SmallRng::seed_from_u64(3)),
-            Ok(()),
+            split_existing_edge(
+                &mut child,
+                crate::mutation::graph::operators::test_inputs(&[]),
+                &mut SmallRng::seed_from_u64(3)
+            ),
+            Ok(crate::mutation::types::BundleEdits::default()),
             "{label}: the split applies"
         );
         assert_eq!(child.compute_nodes().len(), def.compute_nodes().len() + 1);

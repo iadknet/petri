@@ -3,8 +3,8 @@
 //! the termination reason and the heading.
 
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{DirectedVoteKind, VoteKind, VoteSink};
 use crate::contracts::{Direction, WorldAction};
-use crate::genome::vote::{DirectedVoteKind, VoteKind, VoteSink};
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::vote_test_support::{genome, run_tick_heading, vm_voter, GraphBuilder, Senses};
 

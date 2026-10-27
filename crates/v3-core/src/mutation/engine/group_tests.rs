@@ -7,13 +7,13 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use super::*;
+use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::{
     test_support::edit_sinks, CgpGraphBackendDef, GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
 fn graph_index(genome: &CreatureGenome) -> usize {
@@ -124,10 +124,10 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &config,
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok());
-        assert_eq!(edits.groups_removed, 1);
+        assert_eq!(edits.removed, 1);
 
         let mut rolled_back = broken.clone();
         let (result, edits, scope) = apply_graph_event(
@@ -136,10 +136,10 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &config,
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert_eq!(result, Err(MutationSkipReason::GraphInvariantViolation));
-        assert_eq!(edits, GroupEdits::default());
+        assert_eq!(edits, BundleEdits::default());
         assert_eq!(scope, None);
         assert_eq!(rolled_back, broken);
     }
@@ -166,7 +166,7 @@ fn a_rolled_back_attribute_change_reports_no_scope() {
                 &mut TargetSelector::reachable_only(&all, 0.0),
                 &mut SmallRng::seed_from_u64(seed),
                 &config,
-                2,
+                &crate::config::test_sensor_context(2),
             );
             assert!(result.is_ok(), "{op:?} seed {seed}");
             assert!(scope.is_some(), "{op:?} seed {seed} reports its scope");
@@ -178,62 +178,18 @@ fn a_rolled_back_attribute_change_reports_no_scope() {
                 &mut TargetSelector::reachable_only(&all, 0.0),
                 &mut SmallRng::seed_from_u64(seed),
                 &config,
-                2,
+                &crate::config::test_sensor_context(2),
             );
             assert_eq!(
                 result,
                 Err(MutationSkipReason::GraphInvariantViolation),
                 "{op:?} seed {seed}"
             );
-            assert_eq!(edits, GroupEdits::default());
+            assert_eq!(edits, BundleEdits::default());
             assert_eq!(scope, None, "{op:?} seed {seed} reports no scope");
             assert_eq!(rolled_back, broken);
         }
     }
-}
-
-#[test]
-fn group_edits_count_detaches_and_removals_by_operator() {
-    let edits = |op, before, after| group_edits(op, before, after);
-    assert_eq!(
-        edits(GraphOperator::RetargetGraphEdge, (8, 1), (7, 1)),
-        GroupEdits {
-            detached: 1,
-            groups_removed: 0
-        }
-    );
-    assert_eq!(
-        edits(GraphOperator::GraphRawFieldMutation, (1, 1), (0, 0)),
-        GroupEdits {
-            detached: 1,
-            groups_removed: 1
-        }
-    );
-    assert_eq!(
-        edits(GraphOperator::RemoveGraphEdge, (1, 1), (0, 0)),
-        GroupEdits {
-            detached: 0,
-            groups_removed: 1
-        }
-    );
-    assert_eq!(
-        edits(GraphOperator::RemoveGroup, (16, 2), (8, 1)),
-        GroupEdits {
-            detached: 0,
-            groups_removed: 1
-        }
-    );
-    assert_eq!(
-        edits(GraphOperator::AddRingGroup, (0, 0), (8, 1)),
-        GroupEdits::default()
-    );
-    assert_eq!(
-        edits(GraphOperator::DetachGraphEdge, (8, 1), (7, 1)),
-        GroupEdits {
-            detached: 1,
-            groups_removed: 0
-        }
-    );
 }
 
 /// The ten operators whose committed change reports its scope (T25.F08
@@ -274,14 +230,15 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok(), "seed {seed}");
         assert_eq!(
             edits,
-            GroupEdits {
+            BundleEdits {
                 detached: 1,
-                groups_removed: 0
+                removed: 0,
+                ..BundleEdits::default()
             }
         );
         assert_eq!(scope, None, "a detach reports no attribute scope");
@@ -312,20 +269,21 @@ fn a_last_member_detach_removes_the_group_and_counts_one_removal() {
         &mut TargetSelector::reachable_only(&all, 0.0),
         &mut SmallRng::seed_from_u64(0),
         &MutationConfig::default(),
-        2,
+        &crate::config::test_sensor_context(2),
     );
     assert!(result.is_ok());
     assert_eq!(
         edits,
-        GroupEdits {
+        BundleEdits {
             detached: 1,
-            groups_removed: 1
+            removed: 1,
+            ..BundleEdits::default()
         }
     );
     assert!(graph_mut(&mut detached.nodes[idx]).groups().is_empty());
     assert_eq!(detached.genome_size(), genome.genome_size());
     let mut summary = MutationSummary::zero();
-    summary.record_group_edits(edits);
+    summary.record_bundle_edits(edits);
     assert_eq!(
         (summary.graph_edges_detached, summary.groups_removed),
         (1, 1)
@@ -397,9 +355,9 @@ fn a_sole_members_detach_moves_genome_size_by_the_unit_rule() {
                     &mut TargetSelector::reachable_only(&all, 0.0),
                     &mut SmallRng::seed_from_u64(seed),
                     &MutationConfig::default(),
-                    2,
+                    &crate::config::test_sensor_context(2),
                 );
-                if result.is_err() || edits.groups_removed == 0 {
+                if result.is_err() || edits.removed == 0 {
                     continue;
                 }
                 detached_once = true;
@@ -454,7 +412,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok(), "seed {seed}");
         let (before, after) = (plasticity(&genome), plasticity(&changed));
@@ -488,7 +446,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok());
         let def = graph_mut(&mut changed.nodes[idx]);
@@ -515,7 +473,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(1),
             &MutationConfig::default(),
-            2,
+            &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok(), "{op:?}");
         assert_eq!(scope, None, "{op:?} reports no attribute scope");
@@ -528,31 +486,19 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
     assert_eq!(summary.attribute_changes_by_scope, [1, 2]);
 }
 
-/// The tallies count every member edge and every group record: one ring
-/// group is eight members, a second doubles both.
-#[test]
-fn group_tallies_count_members_and_group_records() {
-    let (mut genome, idx, ring) = grouped_founder();
-    assert_eq!(group_tallies(&genome), (8, 1));
-    graph_mut(&mut genome.nodes[idx]).add_group(
-        Shape::Ring { ring_ref: ring },
-        DirectedVoteKind::Move,
-        5,
-    );
-    assert_eq!(group_tallies(&genome), (16, 2));
-}
-
 /// A summary accumulates every committed event's detaches and removals.
 #[test]
-fn record_group_edits_accumulates_across_events() {
+fn record_bundle_edits_accumulates_across_events() {
     let mut summary = MutationSummary::zero();
-    summary.record_group_edits(GroupEdits {
+    summary.record_bundle_edits(BundleEdits {
         detached: 2,
-        groups_removed: 1,
+        removed: 1,
+        ..BundleEdits::default()
     });
-    summary.record_group_edits(GroupEdits {
+    summary.record_bundle_edits(BundleEdits {
         detached: 3,
-        groups_removed: 4,
+        removed: 4,
+        ..BundleEdits::default()
     });
     assert_eq!(summary.graph_edges_detached, 5);
     assert_eq!(summary.groups_removed, 5);
@@ -739,7 +685,7 @@ proptest! {
                 &reachable,
                 ParentExecuted::NONE,
                 &mut rng,
-                2,
+                &crate::config::test_sensor_context(2),
             );
             // Every committed attribute change reports one scope (T25.F08).
             let attribute_events: u32 = ATTRIBUTE_OPERATORS

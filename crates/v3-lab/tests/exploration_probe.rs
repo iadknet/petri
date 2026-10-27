@@ -113,13 +113,13 @@ fn e3_fixed_pool_selection_audit() {
             .map(|i| {
                 let mut child = founder.clone();
                 let mut rng = SmallRng::seed_from_u64(0xE3_C0_00_00 + pool * 1_000 + i as u64);
-                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                let summary = MutationEngine::apply_mutations_in(
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
-                    food_types,
+                    &setup.config.sensor_context(food_types),
                 );
                 if child == founder {
                     return (true, summary.applied_events, 0.0, 0.0, 0.0, 0.0);
@@ -272,13 +272,13 @@ fn e4_elite_neighbourhood_audit() {
             .map(|i| {
                 let mut child = parent.clone();
                 let mut rng = SmallRng::seed_from_u64(0xE4_C0_00_00 + i);
-                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                let summary = MutationEngine::apply_mutations_in(
                     &mut child,
                     &setup.config.mutation,
                     &reachable,
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
-                    food_types,
+                    &setup.config.sensor_context(food_types),
                 );
                 let ops: Vec<String> = summary
                     .events
@@ -344,13 +344,15 @@ fn elite(dir: &str, name: &str) -> CreatureGenome {
 fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) -> CreatureGenome {
     let mut child = parent.clone();
     let mut rng = SmallRng::seed_from_u64(seed);
-    MutationEngine::apply_mutations_with_food_type_count(
+    MutationEngine::apply_mutations_in(
         &mut child,
         &setup.config.mutation,
         &mesh_reachable_nodes(parent),
         ParentExecuted::Query(&|window| frozen.executed_indices(window)),
         &mut rng,
-        setup.config.world.food.types.len(),
+        &setup
+            .config
+            .sensor_context(setup.config.world.food.types.len()),
     );
     child
 }

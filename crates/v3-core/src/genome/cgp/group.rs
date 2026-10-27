@@ -6,8 +6,8 @@
 //! weight is [`compose`]`(own_weight, scale, pattern)`.
 
 use super::{CgpGraphBackendDef, EdgeOccurrence, OutputSinkKind};
-use crate::contracts::{compass_x, compass_y, DirectionPair, InputReference};
-use crate::genome::vote::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
+use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
+use crate::contracts::{compass_x, compass_y, DirectionPair, FieldSet, InputReference};
 
 /// Where a member sits relative to its group's kind `K` (T25.F10): a
 /// **direction member** on a direction sink `K(d)`, or a **fact member** of
@@ -283,4 +283,78 @@ pub fn pair_birth_members(pair: DirectionPair, offset: u8) -> impl Iterator<Item
 #[must_use]
 pub fn compose(own: f32, scale: f32, pattern: f32) -> f32 {
     scale * pattern + own
+}
+
+/// What a bundle reads (T25.F11): one field set of a declared sensor, or a
+/// shared-memory bank (no declaration; its one field set is index 0).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum BundleSource {
+    Sensor { ref_idx: u16, field_set: u8 },
+    Memory { previous: bool },
+}
+
+impl BundleSource {
+    /// The field set index the source names.
+    #[inline]
+    #[must_use]
+    pub const fn field_set(self) -> u8 {
+        match self {
+            Self::Sensor { field_set, .. } => field_set,
+            Self::Memory { .. } => 0,
+        }
+    }
+}
+
+/// How a bundle's members sit on the sinks (T25.F11): every field on one
+/// vote sink (`Plain`), a ring cell per direction (`Ring`), or an offset
+/// pair across the compass with its facts on the drive (`DirectionPair`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Wiring {
+    Plain { sink: VoteSink },
+    Ring { kind: DirectedVoteKind, offset: u8 },
+    DirectionPair { kind: DirectedVoteKind, offset: u8 },
+}
+
+/// One sampled plan with its birth law (T25.F11): the field set it wires,
+/// the wiring, and the record's scale (0 for a silent bundle).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BundleBirth {
+    pub field_set: u8,
+    pub wiring: Wiring,
+    pub scale: f32,
+}
+
+/// Whether `def` carries every sink `kind`'s directed wirings need: its
+/// eight direction sinks, and its drive when `drive` is set.
+fn hosts_kind(def: &CgpGraphBackendDef, kind: DirectedVoteKind, drive: bool) -> bool {
+    let present = |vote: VoteSink| def.sink(OutputSinkKind::ActionVote(vote)).is_some();
+    (0..VOTE_DIRECTION_COUNT).all(|d| present(kind.sink(d))) && (!drive || present(kind.drive()))
+}
+
+/// Every admissible wiring of `set` on `def`, in deterministic order (T25.F11
+/// invariant 5): a set without geometry one `Plain` per present vote sink in
+/// catalog order; a `Ring` or `Pair` set `(kind, offset)` for every kind
+/// whose required sinks are present, kinds in `DirectedVoteKind::ALL` order,
+/// offsets `0..8`. Depends only on the set's geometry and the sinks present.
+#[must_use]
+pub fn plans(def: &CgpGraphBackendDef, set: &FieldSet) -> Vec<Wiring> {
+    let directed = |drive: bool, wiring: fn(DirectedVoteKind, u8) -> Wiring| {
+        DirectedVoteKind::ALL
+            .into_iter()
+            .filter(|&kind| hosts_kind(def, kind, drive))
+            .flat_map(move |kind| (0..VOTE_DIRECTION_COUNT).map(move |offset| wiring(kind, offset)))
+            .collect()
+    };
+    match set {
+        FieldSet::Plain { .. } => def
+            .output_sinks()
+            .iter()
+            .filter_map(|sink| match sink.kind {
+                OutputSinkKind::ActionVote(vote) => Some(Wiring::Plain { sink: vote }),
+                _ => None,
+            })
+            .collect(),
+        FieldSet::Ring => directed(false, |kind, offset| Wiring::Ring { kind, offset }),
+        FieldSet::Pair(_) => directed(true, |kind, offset| Wiring::DirectionPair { kind, offset }),
+    }
 }

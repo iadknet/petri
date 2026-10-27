@@ -3,11 +3,11 @@
 //! tick in all three execution modes and asserts they agree.
 
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{ActionParamField, VoteSink};
 use crate::contracts::{Direction, InputReference, NodeId, RouteTarget, WorldAction};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::mesh::{
     execute_creature_mesh_impl, ObservedMeshExecution, UntracedMeshExecution,

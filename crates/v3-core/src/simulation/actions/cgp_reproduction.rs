@@ -247,7 +247,12 @@ mod tests {
         use rand::SeedableRng;
         let mut def = tracked_def();
         let mut rng = rand::rngs::SmallRng::seed_from_u64(19);
-        split_existing_edge(&mut def, &[], &mut rng).unwrap();
+        split_existing_edge(
+            &mut def,
+            crate::mutation::graph::operators::test_inputs(&[]),
+            &mut rng,
+        )
+        .unwrap();
         let birth = rows(&def);
         let identity = birth.iter().position(|v| v == &[None]).unwrap();
         assert_eq!(def.compute_nodes()[identity].inputs[0].own_weight(), 1.0);
@@ -271,9 +276,25 @@ mod tests {
             let mut def = original.clone();
             match operation {
                 0 => alter_edge_weight_in_def(&mut def, &mut rng).unwrap(),
-                1 => retarget_edge(&mut def, &[], &mut rng).unwrap(),
-                2 => raw_field_mutation(&mut def, &[], &mut rng).unwrap(),
-                3 => remove_edge(&mut def, &mut rng).unwrap(),
+                1 => {
+                    retarget_edge(
+                        &mut def,
+                        crate::mutation::graph::operators::test_inputs(&[]),
+                        &mut rng,
+                    )
+                    .unwrap();
+                }
+                2 => {
+                    raw_field_mutation(
+                        &mut def,
+                        crate::mutation::graph::operators::test_inputs(&[]),
+                        &mut rng,
+                    )
+                    .unwrap();
+                }
+                3 => {
+                    remove_edge(&mut def, &mut rng).unwrap();
+                }
                 _ => copy_edge_bundle(&mut def, &mut rng).unwrap(),
             }
             let birth = rows(&def);
@@ -425,7 +446,7 @@ mod tests {
         for seed in 0..12 {
             add_edge(
                 &mut def,
-                &[],
+                crate::mutation::graph::operators::test_inputs(&[]),
                 &mut rand::rngs::SmallRng::seed_from_u64(seed),
             )
             .unwrap();
@@ -435,12 +456,22 @@ mod tests {
         }
         let mut draw = tracked_def();
         let mut rng = rand::rngs::SmallRng::seed_from_u64(22);
-        retarget_edge(&mut draw, &[], &mut rng).unwrap();
+        retarget_edge(
+            &mut draw,
+            crate::mutation::graph::operators::test_inputs(&[]),
+            &mut rng,
+        )
+        .unwrap();
         // Replay the draw against its already selected source: no actual rewiring.
         draw.take_birth_seeds();
         draw.seed_compute_rows(tracked_parent());
         let before = draw.birth_seeds().cloned();
-        retarget_edge(&mut draw, &[], &mut rand::rngs::SmallRng::seed_from_u64(22)).unwrap();
+        retarget_edge(
+            &mut draw,
+            crate::mutation::graph::operators::test_inputs(&[]),
+            &mut rand::rngs::SmallRng::seed_from_u64(22),
+        )
+        .unwrap();
         assert_eq!(draw.birth_seeds().cloned(), before);
     }
 }

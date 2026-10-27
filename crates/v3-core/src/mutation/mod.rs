@@ -1,4 +1,3 @@
-pub mod compound;
 pub mod engine;
 pub mod graph;
 pub mod input_ref;
@@ -17,7 +16,7 @@ mod drive_reach_tests;
 
 pub use engine::MutationEngine;
 pub use types::{
-    BirthEdgeClass, GroupEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    BirthEdgeClass, BundleEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
     MutationSummary, TargetReachability,
 };

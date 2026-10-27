@@ -6,13 +6,13 @@ use proptest::prelude::*;
 
 use super::rules::relax;
 use super::LearnedState;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::test_support::plastic_node;
 use crate::genome::cgp::{
     BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, GroupId, Scope, Shape,
 };
-use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
 
 const RING_REF: u16 = 0;

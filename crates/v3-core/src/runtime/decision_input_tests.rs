@@ -4,10 +4,10 @@
 //! frozen previous outcome, runs on the simulation (`simulation/tick/tests`).
 
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{VoteKind, VoteSink};
 use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, WorldAction};
 use crate::genome::cgp::GraphSource;
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{VoteKind, VoteSink};
 use crate::genome::VmInstruction;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{

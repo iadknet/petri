@@ -47,6 +47,7 @@ pub use sample::{
 };
 
 use crate::config::{RuntimeConfig, SimulationConfig};
+use crate::contracts::SensorContext;
 
 /// Multiplier for an evolved genome's seed offset:
 /// `EVOLVED_SEED_MULTIPLIER * (genome_index + 1)`, `genome_index` running
@@ -65,7 +66,8 @@ pub const BATTERY_VERSION: &str = "neighborhood-v2";
 pub struct EvalContext<'a> {
     pub runtime: &'a RuntimeConfig,
     pub shared_memory_decay_rate: f32,
-    pub food_type_count: usize,
+    /// The run's sensor descriptor context (T25.F11).
+    pub sensors: SensorContext,
 }
 
 impl<'a> EvalContext<'a> {
@@ -74,7 +76,7 @@ impl<'a> EvalContext<'a> {
         Self {
             runtime: &config.runtime,
             shared_memory_decay_rate: config.shared_memory.decay_rate,
-            food_type_count: config.world.food.types.len(),
+            sensors: config.sensor_context(config.world.food.types.len()),
         }
     }
 }

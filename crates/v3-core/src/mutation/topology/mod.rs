@@ -1,6 +1,7 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
+use crate::contracts::SensorContext;
 use crate::genome::CreatureGenome;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -160,17 +161,24 @@ impl TopologyMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
+        Self::apply_in(
+            genome,
+            op,
+            targets,
+            rng,
+            config,
+            &crate::config::SimulationConfig::default().sensor_context(1),
+        )
     }
 
-    /// Apply a topology operator with typed-food mutation context.
-    pub fn apply_with_food_type_count(
+    /// [`Self::apply`] under the run's sensor context.
+    pub fn apply_in(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         _config: &MutationConfig,
-        _food_type_count: usize,
+        context: &SensorContext,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
             TopologyOperator::AddNode => structural::apply_splice_node(genome, targets, rng),
@@ -194,10 +202,10 @@ impl TopologyMutator {
                 routing::apply_retarget_node_target(genome, targets, rng)
             }
             TopologyOperator::AddRouteTarget => {
-                routing::apply_add_route_target(genome, targets, rng)
+                routing::apply_add_route_target(genome, targets, rng, context)
             }
             TopologyOperator::AddFeedbackRoute => {
-                routing::apply_add_feedback_route(genome, targets, rng)
+                routing::apply_add_feedback_route(genome, targets, rng, context)
             }
             TopologyOperator::RemoveRouteTarget => {
                 routing::apply_remove_route_target(genome, targets, rng)

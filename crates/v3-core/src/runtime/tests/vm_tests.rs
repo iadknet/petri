@@ -1,7 +1,8 @@
 use super::*;
 use crate::config::RuntimeConfig;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::genome::{VmBackendDef, VmInstruction};
-use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::MeshSideOutputs;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;

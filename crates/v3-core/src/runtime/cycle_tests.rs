@@ -54,7 +54,7 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
                 // A `Terminate` vote commits nothing, so every tick is one
                 // pass and the cycle fixtures read the pass directly.
                 VmInstruction::AddVote {
-                    sink: crate::genome::vote::VoteSink::Terminate.index() as u8,
+                    sink: crate::contracts::votes::VoteSink::Terminate.index() as u8,
                     src: 0,
                 },
                 VmInstruction::Halt,

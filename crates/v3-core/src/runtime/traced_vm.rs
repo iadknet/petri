@@ -1,10 +1,11 @@
 //! Trace recording adapter for the shared VM execution loop.
 
 use crate::config::RuntimeConfig;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::trace::domain::{SlotWrite, VmStepTrace, VmTrace};
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{execute_vm_node_impl, nr, VmTraceSink};
 use crate::sensors::perception::SensorSnapshot;
 

@@ -1,12 +1,13 @@
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{VoteSink, VoteVector, VOTE_SINK_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
-use crate::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
 use crate::genome::{VmBackendDef, VmInstruction};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{
-    sanitize_f32, shared_memory_write_changed, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT,
+    sanitize_f32, shared_memory_write_changed, MeshSideOutputs, NodeResult,
 };
 use crate::sensors::perception::SensorSnapshot;
 

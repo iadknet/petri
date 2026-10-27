@@ -1,5 +1,7 @@
 use super::*;
 use crate::config::{MutationConfig, OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{DynamicIntrospectionKey, NodeId, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
@@ -7,15 +9,24 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::genome::mesh_annotations::MeshReadClass;
+use crate::genome::{input_ref_kind, InputRefKind};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::applicability_tests::{genome as generated_genome, module_size};
 use crate::mutation::sampling::{random_input_reference, random_input_reference_for_food_types};
 use crate::neighborhood::{Battery, Signature};
-use crate::runtime::OUTPUT_SLOT_COUNT;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
+
+/// A reference's descriptor width at the default context, as a draw bound.
+fn width_of(reference: &InputReference) -> u16 {
+    u16::try_from(
+        crate::contracts::SensorDescriptor::of(reference, &crate::config::test_sensor_context(1))
+            .width(),
+    )
+    .expect("a test width fits u16")
+}
 
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
@@ -108,14 +119,17 @@ fn swap_alternatives_follow_the_kind_table() {
     let food_here =
         |t: u16| InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::new(t)));
     // Typed food is swappable only with more than one food type.
-    assert!(swap_alternatives(&food_here(0), 1).is_empty());
-    assert_eq!(swap_alternatives(&food_here(0), 2), vec![food_here(1)]);
+    assert!(swap_alternatives(&food_here(0), &crate::config::test_sensor_context(1)).is_empty());
+    assert_eq!(
+        swap_alternatives(&food_here(0), &crate::config::test_sensor_context(2)),
+        vec![food_here(1)]
+    );
     assert_eq!(
         swap_alternatives(
             &InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
                 1
             ))),
-            3
+            &crate::config::test_sensor_context(3)
         ),
         vec![
             InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
@@ -129,17 +143,21 @@ fn swap_alternatives_follow_the_kind_table() {
     // The seven introspection scalars form one kind (T19.F05 adds
     // `HopsThisTick`, T27.F01 the three own-colour keys).
     let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
-    let others = swap_alternatives(&energy, 1);
+    let others = swap_alternatives(&energy, &crate::config::test_sensor_context(1));
     assert_eq!(others.len(), 6);
     assert!(others.contains(&InputReference::DynamicIntrospection(
         DynamicIntrospectionKey::HopsThisTick
     )));
     assert!(!others.contains(&energy));
-    assert!(others
-        .iter()
-        .all(|r| input_ref_kind(r) == input_ref_kind(&energy)));
+    assert!(others.iter().all(
+        |r| input_ref_kind(r, &crate::config::test_sensor_context(1))
+            == input_ref_kind(&energy, &crate::config::test_sensor_context(1))
+    ));
     // Upstream slots form one kind.
-    let upstream = swap_alternatives(&InputReference::UpstreamSlot(2), 1);
+    let upstream = swap_alternatives(
+        &InputReference::UpstreamSlot(2),
+        &crate::config::test_sensor_context(1),
+    );
     assert_eq!(upstream.len(), OUTPUT_SLOT_COUNT - 1);
     assert!(!upstream.contains(&InputReference::UpstreamSlot(2)));
     // Single-member kinds are never swappable.
@@ -154,7 +172,7 @@ fn swap_alternatives_follow_the_kind_table() {
         InputReference::PreviousOutcome,
     ] {
         assert!(
-            swap_alternatives(&lone, 4).is_empty(),
+            swap_alternatives(&lone, &crate::config::test_sensor_context(4)).is_empty(),
             "{lone:?} must not be swappable"
         );
     }
@@ -171,22 +189,28 @@ fn kind_is_class_and_width() {
         OrdinaryFoodTypeId::default(),
     ));
     assert_eq!(
-        input_ref_kind(&ring),
+        input_ref_kind(&ring, &crate::config::test_sensor_context(1)),
         InputRefKind {
             class: MeshReadClass::Food,
             width: 8
         }
     );
     assert_eq!(
-        input_ref_kind(&summary),
+        input_ref_kind(&summary, &crate::config::test_sensor_context(1)),
         InputRefKind {
             class: MeshReadClass::Food,
             width: 7
         }
     );
-    assert_ne!(input_ref_kind(&ring), input_ref_kind(&summary));
+    assert_ne!(
+        input_ref_kind(&ring, &crate::config::test_sensor_context(1)),
+        input_ref_kind(&summary, &crate::config::test_sensor_context(1))
+    );
     assert_eq!(
-        input_ref_kind(&InputReference::ActionQueue),
+        input_ref_kind(
+            &InputReference::ActionQueue,
+            &crate::config::test_sensor_context(1)
+        ),
         InputRefKind {
             class: MeshReadClass::ActionQueue,
             width: 12
@@ -202,7 +226,11 @@ fn kind_is_class_and_width() {
 fn swap_applies_on_both_founder_nodes() {
     let genome = v3alpha1_founder_genome();
     assert_eq!(
-        InputRefMutator::applicable_indices(&genome, InputRefOperator::Swap, 1),
+        InputRefMutator::applicable_indices(
+            &genome,
+            InputRefOperator::Swap,
+            &crate::config::test_sensor_context(1)
+        ),
         vec![0, 1]
     );
 }
@@ -215,7 +243,11 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
     let genome = v3alpha1_founder_genome();
     let config = default_config();
     assert_eq!(
-        InputRefMutator::applicable_indices(&genome, InputRefOperator::Prune, 1),
+        InputRefMutator::applicable_indices(
+            &genome,
+            InputRefOperator::Prune,
+            &crate::config::test_sensor_context(1)
+        ),
         vec![0]
     );
     assert_eq!(prunable_indices(&genome.nodes[0]), vec![4]);
@@ -254,7 +286,14 @@ fn prune_on_the_founder_vm_node_is_silent() {
 
     let mut pruned = genome.clone();
     let mut r = rng(11);
-    InputRefMutator::apply_to_node(&mut pruned, InputRefOperator::Prune, 1, &mut r, 1).unwrap();
+    InputRefMutator::apply_to_node(
+        &mut pruned,
+        InputRefOperator::Prune,
+        1,
+        &mut r,
+        &crate::config::test_sensor_context(1),
+    )
+    .unwrap();
     assert_eq!(
         pruned.nodes[1].input_refs,
         crate::creature::founder::vm_decision_founder_genome().nodes[1].input_refs
@@ -380,13 +419,13 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
     for seed in 0u64..64 {
         let mut genome = base_genome.clone();
         let mut r = rng(seed);
-        InputRefMutator::apply_with_food_type_count(
+        InputRefMutator::apply_in(
             &mut genome,
             InputRefOperator::Swap,
             &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &config,
-            2,
+            &crate::config::test_sensor_context(2),
         )
         .unwrap();
         assert_eq!(
@@ -407,7 +446,9 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
 /// the decision compounds never share a kind with the introspection ones.
 #[test]
 fn decision_state_kinds_follow_the_swap_table() {
-    let kind = |reference: &InputReference| input_ref_kind(reference);
+    let kind = |reference: &InputReference| {
+        input_ref_kind(reference, &crate::config::test_sensor_context(1))
+    };
     let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
     for (reference, class, width) in [
         (InputReference::ActionVotes, MeshReadClass::Decision, 39),
@@ -431,14 +472,20 @@ fn decision_state_kinds_follow_the_swap_table() {
         );
     }
     assert_eq!(
-        swap_alternatives(&InputReference::ActionVotes, 3),
+        swap_alternatives(
+            &InputReference::ActionVotes,
+            &crate::config::test_sensor_context(3)
+        ),
         vec![InputReference::PreviousPassVotes]
     );
     assert_eq!(
-        swap_alternatives(&InputReference::PreviousPassVotes, 3),
+        swap_alternatives(
+            &InputReference::PreviousPassVotes,
+            &crate::config::test_sensor_context(3)
+        ),
         vec![InputReference::ActionVotes]
     );
-    let mut hops_partners = swap_alternatives(&hops, 1);
+    let mut hops_partners = swap_alternatives(&hops, &crate::config::test_sensor_context(1));
     hops_partners.sort_by_key(|reference| format!("{reference:?}"));
     assert_eq!(
         hops_partners,
@@ -469,14 +516,14 @@ proptest! {
     ) {
         let base = generated_genome(seed, &sizes);
         let applicable = InputRefMutator::applicable_indices(
-            &base, InputRefOperator::Swap, food_type_count,
+            &base, InputRefOperator::Swap, &crate::config::test_sensor_context(food_type_count),
         );
         for node_idx in applicable {
             for apply_seed in 0u64..4 {
                 let mut genome = base.clone();
                 let mut r = rng(seed ^ apply_seed);
                 InputRefMutator::apply_to_node(
-                    &mut genome, InputRefOperator::Swap, node_idx, &mut r, food_type_count,
+                    &mut genome, InputRefOperator::Swap, node_idx, &mut r, &crate::config::test_sensor_context(food_type_count),
                 )
                 .expect("an accepted node applies");
                 for (idx, node) in genome.nodes.iter().enumerate() {
@@ -494,15 +541,15 @@ proptest! {
                 prop_assert_eq!(changed.len(), 1, "exactly one entry changes");
                 let i = changed[0];
                 prop_assert!(
-                    swap_alternatives(&before.input_refs[i], food_type_count)
+                    swap_alternatives(&before.input_refs[i], &crate::config::test_sensor_context(food_type_count))
                         .contains(&after.input_refs[i]),
                     "{:?} -> {:?} is not a within-kind step",
                     before.input_refs[i],
                     after.input_refs[i]
                 );
                 prop_assert_eq!(
-                    input_ref_kind(&after.input_refs[i]),
-                    input_ref_kind(&before.input_refs[i])
+                    input_ref_kind(&after.input_refs[i], &crate::config::test_sensor_context(1)),
+                    input_ref_kind(&before.input_refs[i], &crate::config::test_sensor_context(1))
                 );
             }
         }
@@ -517,13 +564,13 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
         let base = generated_genome(seed, &sizes);
-        let applicable = InputRefMutator::applicable_indices(&base, InputRefOperator::Prune, 1);
+        let applicable = InputRefMutator::applicable_indices(&base, InputRefOperator::Prune, &crate::config::test_sensor_context(1));
         for node_idx in applicable {
             for apply_seed in 0u64..4 {
                 let mut genome = base.clone();
                 let mut r = rng(seed ^ apply_seed);
                 InputRefMutator::apply_to_node(
-                    &mut genome, InputRefOperator::Prune, node_idx, &mut r, 1,
+                    &mut genome, InputRefOperator::Prune, node_idx, &mut r, &crate::config::test_sensor_context(1),
                 )
                 .expect("an accepted node applies");
                 for (idx, node) in genome.nodes.iter().enumerate() {
@@ -562,7 +609,7 @@ fn random_input_reference_covers_all_categories() {
     let mut categories: HashSet<String> = HashSet::new();
     for seed in 0u64..1000 {
         let mut r = rng(seed);
-        let ir = random_input_reference(&mut r);
+        let ir = random_input_reference(&mut r, &crate::config::test_sensor_context(1));
         let cat = match ir {
             InputReference::World(WorldInputKey::FoodHere { .. }) => "FoodHere".to_string(),
             InputReference::World(WorldInputKey::NeighborFoodRing { .. }) => {
@@ -587,6 +634,7 @@ fn random_input_reference_covers_all_categories() {
             InputReference::StaticIntrospection(_) => "StaticIntrospection".to_string(),
             InputReference::DynamicIntrospection(_) => "DynamicIntrospection".to_string(),
             InputReference::UpstreamSlot(_) => "UpstreamSlot".to_string(),
+            InputReference::UpstreamBus => "UpstreamBus".to_string(),
             InputReference::ActionQueue => "ActionQueue".to_string(),
             InputReference::ActionVotes => "ActionVotes".to_string(),
             InputReference::PreviousPassVotes => "PreviousPassVotes".to_string(),
@@ -610,7 +658,9 @@ fn random_input_reference_covers_all_categories() {
 fn random_input_reference_upstream_slot_bounded() {
     for seed in 0u64..20_000 {
         let mut r = rng(seed);
-        if let InputReference::UpstreamSlot(slot) = random_input_reference(&mut r) {
+        if let InputReference::UpstreamSlot(slot) =
+            random_input_reference(&mut r, &crate::config::test_sensor_context(1))
+        {
             assert!(
                 slot < OUTPUT_SLOT_COUNT,
                 "upstream slot must be bounded < {OUTPUT_SLOT_COUNT}, got {slot}"
@@ -789,7 +839,7 @@ fn apply_add_to_node(
         InputRefOperator::Add,
         node_idx,
         rng,
-        food_type_count,
+        &crate::config::test_sensor_context(food_type_count),
     )
     .expect("Add always applies");
 }
@@ -821,10 +871,7 @@ fn add_input_ref_to_graph_node_wires_one_vote_edge() {
             panic!("seed {seed}: the born edge reads the new reference, not {source:?}");
         };
         assert_eq!(ref_idx, 0, "seed {seed}");
-        assert!(
-            sub_idx < sub_value_count(&after.input_refs[0]),
-            "seed {seed}"
-        );
+        assert!(sub_idx < width_of(&after.input_refs[0]), "seed {seed}");
         assert!(
             (-1.0..=1.0).contains(&weight),
             "seed {seed}: weight {weight}"
@@ -937,8 +984,8 @@ fn add_input_ref_on_graph_draws_sub_value_then_sink_then_weight() {
         let mut r = rng(seed);
         apply_add_to_node(&mut genome, 0, &mut r, 1);
         let mut replay = rng(seed);
-        let reference = random_input_reference(&mut replay);
-        let sub_idx = replay.gen_range(0..sub_value_count(&reference));
+        let reference = random_input_reference(&mut replay, &crate::config::test_sensor_context(1));
+        let sub_idx = replay.gen_range(0..width_of(&reference));
         let sink = VoteSink::from_index(replay.gen_range(0..VOTE_SINK_COUNT)).unwrap();
         let weight = replay.gen_range(-1.0f32..=1.0);
         assert_eq!(genome.nodes[0].input_refs, vec![reference], "seed {seed}");
@@ -974,7 +1021,7 @@ fn add_input_ref_on_vm_draws_only_the_reference() {
             apply_add_to_node(&mut genome, 0, &mut r, food_type_count);
             let mut replay = rng(seed);
             let reference = if food_type_count <= 1 {
-                random_input_reference(&mut replay)
+                random_input_reference(&mut replay, &crate::config::test_sensor_context(1))
             } else {
                 random_input_reference_for_food_types(&mut replay, food_type_count)
             };
@@ -1017,9 +1064,10 @@ fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
 }
 
 /// The appended index 65,535 still fits `u16` and connects; 65,536 does not,
-/// so the event stays a declaration, and both take the same three draws.
+/// so `add_sensor` refuses it and nothing is written, after the same three
+/// draws.
 #[test]
-fn add_input_ref_connects_only_while_the_index_fits_u16() {
+fn add_input_ref_declares_only_while_the_index_fits_u16() {
     let filler = InputReference::ActionQueue;
     let mut fits = graph_node_genome_full_catalog();
     fits.nodes[0].input_refs = vec![filler.clone(); 65_535];
@@ -1029,7 +1077,18 @@ fn add_input_ref_connects_only_while_the_index_fits_u16() {
     let mut r_fits = rng(7);
     apply_add_to_node(&mut fits, 0, &mut r_fits, 1);
     let mut r_overflows = rng(7);
-    apply_add_to_node(&mut overflows, 0, &mut r_overflows, 1);
+    let before = overflows.clone();
+    assert_eq!(
+        InputRefMutator::apply_to_node(
+            &mut overflows,
+            InputRefOperator::Add,
+            0,
+            &mut r_overflows,
+            &crate::config::test_sensor_context(1),
+        ),
+        Err(MutationSkipReason::NoApplicableTarget),
+        "a declaration past the u16 index space is refused (T25.F11 `add_sensor`)"
+    );
 
     assert_eq!(fits.nodes[0].input_refs.len(), 65_536);
     let edges = vote_edges(&fits.nodes[0]);
@@ -1041,8 +1100,7 @@ fn add_input_ref_connects_only_while_the_index_fits_u16() {
             ..
         }
     ));
-    assert_eq!(overflows.nodes[0].input_refs.len(), 65_537);
-    assert_eq!(edge_count(&overflows.nodes[0]), 0, "a plain declaration");
+    assert_eq!(overflows, before, "nothing written");
     assert_eq!(r_fits.gen::<u64>(), r_overflows.gen::<u64>(), "same draws");
 }
 
@@ -1065,7 +1123,7 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
     let ring = InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
         0,
     )));
-    let width = sub_value_count(&ring);
+    let width = width_of(&ring);
     assert_eq!(width, 8);
     let mut sinks = std::collections::BTreeSet::new();
     let mut subs = std::collections::BTreeSet::new();
@@ -1073,7 +1131,7 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
     for seed in 0u64..4096 {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let mut r = rng(seed);
-        connect_declared_input(&mut def, Some(7), width, &mut r);
+        connect_declared_input(&mut def, Some(7), u32::from(width), &mut r);
         let mut edges = def
             .output_sinks()
             .iter()
@@ -1126,7 +1184,7 @@ proptest! {
             let mut genome = base.clone();
             let mut r = rng(seed ^ node_idx as u64);
             InputRefMutator::apply_to_node(
-                &mut genome, InputRefOperator::Add, node_idx, &mut r, food_type_count,
+                &mut genome, InputRefOperator::Add, node_idx, &mut r, &crate::config::test_sensor_context(food_type_count),
             )
             .expect("Add always applies");
             for (idx, node) in genome.nodes.iter().enumerate() {
@@ -1138,7 +1196,7 @@ proptest! {
             let after = &genome.nodes[node_idx];
             prop_assert_eq!(after.input_refs.len(), before.input_refs.len() + 1);
             prop_assert_eq!(&after.input_refs[..before.input_refs.len()], &before.input_refs[..]);
-            let width = sub_value_count(&after.input_refs[before.input_refs.len()]);
+            let width = width_of(&after.input_refs[before.input_refs.len()]);
             match (&before.backend_def, &after.backend_def) {
                 (BackendDef::Vm(b), BackendDef::Vm(a)) => prop_assert_eq!(a, b),
                 (BackendDef::Graph(b), BackendDef::Graph(a)) => {
@@ -1301,7 +1359,7 @@ fn extended_perception_families_reachable_in_pool() {
     let mut found = [false; 4]; // Food, Barrier, Occupancy, Nearby
     for seed in 0u64..5000 {
         let mut r = rng(seed);
-        match random_input_reference(&mut r) {
+        match random_input_reference(&mut r, &crate::config::test_sensor_context(1)) {
             InputReference::World(WorldInputKey::AreaFoodSummary { .. }) => found[0] = true,
             InputReference::World(WorldInputKey::AreaBarrierSummary) => found[1] = true,
             InputReference::World(WorldInputKey::AreaOccupancySummary) => found[2] = true,
@@ -1332,7 +1390,9 @@ fn action_queue_appears_in_random_input_reference_pool() {
     let mut found_aq = false;
     for seed in 0u64..500 {
         let mut r = rng(seed);
-        if random_input_reference(&mut r) == InputReference::ActionQueue {
+        if random_input_reference(&mut r, &crate::config::test_sensor_context(1))
+            == InputReference::ActionQueue
+        {
             found_aq = true;
             break;
         }
@@ -1373,13 +1433,13 @@ fn input_ref_add_can_introduce_non_default_food_type() {
     let mut saw_non_default = false;
     for _ in 0..1024 {
         let mut genome = v3alpha1_founder_genome();
-        let _ = InputRefMutator::apply_with_food_type_count(
+        let _ = InputRefMutator::apply_in(
             &mut genome,
             InputRefOperator::Add,
             &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
-            3,
+            &crate::config::test_sensor_context(3),
         );
         if genome
             .nodes
@@ -1403,13 +1463,13 @@ fn input_ref_swap_can_introduce_non_default_food_type() {
     let mut saw_non_default = false;
     for _ in 0..1024 {
         let mut genome = v3alpha1_founder_genome();
-        let _ = InputRefMutator::apply_with_food_type_count(
+        let _ = InputRefMutator::apply_in(
             &mut genome,
             InputRefOperator::Swap,
             &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
-            4,
+            &crate::config::test_sensor_context(4),
         );
         if genome
             .nodes
@@ -1433,13 +1493,13 @@ fn input_ref_raw_field_mutation_can_mutate_food_type_idx() {
         WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
     ));
     let mut r = rng(0xFACE);
-    let result = InputRefMutator::apply_with_food_type_count(
+    let result = InputRefMutator::apply_in(
         &mut genome,
         InputRefOperator::RawFieldMutation,
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
-        3,
+        &crate::config::test_sensor_context(3),
     );
 
     assert!(
@@ -1456,7 +1516,7 @@ fn input_reference_universe_caps_food_types_at_the_full_u16_range() {
     let last_food_type =
         InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::new(u16::MAX)));
 
-    let at_cap = input_reference_universe(full_range);
+    let at_cap = input_reference_universe(&crate::config::test_sensor_context(full_range));
 
     assert!(
         at_cap.contains(&last_food_type),
@@ -1464,7 +1524,7 @@ fn input_reference_universe_caps_food_types_at_the_full_u16_range() {
         u16::MAX
     );
     assert_eq!(
-        input_reference_universe(full_range + 7),
+        input_reference_universe(&crate::config::test_sensor_context(full_range + 7)),
         at_cap,
         "food type counts above the cap add nothing to the universe"
     );

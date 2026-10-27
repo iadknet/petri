@@ -766,13 +766,13 @@ fn food_choice_mutation_diagnostic() {
     for birth in 0..1000u64 {
         let mut child = parent.clone();
         let mut rng = SmallRng::seed_from_u64(9000 + birth);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_in(
             &mut child,
             &cfg.mutation,
             &reachable,
             ParentExecuted::Indices(&executed),
             &mut rng,
-            2,
+            &v3_core::config::SimulationConfig::default().sensor_context(2),
         );
         zero += usize::from(summary.applied_events == 0);
         let signature = battery.signature(&child, &cfg.runtime, cfg.shared_memory.decay_rate);

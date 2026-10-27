@@ -1,4 +1,5 @@
 use crate::config::RuntimeConfig;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::runtime::cgp::execute::execute_graph_impl;
@@ -7,7 +8,7 @@ use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{
     kind_label, GraphNodeEvalTrace, GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
 };
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
 pub(crate) struct RecordingTracer {

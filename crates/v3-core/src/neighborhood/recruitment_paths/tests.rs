@@ -411,7 +411,7 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     &mut rng,
-                    1,
+                    &crate::config::test_sensor_context(1),
                 );
                 let events: Vec<_> = summary.events.iter().map(Event::from).collect();
                 assert_eq!(events, record.events);
@@ -2597,7 +2597,7 @@ fn recruitment_paths_destination_kind_reads_a_wired_vote_sink_alone_as_an_effect
     let mut vote_only = inert;
     let terminate = vote_only
         .sink_surface(crate::genome::cgp::OutputSinkKind::ActionVote(
-            crate::genome::vote::VoteSink::Terminate,
+            crate::contracts::votes::VoteSink::Terminate,
         ))
         .unwrap();
     vote_only.push_edge(

@@ -7,6 +7,7 @@
 use std::collections::BTreeSet;
 
 use crate::config::RuntimeConfig;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::SHARED_MEMORY_SLOTS;
 use crate::genome::cgp::ComputeNodeKind;
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
@@ -14,7 +15,7 @@ use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::mesh::MeshExecutionMode;
 use crate::runtime::state::GraphRuntimeState;
-use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{execute_vm_node_impl, nr, VmTraceSink};
 use crate::sensors::perception::SensorSnapshot;
 

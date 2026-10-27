@@ -4,6 +4,7 @@ use axum::Json;
 use slotmap::{Key, KeyData};
 use std::collections::{BTreeMap, BTreeSet};
 use v3_core::contracts::ActionOutcome;
+use v3_core::contracts::OUTPUT_SLOT_COUNT;
 use v3_core::contracts::{CreatureId, InputReference};
 use v3_core::creature::action_log::{ActionLogEntry, ActionType};
 use v3_core::creature::colour::channels_to_rgb;
@@ -13,7 +14,6 @@ use v3_core::genome::mesh_annotations::{
     MeshWriteClass,
 };
 use v3_core::genome::{BackendDef, VmInstruction};
-use v3_core::runtime::OUTPUT_SLOT_COUNT;
 use v3_core::sensors::static_inputs::assemble_static_inputs;
 use v3_core::simulation::recording::ActiveTrace;
 

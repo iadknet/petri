@@ -10,8 +10,9 @@
 //! non-empty queue, when the queue is full, or on exhaustion.
 
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{VoteKind, VoteSink, VoteVector};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{Direction, NodeId, WorldAction, SHARED_MEMORY_SLOTS};
-use crate::genome::vote::{VoteKind, VoteSink, VoteVector};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
 use crate::runtime::action_decode::decode_commit;
@@ -19,7 +20,7 @@ use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::{MeshPassTrace, PassEndReason, TerminationReason};
-use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::runtime::vm::execute_vm_node;
 use crate::runtime::vote_select::select;
 use crate::sensors::perception::SensorSnapshot;
@@ -591,8 +592,8 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction, WorldInputKey};
-    use crate::genome::vote::DirectedVoteKind;
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -653,8 +654,8 @@ mod tests {
         genome.nodes[0] = crate::runtime::vote_test_support::vm_voter(
             0,
             &[
-                (crate::genome::vote::VoteSink::Eat, 1.0),
-                (crate::genome::vote::VoteSink::Decide, 1.0),
+                (crate::contracts::votes::VoteSink::Eat, 1.0),
+                (crate::contracts::votes::VoteSink::Decide, 1.0),
             ],
             &[0],
         );
@@ -777,7 +778,7 @@ mod tests {
                 weight_clamp: 2.0,
                 lamarckian: false,
                 modulation: Some(crate::genome::RewardModulationConfig {
-                    reward_source: crate::genome::OutcomeChannel::EnergyDelta,
+                    reward_source: crate::contracts::OutcomeChannel::EnergyDelta,
                     trace_decay: 0.9,
                 }),
                 retention: 1.0,
@@ -794,7 +795,7 @@ mod tests {
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
                     VmInstruction::AddVote {
-                        sink: crate::genome::vote::VoteSink::Eat.index() as u8,
+                        sink: crate::contracts::votes::VoteSink::Eat.index() as u8,
                         src: 0,
                     },
                 ],
@@ -949,7 +950,7 @@ mod tests {
     /// `action_type` (1 Eat, 2 to 4 the directed kinds toward N; 0 votes
     /// nothing), so a tick commits that action once.
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
-        use crate::genome::vote::VoteSink;
+        use crate::contracts::votes::VoteSink;
         let sink = match action_type {
             1 => Some(VoteSink::Eat),
             2 => Some(VoteSink::Directed(DirectedVoteKind::Move, 0)),
@@ -1356,7 +1357,7 @@ mod tests {
                             const_idx: 1,
                         },
                         VmInstruction::AddVote {
-                            sink: crate::genome::vote::VoteSink::Eat.index() as u8,
+                            sink: crate::contracts::votes::VoteSink::Eat.index() as u8,
                             src: 0,
                         },
                         VmInstruction::Halt,
@@ -1404,7 +1405,7 @@ mod tests {
                 const_idx: 1,
             },
             VmInstruction::AddVote {
-                sink: crate::genome::vote::VoteSink::Eat.index() as u8,
+                sink: crate::contracts::votes::VoteSink::Eat.index() as u8,
                 src: 0,
             },
             VmInstruction::Halt,
@@ -1579,7 +1580,7 @@ mod tests {
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
                     VmInstruction::AddVote {
-                        sink: crate::genome::vote::VoteSink::Eat.index() as u8,
+                        sink: crate::contracts::votes::VoteSink::Eat.index() as u8,
                         src: 0,
                     },
                     VmInstruction::Halt,
@@ -2149,8 +2150,8 @@ mod tests {
 
     #[test]
     fn a_ring_group_records_its_ring() {
+        use crate::contracts::votes::DirectedVoteKind;
         use crate::genome::cgp::{CgpGraphBackendDef, Shape};
-        use crate::genome::vote::DirectedVoteKind;
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let id = def.add_group(
             Shape::Ring { ring_ref: 0 },

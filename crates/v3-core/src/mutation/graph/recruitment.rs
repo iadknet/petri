@@ -4,16 +4,18 @@ use std::collections::HashMap;
 use rand::{seq::SliceRandom, Rng};
 
 use crate::config::NeutralInputRecruitment as Arm;
-use crate::contracts::{DirectionPair, InputReference, WorldInputKey};
-use crate::genome::cgp::{
-    ring_offset, CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind, Shape,
+use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
+use crate::contracts::{
+    DirectionPair, InputReference, SensorContext, SensorDescriptor, WorldInputKey,
 };
-use crate::genome::vote::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
+use crate::genome::cgp::{
+    ring_offset, BundleBirth, BundleSource, CgpGraphBackendDef, EdgeSurface, GraphEdge,
+    GraphSource, OutputSinkKind, Wiring,
+};
 use crate::genome::{BackendDef, NodeGenome};
-use crate::mutation::compound::sub_value_count;
 use crate::mutation::input_ref::input_reference_universe;
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::OUTPUT_SLOT_COUNT;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SourceFamily {
@@ -69,29 +71,56 @@ impl Plan {
     /// pair, in `facts` order (T25.F04, T25.F10). A slot plan landing
     /// elsewhere takes the drawn slot's channels, ascending, as its sources
     /// (T25.F05). Every other plan appends its sources at weight 0.
-    fn append(self, node: &mut NodeGenome, destination: usize, pair: Option<u8>) {
-        let BackendDef::Graph(def) = &mut node.backend_def else {
+    fn append(
+        self,
+        node: &mut NodeGenome,
+        destination: usize,
+        pair: Option<u8>,
+        context: &SensorContext,
+    ) {
+        let BackendDef::Graph(def) = &node.backend_def else {
             unreachable!("admission requires a Graph backend")
         };
-        node.input_refs.extend(self.declarations);
         let directed = directed(def, destination);
-        if let (Some(PairPlan { ref_idx, pairs, .. }), Some((kind, d)), Some(pair)) =
+        for reference in self.declarations {
+            node.add_sensor(reference, &[], context)
+                .expect("an admitted declaration index fits u16");
+        }
+        let silent = |field_set, wiring| BundleBirth {
+            field_set,
+            wiring,
+            scale: 0.0,
+        };
+        if let (Some(PairPlan { ref_idx, .. }), Some((kind, d)), Some(pair)) =
             (self.pairs, directed, pair)
         {
-            let layout = pairs[usize::from(pair)];
-            def.add_pair_group(ref_idx, pair, layout, kind, d, layout.facts);
+            let source = BundleSource::Sensor {
+                ref_idx,
+                field_set: pair,
+            };
+            let wiring = Wiring::DirectionPair { kind, offset: d };
+            node.add_bundle(source, silent(pair, wiring), context)
+                .expect("a preflighted pair plan");
             return;
         }
         if let (Some((ref_idx, channel)), Some((kind, d))) = (self.ring, directed) {
             let channel =
                 u8::try_from(channel % u16::from(VOTE_DIRECTION_COUNT)).expect("channel below 8");
-            def.add_group(
-                Shape::Ring { ring_ref: ref_idx },
+            let source = BundleSource::Sensor {
+                ref_idx,
+                field_set: 0,
+            };
+            let wiring = Wiring::Ring {
                 kind,
-                ring_offset(d, channel),
-            );
+                offset: ring_offset(d, channel),
+            };
+            node.add_bundle(source, silent(0, wiring), context)
+                .expect("a preflighted ring plan");
             return;
         }
+        let BackendDef::Graph(def) = &mut node.backend_def else {
+            unreachable!("admission requires a Graph backend")
+        };
         let mut sources = self.sources;
         if let Some(PairPlan {
             ref_idx,
@@ -135,10 +164,15 @@ struct Admission<'a> {
     /// ([`CgpGraphBackendDef::can_host_facts`], T25.F04, T25.F10);
     /// when not, pair-declaring families leave the `WholeFamily` universe.
     hosts_pair_plan: bool,
+    context: &'a SensorContext,
 }
 
 impl<'a> Admission<'a> {
-    fn new(references: &'a [InputReference], def: &CgpGraphBackendDef) -> Self {
+    fn new(
+        references: &'a [InputReference],
+        def: &CgpGraphBackendDef,
+        context: &'a SensorContext,
+    ) -> Self {
         let hosts_ring_group = def.can_host_group();
         let hosts_pair_plan = hosts_ring_group
             && DirectedVoteKind::ALL
@@ -168,6 +202,7 @@ impl<'a> Admission<'a> {
             append_end,
             hosts_ring_group,
             hosts_pair_plan,
+            context,
         }
     }
 
@@ -197,7 +232,7 @@ impl<'a> Admission<'a> {
         };
         match family {
             SourceFamily::Input(reference) => {
-                let width = sub_value_count(reference);
+                let width = draw_width(reference, self.context);
                 if *reference == InputReference::ActionQueue {
                     if arm == Arm::WholeFamily {
                         return None;
@@ -260,8 +295,8 @@ impl<'a> Admission<'a> {
         Some(plan)
     }
 
-    fn families(&self, arm: Arm, food_type_count: usize) -> Vec<SourceFamily> {
-        let mut families: Vec<_> = input_reference_universe(food_type_count)
+    fn families(&self, arm: Arm) -> Vec<SourceFamily> {
+        let mut families: Vec<_> = input_reference_universe(self.context)
             .into_iter()
             .filter(|reference| {
                 arm != Arm::WholeFamily
@@ -305,6 +340,11 @@ fn universe_entries(reference: &InputReference) -> usize {
     }
 }
 
+/// The sub-value draw bound of `reference`: its descriptor width.
+fn draw_width(reference: &InputReference, context: &SensorContext) -> u16 {
+    u16::try_from(SensorDescriptor::of(reference, context).width()).expect("a width below u16::MAX")
+}
+
 pub(super) fn destinations(def: &CgpGraphBackendDef) -> Vec<usize> {
     def.output_sinks()
         .iter()
@@ -323,7 +363,7 @@ pub(super) fn destinations(def: &CgpGraphBackendDef) -> Vec<usize> {
 pub(super) fn recruit(
     node: &mut NodeGenome,
     arm: Arm,
-    food_type_count: usize,
+    context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let BackendDef::Graph(def) = &node.backend_def else {
@@ -333,8 +373,8 @@ pub(super) fn recruit(
     if arm == Arm::Off || sites.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let admission = Admission::new(&node.input_refs, def);
-    let families = admission.families(arm, food_type_count);
+    let admission = Admission::new(&node.input_refs, def, context);
+    let families = admission.families(arm);
     // Both memory banks are always feasible. No retries, partial bundles or
     // sampled capacity failure can turn an eligible node into a local skip.
     let family = families
@@ -345,7 +385,7 @@ pub(super) fn recruit(
     } else {
         match family {
             SourceFamily::Input(InputReference::ActionQueue) => rng.gen(),
-            SourceFamily::Input(reference) => rng.gen_range(0..sub_value_count(reference)),
+            SourceFamily::Input(reference) => rng.gen_range(0..draw_width(reference, context)),
             SourceFamily::Memory(_) => rng.gen_range(0..16),
             SourceFamily::Upstream => unreachable!("whole-family source"),
         }
@@ -359,7 +399,7 @@ pub(super) fn recruit(
     let pair = plan
         .pair_count(def, destination)
         .map(|count| u8::try_from(rng.gen_range(0..count)).expect("few pairs"));
-    plan.append(node, destination, pair);
+    plan.append(node, destination, pair, context);
     Ok(())
 }
 
@@ -405,11 +445,12 @@ fn place(
         .into_iter()
         .find(|&i| def.output_sinks()[i].kind == OutputSinkKind::ActionVote(vote))
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let plan = Admission::new(&node.input_refs, def)
+    let context = crate::config::test_sensor_context(1);
+    let plan = Admission::new(&node.input_refs, def, &context)
         .plan(family, arm, channel)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let pair = plan.pair_count(def, destination).map(|_| pair);
-    plan.append(node, destination, pair);
+    plan.append(node, destination, pair, &context);
     Ok(())
 }
 

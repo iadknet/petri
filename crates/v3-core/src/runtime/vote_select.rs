@@ -5,10 +5,10 @@
 //! Pure and RNG-free: the mesh loop calls [`select`] at every node boundary
 //! for the `Decide` guard and once at every pass end for the commit.
 
-use crate::contracts::Direction;
-use crate::genome::vote::{
+use crate::contracts::votes::{
     DirectedVoteKind, VoteKind, VoteSink, VoteVector, VOTE_DIRECTION_COUNT, VOTE_KIND_COUNT,
 };
+use crate::contracts::Direction;
 
 /// The bar one commit adds to its kind, equal to the vote scale.
 pub const VOTE_UNIT: f32 = 1.0;
@@ -98,7 +98,7 @@ pub fn select(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::genome::vote::VOTE_SINK_COUNT;
+    use crate::contracts::votes::VOTE_SINK_COUNT;
     use proptest::prelude::*;
 
     const N: Direction = Direction::N;

@@ -4,10 +4,10 @@
 //! nodes (ComputeNodeKind), and the fixed output sink catalog (OutputSink),
 //! which includes the action-vote and parameter sinks (T19.F03, T19.F04).
 
-use crate::contracts::MAX_GATE_SLOTS;
-use crate::genome::vote::{
+use crate::contracts::votes::{
     ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
+use crate::contracts::MAX_GATE_SLOTS;
 
 mod container;
 mod edge;
@@ -21,8 +21,8 @@ pub use container::{
 };
 pub use edge::{GraphEdge, GraphSource, Membership, Scope};
 pub use group::{
-    compose, detach, pair_birth_members, pair_relative, ring_birth_members, ring_offset,
-    BirthCoordinate, Group, GroupId, MemberSite, Shape,
+    compose, detach, pair_birth_members, pair_relative, plans, ring_birth_members, ring_offset,
+    BirthCoordinate, BundleBirth, BundleSource, Group, GroupId, MemberSite, Shape, Wiring,
 };
 
 // ── Compute layer ───────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ impl OutputSinkKind {
 }
 
 /// Number of CustomOutput sinks in the fixed catalog.
-pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
+pub const CUSTOM_OUTPUT_COUNT: u8 = crate::contracts::OUTPUT_SLOT_COUNT as u8;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = crate::contracts::SHARED_MEMORY_SLOTS as u8;
 /// Catalog index of the first `ActionVote` sink, which is also the count of

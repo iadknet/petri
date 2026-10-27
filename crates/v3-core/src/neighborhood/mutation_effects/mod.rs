@@ -27,7 +27,7 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::config::MutationConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{NodeId, SensorContext, WorldAction};
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
 use crate::mutation::reachability::ParentExecuted;
@@ -449,7 +449,7 @@ pub(in crate::neighborhood) struct Proposals<'a> {
     pub(in crate::neighborhood) executed: &'a [usize],
     pub(in crate::neighborhood) seed_base: u64,
     pub(in crate::neighborhood) one_event: &'a MutationConfig,
-    pub(in crate::neighborhood) food_type_count: usize,
+    pub(in crate::neighborhood) sensors: SensorContext,
 }
 
 impl Proposals<'_> {
@@ -467,7 +467,7 @@ impl Proposals<'_> {
             self.reachable,
             ParentExecuted::Indices(self.executed),
             &mut rng,
-            self.food_type_count,
+            &self.sensors,
         );
         (child, summary)
     }
@@ -587,7 +587,7 @@ fn evaluate_parent(
         executed: &executed,
         seed_base: proposal_seed_base(cohort, position),
         one_event,
-        food_type_count: context.food_type_count,
+        sensors: context.sensors,
     };
 
     let proposals: Vec<(ProposalOutcome, Option<CreatureGenome>)> = (0..sizes.proposals)

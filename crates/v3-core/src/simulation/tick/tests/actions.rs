@@ -597,8 +597,9 @@ fn energy_floor_at_zero_after_action_execution() {
 
 #[test]
 fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
+    use crate::contracts::OutcomeChannel;
     use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
-    use crate::genome::{HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig};
+    use crate::genome::{HebbianRule, PlasticityConfig, RewardModulationConfig};
     for lamarckian in [false, true] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
@@ -916,7 +917,7 @@ fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
 /// A one-node VM genome that eats food type 0 leaving the share `leave` on
 /// the cell (T02.F08): write `EatLeaveShare`, then vote one `Eat`.
 fn eat_leave_genome(leave: f32) -> CreatureGenome {
-    use crate::genome::vote::{ActionParamField, VoteSink};
+    use crate::contracts::votes::{ActionParamField, VoteSink};
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -1103,7 +1104,7 @@ fn per_type_standing_density_matches_the_applied_growth_summary() {
 #[test]
 fn neutral_recruitment_costs_follow_applied_genome_growth() {
     use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
-    use crate::genome::vote::VoteSink;
+    use crate::contracts::votes::VoteSink;
     use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     use crate::simulation::tick::Phase0Charge;
     let config = crate::config::SimulationConfig::default();

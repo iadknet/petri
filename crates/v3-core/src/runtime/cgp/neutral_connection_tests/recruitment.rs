@@ -1,7 +1,7 @@
 //! F04 access through the actual preflight/append path and native evaluator.
 use super::*;
 use crate::config::{MutationConfig, NeutralInputRecruitment as Arm};
-use crate::genome::vote::DirectedVoteKind;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::mutation::graph::group;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
@@ -156,7 +156,14 @@ fn recruitment_reuses_references_appends_duplicates_and_copies_then_prunes_witho
     for _ in 0..2 {
         remove_edge(graph_mut(&mut genome.nodes[2]), &mut rng).unwrap();
     }
-    InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 2, &mut rng, 2).unwrap();
+    InputRefMutator::apply_to_node(
+        &mut genome,
+        InputRefOperator::Prune,
+        2,
+        &mut rng,
+        &crate::config::test_sensor_context(2),
+    )
+    .unwrap();
     let deleted = genome.nodes[2].clone();
     assert!(deleted.input_refs.is_empty());
     for _ in 0..3 {

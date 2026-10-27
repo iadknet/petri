@@ -5,20 +5,21 @@
 use super::learned::LearningCounts;
 use super::{LearnedState, OutcomeSignalBank};
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::OutcomeChannel;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     BirthSeeds, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, GroupId, OutputSinkKind, Scope, Shape,
 };
-use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
 };
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::state::GraphRuntimeState;
-use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::MeshSideOutputs;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;

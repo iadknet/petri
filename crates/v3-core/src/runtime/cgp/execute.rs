@@ -1,4 +1,5 @@
 use crate::config::RuntimeConfig;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::ledger::{applied_debit, observe_energy_change, DeathCause};
@@ -10,7 +11,7 @@ use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::state::GraphRuntimeState;
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Collect a learning graph's weighted inputs of compute node `current_idx`
@@ -429,7 +430,7 @@ mod work_counter_tests {
                         )])
                         .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
                             crate::genome::cgp::OutputSinkKind::ActionVote(
-                                crate::genome::vote::VoteSink::Terminate,
+                                crate::contracts::votes::VoteSink::Terminate,
                             ),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                         )]),

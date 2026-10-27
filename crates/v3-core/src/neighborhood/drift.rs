@@ -203,7 +203,7 @@ pub fn observe(
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     rng,
-                    context.food_type_count,
+                    &context.sensors,
                 );
                 tracker.record_birth(BirthObservation {
                     lineage: lineage as u32,
@@ -384,7 +384,7 @@ mod tests {
         use crate::genome::BackendDef;
         let config = replay_config();
         let context = EvalContext::from_config(&config);
-        let battery = Battery::generate(context.food_type_count);
+        let battery = Battery::generate(context.sensors.food_type_count);
         // The founder with every vote and parameter edge removed votes
         // nothing, so every execution is `NoOp`.
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
@@ -431,7 +431,7 @@ mod tests {
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
-                context.food_type_count,
+                &context.sensors,
             );
             zero_births += u32::from(summary.applied_events == 0);
             let signature = battery.signature(
@@ -480,7 +480,7 @@ mod tests {
                     &mesh_reachable_nodes(&before[0]),
                     ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
-                    context.food_type_count,
+                    &context.sensors,
                 );
                 MutationEngine::apply_mutations_on_units(
                     &mut with,
@@ -489,7 +489,7 @@ mod tests {
                     &mesh_reachable_nodes(&genomes[0]),
                     ParentExecuted::Indices(&next_executed),
                     &mut rng.clone(),
-                    context.food_type_count,
+                    &context.sensors,
                 );
                 assert_eq!(with, without);
             }
@@ -536,7 +536,7 @@ mod tests {
                         &reachable,
                         ParentExecuted::Indices(&executed),
                         &mut rng,
-                        context.food_type_count,
+                        &context.sensors,
                     )
                     .applied_events;
                 }
@@ -624,7 +624,7 @@ mod tests {
                             &reachable,
                             ParentExecuted::Indices(&executed),
                             &mut rng,
-                            context.food_type_count,
+                            &context.sensors,
                         );
                     }
                     genome
@@ -688,7 +688,7 @@ mod tests {
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     &mut rng,
-                    context.food_type_count,
+                    &context.sensors,
                 );
             }
             replayed.push(genome);
@@ -924,7 +924,7 @@ mod tests {
         const CLOSING: u64 = 3 * EXECUTED_REFRESH_INTERVAL;
         let config = SimulationConfig::default();
         let context = EvalContext::from_config(&config);
-        let battery = Battery::generate(context.food_type_count);
+        let battery = Battery::generate(context.sensors.food_type_count);
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let walk = |checkpoints: &'static [u64]| -> Vec<RecruitmentCheckpoint> {
             observe(

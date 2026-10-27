@@ -29,10 +29,9 @@
 
 use rand::{Rng, RngCore};
 
+use crate::contracts::OutcomeChannel;
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
-use crate::genome::{
-    retention_decays, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
-};
+use crate::genome::{retention_decays, HebbianRule, PlasticityConfig, RewardModulationConfig};
 use crate::mutation::types::MutationSkipReason;
 
 // ─── Applicability predicates ───────────────────────────────────────────────
@@ -527,12 +526,12 @@ pub(crate) fn set_scope_in_def(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::votes::VoteSink;
     use crate::genome::cgp::test_support::plastic_node;
     use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::genome::vote::VoteSink;
     use crate::genome::BackendDef;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
@@ -900,8 +899,8 @@ mod tests {
 
     // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
 
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::genome::cgp::{GroupId, Scope, Shape};
-    use crate::genome::vote::DirectedVoteKind;
 
     /// A full catalog with one ring group of eight members on `Move`, member
     /// `k` carrying `configs[k]` (static past the list's end).

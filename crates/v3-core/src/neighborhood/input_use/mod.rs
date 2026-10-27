@@ -31,7 +31,6 @@ use crate::config::MutationConfig;
 use crate::contracts::WorldAction;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
-use crate::mutation::compound::sub_value_count;
 
 use super::battery::{first_action_difference, run_panel, Scenario};
 use super::mesh_execution::indices_for_node_ids;
@@ -203,9 +202,16 @@ fn event_channels(inventory: &Inventory, event: ReadEvent) -> Vec<(Channel, bool
 }
 
 /// Every channel of a declared reference.
-fn channels_of(reference: &crate::contracts::InputReference) -> impl Iterator<Item = Channel> + '_ {
-    (0..sub_value_count(reference).max(1)).filter_map(move |sub_idx| {
-        match addressed(reference, sub_idx) {
+fn channels_of<'a>(
+    reference: &'a crate::contracts::InputReference,
+    context: &'a crate::contracts::SensorContext,
+) -> impl Iterator<Item = Channel> + 'a {
+    let width = crate::contracts::SensorDescriptor::of(reference, context)
+        .width()
+        .max(1);
+    (0..width).filter_map(move |sub_idx| {
+        let sub_idx = u16::try_from(sub_idx).expect("a sub-value index fits u16");
+        match addressed(reference, sub_idx, context) {
             Addressed::Channel(channel) => Some(channel),
             Addressed::OutOfWidth(_) => None,
         }
@@ -219,12 +225,18 @@ fn evaluate_parent(
     scenes: &Scenes<'_>,
 ) -> ParentUse {
     let reachable = mesh_reachable_nodes(genome);
-    let inventory = Inventory::new(genome, &reachable);
+    let sensors = &scenes.context.sensors;
+    let inventory = Inventory::new(genome, &reachable, sensors);
     let mut use_ = ParentUse {
         declared: declarations(genome, &reachable),
         declared_channels: reachable
             .iter()
-            .flat_map(|&index| genome.nodes[index].input_refs.iter().flat_map(channels_of))
+            .flat_map(|&index| {
+                genome.nodes[index]
+                    .input_refs
+                    .iter()
+                    .flat_map(|reference| channels_of(reference, sensors))
+            })
             .collect(),
         connected: inventory.connected(),
         ..ParentUse::default()
@@ -248,7 +260,7 @@ fn evaluate_parent(
     let candidates: Vec<Channel> = inventory.input_channels().into_iter().collect();
     let differences: Vec<Difference> = candidates
         .par_iter()
-        .map(|&channel| scenes.difference(&ablated(genome, |c| c == channel), &baseline))
+        .map(|&channel| scenes.difference(&ablated(genome, |c| c == channel, sensors), &baseline))
         .collect();
     for (&channel, difference) in candidates.iter().zip(differences) {
         if difference != Difference::None {
@@ -270,7 +282,7 @@ fn evaluate_parent(
                 causal
                     .iter()
                     .map(|&channel| {
-                        scenes.difference(&ablated(child, |c| c == channel), &base)
+                        scenes.difference(&ablated(child, |c| c == channel, sensors), &base)
                             != Difference::None
                     })
                     .collect()
@@ -479,7 +491,7 @@ fn observe_cohort(
                         executed: &executed,
                         seed_base: proposal_seed_base(cohort, position),
                         one_event,
-                        food_type_count: context.food_type_count,
+                        sensors: context.sensors,
                     };
                     retention_children(&source, sizes.proposals, wanted)
                 },

@@ -1,12 +1,12 @@
 use proptest::prelude::*;
 
 use super::*;
+use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
     compose, detach, GroupId, Membership, Scope, Shape, FIRST_ACTION_VOTE_SINK,
 };
-use crate::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::genome::HebbianRule;
 
 /// A new def field is a compile error here until it is placed inside or

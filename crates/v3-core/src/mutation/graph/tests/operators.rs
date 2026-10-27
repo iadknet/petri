@@ -6,18 +6,19 @@
 //! compound reference, and the graph raw-field operator changes exactly one
 //! field by one unit.
 
-use crate::genome::vote::DirectedVoteKind;
+use crate::contracts::votes::DirectedVoteKind;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{ActionParamField, VoteSink};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, WorldAction, WorldInputKey};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
     raw_field_mutation, split_existing_edge,
@@ -26,7 +27,7 @@ use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::cgp::tracer::GraphTracer;
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -306,7 +307,7 @@ proptest! {
         for (label, parent, refs) in fixtures() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            add_bootstrap_node(&mut child, &refs, &mut rng).unwrap();
+            add_bootstrap_node(&mut child, crate::mutation::graph::operators::test_inputs(&refs), &mut rng).unwrap();
             assert_neutral(
                 &format!("add_bootstrap_node[{label}]"),
                 &parent,
@@ -323,7 +324,7 @@ proptest! {
         for (label, parent, refs) in fixtures() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            if split_existing_edge(&mut child, &[], &mut rng).is_err() {
+            if split_existing_edge(&mut child, crate::mutation::graph::operators::test_inputs(&[]), &mut rng).is_err() {
                 continue;
             }
             assert_neutral(
@@ -384,7 +385,7 @@ proptest! {
         for (label, parent, parent_refs) in fixtures() {
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut child_refs = parent_refs.clone();
-            child_refs.push(random_input_reference(&mut rng));
+            child_refs.push(random_input_reference(&mut rng, &crate::config::test_sensor_context(1)));
             assert_neutral(
                 &format!("unconsumed_input_ref_append_graph[{label}]"),
                 &parent,
@@ -561,7 +562,7 @@ proptest! {
         let refs = base_input_refs();
         let mut child = parent.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if split_existing_edge(&mut child, &[], &mut rng).is_err() {
+        if split_existing_edge(&mut child, crate::mutation::graph::operators::test_inputs(&[]), &mut rng).is_err() {
             return Ok(());
         }
         // Only compute-consumer splits insert-and-shift; sink/action/execute
@@ -619,7 +620,6 @@ proptest! {
     /// in `operators.rs`.
     #[test]
     fn random_graph_source_sub_idx_is_within_reference_width(seed in any::<u64>()) {
-        use crate::mutation::compound::sub_value_count;
         use crate::mutation::graph::operators::random_graph_source;
 
         let refs = vec![
@@ -628,11 +628,15 @@ proptest! {
         ];
         let mut rng = SmallRng::seed_from_u64(seed);
         if let GraphSource::InputLeaf { ref_idx, sub_idx } =
-            random_graph_source(3, &refs, &mut rng)
+            random_graph_source(3, crate::mutation::graph::operators::test_inputs(&refs), &mut rng)
         {
-            let width = sub_value_count(&refs[ref_idx as usize]);
+            let width = crate::contracts::SensorDescriptor::of(
+                &refs[ref_idx as usize],
+                &crate::config::test_sensor_context(1),
+            )
+            .width();
             prop_assert!(
-                sub_idx < width,
+                u32::from(sub_idx) < width,
                 "seed {}: sub_idx {} >= width {}",
                 seed,
                 sub_idx,
@@ -665,7 +669,7 @@ proptest! {
             .flat_map(|n| n.inputs.iter().map(|e| e.source()))
             .collect();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if raw_field_mutation(&mut def, &refs, &mut rng)
+        if raw_field_mutation(&mut def, crate::mutation::graph::operators::test_inputs(&refs), &mut rng)
             == Err(MutationSkipReason::NoApplicableTarget)
         {
             return Ok(());

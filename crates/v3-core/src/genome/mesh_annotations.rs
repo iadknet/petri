@@ -181,7 +181,7 @@ pub(crate) fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
         InputReference::ActionVotes
         | InputReference::PreviousPassVotes
         | InputReference::CommitCounts => MeshReadClass::Decision,
-        InputReference::UpstreamSlot(_) => MeshReadClass::Upstream,
+        InputReference::UpstreamSlot(_) | InputReference::UpstreamBus => MeshReadClass::Upstream,
         InputReference::ActionQueue => MeshReadClass::ActionQueue,
     }
 }

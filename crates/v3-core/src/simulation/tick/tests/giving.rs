@@ -4,11 +4,12 @@
 
 use super::super::run_tick;
 use super::support::*;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::ActionOutcome;
+use crate::contracts::OutcomeChannel;
 use crate::contracts::{ActionType, CreatureId, Direction, WorldAction};
 use crate::creature::action_log::{ActionLog, ActionLogEntry};
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::{CreatureGenome, OutcomeChannel, VmInstruction};
+use crate::genome::{CreatureGenome, VmInstruction};
 use crate::ledger::{applied_debit, DeathCause};
 use crate::simulation::actions::GiveActionResult;
 use crate::simulation::outcomes::OutcomeAccumulator;

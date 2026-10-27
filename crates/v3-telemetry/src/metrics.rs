@@ -21,9 +21,9 @@ use opentelemetry_proto::tonic::metrics::v1::{
     Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum,
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
+use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::{ActionType, WorldInputKey};
 use v3_core::genome::cgp::Scope;
-use v3_core::genome::vote::DirectedVoteKind;
 use v3_core::ledger::DeathCause;
 use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};

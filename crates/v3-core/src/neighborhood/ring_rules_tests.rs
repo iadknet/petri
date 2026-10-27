@@ -1,10 +1,10 @@
 use super::*;
 use crate::config::{FounderProfile, OrdinaryFoodTypeId};
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::founder::founder_genome;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::cgp::{GraphEdge, GroupId};
-use crate::genome::vote::VoteSink;
 use crate::genome::NodeGenome;
 
 fn barrier() -> InputReference {

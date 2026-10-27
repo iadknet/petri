@@ -24,11 +24,12 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
 use crate::config::MutationConfig;
+use crate::contracts::OutcomeChannel;
 use crate::contracts::{InputReference, NodeId};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    VmBackendDef, VmInstruction,
 };
 use crate::mutation::graph::operators::{random_compute_node_kind, random_graph_source};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -92,7 +93,9 @@ pub(in crate::mutation) fn module_size() -> impl Strategy<Value = ModuleSize> {
 }
 
 fn input_refs(rng: &mut SmallRng, count: usize) -> Vec<InputReference> {
-    (0..count).map(|_| random_input_reference(rng)).collect()
+    (0..count)
+        .map(|_| random_input_reference(rng, &crate::config::test_sensor_context(1)))
+        .collect()
 }
 
 fn plasticity(rng: &mut SmallRng) -> Option<PlasticityConfig> {
@@ -140,7 +143,11 @@ fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> C
     let compute_count = def.compute_nodes().len() as u16;
     let edge = |rng: &mut SmallRng| {
         GraphEdge::new(
-            random_graph_source(compute_count, refs, rng),
+            random_graph_source(
+                compute_count,
+                crate::mutation::graph::operators::test_inputs(refs),
+                rng,
+            ),
             rng.gen_range(-1.0f32..=1.0),
         )
     };
@@ -252,12 +259,12 @@ proptest! {
     ) {
         let base = genome(seed, &sizes);
         for &op in &GraphOperator::ALL {
-            for node_idx in GraphMutator::applicable_indices(&base, op) {
+            for node_idx in GraphMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1)) {
                 for apply_seed in 0u64..8 {
                     let mut genome = base.clone();
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result =
-                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng, &MutationConfig { neutral_input_recruitment: crate::config::NeutralInputRecruitment::SingleChannel, ..MutationConfig::default() }, 2);
+                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng, &MutationConfig { neutral_input_recruitment: crate::config::NeutralInputRecruitment::SingleChannel, ..MutationConfig::default() }, &crate::config::test_sensor_context(2));
                     prop_assert!(
                         result.is_ok(),
                         "{op:?} accepted node {node_idx} but skipped: {result:?}"
@@ -277,13 +284,13 @@ proptest! {
         let base = genome(seed, &sizes);
         for &op in &INPUT_REF_OPS {
             for node_idx in
-                InputRefMutator::applicable_indices(&base, op, food_type_count)
+                InputRefMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(food_type_count))
             {
                 for apply_seed in 0u64..8 {
                     let mut genome = base.clone();
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result = InputRefMutator::apply_to_node(
-                        &mut genome, op, node_idx, &mut rng, food_type_count,
+                        &mut genome, op, node_idx, &mut rng, &crate::config::test_sensor_context(food_type_count),
                     );
                     prop_assert!(
                         result.is_ok(),
@@ -329,7 +336,7 @@ proptest! {
         let config = MutationConfig { neutral_input_recruitment: crate::config::NeutralInputRecruitment::WholeFamily, ..MutationConfig::default() };
         let base = genome(seed, &sizes);
         for &op in &GraphOperator::ALL {
-            let applicable = GraphMutator::applicable_indices(&base, op);
+            let applicable = GraphMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
             let mut genome = base.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = selector();
@@ -367,7 +374,7 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let applicable = InputRefMutator::applicable_indices(&base, op, 1);
+            let applicable = InputRefMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
             let mut genome = base.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = selector();
@@ -401,7 +408,7 @@ proptest! {
         // Every other node index, ascending, as `TargetSelector` requires.
         let reachable: Vec<usize> = (0..base.nodes.len()).step_by(2).collect();
         for &op in &GraphOperator::ALL {
-            let applicable = GraphMutator::applicable_indices(&base, op);
+            let applicable = GraphMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
             if applicable.is_empty() {
                 continue;
             }
@@ -441,7 +448,7 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let applicable = InputRefMutator::applicable_indices(&base, op, 1);
+            let applicable = InputRefMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
             if applicable.is_empty() {
                 continue;
             }
@@ -483,8 +490,8 @@ proptest! {
             });
         }
         for &op in &GraphOperator::ALL {
-            let before = GraphMutator::applicable_indices(&base, op);
-            let after = GraphMutator::applicable_indices(&padded, op);
+            let before = GraphMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
+            let after = GraphMutator::applicable_indices(&padded, op, &crate::config::test_sensor_context(1));
             for idx in &before {
                 prop_assert!(after.contains(idx), "{op:?} lost node {idx} to padding");
             }
@@ -515,8 +522,8 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let before = InputRefMutator::applicable_indices(&base, op, 1);
-            let after = InputRefMutator::applicable_indices(&padded, op, 1);
+            let before = InputRefMutator::applicable_indices(&base, op, &crate::config::test_sensor_context(1));
+            let after = InputRefMutator::applicable_indices(&padded, op, &crate::config::test_sensor_context(1));
             for idx in &before {
                 prop_assert!(after.contains(idx), "{op:?} lost node {idx} to padding");
             }
@@ -549,13 +556,18 @@ fn growth_operators_reach_a_blank_graph_module() {
         GraphOperator::AddGraphEdge,
     ] {
         assert_eq!(
-            GraphMutator::applicable_indices(&genome, op),
+            GraphMutator::applicable_indices(&genome, op, &crate::config::test_sensor_context(1)),
             vec![0],
             "{op:?} must reach a blank Graph module"
         );
     }
     assert!(
-        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode).is_empty(),
+        GraphMutator::applicable_indices(
+            &genome,
+            GraphOperator::CopyInternalNode,
+            &crate::config::test_sensor_context(1)
+        )
+        .is_empty(),
         "CopyInternalNode has nothing to copy on a blank module"
     );
 
@@ -571,7 +583,11 @@ fn growth_operators_reach_a_blank_graph_module() {
     )
     .expect("growth applies to a blank module");
     assert_eq!(
-        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode),
+        GraphMutator::applicable_indices(
+            &genome,
+            GraphOperator::CopyInternalNode,
+            &crate::config::test_sensor_context(1)
+        ),
         vec![0],
         "CopyInternalNode must reach a module that has a compute node"
     );

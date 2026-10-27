@@ -2,7 +2,9 @@ use std::collections::BTreeSet;
 
 use super::*;
 use crate::config::FounderProfile;
+use crate::contracts::votes::VoteSink;
 use crate::contracts::NodeId;
+use crate::contracts::OutcomeChannel;
 use crate::creature::founder::founder_genome;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::cgp::test_support::plastic_node;
@@ -10,10 +12,8 @@ use crate::genome::cgp::{
     validate_graph, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, GraphEdge,
     GraphInvariantViolation, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::VoteSink;
 use crate::genome::{
-    BackendDef, CreatureGenome, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig,
+    BackendDef, CreatureGenome, NodeGenome, PlasticityConfig, RewardModulationConfig,
 };
 use crate::runtime::plasticity::PlasticityKind;
 use crate::runtime::state::GraphRuntimeState;
@@ -317,9 +317,9 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
 /// counts once per group by its `inherit_scale`, with its drift and bound.
 #[test]
 fn group_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::WorldInputKey;
     use crate::genome::cgp::{BirthSeeds, EdgeSurface, Scope, Shape};
-    use crate::genome::vote::DirectedVoteKind;
     use crate::genome::HebbianRule;
 
     let lamarckian = PlasticityConfig {
@@ -422,9 +422,9 @@ fn retention_bins_cover_every_admitted_retention() {
 /// ones only.
 #[test]
 fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::genome::cgp::{Scope, Shape};
-    use crate::genome::vote::DirectedVoteKind;
 
     for (retention, bin) in [
         (1.0, 0),

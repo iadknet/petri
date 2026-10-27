@@ -22,9 +22,9 @@ use std::collections::BTreeSet;
 
 use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
+use crate::contracts::votes::{VoteKind, VoteSink};
 use crate::contracts::{Direction, NodeId, WorldAction};
 use crate::genome::cgp::OutputSinkKind;
-use crate::genome::vote::{VoteKind, VoteSink};
 use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -206,12 +206,12 @@ impl SteeringBattery {
 mod tests {
     use super::*;
     use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::founder::founder_genome;
     use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use crate::genome::vote::DirectedVoteKind;
     use crate::genome::NodeGenome;
     use crate::neighborhood::Battery;
 

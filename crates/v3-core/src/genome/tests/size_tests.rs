@@ -5,12 +5,12 @@
 use proptest::prelude::*;
 
 use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::genome::cgp::{
     detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSink, OutputSinkKind, Shape,
 };
-use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
 fn leaf(ref_idx: u16) -> GraphSource {

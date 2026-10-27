@@ -5,17 +5,15 @@
 //! record; each converts from the core type by an exhaustive match.
 
 use serde::Serialize;
+use v3_core::contracts::votes as core_vote;
+use v3_core::contracts::OutcomeChannel as CoreOutcomeChannel;
 use v3_core::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, OrdinaryFoodTypeId,
     StaticIntrospectionKey, WorldAction as CoreWorldAction, WorldInputKey,
 };
 use v3_core::genome::cgp as core_cgp;
 use v3_core::genome::mesh_annotations as core_mesh;
-use v3_core::genome::vote as core_vote;
-use v3_core::genome::{
-    HebbianRule as CoreHebbianRule, OutcomeChannel as CoreOutcomeChannel,
-    VmInstruction as CoreVmInstruction,
-};
+use v3_core::genome::{HebbianRule as CoreHebbianRule, VmInstruction as CoreVmInstruction};
 
 // ── Input references ────────────────────────────────────────────────────────
 
@@ -52,6 +50,7 @@ pub enum InputKey {
     EnergyConsumedThisTick,
     HopsThisTick,
     UpstreamSlot,
+    UpstreamBus,
     ActionQueue,
     ActionVotes,
     PreviousPassVotes,
@@ -142,6 +141,7 @@ impl From<&InputReference> for InputRef {
                 slot: Some(*slot),
                 ..Self::of(InputFamily::Upstream, InputKey::UpstreamSlot)
             },
+            InputReference::UpstreamBus => Self::of(InputFamily::Upstream, InputKey::UpstreamBus),
             InputReference::ActionQueue => {
                 Self::of(InputFamily::ActionQueue, InputKey::ActionQueue)
             }

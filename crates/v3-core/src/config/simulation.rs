@@ -1,5 +1,5 @@
 use super::terrain::TerrainLayer;
-use crate::contracts::OrdinaryFoodTypeId;
+use crate::contracts::{OrdinaryFoodTypeId, SensorContext};
 
 /// Edge mode for the world grid.
 /// Canonical owner: v3-world-grid-spec.md Section 4.
@@ -1329,6 +1329,27 @@ impl SimulationConfig {
         let log_step_bound = (max_energy / cap.min).ln();
         self.mutation.capacity.normalize(log_step_bound);
     }
+}
+
+impl SimulationConfig {
+    /// The sensor descriptor context (T25.F11) of a world with
+    /// `food_type_count` ordinary food types: the action-queue slots are the
+    /// normalized `max_actions_per_turn`.
+    #[must_use]
+    pub fn sensor_context(&self, food_type_count: usize) -> SensorContext {
+        SensorContext::new(
+            food_type_count,
+            u32::try_from(self.runtime.max_actions_per_turn).unwrap_or(u32::MAX),
+        )
+    }
+}
+
+/// The default configuration's sensor context with `food_type_count` food
+/// types (a test fixture).
+#[cfg(test)]
+#[must_use]
+pub(crate) fn test_sensor_context(food_type_count: usize) -> SensorContext {
+    SimulationConfig::default().sensor_context(food_type_count)
 }
 
 impl SimulationConfig {

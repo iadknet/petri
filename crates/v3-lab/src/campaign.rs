@@ -892,13 +892,13 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
                 Part::U(next_generation),
                 Part::U((survivors + offset) as u64),
             ]));
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_in(
                 &mut child,
                 &config.mutation,
                 &reachable[pick],
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
-                config.world.food.types.len(),
+                &config.sensor_context(config.world.food.types.len()),
             );
             let identical = child == *parent_genome;
             let birth = birth_events(&summary, identical);
@@ -1295,13 +1295,15 @@ mod tests {
                 Part::U(generation),
                 Part::U(slot),
             ]));
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_in(
                 &mut genome,
                 &arm.setup.config.mutation,
                 &reachable,
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
-                arm.setup.config.world.food.types.len(),
+                &arm.setup
+                    .config
+                    .sensor_context(arm.setup.config.world.food.types.len()),
             );
             (genome, summary)
         };

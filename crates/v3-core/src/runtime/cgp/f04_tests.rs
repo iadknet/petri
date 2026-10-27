@@ -6,21 +6,22 @@
 //! exhaustion rules. A zero-compute graph with no wired surface stays inert.
 
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{
     Direction, InputReference, NodeId, RouteTarget, StaticIntrospectionKey, WorldAction,
 };
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::cgp::traced::execute_graph_node_traced;
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::state::GraphRuntimeState;
 use crate::runtime::trace::domain::TerminationReason;
-use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -606,7 +607,7 @@ proptest! {
 
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
-        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; crate::genome::vote::VOTE_SINK_COUNT]);
+        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; crate::contracts::votes::VOTE_SINK_COUNT]);
         prop_assert_eq!(visited.side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);

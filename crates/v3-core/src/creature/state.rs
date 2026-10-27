@@ -1,6 +1,7 @@
 use std::mem::size_of;
 
 use crate::config::{EnergyCapacityConfig, RuntimeConfig};
+use crate::contracts::OUTCOME_CHANNEL_COUNT;
 use crate::contracts::{
     CreatureId, Direction, OrdinaryFoodTypeId, PerceptionRequirements, Position, WorldInputKey,
     SHARED_MEMORY_SLOTS,
@@ -14,7 +15,7 @@ use crate::genome::sensor_analysis::{
     declared_world_keys, has_barrier_reader, live_vm_world_reads, perception_requirements,
     sensor_census,
 };
-use crate::genome::{CreatureGenome, OUTCOME_CHANNEL_COUNT};
+use crate::genome::CreatureGenome;
 use crate::mutation::{BirthEdgeClass, MutationOperator};
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::plasticity::{LearningCounts, OutcomeSignalBank};
@@ -606,13 +607,13 @@ mod tests {
             let mut genome = founder_genome(profiles[profile]);
             for _ in 0..rounds {
                 let reachable = mesh_reachable_nodes(&genome);
-                MutationEngine::apply_mutations_with_food_type_count(
+                MutationEngine::apply_mutations_in(
                     &mut genome,
                     &config,
                     &reachable,
                     ParentExecuted::Indices(&reachable),
                     &mut rng,
-                    1,
+                    &crate::config::test_sensor_context(1),
                 );
             }
             genome

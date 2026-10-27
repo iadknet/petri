@@ -6,6 +6,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::contracts::SensorContext;
 use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
 use crate::genome::cgp_analysis::cgp_live_compute_indices;
 use crate::genome::mesh_annotations::collect_live_vm_instruction_indices;
@@ -65,12 +66,12 @@ pub(super) struct Inventory {
     pub(super) nodes: Vec<NodeConsumers>,
 }
 
-fn edge_target(node: &NodeGenome, edge: &GraphEdge) -> Option<Target> {
+fn edge_target(node: &NodeGenome, edge: &GraphEdge, context: &SensorContext) -> Option<Target> {
     match edge.source() {
         GraphSource::InputLeaf { ref_idx, sub_idx } => node
             .input_refs
             .get(usize::from(ref_idx))
-            .map(|reference| Target::Input(addressed(reference, sub_idx))),
+            .map(|reference| Target::Input(addressed(reference, sub_idx, context))),
         GraphSource::SharedMemory { slot, previous } if slot < 16 => {
             Some(Target::Slot(shared_memory(usize::from(slot), previous)))
         }
@@ -78,14 +79,18 @@ fn edge_target(node: &NodeGenome, edge: &GraphEdge) -> Option<Target> {
     }
 }
 
-fn instruction_target(node: &NodeGenome, instruction: &VmInstruction) -> Option<Target> {
+fn instruction_target(
+    node: &NodeGenome,
+    instruction: &VmInstruction,
+    context: &SensorContext,
+) -> Option<Target> {
     match *instruction {
         VmInstruction::ReadInput {
             ref_idx, sub_idx, ..
         } => node
             .input_refs
             .get(usize::from(ref_idx))
-            .map(|reference| Target::Input(addressed(reference, sub_idx))),
+            .map(|reference| Target::Input(addressed(reference, sub_idx, context))),
         VmInstruction::LoadSlotImm { slot_idx, .. } => {
             Some(Target::Slot(shared_memory(usize::from(slot_idx), false)))
         }
@@ -97,12 +102,16 @@ fn instruction_target(node: &NodeGenome, instruction: &VmInstruction) -> Option<
     }
 }
 
-fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsumers {
+fn graph_consumers(
+    node: &NodeGenome,
+    graph: &CgpGraphBackendDef,
+    context: &SensorContext,
+) -> NodeConsumers {
     let live: BTreeSet<usize> = cgp_live_compute_indices(graph).into_iter().collect();
     let consumers = |edges: &[GraphEdge], live: bool| {
         edges
             .iter()
-            .filter_map(|edge| edge_target(node, edge))
+            .filter_map(|edge| edge_target(node, edge, context))
             .map(|target| Consumer { target, live })
             .collect::<Vec<_>>()
     };
@@ -127,14 +136,18 @@ fn graph_consumers(node: &NodeGenome, graph: &CgpGraphBackendDef) -> NodeConsume
 
 impl Inventory {
     /// Every node's consumers; `reachable` is `mesh_reachable_nodes`.
-    pub(super) fn new(genome: &CreatureGenome, reachable: &[usize]) -> Self {
+    pub(super) fn new(
+        genome: &CreatureGenome,
+        reachable: &[usize],
+        context: &SensorContext,
+    ) -> Self {
         let nodes = genome
             .nodes
             .iter()
             .enumerate()
             .map(|(index, node)| {
                 let mut consumers = match &node.backend_def {
-                    BackendDef::Graph(graph) => graph_consumers(node, graph),
+                    BackendDef::Graph(graph) => graph_consumers(node, graph, context),
                     BackendDef::Vm(vm) => {
                         let live: BTreeSet<usize> = collect_live_vm_instruction_indices(vm)
                             .into_iter()
@@ -145,7 +158,7 @@ impl Inventory {
                                 .iter()
                                 .enumerate()
                                 .filter_map(|(pc, instruction)| {
-                                    instruction_target(node, instruction).map(|target| {
+                                    instruction_target(node, instruction, context).map(|target| {
                                         (
                                             pc,
                                             Consumer {
@@ -223,6 +236,7 @@ pub(super) fn declarations(genome: &CreatureGenome, reachable: &[usize]) -> BTre
 pub(in crate::neighborhood) fn ablated(
     genome: &CreatureGenome,
     ablate: impl Fn(Channel) -> bool,
+    context: &SensorContext,
 ) -> CreatureGenome {
     let mut ablated = genome.clone();
     for node in &mut ablated.nodes {
@@ -233,7 +247,7 @@ pub(in crate::neighborhood) fn ablated(
         let refs = &node.input_refs;
         let hit = |ref_idx: u16, sub_idx: u16| {
             refs.get(usize::from(ref_idx)).is_some_and(|reference| {
-                matches!(addressed(reference, sub_idx), Addressed::Channel(c) if ablate(c))
+                matches!(addressed(reference, sub_idx, context), Addressed::Channel(c) if ablate(c))
             })
         };
         match &mut node.backend_def {

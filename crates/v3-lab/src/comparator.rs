@@ -1,9 +1,10 @@
 //! Built-in comparators: competence witnesses composed from the existing
 //! `input-opportunity-v1` controllers, never tuned on assay outcomes.
 
+use v3_core::contracts::votes::DirectedVoteKind;
+use v3_core::contracts::votes::VoteSink;
 use v3_core::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-use v3_core::genome::vote::DirectedVoteKind;
-use v3_core::genome::{BackendDef, CreatureGenome, VoteSink};
+use v3_core::genome::{BackendDef, CreatureGenome};
 use v3_core::neighborhood::opportunity::controllers::{
     controller, AUTHORED_REF, RING_INHIBITION, VOTE_NODE,
 };

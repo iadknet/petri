@@ -3,9 +3,9 @@
 //! the canonical founder's fan-outs read by the same code.
 
 use serde::{Deserialize, Serialize};
+use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::analysis::mesh_reachable_nodes;
-use v3_core::genome::vote::DirectedVoteKind;
 use v3_core::neighborhood::drives::{DriveCensus, KindDrives, DRIVES_VERSION};
 
 use super::schema::Indicator;

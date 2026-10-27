@@ -54,9 +54,9 @@ fn full_assembly_matches_production_for_a_genome_reading_every_input() {
 #[test]
 fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
     use crate::config::NeutralInputRecruitment as Arm;
+    use crate::contracts::votes::VoteSink;
     use crate::contracts::NodeId;
     use crate::genome::cgp::CgpGraphBackendDef;
-    use crate::genome::vote::VoteSink;
     use crate::genome::{BackendDef, NodeGenome};
     use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     let parent = CreatureGenome {

@@ -637,7 +637,7 @@ pub(super) fn compute_founder_neighborhood(
         sizes.founder_births,
         0,
     );
-    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let steering_battery = SteeringBattery::generate(context.sensors.food_type_count);
     let (mesh_execution, steering) =
         mesh_execution_and_steering(battery, &steering_battery, &subject, &context);
     NeighborhoodFounderHalf {
@@ -680,7 +680,7 @@ pub(super) fn evolved_neighborhood_for_seed(
     let mut sampled_genomes = Vec::with_capacity(ranks.len());
     let mut pooled_operator_tallies: Vec<Tally> = vec![Tally::default(); catalog.len()];
     let mut pooled_births = BirthResult::default();
-    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let steering_battery = SteeringBattery::generate(context.sensors.food_type_count);
     let mut pooled_steering = steering::SteeringPooled::default();
 
     for (genome_index, &rank) in ranks.iter().enumerate() {

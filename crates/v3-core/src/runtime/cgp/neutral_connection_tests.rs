@@ -4,6 +4,10 @@ use super::effects::apply_cgp_graph_effects;
 use super::execute::execute_graph_node;
 use super::sources::resolve_source_post_convergence;
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
+use crate::contracts::OutcomeChannel;
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, NodeId, RouteTarget,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
@@ -11,16 +15,13 @@ use crate::contracts::{
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
-    RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
 };
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::state::GraphRuntimeState;
-use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;

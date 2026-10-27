@@ -9,12 +9,12 @@
 
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::food_idx;
-use crate::contracts::{InputReference, WorldInputKey};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{ActionParamField, VoteSink};
+use crate::contracts::{InputReference, SensorContext, WorldInputKey};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{ActionParamField, VoteSink};
 use crate::genome::{BackendDef, CreatureGenome};
 
 use super::super::input_use::catalog::{addressed, Addressed, Channel};
@@ -109,11 +109,11 @@ impl Family {
 
     /// The authored channels, in the input-use catalog.
     #[must_use]
-    pub fn authored_channels(self) -> Vec<Channel> {
+    pub fn authored_channels(self, context: &SensorContext) -> Vec<Channel> {
         let reference = self.reference();
         self.authored_sub_indices()
             .iter()
-            .map(|&sub_idx| match addressed(&reference, sub_idx) {
+            .map(|&sub_idx| match addressed(&reference, sub_idx, context) {
                 Addressed::Channel(channel) => channel,
                 Addressed::OutOfWidth(_) => unreachable!("world keys always address a channel"),
             })

@@ -24,7 +24,7 @@ pub(super) struct Decided {
     pub(super) actions: Vec<crate::contracts::WorldAction>,
     pub(super) priority_bid: f32,
     pub(super) termination_reason: crate::runtime::trace::domain::TerminationReason,
-    pub(super) commit_counts: [u32; crate::genome::VOTE_KIND_COUNT],
+    pub(super) commit_counts: [u32; crate::contracts::votes::VOTE_KIND_COUNT],
 }
 
 #[cfg(test)]

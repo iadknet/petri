@@ -3,12 +3,12 @@
 //! all three execution modes.
 
 use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::{ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey,
 };
 use crate::genome::cgp::{ComputeNodeKind, GraphSource};
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::{ActionParamField, VoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT};
 use crate::genome::{CreatureGenome, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};

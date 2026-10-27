@@ -232,7 +232,8 @@ fn arm_of(creature: &CreatureState) -> Arm {
 /// changes the committed actions of one execution from fresh cognition
 /// state.
 fn expose(sim: &Simulation, family: Family, ids: &[CreatureId]) -> Exposure {
-    let channels = family.authored_channels();
+    let context = sim.config.sensor_context(sim.config.world.food.types.len());
+    let channels = family.authored_channels(&context);
     let reference = family.reference();
     let mut exposure = Exposure::default();
     for (id, sensors) in assemble_full_sensor_inputs(sim, ids) {
@@ -240,13 +241,13 @@ fn expose(sim: &Simulation, family: Family, ids: &[CreatureId]) -> Exposure {
         exposure.sampled += 1;
         let resolve_ctx = crate::runtime::inputs::ResolveCtx {
             sensors: &sensors,
-            upstream_slots: &[0.0; crate::runtime::OUTPUT_SLOT_COUNT],
+            upstream_slots: &[0.0; crate::contracts::OUTPUT_SLOT_COUNT],
             energy: creature.energy,
             energy_consumed: 0.0,
             action_queue: &crate::contracts::ActionQueue::new(1),
-            votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
-            previous_pass_votes: &[0.0; crate::genome::vote::VOTE_SINK_COUNT],
-            commit_counts: &[0; crate::genome::vote::VOTE_KIND_COUNT],
+            votes: &[0.0; crate::contracts::votes::VOTE_SINK_COUNT],
+            previous_pass_votes: &[0.0; crate::contracts::votes::VOTE_SINK_COUNT],
+            commit_counts: &[0; crate::contracts::votes::VOTE_KIND_COUNT],
             mesh_hops: 0,
         };
         let exposed = family.authored_sub_indices().iter().any(|&sub| {
@@ -261,7 +262,11 @@ fn expose(sim: &Simulation, family: Family, ids: &[CreatureId]) -> Exposure {
         let run = |genome: &CreatureGenome| {
             execute_scenario_tick(genome, &scenario, runtime, UntracedMeshExecution).actions
         };
-        let silenced = ablated(creature.genome(), |channel| channels.contains(&channel));
+        let silenced = ablated(
+            creature.genome(),
+            |channel| channels.contains(&channel),
+            &context,
+        );
         exposure.applied += u64::from(run(creature.genome()) != run(&silenced));
     }
     exposure

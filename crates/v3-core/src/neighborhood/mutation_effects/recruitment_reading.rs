@@ -37,13 +37,13 @@ fn neutral_recruitment_engineering_panel() {
         let mut exposure = BTreeMap::<String, u64>::new();
         for i in 0..2048 {
             let mut child = parent.clone();
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_in(
                 &mut child,
                 &config.mutation,
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut SmallRng::seed_from_u64(29_004_000 + i),
-                2,
+                &crate::config::test_sensor_context(2),
             );
             requested += u64::from(summary.attempted_events);
             total_growth += i64::from(child.genome_size()) - i64::from(parent.genome_size());
@@ -88,9 +88,11 @@ fn neutral_recruitment_engineering_panel() {
                             edges += 1;
                             let channel = match edge.source() {
                                 GraphSource::InputLeaf { ref_idx, sub_idx } => {
-                                    let Addressed::Channel(channel) =
-                                        addressed(&new.input_refs[usize::from(ref_idx)], sub_idx)
-                                    else {
+                                    let Addressed::Channel(channel) = addressed(
+                                        &new.input_refs[usize::from(ref_idx)],
+                                        sub_idx,
+                                        &crate::config::test_sensor_context(1),
+                                    ) else {
                                         panic!("noncanonical input")
                                     };
                                     channel

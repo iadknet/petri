@@ -4,11 +4,11 @@
 use super::fixtures::{cue, move_sink, stage_for, EAST};
 use super::*;
 use crate::config::MutationConfig;
+use crate::contracts::votes::DirectedVoteKind;
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{InputReference, NodeId};
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-use crate::genome::vote::DirectedVoteKind;
-use crate::genome::vote::VoteSink;
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{input_ref_operator_key, topology_operator_key, vm_operator_key};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -67,23 +67,23 @@ impl ProductionEvent {
         let mut rng = SmallRng::seed_from_u64(seed);
         let config = MutationConfig::default();
         match self {
-            Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
+            Self::Topology(op) => TopologyMutator::apply_in(
                 genome,
                 op,
                 &mut selector,
                 &mut rng,
                 &config,
-                1,
+                &crate::config::SimulationConfig::default().sensor_context(1),
             ),
             Self::Graph(op) => GraphMutator::apply(genome, op, &mut selector, &mut rng, &config),
             Self::Vm(op) => VmMutator::apply(genome, op, &mut selector, &mut rng, &config),
-            Self::InputRef(op) => InputRefMutator::apply_with_food_type_count(
+            Self::InputRef(op) => InputRefMutator::apply_in(
                 genome,
                 op,
                 &mut selector,
                 &mut rng,
                 &config,
-                1,
+                &crate::config::SimulationConfig::default().sensor_context(1),
             ),
         }
     }

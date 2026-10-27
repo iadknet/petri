@@ -4,9 +4,9 @@
 //! under `runtime::inputs::resolve_input`.
 
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, SensorContext, SensorDescriptor,
+    StaticIntrospectionKey, WorldInputKey,
 };
-use crate::mutation::compound::sub_value_count;
 
 /// One input family. Food families carry their food type. Declaration order
 /// follows `mutation::sampling::INPUT_BUCKETS`,
@@ -35,6 +35,8 @@ pub enum Family {
     PreviousOutcome,
     /// Channel = slot.
     UpstreamSlot,
+    /// Channel = slot, every slot in one declaration (T25.F11).
+    UpstreamBus,
     /// Shared memory, current tick (channel = slot); no declaration or causal stage.
     SharedMemory,
     /// Shared memory, previous tick (channel = slot); no declaration or causal stage.
@@ -76,6 +78,7 @@ impl Family {
                 DynamicIntrospectionKey::HopsThisTick => Self::HopsThisTick,
             },
             InputReference::UpstreamSlot(_) => Self::UpstreamSlot,
+            InputReference::UpstreamBus => Self::UpstreamBus,
             InputReference::ActionQueue => Self::ActionQueue,
             InputReference::ActionVotes => Self::ActionVotes,
             InputReference::PreviousPassVotes => Self::PreviousPassVotes,
@@ -132,7 +135,7 @@ pub enum Addressed {
 /// compounds address `sub_idx` below their width and nothing at or past it,
 /// and `UpstreamSlot(k)` is channel `k`.
 #[must_use]
-pub fn addressed(reference: &InputReference, sub_idx: u16) -> Addressed {
+pub fn addressed(reference: &InputReference, sub_idx: u16, context: &SensorContext) -> Addressed {
     let family = Family::of(reference);
     let channel = match reference {
         InputReference::World(key) if key.compound_width() > 1 => sub_idx % key.compound_width(),
@@ -140,8 +143,9 @@ pub fn addressed(reference: &InputReference, sub_idx: u16) -> Addressed {
         InputReference::ActionVotes
         | InputReference::PreviousPassVotes
         | InputReference::CommitCounts
-        | InputReference::PreviousOutcome => {
-            if sub_idx >= sub_value_count(reference) {
+        | InputReference::PreviousOutcome
+        | InputReference::UpstreamBus => {
+            if u32::from(sub_idx) >= SensorDescriptor::of(reference, context).width() {
                 return Addressed::OutOfWidth(family);
             }
             sub_idx
@@ -198,7 +202,11 @@ mod tests {
     use crate::config::OrdinaryFoodTypeId;
 
     fn world(key: WorldInputKey, sub_idx: u16) -> Addressed {
-        addressed(&InputReference::World(key), sub_idx)
+        addressed(
+            &InputReference::World(key),
+            sub_idx,
+            &crate::config::test_sensor_context(1),
+        )
     }
 
     #[test]
@@ -217,11 +225,19 @@ mod tests {
 
     #[test]
     fn action_queue_keeps_the_raw_index_and_labels_past_the_draw_width() {
-        let Addressed::Channel(inside) = addressed(&InputReference::ActionQueue, 11) else {
+        let Addressed::Channel(inside) = addressed(
+            &InputReference::ActionQueue,
+            11,
+            &crate::config::test_sensor_context(1),
+        ) else {
             panic!("ActionQueue always addresses a channel");
         };
         assert!(!inside.beyond_draw_width());
-        let Addressed::Channel(beyond) = addressed(&InputReference::ActionQueue, 14) else {
+        let Addressed::Channel(beyond) = addressed(
+            &InputReference::ActionQueue,
+            14,
+            &crate::config::test_sensor_context(1),
+        ) else {
             panic!("ActionQueue always addresses a channel");
         };
         assert_eq!(beyond.channel, 14);
@@ -230,13 +246,28 @@ mod tests {
 
     #[test]
     fn decision_compounds_read_nothing_at_or_past_their_width() {
-        let width = sub_value_count(&InputReference::CommitCounts);
+        let width = u16::try_from(
+            SensorDescriptor::of(
+                &InputReference::CommitCounts,
+                &crate::config::test_sensor_context(1),
+            )
+            .width(),
+        )
+        .unwrap();
         assert!(matches!(
-            addressed(&InputReference::CommitCounts, width - 1),
+            addressed(
+                &InputReference::CommitCounts,
+                width - 1,
+                &crate::config::test_sensor_context(1)
+            ),
             Addressed::Channel(_)
         ));
         assert_eq!(
-            addressed(&InputReference::CommitCounts, width),
+            addressed(
+                &InputReference::CommitCounts,
+                width,
+                &crate::config::test_sensor_context(1)
+            ),
             Addressed::OutOfWidth(Family::CommitCounts)
         );
     }
@@ -244,10 +275,18 @@ mod tests {
     #[test]
     fn upstream_declarations_cover_only_their_slot() {
         let declaration = Declaration::of(&InputReference::UpstreamSlot(3));
-        let Addressed::Channel(three) = addressed(&InputReference::UpstreamSlot(3), 0) else {
+        let Addressed::Channel(three) = addressed(
+            &InputReference::UpstreamSlot(3),
+            0,
+            &crate::config::test_sensor_context(1),
+        ) else {
             panic!("upstream slots address a channel");
         };
-        let Addressed::Channel(four) = addressed(&InputReference::UpstreamSlot(4), 0) else {
+        let Addressed::Channel(four) = addressed(
+            &InputReference::UpstreamSlot(4),
+            0,
+            &crate::config::test_sensor_context(1),
+        ) else {
             panic!("upstream slots address a channel");
         };
         assert!(declaration.covers(three));

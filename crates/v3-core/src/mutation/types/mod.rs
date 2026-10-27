@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use crate::contracts::votes::VoteSink;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::Scope;
-use crate::genome::vote::VoteSink;
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -20,12 +20,56 @@ impl ComplexityEffect {
     }
 }
 
-/// The member detaches and group removals one committed Graph event made
-/// (T25.F03).
+/// What one committed event did to bundles (T25.F11), reported by the
+/// operator from the container's return values: the bundles it created by
+/// wiring (`plain`, `ring`, `pair`) and creation form (`uniform`,
+/// `randomized`), the members it detached and the records it removed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct GroupEdits {
-    pub detached: u32,
-    pub groups_removed: u32,
+pub struct BundleEdits {
+    pub created: [[u8; 2]; 3],
+    pub detached: u8,
+    pub removed: u8,
+}
+
+impl BundleEdits {
+    /// One member detach, which removed its record when it was the last.
+    #[must_use]
+    pub const fn detach(removed: bool) -> Self {
+        Self {
+            created: [[0; 2]; 3],
+            detached: 1,
+            removed: removed as u8,
+        }
+    }
+
+    /// A removal that took a record when `removed`.
+    #[must_use]
+    pub const fn removal(removed: bool) -> Self {
+        Self {
+            created: [[0; 2]; 3],
+            detached: 0,
+            removed: removed as u8,
+        }
+    }
+
+    /// One bundle created with `wiring` in `form`.
+    #[must_use]
+    pub fn creation(wiring: &crate::genome::cgp::Wiring, randomized: bool) -> Self {
+        let mut edits = Self::default();
+        edits.created[wiring_index(wiring)][usize::from(randomized)] = 1;
+        edits
+    }
+}
+
+/// A wiring's row in [`BundleEdits::created`]: `plain`, `ring`, `pair`.
+#[must_use]
+pub const fn wiring_index(wiring: &crate::genome::cgp::Wiring) -> usize {
+    use crate::genome::cgp::Wiring;
+    match wiring {
+        Wiring::Plain { .. } => 0,
+        Wiring::Ring { .. } => 1,
+        Wiring::DirectionPair { .. } => 2,
+    }
 }
 
 /// Reason a mutation event was skipped.
@@ -156,7 +200,7 @@ impl From<&InputReference> for MutationAddedNodeInputClass {
             InputReference::ActionVotes
             | InputReference::PreviousPassVotes
             | InputReference::CommitCounts => Self::Decision,
-            InputReference::UpstreamSlot(_) => Self::Upstream,
+            InputReference::UpstreamSlot(_) | InputReference::UpstreamBus => Self::Upstream,
             InputReference::ActionQueue => Self::ActionQueue,
         }
     }
@@ -724,9 +768,9 @@ impl MutationSummary {
     }
 
     /// Record the detaches and group removals of a committed event.
-    pub fn record_group_edits(&mut self, edits: GroupEdits) {
-        self.graph_edges_detached += edits.detached;
-        self.groups_removed += edits.groups_removed;
+    pub fn record_bundle_edits(&mut self, edits: BundleEdits) {
+        self.graph_edges_detached += u32::from(edits.detached);
+        self.groups_removed += u32::from(edits.removed);
     }
 
     /// Record one committed attribute change at the scope it landed on.

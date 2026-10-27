@@ -20,6 +20,7 @@ export type InputKey =
 	| "EnergyConsumedThisTick"
 	| "HopsThisTick"
 	| "UpstreamSlot"
+	| "UpstreamBus"
 	| "ActionQueue"
 	| "ActionVotes"
 	| "PreviousPassVotes"

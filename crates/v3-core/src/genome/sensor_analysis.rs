@@ -256,13 +256,13 @@ impl SensorCensus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::world_key_strategy;
     use crate::contracts::{DynamicIntrospectionKey, NodeId, OrdinaryFoodTypeId};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::genome::analysis::mesh_reachable_nodes;
     use crate::genome::cgp::test_support::push_sink;
     use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
-    use crate::genome::vote::DirectedVoteKind;
     use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction};
     use proptest::prelude::*;
 
@@ -607,8 +607,8 @@ mod tests {
 
     #[test]
     fn world_inputs_reach_vote_and_terminate_sink_edges() {
+        use crate::contracts::votes::VoteSink;
         use crate::genome::cgp::{OutputSink, OutputSinkKind};
-        use crate::genome::vote::VoteSink;
         let mut graph = empty_graph();
         push_sink(
             &mut graph,
@@ -730,8 +730,8 @@ mod tests {
     /// its ring (T25.F03).
     #[test]
     fn a_ring_group_is_a_live_consumer_of_its_ring() {
+        use crate::contracts::votes::DirectedVoteKind;
         use crate::genome::cgp::Shape;
-        use crate::genome::vote::DirectedVoteKind;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.add_group(Shape::Ring { ring_ref: 1 }, DirectedVoteKind::Move, 0);
         let refs = vec![

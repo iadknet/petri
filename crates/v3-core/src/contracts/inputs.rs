@@ -440,6 +440,9 @@ pub enum InputReference {
     DynamicIntrospection(DynamicIntrospectionKey),
     /// Output slot from the upstream node in the mesh chain.
     UpstreamSlot(usize),
+    /// Compound (T25.F11): every upstream output slot, sub-value `k` the
+    /// slot `k`; width `OUTPUT_SLOT_COUNT`.
+    UpstreamBus,
     /// Compound: the creature's action queue. sub_idx maps to queue slot values:
     /// `sub_idx / 3` = queue slot index, `sub_idx % 3`: 0 = action_type, 1 = param0, 2 = param1.
     ActionQueue,
@@ -484,6 +487,168 @@ impl InputReference {
     }
 }
 
+// ── Sensor descriptor (T25.F11) ─────────────────────────────────────────────
+
+/// What a sensor's descriptor reads beyond the reference itself: the run's
+/// ordinary food types and the action-queue slots a turn can hold. Built
+/// once per run from the configuration (`SimulationConfig::sensor_context`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SensorContext {
+    /// Ordinary food types in the world (at least 1 in a valid config).
+    pub food_type_count: usize,
+    /// The normalized `max_actions_per_turn`.
+    pub action_queue_slots: u32,
+}
+
+impl SensorContext {
+    #[must_use]
+    pub const fn new(food_type_count: usize, action_queue_slots: u32) -> Self {
+        Self {
+            food_type_count,
+            action_queue_slots,
+        }
+    }
+}
+
+/// `ActionQueue`'s declared width: the first four queued actions, three
+/// sub-values each, whatever the configured queue.
+const ACTION_QUEUE_WIDTH: u32 = 12;
+
+/// One field set of a sensor or a shared-memory bank: the fields one bundle
+/// wires and the geometry they carry. Field indices are the sensor's
+/// sub-values (a memory bank's slots).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldSet {
+    /// Fields `0..width`, no geometry.
+    Plain { width: u32 },
+    /// A neighbor ring: field `c` the neighbor in `Direction::ALL[c]`, eight.
+    Ring,
+    /// An `(x, y)` offset pair and the same thing's facts.
+    Pair(DirectionPair),
+}
+
+/// A shared-memory bank's one field set: every slot, no geometry. A bank is
+/// a bundle source without a declaration.
+pub const MEMORY_BANK: FieldSet = FieldSet::Plain {
+    width: crate::contracts::SHARED_MEMORY_SLOTS as u32,
+};
+
+/// The fields of a `Ring` set.
+const RING_FIELDS: u16 = 8;
+
+impl FieldSet {
+    /// The set's fields, ascending.
+    #[must_use]
+    pub fn fields(self) -> Vec<u16> {
+        match self {
+            Self::Plain { width } => (0..width)
+                .map(|field| u16::try_from(field).expect("a sub-value index fits u16"))
+                .collect(),
+            Self::Ring => (0..RING_FIELDS).collect(),
+            Self::Pair(pair) => {
+                let mut fields: Vec<u16> = [pair.x, pair.y]
+                    .into_iter()
+                    .chain(pair.facts.iter().copied())
+                    .collect();
+                fields.sort_unstable();
+                fields
+            }
+        }
+    }
+
+    /// Whether `field` belongs to the set.
+    #[must_use]
+    pub fn contains(self, field: u16) -> bool {
+        match self {
+            Self::Plain { width } => u32::from(field) < width,
+            Self::Ring => field < RING_FIELDS,
+            Self::Pair(pair) => field == pair.x || field == pair.y || pair.facts.contains(&field),
+        }
+    }
+}
+
+/// How a sensor's fields split into field sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Layout {
+    /// One set of every field, no geometry.
+    Plain,
+    /// One `Ring` set.
+    Ring,
+    /// One `Pair` set per declared pair.
+    Pairs(&'static [DirectionPair]),
+}
+
+/// A sensor's width and field sets (T25.F11): the one declaration every
+/// width reader and every wiring reads. Never names an action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SensorDescriptor {
+    width: u32,
+    layout: Layout,
+}
+
+impl SensorDescriptor {
+    /// The descriptor of `reference` under `context`.
+    #[must_use]
+    pub fn of(reference: &InputReference, context: &SensorContext) -> Self {
+        let _ = context;
+        let width = match reference {
+            InputReference::World(key) => u32::from(key.compound_width()),
+            InputReference::ActionQueue => ACTION_QUEUE_WIDTH,
+            InputReference::ActionVotes | InputReference::PreviousPassVotes => {
+                crate::contracts::votes::VOTE_SINK_COUNT as u32
+            }
+            InputReference::CommitCounts => crate::contracts::votes::VOTE_KIND_COUNT as u32,
+            InputReference::PreviousOutcome => crate::contracts::OUTCOME_CHANNEL_COUNT as u32,
+            InputReference::UpstreamBus => crate::contracts::OUTPUT_SLOT_COUNT as u32,
+            InputReference::StaticIntrospection(_)
+            | InputReference::DynamicIntrospection(_)
+            | InputReference::UpstreamSlot(_) => 1,
+        };
+        let layout = match reference {
+            InputReference::World(key) if key.is_neighbor_ring() => Layout::Ring,
+            InputReference::World(key) if !key.direction_pairs().is_empty() => {
+                Layout::Pairs(key.direction_pairs())
+            }
+            _ => Layout::Plain,
+        };
+        Self { width, layout }
+    }
+
+    /// The number of sub-values the sensor exposes.
+    #[must_use]
+    pub const fn width(self) -> u32 {
+        self.width
+    }
+
+    /// How many field sets the sensor declares (at least one).
+    #[must_use]
+    pub const fn field_set_count(self) -> usize {
+        match self.layout {
+            Layout::Plain | Layout::Ring => 1,
+            Layout::Pairs(pairs) => pairs.len(),
+        }
+    }
+
+    /// Field set `index`, when declared.
+    #[must_use]
+    pub fn field_set(self, index: u8) -> Option<FieldSet> {
+        let index = usize::from(index);
+        match self.layout {
+            Layout::Plain => (index == 0).then_some(FieldSet::Plain { width: self.width }),
+            Layout::Ring => (index == 0).then_some(FieldSet::Ring),
+            Layout::Pairs(pairs) => pairs.get(index).copied().map(FieldSet::Pair),
+        }
+    }
+
+    /// Every field set, in index order.
+    pub fn field_sets(self) -> impl Iterator<Item = FieldSet> {
+        (0..self.field_set_count()).map(move |index| {
+            self.field_set(u8::try_from(index).expect("few field sets"))
+                .expect("an index below the count")
+        })
+    }
+}
+
 /// Draws a world input key from [`WorldInputKey::universe`] over food types
 /// 0..3, so property tests track the key families without a hand-kept list.
 #[cfg(test)]
@@ -502,6 +667,83 @@ mod tests {
     fn every_world_key() -> Vec<WorldInputKey> {
         let food = (0..3).map(OrdinaryFoodTypeId::new);
         WorldInputKey::universe(food).into_iter().collect()
+    }
+
+    const CONTEXT: SensorContext = SensorContext::new(1, 10);
+
+    /// Every field set's fields lie below the sensor's width, and the sets
+    /// cover every field: a slot family's sets partition it (each slot of
+    /// `NearbyCreature` one set), an area summary's two pairs share the
+    /// family's facts, a ring is one `Ring` set and every other sensor one
+    /// `Plain` set of all its fields (T25.F11 invariant 1).
+    #[test]
+    fn the_descriptor_field_sets_cover_each_sensor() {
+        let world = every_world_key().into_iter().map(InputReference::World);
+        let others = [
+            InputReference::ActionQueue,
+            InputReference::ActionVotes,
+            InputReference::PreviousPassVotes,
+            InputReference::CommitCounts,
+            InputReference::PreviousOutcome,
+            InputReference::UpstreamBus,
+            InputReference::UpstreamSlot(3),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+        ];
+        for reference in world.chain(others) {
+            let descriptor = SensorDescriptor::of(&reference, &CONTEXT);
+            let mut covered = vec![0u32; descriptor.width() as usize];
+            for set in descriptor.field_sets() {
+                for field in set.fields() {
+                    assert!(set.contains(field));
+                    covered[usize::from(field)] += 1;
+                }
+            }
+            assert!(
+                covered.iter().all(|&n| n >= 1),
+                "{reference:?} covers every field"
+            );
+            let shared = matches!(
+                reference,
+                InputReference::World(
+                    WorldInputKey::AreaFoodSummary { .. }
+                        | WorldInputKey::AreaBarrierSummary
+                        | WorldInputKey::AreaOccupancySummary
+                )
+            );
+            if !shared {
+                assert!(covered.iter().all(|&n| n == 1), "{reference:?} partitions");
+            }
+            let expected_sets = match &reference {
+                InputReference::World(WorldInputKey::NearbyCreature) => 4,
+                InputReference::World(key) if !key.direction_pairs().is_empty() => 2,
+                _ => 1,
+            };
+            assert_eq!(descriptor.field_set_count(), expected_sets, "{reference:?}");
+            assert_eq!(
+                descriptor.field_set(u8::try_from(expected_sets).unwrap()),
+                None
+            );
+        }
+    }
+
+    /// The non-world widths keep their values; `UpstreamBus` is every
+    /// upstream slot; a ring's one set is `Ring` (T25.F11 invariant 1).
+    #[test]
+    fn the_descriptor_widths_follow_the_brain_io_catalog() {
+        let width = |reference: InputReference| SensorDescriptor::of(&reference, &CONTEXT).width();
+        assert_eq!(width(InputReference::ActionVotes), 39);
+        assert_eq!(width(InputReference::PreviousPassVotes), 39);
+        assert_eq!(width(InputReference::CommitCounts), 5);
+        assert_eq!(width(InputReference::PreviousOutcome), 4);
+        assert_eq!(width(InputReference::UpstreamBus), 24);
+        assert_eq!(width(InputReference::UpstreamSlot(9)), 1);
+        assert_eq!(width(InputReference::ActionQueue), 12);
+        let ring = SensorDescriptor::of(
+            &InputReference::World(WorldInputKey::NeighborBarrierRing),
+            &CONTEXT,
+        );
+        assert_eq!(ring.field_set(0), Some(FieldSet::Ring));
+        assert_eq!(MEMORY_BANK.fields().len(), 16);
     }
 
     #[test]
@@ -616,9 +858,10 @@ mod tests {
         for food_types in 1..=3 {
             for key in every_world_key() {
                 let reference = InputReference::World(key);
-                for alternative in
-                    crate::mutation::input_ref::swap_alternatives(&reference, food_types)
-                {
+                for alternative in crate::mutation::input_ref::swap_alternatives(
+                    &reference,
+                    &crate::config::test_sensor_context(food_types),
+                ) {
                     assert_eq!(
                         alternative.direction_pairs(),
                         reference.direction_pairs(),

@@ -469,7 +469,7 @@ fn temporal_report_keeps_substrate_counts_separate() {
                     )])
                     .with_output_sinks(vec![v3_core::genome::cgp::OutputSink::new(
                         v3_core::genome::cgp::OutputSinkKind::ActionVote(
-                            v3_core::genome::vote::VoteSink::Eat,
+                            v3_core::contracts::votes::VoteSink::Eat,
                         ),
                         vec![edge],
                     )]),
@@ -1092,8 +1092,8 @@ fn neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions(
 /// routes two ways within every snapshot and the same way across them.
 #[test]
 fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
+    use v3_core::contracts::votes::VoteSink;
     use v3_core::contracts::{InputReference, NodeId, RouteTarget};
-    use v3_core::genome::vote::VoteSink;
     use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     let vm_node = |id: u32, targets: &[u32], program: Vec<VmInstruction>| NodeGenome {
         node_id: NodeId::new(id),
@@ -1152,8 +1152,8 @@ fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
     };
     let config = SimulationConfig::default();
     let context = EvalContext::from_config(&config);
-    let battery = Battery::generate(context.food_type_count);
-    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let battery = Battery::generate(context.sensors.food_type_count);
+    let steering_battery = SteeringBattery::generate(context.sensors.food_type_count);
     let (block, _) = mesh_execution_and_steering(&battery, &steering_battery, &genome, &context);
     assert!(block.route_varies_within_snapshot);
     assert!(block.route_destination_varies_within_snapshot);

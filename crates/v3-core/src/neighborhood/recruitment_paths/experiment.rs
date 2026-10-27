@@ -273,7 +273,7 @@ fn propose_siblings(
             &reachable,
             ParentExecuted::Indices(&executed),
             &mut rng,
-            config.world.food.types.len(),
+            &config.sensor_context(config.world.food.types.len()),
         );
         // Inspect a clone, never advance the proposal's mutation stream.
         let rng_after = rng.clone().next_u64();
@@ -1041,7 +1041,9 @@ impl Assay {
             &reachable,
             ParentExecuted::Indices(&executed),
             &mut rng,
-            self.config.world.food.types.len(),
+            &self
+                .config
+                .sensor_context(self.config.world.food.types.len()),
         );
         (rng.clone().next_u64(), summary)
     }

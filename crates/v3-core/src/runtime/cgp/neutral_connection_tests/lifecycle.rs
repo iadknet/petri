@@ -1,8 +1,8 @@
 //! Existing mutation, copy, serde and reference-repair seams for zero edges.
 use super::*;
 use crate::config::MutationConfig;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::genome::cgp::test_support::{edit_sinks, reweighted};
-use crate::genome::vote::DirectedVoteKind;
 use crate::mutation::graph::operators::{alter_edge_weight_in_def, remove_edge};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::mutation::reachability::TargetSelector;
@@ -96,7 +96,7 @@ proptest! {
         let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, refs)] };
         let before = effects(graph(&genome.nodes[0]), &genome.nodes[0].input_refs, 0.25).side.dispatch_effects();
         let mut rng = SmallRng::seed_from_u64(seed);
-        InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, 2).unwrap();
+        InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, &crate::config::test_sensor_context(2)).unwrap();
         let node = &genome.nodes[0];
         prop_assert_eq!(&node.input_refs[unused - 1], &source_ref);
         for edge in graph(node).edges() {
@@ -142,13 +142,26 @@ fn last_zero_consumer_removal_enables_pruning_and_never_recreates_the_edge() {
         assert_eq!(graph(&genome.nodes[0]).edges().count(), remaining);
         assert!(prunable_indices(&genome.nodes[0]).is_empty());
         assert_eq!(
-            InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, 1),
+            InputRefMutator::apply_to_node(
+                &mut genome,
+                InputRefOperator::Prune,
+                0,
+                &mut rng,
+                &crate::config::test_sensor_context(1)
+            ),
             Err(MutationSkipReason::NoApplicableTarget)
         );
         remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();
     }
     assert_eq!(prunable_indices(&genome.nodes[0]), vec![0]);
-    InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, 1).unwrap();
+    InputRefMutator::apply_to_node(
+        &mut genome,
+        InputRefOperator::Prune,
+        0,
+        &mut rng,
+        &crate::config::test_sensor_context(1),
+    )
+    .unwrap();
     assert!(genome.nodes[0].input_refs.is_empty());
     assert_eq!(
         remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng),

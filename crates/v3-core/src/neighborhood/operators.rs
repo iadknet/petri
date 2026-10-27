@@ -8,6 +8,7 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::config::{MutationConfig, ReachableBiasConfig};
+use crate::contracts::SensorContext;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -101,7 +102,7 @@ impl OperatorKind {
         genome: &mut CreatureGenome,
         targets: &TargetSets<'_>,
         mutation_config: &MutationConfig,
-        food_type_count: usize,
+        context: &SensorContext,
         rng: &mut SmallRng,
     ) -> Result<TargetReachability, MutationSkipReason> {
         let mut targets = targets.selector(
@@ -110,30 +111,15 @@ impl OperatorKind {
         );
         match self {
             Self::Vm(op) => VmMutator::apply(genome, op, &mut targets, rng, mutation_config),
-            Self::Graph(op) => GraphMutator::apply_with_food_type_count(
-                genome,
-                op,
-                &mut targets,
-                rng,
-                mutation_config,
-                food_type_count,
-            ),
-            Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
-                genome,
-                op,
-                &mut targets,
-                rng,
-                mutation_config,
-                food_type_count,
-            ),
-            Self::InputRef(op) => InputRefMutator::apply_with_food_type_count(
-                genome,
-                op,
-                &mut targets,
-                rng,
-                mutation_config,
-                food_type_count,
-            ),
+            Self::Graph(op) => {
+                GraphMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
+            }
+            Self::Topology(op) => {
+                TopologyMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
+            }
+            Self::InputRef(op) => {
+                InputRefMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
+            }
         }
     }
 }
@@ -196,7 +182,7 @@ pub fn per_operator_rows(
                         &mut genome,
                         &targets,
                         mutation_config,
-                        context.food_type_count,
+                        &context.sensors,
                         &mut rng,
                     )
                     .map(|_| genome);
@@ -455,13 +441,13 @@ mod tests {
 
         for op in TopologyOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, TOPOLOGY_SEED_BASE, |genome, rng| {
-                TopologyMutator::apply_with_food_type_count(
+                TopologyMutator::apply_in(
                     genome,
                     op,
                     &mut sets.selector(rb.topology, executed_bias),
                     rng,
                     &config.mutation,
-                    context.food_type_count,
+                    &context.sensors,
                 )
                 .map(|_| ())
             });
@@ -470,13 +456,13 @@ mod tests {
 
         for op in InputRefOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, INPUT_REF_SEED_BASE, |genome, rng| {
-                InputRefMutator::apply_with_food_type_count(
+                InputRefMutator::apply_in(
                     genome,
                     op,
                     &mut sets.selector(rb.input_ref, executed_bias),
                     rng,
                     &config.mutation,
-                    context.food_type_count,
+                    &context.sensors,
                 )
                 .map(|_| ())
             });

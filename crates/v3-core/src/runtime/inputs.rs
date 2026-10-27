@@ -1,6 +1,6 @@
+use crate::contracts::votes::{VoteVector, VOTE_KIND_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
-use crate::genome::vote::{VoteVector, VOTE_KIND_COUNT};
-use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::SensorSnapshot;
 use crate::sensors::static_inputs::energy_fraction;
 
@@ -47,6 +47,7 @@ fn compound_at(values: &[f32], sub_idx: u16) -> f32 {
 /// - The decision-state compounds read `sub_idx` directly; at or past the
 ///   width they read 0.0.
 /// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= `OUTPUT_SLOT_COUNT` yields 0.0.
+/// - UpstreamBus: reads `upstream_slots[sub_idx]`; at or past the width 0.0.
 /// - Missing or out-of-range index: 0.0 (soft default).
 #[inline]
 #[must_use]
@@ -98,6 +99,11 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
                 0.0
             }
         }
+        InputReference::UpstreamBus => ctx
+            .upstream_slots
+            .get(usize::from(sub_idx))
+            .copied()
+            .unwrap_or(0.0),
     }
 }
 
@@ -225,6 +231,24 @@ mod tests {
             let v = resolve_input(&key, 0, &ctx);
             assert!((v - expected).abs() < 1e-6, "consumed={consumed} read {v}");
         }
+    }
+
+    /// `UpstreamBus` reads upstream slot `sub_idx`, 0 past the width
+    /// (T25.F11).
+    #[test]
+    fn upstream_bus_reads_the_slot_its_sub_value_names() {
+        let ss = make_sensor_snapshot(0.0);
+        let upstream: [f32; OUTPUT_SLOT_COUNT] = std::array::from_fn(|slot| slot as f32 + 1.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
+        for slot in 0..OUTPUT_SLOT_COUNT {
+            let sub_idx = u16::try_from(slot).unwrap();
+            assert_eq!(
+                resolve_input(&InputReference::UpstreamBus, sub_idx, &ctx),
+                resolve_input(&InputReference::UpstreamSlot(slot), 0, &ctx)
+            );
+        }
+        let past = u16::try_from(OUTPUT_SLOT_COUNT).unwrap();
+        assert_eq!(resolve_input(&InputReference::UpstreamBus, past, &ctx), 0.0);
     }
 
     #[test]
@@ -536,8 +560,8 @@ mod tests {
         }
     }
 
-    use crate::genome::vote::VOTE_SINK_COUNT;
-    use crate::genome::OUTCOME_CHANNEL_COUNT;
+    use crate::contracts::votes::VOTE_SINK_COUNT;
+    use crate::contracts::OUTCOME_CHANNEL_COUNT;
     use proptest::prelude::*;
 
     proptest! {
@@ -545,14 +569,14 @@ mod tests {
         /// its width and `0.0` at or past it, never wrapping.
         #[test]
         fn decision_compounds_read_their_vector_and_zero_past_the_width(
-            votes in prop::collection::vec(-1e6f32..1e6, crate::genome::vote::VOTE_SINK_COUNT),
-            previous in prop::collection::vec(-1e6f32..1e6, crate::genome::vote::VOTE_SINK_COUNT),
+            votes in prop::collection::vec(-1e6f32..1e6, crate::contracts::votes::VOTE_SINK_COUNT),
+            previous in prop::collection::vec(-1e6f32..1e6, crate::contracts::votes::VOTE_SINK_COUNT),
             counts in prop::array::uniform5(0u32..100),
             outcome in prop::array::uniform4(-1f32..1.0),
             sub in any::<u16>(),
         ) {
-            let votes: crate::genome::vote::VoteVector = votes.try_into().unwrap();
-            let previous: crate::genome::vote::VoteVector = previous.try_into().unwrap();
+            let votes: crate::contracts::votes::VoteVector = votes.try_into().unwrap();
+            let previous: crate::contracts::votes::VoteVector = previous.try_into().unwrap();
             let mut ss = make_sensor_snapshot(0.0);
             ss.local.previous_outcome = outcome;
             let upstream = [0.0f32; OUTPUT_SLOT_COUNT];

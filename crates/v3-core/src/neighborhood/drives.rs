@@ -13,8 +13,8 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::genome::cgp::{CgpGraphBackendDef, GraphSource, OutputSinkKind};
-use crate::genome::vote::{DirectedVoteKind, VoteSink};
 use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// The census version the goal summary records.

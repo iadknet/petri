@@ -1,17 +1,16 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
+use crate::contracts::votes::{VoteVector, VOTE_SINK_COUNT};
+use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
-use crate::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::cgp::tracer::GraphTracer;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::Learner;
 use crate::runtime::routing::RouteGateMap;
-use crate::runtime::types::{
-    sanitize_f32, shared_memory_write_changed, NodeResult, OUTPUT_SLOT_COUNT,
-};
+use crate::runtime::types::{sanitize_f32, shared_memory_write_changed, NodeResult};
 
 /// One sink's weighted inputs into `buf` and their sum: each edge's value
 /// as the sink sum reads it, with shared memory as earlier sinks wrote it,

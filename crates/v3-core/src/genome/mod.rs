@@ -4,13 +4,13 @@ pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod companions;
 pub mod mesh_annotations;
+mod node_edit;
 pub mod sensor_analysis;
-pub mod vote;
 
 pub use companions::{structural_companions, StructuralCompanions};
-pub use vote::{VoteKind, VoteSink, VoteVector, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+pub use node_edit::{input_ref_kind, InputRefKind, NodeEditError};
 
-use crate::contracts::{InputReference, NodeId, RouteTarget};
+use crate::contracts::{InputReference, NodeId, OutcomeChannel, RouteTarget};
 
 /// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -148,43 +148,9 @@ pub enum HebbianRule {
     Covariance,
 }
 
-/// Outcome channel for reward-modulated learning.
-///
-/// Describes **what happened** (not what should matter). Evolution discovers
-/// which circuits listen to which signals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum OutcomeChannel {
-    EnergyDelta = 0,
-    ActionSuccess = 1,
-    DamageDelta = 2,
-    OffspringSuccess = 3,
-}
-
-/// Number of outcome channels.
-pub const OUTCOME_CHANNEL_COUNT: usize = 4;
-const _: () = {
-    assert!(OutcomeChannel::OffspringSuccess as usize + 1 == OUTCOME_CHANNEL_COUNT);
-    // `ALL[i]` has discriminant `i`, so the list is complete and ordered.
-    let mut i = 0;
-    while i < OUTCOME_CHANNEL_COUNT {
-        assert!(OutcomeChannel::ALL[i] as usize == i);
-        i += 1;
-    }
-};
-
 impl HebbianRule {
     /// Every rule, in declaration order.
     pub const ALL: [Self; 4] = [Self::Classic, Self::Oja, Self::AntiHebb, Self::Covariance];
-}
-
-impl OutcomeChannel {
-    /// Every channel, in discriminant order.
-    pub const ALL: [Self; OUTCOME_CHANNEL_COUNT] = [
-        Self::EnergyDelta,
-        Self::ActionSuccess,
-        Self::DamageDelta,
-        Self::OffspringSuccess,
-    ];
 }
 
 /// Reward modulation config for three-factor plasticity.
@@ -374,6 +340,10 @@ mod group_tests;
 #[cfg(test)]
 #[path = "tests/size_tests.rs"]
 mod size_tests;
+
+#[cfg(test)]
+#[path = "tests/node_edit_tests.rs"]
+mod node_edit_tests;
 
 #[cfg(test)]
 mod tests {
@@ -873,8 +843,8 @@ mod tests {
     /// A two-node genome with all three action-parameter fields wired by a
     /// Graph node and written by a VM node (T11.F27).
     fn all_param_fields_genome() -> CreatureGenome {
+        use crate::contracts::votes::ActionParamField;
         use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
-        use crate::genome::vote::ActionParamField;
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         for (i, field) in ActionParamField::ALL.into_iter().enumerate() {
             let surface = graph

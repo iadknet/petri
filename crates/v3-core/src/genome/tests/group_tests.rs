@@ -4,12 +4,12 @@ use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
 use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 use crate::genome::cgp::{ring_offset, validate_graph, CgpGraphBackendDef, GroupId, Shape};
 use crate::genome::cgp_mesh_annotations::derive_cgp_annotations;
 use crate::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
-use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::input_ref::{prunable_indices, InputRefMutator, InputRefOperator};
 use crate::neighborhood::mutation_effects::genome_identity;
@@ -162,8 +162,8 @@ proptest! {
         prop_assert!(!prunable_indices(node).contains(&usize::from(ring)));
         prop_assert!(!prunable_indices(node).contains(&usize::from(summary)));
         let mut rng = SmallRng::seed_from_u64(seed);
-        while InputRefOperator::Prune.applies_to(&genome.nodes[idx], 1) {
-            InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, idx, &mut rng, 1)
+        while InputRefOperator::Prune.applies_to(&genome.nodes[idx], &crate::config::test_sensor_context(1)) {
+            InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, idx, &mut rng, &crate::config::test_sensor_context(1))
                 .unwrap();
         }
         let node = &mut genome.nodes[idx];

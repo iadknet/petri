@@ -2,9 +2,9 @@ use rand::Rng;
 use std::ops::Range;
 
 use crate::config::MutationConfig;
+use crate::contracts::votes::{ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT};
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
-use crate::genome::vote::{ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT};
 use crate::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 

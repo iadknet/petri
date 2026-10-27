@@ -1,9 +1,11 @@
 use super::*;
 use crate::config::EnergyConfig;
+use crate::contracts::votes::{
+    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
+};
 use crate::creature::body::HeritableBody;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::phenotype::Phenotype;
-use crate::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT};
 
 // ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
 
@@ -103,7 +105,7 @@ fn write_action_param_ignores_and_charges_an_invalid_field() {
 
 #[test]
 fn write_action_param_overwrites_and_ignores_an_invalid_field() {
-    use crate::genome::vote::{ActionParamField, ACTION_PARAM_FIELD_COUNT};
+    use crate::contracts::votes::{ActionParamField, ACTION_PARAM_FIELD_COUNT};
     const REPRODUCE: u8 = ActionParamField::ReproduceTransferFraction.index() as u8;
     let (_, _, side) = run_vm(
         vec![
