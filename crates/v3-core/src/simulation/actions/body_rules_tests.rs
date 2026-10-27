@@ -88,7 +88,7 @@ fn eat_effort(sim: &Simulation, id: CreatureId) -> f32 {
     let creature = &sim.creatures[id];
     sim.config.energy.action_effort(
         sim.config.energy.costs.eat_cost,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     )
 }
@@ -211,7 +211,7 @@ fn steal(victim_energy: f32, effort: f32) -> (Simulation, CreatureId, PredationA
     let charge = sim
         .config
         .energy
-        .action_effort(0.0, attacker.cached_complexity, attacker.age);
+        .action_effort(0.0, attacker.complexity(), attacker.age);
     let result = apply_steal_energy(ids[0], &mut sim, Direction::N, effort).result;
     (sim, ids[0], result, 195.0 - charge)
 }
@@ -244,7 +244,7 @@ fn predation_caps_after_the_transfer_and_again_after_the_kill_bonus() {
         transferred > max,
         "the fixture must put the first cap in play"
     );
-    let bonus = sim.creatures[attacker].cached_complexity as f32;
+    let bonus = sim.creatures[attacker].complexity() as f32;
     assert!(bonus > 0.0, "the fixture must award a kill bonus");
     let flows = &sim.stats.energy_flows;
     assert_eq!(
@@ -398,7 +398,7 @@ fn a_large_body_pays_its_move_factor_on_the_move_base() {
     let creature = &sim.creatures[id];
     let expected = sim.config.energy.action_effort(
         sim.config.energy.costs.move_cost * 2.5,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     );
     assert_eq!(creature.move_effort(&sim.config.energy), expected);
@@ -430,7 +430,7 @@ proptest::proptest! {
         let effort = creature.move_effort(&sim.config.energy);
         let noop = sim.config.energy.action_effort(
             sim.config.energy.costs.noop_cost,
-            creature.cached_complexity,
+            creature.complexity(),
             creature.age,
         );
         proptest::prop_assert!(effort > 0.0);
@@ -438,7 +438,7 @@ proptest::proptest! {
         creature.body.capacity = reference;
         let today = sim.config.energy.action_effort(
             move_cost,
-            creature.cached_complexity,
+            creature.complexity(),
             creature.age,
         );
         proptest::prop_assert_eq!(
@@ -462,7 +462,7 @@ fn move_once(blocked: bool) -> (bool, f32, Simulation, CreatureId) {
     let creature = &sim.creatures[id];
     let effort = sim.config.energy.action_effort(
         sim.config.energy.costs.move_cost,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     );
     let moved = apply_move(

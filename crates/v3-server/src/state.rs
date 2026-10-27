@@ -281,7 +281,7 @@ impl PopulationCensus {
         self.count += 1;
         self.generation_sum += creature.generation;
         self.generation_max = self.generation_max.max(creature.generation);
-        self.genome_size_sum += u64::from(creature.cached_genome_size);
+        self.genome_size_sum += u64::from(creature.genome_size());
         self.world_inputs_read_sum += creature.last_mesh_world_reads.len() as u64;
         *self
             .lineage_counts
@@ -444,11 +444,11 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let mut census = PopulationCensus::default();
     for (id, creature) in &sim.creatures {
         census.observe(creature);
-        let c = creature.cached_complexity;
+        let c = creature.complexity();
         complexity_sum += c as u64;
         complexity_min = complexity_min.min(c);
         complexity_max = complexity_max.max(c);
-        for (key, count) in creature.cached_live_vm_world_inputs.iter().copied() {
+        for (key, count) in creature.live_vm_world_inputs().iter().copied() {
             *vm_live_read_world_inputs_current.entry(key).or_insert(0u64) += u64::from(count);
         }
         creatures.push(CreatureSnapshot {

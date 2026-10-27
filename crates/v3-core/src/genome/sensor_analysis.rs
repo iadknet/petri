@@ -104,7 +104,7 @@ impl SensorCensus {
 
 /// Census one creature from its genome and its cached reachable node indices.
 ///
-/// `reachable_indices` is the creature's `cached_reachable_nodes`, so no second
+/// `reachable_indices` is the creature's `reachable_nodes()`, so no second
 /// mesh reachability walk is paid.
 #[must_use]
 pub fn sensor_census(genome: &CreatureGenome, reachable_indices: &[usize]) -> SensorCensus {

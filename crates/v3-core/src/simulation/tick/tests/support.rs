@@ -83,6 +83,26 @@ pub(super) fn vm_raw_program_genome(program: Vec<VmInstruction>) -> CreatureGeno
     }
 }
 
+/// A one-node VM genome of exactly `units` genome units (`units >= 1`):
+/// the node and `units - 1` `Halt` instructions.
+pub(super) fn sized_genome(units: u32) -> CreatureGenome {
+    let genome = vm_raw_program_genome(vec![VmInstruction::Halt; units as usize - 1]);
+    assert_eq!(genome.genome_size(), units);
+    genome
+}
+
+/// A one-node VM genome of functional complexity `complexity`
+/// (`complexity >= 1`): the node and `complexity - 1` live payload writes.
+pub(super) fn genome_of_complexity(complexity: u32) -> CreatureGenome {
+    let write = VmInstruction::WriteInternalPayload {
+        slot_idx: 0,
+        src: 0,
+    };
+    let genome = vm_raw_program_genome(vec![write; complexity as usize - 1]);
+    assert_eq!(genome.complexity(), complexity);
+    genome
+}
+
 /// A one-node VM genome running `program` after `r0 = 1.0`, so an
 /// `AddVote { src: 0, .. }` votes one unit and commits its action once.
 pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
@@ -110,6 +130,22 @@ pub(super) fn make_sim_two_creatures(
     energy_a: f32,
     energy_b: f32,
 ) -> (Simulation, CreatureId, CreatureId) {
+    make_sim_two_with_genomes(
+        energy_a,
+        energy_b,
+        v3alpha1_founder_genome(),
+        v3alpha1_founder_genome(),
+    )
+}
+
+/// [`make_sim_two_creatures`] with creature `a` built from `genome_a` and
+/// `b` (one cell north of `a`) from `genome_b`.
+pub(super) fn make_sim_two_with_genomes(
+    energy_a: f32,
+    energy_b: f32,
+    genome_a: CreatureGenome,
+    genome_b: CreatureGenome,
+) -> (Simulation, CreatureId, CreatureId) {
     let mut cfg = small_config();
     cfg.world.food.growth_rate = 0.0;
 
@@ -120,7 +156,7 @@ pub(super) fn make_sim_two_creatures(
     let a_id = creatures.insert_with_key(|id| {
         CreatureState::new(
             id,
-            v3alpha1_founder_genome(),
+            genome_a,
             Position::new(5, 5),
             energy_a,
             0,
@@ -133,7 +169,7 @@ pub(super) fn make_sim_two_creatures(
     let b_id = creatures.insert_with_key(|id| {
         CreatureState::new(
             id,
-            v3alpha1_founder_genome(),
+            genome_b,
             Position::new(5, 4),
             energy_b,
             0,

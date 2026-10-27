@@ -435,7 +435,7 @@ pub(super) fn selected_cohort(
             effects::CohortParent {
                 index: position as u64,
                 depth_or_generation: creature.generation,
-                genome: creature.genome.clone(),
+                genome: creature.genome().clone(),
             }
         })
         .collect()

@@ -10,7 +10,7 @@ use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
 use crate::creature::body::HeritableBody;
-use crate::creature::founder::vm_decision_founder_genome;
+use crate::creature::founder::{v3alpha1_founder_genome, vm_decision_founder_genome};
 use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::genome::{
@@ -66,7 +66,7 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
 fn fingerprint(sim: &Simulation) -> String {
     let mut out = String::new();
     for (id, c) in &sim.creatures {
-        let g = &c.graph_runtime;
+        let g = c.graph_runtime();
         writeln!(
             out,
             "{id:?} e={:?} p={:?} a={} m={:?} o={:?} s={:?} n={:?} l={:?}",
@@ -537,9 +537,13 @@ fn an_action_heavy_tick_records_every_applied_action() {
 #[test]
 fn charge_and_reward_match_the_energy_flow_deltas() {
     // A rewarded eat then a move blocked by a neighbor.
-    let (mut sim, a, _) = make_sim_two_creatures(100.0, 100.0);
+    let (mut sim, a, _) = make_sim_two_with_genomes(
+        100.0,
+        100.0,
+        eat_then_move_genome(),
+        v3alpha1_founder_genome(),
+    );
     sim.config.energy.costs.eat_cost = 0.5;
-    sim.creatures[a].genome = eat_then_move_genome();
     sim.world.set_food(Position::new(5, 5), 0.5);
     let mut trace = Some(ActiveTrace::new(a, 1));
     run_tick(&mut sim, &mut trace);
@@ -609,9 +613,12 @@ fn give_north_genome() -> CreatureGenome {
 /// is the recipient's, so the giver's applied action carries no reward.
 #[test]
 fn a_give_charges_its_effort_and_credits_no_reward_to_the_giver() {
-    let (mut sim, giver, recipient) = make_sim_two_creatures(100.0, 80.0);
-    sim.creatures[giver].genome = give_north_genome();
-    sim.creatures[recipient].genome = vm_program_genome(vec![VmInstruction::Halt]);
+    let (mut sim, giver, _) = make_sim_two_with_genomes(
+        100.0,
+        80.0,
+        give_north_genome(),
+        vm_program_genome(vec![VmInstruction::Halt]),
+    );
     let mut trace = Some(ActiveTrace::new(giver, 1));
     run_tick(&mut sim, &mut trace);
     let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
@@ -632,11 +639,14 @@ fn a_give_charges_its_effort_and_credits_no_reward_to_the_giver() {
 #[test]
 fn a_giver_exhausted_by_its_gift_inside_its_window_matches_the_untraced_run() {
     let fixture = || {
-        let (mut sim, giver, recipient) = make_sim_two_creatures(5.0, 30.0);
+        let (mut sim, giver, _) = make_sim_two_with_genomes(
+            5.0,
+            30.0,
+            give_north_genome(),
+            vm_program_genome(vec![VmInstruction::Halt]),
+        );
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
         sim.creatures[giver].body.give_share = 1.0;
-        sim.creatures[giver].genome = give_north_genome();
-        sim.creatures[recipient].genome = vm_program_genome(vec![VmInstruction::Halt]);
         (sim, giver)
     };
     for budget in [Some(WINDOW_BUDGET), None] {
@@ -662,9 +672,12 @@ fn a_giver_exhausted_by_its_gift_inside_its_window_matches_the_untraced_run() {
 
 #[test]
 fn a_steal_credits_its_reward_and_the_victim_records_damage() {
-    let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);
-    sim.creatures[attacker].genome = steal_north_genome();
-    sim.creatures[victim].genome = vm_program_genome(vec![VmInstruction::Halt]);
+    let (mut sim, attacker, _) = make_sim_two_with_genomes(
+        100.0,
+        80.0,
+        steal_north_genome(),
+        vm_program_genome(vec![VmInstruction::Halt]),
+    );
     let mut trace = Some(ActiveTrace::new(attacker, 1));
     run_tick(&mut sim, &mut trace);
     let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
@@ -678,9 +691,12 @@ fn a_steal_credits_its_reward_and_the_victim_records_damage() {
     let ledger = sim.stats.energy_flows.action_charges;
     assert!((steal.charge - ledger[ActionType::StealEnergy]).abs() < 1e-9);
 
-    let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 80.0);
-    sim.creatures[attacker].genome = steal_north_genome();
-    sim.creatures[victim].genome = vm_program_genome(vec![VmInstruction::Halt]);
+    let (mut sim, _, victim) = make_sim_two_with_genomes(
+        100.0,
+        80.0,
+        steal_north_genome(),
+        vm_program_genome(vec![VmInstruction::Halt]),
+    );
     let victim_before = sim.creatures[victim].energy;
     let mut trace = Some(ActiveTrace::new(victim, 1));
     run_tick(&mut sim, &mut trace);
@@ -695,24 +711,25 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
     // Before its turn: the attacker bids higher and acts first. After: the
     // victim acts first by bidding higher itself.
     for victim_first in [false, true] {
-        let (mut sim, attacker, victim) = make_sim_two_creatures(150.0, 3.0);
-        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-        sim.config.exchange.effort_rate = 0.0;
-        // Share 1 at modifier 4: intensity 1, a steal that kills (T27.F03).
-        sim.creatures[attacker].body.steal_share = 1.0;
-        sim.creatures[attacker].genome = steal_north_genome();
-        sim.creatures[victim].genome = vm_program_genome(vec![
+        let attacker_genome = steal_north_genome();
+        let victim_genome = vm_program_genome(vec![
             VmInstruction::AddVote {
                 sink: VoteSink::Terminate.index() as u8,
                 src: 0,
             },
             VmInstruction::Halt,
         ]);
-        if victim_first {
-            sim.creatures[victim].genome = bidding(sim.creatures[victim].genome.clone());
+        let (attacker_genome, victim_genome) = if victim_first {
+            (attacker_genome, bidding(victim_genome))
         } else {
-            sim.creatures[attacker].genome = bidding(sim.creatures[attacker].genome.clone());
-        }
+            (bidding(attacker_genome), victim_genome)
+        };
+        let (mut sim, attacker, victim) =
+            make_sim_two_with_genomes(150.0, 3.0, attacker_genome, victim_genome);
+        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+        sim.config.exchange.effort_rate = 0.0;
+        // Share 1 at modifier 4: intensity 1, a steal that kills (T27.F03).
+        sim.creatures[attacker].body.steal_share = 1.0;
         let mut trace = Some(ActiveTrace::new(victim, 3));
         run_tick(&mut sim, &mut trace);
         assert!(
@@ -731,9 +748,9 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
     }
 
     // Untraced, nothing is observed.
-    let (mut sim, attacker, _) = make_sim_two_creatures(150.0, 3.0);
+    let (mut sim, _, _) =
+        make_sim_two_with_genomes(150.0, 3.0, steal_north_genome(), v3alpha1_founder_genome());
     sim.config.exchange.effort_rate = 0.0;
-    sim.creatures[attacker].genome = steal_north_genome();
     run_tick(&mut sim, &mut None);
     assert!(sim.stats.observed_creature.is_none());
     assert!(sim.stats.observed_removal.is_none());
@@ -759,7 +776,7 @@ fn a_creature_dying_in_the_action_phase_keeps_what_it_applied() {
     let creature = &sim.creatures[id];
     let fatal = sim.config.energy.action_effort(
         sim.config.energy.costs.eat_cost,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     );
     sim.creatures[id].energy = fatal - 0.01;
@@ -783,12 +800,15 @@ fn decisions_discarded_by_a_death_match_the_untraced_run() {
         (sim, id)
     }
     fn preyed() -> (Simulation, CreatureId) {
-        let (mut sim, attacker, victim) = make_sim_two_creatures(150.0, 3.0);
+        let (mut sim, attacker, victim) = make_sim_two_with_genomes(
+            150.0,
+            3.0,
+            bidding(steal_north_genome()),
+            eat_then_move_genome(),
+        );
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
         sim.config.exchange.effort_rate = 0.0;
         sim.creatures[attacker].body.steal_share = 1.0;
-        sim.creatures[attacker].genome = bidding(steal_north_genome());
-        sim.creatures[victim].genome = eat_then_move_genome();
         (sim, victim)
     }
     for fixture in [dying, preyed] {

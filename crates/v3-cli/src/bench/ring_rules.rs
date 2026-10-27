@@ -62,7 +62,7 @@ pub(super) fn observe_world(sim: &v3_core::simulation::Simulation) -> RingRules 
     let census = RingRuleCensus::observe(
         sim.creatures
             .values()
-            .map(|creature| (&creature.genome, &*creature.cached_reachable_nodes)),
+            .map(|creature| (creature.genome(), creature.reachable_nodes())),
     );
     RingRules::from(&census)
 }

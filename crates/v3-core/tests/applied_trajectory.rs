@@ -242,11 +242,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
                         creature.energy.to_bits(),
                         creature.age,
                         creature.generation,
-                        &creature.genome,
+                        creature.genome(),
                         creature.shared_memory.map(f32::to_bits),
                         creature.prev_shared_memory.map(f32::to_bits),
-                        &creature.graph_runtime.node_state,
-                        &creature.graph_runtime.node_outputs,
+                        &creature.graph_runtime().node_state,
+                        &creature.graph_runtime().node_outputs,
                         learned_rows(creature, |edge| edge.learned, true),
                         learned_rows(creature, |edge| edge.trace, false),
                     ))
@@ -333,11 +333,11 @@ fn learned_rows(
     read: impl Fn(&v3_core::runtime::plasticity::LearnedEdge) -> Option<f32>,
     with_scales: bool,
 ) -> Vec<Vec<f32>> {
-    let learned = creature.graph_runtime.learned();
+    let learned = creature.graph_runtime().learned();
     if !learned.has_learning() {
         return Vec::new();
     }
-    (0..creature.genome.nodes.len())
+    (0..creature.genome().nodes.len())
         .map(|node| {
             let scales = learned
                 .scales(node)

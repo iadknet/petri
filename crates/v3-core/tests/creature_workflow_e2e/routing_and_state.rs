@@ -178,11 +178,11 @@ fn graph_state_persists_across_ticks_e2e() {
 
     let creature = sim.creatures.get(target).expect("target creature");
     assert!(
-        !creature.graph_runtime.node_state.is_empty(),
+        !creature.graph_runtime().node_state.is_empty(),
         "graph_runtime.node_state should persist on creature"
     );
     assert!(
-        creature.graph_runtime.node_state[0][1] > out1,
+        creature.graph_runtime().node_state[0][1] > out1,
         "stored DecayIntegrator state should increase across ticks"
     );
 }

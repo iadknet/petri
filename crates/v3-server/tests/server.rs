@@ -26,6 +26,30 @@ fn test_state() -> AppState {
     AppState::from_config(test_config(), 0)
 }
 
+/// Rebuild `creature` from its genome after `edit`, under the same id,
+/// position, energy, generation, body, shared memory, age and heading, so
+/// its derived state and brain runtime follow the edited genome.
+fn rebuild_with<R>(
+    creature: &mut v3_core::creature::state::CreatureState,
+    edit: impl FnOnce(&mut v3_core::genome::CreatureGenome) -> R,
+) -> R {
+    let mut genome = creature.genome().clone();
+    let result = edit(&mut genome);
+    let (age, heading) = (creature.age, creature.heading);
+    *creature = v3_core::creature::state::CreatureState::new(
+        creature.id,
+        genome,
+        creature.position,
+        creature.energy,
+        creature.generation,
+        creature.body,
+        creature.shared_memory,
+    );
+    creature.age = age;
+    creature.heading = heading;
+    result
+}
+
 fn app() -> axum::Router {
     router(test_state())
 }
@@ -1636,7 +1660,7 @@ async fn health_carries_population_census_and_cumulative_vitals() {
     let generation_max = creatures.iter().map(|c| c.generation).max().unwrap_or(0);
     let genome_size_mean = creatures
         .iter()
-        .map(|c| f64::from(c.cached_genome_size))
+        .map(|c| f64::from(c.genome_size()))
         .sum::<f64>()
         / count;
     let reads_mean = creatures
@@ -2545,7 +2569,7 @@ async fn get_creature_exclude_omits_fields() {
 }
 
 #[tokio::test]
-async fn get_creature_brain_annotations_use_cached_reachable_nodes() {
+async fn get_creature_brain_annotations_use_the_records_reachable_nodes() {
     let state = test_state();
     let creature_id = {
         let mut handle = state.sim.lock().await;
@@ -2555,12 +2579,18 @@ async fn get_creature_brain_annotations_use_cached_reachable_nodes() {
             .keys()
             .next()
             .expect("default state should have creatures");
-        handle
+        // An entry id no node carries: no node is reachable.
+        let creature = handle
             .sim
             .creatures
             .get_mut(creature_id)
-            .expect("creature should exist")
-            .cached_reachable_nodes = Vec::new().into_boxed_slice();
+            .expect("creature should exist");
+        rebuild_with(creature, |genome| {
+            genome.entry_node_id = v3_core::contracts::NodeId::new(u32::MAX)
+        });
+        assert!(handle.sim.creatures[creature_id]
+            .reachable_nodes()
+            .is_empty());
         creature_id.data().as_ffi()
     };
 
@@ -2652,23 +2682,24 @@ async fn get_creature_brain_resolves_ring_members_and_their_group() {
     let (node_id, ring_ref, group, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-        let node = creature
-            .genome
-            .nodes
-            .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-            .expect("a Graph node");
-        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-        node.input_refs
-            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let BackendDef::Graph(def) = &mut node.backend_def else {
-            unreachable!()
-        };
-        let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-        def.group_mut(group).set_scale(0.5);
-        let members: Vec<_> = def.members(group).collect();
-        def.edge_mut(members[0]).set_weight(0.25);
-        (node.node_id.0, ring_ref, group.index(), members)
+        rebuild_with(creature, |genome| {
+            let node = genome
+                .nodes
+                .iter_mut()
+                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs
+                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            def.group_mut(group).set_scale(0.5);
+            let members: Vec<_> = def.members(group).collect();
+            def.edge_mut(members[0]).set_weight(0.25);
+            (node.node_id.0, ring_ref, group.index(), members)
+        })
     };
 
     for query in ["", "?exclude=learning"] {
@@ -2728,7 +2759,6 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     };
     use v3_core::genome::vote::{DirectedVoteKind, VoteSink};
     use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig};
-    use v3_core::runtime::state::GraphRuntimeState;
 
     let state = test_state();
     let creature_id = {
@@ -2748,61 +2778,60 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     let (node_id, vote, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-        let node_idx = creature
-            .genome
-            .nodes
-            .iter()
-            .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-            .expect("a Graph node");
-        let node = &mut creature.genome.nodes[node_idx];
-        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-        node.input_refs
-            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let node_id = node.node_id.0;
-        let BackendDef::Graph(def) = &mut node.backend_def else {
-            unreachable!()
-        };
-        let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-        let members: Vec<_> = def.members(group).collect();
-        let vote_sink = def
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-            .unwrap();
-        def.push_edge(
-            vote_sink,
-            GraphEdge::new(
-                GraphSource::SharedMemory {
-                    slot: 0,
-                    previous: false,
-                },
-                0.5,
-            ),
-        );
-        let vote = EdgeOccurrence::new(vote_sink, def.surface_edges(vote_sink).len() - 1);
-        def.edge_mut(vote).set_plasticity(Some(config));
-        def.edge_mut(compute).set_weight(3.0);
-        def.edge_mut(compute).set_plasticity(Some(config));
-        let mut sinks: Vec<Vec<Option<f32>>> = def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect();
-        let EdgeSurface::SinkInput(sink) = vote.surface else {
-            unreachable!()
-        };
-        sinks[sink][vote.index] = Some(1.25);
-        let seeds = BirthSeeds::Rows {
-            compute: def
-                .compute_nodes()
+        rebuild_with(creature, |genome| {
+            let node_idx = genome
+                .nodes
                 .iter()
-                .map(|node| vec![None; node.inputs.len()])
-                .collect(),
-            sinks,
-            groups: vec![None; def.groups().len()],
-        };
-        let mut node_seeds = vec![None; creature.genome.nodes.len()];
-        node_seeds[node_idx] = Some(seeds);
-        creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
-        (node_id, vote, members)
+                .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let node = &mut genome.nodes[node_idx];
+            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs
+                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let node_id = node.node_id.0;
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let group = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            let members: Vec<_> = def.members(group).collect();
+            let vote_sink = def
+                .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+                .unwrap();
+            def.push_edge(
+                vote_sink,
+                GraphEdge::new(
+                    GraphSource::SharedMemory {
+                        slot: 0,
+                        previous: false,
+                    },
+                    0.5,
+                ),
+            );
+            let vote = EdgeOccurrence::new(vote_sink, def.surface_edges(vote_sink).len() - 1);
+            def.edge_mut(vote).set_plasticity(Some(config));
+            def.edge_mut(compute).set_weight(3.0);
+            def.edge_mut(compute).set_plasticity(Some(config));
+            let mut sinks: Vec<Vec<Option<f32>>> = def
+                .output_sinks()
+                .iter()
+                .map(|sink| vec![None; sink.inputs.len()])
+                .collect();
+            let EdgeSurface::SinkInput(sink) = vote.surface else {
+                unreachable!()
+            };
+            sinks[sink][vote.index] = Some(1.25);
+            let seeds = BirthSeeds::Rows {
+                compute: def
+                    .compute_nodes()
+                    .iter()
+                    .map(|node| vec![None; node.inputs.len()])
+                    .collect(),
+                sinks,
+                groups: vec![None; def.groups().len()],
+            };
+            def.seed_birth(seeds);
+            (node_id, vote, members)
+        })
     };
 
     let (_, body) = do_request(
@@ -2885,7 +2914,6 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
-    use v3_core::runtime::state::GraphRuntimeState;
 
     let state = test_state();
     let creature_id = {
@@ -2915,54 +2943,53 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     let (node_id, group, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-        let node_idx = creature
-            .genome
-            .nodes
-            .iter()
-            .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-            .expect("a Graph node");
-        let node = &mut creature.genome.nodes[node_idx];
-        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-        node.input_refs
-            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let node_id = node.node_id.0;
-        let BackendDef::Graph(def) = &mut node.backend_def else {
-            unreachable!()
-        };
-        let id = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-        def.group_mut(id).set_scale(0.5);
-        def.group_mut(id).set_inherit_scale(true);
-        let members: Vec<EdgeOccurrence> = def.members(id).collect();
-        def.edge_mut(members[0]).set_weight(0.25);
-        def.edge_mut(members[0]).set_plasticity(Some(config));
-        def.edge_mut(members[1]).set_plasticity(Some(config));
-        def.edge_mut(members[1]).set_scope(Scope::Group);
-        def.edge_mut(members[3]).set_plasticity(Some(other));
-        def.edge_mut(members[3]).set_scope(Scope::Group);
-        let mut sinks: Vec<Vec<Option<f32>>> = def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect();
-        let EdgeSurface::SinkInput(sink) = members[0].surface else {
-            unreachable!()
-        };
-        sinks[sink][members[0].index] = Some(0.75);
-        let mut groups = vec![None; def.groups().len()];
-        groups[id.index()] = Some(1.5);
-        let seeds = BirthSeeds::Rows {
-            compute: def
-                .compute_nodes()
+        rebuild_with(creature, |genome| {
+            let node_idx = genome
+                .nodes
                 .iter()
-                .map(|node| vec![None; node.inputs.len()])
-                .collect(),
-            sinks,
-            groups,
-        };
-        let mut node_seeds = vec![None; creature.genome.nodes.len()];
-        node_seeds[node_idx] = Some(seeds);
-        creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
-        (node_id, id.index(), members)
+                .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .expect("a Graph node");
+            let node = &mut genome.nodes[node_idx];
+            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+            node.input_refs
+                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let node_id = node.node_id.0;
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            let id = def.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+            def.group_mut(id).set_scale(0.5);
+            def.group_mut(id).set_inherit_scale(true);
+            let members: Vec<EdgeOccurrence> = def.members(id).collect();
+            def.edge_mut(members[0]).set_weight(0.25);
+            def.edge_mut(members[0]).set_plasticity(Some(config));
+            def.edge_mut(members[1]).set_plasticity(Some(config));
+            def.edge_mut(members[1]).set_scope(Scope::Group);
+            def.edge_mut(members[3]).set_plasticity(Some(other));
+            def.edge_mut(members[3]).set_scope(Scope::Group);
+            let mut sinks: Vec<Vec<Option<f32>>> = def
+                .output_sinks()
+                .iter()
+                .map(|sink| vec![None; sink.inputs.len()])
+                .collect();
+            let EdgeSurface::SinkInput(sink) = members[0].surface else {
+                unreachable!()
+            };
+            sinks[sink][members[0].index] = Some(0.75);
+            let mut groups = vec![None; def.groups().len()];
+            groups[id.index()] = Some(1.5);
+            let seeds = BirthSeeds::Rows {
+                compute: def
+                    .compute_nodes()
+                    .iter()
+                    .map(|node| vec![None; node.inputs.len()])
+                    .collect(),
+                sinks,
+                groups,
+            };
+            def.seed_birth(seeds);
+            (node_id, id.index(), members)
+        })
     };
 
     let (status, body) = do_request(router(state), get_req(&uri)).await;
@@ -3052,56 +3079,59 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
         async move {
             let mut handle = state.sim.lock().await;
             let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-            let node = creature
-                .genome
-                .nodes
-                .iter_mut()
-                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-                .expect("a Graph node");
-            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs.push(area);
-            let node_id = node.node_id.0;
-            let BackendDef::Graph(def) = &mut node.backend_def else {
-                unreachable!()
-            };
-            let facts = if with_facts { layout.facts } else { &[] };
-            let group = def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
-            def.group_mut(group).set_scale(2.0);
-            if with_facts {
-                let member = def.members(group).next().unwrap();
-                def.remove_edge(member);
-                let fact = def.members(group).find(|&m| def.is_fact_member(m)).unwrap();
-                def.edge_mut(fact).set_weight(0.375);
-            } else {
-                // A member on a direction where its pattern is 0: `x` at
-                // relative N, which no birth places (a hand-built genome).
-                let mut json = serde_json::to_value(&*def).unwrap();
-                let sinks = json["output_sinks"].as_array_mut().unwrap();
-                let north = sinks
+            rebuild_with(creature, |genome| {
+                let node = genome
+                    .nodes
                     .iter_mut()
-                    .find(|sink| {
-                        sink["kind"] == serde_json::json!({"ActionVote": {"Directed": ["Move", 0]}})
-                    })
-                    .unwrap();
-                let inputs = north["inputs"].as_array_mut().unwrap();
-                inputs.push(serde_json::json!({
-                    "source": {"InputLeaf": {"ref_idx": ref_idx, "sub_idx": layout.x}},
-                    "own_weight": 0.25,
-                    "membership": {"group": group.index(), "scope": "Edge"},
-                }));
-                // The I10 order: independent edges, then members by
-                // (group, field).
-                inputs.sort_by_key(|edge| {
-                    edge.get("membership").map(|m| {
-                        (
-                            m["group"].as_u64().unwrap(),
-                            edge["source"]["InputLeaf"]["sub_idx"].as_u64().unwrap(),
-                        )
-                    })
-                });
-                *def = serde_json::from_value::<CgpGraphBackendDef>(json).unwrap();
-            }
-            (node_id, group.index())
+                    .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                    .expect("a Graph node");
+                let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+                node.input_refs.push(area);
+                let node_id = node.node_id.0;
+                let BackendDef::Graph(def) = &mut node.backend_def else {
+                    unreachable!()
+                };
+                let facts = if with_facts { layout.facts } else { &[] };
+                let group =
+                    def.add_pair_group(ref_idx, 0, layout, DirectedVoteKind::Move, 0, facts);
+                def.group_mut(group).set_scale(2.0);
+                if with_facts {
+                    let member = def.members(group).next().unwrap();
+                    def.remove_edge(member);
+                    let fact = def.members(group).find(|&m| def.is_fact_member(m)).unwrap();
+                    def.edge_mut(fact).set_weight(0.375);
+                } else {
+                    // A member on a direction where its pattern is 0: `x` at
+                    // relative N, which no birth places (a hand-built genome).
+                    let mut json = serde_json::to_value(&*def).unwrap();
+                    let sinks = json["output_sinks"].as_array_mut().unwrap();
+                    let north = sinks
+                        .iter_mut()
+                        .find(|sink| {
+                            sink["kind"]
+                                == serde_json::json!({"ActionVote": {"Directed": ["Move", 0]}})
+                        })
+                        .unwrap();
+                    let inputs = north["inputs"].as_array_mut().unwrap();
+                    inputs.push(serde_json::json!({
+                        "source": {"InputLeaf": {"ref_idx": ref_idx, "sub_idx": layout.x}},
+                        "own_weight": 0.25,
+                        "membership": {"group": group.index(), "scope": "Edge"},
+                    }));
+                    // The I10 order: independent edges, then members by
+                    // (group, field).
+                    inputs.sort_by_key(|edge| {
+                        edge.get("membership").map(|m| {
+                            (
+                                m["group"].as_u64().unwrap(),
+                                edge["source"]["InputLeaf"]["sub_idx"].as_u64().unwrap(),
+                            )
+                        })
+                    });
+                    *def = serde_json::from_value::<CgpGraphBackendDef>(json).unwrap();
+                }
+                (node_id, group.index())
+            })
         }
     };
     let (node_id, first) = edit(false).await;
@@ -4092,7 +4122,7 @@ async fn energy_only_shared_reward_can_be_changed_live() {
             let creature = &sim.creatures[id];
             let effort = sim.config.energy.action_effort(
                 sim.config.energy.costs.eat_cost,
-                creature.cached_complexity,
+                creature.complexity(),
                 creature.age,
             );
             assert!(effort > 0.0);
@@ -4552,7 +4582,7 @@ async fn recipe_export_preserves_complete_config_and_large_seeds() {
                 (
                     creature.position,
                     creature.energy,
-                    serde_json::to_value(&creature.genome).unwrap(),
+                    serde_json::to_value(creature.genome()).unwrap(),
                 )
             })
             .collect::<Vec<_>>();

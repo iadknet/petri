@@ -561,12 +561,12 @@ fn vm_eats_when_food_here() {
     // One tick of the pass loop: a vote of 1.0 commits once.
     let mut energy = creature.energy;
     let actions = crate::runtime::mesh::execute_creature_mesh(
-        &creature.genome,
+        creature.genome(),
         &ss,
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new()),
+        &mut crate::runtime::state::GraphRuntimeState::for_genome(creature.genome(), Vec::new()),
         &config(),
         crate::contracts::Direction::N,
     )
@@ -661,12 +661,12 @@ fn vm_noop_when_no_food() {
     // One tick of the pass loop: a vote of 1.0 commits once.
     let mut energy = 30.0;
     let actions = crate::runtime::mesh::execute_creature_mesh(
-        &creature.genome,
+        creature.genome(),
         &ss,
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new()),
+        &mut crate::runtime::state::GraphRuntimeState::for_genome(creature.genome(), Vec::new()),
         &config(),
         crate::contracts::Direction::N,
     )

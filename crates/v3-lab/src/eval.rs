@@ -511,7 +511,7 @@ fn evaluate_observed(
             sequence.push((creature.position, creature.energy));
         }
         frozen = Frozen {
-            record: creature.graph_runtime.dispatch_record.clone(),
+            record: creature.graph_runtime().dispatch_record.clone(),
             age: creature.age,
         };
         if bites > 0 {
@@ -1344,7 +1344,7 @@ mod tests {
         let food = Position::new(start.x + D, start.y);
         let complexity = probe
             .creature(CreatureId::default(), founder.clone(), 3, start)
-            .cached_complexity;
+            .complexity();
         let energy = &probe.config.energy;
         let walk: f32 = (0..u64::from(D))
             .map(|age| {

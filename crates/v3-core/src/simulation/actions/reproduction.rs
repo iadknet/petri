@@ -234,11 +234,11 @@ fn conceive(
     // both gates pass (T16.F01): a rejected attempt pays only Step 0.
     let cost = sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
-        sim.creatures[parent_id].cached_complexity,
+        sim.creatures[parent_id].complexity(),
         sim.creatures[parent_id].age,
     ) * genome_replication_cost_multiplier(
         sim.config.energy.lifecycle.genome_replication_cost_per_unit,
-        sim.creatures[parent_id].cached_genome_size,
+        sim.creatures[parent_id].genome_size(),
     );
     let energy_before_cost = sim.creatures[parent_id].energy;
     let after_cost = energy_before_cost - cost;
@@ -287,7 +287,7 @@ fn conceive(
     // delivered here, at the validated target, exactly as before the feature.
     sim.stats.gestations_started_total += 1;
     let span = gestation_ticks(
-        sim.creatures[parent_id].cached_genome_size,
+        sim.creatures[parent_id].genome_size(),
         sim.config
             .energy
             .lifecycle
@@ -382,16 +382,15 @@ fn spawn_child(
     rng: &mut impl Rng,
 ) {
     // Step 9: Build offspring draft (clone parent genome + state).
-    let child_genome = sim.creatures[parent_id].genome.clone();
-    let child_shared_memory = sim.creatures[parent_id].shared_memory;
-    let child_generation = sim.creatures[parent_id].generation + 1;
-    let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
+    let parent = &sim.creatures[parent_id];
+    let mut child_genome = parent.genome().clone();
+    let child_shared_memory = parent.shared_memory;
+    let child_generation = parent.generation + 1;
     // T11.F17: the parent's own recent dispatches bias the offspring's targets.
     // Passed unresolved, so a zero-event birth derives nothing.
-    let parent = &sim.creatures[parent_id];
     let executed_within = |window| {
         parent
-            .graph_runtime
+            .graph_runtime()
             .dispatch_record
             .executed_indices(parent.age, window)
     };
@@ -399,15 +398,11 @@ fn spawn_child(
 
     // Step 10: Apply genome mutations to the draft, which carries the
     // parent's learned weights as birth seeds (T25.F01).
-    let mut child_genome = child_genome;
-    cgp_reproduction::capture_birth_seeds(
-        &mut child_genome,
-        sim.creatures[parent_id].graph_runtime.learned(),
-    );
+    cgp_reproduction::capture_birth_seeds(&mut child_genome, parent.graph_runtime().learned());
     let summary = MutationEngine::apply_mutations_with_food_type_count(
         &mut child_genome,
         &sim.config.mutation,
-        &parent_cached_reachable,
+        parent.reachable_nodes(),
         parent_executed,
         rng,
         sim.config.world.food.types.len(),
@@ -529,40 +524,22 @@ fn spawn_child(
         rng,
     );
 
-    // Step 12: Lamarckian inheritance happens in the constructors below,
-    // which build the newborn's weights from the draft's seeds.
+    // Step 12: Lamarckian inheritance happens in the constructor below,
+    // which builds the newborn's weights from the draft's seeds.
 
-    // Step 13–14: Spawn child in slotmap + world.
-    // No-mutation fast path: if no genome mutations were applied, the offspring's
-    // genome is identical to the parent's — copy cached_complexity and
-    // cached_genome_size to avoid expensive recomputation.
-    let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
-    let parent_cached_genome_size = sim.creatures[parent_id].cached_genome_size;
+    // Step 13–14: Spawn child in slotmap + world. The constructor derives the
+    // child's analyses from the genome it stores, whether or not an event
+    // applied.
     let child_id = sim.creatures.insert_with_key(move |id| {
-        let mut child = if summary.applied_events == 0 {
-            CreatureState::new_with_cached_fields(
-                id,
-                child_genome,
-                target,
-                transfer,
-                child_generation,
-                child_body,
-                child_shared_memory,
-                parent_cached_complexity,
-                parent_cached_genome_size,
-                parent_cached_reachable,
-            )
-        } else {
-            CreatureState::new(
-                id,
-                child_genome,
-                target,
-                transfer,
-                child_generation,
-                child_body,
-                child_shared_memory,
-            )
-        };
+        let mut child = CreatureState::new(
+            id,
+            child_genome,
+            target,
+            transfer,
+            child_generation,
+            child_body,
+            child_shared_memory,
+        );
         child.birth_mutation_operators = child_birth_mutation_operators;
         child.birth_edge_class = child_birth_edge_class;
         child.heading = direction;
@@ -685,8 +662,8 @@ mod tests {
         );
         for (_, creature) in sim.creatures.iter() {
             assert_eq!(
-                creature.cached_genome_size,
-                creature.genome.genome_size(),
+                creature.genome_size(),
+                creature.genome().genome_size(),
                 "generation {} caches a stale genome size",
                 creature.generation
             );
@@ -1090,17 +1067,21 @@ mod tests {
     ) {
         use crate::config::SimulationConfig;
         use crate::simulation::seed_simulation;
+        use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
         cfg.mutation.per_unit_rate = rate;
         // Rate 0.0 delivers at conception (T03.F12): the child exists at return.
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-        let mut sim = seed_simulation(cfg, 83);
-        let parent_id = sim.creatures.keys().next().unwrap();
         // A seeded founder carries no seeds and no runtime weights.
-        assert!(!sim.creatures[parent_id]
-            .graph_runtime
+        let seeded = seed_simulation(cfg.clone(), 83);
+        assert!(!seeded
+            .creatures
+            .values()
+            .next()
+            .unwrap()
+            .graph_runtime()
             .learned()
             .has_learning());
         let genome =
@@ -1122,18 +1103,21 @@ mod tests {
                     retention: 1.0,
                 }),
             )]);
+        let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
+            *founder = genome.clone();
+        });
+        let parent_id = sim.creatures.keys().next().unwrap();
         let parent = &mut sim.creatures[parent_id];
-        parent.genome = genome.clone();
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
         parent.energy = 10000.0;
-        parent.graph_runtime =
-            crate::runtime::state::GraphRuntimeState::for_genome(&genome, Vec::new());
+        // What the parent learned and dispatched in its life so far.
+        let runtime = parent.runtime_mut();
         if let Some(learned) = learned {
-            parent.graph_runtime.learned.set_slot(0, 0, learned, 99.0);
+            runtime.learned.set_slot(0, 0, learned, 99.0);
         }
-        parent.graph_runtime.node_state = vec![vec![7.0]];
-        parent.graph_runtime.node_outputs = vec![vec![8.0]];
-        parent.graph_runtime.dispatch_record.record_dispatch(0);
+        runtime.node_state = vec![vec![7.0]];
+        runtime.node_outputs = vec![vec![8.0]];
+        runtime.dispatch_record.record_dispatch(0);
         let direction = Direction::ALL
             .into_iter()
             .find(|&direction| {
@@ -1166,25 +1150,25 @@ mod tests {
         child_id: crate::contracts::CreatureId,
     ) {
         let child = &sim.creatures[child_id];
-        let edge = child.graph_runtime.learned().edges(0).next().unwrap();
+        let edge = child.graph_runtime().learned().edges(0).next().unwrap();
         assert_eq!(edge.learned, Some(0.9));
         // A pure-Hebbian slot carries no trace.
         assert_eq!(edge.trace, None);
-        assert!(child.graph_runtime.node_state.is_empty());
-        assert!(child.graph_runtime.node_outputs.is_empty());
-        assert!(child.graph_runtime.dispatch_record.is_empty());
-        for node in &child.genome.nodes {
+        assert!(child.graph_runtime().node_state.is_empty());
+        assert!(child.graph_runtime().node_outputs.is_empty());
+        assert!(child.graph_runtime().dispatch_record.is_empty());
+        for node in &child.genome().nodes {
             if let BackendDef::Graph(def) = &node.backend_def {
                 assert!(def.birth_seeds().is_none());
             }
         }
         let parent = &sim.creatures[parent_id];
-        assert_eq!(&parent.genome, genome);
-        let edge = parent.graph_runtime.learned().edges(0).next().unwrap();
+        assert_eq!(parent.genome(), genome);
+        let edge = parent.graph_runtime().learned().edges(0).next().unwrap();
         assert_eq!(edge.learned, Some(0.9));
     }
 
-    /// Fast path (`new_with_cached_fields`, no genome event applied).
+    /// Zero-event birth (no genome event applied).
     #[test]
     fn birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit() {
         let (sim, parent_id, genome, child_id, applied) = live_birth(0.0, 2, Some(0.9));
@@ -1192,15 +1176,15 @@ mod tests {
         assert_seeded_birth(&sim, parent_id, &genome, child_id);
     }
 
-    /// Mutated branch (`CreatureState::new`, at least one genome event
-    /// applied): the first seed whose events leave the learned edge in place.
+    /// Mutated birth (at least one genome event applied): the first seed
+    /// whose events leave the learned edge in place.
     #[test]
     fn mutated_birth_keeps_parent_and_resets_all_newborn_credit() {
         let (sim, parent_id, genome, child_id) = (0..64)
             .find_map(|seed| {
                 let (sim, parent_id, genome, child_id, applied) = live_birth(1.0, seed, Some(0.9));
                 let kept = sim.creatures[child_id]
-                    .graph_runtime
+                    .graph_runtime()
                     .learned()
                     .edges(0)
                     .next()
@@ -1217,7 +1201,7 @@ mod tests {
     fn birth_from_a_parent_with_nothing_learned_starts_uninitialized() {
         let (sim, _, _, child_id, applied) = live_birth(0.0, 2, None);
         assert_eq!(applied, 0);
-        let learned = sim.creatures[child_id].graph_runtime.learned();
+        let learned = sim.creatures[child_id].graph_runtime().learned();
         let edges: Vec<_> = learned.edges(0).collect();
         assert_eq!(edges.len(), 1);
         assert_eq!(edges[0].learned, None);
@@ -1233,15 +1217,13 @@ mod tests {
         use crate::creature::founder::v3alpha1_founder_genome;
         use crate::genome::cgp::Shape;
         use crate::genome::vote::DirectedVoteKind;
-        use crate::simulation::seed_simulation;
+        use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
         cfg.mutation.per_unit_rate = 1.0;
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-        let mut sim = seed_simulation(cfg, 83);
-        let parent_id = sim.creatures.keys().next().unwrap();
         let mut genome = v3alpha1_founder_genome();
         let node = genome
             .nodes
@@ -1256,8 +1238,11 @@ mod tests {
         };
         def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 0);
         def.add_group(Shape::Ring { ring_ref: ring }, DirectedVoteKind::Move, 4);
+        let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
+            *founder = genome.clone();
+        });
+        let parent_id = sim.creatures.keys().next().unwrap();
         let parent = &mut sim.creatures[parent_id];
-        parent.genome = genome;
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
         parent.energy = 10000.0;
         let direction = Direction::ALL
@@ -1375,17 +1360,18 @@ mod tests {
     #[test]
     fn an_unmutated_birth_of_a_pair_group_carrier_counts_once() {
         use crate::config::SimulationConfig;
-        use crate::simulation::seed_simulation;
+        use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
         cfg.mutation.per_unit_rate = 0.0;
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-        let mut sim = seed_simulation(cfg, 83);
+        let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
+            *founder = pair_grouped_founder(-0.25);
+        });
         let parent_id = sim.creatures.keys().next().unwrap();
         let parent = &mut sim.creatures[parent_id];
-        parent.genome = pair_grouped_founder(-0.25);
         parent.age = sim.config.energy.lifecycle.min_reproduce_age;
         parent.energy = 10000.0;
         let direction = Direction::ALL
@@ -1417,7 +1403,7 @@ mod tests {
     fn a_births_attribute_changes_reach_the_run_totals_by_scope() {
         use crate::config::SimulationConfig;
         use crate::mutation::types::MutationOperator as Op;
-        use crate::simulation::seed_simulation;
+        use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
         const ATTRIBUTE: [Op; 10] = [
@@ -1438,10 +1424,11 @@ mod tests {
             cfg.population.initial_creatures = 1;
             cfg.mutation.per_unit_rate = 1.0;
             cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-            let mut sim = seed_simulation(cfg, 83);
+            let mut sim = seed_simulation_with_founder_genomes(cfg, 83, |_, founder| {
+                *founder = pair_grouped_founder(-0.25);
+            });
             let parent_id = sim.creatures.keys().next().unwrap();
             let parent = &mut sim.creatures[parent_id];
-            parent.genome = pair_grouped_founder(-0.25);
             parent.age = sim.config.energy.lifecycle.min_reproduce_age;
             parent.energy = 10000.0;
             let direction = Direction::ALL

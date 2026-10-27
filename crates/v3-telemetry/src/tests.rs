@@ -1206,6 +1206,7 @@ fn run_ended_with_totals_encodes_each_as_petri_total() {
 
 #[test]
 fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
+    use v3_core::genome::analysis::mesh_reachable_nodes;
     use v3_core::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
     use v3_core::genome::vote::{DirectedVoteKind, VoteSink};
     use v3_core::genome::BackendDef;
@@ -1213,27 +1214,34 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
     let config = small_config();
-    let mut sim = simulation(&config);
     // Wire one founder's entry node, which is reachable, into the Move drive.
-    let creature = sim.creatures.values_mut().next().unwrap();
-    let entry = creature.cached_reachable_nodes[0];
-    let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
-        panic!("the default founder's entry node is a Graph node");
-    };
-    let surface = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
-            DirectedVoteKind::Move,
-        )))
-        .unwrap();
-    def.push_edge(
-        surface,
-        GraphEdge::new(
-            GraphSource::SharedMemory {
-                slot: 0,
-                previous: false,
-            },
-            0.5,
-        ),
+    let sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+        config.clone(),
+        7,
+        |founder_index, genome| {
+            if founder_index != 0 {
+                return;
+            }
+            let entry = mesh_reachable_nodes(genome)[0];
+            let BackendDef::Graph(def) = &mut genome.nodes[entry].backend_def else {
+                panic!("the default founder's entry node is a Graph node");
+            };
+            let surface = def
+                .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
+                    DirectedVoteKind::Move,
+                )))
+                .unwrap();
+            def.push_edge(
+                surface,
+                GraphEdge::new(
+                    GraphSource::SharedMemory {
+                        slot: 0,
+                        previous: false,
+                    },
+                    0.5,
+                ),
+            );
+        },
     );
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
@@ -1391,6 +1399,7 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
 
 #[test]
 fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
+    use v3_core::genome::analysis::mesh_reachable_nodes;
     use v3_core::genome::cgp::{
         BirthSeeds, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
         GraphSource,
@@ -1398,70 +1407,74 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     use v3_core::genome::{
         BackendDef, HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
-    use v3_core::runtime::state::GraphRuntimeState;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
     let config = small_config();
-    let mut sim = simulation(&config);
     // Give one founder's entry node, which is reachable, a compute node with
     // two Lamarckian plastic edges whose inherited weights have moved: one to
-    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized). The
-    // second decays (T25.F09).
-    let creature = sim.creatures.values_mut().next().unwrap();
-    let entry = creature.cached_reachable_nodes[0];
-    let BackendDef::Graph(def) = &mut creature.genome.nodes[entry].backend_def else {
-        panic!("the default founder's entry node is a Graph node");
-    };
-    let edge = |slot, weight| {
-        GraphEdge::new(
-            GraphSource::SharedMemory {
-                slot,
-                previous: false,
-            },
-            weight,
-        )
-    };
-    let compute = def.compute_nodes().len();
-    def.append_compute_node(ComputeNode::new(
-        ComputeNodeKind::Add,
-        vec![edge(0, 0.5), edge(1, 0.0)],
-    ));
-    for index in 0..2 {
-        def.edge_mut(EdgeOccurrence::new(
-            EdgeSurface::ComputeInput(compute),
-            index,
-        ))
-        .set_plasticity(Some(PlasticityConfig {
-            rule: HebbianRule::Covariance,
-            learning_rate: 0.1,
-            weight_clamp: 1.0,
-            lamarckian: true,
-            modulation: Some(RewardModulationConfig {
-                reward_source: OutcomeChannel::EnergyDelta,
-                trace_decay: 0.5,
-            }),
-            retention: [1.0, 0.5][index],
-        }));
-    }
-    let mut rows = BirthSeeds::Rows {
-        compute: def
-            .compute_nodes()
-            .iter()
-            .map(|node| vec![None; node.inputs.len()])
-            .collect(),
-        sinks: def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect(),
-        groups: vec![None; def.groups().len()],
-    };
-    let BirthSeeds::Rows { compute: seeds, .. } = &mut rows;
-    seeds[compute] = vec![Some(1.0), Some(0.25)];
-    let mut node_seeds = vec![None; creature.genome.nodes.len()];
-    node_seeds[entry] = Some(rows);
-    creature.graph_runtime = GraphRuntimeState::for_genome(&creature.genome, node_seeds);
+    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized), as birth
+    // seeds the constructor builds them from. The second decays (T25.F09).
+    let sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+        config.clone(),
+        7,
+        |founder_index, genome| {
+            if founder_index != 0 {
+                return;
+            }
+            let entry = mesh_reachable_nodes(genome)[0];
+            let BackendDef::Graph(def) = &mut genome.nodes[entry].backend_def else {
+                panic!("the default founder's entry node is a Graph node");
+            };
+            let edge = |slot, weight| {
+                GraphEdge::new(
+                    GraphSource::SharedMemory {
+                        slot,
+                        previous: false,
+                    },
+                    weight,
+                )
+            };
+            let compute = def.compute_nodes().len();
+            def.append_compute_node(ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![edge(0, 0.5), edge(1, 0.0)],
+            ));
+            for index in 0..2 {
+                def.edge_mut(EdgeOccurrence::new(
+                    EdgeSurface::ComputeInput(compute),
+                    index,
+                ))
+                .set_plasticity(Some(PlasticityConfig {
+                    rule: HebbianRule::Covariance,
+                    learning_rate: 0.1,
+                    weight_clamp: 1.0,
+                    lamarckian: true,
+                    modulation: Some(RewardModulationConfig {
+                        reward_source: OutcomeChannel::EnergyDelta,
+                        trace_decay: 0.5,
+                    }),
+                    retention: [1.0, 0.5][index],
+                }));
+            }
+            let mut rows = BirthSeeds::Rows {
+                compute: def
+                    .compute_nodes()
+                    .iter()
+                    .map(|node| vec![None; node.inputs.len()])
+                    .collect(),
+                sinks: def
+                    .output_sinks()
+                    .iter()
+                    .map(|sink| vec![None; sink.inputs.len()])
+                    .collect(),
+                groups: vec![None; def.groups().len()],
+            };
+            let BirthSeeds::Rows { compute: seeds, .. } = &mut rows;
+            seeds[compute] = vec![Some(1.0), Some(0.25)];
+            def.seed_birth(rows);
+        },
+    );
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);

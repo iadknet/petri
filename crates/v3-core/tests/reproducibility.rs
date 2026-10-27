@@ -27,6 +27,7 @@ use v3_core::contracts::{NodeId, Position, RouteTarget};
 use v3_core::creature::action_log::ActionType;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::mutation::MutationOperator;
+use v3_core::simulation::seeding::seed_simulation_with_founder_genomes;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
 const SEED: u64 = 20_260_904;
@@ -51,9 +52,7 @@ fn reproducibility_config() -> SimulationConfig {
 /// Seed a simulation and route every founder's decision node into a VM node
 /// that holds the paired slot groups.
 fn seeded_fixture(seed: u64) -> Simulation {
-    let mut sim = seed_simulation(reproducibility_config(), seed);
-    for (_, creature) in sim.creatures.iter_mut() {
-        let genome = &mut creature.genome;
+    seed_simulation_with_founder_genomes(reproducibility_config(), seed, |_, genome| {
         let vm_id = NodeId::new(genome.nodes.len() as u32);
         let last = genome.nodes.last_mut().expect("founder genomes have nodes");
         assert!(last.targets.is_empty(), "the decision node ends the chain");
@@ -82,8 +81,7 @@ fn seeded_fixture(seed: u64) -> Simulation {
                 program,
             }),
         });
-    }
-    sim
+    })
 }
 
 /// One entry per creature, in `SlotMap` order: position, energy and
@@ -102,7 +100,7 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
                 c.body.capacity.to_bits(),
                 c.age,
                 c.generation,
-                &c.genome,
+                c.genome(),
             )
         })
         .collect()

@@ -872,7 +872,7 @@ fn run_and_observe_integrator_clock(
         let gtrace = graph_hop(&tick, 0);
         observed_passes.push(gtrace.passes.len() as u32);
         let creature = sim.creatures.get(target).expect("creature alive");
-        observed_states.push(creature.graph_runtime.node_state[0][1]);
+        observed_states.push(creature.graph_runtime().node_state[0][1]);
     }
     (observed_states, observed_passes)
 }
@@ -1029,7 +1029,7 @@ fn d4_integrator_visited_twice_per_tick_steps_twice() {
             6,
             "entry, module, entry, module, entry, exit"
         );
-        states.push(sim.creatures[target].graph_runtime.node_state[1][1]);
+        states.push(sim.creatures[target].graph_runtime().node_state[1][1]);
     }
     assert_eq!(states, [0.75, 0.9375, 0.984_375]);
 }
@@ -1089,7 +1089,7 @@ fn plastic_edge(
     node: usize,
 ) -> v3_core::runtime::plasticity::LearnedEdge {
     creature
-        .graph_runtime
+        .graph_runtime()
         .learned()
         .edges(node)
         .next()

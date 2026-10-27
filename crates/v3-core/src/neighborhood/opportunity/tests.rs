@@ -180,8 +180,8 @@ fn arms_follow_creature_order_and_descendants_inherit_them() {
             Arm::Authored(family) => &genomes.authored[family.index() as usize],
             Arm::Inert(family) => &genomes.inert[family.index() as usize],
         };
-        assert_eq!(&creature.genome, expected);
-        assert_eq!(creature.cached_genome_size, expected.genome_size());
+        assert_eq!(creature.genome(), expected);
+        assert_eq!(creature.genome_size(), expected.genome_size());
     }
 
     let run = run_replicate(&config, run_seed(0, 0), &genomes, 150);
@@ -206,7 +206,7 @@ fn arms_follow_creature_order_and_descendants_inherit_them() {
                 if seen.insert(id) {
                     per_arm[Arm::of_lineage(creature.body.identity.lineage_id).index()] += 1;
                     assert_eq!(
-                        creature.genome,
+                        *creature.genome(),
                         *match Arm::of_lineage(creature.body.identity.lineage_id) {
                             Arm::Founder => &genomes.founder,
                             Arm::Incumbent => &genomes.incumbents[0],

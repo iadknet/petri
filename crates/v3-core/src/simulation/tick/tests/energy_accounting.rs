@@ -1,6 +1,7 @@
 use super::support::*;
 use crate::contracts::Direction;
 use crate::contracts::{OrdinaryFoodTypeId, WorldAction};
+use crate::creature::founder::v3alpha1_founder_genome;
 use crate::ledger::DeathCause;
 use crate::runtime::types::ComputeCostReport;
 use crate::simulation::actions::apply_steal_energy;
@@ -143,9 +144,12 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
     use crate::genome::VmInstruction;
     use crate::simulation::recording::ActiveTrace;
     for traced in [false, true] {
-        let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 0.01);
-        sim.creatures[attacker].genome = vm_raw_program_genome(vec![]);
-        sim.creatures[victim].genome = vm_raw_program_genome(vec![VmInstruction::Noop]);
+        let (mut sim, attacker, victim) = make_sim_two_with_genomes(
+            100.0,
+            0.01,
+            vm_raw_program_genome(vec![]),
+            vm_raw_program_genome(vec![VmInstruction::Noop]),
+        );
         sim.config.runtime.vm.opcode_cost_multiplier = 1.0;
         sim.config.runtime.vm.step_ramp_cost = 0.0;
         sim.config.exchange.effort_rate = 0.0;
@@ -190,12 +194,13 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
 
 #[test]
 fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
-    let (mut sim, attacker, victim) = make_sim_two_creatures(9.0, 2.0);
+    let (mut sim, attacker, victim) =
+        make_sim_two_with_genomes(9.0, 2.0, v3alpha1_founder_genome(), genome_of_complexity(4));
     sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
     sim.creatures[attacker].body.capacity = 10.0;
-    sim.creatures[victim].cached_complexity = 4;
+    assert_eq!(sim.creatures[victim].complexity(), 4);
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.predation_victim_debit, 2.0);
@@ -205,11 +210,16 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
 
     // An exhausted victim yields nothing: no kill, no bonus, no flow.
-    let (mut sim, attacker, victim) = make_sim_two_creatures(1.0, -2.0);
+    let (mut sim, attacker, victim) = make_sim_two_with_genomes(
+        1.0,
+        -2.0,
+        v3alpha1_founder_genome(),
+        genome_of_complexity(3),
+    );
     sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 1.0;
-    sim.creatures[victim].cached_complexity = 3;
+    assert_eq!(sim.creatures[victim].complexity(), 3);
     apply_steal_energy(attacker, &mut sim, Direction::N, 10.0);
     assert_eq!(sim.creatures[attacker].energy, 1.0);
     assert_eq!(sim.creatures[victim].energy, -2.0);
@@ -225,7 +235,7 @@ fn zero_carrying_rate_keeps_exposure_and_food_lower_floor_is_observed() {
     let (mut sim, id) = make_sim_with_one_creature(100.0);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
-    let size = sim.creatures[id].cached_genome_size;
+    let size = sim.creatures[id].genome_size();
     run_phase_0(&mut sim);
     assert_eq!(sim.stats.energy_flows.genome_carrying, 0.0);
     assert_eq!(
@@ -529,10 +539,10 @@ fn phase_zero_assigns_each_creatures_decay_first_cause_at_the_zero_boundary() {
         (2.0, DeathCause::LifecycleDecay),
         (3.0, DeathCause::GenomeCarrying),
     ] {
-        let (mut sim, id) = make_sim_with_one_creature(initial_energy);
+        let (mut sim, id) = make_sim_with_custom_genome(initial_energy, sized_genome(4));
         sim.config.energy.lifecycle.energy_decay_per_tick = 2.0;
         sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.5;
-        sim.creatures[id].cached_genome_size = 4;
+        assert_eq!(sim.creatures[id].genome_size(), 4);
 
         run_phase_0(&mut sim);
 
@@ -544,11 +554,12 @@ fn phase_zero_assigns_each_creatures_decay_first_cause_at_the_zero_boundary() {
 
 #[test]
 fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() {
-    let (mut sim, decay, carrying) = make_sim_two_creatures(1.0, 3.0);
+    let (mut sim, decay, carrying) =
+        make_sim_two_with_genomes(1.0, 3.0, sized_genome(4), sized_genome(4));
     sim.config.energy.lifecycle.energy_decay_per_tick = 2.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.5;
-    sim.creatures[decay].cached_genome_size = 4;
-    sim.creatures[carrying].cached_genome_size = 4;
+    assert_eq!(sim.creatures[decay].genome_size(), 4);
+    assert_eq!(sim.creatures[carrying].genome_size(), 4);
     run_phase_0(&mut sim);
     assert_eq!(sim.stats.mortality.count(DeathCause::LifecycleDecay), 1);
     assert_eq!(sim.stats.mortality.count(DeathCause::GenomeCarrying), 1);

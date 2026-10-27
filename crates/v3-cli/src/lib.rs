@@ -195,10 +195,10 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
     let [mut genome_size, mut mesh_nodes, mut generation, mut wired_sinks, mut groups, mut members] =
         [0u64; 6];
     for creature in sim.creatures.values() {
-        genome_size += u64::from(creature.cached_genome_size);
-        mesh_nodes += creature.genome.nodes.len() as u64;
+        genome_size += u64::from(creature.genome_size());
+        mesh_nodes += creature.genome().nodes.len() as u64;
         generation += creature.generation;
-        for node in &creature.genome.nodes {
+        for node in &creature.genome().nodes {
             if let BackendDef::Graph(graph) = &node.backend_def {
                 wired_sinks += graph
                     .output_sinks()
@@ -327,12 +327,8 @@ mod tests {
         let sim = seed_simulation(cfg, 42);
         assert_eq!(sim.creatures.len(), 4);
 
-        let expected_genome_size = f64::from(
-            sim.creatures
-                .values()
-                .map(|c| c.cached_genome_size)
-                .sum::<u32>(),
-        ) / 4.0;
+        let expected_genome_size =
+            f64::from(sim.creatures.values().map(|c| c.genome_size()).sum::<u32>()) / 4.0;
         assert_eq!(
             structure_means(&sim),
             StructureMeans {
@@ -359,29 +355,35 @@ mod tests {
         cfg.world.width = 32;
         cfg.world.height = 32;
         cfg.population.initial_creatures = 4;
-        let mut sim = seed_simulation(cfg, 42);
-        assert_eq!(sim.creatures.len(), 4);
-
         // Two groups on one creature's first graph, one of them missing a
         // member: 2 / 4 = 0.5 groups per creature, 15 / 2 members per group.
-        let creature = sim.creatures.values_mut().next().unwrap();
-        let node = creature
-            .genome
-            .nodes
-            .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
-            .expect("a founder carries a graph node");
-        let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-        node.input_refs
-            .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let BackendDef::Graph(graph) = &mut node.backend_def else {
-            unreachable!()
-        };
-        graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
-        let second = graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Reproduce, 1);
-        let member = graph.members(second).next().unwrap();
-        assert!(matches!(member.surface, EdgeSurface::SinkInput(_)));
-        graph.remove_edge(member);
+        let sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+            cfg,
+            42,
+            |founder_index, genome| {
+                if founder_index != 0 {
+                    return;
+                }
+                let node = genome
+                    .nodes
+                    .iter_mut()
+                    .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                    .expect("a founder carries a graph node");
+                let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
+                node.input_refs
+                    .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+                let BackendDef::Graph(graph) = &mut node.backend_def else {
+                    unreachable!()
+                };
+                graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Move, 0);
+                let second =
+                    graph.add_group(Shape::Ring { ring_ref }, DirectedVoteKind::Reproduce, 1);
+                let member = graph.members(second).next().unwrap();
+                assert!(matches!(member.surface, EdgeSurface::SinkInput(_)));
+                graph.remove_edge(member);
+            },
+        );
+        assert_eq!(sim.creatures.len(), 4);
 
         let means = structure_means(&sim);
         assert_eq!(means.ring_groups, 0.5);

@@ -10,6 +10,7 @@ use v3_core::contracts::Position;
 use v3_core::creature::action_log::ActionType;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
 use v3_core::simulation::seed_simulation;
+use v3_core::simulation::seeding::seed_simulation_with_founder_genomes;
 
 #[test]
 fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
@@ -418,16 +419,12 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
 
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 3;
-    let mut sim = seed_simulation(config, 11);
-    let ids: Vec<_> = sim.creatures.keys().collect();
-    assert_eq!(ids.len(), 3);
-    for (id, graph) in ids
-        .iter()
-        .zip([shared_memory_reader, stateful_node_holder, inert])
-    {
-        sim.creatures[*id].genome = graph_genome(graph);
-        sim.creatures[*id].cached_reachable_nodes = vec![0].into_boxed_slice();
-    }
+    let genomes = [shared_memory_reader, stateful_node_holder, inert].map(graph_genome);
+    let sim = seed_simulation_with_founder_genomes(config, 11, |index, genome| {
+        *genome = genomes[index].clone();
+    });
+    assert_eq!(sim.creatures.len(), 3);
+    assert!(sim.creatures.values().all(|c| c.reachable_nodes() == [0]));
 
     // Act
     let census = SensorCensus::observe(&sim);
@@ -537,12 +534,8 @@ fn population_readings_average_the_living_population_and_count_its_clades() {
     let sim = seed_simulation(config, 42);
     assert_eq!(sim.creatures.len(), 4);
 
-    let expected_genome_size = f64::from(
-        sim.creatures
-            .values()
-            .map(|c| c.cached_genome_size)
-            .sum::<u32>(),
-    ) / 4.0;
+    let expected_genome_size =
+        f64::from(sim.creatures.values().map(|c| c.genome_size()).sum::<u32>()) / 4.0;
     let readings = PopulationReadings::observe(&sim);
     assert_eq!(readings.mean_genome_size, expected_genome_size);
     assert_eq!(readings.mean_mesh_nodes, 2.0);
@@ -1833,7 +1826,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
     assert_eq!(
         small.mean_genome_size,
         six(f64::from(
-            sim.creatures.values().nth(3).unwrap().cached_genome_size
+            sim.creatures.values().nth(3).unwrap().genome_size()
         ))
     );
 
@@ -1905,10 +1898,8 @@ fn decision_input_rows_count_each_referencing_creature_once() {
 
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 3;
-    let mut sim = seed_simulation(config, 11);
-    let ids: Vec<_> = sim.creatures.keys().collect();
     let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
-    for (id, refs) in ids.iter().zip([
+    let genomes = [
         vec![
             InputReference::ActionVotes,
             InputReference::ActionVotes,
@@ -1916,10 +1907,12 @@ fn decision_input_rows_count_each_referencing_creature_once() {
         ],
         vec![InputReference::ActionVotes, InputReference::PreviousOutcome],
         vec![],
-    ]) {
-        sim.creatures[*id].genome = reading(refs);
-        sim.creatures[*id].cached_reachable_nodes = vec![0].into_boxed_slice();
-    }
+    ]
+    .map(reading);
+    let sim = seed_simulation_with_founder_genomes(config, 11, |index, genome| {
+        *genome = genomes[index].clone();
+    });
+    assert!(sim.creatures.values().all(|c| c.reachable_nodes() == [0]));
 
     let census = SensorCensus::observe(&sim);
 

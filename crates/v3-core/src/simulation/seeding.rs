@@ -347,7 +347,7 @@ mod tests {
         let sim = seed_simulation_with_perception_mix(small_config(), 42, 1);
         let creature = sim.creatures.values().next().expect("seeded creature");
         assert_eq!(
-            creature.genome.nodes[0].input_refs[0],
+            creature.genome().nodes[0].input_refs[0],
             InputReference::World(WorldInputKey::AreaFoodSummary {
                 type_idx: OrdinaryFoodTypeId::default(),
             })
@@ -366,18 +366,18 @@ mod tests {
         use crate::sensors::reads::WorldKeySet;
         let sim = seed_simulation_with_perception_mix(small_config(), 42, 2);
         for creature in sim.creatures.values() {
-            let genome = &creature.genome;
+            let genome = creature.genome();
             let reachable = mesh_reachable_nodes(genome);
-            assert_eq!(*creature.cached_reachable_nodes, *reachable);
-            assert_eq!(creature.cached_complexity, genome.complexity());
-            assert_eq!(creature.cached_genome_size, genome.genome_size());
+            assert_eq!(*creature.reachable_nodes(), *reachable);
+            assert_eq!(creature.complexity(), genome.complexity());
+            assert_eq!(creature.genome_size(), genome.genome_size());
             assert_eq!(
-                creature.cached_has_barrier_reader,
+                creature.has_barrier_reader(),
                 has_barrier_reader(genome, &reachable)
             );
             assert_eq!(
-                creature.cached_live_vm_world_inputs,
-                live_vm_world_reads(genome, &reachable)
+                creature.live_vm_world_inputs(),
+                &*live_vm_world_reads(genome, &reachable)
             );
             assert_eq!(
                 creature.perception_requirements(),
@@ -390,10 +390,10 @@ mod tests {
                 .world_inputs
                 .into_iter()
                 .collect();
-            assert_eq!(creature.cached_declared_world_inputs, declared);
-            assert_eq!(creature.cached_wired_world_inputs, wired);
+            assert_eq!(creature.declared_world_inputs(), &declared);
+            assert_eq!(creature.wired_world_inputs(), &wired);
             assert_eq!(
-                creature.graph_runtime.sink_weights,
+                creature.graph_runtime().sink_weights,
                 GraphRuntimeState::for_genome(genome, Vec::new()).sink_weights
             );
         }
@@ -453,9 +453,9 @@ mod tests {
         );
         let sim = seed_simulation(cfg, 42);
         let founder = sim.creatures.values().next().expect("seeded founder");
-        assert_eq!(founder.genome, expected);
+        assert_eq!(*founder.genome(), expected);
         assert_ne!(
-            founder.genome,
+            *founder.genome(),
             crate::creature::founder::v3alpha1_founder_genome(),
             "the forage-first decision graph differs from V3Alpha1's"
         );
@@ -470,7 +470,7 @@ mod tests {
         cfg.energy.lifecycle.age_reference_ticks = 1_000;
         let sim = seed_simulation(cfg, 42);
         let founder = sim.creatures.values().next().expect("seeded founder");
-        let BackendDef::Graph(graph) = &founder.genome.nodes[0].backend_def else {
+        let BackendDef::Graph(graph) = &founder.genome().nodes[0].backend_def else {
             panic!("node 0 should be graph backend");
         };
         assert_eq!(

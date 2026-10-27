@@ -448,8 +448,6 @@ fn temporal_report_keeps_substrate_counts_separate() {
     use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 1;
-    let mut sim = seed_simulation(config, 11);
-    let id = sim.creatures.keys().next().unwrap();
     let edge = GraphEdge::new(
         GraphSource::SharedMemory {
             slot: 0,
@@ -457,7 +455,7 @@ fn temporal_report_keeps_substrate_counts_separate() {
         },
         1.0,
     );
-    sim.creatures[id].genome = CreatureGenome {
+    let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
@@ -478,10 +476,12 @@ fn temporal_report_keeps_substrate_counts_separate() {
             ),
         }],
     };
-    sim.creatures[id].graph_runtime = v3_core::runtime::state::GraphRuntimeState::for_genome(
-        &sim.creatures[id].genome,
-        Vec::new(),
+    let mut sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+        config,
+        11,
+        |_, founder| *founder = genome.clone(),
     );
+    let id = sim.creatures.keys().next().unwrap();
     sim.creatures[id].prev_shared_memory[0] = 1.0;
     let report = temporal_memory_sensitivity(11, &sim);
     assert_eq!(report.previous_slots.final_creature_count, 1);
@@ -712,7 +712,7 @@ fn evolved_neighborhood_for_seed_offsets_each_sampled_genome_by_its_rank_order()
         let seed_offset =
             v3_core::neighborhood::EVOLVED_SEED_MULTIPLIER * (genome_index as u64 + 1);
         let expected = evaluate_genome(
-            &creature.genome,
+            creature.genome(),
             &battery,
             &config.mutation,
             &context,
@@ -943,12 +943,12 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
         let creature_id = creature_ids[rank];
         let creature = &sim.creatures[creature_id];
         let base = battery.signature(
-            &creature.genome,
+            creature.genome(),
             context.runtime,
             context.shared_memory_decay_rate,
         );
         let expected = neighborhood::births::per_birth_result(
-            &creature.genome,
+            creature.genome(),
             &base,
             &battery,
             &config.mutation,
@@ -961,17 +961,17 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
         assert_eq!(row.creature_id, format!("{creature_id:?}"));
         assert_eq!(row.lineage_id, creature.body.identity.lineage_id);
         assert_eq!(row.generation, creature.generation);
-        assert_eq!(row.genome_size, creature.genome.genome_size());
-        assert_eq!(row.total_nodes, creature.genome.nodes.len() as u64);
+        assert_eq!(row.genome_size, creature.genome().genome_size());
+        assert_eq!(row.total_nodes, creature.genome().nodes.len() as u64);
         assert_eq!(
             row.reachable_nodes,
-            structural_companions(&creature.genome).reachable_node_count as u64
+            structural_companions(creature.genome()).reachable_node_count as u64
         );
         assert_eq!(
             row.executed_nodes,
             battery
                 .executed_indices(
-                    &creature.genome,
+                    creature.genome(),
                     context.runtime,
                     context.shared_memory_decay_rate
                 )

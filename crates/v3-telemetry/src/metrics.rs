@@ -158,8 +158,8 @@ impl Census {
             &catalog,
             sim.creatures.values().map(|c| {
                 [
-                    &c.cached_declared_world_inputs,
-                    &c.cached_wired_world_inputs,
+                    c.declared_world_inputs(),
+                    c.wired_world_inputs(),
                     &c.last_mesh_world_reads,
                 ]
             }),
@@ -174,12 +174,12 @@ impl Census {
         let drives = DriveCensus::observe(
             sim.creatures
                 .values()
-                .map(|c| (&c.genome, &*c.cached_reachable_nodes)),
+                .map(|c| (c.genome(), c.reachable_nodes())),
         );
         let plasticity = PlasticityCensus::observe(
             sim.creatures
                 .values()
-                .map(|c| (&*c.cached_reachable_nodes, c.graph_runtime.learned())),
+                .map(|c| (c.reachable_nodes(), c.graph_runtime().learned())),
         );
         Self {
             plasticity,
@@ -197,13 +197,13 @@ impl Census {
             mean_genome_size: mean(
                 sim.creatures
                     .values()
-                    .map(|c| u64::from(c.cached_genome_size))
+                    .map(|c| u64::from(c.genome_size()))
                     .sum(),
             ),
             mean_mesh_nodes: mean(
                 sim.creatures
                     .values()
-                    .map(|c| c.genome.nodes.len() as u64)
+                    .map(|c| c.genome().nodes.len() as u64)
                     .sum(),
             ),
             mean_generation: mean(sim.creatures.values().map(|c| c.generation).sum()),

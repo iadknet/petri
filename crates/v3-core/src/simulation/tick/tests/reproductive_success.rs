@@ -1,5 +1,6 @@
 use super::support::*;
 use crate::contracts::{Direction, NodeId};
+use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction};
 use crate::ledger::DeathCause;
@@ -139,8 +140,12 @@ fn reproductive_success_preserves_phase_zero_and_predation_removal_ages() {
         }
     );
 
-    let (mut sim, attacker, victim) = make_sim_two_creatures(10.0, 2.0);
-    sim.creatures[victim].genome = genome_for(CognitiveClass::SharedMemory);
+    let (mut sim, attacker, victim) = make_sim_two_with_genomes(
+        10.0,
+        2.0,
+        v3alpha1_founder_genome(),
+        genome_for(CognitiveClass::SharedMemory),
+    );
     sim.creatures[victim].age = 19;
     sim.creatures[victim].offspring_spawned_count = 5;
     sim.config.exchange.effort_rate = 0.0;

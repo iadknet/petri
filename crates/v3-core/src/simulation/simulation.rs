@@ -121,7 +121,7 @@ impl Simulation {
                 self.stats.observed_removal = Some((id, cause));
             }
             self.stats.reproductive_success_by_cognitive_class.record(
-                CognitiveClass::from_companions(&structural_companions(&creature.genome)),
+                CognitiveClass::from_companions(&structural_companions(creature.genome())),
                 creature.offspring_spawned_count,
                 creature.age,
             );

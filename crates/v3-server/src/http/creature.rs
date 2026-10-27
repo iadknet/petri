@@ -260,7 +260,7 @@ fn build_creature_diagnostics(
     let mut upstream_slots: BTreeSet<usize> = BTreeSet::new();
     let mut payload_slots: BTreeSet<usize> = BTreeSet::new();
     let mut custom_output_slots: BTreeSet<usize> = BTreeSet::new();
-    for node in &creature.genome.nodes {
+    for node in &creature.genome().nodes {
         if !reachable_node_ids.contains(&node.node_id) {
             continue;
         }
@@ -384,8 +384,8 @@ pub async fn get_creature(
     let include_diagnostics = !exclude.contains("diagnostics");
     let mesh_annotations = if include_brain || include_diagnostics {
         derive_mesh_annotations_with_reachable_indices(
-            &creature.genome,
-            &creature.cached_reachable_nodes,
+            creature.genome(),
+            creature.reachable_nodes(),
         )
     } else {
         Vec::new()
@@ -409,8 +409,8 @@ pub async fn get_creature(
         age: creature.age,
         generation: creature.generation,
         heading: creature.heading,
-        complexity: creature.cached_complexity,
-        genome_size: creature.genome.genome_size(),
+        complexity: creature.complexity(),
+        genome_size: creature.genome().genome_size(),
         phenotype: CreaturePhenotypeResponse {
             channels: creature.body.phenotype.channels,
             active_channel: creature.body.phenotype.active_channel,
@@ -420,15 +420,15 @@ pub async fn get_creature(
         latest_tick,
         brain: include_brain.then(|| {
             brain_view(
-                &creature.genome,
-                creature.graph_runtime.learned(),
+                creature.genome(),
+                creature.graph_runtime().learned(),
                 &mesh_annotations,
             )
         }),
         learning: if exclude.contains("learning") {
             None
         } else {
-            learning_view(&creature.genome, creature.graph_runtime.learned())
+            learning_view(creature.genome(), creature.graph_runtime().learned())
         },
         shared_memory: (!exclude.contains("shared_memory")).then(|| &creature.shared_memory[..]),
         action_log: (!exclude.contains("action_log")).then(|| {

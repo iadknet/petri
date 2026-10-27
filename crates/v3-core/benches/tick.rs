@@ -70,8 +70,6 @@ fn bench_full_tick(c: &mut Criterion) {
 }
 
 fn bench_mesh_execution_only(c: &mut Criterion) {
-    use v3_core::runtime::mesh::execute_creature_mesh;
-
     c.bench_function("mesh_execution_200_creatures", |b| {
         b.iter_with_setup(
             || seed_simulation(bench_config(), 42),
@@ -93,16 +91,7 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         typed_local_food,
                     };
                     let creature = sim.creatures.get_mut(id).unwrap();
-                    let _ = black_box(execute_creature_mesh(
-                        &creature.genome,
-                        &ss,
-                        &mut creature.energy,
-                        &mut creature.shared_memory,
-                        &creature.prev_shared_memory,
-                        &mut creature.graph_runtime,
-                        &config,
-                        v3_core::contracts::Direction::N,
-                    ));
+                    let _ = black_box(creature.think(&ss, &config));
                 }
             },
         );

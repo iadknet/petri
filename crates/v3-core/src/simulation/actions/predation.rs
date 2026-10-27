@@ -132,7 +132,7 @@ pub fn apply_steal_energy(
     // Step 8: Check kill.
     if sim.creatures[victim_id].energy <= 0.0 {
         // Snapshot victim data before removal.
-        let victim_complexity = sim.creatures[victim_id].cached_complexity;
+        let victim_complexity = sim.creatures[victim_id].complexity();
         let victim_pos = sim.creatures[victim_id].position;
 
         // Compute and award complexity bonus.
@@ -437,7 +437,7 @@ mod tests {
         // Base: rate 0.2 × intensity 0.2 × the attacker's 50.
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 0.2 * 50.0,
-            sim.creatures[attacker_id].cached_complexity,
+            sim.creatures[attacker_id].complexity(),
             sim.creatures[attacker_id].age,
         );
 
@@ -462,12 +462,12 @@ mod tests {
         // Intensity 1 (0.2 × modifier 5, capped): base 0.2 × 1 × 50.
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 50.0,
-            sim.creatures[attacker_id].cached_complexity,
+            sim.creatures[attacker_id].complexity(),
             sim.creatures[attacker_id].age,
         );
 
         // Capture victim complexity before kill removes it from slotmap.
-        let victim_complexity = sim.creatures[victim_id].cached_complexity;
+        let victim_complexity = sim.creatures[victim_id].complexity();
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 5.0).result;
 
         // At intensity 1 the steal takes the whole store and kills.
@@ -493,7 +493,7 @@ mod tests {
         sim.config.exchange.effort_rate = 0.2;
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 0.2 * 50.0,
-            sim.creatures[attacker_id].cached_complexity,
+            sim.creatures[attacker_id].complexity(),
             sim.creatures[attacker_id].age,
         );
 
@@ -540,7 +540,7 @@ mod tests {
         sim.config.exchange.effort_rate = 0.0;
         sim.config.predation.kill_complexity_bonus_multiplier = 1.0; // large multiplier for clarity
 
-        let victim_complexity = sim.creatures[victim_id].cached_complexity;
+        let victim_complexity = sim.creatures[victim_id].complexity();
         assert!(
             victim_complexity > 0,
             "founder genome should have nonzero complexity"

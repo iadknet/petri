@@ -689,7 +689,7 @@ pub(super) fn evolved_neighborhood_for_seed(
         let seed_offset =
             v3_core::neighborhood::EVOLVED_SEED_MULTIPLIER * (genome_index as u64 + 1);
         let evaluation = evaluate_genome(
-            &creature.genome,
+            creature.genome(),
             battery,
             mutation_config,
             context,
@@ -697,7 +697,7 @@ pub(super) fn evolved_neighborhood_for_seed(
             sizes.evolved_births,
             seed_offset,
         );
-        let companions = structural_companions(&creature.genome);
+        let companions = structural_companions(creature.genome());
 
         for (pooled, row) in pooled_operator_tallies
             .iter_mut()
@@ -707,7 +707,7 @@ pub(super) fn evolved_neighborhood_for_seed(
         }
         pooled_births = pooled_births.merge(&evaluation.births);
         let (mesh_execution, steering) =
-            mesh_execution_and_steering(battery, &steering_battery, &creature.genome, context);
+            mesh_execution_and_steering(battery, &steering_battery, creature.genome(), context);
         pooled_steering = pooled_steering.merge(steering.reading);
 
         sampled_genomes.push(NeighborhoodSampledGenome {
@@ -778,7 +778,7 @@ pub(super) fn neighborhood_read_for_seed(
     for (genome_index, &rank) in ranks.iter().enumerate() {
         let creature_id = creature_ids[rank];
         let creature = &sim.creatures[creature_id];
-        let genome = &creature.genome;
+        let genome = creature.genome();
         let seed_offset = READ_SEED_BASE + READ_GENOME_MULTIPLIER * (genome_index as u64 + 1);
         let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
         let (births, genome_exposure) = neighborhood::births::per_birth_reading(

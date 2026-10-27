@@ -18,8 +18,6 @@ use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::trace::domain::{
     PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
 };
-#[cfg(not(feature = "telemetry-seams"))]
-use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
 use crate::sensors::perception::{PerceptionConfig, PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::reducers::assemble_perception;
@@ -51,7 +49,7 @@ mod window_seam;
 #[cfg(feature = "telemetry-seams")]
 use self::window_seam::{record_limit, FlowMarks};
 #[cfg(feature = "telemetry-seams")]
-use crate::runtime::traced_mesh::{execute_creature_mesh_budgeted, RecordedMesh};
+use crate::runtime::traced_mesh::RecordedMesh;
 #[cfg(feature = "telemetry-seams")]
 use crate::simulation::recording::{TickOutcome, Truncation};
 
@@ -113,7 +111,7 @@ fn has_any_valid_adjacent_target(world: &WorldState, position: Position) -> bool
 }
 
 fn barrier_reader_state_for_creature(creature: &CreatureState) -> BarrierReaderState {
-    if creature.cached_has_barrier_reader {
+    if creature.has_barrier_reader() {
         BarrierReaderState::HasBarrierReader
     } else {
         BarrierReaderState::NoBarrierReader
@@ -213,7 +211,7 @@ impl Phase0Charge {
 /// 1. Food growth
 /// 2. Creature aging (+1 per creature)
 /// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
-///    cost `genome_carry_cost_per_unit * cached_genome_size` and the signed
+///    cost `genome_carry_cost_per_unit * genome_size()` and the signed
 ///    capacity upkeep, floored at zero, as one charge: [`Phase0Charge`])
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 ///
@@ -253,7 +251,7 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
         let settled = Phase0Charge::new(
             lifecycle.energy_decay_per_tick,
             lifecycle.genome_carry_cost_per_unit,
-            creature.cached_genome_size,
+            creature.genome_size(),
             creature.body.upkeep(capacity),
         )
         .settle(energy_before);
@@ -262,12 +260,12 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
         flows.lifecycle_decay += settled.decay;
         flows.genome_carrying += settled.carrying;
         flows.capacity_upkeep += settled.upkeep;
-        flows.genome_size_creature_ticks += u64::from(creature.cached_genome_size);
+        flows.genome_size_creature_ticks += u64::from(creature.genome_size());
         creature.observe_energy(energy_before, settled.cause);
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
-        creature.graph_runtime.begin_tick(creature.age);
+        creature.begin_tick();
         advance_shared_memory(
             &mut creature.shared_memory,
             &mut creature.prev_shared_memory,
@@ -454,12 +452,12 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
     let mut observations = Vec::with_capacity(ids.len() * 3);
     for (id, sensors) in assemble_sensor_inputs(sim, &ids) {
         let creature = &sim.creatures[id];
-        let mut prepared = creature.graph_runtime.clone();
+        let mut prepared = creature.graph_runtime().clone();
         prepared.begin_tick(creature.age);
         let evaluate = |graph: &mut crate::runtime::state::GraphRuntimeState,
                         previous: &[f32; SHARED_MEMORY_SLOTS]| {
             execute_creature_mesh(
-                &creature.genome,
+                creature.genome(),
                 &sensors,
                 &mut { creature.energy },
                 &mut { creature.shared_memory },
@@ -522,10 +520,10 @@ fn observe_action_queue(
     runtime_config: &crate::config::RuntimeConfig,
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
-    let mut graph_runtime = creature.graph_runtime.clone();
+    let mut graph_runtime = creature.graph_runtime().clone();
     graph_runtime.begin_tick(creature.age);
     execute_creature_mesh(
-        &creature.genome,
+        creature.genome(),
         sensors,
         &mut energy,
         &mut shared_memory,
@@ -568,16 +566,7 @@ fn run_cognition(
     let mut parallel_decisions: Vec<_> = work
         .par_iter_mut()
         .map(|(id, ss, creature)| {
-            let output = execute_creature_mesh(
-                &creature.genome,
-                ss,
-                &mut creature.energy,
-                &mut creature.shared_memory,
-                &creature.prev_shared_memory,
-                &mut creature.graph_runtime,
-                &runtime_config,
-                creature.heading,
-            );
+            let output = creature.think(ss, &runtime_config);
             creature.pending_death_cause = output.energy_observation.pending_cause;
             creature.heading = output.heading;
             creature.last_mesh_world_reads = ss.world_reads.set();
@@ -600,28 +589,9 @@ fn run_cognition(
                 hops,
                 passes,
                 truncated,
-            } = execute_creature_mesh_budgeted(
-                &creature.genome,
-                ss,
-                &mut creature.energy,
-                &mut creature.shared_memory,
-                &creature.prev_shared_memory,
-                &mut creature.graph_runtime,
-                &runtime_config,
-                heading_before,
-                limit,
-            );
+            } = creature.think_budgeted(ss, &runtime_config, limit);
             #[cfg(not(feature = "telemetry-seams"))]
-            let (output, hops, passes) = execute_creature_mesh_traced(
-                &creature.genome,
-                ss,
-                &mut creature.energy,
-                &mut creature.shared_memory,
-                &creature.prev_shared_memory,
-                &mut creature.graph_runtime,
-                &runtime_config,
-                heading_before,
-            );
+            let (output, hops, passes) = creature.think_traced(ss, &runtime_config);
             creature.pending_death_cause = output.energy_observation.pending_cause;
             creature.heading = output.heading;
             creature.last_mesh_world_reads = ss.world_reads.set();
@@ -1355,11 +1325,12 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
             .as_ref()
             .map_or([0.0; OUTCOME_CHANNEL_COUNT], |bank| bank.signals);
 
-        let learned = &mut creature.graph_runtime.learned;
-        let Some(signals) = signals.filter(|_| learned.has_reward_modulated()) else {
+        let Some(signals) =
+            signals.filter(|_| creature.graph_runtime().learned().has_reward_modulated())
+        else {
             continue;
         };
-        let counts = learned.apply_reward(&signals);
+        let counts = creature.apply_reward(&signals);
         sim.stats.plasticity_updates_total += u64::from(counts.updates);
         sim.stats.reward_modulated_updates_total += u64::from(counts.updates);
         sim.stats.plasticity_changes_total += u64::from(counts.changes);
@@ -1535,6 +1506,7 @@ mod final_action_observation_tests {
     };
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::simulation::seed_simulation;
+    use crate::simulation::seeding::seed_simulation_with_founder_genomes;
     use proptest::prelude::*;
     use rand::RngCore;
 
@@ -1646,25 +1618,25 @@ mod final_action_observation_tests {
         config.world.width = 16;
         config.world.height = 16;
         config.population.initial_creatures = 1;
-        let mut sim = seed_simulation(config, 11);
+        let mut sim = seed_simulation_with_founder_genomes(config, 11, |_, founder| {
+            *founder = memory_direction_genome();
+        });
         let id = sim.creatures.keys().next().expect("one founder");
         let creature = &mut sim.creatures[id];
-        creature.genome = memory_direction_genome();
-        creature.graph_runtime =
-            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
         creature.prev_shared_memory[0] = 0.75;
-        creature.graph_runtime.node_state = vec![vec![0.5]];
-        creature.graph_runtime.scratch_prev = vec![1.0];
-        creature.graph_runtime.scratch_curr = vec![2.0];
-        creature.graph_runtime.scratch_backup = vec![3.0];
-        creature.graph_runtime.scratch_w_inputs = vec![4.0];
+        let runtime = creature.runtime_mut();
+        runtime.node_state = vec![vec![0.5]];
+        runtime.scratch_prev = vec![1.0];
+        runtime.scratch_curr = vec![2.0];
+        runtime.scratch_backup = vec![3.0];
+        runtime.scratch_w_inputs = vec![4.0];
 
         let memory_before = creature.shared_memory;
         let previous_memory_before = creature.prev_shared_memory;
         let energy_before = creature.energy;
-        let graph_state_before = creature.graph_runtime.clone();
+        let graph_state_before = creature.graph_runtime().clone();
         let mut rng_before = sim.rng.clone();
 
         let observations = observe_final_actions(&sim);
@@ -1686,27 +1658,27 @@ mod final_action_observation_tests {
         assert_eq!(sim.creatures[id].prev_shared_memory, previous_memory_before);
         assert_eq!(sim.creatures[id].energy, energy_before);
         assert_eq!(
-            sim.creatures[id].graph_runtime.node_state,
+            sim.creatures[id].graph_runtime().node_state,
             graph_state_before.node_state
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.learned(),
+            sim.creatures[id].graph_runtime().learned(),
             graph_state_before.learned()
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.scratch_prev,
+            sim.creatures[id].graph_runtime().scratch_prev,
             graph_state_before.scratch_prev
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.scratch_curr,
+            sim.creatures[id].graph_runtime().scratch_curr,
             graph_state_before.scratch_curr
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.scratch_backup,
+            sim.creatures[id].graph_runtime().scratch_backup,
             graph_state_before.scratch_backup
         );
         assert_eq!(
-            sim.creatures[id].graph_runtime.scratch_w_inputs,
+            sim.creatures[id].graph_runtime().scratch_w_inputs,
             graph_state_before.scratch_w_inputs
         );
         assert_eq!(sim.rng.next_u64(), rng_before.next_u64());
@@ -1718,15 +1690,14 @@ mod final_action_observation_tests {
         config.world.width = 16;
         config.world.height = 16;
         config.population.initial_creatures = 1;
-        let mut sim = seed_simulation(config, 11);
+        let mut sim = seed_simulation_with_founder_genomes(config, 11, |_, founder| {
+            *founder = runtime_state_action_genome();
+        });
         let id = sim.creatures.keys().next().expect("one founder");
         let creature = &mut sim.creatures[id];
-        creature.genome = runtime_state_action_genome();
-        creature.graph_runtime =
-            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
         creature.shared_memory[0] = 1.0;
         creature.shared_memory[1] = 0.25;
-        creature.graph_runtime.node_state = vec![vec![1.0]];
+        creature.runtime_mut().node_state = vec![vec![1.0]];
 
         let observations = observe_final_actions(&sim);
 
@@ -1735,7 +1706,10 @@ mod final_action_observation_tests {
         assert_eq!(observation.intact, expected);
         assert_eq!(observation.zeroed, expected);
         assert_eq!(observation.scrambled, expected);
-        assert_eq!(sim.creatures[id].graph_runtime.node_state, vec![vec![1.0]]);
+        assert_eq!(
+            sim.creatures[id].graph_runtime().node_state,
+            vec![vec![1.0]]
+        );
     }
 
     #[test]
@@ -1747,9 +1721,6 @@ mod final_action_observation_tests {
         ] {
             let mut config = SimulationConfig::default();
             config.population.initial_creatures = 1;
-            let mut sim = seed_simulation(config, 11);
-            let id = sim.creatures.keys().next().unwrap();
-            let creature = &mut sim.creatures[id];
             let source = match substrate {
                 TemporalMemorySubstrate::PreviousSlots => GraphSource::SharedMemory {
                     slot: 0,
@@ -1786,14 +1757,18 @@ mod final_action_observation_tests {
                     retention: 1.0,
                 }),
             );
-            creature.genome = genome;
-            creature.graph_runtime =
-                crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
-            creature.graph_runtime.learned.set_slot(0, 0, 1.0, 0.5);
+            let mut sim = seed_simulation_with_founder_genomes(config, 11, |_, founder| {
+                *founder = genome.clone();
+            });
+            let id = sim.creatures.keys().next().unwrap();
+            let creature = &mut sim.creatures[id];
             creature.prev_shared_memory[0] = 1.0;
-            creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
-            creature.graph_runtime.node_outputs = vec![vec![1.0, 0.0]];
-            let graph_before = creature.graph_runtime.clone();
+            // A non-Lamarckian learner's value and trace are post-birth state.
+            let runtime = creature.runtime_mut();
+            runtime.learned.set_slot(0, 0, 1.0, 0.5);
+            runtime.node_state = vec![vec![1.0, 0.0]];
+            runtime.node_outputs = vec![vec![1.0, 0.0]];
+            let graph_before = creature.graph_runtime().clone();
             let memory_before = creature.shared_memory;
             let previous_before = creature.prev_shared_memory;
             let energy_before = creature.energy;
@@ -1811,10 +1786,10 @@ mod final_action_observation_tests {
                 }
             }
             let creature = &sim.creatures[id];
-            assert_eq!(creature.graph_runtime.learned(), graph_before.learned());
-            assert_eq!(creature.graph_runtime.node_state, graph_before.node_state);
+            assert_eq!(creature.graph_runtime().learned(), graph_before.learned());
+            assert_eq!(creature.graph_runtime().node_state, graph_before.node_state);
             assert_eq!(
-                creature.graph_runtime.node_outputs,
+                creature.graph_runtime().node_outputs,
                 graph_before.node_outputs
             );
             assert_eq!(creature.shared_memory, memory_before);
@@ -1834,12 +1809,11 @@ mod final_action_observation_tests {
             config.world.width = 16;
             config.world.height = 16;
             config.population.initial_creatures = 1;
-            let mut sim = seed_simulation(config, 11);
+            let mut sim = seed_simulation_with_founder_genomes(config, 11, |_, founder| {
+                *founder = memory_direction_genome();
+            });
             let id = sim.creatures.keys().next().expect("one founder");
             let creature = &mut sim.creatures[id];
-            creature.genome = memory_direction_genome();
-        creature.graph_runtime =
-            crate::runtime::state::GraphRuntimeState::for_genome(&creature.genome, Vec::new());
             creature.shared_memory[0] = slot_zero;
             creature.shared_memory[1] = slot_one;
 

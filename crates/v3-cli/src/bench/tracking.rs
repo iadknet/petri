@@ -455,7 +455,7 @@ impl CladeMemberReading {
             energy: creature.energy,
             age: creature.age,
             generation: creature.generation,
-            genome_size: creature.cached_genome_size,
+            genome_size: creature.genome_size(),
             eats_by_type: creature.lifetime_eats_applied_by_type.clone(),
             actions_by_type: creature.lifetime_actions_attempted_by_type,
             predation_kills: creature.lifetime_predation_kills_count,
@@ -982,8 +982,8 @@ impl PlasticityCensusBlock {
         use v3_core::neighborhood::plasticity_census::PlasticityCensus;
         let census = PlasticityCensus::observe(sim.creatures.values().map(|creature| {
             (
-                &*creature.cached_reachable_nodes,
-                creature.graph_runtime.learned(),
+                creature.reachable_nodes(),
+                creature.graph_runtime().learned(),
             )
         }));
         Self {
@@ -1116,7 +1116,7 @@ impl SensorCensus {
         let mut creatures_with_any_stateful_read = 0;
 
         for creature in sim.creatures.values() {
-            let census = sensor_census(&creature.genome, &creature.cached_reachable_nodes);
+            let census = sensor_census(creature.genome(), creature.reachable_nodes());
             creatures_reading_shared_memory += u64::from(census.reads_shared_memory);
             creatures_with_stateful_node += u64::from(census.holds_stateful_node);
             creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());

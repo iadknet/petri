@@ -26,7 +26,7 @@ pub(super) fn pay_effort(
     base: f32,
     cause: DeathCause,
 ) -> f64 {
-    let effort = energy.action_effort(base, creature.cached_complexity, creature.age);
+    let effort = energy.action_effort(base, creature.complexity(), creature.age);
     charge_effort(creature, effort, cause)
 }
 
@@ -441,7 +441,7 @@ mod tests {
         let (mut sim, id) = make_sim_one_creature(start, 50.0);
         let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.move_cost,
-            sim.creatures[id].cached_complexity,
+            sim.creatures[id].complexity(),
             sim.creatures[id].age,
         );
         let energy_before = sim.creatures[id].energy;
@@ -473,7 +473,7 @@ mod tests {
         let energy_before = sim.creatures[id].energy;
         let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.move_cost,
-            sim.creatures[id].cached_complexity,
+            sim.creatures[id].complexity(),
             sim.creatures[id].age,
         );
         {
@@ -777,7 +777,7 @@ mod tests {
         parent.energy
             - sim.config.energy.action_effort(
                 sim.config.energy.costs.reproduce_attempt_cost,
-                parent.cached_complexity,
+                parent.complexity(),
                 parent.age,
             )
     }
@@ -788,11 +788,11 @@ mod tests {
         let parent = &sim.creatures[parent_id];
         sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.reproduce_cost,
-            parent.cached_complexity,
+            parent.complexity(),
             parent.age,
         ) * reproduction::genome_replication_cost_multiplier(
             sim.config.energy.lifecycle.genome_replication_cost_per_unit,
-            parent.cached_genome_size,
+            parent.genome_size(),
         )
     }
 
@@ -1070,25 +1070,27 @@ mod tests {
         let mut observed = false;
 
         for seed in 0u64..10_000 {
-            let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+            // Bias toward skipped mutations: no Graph nodes, no input refs, no route targets.
+            let genome = crate::genome::CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                }],
+            };
+            let (mut sim, parent_id) = make_sim_one_founder(genome, pos, 80.0);
             sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
             // Rate 1.0: every genome unit requests one event.
             sim.config.mutation.per_unit_rate = 1.0;
             sim.config.mutation.phenotype.channel_change_chance = 0.0;
             sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
             sim.config.mutation.phenotype.channel_step = 1;
-
-            // Bias toward skipped mutations: no Graph nodes, no input refs, no route targets.
-            sim.creatures[parent_id].genome.nodes = vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: vec![],
-            }];
 
             let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
             let parent_generation = sim.creatures[parent_id].generation;
@@ -1128,9 +1130,9 @@ mod tests {
         // Rate 1.0: every genome unit requests one event.
         sim.config.mutation.per_unit_rate = 1.0;
         // Stand in for lived ticks: the parent dispatched both mesh nodes.
-        for index in 0..sim.creatures[parent_id].genome.nodes.len() {
+        for index in 0..sim.creatures[parent_id].genome().nodes.len() {
             sim.creatures[parent_id]
-                .graph_runtime
+                .runtime_mut()
                 .dispatch_record
                 .record_dispatch(index);
         }
@@ -1207,12 +1209,12 @@ mod tests {
     fn reproduce_accumulates_skipped_operator_funnel_across_births() {
         // Arrange: a duplicated node id leaves every mutated genome
         // unparseable, so each selected operator is rolled back and skipped.
-        let (mut sim, parent_id) = make_sim_one_creature(Position::new(5, 5), 400.0);
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes.push(genome.nodes[0].clone());
+        let (mut sim, parent_id) = make_sim_one_founder(genome, Position::new(5, 5), 400.0);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         // Rate 1.0: every genome unit requests one event.
         sim.config.mutation.per_unit_rate = 1.0;
-        let duplicate = sim.creatures[parent_id].genome.nodes[0].clone();
-        sim.creatures[parent_id].genome.nodes.push(duplicate);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
 
         // Act
@@ -2080,7 +2082,7 @@ mod tests {
         let after_effort = post_effort(&sim, id);
         let cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.reproduce_cost,
-            sim.creatures[id].cached_complexity,
+            sim.creatures[id].complexity(),
             20,
         );
         assert_eq!(

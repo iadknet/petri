@@ -65,7 +65,7 @@ fn effort(sim: &Simulation, id: CreatureId, base: f32) -> f32 {
     let creature = &sim.creatures[id];
     sim.config
         .energy
-        .action_effort(base, creature.cached_complexity, creature.age)
+        .action_effort(base, creature.complexity(), creature.age)
 }
 
 fn barrier_north(energy: f32) -> (Simulation, CreatureId) {
@@ -447,7 +447,7 @@ fn noop_and_move_charges_are_unchanged_at_the_defaults() {
         let legacy =
             sim.config
                 .energy
-                .adjusted_action_cost(base, creature.cached_complexity, creature.age);
+                .adjusted_action_cost(base, creature.complexity(), creature.age);
         execute(&mut sim, id, action);
         assert_eq!(
             sim.creatures[id].energy.to_bits(),
@@ -487,7 +487,7 @@ fn a_conception_pays_effort_then_cost_then_litter() {
     let creature = &sim.creatures[id];
     let cost = energy.adjusted_action_cost(
         energy.costs.reproduce_cost,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     );
     let after_effort = 100.0f32 - effort;
@@ -524,7 +524,7 @@ fn a_steal_pays_its_charge_base_above_the_floor_and_the_floor_below_it() {
         let creature = &sim.creatures[attacker];
         let charged = sim.config.energy.adjusted_action_cost(
             f32::max(base, sim.config.energy.costs.noop_cost),
-            creature.cached_complexity,
+            creature.complexity(),
             creature.age,
         );
         execute(

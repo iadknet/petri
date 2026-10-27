@@ -174,7 +174,7 @@ impl PairGroups {
         Some(Self::census(
             sim.creatures
                 .values()
-                .map(|creature| (&creature.genome, &*creature.cached_reachable_nodes)),
+                .map(|creature| (creature.genome(), creature.reachable_nodes())),
             add_applied_total,
             sim.stats.pair_group_inherited_nonzero_births_total,
         ))

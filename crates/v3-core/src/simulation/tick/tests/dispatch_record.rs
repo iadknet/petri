@@ -10,7 +10,7 @@ use crate::simulation::seeding::seed_simulation;
 fn recorded(sim: &crate::simulation::Simulation, id: crate::contracts::CreatureId) -> Vec<usize> {
     let creature = &sim.creatures[id];
     creature
-        .graph_runtime
+        .graph_runtime()
         .dispatch_record
         .executed_indices(creature.age, u64::MAX)
 }
@@ -45,7 +45,7 @@ fn the_window_forgets_a_node_the_creature_stopped_dispatching() {
     run_tick(&mut sim, &mut None);
     let creature = &sim.creatures[id];
     let age = creature.age;
-    let record = &creature.graph_runtime.dispatch_record;
+    let record = &creature.graph_runtime().dispatch_record;
     assert_eq!(record.executed_indices(age, 1), vec![0, 1]);
     assert!(record.executed_indices(age + 1, 1).is_empty());
 }
@@ -63,7 +63,7 @@ fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
     }
     assert!(
         !sim.creatures[parent]
-            .graph_runtime
+            .graph_runtime()
             .dispatch_record
             .is_empty(),
         "the parent has dispatched by now"
@@ -80,7 +80,7 @@ fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
         .find(|creature| creature.id != parent)
         .expect("child not found");
     assert!(
-        child.graph_runtime.dispatch_record.is_empty(),
+        child.graph_runtime().dispatch_record.is_empty(),
         "a newborn never inherits its parent's record"
     );
 }

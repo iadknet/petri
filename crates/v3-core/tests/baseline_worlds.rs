@@ -285,7 +285,7 @@ fn short_run_identity(gestation_rate: Option<f32>) -> u64 {
             }
         }
         for c in sim.creatures.values() {
-            format!("{:?}", (c.position, c.energy.to_bits(), c.age, &c.genome)).hash(&mut hash);
+            format!("{:?}", (c.position, c.energy.to_bits(), c.age, c.genome())).hash(&mut hash);
         }
         if tick < 30 {
             run_tick(&mut sim, &mut None);

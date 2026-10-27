@@ -357,7 +357,7 @@ fn small_reading(sim: &Simulation) -> Reading {
         .map(|(index, creature)| CohortParent {
             index: index as u64,
             depth_or_generation: creature.generation,
-            genome: creature.genome.clone(),
+            genome: creature.genome().clone(),
         })
         .collect();
     let selected = if selected.is_empty() {

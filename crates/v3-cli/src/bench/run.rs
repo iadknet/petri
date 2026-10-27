@@ -147,7 +147,7 @@ pub(super) struct NeighborhoodObservation<'a> {
 fn final_complexities(sim: &v3_core::simulation::Simulation) -> Vec<u32> {
     sim.creatures
         .values()
-        .map(|c| functional_complexity(&c.genome))
+        .map(|c| functional_complexity(c.genome()))
         .collect()
 }
 
@@ -234,7 +234,7 @@ pub(super) fn run_one_seed(
         let memory_sensitivity_seed = memory_sensitivity(seed, &actions);
         let structural_companions = structural_companions_census(
             seed,
-            sim.creatures.values().map(|creature| &creature.genome),
+            sim.creatures.values().map(|creature| creature.genome()),
         );
         let temporal_memory_sensitivity = temporal_memory_sensitivity(seed, &sim);
         let wall_clock_ms = millis(observation_started.elapsed());

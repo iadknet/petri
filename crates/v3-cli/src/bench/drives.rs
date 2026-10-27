@@ -78,7 +78,7 @@ pub(super) fn observe_world(sim: &v3_core::simulation::Simulation) -> Drives {
     let census = DriveCensus::observe(
         sim.creatures
             .values()
-            .map(|creature| (&creature.genome, &*creature.cached_reachable_nodes)),
+            .map(|creature| (creature.genome(), creature.reachable_nodes())),
     );
     let founder = founder_genome_with_age_gate(
         sim.config.population.founder_profile,

@@ -70,10 +70,8 @@ fn native_run(genome: &CreatureGenome) {
 
 #[test]
 fn deleted_positions_survive_native_offspring_construction() {
-    use crate::simulation::{
-        actions::{apply_reproduce, ReproductionActionResult},
-        seed_simulation,
-    };
+    use crate::simulation::actions::{apply_reproduce, ReproductionActionResult};
+    use crate::simulation::seeding::seed_simulation_with_founder_genomes;
     let mut genome = fixture();
     let mut rng = SmallRng::seed_from_u64(29_005_002);
     remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();
@@ -82,11 +80,11 @@ fn deleted_positions_survive_native_offspring_construction() {
     config.mutation.per_unit_rate = 0.0;
     // Rate 0.0 delivers at conception (T03.F12): the child exists at return.
     config.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
-    let mut sim = seed_simulation(config, 83);
+    let mut sim = seed_simulation_with_founder_genomes(config, 83, |_, founder| {
+        *founder = genome.clone();
+    });
     let parent_id = sim.creatures.keys().next().unwrap();
     let parent = &mut sim.creatures[parent_id];
-    parent.genome = genome.clone();
-    parent.cached_genome_size = genome.genome_size();
     parent.age = sim.config.energy.lifecycle.min_reproduce_age;
     parent.energy = 10000.0;
     let direction = Direction::ALL
@@ -107,8 +105,8 @@ fn deleted_positions_survive_native_offspring_construction() {
         .find(|(id, _)| *id != parent_id)
         .unwrap()
         .1;
-    assert_eq!(child.genome, genome);
-    assert_eq!(child.cached_genome_size, genome.genome_size());
-    assert_eq!(sim.creatures[parent_id].genome, genome);
-    native_run(&child.genome);
+    assert_eq!(*child.genome(), genome);
+    assert_eq!(child.genome_size(), genome.genome_size());
+    assert_eq!(*sim.creatures[parent_id].genome(), genome);
+    native_run(child.genome());
 }

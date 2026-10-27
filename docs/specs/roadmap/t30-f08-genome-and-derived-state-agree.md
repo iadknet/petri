@@ -184,23 +184,23 @@ value, or a gate compute regression past its threshold would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] 1. In `creature/state.rs`: the derived value type and its one function
+- [x] 1. In `creature/state.rs`: the derived value type and its one function
       (invariant 2); private `genome`, `graph_runtime` and derived field;
       the accessors of invariant 1; delete `new_with_cached_fields` and its
       test; write invariant 3's record test first and make `new` the one
       constructor.
-- [ ] 2. The brain operations `begin_tick`, `think`, `think_traced`,
+- [x] 2. The brain operations `begin_tick`, `think`, `think_traced`,
       `think_budgeted` and `apply_reward`, `graph_runtime()` and the
       `#[cfg(test)]` `runtime_mut()` (invariant 4); route
       `simulation/tick.rs`'s cognition calls, `begin_tick`, the reward
       update, the two observation paths and `benches/tick.rs` through them.
-- [ ] 3. `spawn_child`: delete the zero-event branch and the
+- [x] 3. `spawn_child`: delete the zero-event branch and the
       `parent_cached_*` copies; one `CreatureState::new` call; the mutation
       engine reads `reachable_nodes()`.
-- [ ] 4. Every production read in `v3-core`, `v3-cli`, `v3-server`,
+- [x] 4. Every production read in `v3-core`, `v3-cli`, `v3-server`,
       `v3-telemetry` and `v3-lab` goes through the accessors
       (compiler-driven; sites in the readings).
-- [ ] 5. The 14 test files in the readings' write table build their
+- [x] 5. The 14 test files in the readings' write table build their
       creatures as invariant 5 says; genomes of the required size and
       complexity for the Phase 0 and predation tests; birth seeds for the
       inherited values in `server.rs` and telemetry `tests.rs`; `runtime_mut()`
@@ -213,10 +213,9 @@ value, or a gate compute regression past its threshold would show it wrong.
 
 ## Verification
 
-- [ ] Invariant 1: `grep -rnE "cached_(complexity|genome_size|reachable_nodes|has_barrier_reader|live_vm_world_inputs|perception_requirements|declared_world_inputs|wired_world_inputs)" crates`
-      matches only in `crates/v3-core/src/creature/state.rs`; result in the
-      readings.
-- [ ] Invariant 3: `cargo test -p v3-core creature::state` -> the record
+- [x] Invariant 1: `grep -rnE "cached_(complexity|genome_size|reachable_nodes|has_barrier_reader|live_vm_world_inputs|perception_requirements|declared_world_inputs|wired_world_inputs)" crates`
+      matches only in `crates/v3-core/src/creature/state.rs`.
+- [x] Invariant 3: `cargo test -p v3-core creature::state` -> the record
       test passes; `grep -rn new_with_cached_fields crates` is empty.
 - [ ] Invariant 4: `grep -rn "runtime_mut" crates` -> one `#[cfg(test)]`
       definition in `creature/state.rs` and uses in test code only;

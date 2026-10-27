@@ -229,7 +229,7 @@ fn phase_0_charges_the_founder_its_carrying_cost_beside_decay() {
     assert_eq!(rate, 1e-4);
     // The canonical founder carries 80 genome units under the T25.F02 unit
     // rule (97 before it; the old rule restores 97).
-    assert_eq!(sim.creatures[id].cached_genome_size, 80);
+    assert_eq!(sim.creatures[id].genome_size(), 80);
 
     run_phase_0(&mut sim);
 
@@ -240,12 +240,12 @@ fn phase_0_charges_the_founder_its_carrying_cost_beside_decay() {
 }
 
 #[test]
-fn phase_0_charge_scales_with_the_cached_genome_size() {
+fn phase_0_charge_scales_with_the_genome_size() {
     let initial = 50.0f32;
-    let (mut sim, id) = make_sim_with_one_creature(initial);
+    let (mut sim, id) = make_sim_with_custom_genome(initial, sized_genome(7));
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 1.0;
-    sim.creatures.get_mut(id).unwrap().cached_genome_size = 7;
+    assert_eq!(sim.creatures[id].genome_size(), 7);
 
     run_phase_0(&mut sim);
 
@@ -269,11 +269,11 @@ fn phase_0_at_rate_zero_reproduces_the_pre_feature_energy_bit_for_bit() {
 
 #[test]
 fn a_creature_the_carrying_charge_takes_to_zero_dies_in_the_same_tick() {
-    let (mut sim, id) = make_sim_with_one_creature(1.0);
+    let (mut sim, id) = make_sim_with_custom_genome(1.0, sized_genome(25));
     // Decay alone leaves the creature alive; the carrying charge is what kills it.
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.75;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.01;
-    sim.creatures.get_mut(id).unwrap().cached_genome_size = 25;
+    assert_eq!(sim.creatures[id].genome_size(), 25);
 
     run_phase_0(&mut sim);
 
@@ -283,10 +283,10 @@ fn a_creature_the_carrying_charge_takes_to_zero_dies_in_the_same_tick() {
 
 #[test]
 fn a_creature_the_carrying_charge_leaves_above_zero_survives_the_tick() {
-    let (mut sim, id) = make_sim_with_one_creature(1.0);
+    let (mut sim, id) = make_sim_with_custom_genome(1.0, sized_genome(10));
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.75;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.01;
-    sim.creatures.get_mut(id).unwrap().cached_genome_size = 10;
+    assert_eq!(sim.creatures[id].genome_size(), 10);
 
     run_phase_0(&mut sim);
 
@@ -297,10 +297,10 @@ fn a_creature_the_carrying_charge_leaves_above_zero_survives_the_tick() {
 #[test]
 fn phase_0_samples_lifetime_energy_after_the_carrying_charge() {
     let initial = 50.0f32;
-    let (mut sim, id) = make_sim_with_one_creature(initial);
+    let (mut sim, id) = make_sim_with_custom_genome(initial, sized_genome(10));
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 1.0;
-    sim.creatures.get_mut(id).unwrap().cached_genome_size = 10;
+    assert_eq!(sim.creatures[id].genome_size(), 10);
 
     run_phase_0(&mut sim);
 

@@ -85,7 +85,7 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
     let creature = &sim.creatures[id];
     let fatal_eat_cost = sim.config.energy.action_effort(
         sim.config.energy.costs.eat_cost,
-        creature.cached_complexity,
+        creature.complexity(),
         creature.age,
     );
     sim.creatures[id].energy = fatal_eat_cost - 0.01;
@@ -659,7 +659,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         sim.config.mutation.per_unit_rate = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.creatures[parent]
-            .graph_runtime
+            .runtime_mut()
             .learned
             .set_slot(0, 0, 1.5, 3.0);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
@@ -669,7 +669,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         // A child's credit starts at zero: no trace before its first visit
         // unless its Lamarckian slot is seeded, then a zero one (T25.F06).
         let child_traces: Vec<_> = child
-            .graph_runtime
+            .graph_runtime()
             .learned()
             .edges(0)
             .map(|e| e.trace)
@@ -677,7 +677,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         assert_eq!(child_traces, vec![lamarckian.then_some(0.0)]);
         assert_eq!(child.age, 0);
         let parent_traces: Vec<_> = sim.creatures[parent]
-            .graph_runtime
+            .graph_runtime()
             .learned()
             .edges(0)
             .map(|e| e.trace)
@@ -729,7 +729,7 @@ fn base_reproduce_charge(genome: &CreatureGenome) -> f32 {
     let (sim, parent) = make_sim_with_custom_genome(1000.0, genome.clone());
     sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
-        sim.creatures[parent].cached_complexity,
+        sim.creatures[parent].complexity(),
         sim.config.energy.lifecycle.min_reproduce_age,
     )
 }

@@ -142,7 +142,7 @@ pub fn draw_incumbents(sim: &Simulation, goal_seed: u64) -> Vec<CreatureGenome> 
     let mut rng = SmallRng::seed_from_u64(INCUMBENT_SEED_BASE + goal_seed);
     rand::seq::index::sample(&mut rng, ids.len(), amount)
         .into_iter()
-        .map(|position| sim.creatures[ids[position]].genome.clone())
+        .map(|position| sim.creatures[ids[position]].genome().clone())
         .collect()
 }
 
@@ -261,8 +261,8 @@ fn expose(sim: &Simulation, family: Family, ids: &[CreatureId]) -> Exposure {
         let run = |genome: &CreatureGenome| {
             execute_scenario_tick(genome, &scenario, runtime, UntracedMeshExecution).actions
         };
-        let silenced = ablated(&creature.genome, |channel| channels.contains(&channel));
-        exposure.applied += u64::from(run(&creature.genome) != run(&silenced));
+        let silenced = ablated(creature.genome(), |channel| channels.contains(&channel));
+        exposure.applied += u64::from(run(creature.genome()) != run(&silenced));
     }
     exposure
 }

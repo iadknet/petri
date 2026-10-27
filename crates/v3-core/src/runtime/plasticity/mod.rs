@@ -11,8 +11,8 @@ mod learned;
 pub(crate) mod rules;
 
 pub use kind::{PlasticityKind, RULES};
-pub(crate) use learned::Learner;
 pub use learned::{LearnedEdge, LearnedScale, LearnedState};
+pub(crate) use learned::{Learner, LearningCounts};
 
 use crate::genome::OUTCOME_CHANNEL_COUNT;
 

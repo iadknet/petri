@@ -1,5 +1,6 @@
 use std::mem::size_of;
 
+use crate::config::RuntimeConfig;
 use crate::config::{EnergyCapacityConfig, EnergyConfig};
 use crate::contracts::{
     CreatureId, Direction, OrdinaryFoodTypeId, PerceptionRequirements, Position, WorldInputKey,
@@ -16,7 +17,17 @@ use crate::genome::sensor_analysis::{
 };
 use crate::genome::{CreatureGenome, OUTCOME_CHANNEL_COUNT};
 use crate::mutation::{BirthEdgeClass, MutationOperator};
+use crate::runtime::mesh::execute_creature_mesh;
+use crate::runtime::plasticity::{LearningCounts, OutcomeSignalBank};
 use crate::runtime::state::GraphRuntimeState;
+#[cfg(not(feature = "telemetry-seams"))]
+use crate::runtime::trace::domain::{MeshHopTrace, MeshPassTrace};
+#[cfg(not(feature = "telemetry-seams"))]
+use crate::runtime::traced_mesh::execute_creature_mesh_traced;
+#[cfg(feature = "telemetry-seams")]
+use crate::runtime::traced_mesh::{execute_creature_mesh_budgeted, RecordLimit, RecordedMesh};
+use crate::runtime::types::MeshOutput;
+use crate::sensors::perception::SensorSnapshot;
 use crate::sensors::reads::WorldKeySet;
 use crate::sensors::static_inputs::BodyView;
 
@@ -37,7 +48,9 @@ pub struct PendingBirth {
 /// Full runtime state of a creature in the simulation.
 pub struct CreatureState {
     pub id: CreatureId,
-    pub genome: CreatureGenome,
+    /// Immutable after construction: set with its derived state and runtime
+    /// by [`Self::new`] and read through [`Self::genome`].
+    genome: CreatureGenome,
     pub position: Position,
     pub energy: f32,
     /// Observation only: first exhausting sink since the last positive recovery.
@@ -49,27 +62,14 @@ pub struct CreatureState {
     pub shared_memory: [f32; SHARED_MEMORY_SLOTS],
     /// Snapshot of shared_memory from the previous tick (set at tick start).
     pub prev_shared_memory: [f32; SHARED_MEMORY_SLOTS],
-    /// Per-node runtime state for Graph backends (stateful operators + plasticity weights).
-    pub graph_runtime: GraphRuntimeState,
+    /// Per-node runtime state for Graph backends (stateful operators +
+    /// plasticity weights), built from the genome; read through
+    /// [`Self::graph_runtime`] and run through the brain operations.
+    graph_runtime: GraphRuntimeState,
     /// The heritable body: colour phenotype and kin identity (T26.F01).
     pub body: HeritableBody,
-    /// Functional complexity cached at birth. Genome is immutable after creation,
-    /// so this value is always current.
-    pub cached_complexity: u32,
-    /// Total genome size cached at birth, junk included. Genome is immutable
-    /// after creation, so this value is always current. Phase 0 charges the
-    /// per-unit carrying cost against it without walking the genome.
-    pub cached_genome_size: u32,
-    /// Sorted indices of mesh nodes reachable from the entry node, cached at birth.
-    /// Used by the mutation engine to bias target selection toward functional structure.
-    pub cached_reachable_nodes: Box<[usize]>,
-    /// Whether any reachable node has a live barrier read path.
-    pub cached_has_barrier_reader: bool,
-    /// Exact world-input keys read by live VM `ReadInput` instructions on reachable nodes.
-    pub cached_live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
-    /// Cached at birth from genome analysis; read through
-    /// [`CreatureState::perception_requirements`].
-    cached_perception_requirements: PerceptionRequirements,
+    /// What the record derives from `genome` at birth.
+    derived: GenomeDerived,
     /// Mutation operators applied when this creature was born.
     pub birth_mutation_operators: Box<[MutationOperator]>,
     /// The class of the vote sink its birth's sole `AddGraphEdge` or
@@ -109,11 +109,6 @@ pub struct CreatureState {
     /// The world keys this creature's most recent mesh run resolved
     /// (observation only, for the sensor census telemetry); empty at birth.
     pub last_mesh_world_reads: WorldKeySet,
-    /// World keys a reachable node's `input_refs` holds, cached at birth.
-    pub cached_declared_world_inputs: WorldKeySet,
-    /// World keys the sensor census wires (live read, wired edge or ring
-    /// projection), cached at birth.
-    pub cached_wired_world_inputs: WorldKeySet,
     /// The direction of this creature's last committed `Move` (T11.F30); at
     /// birth the direction from its parent to its cell, at seeding a drawn
     /// direction, `N` at every other construction. The pass end breaks a tie
@@ -163,13 +158,6 @@ impl CreatureState {
         self.body.capacity
     }
 
-    /// The snapshots the brain needs assembled each turn, derived from the
-    /// genome at birth.
-    #[must_use]
-    pub fn perception_requirements(&self) -> PerceptionRequirements {
-        self.cached_perception_requirements
-    }
-
     /// The effort one move charges this creature, successful or blocked
     /// (T26.F02 body rule): the move base scaled by the body's
     /// [`HeritableBody::move_factor`], through [`EnergyConfig::action_effort`]
@@ -177,11 +165,7 @@ impl CreatureState {
     #[must_use]
     pub fn move_effort(&self, energy: &EnergyConfig) -> f32 {
         let factor = self.body.move_factor(&energy.capacity);
-        energy.action_effort(
-            energy.costs.move_cost * factor,
-            self.cached_complexity,
-            self.age,
-        )
+        energy.action_effort(energy.costs.move_cost * factor, self.complexity(), self.age)
     }
 
     /// Observe the already-applied arithmetic without changing the stored energy.
@@ -196,45 +180,13 @@ impl CreatureState {
         applied_debit(before, self.energy)
     }
 
-    /// Create a new creature with zeroed prev_shared_memory and graph runtime
-    /// state whose learned state the constructor builds from the genome and
-    /// the birth seeds it takes out of `genome` (`creature::newborn`; none
-    /// for a seedless genome).
-    /// Computes `cached_complexity`, `cached_genome_size` and the reachable
-    /// nodes from the genome (none of them reads a birth seed) and delegates
-    /// to [`Self::new_with_cached_fields`].
+    /// The only constructor: a creature with zeroed `prev_shared_memory`
+    /// whose derived state and brain runtime are built from `genome`. It
+    /// takes the birth seeds out of `genome` (`creature::newborn`; none for a
+    /// seedless genome), derives every analysis from the seedless genome it
+    /// stores (no analysis reads a seed) and builds the learned state from
+    /// the genome and the seeds.
     pub fn new(
-        id: CreatureId,
-        genome: CreatureGenome,
-        position: Position,
-        energy: f32,
-        generation: u64,
-        body: HeritableBody,
-        shared_memory: [f32; SHARED_MEMORY_SLOTS],
-    ) -> Self {
-        let cached_complexity = genome.complexity();
-        let cached_genome_size = genome.genome_size();
-        let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
-        Self::new_with_cached_fields(
-            id,
-            genome,
-            position,
-            energy,
-            generation,
-            body,
-            shared_memory,
-            cached_complexity,
-            cached_genome_size,
-            cached_reachable_nodes,
-        )
-    }
-
-    /// Create a new creature with pre-computed cached fields.
-    /// Used in the no-mutation reproduction fast path where the offspring
-    /// genome is identical to the parent's. Builds the learned state from
-    /// the birth seeds it takes out of `genome`, as [`Self::new`] does.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_cached_fields(
         id: CreatureId,
         mut genome: CreatureGenome,
         position: Position,
@@ -242,23 +194,10 @@ impl CreatureState {
         generation: u64,
         body: HeritableBody,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
-        cached_complexity: u32,
-        cached_genome_size: u32,
-        cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
         let seeds = take_birth_seeds(&mut genome);
+        let derived = GenomeDerived::of(&genome);
         let graph_runtime = GraphRuntimeState::for_genome(&genome, seeds);
-        let reachable = cached_reachable_nodes.as_ref();
-        let cached_has_barrier_reader = has_barrier_reader(&genome, reachable);
-        let cached_live_vm_world_inputs = live_vm_world_reads(&genome, reachable);
-        let cached_perception_requirements = perception_requirements(&genome);
-        let cached_declared_world_inputs: WorldKeySet = declared_world_keys(&genome, reachable)
-            .into_iter()
-            .collect();
-        let cached_wired_world_inputs: WorldKeySet = sensor_census(&genome, reachable)
-            .world_inputs
-            .into_iter()
-            .collect();
         Self {
             id,
             genome,
@@ -271,15 +210,8 @@ impl CreatureState {
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
             graph_runtime,
             body,
-            cached_complexity,
-            cached_genome_size,
-            cached_reachable_nodes,
-            cached_has_barrier_reader,
-            cached_live_vm_world_inputs,
-            cached_perception_requirements,
+            derived,
             last_mesh_world_reads: WorldKeySet::default(),
-            cached_declared_world_inputs,
-            cached_wired_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             birth_edge_class: None,
             offspring_spawned_count: 0,
@@ -297,6 +229,191 @@ impl CreatureState {
             heading: Direction::N,
         }
     }
+
+    // ── The genome and what is derived from it ──────────────────────────────
+
+    /// The genome this creature was built from; it never changes.
+    #[must_use]
+    pub fn genome(&self) -> &CreatureGenome {
+        &self.genome
+    }
+
+    /// Functional complexity of the genome.
+    #[must_use]
+    pub fn complexity(&self) -> u32 {
+        self.derived.complexity
+    }
+
+    /// Total genome size, junk included. Phase 0 charges the per-unit
+    /// carrying cost against it without walking the genome.
+    #[must_use]
+    pub fn genome_size(&self) -> u32 {
+        self.derived.genome_size
+    }
+
+    /// Sorted indices of mesh nodes reachable from the entry node. The
+    /// mutation engine biases target selection toward them.
+    #[must_use]
+    pub fn reachable_nodes(&self) -> &[usize] {
+        &self.derived.reachable_nodes
+    }
+
+    /// Whether any reachable node has a live barrier read path.
+    #[must_use]
+    pub fn has_barrier_reader(&self) -> bool {
+        self.derived.has_barrier_reader
+    }
+
+    /// Exact world-input keys read by live VM `ReadInput` instructions on
+    /// reachable nodes, with their read counts.
+    #[must_use]
+    pub fn live_vm_world_inputs(&self) -> &[(WorldInputKey, u16)] {
+        &self.derived.live_vm_world_inputs
+    }
+
+    /// The snapshots the brain needs assembled each turn.
+    #[must_use]
+    pub fn perception_requirements(&self) -> PerceptionRequirements {
+        self.derived.perception_requirements
+    }
+
+    /// World keys a reachable node's `input_refs` holds.
+    #[must_use]
+    pub fn declared_world_inputs(&self) -> &WorldKeySet {
+        &self.derived.declared_world_inputs
+    }
+
+    /// World keys the sensor census wires (live read, wired edge or ring
+    /// projection).
+    #[must_use]
+    pub fn wired_world_inputs(&self) -> &WorldKeySet {
+        &self.derived.wired_world_inputs
+    }
+
+    // ── The brain ───────────────────────────────────────────────────────────
+
+    /// The brain's runtime state, built for [`Self::genome`].
+    #[must_use]
+    pub fn graph_runtime(&self) -> &GraphRuntimeState {
+        &self.graph_runtime
+    }
+
+    /// Per-tick and post-birth runtime state for an in-crate test to arrange
+    /// on a constructed creature, whose genome cannot change under it.
+    #[cfg(test)]
+    pub(crate) fn runtime_mut(&mut self) -> &mut GraphRuntimeState {
+        &mut self.graph_runtime
+    }
+
+    /// Prepare the brain for a new world tick
+    /// ([`GraphRuntimeState::begin_tick`] at this creature's age).
+    pub(crate) fn begin_tick(&mut self) {
+        self.graph_runtime.begin_tick(self.age);
+    }
+
+    /// Run the brain once on `sensors` from this creature's heading
+    /// ([`execute_creature_mesh`]), spending its energy and writing its
+    /// shared memory and runtime; the output is the runtime's, unchanged.
+    pub fn think(&mut self, sensors: &SensorSnapshot, config: &RuntimeConfig) -> MeshOutput {
+        execute_creature_mesh(
+            &self.genome,
+            sensors,
+            &mut self.energy,
+            &mut self.shared_memory,
+            &self.prev_shared_memory,
+            &mut self.graph_runtime,
+            config,
+            self.heading,
+        )
+    }
+
+    /// [`Self::think`] with trace recording ([`execute_creature_mesh_traced`]).
+    #[cfg(not(feature = "telemetry-seams"))]
+    pub(crate) fn think_traced(
+        &mut self,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+    ) -> (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>) {
+        execute_creature_mesh_traced(
+            &self.genome,
+            sensors,
+            &mut self.energy,
+            &mut self.shared_memory,
+            &self.prev_shared_memory,
+            &mut self.graph_runtime,
+            config,
+            self.heading,
+        )
+    }
+
+    /// [`Self::think_traced`] under a record budget
+    /// (`execute_creature_mesh_budgeted`).
+    #[cfg(feature = "telemetry-seams")]
+    pub(crate) fn think_budgeted(
+        &mut self,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        limit: Option<RecordLimit>,
+    ) -> RecordedMesh {
+        execute_creature_mesh_budgeted(
+            &self.genome,
+            sensors,
+            &mut self.energy,
+            &mut self.shared_memory,
+            &self.prev_shared_memory,
+            &mut self.graph_runtime,
+            config,
+            self.heading,
+            limit,
+        )
+    }
+
+    /// Drive the three-factor update of every initialized reward-modulated
+    /// edge from `signals`: the learned state's update and change counts.
+    pub(crate) fn apply_reward(&mut self, signals: &OutcomeSignalBank) -> LearningCounts {
+        self.graph_runtime.learned.apply_reward(signals)
+    }
+}
+
+/// The eight analyses a creature derives from its genome at birth, computed
+/// together by [`GenomeDerived::of`] so they always describe one genome.
+struct GenomeDerived {
+    complexity: u32,
+    genome_size: u32,
+    reachable_nodes: Box<[usize]>,
+    has_barrier_reader: bool,
+    live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
+    perception_requirements: PerceptionRequirements,
+    declared_world_inputs: WorldKeySet,
+    wired_world_inputs: WorldKeySet,
+}
+
+impl GenomeDerived {
+    /// Every analysis of `genome`; the reachable set feeds the sensor ones.
+    fn of(genome: &CreatureGenome) -> Self {
+        let complexity = genome.complexity();
+        let genome_size = genome.genome_size();
+        let reachable_nodes = mesh_reachable_nodes(genome).into_boxed_slice();
+        let reachable = reachable_nodes.as_ref();
+        let has_barrier_reader = has_barrier_reader(genome, reachable);
+        let live_vm_world_inputs = live_vm_world_reads(genome, reachable);
+        let perception_requirements = perception_requirements(genome);
+        let declared_world_inputs = declared_world_keys(genome, reachable).into_iter().collect();
+        let wired_world_inputs = sensor_census(genome, reachable)
+            .world_inputs
+            .into_iter()
+            .collect();
+        Self {
+            complexity,
+            genome_size,
+            reachable_nodes,
+            has_barrier_reader,
+            live_vm_world_inputs,
+            perception_requirements,
+            declared_world_inputs,
+            wired_world_inputs,
+        }
+    }
 }
 
 // Compile-time size assertion: shared_memory is 2x16x4=128 bytes vs old 1024-byte memory.
@@ -310,6 +427,7 @@ mod tests {
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::phenotype::Phenotype;
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+    use proptest::prelude::*;
     use slotmap::SlotMap;
 
     /// A body with `channels`, the founder's active channel and polarity, and
@@ -359,9 +477,9 @@ mod tests {
         assert_eq!(state.age, 0);
         assert_eq!(state.shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
-        assert!(state.graph_runtime.node_state.is_empty());
-        assert!(state.graph_runtime.node_outputs.is_empty());
-        assert!(!state.graph_runtime.learned().has_learning());
+        assert!(state.graph_runtime().node_state.is_empty());
+        assert!(state.graph_runtime().node_outputs.is_empty());
+        assert!(!state.graph_runtime().learned().has_learning());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.body.phenotype.channels, [128, 64, 32, 10, 20, 30]);
@@ -404,9 +522,9 @@ mod tests {
             body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
-        assert!(state.graph_runtime.dispatch_record.is_empty());
+        assert!(state.graph_runtime().dispatch_record.is_empty());
         assert!(state
-            .graph_runtime
+            .graph_runtime()
             .dispatch_record
             .executed_indices(0, 100)
             .is_empty());
@@ -426,7 +544,7 @@ mod tests {
             body([0; 6]),
             [0.0; SHARED_MEMORY_SLOTS],
         );
-        assert_eq!(&*state.cached_reachable_nodes, &[0]);
+        assert_eq!(state.reachable_nodes(), &[0]);
     }
 
     #[test]
@@ -469,33 +587,98 @@ mod tests {
             [0.0; SHARED_MEMORY_SLOTS],
         );
         // Only node 0 should be reachable
-        assert_eq!(&*state.cached_reachable_nodes, &[0]);
+        assert_eq!(state.reachable_nodes(), &[0]);
     }
 
-    #[test]
-    fn new_with_cached_fields_preserves_provided_reachable() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let reachable: Box<[usize]> = vec![0, 2, 5].into_boxed_slice();
-        let state = CreatureState::new_with_cached_fields(
-            id,
-            minimal_genome(),
-            Position::new(0, 0),
-            20.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-            42,
-            7,
-            reachable.clone(),
-        );
-        assert_eq!(&*state.cached_reachable_nodes, &[0, 2, 5]);
-        assert_eq!(state.cached_complexity, 42);
-        assert_eq!(state.cached_genome_size, 7);
-        assert_eq!(state.lifetime_actions_attempted_by_type, [0; 6]);
-        assert!(state.lifetime_eats_applied_by_type.is_empty());
-        assert_eq!(state.lifetime_predation_kills_count, 0);
-        assert_eq!(state.lifetime_predation_hits_taken_count, 0);
+    /// A founder of a drawn profile after `rounds` births' worth of mutation
+    /// at a raised rate, carrying its parent's birth seeds when the drawn
+    /// parent learned: VM beside Graph nodes, unreachable nodes and emptied
+    /// sinks all occur.
+    fn mutated_genome() -> impl Strategy<Value = CreatureGenome> {
+        use crate::config::{FounderProfile, MutationConfig};
+        use crate::creature::founder::founder_genome;
+        use crate::mutation::reachability::ParentExecuted;
+        use crate::mutation::MutationEngine;
+        use rand::rngs::SmallRng;
+        use rand::SeedableRng;
+
+        let profiles = [
+            FounderProfile::V3Alpha1,
+            FounderProfile::ForageFirstSparse,
+            FounderProfile::ForageFirstSparseBalanced,
+        ];
+        (0..profiles.len(), any::<u64>(), 0usize..6).prop_map(move |(profile, seed, rounds)| {
+            let config = MutationConfig {
+                per_unit_rate: 0.05,
+                ..MutationConfig::default()
+            };
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut genome = founder_genome(profiles[profile]);
+            for _ in 0..rounds {
+                let reachable = mesh_reachable_nodes(&genome);
+                MutationEngine::apply_mutations_with_food_type_count(
+                    &mut genome,
+                    &config,
+                    &reachable,
+                    ParentExecuted::Indices(&reachable),
+                    &mut rng,
+                    1,
+                );
+            }
+            genome
+        })
+    }
+
+    proptest! {
+        /// Every accessor of a constructed record is the analysis of the
+        /// genome it stores, which carries no seeds, and its runtime is the
+        /// one built for that genome; replaces the removed constructor that
+        /// took the analyses as arguments.
+        #[test]
+        fn every_derived_accessor_is_the_analysis_of_the_stored_genome(
+            genome in mutated_genome(),
+        ) {
+            let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+            let state = CreatureState::new(
+                sm.insert(()),
+                genome,
+                Position::new(0, 0),
+                20.0,
+                0,
+                body([0; 6]),
+                [0.0; SHARED_MEMORY_SLOTS],
+            );
+            let genome = state.genome();
+            let reachable = mesh_reachable_nodes(genome);
+            prop_assert!(take_birth_seeds(&mut genome.clone()).is_empty());
+            prop_assert_eq!(state.complexity(), genome.complexity());
+            prop_assert_eq!(state.genome_size(), genome.genome_size());
+            prop_assert_eq!(state.reachable_nodes(), reachable.as_slice());
+            prop_assert_eq!(
+                state.has_barrier_reader(),
+                has_barrier_reader(genome, &reachable)
+            );
+            prop_assert_eq!(
+                state.live_vm_world_inputs(),
+                &*live_vm_world_reads(genome, &reachable)
+            );
+            prop_assert_eq!(
+                state.perception_requirements(),
+                perception_requirements(genome)
+            );
+            let declared: WorldKeySet =
+                declared_world_keys(genome, &reachable).into_iter().collect();
+            prop_assert_eq!(state.declared_world_inputs(), &declared);
+            let wired: WorldKeySet = sensor_census(genome, &reachable)
+                .world_inputs
+                .into_iter()
+                .collect();
+            prop_assert_eq!(state.wired_world_inputs(), &wired);
+            prop_assert_eq!(state.lifetime_actions_attempted_by_type, [0; 6]);
+            prop_assert!(state.lifetime_eats_applied_by_type.is_empty());
+            prop_assert_eq!(state.lifetime_predation_kills_count, 0);
+            prop_assert_eq!(state.lifetime_predation_hits_taken_count, 0);
+        }
     }
 
     #[test]
@@ -549,8 +732,8 @@ mod tests {
                 body([0; 6]),
                 [0.0; SHARED_MEMORY_SLOTS],
             );
-            assert_eq!(state.cached_genome_size, expected);
-            assert_eq!(state.cached_genome_size, state.genome.genome_size());
+            assert_eq!(state.genome_size(), expected);
+            assert_eq!(state.genome_size(), state.genome().genome_size());
         }
     }
 
@@ -740,7 +923,7 @@ mod tests {
         );
 
         let counts: std::collections::HashMap<_, _> =
-            state.cached_live_vm_world_inputs.iter().cloned().collect();
+            state.live_vm_world_inputs().iter().cloned().collect();
         assert_eq!(
             counts.get(&WorldInputKey::AreaFoodSummary {
                 type_idx: crate::config::OrdinaryFoodTypeId::default()

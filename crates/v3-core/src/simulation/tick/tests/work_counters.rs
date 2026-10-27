@@ -273,12 +273,12 @@ fn production_learning_splits_accumulate_and_observations_leave_them_unchanged()
                 ]
             );
             let before = cognition_totals(&sim.stats);
-            let weights = sim.creatures[id].graph_runtime.learned().clone();
+            let weights = sim.creatures[id].graph_runtime().learned().clone();
             let memory = sim.creatures[id].shared_memory;
             crate::simulation::observe_final_actions(&sim);
             crate::simulation::observe_temporal_actions(&sim);
             assert_eq!(cognition_totals(&sim.stats), before);
-            assert_eq!(sim.creatures[id].graph_runtime.learned(), &weights);
+            assert_eq!(sim.creatures[id].graph_runtime().learned(), &weights);
             assert_eq!(sim.creatures[id].shared_memory, memory);
         }
     }

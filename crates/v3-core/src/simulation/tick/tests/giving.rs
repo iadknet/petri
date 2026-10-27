@@ -40,7 +40,7 @@ fn exchange_effort(sim: &Simulation, id: CreatureId, intensity: f32) -> f32 {
     let base = sim.config.exchange.effort_rate * intensity * creature.energy;
     sim.config
         .energy
-        .action_effort(base, creature.cached_complexity, creature.age)
+        .action_effort(base, creature.complexity(), creature.age)
 }
 
 #[test]
@@ -302,9 +302,12 @@ fn exchange_genome(kind: DirectedVoteKind, dir: Direction) -> CreatureGenome {
 fn a_tick_counts_its_gives_and_steals_among_the_applied_actions() {
     // The giver sits south of the attacker: it gives north, the attacker
     // steals back south.
-    let (mut sim, giver, attacker) = make_sim_two_creatures(50.0, 50.0);
-    sim.creatures[giver].genome = exchange_genome(DirectedVoteKind::GiveEnergy, Direction::N);
-    sim.creatures[attacker].genome = exchange_genome(DirectedVoteKind::StealEnergy, Direction::S);
+    let (mut sim, _, _) = make_sim_two_with_genomes(
+        50.0,
+        50.0,
+        exchange_genome(DirectedVoteKind::GiveEnergy, Direction::N),
+        exchange_genome(DirectedVoteKind::StealEnergy, Direction::S),
+    );
 
     run_tick(&mut sim, &mut None);
 

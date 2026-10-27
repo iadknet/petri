@@ -736,7 +736,7 @@ impl Active {
         run.samples.next_index += 1;
         run.samples.last_admitted = Some(started_at);
         let creature_id = id.data().as_ffi();
-        let (body, hash) = genome_body(&creature.genome);
+        let (body, hash) = genome_body(creature.genome());
         let body_len = body.len() as u64;
         let dropped = traced && body_len > self.shared.max_body_bytes();
         if traced {
@@ -747,7 +747,7 @@ impl Active {
                 ("petri.genome_hash", LogValue::from(hash.clone())),
                 (
                     "petri.genome_size",
-                    LogValue::Int(i64::from(creature.cached_genome_size)),
+                    LogValue::Int(i64::from(creature.genome_size())),
                 ),
             ];
             self.emit(run, "creature.genome", sim.tick, extra, Some(body));
@@ -755,7 +755,7 @@ impl Active {
         let start = Start {
             lineage: creature.body.identity.lineage_id,
             generation: creature.generation,
-            genome_size: creature.cached_genome_size,
+            genome_size: creature.genome_size(),
             genome_hash: hash.clone(),
             age: creature.age,
         };
@@ -764,7 +764,7 @@ impl Active {
         root.int("petri.kin_tag", creature.body.identity.kin_tag);
         root.int("petri.generation", creature.generation);
         root.int("petri.age_start", creature.age);
-        root.int("petri.genome_size", creature.cached_genome_size);
+        root.int("petri.genome_size", creature.genome_size());
         root.text("petri.genome_hash", hash);
         if dropped {
             root.flag("petri.genome_dropped", true);
