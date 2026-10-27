@@ -80,13 +80,14 @@ impl PredationActionResult {
 /// `NothingToTake` and kills nothing. If the victim's energy drops to zero
 /// or below (at `i = 1`, or by rounding), the attacker receives a
 /// complexity bonus and the outcome is `TransferredAndKilled`: the commit
-/// step removes the victim.
+/// step removes the victim. Returns the result with the victim, `None` when
+/// the target cell held none.
 pub(crate) fn apply_steal_energy(
     inputs: &mut ActionInputs<'_>,
     attacker_id: CreatureId,
     dir: Direction,
     effort: f32,
-) -> ActionResult {
+) -> (ActionResult, Option<CreatureId>) {
     use crate::ledger::DeathCause;
 
     // Deduct the effort, known from the attacker alone.
@@ -103,14 +104,17 @@ pub(crate) fn apply_steal_energy(
     // Resolve the target cell and its victim, guarding against
     // self-predation in degenerate worlds.
     let Some(victim_id) = super::neighbour_creature(inputs, attacker_id, dir) else {
-        return ActionResult::new(ActionOutcome::NoVictim, effort);
+        return (ActionResult::new(ActionOutcome::NoVictim, effort), None);
     };
 
     // The share of the victim's store the intensity takes; a steal transfers
     // only when the victim's stored energy falls.
     let before = inputs.creatures[victim_id].energy;
     let Some(actual) = super::exchange_amount(intensity, before) else {
-        return ActionResult::new(ActionOutcome::NothingToTake, effort);
+        return (
+            ActionResult::new(ActionOutcome::NothingToTake, effort),
+            Some(victim_id),
+        );
     };
 
     // Transfer energy.
@@ -137,9 +141,13 @@ pub(crate) fn apply_steal_energy(
             attacker.observe_energy(before, DeathCause::Predation);
         inputs.flows.maximum_energy_clamp_loss +=
             super::cap_energy(&mut inputs.creatures[attacker_id]);
-        return ActionResult::new(ActionOutcome::TransferredAndKilled, effort).with_amount(actual);
+        let result = ActionResult::new(ActionOutcome::TransferredAndKilled, effort);
+        return (result.with_amount(actual), Some(victim_id));
     }
-    ActionResult::new(ActionOutcome::Success, effort).with_amount(actual)
+    (
+        ActionResult::new(ActionOutcome::Success, effort).with_amount(actual),
+        Some(victim_id),
+    )
 }
 
 #[cfg(test)]

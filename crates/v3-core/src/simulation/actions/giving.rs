@@ -62,13 +62,14 @@ impl GiveActionResult {
 /// (`gift_debit`, `gift_credit`); the recipient is capped, the excess booked
 /// as clamp loss, and a recipient at its cap still receives the gift. A
 /// giver left at or below zero is removed by the commit step, with pending
-/// cause `Gift`.
+/// cause `Gift`. Returns the result with the recipient, `None` when the
+/// target cell held none.
 pub(crate) fn apply_give_energy(
     inputs: &mut ActionInputs<'_>,
     giver_id: CreatureId,
     dir: Direction,
     effort: f32,
-) -> ActionResult {
+) -> (ActionResult, Option<CreatureId>) {
     let giver = &mut inputs.creatures[giver_id];
     let intensity = super::exchange_intensity(giver.body.give_share, effort);
     let effort = super::pay_exchange_effort(
@@ -80,13 +81,16 @@ pub(crate) fn apply_give_energy(
     inputs.flows.action_charges[ActionType::GiveEnergy] += effort;
 
     let Some(recipient_id) = super::neighbour_creature(inputs, giver_id, dir) else {
-        return ActionResult::new(ActionOutcome::NoRecipient, effort);
+        return (ActionResult::new(ActionOutcome::NoRecipient, effort), None);
     };
 
     // A gift moves only when the giver's stored energy falls.
     let before = inputs.creatures[giver_id].energy;
     let Some(amount) = super::exchange_amount(intensity, before) else {
-        return ActionResult::new(ActionOutcome::NothingToGive, effort);
+        return (
+            ActionResult::new(ActionOutcome::NothingToGive, effort),
+            Some(recipient_id),
+        );
     };
 
     let giver = &mut inputs.creatures[giver_id];
@@ -98,5 +102,8 @@ pub(crate) fn apply_give_energy(
     inputs.flows.gift_credit -= recipient.observe_energy(recipient_before, DeathCause::Gift);
     inputs.flows.maximum_energy_clamp_loss +=
         super::cap_energy(&mut inputs.creatures[recipient_id]);
-    ActionResult::new(ActionOutcome::Success, effort).with_amount(amount)
+    (
+        ActionResult::new(ActionOutcome::Success, effort).with_amount(amount),
+        Some(recipient_id),
+    )
 }

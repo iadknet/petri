@@ -8,8 +8,7 @@
 use slotmap::SlotMap;
 
 use super::{
-    apply_give_energy, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
-    apply_typed_eat, neighbour_creature,
+    apply_give_energy, apply_move, apply_noop, apply_reproduce, apply_steal_energy, apply_typed_eat,
 };
 use crate::config::SimulationConfig;
 use crate::contracts::{ActionResult, ActionType, CreatureId, Position, WorldAction};
@@ -90,13 +89,13 @@ pub(crate) fn resolve(
             result
         }
         WorldAction::StealEnergy { direction, effort } => {
-            let result = apply_steal_energy(inputs, id, direction, effort);
-            counterpart = neighbour_creature(inputs, id, direction);
+            let (result, victim) = apply_steal_energy(inputs, id, direction, effort);
+            counterpart = victim;
             result
         }
         WorldAction::GiveEnergy { direction, effort } => {
-            let result = apply_give_energy(inputs, id, direction, effort);
-            counterpart = neighbour_creature(inputs, id, direction);
+            let (result, recipient) = apply_give_energy(inputs, id, direction, effort);
+            counterpart = recipient;
             result
         }
     };

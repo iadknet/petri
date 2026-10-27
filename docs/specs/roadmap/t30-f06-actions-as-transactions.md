@@ -224,7 +224,9 @@ Pass 2 (the one applied result and the records derived from it):
 - [x] Focused tests: v3-core `--all-features` lib 2348 and every
       integration test passed (`applied_trajectory` sampled digests
       re-pinned for log text only); v3-server 174, v3-telemetry 80,
-      v3-lab 212; `npm test` 673, `tsc -b`, lint, `make rust-clippy` clean.
+      v3-lab 212; `npm test` 673, `tsc -b`, lint, `make rust-clippy`,
+      `cargo fmt --all --check` and `cargo check --workspace --all-targets`
+      clean on the simplified diff.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0.
 - [ ] Gate after pass 1 (readings only) and after pass 2 (summary at
