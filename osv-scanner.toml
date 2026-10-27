@@ -1,0 +1,8 @@
+# Reviewed OSV exceptions. SECURITY.md: every exception requires explicit review.
+
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+reason = """block-buffer 0.10.4 has no fixed release. It is reached only through \
+sha1 0.10 from axum 0.7 (ws) and tungstenite 0.24 in v3-server; the latest axum \
+(0.8.9) still requires sha1 0.10, so no upgrade removes it. Reviewed and accepted \
+by the user on 2026-10-26; revisit when axum moves to sha1 0.11."""
