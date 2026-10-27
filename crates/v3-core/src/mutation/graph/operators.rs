@@ -244,8 +244,9 @@ pub(crate) fn random_graph_source(
         GraphSource::ComputeNode(rng.gen_range(0..compute_count))
     } else if roll < 0.8 && !inputs.refs.is_empty() {
         // `0..=last` is `0..len`'s exact draw, and reaches index 65,535 when
-        // 65,536 declarations fill the `u16` space.
-        let last = u16::try_from(inputs.refs.len() - 1).expect("declarations within u16");
+        // 65,536 declarations fill the `u16` space; declarations past it are
+        // not addressable (as in `bundle_sources`).
+        let last = u16::try_from(inputs.refs.len() - 1).unwrap_or(u16::MAX);
         let ref_idx = rng.gen_range(0..=last);
         let width = inputs.width(ref_idx);
         GraphSource::InputLeaf {
