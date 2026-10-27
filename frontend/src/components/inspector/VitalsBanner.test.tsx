@@ -12,7 +12,7 @@ function makeEntry(overrides: Partial<ActionLogEntry> = {}): ActionLogEntry {
 	return {
 		tick: 1,
 		action_type: "Move",
-		result: "Success",
+		outcome: "Success",
 		direction: 2,
 		energy_before: 100,
 		energy_after: 95,

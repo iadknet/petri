@@ -7,8 +7,9 @@ use super::super::run_tick;
 use super::super::window_seam::{take_decided, take_logged, Decided};
 use super::support::*;
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
+use crate::contracts::ActionOutcome;
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
-use crate::creature::action_log::{ActionLog, ActionResult, ActionType};
+use crate::creature::action_log::{ActionLog, ActionType};
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::{v3alpha1_founder_genome, vm_decision_founder_genome};
 use crate::creature::phenotype::Phenotype;
@@ -550,11 +551,11 @@ fn charge_and_reward_match_the_energy_flow_deltas() {
     let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
     let eat = &outcome.applied[0];
     assert_eq!(eat.entry.action_type, ActionType::Eat);
-    assert_eq!(eat.entry.result, ActionResult::Success);
+    assert_eq!(eat.entry.outcome, ActionOutcome::Success);
     assert!(eat.reward > 0.0);
     assert!(eat.charge > 0.0);
     let moved = &outcome.applied[1];
-    assert_eq!(moved.entry.result, ActionResult::Blocked);
+    assert_eq!(moved.entry.outcome, ActionOutcome::Blocked);
     assert!(moved.charge > 0.0);
     assert_eq!(moved.reward, 0.0);
     // The deltas account for every energy change the two actions logged.
@@ -624,7 +625,7 @@ fn a_give_charges_its_effort_and_credits_no_reward_to_the_giver() {
     let outcome = trace.unwrap().ticks.remove(0).outcome.unwrap();
     let give = &outcome.applied[0];
     assert_eq!(give.entry.action_type, ActionType::GiveEnergy);
-    assert_eq!(give.entry.result, ActionResult::Success);
+    assert_eq!(give.entry.outcome, ActionOutcome::Success);
     assert!(give.charge > 0.0);
     let ledger = sim.stats.energy_flows.action_charges;
     assert!((give.charge - ledger[ActionType::GiveEnergy]).abs() < 1e-9);

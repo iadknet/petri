@@ -5,11 +5,12 @@ use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSo
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::mutation::MutationOperator;
-use crate::simulation::actions::{reproduce_now, steal_now, ReproductionActionResult};
+use crate::simulation::actions::ReproductionActionResult;
 use crate::simulation::reproductive_success::{
     CognitiveClass, ReproductiveSuccessByCognitiveClass, ReproductiveSuccessTotals,
 };
 use crate::simulation::tick::run_phase_0;
+use crate::simulation::tick::{reproduce_now, steal_now};
 use rand::{rngs::SmallRng, SeedableRng};
 
 fn genome_for(class: CognitiveClass) -> CreatureGenome {

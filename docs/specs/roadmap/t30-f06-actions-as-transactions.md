@@ -191,12 +191,9 @@ Pass 1 (executors with narrow inputs and the cost composition):
 
 - [x] `simulation::actions::move_effort`; `CreatureState::move_effort`
       deleted; `apply_move` and the lab on it (R3; invariant 3).
-- [x] `simulation/actions/transaction.rs` with `ActionInputs` (holding
-      `stats: &mut SimStats` in this pass only, for the records the moved
-      executors still write), `resolve` and `Applied` with the settle step
-      (the floor, the netting, the removal report), `Applied.result` being
-      in this pass a private struct of today's log fields that pass 2
-      replaces; the six executors and the three exchange and reproduce
+- [x] `simulation/actions/transaction.rs` with `ActionInputs`, `resolve`
+      and `Applied` with the settle step (the floor, the netting, the
+      removal report); the six executors and the three exchange and reproduce
       functions on the inputs, the victim removal and the span-0 spawn
       returned to the caller (R1, R2, R6; invariants 2, 6, 7 with the
       `WORKAROUND(G4)` comments).
@@ -206,13 +203,13 @@ Pass 1 (executors with narrow inputs and the cost composition):
 
 Pass 2 (the one applied result and the records derived from it):
 
-- [ ] `contracts::actions::{ActionOutcome, ActionResult}`; the log enum and
+- [x] `contracts::actions::{ActionOutcome, ActionResult}`; the log enum and
       `TransferOutcome` deleted; every `apply_*` returns `ActionResult`; the
       key enums gain their outcome constructors (R4; invariants 1, 5).
-- [ ] `ActionInputs` loses `stats` for `flows`; the failed-effort booking
+- [x] `ActionInputs` loses `stats` for `flows`; the failed-effort booking
       at its one site; the commit step derives every record of invariant 5
       from the result (R4, R7; invariants 2, 5).
-- [ ] `ActionLogEntry.outcome`; the wire enum, entry and `From`; generated
+- [x] `ActionLogEntry.outcome`; the wire enum, entry and `From`; generated
       files rewritten with `PETRI_WRITE_TS_TYPES=1`; frontend readers (`VitalsBanner.tsx`, the fixtures and store tests)
       on `outcome`; diagnostics keys (R5; invariant 8).
 - [ ] At closure: G18, G19 and G22 rows deleted from `docs/architecture.md`;
@@ -221,13 +218,13 @@ Pass 2 (the one applied result and the records derived from it):
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` first -> 30 passed.
-- [x] `simulation/actions/transaction` tests: the settle order (failed
-      effort booked before the floor and the netting), the conception
-      handoff at span 0, an exhausted victim kept, no removal inside
-      `resolve` -> 5 passed.
-- [ ] Focused tests (`simulation/actions`, `simulation/tick/tests`,
-      v3-server `transport::action_log` and `wire_types`, frontend
-      `npm test`) -> results.
+- [x] `simulation/actions/transaction` tests (settle order, failed effort
+      booked once, span-0 handoff, exhausted victim kept, no removal in
+      `resolve`) -> 6 passed.
+- [x] Focused tests: v3-core `--all-features` lib 2348 and every
+      integration test passed (`applied_trajectory` sampled digests
+      re-pinned for log text only); v3-server 174, v3-telemetry 80,
+      v3-lab 212; `npm test` 673, `tsc -b`, lint, `make rust-clippy` clean.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0.
 - [ ] Gate after pass 1 (readings only) and after pass 2 (summary at

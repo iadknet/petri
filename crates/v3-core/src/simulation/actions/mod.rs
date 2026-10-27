@@ -14,59 +14,8 @@ pub(crate) use reproduction::{deliver_pending_birth, spawn_child, BirthDelivery}
 pub use reproduction::{ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use transaction::{resolve, ActionInputs, Applied, Conception};
 
-/// [`apply_reproduce`] on `sim` with a span-0 conception born at once, as
-/// the commit step delivers it.
-#[cfg(test)]
-pub(crate) fn reproduce_now(
-    parent: CreatureId,
-    sim: &mut crate::simulation::simulation::Simulation,
-    dir: Direction,
-    energy_transfer_fraction: f32,
-    rng: &mut impl rand::Rng,
-) -> ReproductionActionResult {
-    let (result, conception) = apply_reproduce(
-        &mut sim.action_inputs(),
-        parent,
-        dir,
-        energy_transfer_fraction,
-    );
-    if let Some(conception) = conception {
-        spawn_child(parent, sim, conception.target, dir, conception.litter, rng);
-    }
-    result
-}
-
-/// [`apply_steal_energy`] on `sim` with a killed victim removed, as the
-/// commit step settles it.
-#[cfg(test)]
-pub(crate) fn steal_now(
-    attacker: CreatureId,
-    sim: &mut crate::simulation::simulation::Simulation,
-    dir: Direction,
-    effort: f32,
-) -> TransferOutcome<PredationActionResult> {
-    let outcome = apply_steal_energy(&mut sim.action_inputs(), attacker, dir, effort);
-    if let (PredationActionResult::TransferredAndKilled, Some(victim)) =
-        (outcome.result, outcome.counterpart)
-    {
-        sim.remove_creature(victim);
-    }
-    outcome
-}
-
-/// [`apply_give_energy`] on `sim`.
-#[cfg(test)]
-pub(crate) fn give_now(
-    giver: CreatureId,
-    sim: &mut crate::simulation::simulation::Simulation,
-    dir: Direction,
-    effort: f32,
-) -> TransferOutcome<GiveActionResult> {
-    apply_give_energy(&mut sim.action_inputs(), giver, dir, effort)
-}
-
 use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
-use crate::contracts::{CreatureId, Direction};
+use crate::contracts::{ActionOutcome, ActionResult, CreatureId, Direction};
 use crate::creature::body::HeritableBody;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -85,16 +34,6 @@ pub(super) fn pay_effort(
 ) -> f64 {
     let effort = energy.action_effort(base, creature.complexity(), creature.age);
     charge_effort(creature, effort, cause)
-}
-
-/// What an exchange act moved: its result, the energy debited from the side
-/// that gives it up, and the counterpart creature, `None` when the target cell
-/// held none (T27.F03).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TransferOutcome<R> {
-    pub result: R,
-    pub amount: f32,
-    pub counterpart: Option<CreatureId>,
 }
 
 /// The intensity of an exchange attempt (T27.F03): `min(1, share ×
@@ -217,18 +156,21 @@ pub fn apply_noop(
     creature: &mut CreatureState,
     config: &SimulationConfig,
     flows: &mut EnergyFlows,
-) {
-    flows.action_charges[ActionType::NoOp] += pay_effort(
+) -> ActionResult {
+    let effort = pay_effort(
         creature,
         &config.energy,
         config.energy.costs.noop_cost,
         DeathCause::ActionNoop,
     );
+    flows.action_charges[ActionType::NoOp] += effort;
+    ActionResult::new(ActionOutcome::Success, effort)
 }
 
 /// Apply a typed Eat action using the configured food owner for the cell,
 /// leaving the share `leave` of the cell's food in place (T02.F08). Credits
-/// `eaten × reward` and returns the amount eaten; 0.0 is a failed eat.
+/// `eaten × reward`; `Success` with the amount eaten, or `NoFood` when
+/// nothing was eaten.
 #[must_use]
 pub fn apply_typed_eat(
     creature: &mut CreatureState,
@@ -237,7 +179,7 @@ pub fn apply_typed_eat(
     type_idx: OrdinaryFoodTypeId,
     leave: f32,
     flows: &mut EnergyFlows,
-) -> f32 {
+) -> ActionResult {
     flows
         .food_intake_by_type
         .resize(config.world.food.types.len(), 0.0);
@@ -269,10 +211,11 @@ pub fn apply_typed_eat(
         DeathCause::ActionEat,
     );
     flows.action_charges[ActionType::Eat] += effort;
-    if eaten <= 0.0 {
-        flows.failed_action_effort[ActionType::Eat] += effort;
+    if eaten > 0.0 {
+        ActionResult::new(ActionOutcome::Success, effort).with_amount(eaten)
+    } else {
+        ActionResult::new(ActionOutcome::NoFood, effort)
     }
-    eaten
 }
 
 /// The effort one move charges, successful or blocked (T26.F02): the move
@@ -291,8 +234,8 @@ pub fn move_effort(body: &HeritableBody, energy: &EnergyConfig, complexity: u32,
 /// Apply a Move action: move one step in `dir` if the target is valid.
 ///
 /// The effort is always deducted, and nothing more if the move is rejected
-/// (blocked cell).
-/// Returns `true` if the creature actually moved, `false` if the target was invalid.
+/// (blocked cell). `Success` if the creature moved, `Blocked` if the target
+/// was invalid.
 #[must_use]
 pub fn apply_move(
     id: CreatureId,
@@ -301,7 +244,7 @@ pub fn apply_move(
     dir: Direction,
     config: &SimulationConfig,
     flows: &mut EnergyFlows,
-) -> bool {
+) -> ActionResult {
     let target = world
         .resolve_neighbor(creature.position, dir)
         .filter(|&p| world.is_valid_target_cell(p));
@@ -323,10 +266,12 @@ pub fn apply_move(
     );
     let effort = charge_effort(creature, move_effort, DeathCause::ActionMove);
     flows.action_charges[ActionType::Move] += effort;
-    if !succeeded {
-        flows.failed_action_effort[ActionType::Move] += effort;
-    }
-    succeeded
+    let outcome = if succeeded {
+        ActionOutcome::Success
+    } else {
+        ActionOutcome::Blocked
+    };
+    ActionResult::new(outcome, effort)
 }
 
 #[cfg(test)]
@@ -347,6 +292,7 @@ mod tests {
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;
+    use crate::simulation::tick::{reproduce_now, steal_now};
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
@@ -504,7 +450,7 @@ mod tests {
             &mut sim.stats.energy_flows,
         );
 
-        assert!(succeeded > 0.0);
+        assert!(succeeded.amount > 0.0);
         // Effort-cost defaults, 2026-10-10: the eat pays the 0.4 effort floor after the credit.
         assert!((sim.creatures[id].energy - (before + 0.25 * 5.0 - 0.4)).abs() < 1e-5);
     }
@@ -1406,7 +1352,7 @@ mod tests {
             &sim.config,
             &mut sim.stats.energy_flows,
         );
-        assert!(result, "successful move should return true");
+        assert_eq!(result.outcome, ActionOutcome::Success);
     }
 
     #[test]
@@ -1423,7 +1369,7 @@ mod tests {
             &sim.config,
             &mut sim.stats.energy_flows,
         );
-        assert!(!result, "blocked move should return false");
+        assert_eq!(result.outcome, ActionOutcome::Blocked);
     }
 
     #[test]
@@ -1476,7 +1422,7 @@ mod tests {
             &sim.config,
             &mut sim.stats.energy_flows,
         );
-        assert!(!result, "move into occupied cell should return false");
+        assert_eq!(result.outcome, ActionOutcome::Blocked);
     }
 
     // ── typed Eat return value ──────────────────────────────────────────────
@@ -1495,7 +1441,11 @@ mod tests {
             0.0,
             &mut sim.stats.energy_flows,
         );
-        assert!(result > 0.0, "eating food should return the eaten amount");
+        assert_eq!(result.outcome, ActionOutcome::Success);
+        assert!(
+            result.amount > 0.0,
+            "eating food should return the eaten amount"
+        );
     }
 
     #[test]
@@ -1512,7 +1462,8 @@ mod tests {
             0.0,
             &mut sim.stats.energy_flows,
         );
-        assert_eq!(result, 0.0, "eating empty cell should eat nothing");
+        assert_eq!(result.outcome, ActionOutcome::NoFood);
+        assert_eq!(result.amount, 0.0, "eating empty cell should eat nothing");
     }
 
     #[test]
@@ -1533,7 +1484,7 @@ mod tests {
             &mut sim.stats.energy_flows,
         );
 
-        assert_eq!(result, 0.0);
+        assert_eq!(result.outcome, ActionOutcome::NoFood);
         assert_eq!(
             sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)),
             food_before
@@ -2070,7 +2021,7 @@ mod tests {
                 sim.creatures[id].energy = 10.0;
                 for index in 0..2 { sim.world.set_food_type(pos, OrdinaryFoodTypeId::new(index), density); }
                 let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected), 0.0, &mut sim.stats.energy_flows);
-                proptest::prop_assert_eq!(applied, density);
+                proptest::prop_assert_eq!(applied.amount, density);
                 proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward - 0.4)).abs() < 1e-5);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(selected)), 0.0);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1-selected)), density);
@@ -2194,8 +2145,9 @@ mod tests {
                 OrdinaryFoodTypeId::default(),
                 0.0,
                 &mut sim.stats.energy_flows
-            ),
-            0.0
+            )
+            .outcome,
+            ActionOutcome::NoFood
         );
         assert_eq!(sim.creatures[id].energy, 48.0);
     }

@@ -20,7 +20,7 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
-use v3_core::contracts::{CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
+use v3_core::contracts::{ActionOutcome, CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::{BackendDef, CreatureGenome};
@@ -643,7 +643,8 @@ pub fn run_scripted(
         ticks = tick;
         let intake_before: f64 = flows.food_intake_by_type.iter().sum();
         let ate = world.food_at_type(actor.position, FOOD) > 0.0
-            && apply_typed_eat(&mut actor, &mut world, config, FOOD, 0.0, &mut flows) > 0.0;
+            && apply_typed_eat(&mut actor, &mut world, config, FOOD, 0.0, &mut flows).outcome
+                == ActionOutcome::Success;
         if ate {
             tally.food_eaten += 1;
             tally.first.get_or_insert(tick);
@@ -651,7 +652,8 @@ pub fn run_scripted(
         } else {
             let direction = policy.direction(tick, actor.position, &progress, &mut rng);
             tally.moves += 1;
-            if !apply_move(id, &mut actor, &mut world, direction, config, &mut flows) {
+            let moved = apply_move(id, &mut actor, &mut world, direction, config, &mut flows);
+            if moved.outcome == ActionOutcome::Blocked {
                 tally.blocked += 1;
             }
         }

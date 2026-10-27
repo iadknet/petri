@@ -1,6 +1,5 @@
 use super::ActionInputs;
-use super::TransferOutcome;
-use crate::contracts::{CreatureId, Direction};
+use crate::contracts::{ActionOutcome, ActionResult, CreatureId, Direction};
 use crate::creature::action_log::ActionType;
 
 /// Spatial record of a single predation event for frontend visualization.
@@ -43,6 +42,19 @@ impl PredationActionResult {
         matches!(self, Self::Transferred | Self::TransferredAndKilled)
     }
 
+    /// The run-total key of a steal that ended in `outcome`; `None` for an
+    /// outcome no steal produces.
+    #[must_use]
+    pub const fn from_outcome(outcome: ActionOutcome) -> Option<Self> {
+        match outcome {
+            ActionOutcome::Success => Some(Self::Transferred),
+            ActionOutcome::TransferredAndKilled => Some(Self::TransferredAndKilled),
+            ActionOutcome::NoVictim => Some(Self::RejectedNoVictim),
+            ActionOutcome::NothingToTake => Some(Self::RejectedNothingToTake),
+            _ => None,
+        }
+    }
+
     /// Stable string key used by transport/API boundaries.
     #[must_use]
     pub const fn as_key(self) -> &'static str {
@@ -65,23 +77,19 @@ impl PredationActionResult {
 /// target resolves, and nothing more. If a victim exists, the transfer is
 /// `i × victim.energy` when the victim's energy is positive, else nothing; a
 /// steal that leaves the victim's stored energy unchanged fails as
-/// `RejectedNothingToTake` and kills nothing. If the victim's energy drops
-/// to zero or below (at `i = 1`, or by rounding), the victim is killed, the
-/// attacker receives a complexity bonus, and the caller removes the victim
-/// (`TransferredAndKilled` names it as the counterpart).
+/// `NothingToTake` and kills nothing. If the victim's energy drops to zero
+/// or below (at `i = 1`, or by rounding), the attacker receives a
+/// complexity bonus and the outcome is `TransferredAndKilled`: the commit
+/// step removes the victim.
 pub(crate) fn apply_steal_energy(
     inputs: &mut ActionInputs<'_>,
     attacker_id: CreatureId,
     dir: Direction,
     effort: f32,
-) -> TransferOutcome<PredationActionResult> {
+) -> ActionResult {
     use crate::ledger::DeathCause;
 
-    // Step 1: Stats — count attempt and per-tick.
-    inputs.stats.predation_actions_attempted_total += 1;
-    inputs.stats.last_tick_steal += 1;
-
-    // Step 2: Deduct the effort, known from the attacker alone.
+    // Deduct the effort, known from the attacker alone.
     let attacker = &mut inputs.creatures[attacker_id];
     let intensity = super::exchange_intensity(attacker.body.steal_share, effort);
     let effort = super::pay_exchange_effort(
@@ -90,142 +98,48 @@ pub(crate) fn apply_steal_energy(
         intensity,
         DeathCause::ActionStealEnergy,
     );
-    inputs.stats.energy_flows.action_charges[ActionType::StealEnergy] += effort;
+    inputs.flows.action_charges[ActionType::StealEnergy] += effort;
 
-    // Steps 3 and 4: resolve the target cell and its victim, guarding
-    // against self-predation in degenerate worlds.
-    let attacker_pos = inputs.creatures[attacker_id].position;
+    // Resolve the target cell and its victim, guarding against
+    // self-predation in degenerate worlds.
     let Some(victim_id) = super::neighbour_creature(inputs, attacker_id, dir) else {
-        return reject(
-            inputs,
-            PredationActionResult::RejectedNoVictim,
-            effort,
-            None,
-        );
+        return ActionResult::new(ActionOutcome::NoVictim, effort);
     };
 
-    // Step 5: The share of the victim's store the intensity takes; a steal
-    // transfers only when the victim's stored energy falls.
+    // The share of the victim's store the intensity takes; a steal transfers
+    // only when the victim's stored energy falls.
     let before = inputs.creatures[victim_id].energy;
     let Some(actual) = super::exchange_amount(intensity, before) else {
-        return reject(
-            inputs,
-            PredationActionResult::RejectedNothingToTake,
-            effort,
-            Some(victim_id),
-        );
+        return ActionResult::new(ActionOutcome::NothingToTake, effort);
     };
 
-    // Step 6: Transfer energy.
+    // Transfer energy.
     let victim = &mut inputs.creatures[victim_id];
     victim.energy -= actual;
-    inputs.stats.energy_flows.predation_victim_debit +=
-        victim.observe_energy(before, DeathCause::Predation);
-    #[cfg(feature = "telemetry-seams")]
-    if inputs.stats.observed_creature == Some(victim_id) {
-        inputs.stats.observed_damage += actual;
-    }
+    inputs.flows.predation_victim_debit += victim.observe_energy(before, DeathCause::Predation);
     let attacker = &mut inputs.creatures[attacker_id];
     let before = attacker.energy;
     attacker.energy += actual;
-    inputs.stats.energy_flows.predation_attacker_credit -=
+    inputs.flows.predation_attacker_credit -=
         attacker.observe_energy(before, DeathCause::Predation);
 
-    // Step 7: Cap attacker energy at its body's cap.
-    inputs.stats.energy_flows.maximum_energy_clamp_loss +=
-        super::cap_energy(&mut inputs.creatures[attacker_id]);
+    // Cap attacker energy at its body's cap.
+    inputs.flows.maximum_energy_clamp_loss += super::cap_energy(&mut inputs.creatures[attacker_id]);
 
-    // Step 8: Check kill.
+    // A drained victim is killed: the attacker takes the complexity bonus.
     if inputs.creatures[victim_id].energy <= 0.0 {
-        // Snapshot victim data before removal.
-        let victim_complexity = inputs.creatures[victim_id].complexity();
-        let victim_pos = inputs.creatures[victim_id].position;
-
-        // Compute and award complexity bonus.
-        let bonus =
-            victim_complexity as f32 * inputs.config.predation.kill_complexity_bonus_multiplier;
+        let bonus = inputs.creatures[victim_id].complexity() as f32
+            * inputs.config.predation.kill_complexity_bonus_multiplier;
         let attacker = &mut inputs.creatures[attacker_id];
         let before = attacker.energy;
         attacker.energy += bonus;
-        inputs.stats.energy_flows.predation_kill_bonus_credit -=
+        inputs.flows.predation_kill_bonus_credit -=
             attacker.observe_energy(before, DeathCause::Predation);
-        inputs.stats.energy_flows.maximum_energy_clamp_loss +=
+        inputs.flows.maximum_energy_clamp_loss +=
             super::cap_energy(&mut inputs.creatures[attacker_id]);
-
-        inputs.creatures[attacker_id].lifetime_predation_kills_count += 1;
-        inputs.stats.predation_kills_total += 1;
-        inputs.stats.last_tick_predation_kills += 1;
-        inputs.stats.predation_actions_transferred_total += 1;
-        *inputs
-            .stats
-            .predation_actions_by_result
-            .entry(PredationActionResult::TransferredAndKilled)
-            .or_insert(0) += 1;
-        inputs
-            .stats
-            .last_tick_predation_events
-            .push(PredationEventRecord {
-                attacker_x: attacker_pos.x,
-                attacker_y: attacker_pos.y,
-                victim_x: victim_pos.x,
-                victim_y: victim_pos.y,
-                energy_stolen: actual,
-                killed: true,
-            });
-        return TransferOutcome {
-            result: PredationActionResult::TransferredAndKilled,
-            amount: actual,
-            counterpart: Some(victim_id),
-        };
+        return ActionResult::new(ActionOutcome::TransferredAndKilled, effort).with_amount(actual);
     }
-
-    // Step 9: Victim survived.
-    inputs.creatures[victim_id].lifetime_predation_hits_taken_count += 1;
-    inputs.stats.predation_actions_transferred_total += 1;
-    *inputs
-        .stats
-        .predation_actions_by_result
-        .entry(PredationActionResult::Transferred)
-        .or_insert(0) += 1;
-    let victim_pos = inputs.creatures[victim_id].position;
-    inputs
-        .stats
-        .last_tick_predation_events
-        .push(PredationEventRecord {
-            attacker_x: attacker_pos.x,
-            attacker_y: attacker_pos.y,
-            victim_x: victim_pos.x,
-            victim_y: victim_pos.y,
-            energy_stolen: actual,
-            killed: false,
-        });
-    TransferOutcome {
-        result: PredationActionResult::Transferred,
-        amount: actual,
-        counterpart: Some(victim_id),
-    }
-}
-
-/// Books a steal that moved nothing: one rejection by `result`, its effort as
-/// failed.
-fn reject(
-    inputs: &mut ActionInputs<'_>,
-    result: PredationActionResult,
-    effort: f64,
-    counterpart: Option<CreatureId>,
-) -> TransferOutcome<PredationActionResult> {
-    inputs.stats.predation_actions_rejected_total += 1;
-    *inputs
-        .stats
-        .predation_actions_by_result
-        .entry(result)
-        .or_insert(0) += 1;
-    inputs.stats.energy_flows.failed_action_effort[ActionType::StealEnergy] += effort;
-    TransferOutcome {
-        result,
-        amount: 0.0,
-        counterpart,
-    }
+    ActionResult::new(ActionOutcome::Success, effort).with_amount(actual)
 }
 
 #[cfg(test)]
@@ -239,8 +153,8 @@ mod tests {
     use crate::creature::phenotype::Phenotype;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
-    use crate::simulation::actions::steal_now;
     use crate::simulation::simulation::Simulation;
+    use crate::simulation::tick::steal_now;
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
@@ -355,8 +269,8 @@ mod tests {
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 1.0);
 
         // Intensity 0.2 (the founder share at modifier 1) takes 0.2 × 30.
-        assert_eq!(outcome.result, PredationActionResult::Transferred);
-        assert_eq!(outcome.amount, 6.0);
+        assert_eq!(outcome.result.outcome, ActionOutcome::Success);
+        assert_eq!(outcome.result.amount, 6.0);
         assert_eq!(outcome.counterpart, Some(victim_id));
         assert_eq!(sim.creatures[attacker_id].energy, (50.0 - 0.4) + 6.0);
         assert_eq!(sim.creatures[victim_id].energy, 24.0, "no kill at 0.2");
@@ -372,7 +286,7 @@ mod tests {
                 make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
             sim.creatures[attacker_id].body.steal_share = share;
             let outcome = steal_now(attacker_id, &mut sim, Direction::N, effort);
-            assert_eq!(outcome.amount, expected, "{share} × {effort}");
+            assert_eq!(outcome.result.amount, expected, "{share} × {effort}");
             assert_eq!(
                 sim.creatures.contains_key(victim_id),
                 expected < 30.0,
@@ -387,9 +301,11 @@ mod tests {
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(result, ActionOutcome::Success);
         assert_eq!(
             sim.creatures[victim_id].lifetime_predation_hits_taken_count,
             1
@@ -408,9 +324,11 @@ mod tests {
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 20.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 20.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         assert!(!sim.creatures.contains_key(victim_id));
         assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 1);
         assert_eq!(
@@ -428,9 +346,11 @@ mod tests {
         let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::RejectedNoVictim);
+        assert_eq!(result, ActionOutcome::NoVictim);
         assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 0);
         assert_eq!(
             sim.creatures[attacker_id].lifetime_predation_hits_taken_count,
@@ -450,9 +370,11 @@ mod tests {
             sim.creatures[attacker_id].age,
         );
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(result, ActionOutcome::Success);
         // attacker: 50 - adjusted_cost + gain(0.2 × 30)
         let expected = 50.0 - adjusted_cost + 6.0;
         assert!(
@@ -477,10 +399,12 @@ mod tests {
 
         // Capture victim complexity before kill removes it from slotmap.
         let victim_complexity = sim.creatures[victim_id].complexity();
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 5.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 5.0)
+            .result
+            .outcome;
 
         // At intensity 1 the steal takes the whole store and kills.
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         // attacker: 50 - adjusted_cost + 5 (actual) + bonus
         let bonus =
             victim_complexity as f32 * sim.config.predation.kill_complexity_bonus_multiplier;
@@ -506,9 +430,11 @@ mod tests {
             sim.creatures[attacker_id].age,
         );
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::RejectedNoVictim);
+        assert_eq!(result, ActionOutcome::NoVictim);
         // Cost still deducted: 50 - adjusted_cost
         let expected = 50.0 - adjusted_cost;
         assert!(
@@ -533,9 +459,11 @@ mod tests {
         sim.config.exchange.effort_rate = 0.0;
 
         // Request exactly victim's energy
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         assert!(
             !sim.creatures.contains_key(victim_id),
             "victim should be dead"
@@ -555,9 +483,11 @@ mod tests {
             "founder genome should have nonzero complexity"
         );
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         // attacker: 50 − 0.4 (effort floor; effort-cost defaults, 2026-10-10) + 5 (actual steal) + complexity bonus
         let expected = 50.0 - 0.4 + 5.0 + victim_complexity as f32 * 1.0;
         assert!(
@@ -575,9 +505,11 @@ mod tests {
             make_sim_two_creatures(Position::new(5, 5), 50.0, victim_pos, 5.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         assert!(
             sim.world.creature_at(victim_pos).is_none(),
             "victim should be removed from world occupancy"
@@ -591,9 +523,11 @@ mod tests {
         sim.config.exchange.effort_rate = 0.0;
         let max_energy = sim.creatures[attacker_id].energy_cap(); // 200.0
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(result, ActionOutcome::Success);
         assert!(
             sim.creatures[attacker_id].energy <= max_energy,
             "attacker energy {} should be capped at max {}",
@@ -614,8 +548,8 @@ mod tests {
 
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 0.0);
 
-        assert_eq!(outcome.result, PredationActionResult::RejectedNothingToTake);
-        assert_eq!(outcome.amount, 0.0);
+        assert_eq!(outcome.result.outcome, ActionOutcome::NothingToTake);
+        assert_eq!(outcome.result.amount, 0.0);
         assert_eq!(outcome.counterpart, Some(victim_id));
         // cost = max(0.2 * 0, noop_cost) = 0.4 (T16.F02; effort-cost defaults, 2026-10-10)
         assert!(
@@ -666,11 +600,11 @@ mod tests {
             let outcome = steal_now(attacker_id, &mut sim, Direction::N, 10.0);
 
             assert_eq!(
-                outcome.result,
-                PredationActionResult::RejectedNothingToTake,
+                outcome.result.outcome,
+                ActionOutcome::NothingToTake,
                 "store {store}"
             );
-            assert_eq!(outcome.amount, 0.0);
+            assert_eq!(outcome.result.amount, 0.0);
             assert_eq!(sim.creatures[victim_id].energy.to_bits(), store.to_bits());
             assert_nothing_taken(&sim, attacker_id, victim_id);
         }
@@ -686,8 +620,8 @@ mod tests {
 
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 1.0);
 
-        assert_eq!(outcome.result, PredationActionResult::RejectedNothingToTake);
-        assert_eq!(outcome.amount, 0.0);
+        assert_eq!(outcome.result.outcome, ActionOutcome::NothingToTake);
+        assert_eq!(outcome.result.amount, 0.0);
         assert_eq!(sim.creatures[victim_id].energy, tiny);
         assert_nothing_taken(&sim, attacker_id, victim_id);
     }
@@ -702,8 +636,8 @@ mod tests {
 
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 1.0);
 
-        assert_eq!(outcome.result, PredationActionResult::TransferredAndKilled);
-        assert_eq!(outcome.amount, tiny);
+        assert_eq!(outcome.result.outcome, ActionOutcome::TransferredAndKilled);
+        assert_eq!(outcome.result.amount, tiny);
         assert!(!sim.creatures.contains_key(victim_id));
     }
 
@@ -724,23 +658,23 @@ mod tests {
             let outcome =
                 steal_now(attacker_id, &mut sim, Direction::N, f32::from_bits(effort_bits));
 
-            match outcome.result {
-                PredationActionResult::Transferred => {
-                    proptest::prop_assert!(outcome.amount > 0.0);
+            match outcome.result.outcome {
+                ActionOutcome::Success => {
+                    proptest::prop_assert!(outcome.result.amount > 0.0);
                     proptest::prop_assert!(sim.creatures[victim_id].energy < store);
                 }
-                PredationActionResult::TransferredAndKilled => {
-                    proptest::prop_assert!(outcome.amount > 0.0);
+                ActionOutcome::TransferredAndKilled => {
+                    proptest::prop_assert!(outcome.result.amount > 0.0);
                     proptest::prop_assert!(!sim.creatures.contains_key(victim_id));
                 }
-                PredationActionResult::RejectedNothingToTake => {
-                    proptest::prop_assert_eq!(outcome.amount, 0.0);
+                ActionOutcome::NothingToTake => {
+                    proptest::prop_assert_eq!(outcome.result.amount, 0.0);
                     proptest::prop_assert_eq!(
                         sim.creatures[victim_id].energy.to_bits(),
                         store.to_bits()
                     );
                 }
-                PredationActionResult::RejectedNoVictim => {
+                _ => {
                     proptest::prop_assert!(false, "the victim is adjacent");
                 }
             }
@@ -753,9 +687,11 @@ mod tests {
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 1.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(result, ActionOutcome::Success);
         assert_eq!(sim.stats.last_tick_predation_events.len(), 1);
         let event = &sim.stats.last_tick_predation_events[0];
         assert_eq!(event.attacker_x, 5);
@@ -772,9 +708,11 @@ mod tests {
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(result, ActionOutcome::TransferredAndKilled);
         assert_eq!(sim.stats.last_tick_predation_events.len(), 1);
         let event = &sim.stats.last_tick_predation_events[0];
         assert_eq!(event.attacker_x, 5);
@@ -791,9 +729,11 @@ mod tests {
         let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
         sim.config.exchange.effort_rate = 0.0;
 
-        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0).result;
+        let result = steal_now(attacker_id, &mut sim, Direction::N, 10.0)
+            .result
+            .outcome;
 
-        assert_eq!(result, PredationActionResult::RejectedNoVictim);
+        assert_eq!(result, ActionOutcome::NoVictim);
         assert!(sim.stats.last_tick_predation_events.is_empty());
         assert_eq!(sim.stats.last_tick_predation_kills, 0);
     }

@@ -3,7 +3,7 @@ use rand::Rng;
 
 use super::cgp_reproduction;
 use super::{ActionInputs, Conception};
-use crate::contracts::{CreatureId, Direction, Position};
+use crate::contracts::{ActionOutcome, ActionResult, CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
@@ -71,6 +71,23 @@ impl ReproductionActionResult {
         Self::RejectedEnergyConstraints,
         Self::RejectedPopulationCap,
     ];
+
+    /// The run-total key of a reproduce that ended in `outcome`; a refused
+    /// litter keys `RejectedEnergyConstraints`. `None` for an outcome no
+    /// reproduce produces.
+    #[must_use]
+    pub const fn from_outcome(outcome: ActionOutcome) -> Option<Self> {
+        match outcome {
+            ActionOutcome::Success => Some(Self::Conceived),
+            ActionOutcome::InvalidTarget => Some(Self::RejectedInvalidTarget),
+            ActionOutcome::AgeConstraints => Some(Self::RejectedAgeConstraints),
+            ActionOutcome::EnergyConstraints | ActionOutcome::LitterTooSmall => {
+                Some(Self::RejectedEnergyConstraints)
+            }
+            ActionOutcome::PopulationCap => Some(Self::RejectedPopulationCap),
+            _ => None,
+        }
+    }
 
     /// Stable string key used by transport/API boundaries.
     #[must_use]
@@ -147,19 +164,15 @@ pub(crate) fn inherits_nonzero_pair_group(
 /// [`Conception`] for the caller to run Steps 9 to 14 at once, the
 /// pre-feature engine.
 ///
-/// Returns `Conceived` or why the attempt was rejected, and the span-0
-/// conception.
+/// Returns `Success` or why the attempt was rejected, its amount the
+/// requested `energy_transfer_fraction`, and the span-0 conception.
 #[must_use]
 pub(crate) fn apply_reproduce(
     inputs: &mut ActionInputs<'_>,
     parent_id: CreatureId,
     dir: Direction,
     energy_transfer_fraction: f32,
-) -> (ReproductionActionResult, Option<Conception>) {
-    // Stats: always count attempt and per-tick reproduce regardless of outcome.
-    inputs.stats.reproduction_actions_attempted_total += 1;
-    inputs.stats.last_tick_reproduce += 1;
-
+) -> (ActionResult, Option<Conception>) {
     // Step 0 (T16.F02): the attempt effort, paid whatever the outcome.
     let effort = super::pay_effort(
         &mut inputs.creatures[parent_id],
@@ -167,15 +180,16 @@ pub(crate) fn apply_reproduce(
         inputs.config.energy.costs.reproduce_attempt_cost,
         DeathCause::ActionReproduce,
     );
-    inputs.stats.energy_flows.action_charges[ActionType::Reproduce] += effort;
+    inputs.flows.action_charges[ActionType::Reproduce] += effort;
 
-    match conceive(inputs, parent_id, dir, energy_transfer_fraction) {
-        Ok(conception) => (ReproductionActionResult::Conceived, conception),
-        Err(rejection) => {
-            inputs.stats.energy_flows.failed_action_effort[ActionType::Reproduce] += effort;
-            (rejection, None)
-        }
-    }
+    let (outcome, conception) = match conceive(inputs, parent_id, dir, energy_transfer_fraction) {
+        Ok(conception) => (ActionOutcome::Success, conception),
+        Err(rejection) => (rejection, None),
+    };
+    (
+        ActionResult::new(outcome, effort).with_amount(energy_transfer_fraction),
+        conception,
+    )
 }
 
 /// Steps 1 to 8 of the unified sequence on the post-effort energy (T16.F01
@@ -187,54 +201,30 @@ fn conceive(
     parent_id: CreatureId,
     dir: Direction,
     energy_transfer_fraction: f32,
-) -> Result<Option<Conception>, ReproductionActionResult> {
+) -> Result<Option<Conception>, ActionOutcome> {
     let parent_pos = inputs.creatures[parent_id].position;
 
     // Step 1: Resolve target cell.
     let target = match inputs.world.resolve_neighbor(parent_pos, dir) {
         Some(p) => p,
         None => {
-            inputs.stats.reproduction_actions_rejected_total += 1;
-            *inputs
-                .stats
-                .reproduction_actions_rejected_by_reason
-                .entry(ReproductionActionResult::RejectedInvalidTarget)
-                .or_insert(0) += 1;
-            return Err(ReproductionActionResult::RejectedInvalidTarget);
+            return Err(ActionOutcome::InvalidTarget);
         }
     };
 
     // Step 2: Validate target cell (no barrier, not occupied).
     if !inputs.world.is_valid_target_cell(target) {
-        inputs.stats.reproduction_actions_rejected_total += 1;
-        *inputs
-            .stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedInvalidTarget)
-            .or_insert(0) += 1;
-        return Err(ReproductionActionResult::RejectedInvalidTarget);
+        return Err(ActionOutcome::InvalidTarget);
     }
 
     // Step 3: Check population cap.
     if inputs.creatures.len() >= inputs.config.population.max_creatures as usize {
-        inputs.stats.reproduction_actions_rejected_total += 1;
-        *inputs
-            .stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedPopulationCap)
-            .or_insert(0) += 1;
-        return Err(ReproductionActionResult::RejectedPopulationCap);
+        return Err(ActionOutcome::PopulationCap);
     }
 
     // Step 4: Enforce minimum reproduction age gate.
     if inputs.creatures[parent_id].age < inputs.config.energy.lifecycle.min_reproduce_age {
-        inputs.stats.reproduction_actions_rejected_total += 1;
-        *inputs
-            .stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedAgeConstraints)
-            .or_insert(0) += 1;
-        return Err(ReproductionActionResult::RejectedAgeConstraints);
+        return Err(ActionOutcome::AgeConstraints);
     }
 
     // Step 5: Compute reproduce_cost (scaled by genome complexity, age, and
@@ -258,13 +248,7 @@ fn conceive(
 
     // Step 6: Check parent would have sufficient energy after the charge.
     if after_cost < inputs.config.energy.lifecycle.min_reproduce_energy {
-        inputs.stats.reproduction_actions_rejected_total += 1;
-        *inputs
-            .stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedEnergyConstraints)
-            .or_insert(0) += 1;
-        return Err(ReproductionActionResult::RejectedEnergyConstraints);
+        return Err(ActionOutcome::EnergyConstraints);
     }
 
     // Step 7 (T17.F01): the litter is a fraction of the parent's post-cost
@@ -277,31 +261,23 @@ fn conceive(
         (fraction * after_cost).min(inputs.config.energy.lifecycle.default_offspring_energy);
 
     if transfer <= 0.0 || transfer < inputs.config.energy.lifecycle.initial_energy {
-        inputs.stats.reproduction_actions_rejected_total += 1;
-        inputs.stats.reproduction_actions_rejected_litter_total += 1;
-        *inputs
-            .stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedEnergyConstraints)
-            .or_insert(0) += 1;
-        return Err(ReproductionActionResult::RejectedEnergyConstraints);
+        return Err(ActionOutcome::LitterTooSmall);
     }
 
     // Step 8: Both gates passed; deduct cost, then transfer, as two
     // successive f32 subtractions so the parent lands on the same value the
     // charge-first order produced.
     inputs.creatures[parent_id].energy = after_cost;
-    inputs.stats.energy_flows.action_charges[ActionType::Reproduce] +=
+    inputs.flows.action_charges[ActionType::Reproduce] +=
         inputs.creatures[parent_id].observe_energy(energy_before_cost, DeathCause::ActionReproduce);
     inputs.creatures[parent_id].energy = after_cost - transfer;
-    inputs.stats.energy_flows.parental_transfer_debit +=
+    inputs.flows.parental_transfer_debit +=
         inputs.creatures[parent_id].observe_energy(after_cost, DeathCause::ParentalTransfer);
 
     // Conception (T03.F12): the litter is carried for the gestation span and
     // born at the parent's Phase 2 slot on its last tick. A span of 0 is
     // handed to the caller for delivery at the validated target, exactly as
     // before the feature.
-    inputs.stats.gestations_started_total += 1;
     let span = gestation_ticks(
         inputs.creatures[parent_id].genome_size(),
         inputs
@@ -594,7 +570,7 @@ mod tests {
     };
     use crate::genome::{BackendDef, CreatureGenome};
     use crate::genome::{HebbianRule, PlasticityConfig};
-    use crate::simulation::actions::reproduce_now;
+    use crate::simulation::tick::reproduce_now;
 
     /// A parent state on `genome` whose plastic slots of mesh node `n`
     /// learned `parent[n]`, in canonical order (each backend visited).

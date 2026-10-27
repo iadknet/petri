@@ -1,14 +1,15 @@
 use super::super::run_tick;
 use super::support::*;
+use crate::contracts::ActionOutcome;
 use crate::contracts::{Direction, InputReference, NodeId, Position, WorldInputKey};
-use crate::creature::action_log::{ActionResult, ActionType};
+use crate::creature::action_log::ActionType;
 use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::simulation::actions::{
-    reproduce_now, steal_now, BarrierReaderState, MoveBlockedCause, ReproductionActionResult,
-    ReproductionInvalidTargetCause,
+    BarrierReaderState, MoveBlockedCause, ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
+use crate::simulation::tick::{reproduce_now, steal_now};
 use rand::SeedableRng;
 use std::collections::HashSet;
 
@@ -108,7 +109,7 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
 }
 
 #[test]
-fn zero_transfer_reproduction_records_energy_constraint_in_action_log() {
+fn zero_transfer_reproduction_records_a_too_small_litter_in_action_log() {
     let genome = vm_program_genome(vec![
         VmInstruction::AddVote { sink: 9, src: 0 },
         VmInstruction::Halt,
@@ -128,7 +129,7 @@ fn zero_transfer_reproduction_records_energy_constraint_in_action_log() {
         .back()
         .expect("reproduce action log entry");
     assert_eq!(entry.action_type, ActionType::Reproduce);
-    assert_eq!(entry.result, ActionResult::EnergyConstraints);
+    assert_eq!(entry.outcome, ActionOutcome::LitterTooSmall);
     assert_eq!(sim.stats.last_tick_reproduce, 1);
 }
 
@@ -190,7 +191,7 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
         Some(crate::config::OrdinaryFoodTypeId::new(1))
     );
     assert!((entry.amount - 0.35).abs() < 1e-6);
-    assert_eq!(entry.result, ActionResult::Success);
+    assert_eq!(entry.outcome, ActionOutcome::Success);
 }
 
 #[test]
@@ -514,8 +515,8 @@ fn steal_energy_dispatch_transfers_and_removes_victim() {
 
     let entry = sim.action_logs[attacker_id].entries().back().copied();
     assert_eq!(
-        entry.map(|entry| entry.result),
-        Some(ActionResult::TransferredAndKilled)
+        entry.map(|entry| entry.outcome),
+        Some(ActionOutcome::TransferredAndKilled)
     );
     assert!(
         !sim.creatures.contains_key(victim_id),
@@ -538,15 +539,12 @@ fn killed_creature_steal_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.exchange.effort_rate = 0.0;
 
-    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result;
-    assert_eq!(
-        result,
-        crate::simulation::actions::PredationActionResult::TransferredAndKilled,
-    );
+    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result.outcome;
+    assert_eq!(result, ActionOutcome::TransferredAndKilled,);
     assert!(!sim.creatures.contains_key(b_id), "B should be dead");
 
     if sim.creatures.contains_key(b_id) {
-        let _result = steal_now(b_id, &mut sim, Direction::S, 10.0).result;
+        let _result = steal_now(b_id, &mut sim, Direction::S, 10.0).result.outcome;
     }
 }
 
@@ -555,11 +553,8 @@ fn killed_creature_reproduce_action_does_not_panic() {
     let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
     sim.config.exchange.effort_rate = 0.0;
 
-    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result;
-    assert_eq!(
-        result,
-        crate::simulation::actions::PredationActionResult::TransferredAndKilled,
-    );
+    let result = steal_now(a_id, &mut sim, Direction::N, 50.0).result.outcome;
+    assert_eq!(result, ActionOutcome::TransferredAndKilled,);
     assert!(!sim.creatures.contains_key(b_id), "B should be dead");
 
     if sim.creatures.contains_key(b_id) {
@@ -1016,7 +1011,7 @@ fn partial_eat_retains_density_credits_the_eaten_amount_and_counts_partial() {
         .find(|entry| entry.action_type == ActionType::Eat)
         .copied()
         .expect("eat action log entry");
-    assert_eq!(entry.result, ActionResult::Success);
+    assert_eq!(entry.outcome, ActionOutcome::Success);
     assert_eq!(entry.amount, 0.25);
     assert_eq!(entry.food_type, Some(staple));
     assert_eq!(

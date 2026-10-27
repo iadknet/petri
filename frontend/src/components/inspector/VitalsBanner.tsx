@@ -171,7 +171,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 					{/* Action dots */}
 					<div className="relative flex items-center gap-px">
 						{visibleActions.map((entry, i) => {
-							const failed = entry.result !== "Success";
+							const failed = entry.outcome !== "Success";
 							return (
 								<div
 									key={`${entry.tick}-${i}`}
@@ -194,7 +194,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 							visibleActions[hoveredIdx] &&
 							(() => {
 								const entry = visibleActions[hoveredIdx]!;
-								const failed = entry.result !== "Success";
+								const failed = entry.outcome !== "Success";
 								const energyDelta = entry.energy_after - entry.energy_before;
 								const dir = DIRECTION_LABELS[entry.direction];
 								// Reproduce logs its transfer fraction in [0, 1]; other types log energy or food.
@@ -214,7 +214,7 @@ export const VitalsBanner = memo(function VitalsBanner({
 										<div>
 											Result:{" "}
 											<span className={failed ? "text-red-400" : "text-emerald-400"}>
-												{entry.result}
+												{entry.outcome}
 											</span>
 										</div>
 										{dir && <div>Direction: {dir}</div>}

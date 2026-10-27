@@ -423,7 +423,7 @@ fn action_event(index: usize, applied: &AppliedAction, time: u64) -> Event {
     a.text("petri.phase", "actions");
     a.count("petri.index", index);
     a.text("petri.action", entry.action_type.as_key());
-    a.text("petri.result", entry.result.as_key());
+    a.text("petri.result", entry.outcome.as_key());
     if entry.direction != NO_DIRECTION {
         a.int("petri.direction", entry.direction);
     }

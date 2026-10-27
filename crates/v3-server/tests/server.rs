@@ -2328,7 +2328,7 @@ async fn get_creature_includes_action_log() {
     let entry = &action_log[0];
     assert!(entry["tick"].is_number(), "missing tick");
     assert!(entry["action_type"].is_string(), "missing action_type");
-    assert!(entry["result"].is_string(), "missing result");
+    assert!(entry["outcome"].is_string(), "missing outcome");
     assert!(entry["direction"].is_number(), "missing direction");
     assert!(entry["energy_before"].is_number(), "missing energy_before");
     assert!(entry["energy_after"].is_number(), "missing energy_after");
@@ -3138,7 +3138,7 @@ async fn get_creature_brain_resolves_pair_coordinates_facts_and_zero_pattern_mem
     let (_, second) = edit(true).await;
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha14");
+    assert_eq!(body["protocol_version"], "v3alpha15");
     let graph = brain_graph(&body, node_id);
 
     let present = |record: &serde_json::Value, list: &str| {
@@ -4116,7 +4116,9 @@ async fn energy_only_shared_reward_can_be_changed_live() {
                     type_idx,
                     0.0,
                     &mut sim.stats.energy_flows
-                ) > 0.0
+                )
+                .amount
+                    > 0.0
             );
             // 0.5 food × 7.5 credited, then the eat effort paid (T16.F02).
             let creature = &sim.creatures[id];

@@ -37,7 +37,7 @@ function makeActionEntry(tick: number, actionType: ActionType = "Move"): ActionL
 	return {
 		tick,
 		action_type: actionType,
-		result: "Success",
+		outcome: "Success",
 		direction: 2,
 		energy_before: 20,
 		energy_after: 18,

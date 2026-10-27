@@ -114,7 +114,7 @@ fn tick<'a>(recorded: &'a RecordedTick, left: &mut usize) -> (Tick<'a>, bool) {
         res: outcome.map(|o| {
             o.applied
                 .iter()
-                .map(|applied| applied.entry.result.as_key())
+                .map(|applied| applied.entry.outcome.as_key())
                 .collect()
         }),
         hops: record.hops[..kept].iter().map(hop).collect(),

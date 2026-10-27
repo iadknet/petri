@@ -471,7 +471,7 @@ fn a_window_record_holds_every_body_field_with_exact_values() {
                 "barrier": ring(&sensed.neighbor_barrier),
                 "occupied": ring(&sensed.neighbor_occupied),
                 "sel": record.trace.final_actions.iter().map(action_label).collect::<Vec<_>>(),
-                "res": outcome.applied.iter().map(|a| a.entry.result.as_key()).collect::<Vec<_>>(),
+                "res": outcome.applied.iter().map(|a| a.entry.outcome.as_key()).collect::<Vec<_>>(),
                 "hops": record.trace.hops.iter().map(|hop| serde_json::json!([
                     hop.node_id.0,
                     if matches!(hop.backend_trace, BackendTrace::Vm(_)) { "v" } else { "g" },

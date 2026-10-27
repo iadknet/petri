@@ -53,7 +53,8 @@ fn the_window_forgets_a_node_the_creature_stopped_dispatching() {
 #[test]
 fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
     use crate::contracts::Direction;
-    use crate::simulation::actions::{reproduce_now, ReproductionActionResult};
+    use crate::simulation::actions::ReproductionActionResult;
+    use crate::simulation::tick::reproduce_now;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 

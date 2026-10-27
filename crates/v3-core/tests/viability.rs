@@ -24,8 +24,9 @@
 use std::collections::HashMap;
 
 use v3_core::config::SimulationConfig;
+use v3_core::contracts::ActionOutcome;
 use v3_core::contracts::{CreatureId, Position};
-use v3_core::creature::action_log::{ActionResult, ActionType};
+use v3_core::creature::action_log::ActionType;
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::phenotype::Phenotype;
@@ -256,7 +257,7 @@ fn canonical_founder_consumes_primary_food_and_reproduces() {
         .values()
         .flat_map(|log| log.entries())
         .filter(|entry| {
-            entry.action_type == ActionType::Eat && entry.result == ActionResult::Success
+            entry.action_type == ActionType::Eat && entry.outcome == ActionOutcome::Success
         })
         .count();
     assert!(

@@ -3,8 +3,9 @@ use axum::response::IntoResponse;
 use axum::Json;
 use slotmap::{Key, KeyData};
 use std::collections::{BTreeMap, BTreeSet};
+use v3_core::contracts::ActionOutcome;
 use v3_core::contracts::{CreatureId, InputReference};
-use v3_core::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
+use v3_core::creature::action_log::{ActionLogEntry, ActionType};
 use v3_core::creature::colour::channels_to_rgb;
 use v3_core::genome::cgp::OutputSinkKind;
 use v3_core::genome::mesh_annotations::{
@@ -300,12 +301,13 @@ fn build_creature_diagnostics(
     let mut blocked_move_count = 0u32;
     let mut invalid_target_reproduce_count = 0u32;
     for entry in &recent_window {
-        let key = format!("{}:{}", entry.action_type.as_key(), entry.result.as_key());
+        let key = format!("{}:{}", entry.action_type.as_key(), entry.outcome.as_key());
         *by_action_result.entry(key).or_insert(0) += 1;
-        if entry.action_type == ActionType::Move && entry.result == ActionResult::Blocked {
+        if entry.action_type == ActionType::Move && entry.outcome == ActionOutcome::Blocked {
             blocked_move_count += 1;
         }
-        if entry.action_type == ActionType::Reproduce && entry.result == ActionResult::InvalidTarget
+        if entry.action_type == ActionType::Reproduce
+            && entry.outcome == ActionOutcome::InvalidTarget
         {
             invalid_target_reproduce_count += 1;
         }
@@ -626,6 +628,6 @@ mod tests {
     #[test]
     fn action_log_keys_use_variant_names() {
         assert_eq!(ActionType::Move.as_key(), "Move");
-        assert_eq!(ActionResult::AgeConstraints.as_key(), "AgeConstraints");
+        assert_eq!(ActionOutcome::NothingToTake.as_key(), "NothingToTake");
     }
 }

@@ -2,8 +2,9 @@
 
 use super::support::*;
 use crate::config::SimulationConfig;
+use crate::contracts::ActionOutcome;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
-use crate::creature::action_log::{ActionLog, ActionResult};
+use crate::creature::action_log::ActionLog;
 use crate::genome::OutcomeChannel;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::{run_phase_0, run_phase_2, run_tick};
@@ -94,7 +95,7 @@ fn gestation_conception_ends_the_queue_and_holds_the_founder_one_tick() {
     assert_eq!(sim.stats.last_tick_noop, 0);
     assert_eq!(log_len(&sim, id), 1);
     let entry = sim.action_logs[id].entries()[0];
-    assert_eq!(entry.result, ActionResult::Success);
+    assert_eq!(entry.outcome, ActionOutcome::Success);
 
     // Tick 1 (T + h): delivered at the parent's slot, which commits nothing.
     let offspring = slot(&mut sim, id, 1, vec![WorldAction::NoOp]);

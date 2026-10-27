@@ -114,7 +114,7 @@ describe("useCreatureDetailResource", () => {
 				{
 					tick: 2733,
 					action_type: "Move" as const,
-					result: "Success" as const,
+					outcome: "Success" as const,
 					direction: 2,
 					energy_before: 42,
 					energy_after: 35,

@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha14";
+pub const PROTOCOL_VERSION: &str = "v3alpha15";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -61,8 +61,8 @@ mod tests {
     /// `input_refs` flat records and types every response: breaking payload
     /// changes.
     #[test]
-    fn protocol_version_is_v3alpha14() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha14");
+    fn protocol_version_is_v3alpha15() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha15");
     }
 
     #[test]

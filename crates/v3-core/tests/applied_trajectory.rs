@@ -194,6 +194,13 @@
 //! field draws `0..5`, sub-index widths) after two agreeing runs: the
 //! sampled digests move (6f97de82... -> cc976227..., gestation rate 0.0
 //! 2a9c2834... -> 82d14a4e...); both guard digests hold.
+//! Re-pinned by T30.F06 pass 2 (text only): the action-log entry names its
+//! `outcome` where `result` stood, and an exhausted victim, an empty gift and
+//! a refused litter log `NothingToTake`, `NothingToGive` and `LitterTooSmall`
+//! where `NoVictim`, `EnergyConstraints` and `EnergyConstraints` stood, which
+//! moves the two sampled digests (cc976227... -> 5b792ac8..., gestation rate
+//! 0.0 82d14a4e... -> 67dcf4ca...); mapping the log text back to the old
+//! shape restores both old digests, and both guard digests hold.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -205,11 +212,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "cc9762271e53d4d465d488e85a2f9e8ddc800088e0762ed31bb80cf57b76e02d"
+        "5b792ac8b46bf3c997854eede8686b808ee751e48506ba59ed8b273f1ab38679"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "82d14a4e59065bf2165785e7be76e41ff0aaf3fbd081f1ac277ea84b493d514a"
+        "67dcf4caa33bd6d13501a4ae56e45dc15cdbe473eb64730863de2075897fe108"
     );
 }
 

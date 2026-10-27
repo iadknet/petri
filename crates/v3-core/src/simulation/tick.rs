@@ -32,6 +32,8 @@ mod actions;
 mod helpers;
 
 use self::actions::run_phase_2;
+#[cfg(test)]
+pub(crate) use self::actions::{give_now, reproduce_now, steal_now};
 use self::helpers::remove_creature_from_sim;
 pub(crate) use self::helpers::sort_by_priority_bid;
 

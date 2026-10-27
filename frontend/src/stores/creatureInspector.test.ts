@@ -9,7 +9,7 @@ function makeEntry(tick: number, actionType: ActionType = "Move"): ActionLogEntr
 	return {
 		tick,
 		action_type: actionType,
-		result: "Success",
+		outcome: "Success",
 		direction: 2,
 		energy_before: 100,
 		energy_after: 95,

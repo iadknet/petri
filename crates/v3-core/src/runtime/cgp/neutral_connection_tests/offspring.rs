@@ -70,8 +70,10 @@ fn native_run(genome: &CreatureGenome) {
 
 #[test]
 fn deleted_positions_survive_native_offspring_construction() {
-    use crate::simulation::actions::{reproduce_now, ReproductionActionResult};
-    use crate::simulation::seeding::seed_simulation_with_founder_genomes;
+    use crate::simulation::{
+        actions::ReproductionActionResult, seeding::seed_simulation_with_founder_genomes,
+        tick::reproduce_now,
+    };
     let mut genome = fixture();
     let mut rng = SmallRng::seed_from_u64(29_005_002);
     remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng).unwrap();

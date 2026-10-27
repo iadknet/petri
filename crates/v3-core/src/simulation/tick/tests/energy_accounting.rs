@@ -5,9 +5,9 @@ use crate::creature::action_log::ActionType;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::ledger::DeathCause;
 use crate::runtime::types::ComputeCostReport;
-use crate::simulation::actions::steal_now;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::run_phase_0;
+use crate::simulation::tick::steal_now;
 use rand::{rngs::SmallRng, SeedableRng};
 
 #[test]

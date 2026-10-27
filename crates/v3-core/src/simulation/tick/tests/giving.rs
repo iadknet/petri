@@ -4,13 +4,15 @@
 
 use super::super::run_tick;
 use super::support::*;
+use crate::contracts::ActionOutcome;
 use crate::contracts::{ActionType, CreatureId, Direction, WorldAction};
-use crate::creature::action_log::{ActionLog, ActionLogEntry, ActionResult};
+use crate::creature::action_log::{ActionLog, ActionLogEntry};
 use crate::genome::vote::DirectedVoteKind;
 use crate::genome::{CreatureGenome, OutcomeChannel, VmInstruction};
 use crate::ledger::{applied_debit, DeathCause};
-use crate::simulation::actions::{give_now, GiveActionResult};
+use crate::simulation::actions::GiveActionResult;
 use crate::simulation::outcomes::OutcomeAccumulator;
+use crate::simulation::tick::give_now;
 use crate::simulation::Simulation;
 use rand::SeedableRng;
 
@@ -79,7 +81,7 @@ fn a_give_moves_the_share_of_the_giver_store_and_books_each_side() {
     assert_eq!(sim.stats.last_tick_give, 1);
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].action_type, ActionType::GiveEnergy);
-    assert_eq!(entries[0].result, ActionResult::Success);
+    assert_eq!(entries[0].outcome, ActionOutcome::Success);
     assert_eq!(entries[0].amount, gift);
     assert_eq!(entries[0].direction, Direction::N.to_index() as u8);
 }
@@ -91,9 +93,9 @@ fn the_give_intensity_scales_the_share_by_the_effort_up_to_one() {
         sim.creatures[giver].body.give_share = share;
         let after_effort = 50.0f32 - exchange_effort(&sim, giver, intensity);
         let outcome = give_now(giver, &mut sim, Direction::N, effort);
-        assert_eq!(outcome.result, GiveActionResult::Transferred);
+        assert_eq!(outcome.result.outcome, ActionOutcome::Success);
         assert_eq!(
-            outcome.amount,
+            outcome.result.amount,
             intensity * after_effort,
             "{share} × {effort}"
         );
@@ -113,7 +115,7 @@ fn a_gift_to_a_capped_recipient_is_transferred_and_the_excess_is_clamp_loss() {
 
     let entries = logged(&mut sim, giver, vec![give_north(1.0)]);
 
-    assert_eq!(entries[0].result, ActionResult::Success);
+    assert_eq!(entries[0].outcome, ActionOutcome::Success);
     assert_eq!(sim.creatures[recipient].energy, cap);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.gift_credit, applied_debit(cap + gift, cap));
@@ -127,7 +129,7 @@ fn a_give_with_no_recipient_logs_no_recipient_and_pays_only_its_effort() {
 
     let entries = logged(&mut sim, giver, vec![give_north(1.0)]);
 
-    assert_eq!(entries[0].result, ActionResult::NoRecipient);
+    assert_eq!(entries[0].outcome, ActionOutcome::NoRecipient);
     assert_eq!(entries[0].amount, 0.0);
     assert_eq!(sim.creatures[giver].energy, 50.0 - effort);
     let flows = &sim.stats.energy_flows;
@@ -151,7 +153,7 @@ fn a_give_with_no_recipient_logs_no_recipient_and_pays_only_its_effort() {
 /// with no effort to pay) keeps the giver alive and its log; a giver its
 /// effort exhausted is removed with its log, its death its effort's.
 #[test]
-fn a_give_with_nothing_to_give_logs_energy_constraints() {
+fn a_give_with_nothing_to_give_logs_nothing_to_give() {
     let tiny = f32::from_bits(1);
     let (mut sim, giver, recipient) = make_sim_two_creatures(tiny, 30.0);
     sim.config.exchange.effort_rate = 0.0;
@@ -161,7 +163,7 @@ fn a_give_with_nothing_to_give_logs_energy_constraints() {
     let entries = logged(&mut sim, giver, vec![give_north(1.0)]);
 
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].result, ActionResult::EnergyConstraints);
+    assert_eq!(entries[0].outcome, ActionOutcome::NothingToGive);
     assert_eq!(entries[0].amount, 0.0);
     assert_eq!(sim.creatures[giver].energy, tiny);
     assert_eq!(sim.creatures[recipient].energy, 30.0);
@@ -235,18 +237,18 @@ proptest::proptest! {
 
         let outcome = give_now(giver, &mut sim, Direction::N, f32::from_bits(effort_bits));
 
-        match outcome.result {
-            GiveActionResult::Transferred => {
-                proptest::prop_assert!(outcome.amount > 0.0);
+        match outcome.result.outcome {
+            ActionOutcome::Success => {
+                proptest::prop_assert!(outcome.result.amount > 0.0);
                 proptest::prop_assert!(sim.creatures[giver].energy < store);
             }
-            GiveActionResult::RejectedNothingToGive => {
-                proptest::prop_assert_eq!(outcome.amount, 0.0);
+            ActionOutcome::NothingToGive => {
+                proptest::prop_assert_eq!(outcome.result.amount, 0.0);
                 proptest::prop_assert_eq!(sim.creatures[recipient].energy, 30.0);
                 proptest::prop_assert_eq!(sim.stats.energy_flows.gift_credit, 0.0);
             }
-            GiveActionResult::RejectedNoRecipient => {
-                proptest::prop_assert!(false, "the recipient is adjacent");
+            other => {
+                proptest::prop_assert!(false, "the recipient is adjacent: {other:?}");
             }
         }
     }

@@ -3,74 +3,10 @@ use std::mem::size_of;
 
 use crate::config::OrdinaryFoodTypeId;
 
-pub use crate::contracts::{ActionType, ACTION_TYPE_COUNT};
+pub use crate::contracts::{ActionOutcome, ActionType, ACTION_TYPE_COUNT};
 
 /// Direction byte recorded for actions that carry no direction parameter.
 pub const NO_DIRECTION: u8 = 255;
-
-/// Outcome of an action for log entries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[repr(u8)]
-pub enum ActionResult {
-    Success = 0,
-    NoFood = 1,
-    Blocked = 2,
-    InvalidTarget = 3,
-    EnergyConstraints = 4,
-    PopulationCap = 5,
-    TransferredAndKilled = 6,
-    NoVictim = 7,
-    AgeConstraints = 8,
-    /// A give found no creature on its target cell (T27.F03).
-    NoRecipient = 9,
-}
-
-/// Number of action results (Success..NoRecipient).
-const ACTION_RESULT_COUNT: usize = 10;
-const _: () = {
-    assert!(ActionResult::NoRecipient as usize + 1 == ACTION_RESULT_COUNT);
-    // `ALL[i]` has discriminant `i`, so the list is complete and ordered.
-    let mut i = 0;
-    while i < ACTION_RESULT_COUNT {
-        assert!(ActionResult::ALL[i] as usize == i);
-        i += 1;
-    }
-};
-
-impl ActionResult {
-    /// Every action result in discriminant order, for fixed-order reports.
-    pub const ALL: [Self; ACTION_RESULT_COUNT] = [
-        Self::Success,
-        Self::NoFood,
-        Self::Blocked,
-        Self::InvalidTarget,
-        Self::EnergyConstraints,
-        Self::PopulationCap,
-        Self::TransferredAndKilled,
-        Self::NoVictim,
-        Self::AgeConstraints,
-        Self::NoRecipient,
-    ];
-
-    /// Stable diagnostics key for this action result.
-    ///
-    /// Matches the variant name emitted by the derived `Serialize` impl.
-    #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        match self {
-            Self::Success => "Success",
-            Self::NoFood => "NoFood",
-            Self::Blocked => "Blocked",
-            Self::InvalidTarget => "InvalidTarget",
-            Self::EnergyConstraints => "EnergyConstraints",
-            Self::PopulationCap => "PopulationCap",
-            Self::TransferredAndKilled => "TransferredAndKilled",
-            Self::NoVictim => "NoVictim",
-            Self::AgeConstraints => "AgeConstraints",
-            Self::NoRecipient => "NoRecipient",
-        }
-    }
-}
 
 /// Single action record in a creature's action log.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -79,8 +15,8 @@ pub struct ActionLogEntry {
     pub tick: u64,
     /// Action type.
     pub action_type: ActionType,
-    /// Action result.
-    pub result: ActionResult,
+    /// How the action ended.
+    pub outcome: ActionOutcome,
     /// Direction parameter (0-7 for cardinal+diagonal, [`NO_DIRECTION`] for N/A).
     pub direction: u8,
     /// Creature energy BEFORE this action was applied.
@@ -151,7 +87,7 @@ mod tests {
         ActionLogEntry {
             tick,
             action_type,
-            result: ActionResult::Success,
+            outcome: ActionOutcome::Success,
             direction: NO_DIRECTION,
             energy_before: 100.0,
             energy_after: 95.0,
@@ -204,7 +140,7 @@ mod tests {
         let entry = ActionLogEntry {
             tick: 42,
             action_type: ActionType::StealEnergy,
-            result: ActionResult::NoVictim,
+            outcome: ActionOutcome::NoVictim,
             direction: 3,
             energy_before: 80.0,
             energy_after: 78.0,
@@ -218,7 +154,7 @@ mod tests {
         let stored = &log.entries()[0];
         assert_eq!(stored.tick, 42);
         assert_eq!(stored.action_type, ActionType::StealEnergy);
-        assert_eq!(stored.result, ActionResult::NoVictim);
+        assert_eq!(stored.outcome, ActionOutcome::NoVictim);
         assert_eq!(stored.direction, 3);
         assert!((stored.energy_before - 80.0).abs() < f32::EPSILON);
         assert!((stored.energy_after - 78.0).abs() < f32::EPSILON);
@@ -237,7 +173,7 @@ mod tests {
         let entry = ActionLogEntry {
             tick: 7,
             action_type: ActionType::Reproduce,
-            result: ActionResult::AgeConstraints,
+            outcome: ActionOutcome::AgeConstraints,
             direction: 0,
             energy_before: 40.0,
             energy_after: 39.0,
@@ -247,50 +183,16 @@ mod tests {
         };
         let mut log = ActionLog::new(8);
         log.push(entry);
-        assert_eq!(log.entries()[0].result, ActionResult::AgeConstraints);
-    }
-
-    fn assert_keys_match_serialization<T: serde::Serialize + Copy>(
-        values: &[T],
-        key: impl Fn(T) -> &'static str,
-    ) {
-        for value in values {
-            assert_eq!(
-                serde_json::to_value(value).expect("serializes"),
-                serde_json::Value::String(key(*value).to_string()),
-            );
-        }
+        assert_eq!(log.entries()[0].outcome, ActionOutcome::AgeConstraints);
     }
 
     #[test]
     fn action_type_as_key_matches_serialized_variant_name() {
-        assert_keys_match_serialization(
-            &[
-                ActionType::NoOp,
-                ActionType::Eat,
-                ActionType::Move,
-                ActionType::Reproduce,
-                ActionType::StealEnergy,
-            ],
-            ActionType::as_key,
-        );
-    }
-
-    #[test]
-    fn action_result_as_key_matches_serialized_variant_name() {
-        assert_keys_match_serialization(
-            &[
-                ActionResult::Success,
-                ActionResult::NoFood,
-                ActionResult::Blocked,
-                ActionResult::InvalidTarget,
-                ActionResult::EnergyConstraints,
-                ActionResult::PopulationCap,
-                ActionResult::TransferredAndKilled,
-                ActionResult::NoVictim,
-                ActionResult::AgeConstraints,
-            ],
-            ActionResult::as_key,
-        );
+        for action in ActionType::ALL {
+            assert_eq!(
+                serde_json::to_value(action).expect("serializes"),
+                serde_json::Value::String(action.as_key().to_string()),
+            );
+        }
     }
 }

@@ -5,8 +5,9 @@ use slotmap::SlotMap;
 
 use super::{resolve, Conception};
 use crate::config::SimulationConfig;
+use crate::contracts::ActionOutcome;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
-use crate::creature::action_log::{ActionResult, ActionType};
+use crate::creature::action_log::ActionType;
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::state::CreatureState;
@@ -65,7 +66,7 @@ fn settle_nets_the_overdraft_after_the_failed_effort_is_booked() {
         &WorldAction::Move(Direction::N),
     );
 
-    assert_eq!(applied.result.result, ActionResult::Blocked);
+    assert_eq!(applied.result.outcome, ActionOutcome::Blocked);
     assert!(applied.energy_after < 0.0, "{}", applied.energy_after);
     assert!(applied.actor_removed);
     assert_eq!(sim.creatures[actor].energy, 0.0);
@@ -93,7 +94,7 @@ fn a_span_zero_conception_is_handed_to_the_caller() {
         },
     );
 
-    assert_eq!(applied.result.result, ActionResult::Success);
+    assert_eq!(applied.result.outcome, ActionOutcome::Success);
     let Some(Conception { target, litter }) = applied.conceived else {
         panic!("a span-0 conception is returned");
     };
@@ -125,7 +126,7 @@ fn a_carried_litter_returns_no_conception() {
         },
     );
 
-    assert_eq!(applied.result.result, ActionResult::Success);
+    assert_eq!(applied.result.outcome, ActionOutcome::Success);
     assert_eq!(applied.conceived, None);
     assert!(sim.creatures[parent].pending_birth.is_some());
 }
@@ -145,7 +146,7 @@ fn an_exhausted_victim_is_kept() {
         },
     );
 
-    assert_eq!(applied.result.result, ActionResult::NoVictim);
+    assert_eq!(applied.result.outcome, ActionOutcome::NothingToTake);
     assert_eq!(applied.counterpart, Some(victim));
     assert!(sim.creatures.contains_key(victim));
     assert_eq!(sim.world.creature_at(north()), Some(victim));
@@ -168,10 +169,50 @@ fn resolve_removes_no_killed_victim() {
         },
     );
 
-    assert_eq!(applied.result.result, ActionResult::TransferredAndKilled);
+    assert_eq!(applied.result.outcome, ActionOutcome::TransferredAndKilled);
     assert_eq!(applied.counterpart, Some(victim));
     assert!(sim.creatures.contains_key(victim));
     assert_eq!(sim.world.creature_at(north()), Some(victim));
     assert!(sim.creatures[victim].energy <= 0.0);
     assert!(!applied.actor_removed);
+}
+
+/// The failed effort is booked once, by the settle step, as the attempt's
+/// effort: a rejected steal books it, an applied one does not; `resolve`
+/// writes no run total.
+#[test]
+fn the_failed_effort_is_the_attempt_effort_of_a_failed_outcome_only() {
+    let steal = WorldAction::StealEnergy {
+        direction: Direction::N,
+        effort: 1.0,
+    };
+    let (mut sim, ids) = sim_with(&[(at(), 100.0)]);
+    let rejected = resolve(&mut sim.action_inputs(), ids[0], &steal);
+    assert_eq!(rejected.result.outcome, ActionOutcome::NoVictim);
+    assert!(rejected.result.attempt_effort > 0.0);
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(
+        flows.failed_action_effort[ActionType::StealEnergy],
+        rejected.result.attempt_effort
+    );
+    assert_eq!(
+        flows.action_charges[ActionType::StealEnergy],
+        rejected.result.attempt_effort
+    );
+    assert_eq!(sim.stats.predation_actions_attempted_total, 0);
+    assert_eq!(sim.stats.predation_actions_rejected_total, 0);
+
+    let (mut sim, ids) = sim_with(&[(at(), 100.0), (north(), 50.0)]);
+    let applied = resolve(&mut sim.action_inputs(), ids[0], &steal);
+    assert_eq!(applied.result.outcome, ActionOutcome::Success);
+    assert!(applied.result.amount > 0.0);
+    assert_eq!(applied.counterpart, Some(ids[1]));
+    let flows = &sim.stats.energy_flows;
+    assert_eq!(flows.failed_action_effort[ActionType::StealEnergy], 0.0);
+    assert_eq!(
+        flows.action_charges[ActionType::StealEnergy],
+        applied.result.attempt_effort
+    );
+    assert_eq!(sim.stats.predation_actions_transferred_total, 0);
+    assert!(sim.stats.last_tick_predation_events.is_empty());
 }

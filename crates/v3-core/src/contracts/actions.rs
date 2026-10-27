@@ -64,6 +64,126 @@ impl ActionType {
     }
 }
 
+/// How an applied action ended: the kind its creature's action log stores
+/// and the reward count reads (T30.F06).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[repr(u8)]
+pub enum ActionOutcome {
+    Success = 0,
+    /// An eat found no food of its type on the cell.
+    NoFood = 1,
+    /// A move's target cell was off-world, a barrier or occupied.
+    Blocked = 2,
+    /// A reproduce's target cell was off-world, a barrier or occupied.
+    InvalidTarget = 3,
+    /// A reproduce would leave the parent under `min_reproduce_energy`.
+    EnergyConstraints = 4,
+    PopulationCap = 5,
+    /// A steal drained its victim, which the commit step removes.
+    TransferredAndKilled = 6,
+    /// A steal found no creature on its target cell.
+    NoVictim = 7,
+    AgeConstraints = 8,
+    /// A give found no creature on its target cell (T27.F03).
+    NoRecipient = 9,
+    /// A steal's victim lost no stored energy.
+    NothingToTake = 10,
+    /// A give moved none of the giver's stored energy.
+    NothingToGive = 11,
+    /// A reproduce's litter fell under `initial_energy` (T17.F01).
+    LitterTooSmall = 12,
+}
+
+/// Number of action outcomes (Success..LitterTooSmall).
+const ACTION_OUTCOME_COUNT: usize = 13;
+const _: () = {
+    assert!(ActionOutcome::LitterTooSmall as usize + 1 == ACTION_OUTCOME_COUNT);
+    // `ALL[i]` has discriminant `i`, so the list is complete and ordered.
+    let mut i = 0;
+    while i < ACTION_OUTCOME_COUNT {
+        assert!(ActionOutcome::ALL[i] as usize == i);
+        i += 1;
+    }
+};
+
+impl ActionOutcome {
+    /// Every outcome in discriminant order, for fixed-order reports.
+    pub const ALL: [Self; ACTION_OUTCOME_COUNT] = [
+        Self::Success,
+        Self::NoFood,
+        Self::Blocked,
+        Self::InvalidTarget,
+        Self::EnergyConstraints,
+        Self::PopulationCap,
+        Self::TransferredAndKilled,
+        Self::NoVictim,
+        Self::AgeConstraints,
+        Self::NoRecipient,
+        Self::NothingToTake,
+        Self::NothingToGive,
+        Self::LitterTooSmall,
+    ];
+
+    /// Stable diagnostics key: the variant name the derived `Serialize`
+    /// emits.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Success => "Success",
+            Self::NoFood => "NoFood",
+            Self::Blocked => "Blocked",
+            Self::InvalidTarget => "InvalidTarget",
+            Self::EnergyConstraints => "EnergyConstraints",
+            Self::PopulationCap => "PopulationCap",
+            Self::TransferredAndKilled => "TransferredAndKilled",
+            Self::NoVictim => "NoVictim",
+            Self::AgeConstraints => "AgeConstraints",
+            Self::NoRecipient => "NoRecipient",
+            Self::NothingToTake => "NothingToTake",
+            Self::NothingToGive => "NothingToGive",
+            Self::LitterTooSmall => "LitterTooSmall",
+        }
+    }
+
+    /// Whether the action applied: `Success`, or a steal that killed. Every
+    /// other outcome is a failed attempt whose effort is failed effort.
+    #[must_use]
+    pub const fn succeeded(self) -> bool {
+        matches!(self, Self::Success | Self::TransferredAndKilled)
+    }
+}
+
+/// One applied action (T30.F06): its outcome, the attempt's applied effort
+/// debit, and the amount the action moved.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActionResult {
+    pub outcome: ActionOutcome,
+    /// The applied debit of the attempt: the noop, eat or move effort, a
+    /// steal's or give's exchange effort, or a reproduce's Step 0 effort.
+    pub attempt_effort: f64,
+    /// Food eaten, energy taken or given, a reproduce's requested transfer
+    /// fraction; `0.0` otherwise.
+    pub amount: f32,
+}
+
+impl ActionResult {
+    /// An outcome with its effort and no amount.
+    #[must_use]
+    pub const fn new(outcome: ActionOutcome, attempt_effort: f64) -> Self {
+        Self {
+            outcome,
+            attempt_effort,
+            amount: 0.0,
+        }
+    }
+
+    /// `self` with `amount`.
+    #[must_use]
+    pub const fn with_amount(self, amount: f32) -> Self {
+        Self { amount, ..self }
+    }
+}
+
 /// The action a creature emits at the end of mesh execution for one tick.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WorldAction {
@@ -313,5 +433,45 @@ mod tests {
             let a2: WorldAction = serde_json::from_str(&json).unwrap();
             assert_eq!(action, a2);
         }
+    }
+
+    /// Every outcome's key is its serialized variant name, its discriminant
+    /// is its index in `ALL`, and only an applied outcome succeeds; `ALL`
+    /// is in the contract order.
+    #[test]
+    fn outcome_keys_order_and_success_agree() {
+        for (index, outcome) in ActionOutcome::ALL.into_iter().enumerate() {
+            assert_eq!(outcome as usize, index);
+            assert_eq!(
+                serde_json::to_value(outcome).unwrap(),
+                serde_json::Value::String(outcome.as_key().to_string())
+            );
+            assert_eq!(
+                outcome.succeeded(),
+                matches!(
+                    outcome,
+                    ActionOutcome::Success | ActionOutcome::TransferredAndKilled
+                )
+            );
+        }
+        let keys = ActionOutcome::ALL.map(ActionOutcome::as_key);
+        assert_eq!(
+            keys,
+            [
+                "Success",
+                "NoFood",
+                "Blocked",
+                "InvalidTarget",
+                "EnergyConstraints",
+                "PopulationCap",
+                "TransferredAndKilled",
+                "NoVictim",
+                "AgeConstraints",
+                "NoRecipient",
+                "NothingToTake",
+                "NothingToGive",
+                "LitterTooSmall",
+            ]
+        );
     }
 }

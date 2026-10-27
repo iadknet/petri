@@ -105,7 +105,7 @@ impl Simulation {
             creatures: &mut self.creatures,
             world: &mut self.world,
             config: &self.config,
-            stats: &mut self.stats,
+            flows: &mut self.stats.energy_flows,
             tick: self.tick,
         }
     }

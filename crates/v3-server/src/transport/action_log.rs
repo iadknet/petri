@@ -1,10 +1,12 @@
-//! The server-owned action-log entry (T30.F01 invariant 8, G22): today's
-//! fields and variant names, built from `creature::action_log`. T30.F06
-//! derives it from the applied action result.
+//! The server-owned action-log entry (T30.F01 invariant 8): the fields and
+//! variant names of the core entry, whose outcome and amount the commit step
+//! derives from the applied action result (T30.F06).
 
 use serde::Serialize;
-use v3_core::contracts::{ActionType as CoreActionType, OrdinaryFoodTypeId};
-use v3_core::creature::action_log::{ActionLogEntry as CoreEntry, ActionResult as CoreResult};
+use v3_core::contracts::{
+    ActionOutcome as CoreOutcome, ActionType as CoreActionType, OrdinaryFoodTypeId,
+};
+use v3_core::creature::action_log::ActionLogEntry as CoreEntry;
 
 /// An action's kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,10 +33,10 @@ impl From<CoreActionType> for ActionType {
     }
 }
 
-/// An action's result.
+/// How an action ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub enum ActionResult {
+pub enum ActionOutcome {
     Success,
     NoFood,
     Blocked,
@@ -45,21 +47,27 @@ pub enum ActionResult {
     NoVictim,
     AgeConstraints,
     NoRecipient,
+    NothingToTake,
+    NothingToGive,
+    LitterTooSmall,
 }
 
-impl From<CoreResult> for ActionResult {
-    fn from(result: CoreResult) -> Self {
-        match result {
-            CoreResult::Success => Self::Success,
-            CoreResult::NoFood => Self::NoFood,
-            CoreResult::Blocked => Self::Blocked,
-            CoreResult::InvalidTarget => Self::InvalidTarget,
-            CoreResult::EnergyConstraints => Self::EnergyConstraints,
-            CoreResult::PopulationCap => Self::PopulationCap,
-            CoreResult::TransferredAndKilled => Self::TransferredAndKilled,
-            CoreResult::NoVictim => Self::NoVictim,
-            CoreResult::AgeConstraints => Self::AgeConstraints,
-            CoreResult::NoRecipient => Self::NoRecipient,
+impl From<CoreOutcome> for ActionOutcome {
+    fn from(outcome: CoreOutcome) -> Self {
+        match outcome {
+            CoreOutcome::Success => Self::Success,
+            CoreOutcome::NoFood => Self::NoFood,
+            CoreOutcome::Blocked => Self::Blocked,
+            CoreOutcome::InvalidTarget => Self::InvalidTarget,
+            CoreOutcome::EnergyConstraints => Self::EnergyConstraints,
+            CoreOutcome::PopulationCap => Self::PopulationCap,
+            CoreOutcome::TransferredAndKilled => Self::TransferredAndKilled,
+            CoreOutcome::NoVictim => Self::NoVictim,
+            CoreOutcome::AgeConstraints => Self::AgeConstraints,
+            CoreOutcome::NoRecipient => Self::NoRecipient,
+            CoreOutcome::NothingToTake => Self::NothingToTake,
+            CoreOutcome::NothingToGive => Self::NothingToGive,
+            CoreOutcome::LitterTooSmall => Self::LitterTooSmall,
         }
     }
 }
@@ -70,7 +78,7 @@ impl From<CoreResult> for ActionResult {
 pub struct ActionLogEntry {
     pub tick: u64,
     pub action_type: ActionType,
-    pub result: ActionResult,
+    pub outcome: ActionOutcome,
     /// Direction index `0..8`, or `NO_DIRECTION` when the action has none.
     pub direction: u8,
     pub energy_before: f32,
@@ -88,7 +96,7 @@ impl From<&CoreEntry> for ActionLogEntry {
         Self {
             tick: entry.tick,
             action_type: entry.action_type.into(),
-            result: entry.result.into(),
+            outcome: entry.outcome.into(),
             direction: entry.direction,
             energy_before: entry.energy_before,
             energy_after: entry.energy_after,
@@ -106,7 +114,7 @@ mod tests {
     /// Every core variant has a wire variant of the same JSON name, and the
     /// wire enums have no other variant.
     #[test]
-    fn action_type_and_result_are_pinned_to_the_core_enums() {
+    fn action_type_and_outcome_are_pinned_to_the_core_enums() {
         for action in CoreActionType::ALL {
             assert_eq!(
                 serde_json::to_value(action).unwrap(),
@@ -120,18 +128,18 @@ mod tests {
                 / 2,
             CoreActionType::ALL.len()
         );
-        for result in CoreResult::ALL {
+        for outcome in CoreOutcome::ALL {
             assert_eq!(
-                result.as_key(),
-                serde_json::to_value(ActionResult::from(result)).unwrap()
+                outcome.as_key(),
+                serde_json::to_value(ActionOutcome::from(outcome)).unwrap()
             );
         }
         assert_eq!(
-            <ActionResult as ts_rs::TS>::decl(&ts_rs::Config::new())
+            <ActionOutcome as ts_rs::TS>::decl(&ts_rs::Config::new())
                 .matches('"')
                 .count()
                 / 2,
-            CoreResult::ALL.len()
+            CoreOutcome::ALL.len()
         );
     }
 }

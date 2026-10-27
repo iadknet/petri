@@ -7,10 +7,10 @@ use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
 use slotmap::SlotMap;
 
-use super::{apply_move, apply_typed_eat, move_effort, reproduce_now, steal_now};
+use super::{apply_typed_eat, move_effort, resolve};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
-use crate::contracts::{CreatureId, Direction, Position};
+use crate::contracts::{ActionOutcome, CreatureId, Direction, Position, WorldAction};
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::identity::CreatureIdentityState;
@@ -19,6 +19,7 @@ use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::ledger::{DeathCause, EnergyFlows};
 use crate::simulation::simulation::Simulation;
+use crate::simulation::tick::{reproduce_now, steal_now};
 
 fn config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();
@@ -80,7 +81,7 @@ fn eat_once(energy: f32, reward: f32) -> (Simulation, CreatureId, EnergyFlows) {
         0.0,
         &mut flows,
     );
-    assert!(eaten > 0.0, "the fixture eat must consume food");
+    assert!(eaten.amount > 0.0, "the fixture eat must consume food");
     (sim, id, flows)
 }
 
@@ -212,7 +213,10 @@ fn steal(victim_energy: f32, effort: f32) -> (Simulation, CreatureId, PredationA
         .config
         .energy
         .action_effort(0.0, attacker.complexity(), attacker.age);
-    let result = steal_now(ids[0], &mut sim, Direction::N, effort).result;
+    let outcome = steal_now(ids[0], &mut sim, Direction::N, effort)
+        .result
+        .outcome;
+    let result = PredationActionResult::from_outcome(outcome).expect("a steal key");
     (sim, ids[0], result, 195.0 - charge)
 }
 
@@ -264,7 +268,7 @@ fn predation_under_the_cap_books_no_clamp_loss() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0), (Position::new(5, 4), 50.0)]);
     sim.config.exchange.effort_rate = 0.0;
     let result = steal_now(ids[0], &mut sim, Direction::N, 1.0).result;
-    assert_eq!(result, PredationActionResult::Transferred);
+    assert_eq!(result.outcome, ActionOutcome::Success);
     assert_eq!(sim.stats.energy_flows.maximum_energy_clamp_loss, 0.0);
 }
 
@@ -382,7 +386,7 @@ fn eat_caps_at_the_bodys_own_capacity() {
         0.0,
         &mut flows,
     );
-    assert!(eaten > 0.0);
+    assert!(eaten.amount > 0.0);
     assert_eq!(flows.maximum_energy_clamp_loss, debit(65.0, 50.0));
     assert_eq!(sim.creatures[id].energy, 50.0 - eat_effort(&sim, id));
 }
@@ -473,14 +477,12 @@ fn move_once(blocked: bool) -> (bool, f32, Simulation, CreatureId) {
         creature.complexity(),
         creature.age,
     );
-    let moved = apply_move(
+    let applied = resolve(
+        &mut sim.action_inputs(),
         id,
-        &mut sim.creatures[id],
-        &mut sim.world,
-        Direction::N,
-        &sim.config,
-        &mut sim.stats.energy_flows,
+        &WorldAction::Move(Direction::N),
     );
+    let moved = applied.result.outcome == ActionOutcome::Success;
     (moved, effort, sim, id)
 }
 

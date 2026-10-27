@@ -9,7 +9,7 @@ mod position;
 pub mod routing;
 
 pub use action_queue::ActionQueue;
-pub use actions::{ActionType, WorldAction, ACTION_TYPE_COUNT};
+pub use actions::{ActionOutcome, ActionResult, ActionType, WorldAction, ACTION_TYPE_COUNT};
 pub use direction::{compass_x, compass_y, Direction};
 pub use food_type_id::OrdinaryFoodTypeId;
 pub use hash::splitmix64;
