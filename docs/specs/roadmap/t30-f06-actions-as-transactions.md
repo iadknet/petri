@@ -21,8 +21,7 @@ trajectory, population and draw stream is unchanged.
 ## Non-Goals
 
 - Any change to what an action costs, when it succeeds, what it moves, when a
-  creature dies or which cause is attributed; the per-tick reproduction RNG
-  derivation in `run_tick` stays (user, 2026-10-26).
+  creature dies or which cause is attributed.
 - The birth path (`spawn_child`, `deliver_pending_birth`, seeding; G4,
   T29.F01). Delivered litters and Phase 0 removals stay lifecycle records.
 - New metrics, frontend behaviour beyond the generated types, any rename of
@@ -124,7 +123,7 @@ The invariants state the closing state.
    `TransferredAndKilled` outcome and then a removed actor through
    `Simulation::remove_creature`; `apply_steal_energy` no longer removes;
    `tick/helpers.rs::remove_creature_if_dead` keeps serving the
-   gestation-hold check; Phase 0 removal and paint eviction are unchanged.
+   gestation-hold check; Phase 0 and paint removal are unchanged.
 7. **Birth path.** `spawn_child` and `deliver_pending_birth` keep their
    signatures and `&mut Simulation`, called from the commit step (and
    `spawn_child` from `deliver_pending_birth`, `reproduction.rs:356`, as
@@ -210,10 +209,10 @@ Pass 2 (the one applied result and the records derived from it):
       at its one site; the commit step derives every record of invariant 5
       from the result (R4, R7; invariants 2, 5).
 - [x] `ActionLogEntry.outcome`; the wire enum, entry and `From`; generated
-      files rewritten with `PETRI_WRITE_TS_TYPES=1`; frontend readers (`VitalsBanner.tsx`, the fixtures and store tests)
-      on `outcome`; diagnostics keys (R5; invariant 8).
-- [ ] At closure: G18, G19 and G22 rows deleted from `docs/architecture.md`;
-      the gate run and its summary recorded.
+      files rewritten with `PETRI_WRITE_TS_TYPES=1`; frontend readers on
+      `outcome`; diagnostics keys (R5; invariant 8).
+- [ ] At closure: the G18, G19 and G22 rows deleted; the gate summary
+      recorded.
 
 ## Verification
 
@@ -222,11 +221,11 @@ Pass 2 (the one applied result and the records derived from it):
       booked once, span-0 handoff, exhausted victim kept, no removal in
       `resolve`) -> 6 passed.
 - [x] Focused tests: v3-core `--all-features` lib 2348 and every
-      integration test passed (`applied_trajectory` sampled digests
-      re-pinned for log text only); v3-server 174, v3-telemetry 80,
-      v3-lab 212; `npm test` 673, `tsc -b`, lint, `make rust-clippy`,
-      `cargo fmt --all --check` and `cargo check --workspace --all-targets`
-      clean on the simplified diff.
+      integration test passed; v3-server 174, v3-telemetry 80, v3-lab 212;
+      `npm test` 673, `tsc -b`, lint, `make rust-clippy`, `cargo fmt --all
+      --check` and `cargo check --workspace --all-targets` clean.
+- [ ] `applied_trajectory`: state-only sampled digests (log bytes excluded)
+      pinned, equal at `18342fef^` and after -> values in the readings file.
 - [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
       exit 0.
 - [ ] Gate after pass 1 (readings only) and after pass 2 (summary at
@@ -239,8 +238,8 @@ Pass 2 (the one applied result and the records derived from it):
 **Predeclaration — written before the run.** A refactor with no mechanism
 and no natural analog to name. Expected cost: none: the arithmetic, its
 order and every draw are unchanged; each action returns one struct and the
-records derive from a match on it. Reference: the gate's selected reference,
-the last measured closure's summary (t30-f07); thresholds: the gate's own.
+records derive from a match on it. Reference: the last measured closure's
+summary (t30-f07); thresholds: the gate's own.
 Expected direction: the nine work counters and every `deterministic` value
 identical after each pass; wall clock neutral within the gate's noise, a
 regression attributed before closure. No indicator can move; nothing is
@@ -280,5 +279,8 @@ re-pinned.
   so the log and the wire gain `NothingToTake`, `NothingToGive` and
   `LitterTooSmall` for the cases the log classed `NoVictim` and
   `EnergyConstraints`; every exported run-total key is unchanged.
+- Decision: the sampled `applied_trajectory` digests hash the log text and
+  follow its vocabulary; state-only digests pinned beside them enforce the
+  unchanged histories; no test maps the new vocabulary to the old.
 - Deferred: audit R8, the birth path on `&mut Simulation`, is paid by
   T29.F01 (G4); the `WORKAROUND(G4)` comments mark both sites.
