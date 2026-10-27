@@ -64,7 +64,8 @@ The invariants state the closing state.
    `ActionInputs<'a>` (`creatures: &'a mut SlotMap<CreatureId, CreatureState>`,
    `world: &'a mut WorldState`, `config: &'a SimulationConfig`,
    `flows: &'a mut EnergyFlows`, `tick: u64`) and
-   `resolve(inputs, id, &WorldAction, rng) -> Applied`, with
+   `resolve(inputs, id, &WorldAction) -> Applied` (no RNG; only the
+   commit step's birth path draws), with
    `Applied { result: ActionResult, energy_after: f32, actor_removed: bool, counterpart: Option<CreatureId>, conceived: Option<Conception> }`
    and `Conception { target: Position, litter: f32 }`. `apply_noop`,
    `apply_typed_eat` and `apply_move` keep today's parameters (one creature,
@@ -88,8 +89,8 @@ The invariants state the closing state.
    charged-before snapshot (today `tick.rs:1308-1317`), and reports
    `energy_after` as the actor's energy before the floor and `actor_removed`
    as its energy at or below `0.0` after it. The transaction reads and writes no `SimStats` field,
-   pushes no log entry and removes no creature; `Simulation` is not imported
-   under `simulation/actions/` except by the birth path (invariant 7).
+   pushes no log entry and removes no creature; `simulation/actions/`
+   imports `Simulation` only on the birth path (invariant 7).
 3. **Move cost.** `simulation::actions::move_effort(body: &HeritableBody, energy: &EnergyConfig, complexity: u32, age: u64) -> f32`
    is `energy.action_effort(energy.costs.move_cost * body.move_factor(&energy.capacity), complexity, age)`;
    `CreatureState::move_effort` is deleted; `apply_move` and the lab
@@ -161,7 +162,7 @@ read from `creature::body::HeritableBody`. Shared rules read, not changed:
 `Simulation::remove_creature` (`simulation/simulation.rs:102`).
 `docs/architecture.md` already places the result in `contracts` and the
 transaction, removal path and derived records in `simulation`; the plan
-commit widens the `contracts` cell to name the amount moved.
+commit widens the `contracts` cell to name the amount.
 
 ## Telemetry
 
@@ -243,8 +244,8 @@ records derive from a match on it. Reference: the gate's selected reference,
 the last measured closure's summary (t30-f07); thresholds: the gate's own.
 Expected direction: the nine work counters and every `deterministic` value
 identical after each pass; wall clock neutral within the gate's noise, a
-regression there attributed before closure. No indicator can move; nothing
-is re-pinned.
+regression attributed before closure. No indicator can move; nothing is
+re-pinned.
 
 **Measured verdict.** Pending.
 
