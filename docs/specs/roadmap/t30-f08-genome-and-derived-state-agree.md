@@ -1,6 +1,6 @@
 # T30.F08 — A Creature's Genome and Its Derived State Agree
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F08
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -207,9 +207,9 @@ value, or a gate compute regression past its threshold would show it wrong.
       inherited values in `server.rs` and telemetry `tests.rs`; `runtime_mut()`
       for the post-birth and per-tick state in `tick.rs` and
       `reproduction.rs`.
-- [ ] 6. `cargo test -p v3-core --test viability` first (tick-loop code
+- [x] 6. `cargo test -p v3-core --test viability` first (tick-loop code
       changes), then `make check`.
-- [ ] 7. At close: delete G27 from `docs/architecture.md`; run the declared
+- [x] 7. At close: delete G27 from `docs/architecture.md`; run the declared
       gate profile and slow tier.
 
 ## Verification
@@ -221,12 +221,12 @@ value, or a gate compute regression past its threshold would show it wrong.
       definition in `creature/state.rs`, uses in test code only; the
       whole-state assignment and `&mut ...graph_runtime` greps are empty
       outside `creature/state.rs` (commands in the readings).
-- [ ] Invariants 5 and 6: `make check` exits 0, no test deleted or ignored.
+- [x] Invariants 5 and 6: `make check` exits 0, no test deleted or ignored.
 - [x] Gate profile: summary at `docs/progress/features/t30-f08.json`, blocks
       equal to the epoch, raw hash and size in the readings, series entry
       added, no full report staged.
-- [ ] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
-- [ ] Invariant 7: `make check-docs` -> exit 0 with G27 deleted.
+- [x] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
+- [x] Invariant 7: `make check-docs` -> exit 0 with G27 deleted.
 
 ## Performance and Goal Impact
 
@@ -252,16 +252,18 @@ clock flagged (+44.9%) under host load; not attributed to this feature.
 
 ## Success Criteria
 
-- [ ] In a non-test build, a write to a record's genome, derived state or
+- [x] In a non-test build, a write to a record's genome, derived state or
       runtime outside `creature/state.rs` does not compile; tests reach the
       runtime only through `runtime_mut()` as invariants 4 and 5 bound it;
       the property test shows every built record's derived state equals the
       analysis of its genome.
-- [ ] One constructor builds every creature; no constructor or operation
+- [x] One constructor builds every creature; no constructor or operation
       accepts derived state apart from the genome it derives from.
-- [ ] No test swaps a genome or sets a cache by hand; every former site
+- [x] No test swaps a genome or sets a cache by hand; every former site
       builds its creature through a construction operation and keeps its
       assertions.
-- [ ] The gate's blocks equal the epoch's, `make check` passes, G27 is deleted.
+- [x] The gate's blocks equal the epoch's, `make check` passes, G27 is deleted.
 
 ## Notes for AI Agents
+
+- Cost: see the readings.
