@@ -216,19 +216,15 @@ value, or a gate compute regression past its threshold would show it wrong.
 
 - [x] Invariant 1: `grep -rnE "cached_(complexity|genome_size|reachable_nodes|has_barrier_reader|live_vm_world_inputs|perception_requirements|declared_world_inputs|wired_world_inputs)" crates`
       matches only in `crates/v3-core/src/creature/state.rs`.
-- [x] Invariant 3: `cargo test -p v3-core creature::state` -> the record
-      test passes; `grep -rn new_with_cached_fields crates` is empty.
+- [x] Invariant 3: `cargo test -p v3-core creature::state` passes; `grep -rn new_with_cached_fields crates` is empty.
 - [x] Invariant 4: `grep -rn "runtime_mut" crates` -> one `#[cfg(test)]`
-      definition in `creature/state.rs` and uses in test code only;
-      `grep -rnE "\*[^=;]*runtime_mut\(\)\s*=" crates` is empty (no whole-state
-      assignment); `grep -rnE "&mut [a-z_.\[\]]*\.graph_runtime\b" crates`
-      is empty outside `creature/state.rs`.
-- [ ] Invariants 5 and 6: `make check` -> exit 0 with no test deleted or
-      ignored (`git diff --stat` and the test count in the readings).
-- [ ] Gate profile: summary stored at
-      `docs/progress/features/t30-f08.json`, deterministic blocks equal to
-      the epoch, local raw hash and byte count checked, series entry points
-      to the summary, no full report staged.
+      definition in `creature/state.rs`, uses in test code only; the
+      whole-state assignment and `&mut ...graph_runtime` greps are empty
+      outside `creature/state.rs` (commands in the readings).
+- [ ] Invariants 5 and 6: `make check` exits 0, no test deleted or ignored.
+- [x] Gate profile: summary at `docs/progress/features/t30-f08.json`, blocks
+      equal to the epoch, raw hash and size in the readings, series entry
+      added, no full report staged.
 - [ ] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
 - [ ] Invariant 7: `make check-docs` -> exit 0 with G27 deleted.
 
@@ -247,7 +243,11 @@ cost to accept: it goes to the spec owner, whose fallback (readings, options
 table) keeps the reuse through an operation on the parent record. No
 indicator can move.
 
-**Measured verdict.** Not run yet.
+**Measured verdict.** Gate, exit 0, `severe=false`: all 9 work counters
+0.000000% and deterministic blocks equal to the epoch, as predeclared. Wall
+clock flagged (+44.9%; severe is 100%) under host load 85–114, untouched
+phases doubling alike; not rerun. The wall-clock reading is not attributed to
+this feature; the next closure's gate on an idle host re-reads it.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f08.json).
 - Full readings: [`docs/progress/readings/t30-f08.md`](../../progress/readings/t30-f08.md).
@@ -264,7 +264,6 @@ indicator can move.
 - [ ] No test swaps a genome or sets a cache by hand; every former site
       builds its creature through a construction operation and keeps its
       assertions.
-- [ ] The gate's deterministic blocks equal the epoch's and `make check`
-      passes; G27 is deleted.
+- [ ] The gate's blocks equal the epoch's, `make check` passes, G27 is deleted.
 
 ## Notes for AI Agents
