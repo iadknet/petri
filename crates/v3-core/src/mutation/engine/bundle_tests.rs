@@ -693,15 +693,13 @@ fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
     let counts = ring + 2;
     node.input_refs.push(InputReference::CommitCounts);
     let context = crate::config::test_sensor_context(1);
-    let refs = node.input_refs.clone();
-    let def = graph_mut(node);
     for &(kind, offset, scale, drop, shape) in bundles {
         let kind = DirectedVoteKind::ALL[kind];
         let id = match shape {
-            BundleShape::Ring => def.add_ring_bundle(ring, kind, offset),
+            BundleShape::Ring => graph_mut(node).add_ring_bundle(ring, kind, offset),
             BundleShape::Pair { pair } => {
                 let layout = crate::contracts::pair_layout(&area, pair);
-                def.add_pair_bundle(summary, pair, layout, kind, offset)
+                graph_mut(node).add_pair_bundle(summary, pair, layout, kind, offset)
             }
             BundleShape::Plain { sink, memory } => {
                 let source = match memory {
@@ -711,14 +709,6 @@ fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
                         field_set: 0,
                     },
                 };
-                let set = match source {
-                    BundleSource::Memory { .. } => crate::contracts::MEMORY_BANK,
-                    BundleSource::Sensor { .. } => {
-                        crate::contracts::SensorDescriptor::of(&refs[usize::from(counts)], &context)
-                            .field_set(0)
-                            .unwrap()
-                    }
-                };
                 let birth = BundleBirth {
                     field_set: 0,
                     wiring: Wiring::Plain {
@@ -726,9 +716,10 @@ fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
                     },
                     scale: 0.0,
                 };
-                def.add_bundle(source, set, birth).unwrap()
+                node.add_bundle(source, birth, &context).unwrap()
             }
         };
+        let def = graph_mut(node);
         def.bundle_mut(id).set_scale(scale);
         let members: Vec<_> = def.members(id).collect();
         let last = members.len() - 1;

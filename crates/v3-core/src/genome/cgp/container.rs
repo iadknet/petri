@@ -1186,12 +1186,14 @@ impl CgpGraphBackendDef {
     /// to `set`, with `birth`'s wiring and scale: every coordinate of the set
     /// under the wiring ([`Wiring::coordinates`]) one member at own weight 0,
     /// static, scope `Edge`, no seed, in one edit (T25.F11 invariant 5).
+    /// The genome's primitive: callers go through `NodeGenome::add_bundle`
+    /// or `add_sensor`, which resolve `set` from the node's declarations.
     ///
     /// # Errors
     ///
     /// The wiring is not admissible for `set` ([`plans`]) or the graph holds
     /// `u16::MAX` records; nothing is written.
-    pub fn add_bundle(
+    pub(in crate::genome) fn add_bundle(
         &mut self,
         source: BundleSource,
         set: FieldSet,

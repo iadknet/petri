@@ -9,7 +9,7 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_SINK_COUNT};
 use crate::contracts::OutcomeChannel;
 use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::genome::cgp::test_support::edit_sinks;
+use crate::genome::cgp::test_support::{add_bundle_on, edit_sinks};
 use crate::genome::cgp::{
     compose, detach, validate_graph, BirthSeeds, BundleBirth, BundleId, BundleSource,
     CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, OutputSinkKind, Scope, Wiring,
@@ -272,9 +272,7 @@ fn applicability_follows_sources_bundles_and_wirings() {
         },
         scale: 0.0,
     };
-    plain_only
-        .add_bundle(source, crate::contracts::MEMORY_BANK, birth)
-        .unwrap();
+    add_bundle_on(&mut plain_only, &[], source, birth);
     let plain_only = genome(vec![], plain_only);
     let context = crate::config::test_sensor_context(1);
     let applies =
@@ -395,7 +393,7 @@ fn replay_creation(op: GraphOperator, rng: &mut SmallRng) -> (CgpGraphBackendDef
         wiring,
         scale,
     };
-    let bundle = want.add_bundle(source, set, birth).unwrap();
+    let bundle = add_bundle_on(&mut want, &creation_refs(), source, birth);
     let randomized = rng.gen_bool(0.5);
     if randomized {
         replay_randomized(&mut want, bundle, rng);
@@ -612,12 +610,7 @@ fn plain_on(def: &mut CgpGraphBackendDef, sink: VoteSink) -> BundleId {
         wiring: Wiring::Plain { sink },
         scale: 0.25,
     };
-    def.add_bundle(
-        BundleSource::Memory { previous: false },
-        crate::contracts::MEMORY_BANK,
-        birth,
-    )
-    .unwrap()
+    add_bundle_on(def, &[], BundleSource::Memory { previous: false }, birth)
 }
 
 /// `RetargetBundle` on a `Plain` bundle: the bundle, then one `gen_range`

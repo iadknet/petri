@@ -5,6 +5,7 @@ import type { WorldAction } from "../../types/generated/WorldAction.ts";
 import directionPairsFixture from "./directionPairs.json";
 import {
 	describeInputRef,
+	describeWholeInputRef,
 	directionName,
 	directionPairs,
 	formatAction,
@@ -78,6 +79,17 @@ describe("formatInputRef", () => {
 	it("formats UpstreamSlot variant", () => {
 		const ref: InputRef = { family: "upstream", key: "UpstreamSlot", slot: 3 };
 		expect(formatInputRef(ref)).toBe("Bus[3]");
+	});
+
+	it("labels the UpstreamBus whole and each field by its slot", () => {
+		const ref: InputRef = { family: "upstream", key: "UpstreamBus" };
+		expect(formatInputRef(ref)).toBe("Bus");
+		expect(describeWholeInputRef(ref).description).not.toContain("undefined");
+		const field = describeInputRef(ref, 5);
+		expect(field.label).toBe("Bus[5]");
+		expect(field.description).toBe(
+			"Bus slot 5: the value the previous mesh node wrote there (0 at tick start).",
+		);
 	});
 
 	it("labels the decision-state references by short names", () => {

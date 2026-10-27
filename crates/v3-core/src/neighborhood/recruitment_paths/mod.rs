@@ -1,3 +1,4 @@
+// WORKAROUND(T25.F11): a reachability assay compiled into v3-core and run by the CLI; the intended design is a v3-lab assay (AGENTS.md lab rule), or no tier at all where the lab's reachability assays supersede it. Payer proposed to the user at T25.F11 closure.
 //! Bounded, replicated task observation. Never used by mutation or simulation.
 
 mod experiment;

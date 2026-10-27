@@ -1120,6 +1120,48 @@ fn add_sensor_declares_only_while_the_index_fits_u16() {
     assert_eq!(overflows, before, "nothing written");
 }
 
+/// A node at the 65,536-declaration limit, its last sensor wired, still
+/// mutates without panicking: the Graph source draw and the raw-field moves
+/// count declarations past `u16` and leave a valid graph.
+#[test]
+fn graph_mutation_after_the_boundary_addition_stays_within_u16() {
+    use crate::mutation::graph::{GraphMutator, GraphOperator};
+    let mut boundary = graph_node_genome_full_catalog();
+    boundary.nodes[0].input_refs = vec![InputReference::ActionQueue; 65_535];
+    apply_add_to_node(
+        &mut boundary,
+        InputRefOperator::AddSensorLive,
+        0,
+        &mut rng(7),
+        1,
+    )
+    .unwrap();
+    let context = crate::config::test_sensor_context(1);
+    for op in [
+        GraphOperator::AddGraphEdge,
+        GraphOperator::RetargetGraphEdge,
+        GraphOperator::GraphRawFieldMutation,
+    ] {
+        for seed in 0u64..16 {
+            let mut genome = boundary.clone();
+            let _ = GraphMutator::apply_to_node(
+                &mut genome,
+                op,
+                0,
+                &mut rng(seed),
+                &MutationConfig::default(),
+                &context,
+            );
+            assert_eq!(genome.nodes[0].input_refs.len(), 65_536);
+            assert_eq!(
+                crate::genome::cgp::validate_graph(&genome.nodes[0]),
+                Ok(()),
+                "{op:?} seed {seed}"
+            );
+        }
+    }
+}
+
 /// The members consume the new reference, so `Prune` cannot take it.
 #[test]
 fn add_sensor_on_graph_leaves_the_new_reference_unprunable() {

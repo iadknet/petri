@@ -207,6 +207,36 @@ pub(crate) fn add_first_plan_bundle(node: &mut NodeGenome, source: BundleSource)
         .expect("a first-plan bundle fixture")
 }
 
+/// `birth` reading `source` on a bare `def`, through
+/// [`NodeGenome::add_bundle`] on a node declaring `refs` that hosts `def`
+/// for the edit, under the default sensor context (a fixture).
+///
+/// # Panics
+///
+/// If the node rejects the edit.
+pub(crate) fn add_bundle_on(
+    def: &mut CgpGraphBackendDef,
+    refs: &[InputReference],
+    source: BundleSource,
+    birth: BundleBirth,
+) -> BundleId {
+    let hosted = std::mem::replace(def, CgpGraphBackendDef::new_with_fixed_outputs());
+    let mut node = NodeGenome {
+        node_id: NodeId::new(0),
+        input_refs: refs.to_vec(),
+        backend_def: BackendDef::Graph(hosted),
+        targets: Vec::new(),
+    };
+    let id = node
+        .add_bundle(source, birth, &crate::config::test_sensor_context(1))
+        .expect("a bundle fixture");
+    let BackendDef::Graph(hosted) = node.backend_def else {
+        unreachable!("the node hosts a Graph def")
+    };
+    *def = hosted;
+    id
+}
+
 fn first_plan_birth(def: &CgpGraphBackendDef, field_set: u8, set: &FieldSet) -> BundleBirth {
     BundleBirth {
         field_set,

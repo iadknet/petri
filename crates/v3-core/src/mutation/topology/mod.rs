@@ -131,10 +131,7 @@ impl TopologyOperator {
     }
 
     /// Pick a random topology operator weighted by impact tier.
-    // WORKAROUND(T25.F08): a sampler beside the engine's
-    // `select_weighted_index`; the VM and Topology domains' `random` and
-    // `TOTAL_WEIGHT` go in one area change (Graph's and InputRef's went
-    // with T25.F11), tests drawing through the engine's sampler.
+    // WORKAROUND(T25.F08): a test-only sampler beside the engine's select_weighted_index over the enabled catalog; the Graph and InputRef samplers went with T25.F11, and this one goes when the VM/Topology catalog's tests draw through the engine's sampler. Unpaid accept recorded in T25.F11's spec; payer proposed to the user at closure.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {

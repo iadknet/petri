@@ -116,7 +116,7 @@ fn birth_learning_reports_each_creation_by_wiring_and_form() {
             unreachable!()
         };
         let mut rng = SmallRng::seed_from_u64(seed);
-        let edits = draw_birth_learning(def, &[id], &[wiring], &mut rng);
+        let edits = draw_birth_learning(def, &[id], &mut rng);
         let mut replay = SmallRng::seed_from_u64(seed);
         let randomized = replay.gen_bool(0.5);
         assert_eq!(edits, BundleEdits::creation(&wiring, randomized));

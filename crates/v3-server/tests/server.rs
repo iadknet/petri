@@ -2690,11 +2690,10 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
             let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-            let refs = node.input_refs.clone();
+            let bundle = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let bundle = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             def.bundle_mut(bundle).set_scale(0.5);
             let members: Vec<_> = def.members(bundle).collect();
             def.edge_mut(members[0]).set_weight(0.25);
@@ -2790,11 +2789,10 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
             let node_id = node.node_id.0;
-            let refs = node.input_refs.clone();
+            let bundle = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let bundle = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             let members: Vec<_> = def.members(bundle).collect();
             let vote_sink = def
                 .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
@@ -2955,11 +2953,10 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
             node.input_refs
                 .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
             let node_id = node.node_id.0;
-            let refs = node.input_refs.clone();
+            let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let id = add_geometric(def, &refs, ring_ref, 0, DirectedVoteKind::Move, 0);
             def.bundle_mut(id).set_scale(0.5);
             def.bundle_mut(id).set_inherit_scale(true);
             let members: Vec<EdgeOccurrence> = def.members(id).collect();
@@ -3063,7 +3060,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
 #[tokio::test]
 async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width() {
     use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
-    use v3_core::contracts::{InputReference, SensorDescriptor};
+    use v3_core::contracts::InputReference;
     use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
     use v3_core::genome::BackendDef;
 
@@ -3089,12 +3086,6 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
                 .expect("a Graph node");
             let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
             node.input_refs.push(InputReference::ActionQueue);
-            let set = SensorDescriptor::of(&InputReference::ActionQueue, &context)
-                .field_set(0)
-                .expect("one field set");
-            let BackendDef::Graph(def) = &mut node.backend_def else {
-                unreachable!()
-            };
             let birth = BundleBirth {
                 field_set: 0,
                 wiring: Wiring::Plain {
@@ -3106,7 +3097,9 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
                 ref_idx,
                 field_set: 0,
             };
-            let bundle = def.add_bundle(source, set, birth).expect("a Plain bundle");
+            let bundle = node
+                .add_bundle(source, birth, &context)
+                .expect("a Plain bundle");
             (node.node_id.0, bundle.index())
         })
     };
@@ -3166,12 +3159,11 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
                 .expect("a Graph node");
             let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
             node.input_refs.push(area);
-            let refs = node.input_refs.clone();
             let node_id = node.node_id.0;
+            let bundle = add_geometric(node, ref_idx, 0, DirectedVoteKind::Move, 0);
             let BackendDef::Graph(def) = &mut node.backend_def else {
                 unreachable!()
             };
-            let bundle = add_geometric(def, &refs, ref_idx, 0, DirectedVoteKind::Move, 0);
             def.bundle_mut(bundle).set_scale(2.0);
             let first = def.members(bundle).next().unwrap();
             def.remove_edge(first);
@@ -4639,24 +4631,21 @@ async fn recipe_export_preserves_complete_config_and_large_seeds() {
     );
 }
 
-/// A silent bundle on field set `field_set` of `refs[ref_idx]`, wired into
-/// `kind` at `offset`: a ring set as `Ring`, a pair set as `DirectionPair`
-/// (a fixture through the container's public primitive).
+/// A silent bundle on field set `field_set` of the node's declaration
+/// `ref_idx`, wired into `kind` at `offset`: a ring set as `Ring`, a pair set
+/// as `DirectionPair` (a fixture through the node's `add_bundle`).
 fn add_geometric(
-    def: &mut v3_core::genome::cgp::CgpGraphBackendDef,
-    refs: &[v3_core::contracts::InputReference],
+    node: &mut v3_core::genome::NodeGenome,
     ref_idx: u16,
     field_set: u8,
     kind: v3_core::contracts::votes::DirectedVoteKind,
     offset: u8,
 ) -> v3_core::genome::cgp::BundleId {
-    use v3_core::contracts::{FieldSet, SensorContext, SensorDescriptor};
+    use v3_core::contracts::{FieldSet, SensorContext};
     use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
-    let set = SensorDescriptor::of(&refs[usize::from(ref_idx)], &SensorContext::WIDEST)
-        .field_set(field_set)
-        .expect("a declared field set");
-    let wiring = match set {
-        FieldSet::Ring => Wiring::Ring { kind, offset },
+    let source = BundleSource::Sensor { ref_idx, field_set };
+    let wiring = match node.field_set(source, &SensorContext::WIDEST) {
+        Some(FieldSet::Ring) => Wiring::Ring { kind, offset },
         _ => Wiring::DirectionPair { kind, offset },
     };
     let birth = BundleBirth {
@@ -4664,6 +4653,6 @@ fn add_geometric(
         wiring,
         scale: 0.0,
     };
-    def.add_bundle(BundleSource::Sensor { ref_idx, field_set }, set, birth)
+    node.add_bundle(source, birth, &SensorContext::WIDEST)
         .expect("a geometric fixture on a full catalog")
 }

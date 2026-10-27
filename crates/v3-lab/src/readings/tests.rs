@@ -501,12 +501,12 @@ fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
     let mut genome = founder(&setup);
     let (entry, barrier) = with_ring(&mut genome, WorldInputKey::NeighborBarrierRing);
     let (_, occupied) = with_ring(&mut genome, WorldInputKey::NeighborOccupiedRing);
-    let refs = genome.nodes[entry].input_refs.clone();
-    let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
-        panic!("the founder entry is a graph node");
-    };
+    let node = &mut genome.nodes[entry];
     for (ring_ref, offset, scale) in [(barrier, 0, 0.5), (occupied, 3, -0.5)] {
-        let id = add_geometric(graph, &refs, ring_ref, 0, DirectedVoteKind::Move, offset);
+        let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, offset);
+        let BackendDef::Graph(graph) = &mut node.backend_def else {
+            panic!("the founder entry is a graph node");
+        };
         graph.bundle_mut(id).set_scale(scale);
     }
     (genome, entry, barrier, occupied)
@@ -670,7 +670,10 @@ fn a_ring_read_only_through_a_bundle_is_causal() {
             .with_output_sinks(sinks);
         moved += rings.len();
         for ring_ref in rings {
-            let id = add_geometric(graph, refs, ring_ref, 0, DirectedVoteKind::Move, 0);
+            let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
+            let BackendDef::Graph(graph) = &mut node.backend_def else {
+                unreachable!("a Graph node")
+            };
             graph.bundle_mut(id).set_scale(1.0);
         }
     }
@@ -1030,11 +1033,11 @@ fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
     let (entry, summary) = with_ring(&mut genome, WorldInputKey::AreaBarrierSummary);
-    let refs = genome.nodes[entry].input_refs.clone();
-    let BackendDef::Graph(graph) = &mut genome.nodes[entry].backend_def else {
+    let node = &mut genome.nodes[entry];
+    let id = add_geometric(node, summary, 1, DirectedVoteKind::Move, 2);
+    let BackendDef::Graph(graph) = &mut node.backend_def else {
         panic!("the founder entry is a graph node");
     };
-    let id = add_geometric(graph, &refs, summary, 1, DirectedVoteKind::Move, 2);
     graph.bundle_mut(id).set_scale(0.75);
     (genome, entry)
 }
@@ -1079,24 +1082,21 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
     );
 }
 
-/// A silent bundle on field set `field_set` of `refs[ref_idx]`, wired into
-/// `kind` at `offset`: a ring set as `Ring`, a pair set as `DirectionPair`
-/// (a fixture through the container's public primitive).
+/// A silent bundle on field set `field_set` of the node's declaration
+/// `ref_idx`, wired into `kind` at `offset`: a ring set as `Ring`, a pair set
+/// as `DirectionPair` (a fixture through the node's `add_bundle`).
 fn add_geometric(
-    def: &mut CgpGraphBackendDef,
-    refs: &[InputReference],
+    node: &mut v3_core::genome::NodeGenome,
     ref_idx: u16,
     field_set: u8,
     kind: v3_core::contracts::votes::DirectedVoteKind,
     offset: u8,
 ) -> v3_core::genome::cgp::BundleId {
-    use v3_core::contracts::{FieldSet, SensorContext, SensorDescriptor};
+    use v3_core::contracts::{FieldSet, SensorContext};
     use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
-    let set = SensorDescriptor::of(&refs[usize::from(ref_idx)], &SensorContext::WIDEST)
-        .field_set(field_set)
-        .expect("a declared field set");
-    let wiring = match set {
-        FieldSet::Ring => Wiring::Ring { kind, offset },
+    let source = BundleSource::Sensor { ref_idx, field_set };
+    let wiring = match node.field_set(source, &SensorContext::WIDEST) {
+        Some(FieldSet::Ring) => Wiring::Ring { kind, offset },
         _ => Wiring::DirectionPair { kind, offset },
     };
     let birth = BundleBirth {
@@ -1104,6 +1104,6 @@ fn add_geometric(
         wiring,
         scale: 0.0,
     };
-    def.add_bundle(BundleSource::Sensor { ref_idx, field_set }, set, birth)
+    node.add_bundle(source, birth, &SensorContext::WIDEST)
         .expect("a geometric fixture on a full catalog")
 }

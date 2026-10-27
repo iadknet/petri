@@ -134,15 +134,15 @@ pub(crate) fn draw_births(
 /// The birth policy's learning draws (T25.F11 invariant 6), after every
 /// bundle of `ids` is materialized: per bundle in order, the form coin
 /// `gen_bool(0.5)` (true `Randomized`), then [`draw_learning`] in that
-/// form. Returns the creations, by wiring and form.
+/// form. Returns the creations, by each bundle's wiring and form.
 pub(crate) fn draw_birth_learning(
     def: &mut CgpGraphBackendDef,
     ids: &[BundleId],
-    wirings: &[Wiring],
     rng: &mut impl Rng,
 ) -> BundleEdits {
     let mut edits = BundleEdits::default();
-    for (&id, wiring) in ids.iter().zip(wirings) {
+    for &id in ids {
+        let wiring = def.bundles()[id.index()].wiring();
         let randomized = rng.gen_bool(0.5);
         let form = if randomized {
             CreationForm::Randomized
@@ -150,7 +150,7 @@ pub(crate) fn draw_birth_learning(
             CreationForm::Uniform
         };
         draw_learning(def, id, form, rng);
-        edits.created[wiring_index(wiring)][usize::from(randomized)] += 1;
+        edits.created[wiring_index(&wiring)][usize::from(randomized)] += 1;
     }
     edits
 }
@@ -215,9 +215,8 @@ pub(crate) fn add_bundle_by_law(
         .add_bundle(source, births[0], context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     let (def, _) = graph_node(node)?;
-    let wirings = [births[0].wiring];
-    let edits = draw_birth_learning(def, &[id], &wirings, rng);
-    Ok((edits, creation_class(&wirings)))
+    let edits = draw_birth_learning(def, &[id], rng);
+    Ok((edits, creation_class(&[births[0].wiring])))
 }
 
 /// `AddSensorLive` / `AddSensorSilent` on a node, after the sensor draw
@@ -249,8 +248,8 @@ pub(crate) fn add_sensor_by_law(
     let ids: Vec<BundleId> = (first..def.bundles().len())
         .map(|index| BundleId::new(u16::try_from(index).expect("bundles below u16::MAX")))
         .collect();
+    let edits = draw_birth_learning(def, &ids, rng);
     let wirings: Vec<Wiring> = births.iter().map(|birth| birth.wiring).collect();
-    let edits = draw_birth_learning(def, &ids, &wirings, rng);
     Ok((edits, creation_class(&wirings)))
 }
 

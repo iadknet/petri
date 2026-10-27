@@ -243,7 +243,10 @@ pub(crate) fn random_graph_source(
     if roll < 0.5 && compute_count > 0 {
         GraphSource::ComputeNode(rng.gen_range(0..compute_count))
     } else if roll < 0.8 && !inputs.refs.is_empty() {
-        let ref_idx = rng.gen_range(0..inputs.refs.len() as u16);
+        // `0..=last` is `0..len`'s exact draw, and reaches index 65,535 when
+        // 65,536 declarations fill the `u16` space.
+        let last = u16::try_from(inputs.refs.len() - 1).expect("declarations within u16");
+        let ref_idx = rng.gen_range(0..=last);
         let width = inputs.width(ref_idx);
         GraphSource::InputLeaf {
             ref_idx,
@@ -769,24 +772,22 @@ fn valid_edge_field_moves(
             }
         }
         GraphSource::InputLeaf { ref_idx, sub_idx } => {
-            let ref_count = inputs.refs.len() as u16;
-            if ref_idx > 0 {
-                let candidate = (ref_idx - 1) as usize;
-                if let Some(width) = inputs.width_at(candidate) {
+            let current = usize::from(ref_idx);
+            if current > 0 {
+                if let Some(width) = inputs.width_at(current - 1) {
                     if u32::from(sub_idx) < width {
                         moves.push(EdgeFieldMove::RefIdx(-1));
                     }
                 }
             }
-            if ref_idx + 1 < ref_count {
-                let candidate = (ref_idx + 1) as usize;
-                if let Some(width) = inputs.width_at(candidate) {
+            if current + 1 < inputs.refs.len() {
+                if let Some(width) = inputs.width_at(current + 1) {
                     if u32::from(sub_idx) < width {
                         moves.push(EdgeFieldMove::RefIdx(1));
                     }
                 }
             }
-            if (ref_idx as usize) < inputs.refs.len() {
+            if current < inputs.refs.len() {
                 let width = inputs.width(ref_idx);
                 if sub_idx > 0 {
                     moves.push(EdgeFieldMove::SubIdx(-1));

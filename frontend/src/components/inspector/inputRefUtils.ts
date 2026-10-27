@@ -224,14 +224,26 @@ export function describeWholeInputRef(ref: InputRef): InputDescription {
 		case "dynamic":
 			return SCALAR_LABELS[ref.key] ?? { label: ref.key, description: "" };
 		case "upstream":
-			return {
-				label: `Bus[${ref.slot}]`,
-				description: `Bus slot ${ref.slot}: the value the previous mesh node wrote there (0 at tick start).`,
-			};
+			if (ref.key === "UpstreamBus") {
+				return {
+					label: "Bus",
+					description:
+						"Every bus slot: the values the previous mesh node wrote there (0 at tick start).",
+				};
+			}
+			return busSlot(ref.slot ?? 0);
 		case "action_queue":
 		case "decision":
 			return STRING_REFS[ref.key] ?? { label: ref.key, description: "" };
 	}
+}
+
+/** One bus slot, read whole by `UpstreamSlot` or as a field of `UpstreamBus`. */
+function busSlot(slot: number): InputDescription {
+	return {
+		label: `Bus[${slot}]`,
+		description: `Bus slot ${slot}: the value the previous mesh node wrote there (0 at tick start).`,
+	};
 }
 
 export function formatInputRef(ref: InputRef): string {
@@ -284,6 +296,8 @@ export function describeInputRef(ref: InputRef, subIdx: number): InputDescriptio
 				return raw();
 		}
 	}
+
+	if (ref.key === "UpstreamBus") return busSlot(subIdx);
 
 	if (ref.family !== "world") return raw();
 
