@@ -33,9 +33,8 @@ Malenka 1995; Liao, Hessler and Malinow 1995).
 - A new sensor beyond `UpstreamBus`; a change to any sensor's fields other
   than `ActionQueue`'s window (invariant 1); an `inherit_scale` edit
   operator; wiring on VM nodes; a cap on `max_actions_per_turn`.
-- `sensor_read` beside `sensor_wired` in the bench census and the by-family
-  pair read (T27.F02's goal-long); any goal-long run (T25's allowance is
-  spent).
+- `sensor_read` in the bench census and the by-family pair read
+  (T27.F02); any goal-long run (T25's allowance is spent).
 
 ## Inputs and Invariants
 
@@ -118,10 +117,9 @@ Each new or renamed family gets its `metrics/tests.rs` row and its
 ## Verification Plan
 
 **Question.** Every sensor added to a Graph node arrives as whole bundles,
-live or silent by one law, and the population under that law carries
-bundles of every wiring at a readable live share; a goal world whose
-creatures carry no `Plain` bundles, or an applied `AddSensor*` whose
-declaration is unwired on a Graph node, shows it wrong.
+live or silent by one law, and the population carries bundles of every
+wiring at a readable live share; a goal world with no `Plain` bundles, or
+an `AddSensor*` leaving a Graph declaration unwired, shows it wrong.
 
 | Check | Declared | Reason |
 | --- | --- | --- |
@@ -175,10 +173,7 @@ mechanics change).
 
 ## Verification
 
-Commits `146909316` (seams) and `d24b334f5` (rename) are green: viability
-30/30, `cargo test` of every crate, `make rust-clippy`, frontend vitest and
-`node scripts/architecture-check.mjs` pass. On the feature head (model
-`55f9fbfb4` plus the behavior-identical self-review cleanup):
+Commits `146909316` and `d24b334f5` held every pin. On the feature head:
 
 - `cargo test -p v3-core --test viability` -> 30/30, founder digests
   unchanged.
@@ -289,16 +284,20 @@ are marked in the series, so those columns are not like-for-like.
 - Decision: a field set with no admissible plan skips after its draws
   under the engine's gated restore; no sensor redraw and no filtered
   universe.
-- Decision: (user, 2026-10-27, "A") the `plasticity_updates` compute rise
-  measured at the gate (0.577 per tick against T27.F03's 0.122, about
-  4.7×; compute only, the plasticity update's energy cost is 0) is accepted
-  as this feature's justified cost. Mechanism: each bundle's learning mode
-  is drawn `gen_range(0..3)` over static, Hebbian and reward-modulated (two
-  in three learn), as T25.F08 defines, and whole-sensor arrivals wire many
-  more edges under that draw where `InputRef.Add` made one lone static
-  edge. The benchmark specialist's final-code gate summary becomes the gate
-  epoch in this feature's closing commit; no threshold and no stored
-  baseline is edited.
+- Decision: (user, 2026-10-27, "A"; track Notes) the gate's
+  `plasticity_updates` rise (0.577 per tick against T27.F03's 0.122, about
+  4.7×, compute only, energy cost 0) is this feature's justified cost:
+  every bundle draws F08's learning mode (two in three learn) and
+  whole-sensor arrivals wire many more edges than `InputRef.Add`'s one
+  static edge. The final-code gate summary becomes the gate epoch in the
+  closing commit; no threshold or stored baseline is edited.
+- Deferred: unpaid accept, `neighborhood/recruitment_paths` (a reachability
+  assay in `v3-core`, placed 2026-09-12 before the T22 lab rule; F11 only
+  re-expressed one plan step); payer proposed to the user at closure: a row
+  moving it to `v3-lab`, or retiring the tier.
+- Deferred: unpaid accept, the test-only samplers at `mutation/vm/mod.rs:118`
+  and `mutation/topology/mod.rs:134` (T25.F08's marker; F11 removed the
+  Graph and InputRef ones); payer proposed to the user at closure.
 - Deferred: bloat under bundles arriving at the declaration rate is read
   by T27.F02's goal-long (bundle count, members, own corrections, with
   compute and energy), naming every feature closed in between.
