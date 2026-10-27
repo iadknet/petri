@@ -177,29 +177,29 @@ mechanics change).
 
 Commits `146909316` (seams) and `d24b334f5` (rename) are green: viability
 30/30, `cargo test` of every crate, `make rust-clippy`, frontend vitest and
-`node scripts/architecture-check.mjs` pass. Commit 3 (the model) is the
-commit after `d24b334f5` on `worktree-t25-f11`; on it:
+`node scripts/architecture-check.mjs` pass. On the feature head (model
+`55f9fbfb4` plus the behavior-identical self-review cleanup):
 
 - `cargo test -p v3-core --test viability` -> 30/30, founder digests
   unchanged.
 - `cargo check --workspace --all-targets`, `cargo fmt --all -- --check`,
   `make rust-clippy` -> clean; `node scripts/architecture-check.mjs` ->
   passes.
-- `cargo test -p v3-core --lib` -> 2,298 pass; `cargo test -p v3-core
-  --tests` -> every binary passes, `recruitment_paths` (the four-event
-  `graph_unprepared` path, seeds 41,639, 7, 55, swap) and the re-pinned
-  `applied_trajectory` and `baseline_worlds` included.
+- `cargo test -p v3-core` -> lib 2,298 pass, every integration binary
+  passes, `recruitment_paths` (four-event `graph_unprepared` path, seeds
+  41,639, 7, 55, swap) and re-pinned `applied_trajectory` and
+  `baseline_worlds` included.
 - `cargo test -p v3-core --features telemetry-seams --lib
-  neighborhood::recruitment_paths::experiment:: -- --ignored` (the slow
-  tier's recruitment half) -> 3/3 on the re-pinned readings (readings file).
+  neighborhood::recruitment_paths::experiment:: -- --ignored` (slow-tier
+  recruitment half) -> 3/3 on the re-pinned readings, at `55f9fbfb4`.
 - `cargo test --no-fail-fast -p v3-server -p v3-telemetry -p v3-lab -p
   v3-cli` -> all pass except
   `gate_profile_has_no_severe_regression_against_series_references`
   (`plasticity_updates` against T27.F03's gate reference), which waits on
   this feature's gate epoch; that epoch is not re-pinned, so the commit-3
-  task stays open.
+  task stays open. Run at `55f9fbfb4` (the cleanup is v3-core only).
 - `npx vitest run` (frontend) -> 673/673; `npm run lint` -> four
-  pre-existing warnings in config-panel files.
+  pre-existing config-panel warnings.
 
 - [x] `cargo test -p v3-core --test viability` -> founder digests unchanged
       in every commit.

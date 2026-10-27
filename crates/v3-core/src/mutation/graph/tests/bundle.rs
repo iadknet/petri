@@ -520,7 +520,7 @@ fn bundle_sources_reach_the_last_u16_index_and_none_past_it() {
     let def = CgpGraphBackendDef::new_with_fixed_outputs();
     let mut refs = vec![InputReference::CommitCounts; usize::from(u16::MAX)];
     refs.push(barrier());
-    let last = bundle::bundle_sources(&def, &refs, &context);
+    let last: Vec<_> = bundle::bundle_sources(&def, &refs, &context).collect();
     assert_eq!(last.len(), refs.len() + 2);
     assert!(last.contains(&(
         BundleSource::Sensor {
@@ -530,7 +530,7 @@ fn bundle_sources_reach_the_last_u16_index_and_none_past_it() {
         FieldSet::Ring
     )));
     refs.insert(0, InputReference::CommitCounts);
-    let past = bundle::bundle_sources(&def, &refs, &context);
+    let past: Vec<_> = bundle::bundle_sources(&def, &refs, &context).collect();
     assert_eq!(past.len(), usize::from(u16::MAX) + 1 + 2);
     assert!(past.iter().all(|(_, set)| *set != FieldSet::Ring));
 }

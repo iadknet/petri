@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK};
+use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor};
 use crate::genome::cgp::{
     bundle_capacity_admits, plans, BundleBirth, BundleId, BundleSource, GraphSource,
 };
@@ -85,13 +85,7 @@ impl NodeGenome {
     /// declared sensor's set, or a memory bank's.
     #[must_use]
     pub fn field_set(&self, source: BundleSource, context: &SensorContext) -> Option<FieldSet> {
-        match source {
-            BundleSource::Sensor { ref_idx, field_set } => {
-                let reference = self.input_refs.get(usize::from(ref_idx))?;
-                SensorDescriptor::of(reference, context).field_set(field_set)
-            }
-            BundleSource::Memory { .. } => Some(MEMORY_BANK),
-        }
+        source.resolve_in(&self.input_refs, context)
     }
 
     /// Declare `reference` and build one bundle per birth in one edit,

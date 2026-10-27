@@ -17,9 +17,7 @@ use crate::mutation::types::{BundleEdits, MutationSkipReason};
 fn area_sets() -> Vec<(u8, FieldSet)> {
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     SensorDescriptor::of(&area, &test_sensor_context(1))
-        .field_sets()
-        .enumerate()
-        .map(|(index, set)| (u8::try_from(index).unwrap(), set))
+        .indexed_field_sets()
         .collect()
 }
 

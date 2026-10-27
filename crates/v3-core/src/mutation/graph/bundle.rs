@@ -11,7 +11,7 @@ use crate::genome::cgp::{
     self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, Scope, Wiring,
 };
 use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
-use crate::mutation::types::{BirthEdgeClass, BundleEdits, MutationSkipReason};
+use crate::mutation::types::{wiring_index, BirthEdgeClass, BundleEdits, MutationSkipReason};
 
 use super::hebbian::{
     draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
@@ -43,7 +43,7 @@ fn draw_mode(rng: &mut impl Rng) -> Option<PlasticityConfig> {
     })
 }
 
-/// The scope coin: true `Bundle`.
+/// The scope coin: true `Scope::Group`, the bundle's shared scale.
 fn draw_scope(rng: &mut impl Rng) -> Scope {
     if rng.gen_bool(0.5) {
         Scope::Group
@@ -150,14 +150,9 @@ pub(crate) fn draw_birth_learning(
             CreationForm::Uniform
         };
         draw_learning(def, id, form, rng);
-        edits.created[cgp_wiring_row(wiring)][usize::from(randomized)] += 1;
+        edits.created[wiring_index(wiring)][usize::from(randomized)] += 1;
     }
     edits
-}
-
-/// A wiring's row in [`BundleEdits::created`].
-fn cgp_wiring_row(wiring: &Wiring) -> usize {
-    crate::mutation::types::wiring_index(wiring)
 }
 
 /// The edge class a creation reports (T11.F30, T25.F11 invariant 8): the
@@ -174,11 +169,12 @@ pub(crate) fn creation_class(wirings: &[Wiring]) -> Option<BirthEdgeClass> {
 /// invariant 7): declared sensors by `ref_idx` (at an index representable
 /// as `u16`), field sets ascending, then `Memory { previous: false }` and
 /// `Memory { previous: true }`; each when its set has an admissible plan.
-pub(crate) fn bundle_sources(
-    def: &CgpGraphBackendDef,
-    input_refs: &[InputReference],
-    context: &SensorContext,
-) -> Vec<(BundleSource, FieldSet)> {
+/// Lazy, so an applicability check stops at the first source.
+pub(crate) fn bundle_sources<'a>(
+    def: &'a CgpGraphBackendDef,
+    input_refs: &'a [InputReference],
+    context: &'a SensorContext,
+) -> impl Iterator<Item = (BundleSource, FieldSet)> + 'a {
     let sensors = input_refs
         .iter()
         .take(usize::from(u16::MAX) + 1)
@@ -186,10 +182,8 @@ pub(crate) fn bundle_sources(
         .flat_map(|(idx, reference)| {
             let ref_idx = u16::try_from(idx).expect("index within u16");
             SensorDescriptor::of(reference, context)
-                .field_sets()
-                .enumerate()
-                .map(move |(set, fields)| {
-                    let field_set = u8::try_from(set).expect("few field sets");
+                .indexed_field_sets()
+                .map(move |(field_set, fields)| {
                     (BundleSource::Sensor { ref_idx, field_set }, fields)
                 })
         });
@@ -197,7 +191,6 @@ pub(crate) fn bundle_sources(
     sensors
         .chain(banks)
         .filter(|(_, set)| !cgp::plans(def, set).is_empty())
-        .collect()
 }
 
 /// `AddBundleLive` / `AddBundleSilent` (T25.F11 invariant 7): one
@@ -212,7 +205,7 @@ pub(crate) fn add_bundle_by_law(
     rng: &mut impl Rng,
 ) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
-    let sources = bundle_sources(def, input_refs, context);
+    let sources: Vec<_> = bundle_sources(def, input_refs, context).collect();
     if sources.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -246,9 +239,7 @@ pub(crate) fn add_sensor_by_law(
         return Ok((BundleEdits::default(), None));
     };
     let sets: Vec<(u8, FieldSet)> = SensorDescriptor::of(&reference, context)
-        .field_sets()
-        .enumerate()
-        .map(|(index, set)| (u8::try_from(index).expect("few field sets"), set))
+        .indexed_field_sets()
         .collect();
     let births = draw_births(def, &sets, law, rng)?;
     let first = def.bundles().len();

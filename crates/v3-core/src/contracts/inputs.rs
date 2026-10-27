@@ -622,9 +622,15 @@ impl SensorDescriptor {
 
     /// Every field set, in index order.
     pub fn field_sets(self) -> impl Iterator<Item = FieldSet> {
+        self.indexed_field_sets().map(|(_, set)| set)
+    }
+
+    /// Every field set with its index, in index order.
+    pub fn indexed_field_sets(self) -> impl Iterator<Item = (u8, FieldSet)> {
         (0..self.field_set_count()).map(move |index| {
-            self.field_set(u8::try_from(index).expect("few field sets"))
-                .expect("an index below the count")
+            let index = u8::try_from(index).expect("few field sets");
+            let set = self.field_set(index).expect("an index below the count");
+            (index, set)
         })
     }
 }

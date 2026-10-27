@@ -258,7 +258,7 @@ impl Wiring {
     /// Every coordinate a new bundle on `set` with this wiring materializes,
     /// in canonical order: a `Plain` set's fields on `Sink`; a ring's eight
     /// cells; a pair's twelve non-zero compass coordinates
-    /// ([`pair_birth_members`]) then its facts on `Drive`. Empty when the
+    /// (x then y per relative direction) then its facts on `Drive`. Empty when the
     /// wiring does not fit the set.
     #[must_use]
     pub fn coordinates(self, set: &FieldSet) -> Vec<(u16, Site)> {

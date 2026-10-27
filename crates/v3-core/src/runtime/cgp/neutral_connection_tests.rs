@@ -426,10 +426,8 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
             unreachable!()
         };
         let sources: Vec<_> = SensorDescriptor::of(&silent.input_refs[0], &context)
-            .field_sets()
-            .enumerate()
-            .map(|(set, fields)| {
-                let field_set = u8::try_from(set).unwrap();
+            .indexed_field_sets()
+            .map(|(field_set, fields)| {
                 (
                     BundleSource::Sensor {
                         ref_idx: 0,

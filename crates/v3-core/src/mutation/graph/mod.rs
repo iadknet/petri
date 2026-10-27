@@ -233,7 +233,9 @@ impl GraphOperator {
                 hebbian::any_edge(def, hebbian::is_reward_modulated)
             }
             Self::AddBundleLive | Self::AddBundleSilent => {
-                !bundle::bundle_sources(def, inputs.refs, inputs.context).is_empty()
+                bundle::bundle_sources(def, inputs.refs, inputs.context)
+                    .next()
+                    .is_some()
             }
             Self::AlterBundleScale | Self::RetargetBundle | Self::RemoveBundle => {
                 bundle::has_bundle(def)

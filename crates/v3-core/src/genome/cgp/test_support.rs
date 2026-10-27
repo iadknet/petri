@@ -178,9 +178,8 @@ pub(crate) fn add_first_plan_sensor(node: &mut NodeGenome, reference: InputRefer
     let context = crate::config::test_sensor_context(1);
     let births = match &node.backend_def {
         BackendDef::Graph(def) => SensorDescriptor::of(&reference, &context)
-            .field_sets()
-            .enumerate()
-            .map(|(index, set)| first_plan_birth(def, u8::try_from(index).unwrap(), &set))
+            .indexed_field_sets()
+            .map(|(index, set)| first_plan_birth(def, index, &set))
             .collect(),
         BackendDef::Vm(_) => Vec::new(),
     };

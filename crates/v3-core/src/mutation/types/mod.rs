@@ -52,9 +52,10 @@ impl BundleEdits {
         }
     }
 
-    /// One bundle created with `wiring` in `form`.
+    /// One bundle created with `wiring` in `form` (a test expectation).
+    #[cfg(test)]
     #[must_use]
-    pub fn creation(wiring: &crate::genome::cgp::Wiring, randomized: bool) -> Self {
+    pub(crate) fn creation(wiring: &crate::genome::cgp::Wiring, randomized: bool) -> Self {
         let mut edits = Self::default();
         edits.created[wiring_index(wiring)][usize::from(randomized)] = 1;
         edits
