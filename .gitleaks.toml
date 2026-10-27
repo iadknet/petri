@@ -13,6 +13,15 @@ regex = '''(?:/Users|/home)/([A-Za-z0-9._-]+)/'''
 secretGroup = 1
 keywords = ["/users/", "/home/"]
 
+# Tools that name directories after a flattened home path, such as Claude
+# Code's /tmp/claude-<uid>/-Users-<name>-<project> scratch directories.
+[[rules]]
+id = "local-flattened-home-path"
+description = "Home directory path flattened into a single directory name"
+regex = '''-(?:Users|home)-([A-Za-z0-9._]+)-'''
+secretGroup = 1
+keywords = ["-users-", "-home-"]
+
 [[rules]]
 id = "local-windows-home-path"
 description = "Absolute path into a Windows user's home directory"
