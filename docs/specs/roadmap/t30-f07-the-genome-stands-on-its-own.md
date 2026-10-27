@@ -1,6 +1,6 @@
 # T30.F07 — The Genome Stands on Its Own
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-26
 **Feature**: T30.F07
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -194,7 +194,7 @@ moved deterministic block or a changed test value would show it wrong.
 - [x] Debts and docs: delete the G24, G25 and G26 rows and update the paths
       in G1–G4, G14 and G15 in `docs/architecture.md`; re-key the G2 and G14
       lines in `scripts/architecture-debts.txt` (invariant 5).
-- [ ] `make check`; the gate profile; `make rust-test-slow` at Close.
+- [x] `make check`; the gate profile; `make rust-test-slow` at Close.
 
 ## Verification
 
@@ -213,14 +213,12 @@ moved deterministic block or a changed test value would show it wrong.
       -p v3-telemetry` -> pass counts in the readings, no expected value
       edited, no test ignored or deleted; `cargo check --workspace
       --all-targets`, `cargo fmt --all --check`, `make rust-clippy` -> exit 0.
-- [ ] `make check` -> exit 0 at the tested commit; `make rust-test-slow` ->
-      exit 0 on the final code (Verification Plan).
+- [x] `make check` -> exit 0 at tested commit `9e338190`;
+      `make rust-test-slow` -> exit 0 there.
 - [x] Overhead: `PETRI_OVERHEAD_WORKLOAD=profile-ticks scripts/telemetry-overhead`
       -> pass, median 0.9984 (readings).
-- [x] Gate profile: summary stored at `docs/progress/features/t30-f07.json`,
-      local raw hash and byte count and verification time checked, series
-      entry points to the summary, deterministic blocks identical to the
-      epoch, no new full report staged.
+- [x] Gate profile: summary, raw hash and bytes, series entry and
+      deterministic blocks checked below; no full report staged.
 
 ## Performance and Goal Impact
 
@@ -250,14 +248,14 @@ block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
 
 ## Success Criteria
 
-- [ ] `crates/v3-core/src/genome/` is the genome's one home and the four
+- [x] `crates/v3-core/src/genome/` is the genome's one home and the four
       readers live in `neighborhood/`; no old path remains under `crates/`.
-- [ ] `v3-cli profile-ticks` runs today's harness as a measurement command
+- [x] `v3-cli profile-ticks` runs today's harness as a measurement command
       under the binary's `--telemetry` switch and `dhat-heap` feature;
       `v3-core` has no binary, feature or `dhat` dependency for it.
-- [ ] The checker classifies every module by its path alone, its tests
+- [x] The checker classifies every module by its path alone, its tests
       pass, and `make check-docs` passes with G24–G26 deleted.
-- [ ] The gate's deterministic blocks and every existing test value are
+- [x] The gate's deterministic blocks and every existing test value are
       unchanged.
 
 ## Notes for AI Agents
@@ -274,3 +272,5 @@ block equals the epoch; raw 134,997 B (`1a361a7b`), summary 28,847 B.
   implementer first fixes scripts/telemetry-overhead so the profile-ticks
   arm calibrates its own tick count. Then one fresh check runs under a new
   5-minute cap, and the spec records your grant as a Decision."
+- Cost: 4 implementer passes (advisor 2, 2, 3, 2); 4 spec-owner resumes;
+  3 Codex rounds, `ready`; review P2 1 (correctness, fixed), else 0.
