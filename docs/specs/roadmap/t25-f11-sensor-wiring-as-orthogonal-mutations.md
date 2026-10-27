@@ -314,5 +314,4 @@ are marked in the series, so those columns are not like-for-like.
   own corrections, compute, energy).
 - Deferred: `sensor_read` beside `sensor_wired` in the bench census and
   the by-family pair read go to T27.F02's run (intent audit gaps 3–4).
-- Cost: tested `2dfb8ead6`; 5 passes, 12 consults, 6 resumes, 5 rounds
-  (ready); P1/P2/P3 2/1/0, 2/0/0, 0/1/1.
+- Cost: tested `fb1f8e777`; 5 passes, 12 consults, 6 resumes, 5 rounds; P1/P2/P3 2/1/0, 2/0/0, 0/1/1.
