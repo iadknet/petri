@@ -74,18 +74,18 @@ Invariants:
    `parent_cached_*` copies are deleted; both reproduction outcomes call
    `new`. The parent's reachable set still reaches the mutation engine, now
    through `reachable_nodes()`. A proptest property test on the record
-   (`AGENTS.md`: pure invariants) checks that every accessor of a built
-   record equals the analysis of its genome over generated genomes (a
-   strategy such as `mutation/topology/f29_tests.rs:106`), replacing the
-   deleted test.
+   checks that every accessor of a built record equals the analysis of its
+   genome over generated genomes (a strategy such as
+   `mutation/topology/f29_tests.rs:106`), replacing the deleted test.
 4. **Brain operations.** No `&mut GraphRuntimeState` of a record leaves
    `creature/state.rs` in a non-test build. The record owns the operations
    the scheduler runs on its brain, thin calls on its own parts with the
    runtime's signatures unchanged (T30.F02):
    `pub(crate) fn begin_tick(&mut self)` (`tick.rs:270`);
    `pub fn think(&mut self, sensors, config) -> MeshOutput`,
-   `pub(crate) fn think_traced(...)` and, under `telemetry-seams`,
-   `pub(crate) fn think_budgeted(..., limit)`, each running the matching
+   `pub(crate) fn think_traced(...)` and `pub(crate) fn think_budgeted(...,
+   limit)`, each under its scheduler caller's gate (`not(telemetry-seams)`
+   and `telemetry-seams`), each running the matching
    `execute_creature_mesh*` on `genome`, `energy`, `shared_memory`,
    `prev_shared_memory`, `graph_runtime` and `heading` and returning the
    runtime's output unchanged, the post-output writes staying in `tick.rs`
@@ -117,7 +117,8 @@ Invariants:
    (`temporal_probe_detects_each_substrate_and_preserves_live_state`,
    `tick.rs:1774-1795`, keeps `lamarckian: false`, value 1.0, trace 0.5).
    Fixtures outside `v3-core` (`server.rs`, telemetry `tests.rs`,
-   `indicators/tests.rs`) need only seeds or a fresh runtime. The tests that
+   `indicators/tests.rs`) need only seeds or construction from the genome
+   they build. The tests that
    set `cached_genome_size` to 4, 7, 10 and 25 and `cached_complexity` to 3
    and 4 build a genome whose `genome_size()` or `complexity()` is that
    value and assert it. `final_action_observation_*` (`tick.rs:1644-1850`)
