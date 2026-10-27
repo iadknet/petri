@@ -148,7 +148,7 @@ fn a_give_with_no_recipient_logs_no_recipient_and_pays_only_its_effort() {
     );
 }
 
-/// Nothing to give is `RejectedNothingToGive`, logged `EnergyConstraints`: a
+/// Nothing to give is `RejectedNothingToGive`, logged `NothingToGive`: a
 /// sub-resolution amount (`share_min` against the smallest positive store,
 /// with no effort to pay) keeps the giver alive and its log; a giver its
 /// effort exhausted is removed with its log, its death its effort's.
