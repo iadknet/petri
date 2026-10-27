@@ -50,6 +50,21 @@ fn provenance() -> artifacts::ConversionProvenance {
     .unwrap()
 }
 
+/// A committed summary names paths relative to the checkout that holds its
+/// raw artifact, never by the absolute paths of the machine that wrote it.
+fn assert_records_no_machine_paths(summary: &Value, dir: &Path) {
+    let text = summary.to_string();
+    for machine in [
+        dir.to_path_buf(),
+        dir.canonicalize().unwrap(),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        std::env::temp_dir(),
+    ] {
+        let machine = machine.to_str().unwrap().trim_end_matches('/');
+        assert!(!text.contains(machine), "summary records {machine}: {text}");
+    }
+}
+
 fn world_source() -> Value {
     let mut raw: Value = serde_json::from_slice(&synthetic_full_report()).unwrap();
     let seed = raw["deterministic"]["per_seed"][0]["seed"].clone();
@@ -86,10 +101,12 @@ fn conversion_is_deterministic_hashes_exact_bytes_and_keeps_historical_unknowns(
     assert_eq!(summary["comparison"], source["comparison"]);
     assert_eq!(summary["raw"]["bytes"], raw.len());
     assert_eq!(summary["raw"]["sha256"], artifacts::sha256(&raw));
+    assert_eq!(summary["raw"]["path"], "raw.json");
     assert_eq!(
-        summary["raw"]["path"],
-        path.canonicalize().unwrap().to_str().unwrap()
+        summary["conversion"]["converter"]["working_directory"],
+        "<external>/converter"
     );
+    assert_records_no_machine_paths(&summary, &dir.0);
     assert!(summary["measurement_evidence"]["command"].is_null());
     assert!(summary["measurement_evidence"]["cli_exit"].is_null());
     assert!(summary["measurement_evidence"]["thresholds"].is_null());
@@ -1020,10 +1037,11 @@ fn direct_sweep_writes_pair_and_conversion_never_overwrites_input() {
     assert!(summary["measurement_evidence"]["outer_exit"].is_null());
     assert!(summary["measurement_evidence"]["effective_config_digest"].is_string());
     let invocation = &summary["measurement_evidence"]["command"];
-    assert_eq!(
-        invocation["working_directory"],
-        dir.0.canonicalize().unwrap().to_str().unwrap()
-    );
+    assert_eq!(invocation["working_directory"], ".");
+    assert_eq!(invocation["executable"], "<external>/v3-cli");
+    assert_eq!(summary["conversion"]["converter"], *invocation);
+    assert_eq!(summary["raw"]["path"], "raw.json");
+    assert_records_no_machine_paths(&summary, &dir.0);
     assert!(invocation["arguments"]
         .as_array()
         .unwrap()
@@ -1325,9 +1343,26 @@ fn output_defaults_resolve_main_and_linked_checkouts_with_spaces() {
         assert!(main
             .join(".bench-artifacts/test-feature/sweep.json")
             .is_file());
-        assert!(checkout
-            .join("docs/progress/features/test-feature-sweep.json")
-            .is_file());
+        let summary: Value = serde_json::from_slice(
+            &std::fs::read(checkout.join("docs/progress/features/test-feature-sweep.json"))
+                .unwrap(),
+        )
+        .unwrap();
+        // Paths are relative to the main checkout, which holds the raw artifact.
+        assert_eq!(
+            summary["raw"]["path"],
+            ".bench-artifacts/test-feature/sweep.json"
+        );
+        let working_directory = if checkout == &main {
+            "."
+        } else {
+            "<external>/linked checkout"
+        };
+        assert_eq!(
+            summary["measurement_evidence"]["command"]["working_directory"],
+            working_directory
+        );
+        assert_records_no_machine_paths(&summary, &dir.0);
     }
     let overrides = artifacts::output_paths(
         &dir.0,
@@ -1874,7 +1909,7 @@ fn v2_from_a_full_report_and_from_its_v1_summary_agree_and_repeat_exactly() {
         .expect("the v1 route records its input");
     assert_eq!(
         source,
-        json!({"path": v1_path.canonicalize().unwrap(), "sha256": artifacts::sha256(&v1_bytes), "bytes": v1_bytes.len()})
+        json!({"path": "v1.json", "sha256": artifacts::sha256(&v1_bytes), "bytes": v1_bytes.len()})
     );
     assert_eq!(from_v1, from_full);
 

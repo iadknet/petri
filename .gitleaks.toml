@@ -1,0 +1,27 @@
+# Gitleaks reads this file for scripts/secret-scan (pre-commit and `make audit`).
+[extend]
+useDefault = true
+
+# Committed files name repository paths relative to the checkout; an absolute
+# path into a home or temporary directory leaks the user name and machine layout.
+# Each rule reports one path segment as its secret: the default global allowlist
+# skips secrets that are whole /home, /tmp, /var or /Users paths.
+[[rules]]
+id = "local-home-path"
+description = "Absolute path into a user's home directory"
+regex = '''(?:/Users|/home)/([A-Za-z0-9._-]+)/'''
+secretGroup = 1
+keywords = ["/users/", "/home/"]
+
+[[rules]]
+id = "local-windows-home-path"
+description = "Absolute path into a Windows user's home directory"
+regex = '''[A-Za-z]:\\+Users\\+([^\\"'\s]+)'''
+secretGroup = 1
+keywords = ["users\\"]
+
+[[rules]]
+id = "local-temporary-path"
+description = "Absolute path into a machine's temporary directory"
+regex = '''(?:/private/(tmp|var)/|/var/folders/([A-Za-z0-9_]+)/)'''
+keywords = ["/private/", "/var/folders/"]

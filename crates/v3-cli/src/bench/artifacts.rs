@@ -45,6 +45,44 @@ impl Invocation {
                 .map_err(|e| format!("cannot identify working directory: {e}"))?,
         })
     }
+
+    /// This invocation as a committed summary records it: paths relative to
+    /// `anchor` (see [`recorded_path`]), absolute arguments included.
+    fn recorded(&self, anchor: &Path) -> Self {
+        let record = |text: &str| {
+            let path = Path::new(text);
+            if path.is_absolute() {
+                recorded_path(path, anchor).to_string_lossy().into_owned()
+            } else {
+                text.to_owned()
+            }
+        };
+        Self {
+            executable: record(&self.executable),
+            arguments: self.arguments.iter().map(|arg| record(arg)).collect(),
+            working_directory: recorded_path(&self.working_directory, anchor),
+        }
+    }
+}
+
+/// Where a committed summary's paths are relative to: the main checkout that
+/// holds `artifact`, or `artifact`'s directory outside any checkout.
+fn record_anchor(artifact: &Path) -> PathBuf {
+    let dir = artifact.parent().unwrap_or(Path::new("."));
+    let anchor = main_checkout(dir).unwrap_or_else(|_| dir.to_path_buf());
+    anchor.canonicalize().unwrap_or(anchor)
+}
+
+/// `path` relative to `anchor` ("." for the anchor itself). A path outside the
+/// anchor keeps only its file name under `<external>`, so no summary records
+/// the home directory, user name or temporary directory of its machine.
+fn recorded_path(path: &Path, anchor: &Path) -> PathBuf {
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    match resolved.strip_prefix(anchor) {
+        Ok(relative) if relative.as_os_str().is_empty() => PathBuf::from("."),
+        Ok(relative) => relative.to_path_buf(),
+        Err(_) => Path::new("<external>").join(resolved.file_name().unwrap_or_default()),
+    }
 }
 
 /// All converter identity and verification time are explicit inputs, making
@@ -530,22 +568,56 @@ pub fn summarize_v1(
     );
     deterministic["goal_indicators"] =
         goal_indicators(&source["deterministic"]["goal_indicators"], &report)?;
+    let anchor = record_anchor(&resolved);
+    let mut measurement_evidence = source.get("measurement_evidence").cloned().unwrap_or_else(|| json!({
+        "command":null,"dirty":null,"cli_exit":null,"outer_exit":null,"thresholds":null,"wall_caps":null,"inheritance":null
+    }));
+    if !measurement_evidence["command"].is_null() {
+        let command: Invocation = serde_json::from_value(measurement_evidence["command"].clone())
+            .map_err(|e| format!("invalid measurement command: {e}"))?;
+        measurement_evidence["command"] = serde_json::to_value(command.recorded(&anchor))
+            .map_err(|e| format!("cannot serialize measurement command: {e}"))?;
+    }
+    let mut conversion = provenance.clone();
+    conversion.converter = conversion.converter.recorded(&anchor);
+    if let Some(command) = conversion
+        .supplied_evidence
+        .as_mut()
+        .and_then(|e| e.command.as_mut())
+    {
+        *command = command.recorded(&anchor);
+    }
     Ok(Summary {
-        kind: SUMMARY_KIND.into(), summary_version: SUMMARY_V1_VERSION, source_schema_version: report.schema_version,
-        feature: report.feature.clone(), deterministic,
+        kind: SUMMARY_KIND.into(),
+        summary_version: SUMMARY_V1_VERSION,
+        source_schema_version: report.schema_version,
+        feature: report.feature.clone(),
+        deterministic,
         environment: aggregate_fields(&source["environment"], &report.environment)?,
-        comparison: source["comparison"].clone(), comparison_inputs: serde_json::to_value(ComparisonInputs::from(&report))
+        comparison: source["comparison"].clone(),
+        comparison_inputs: serde_json::to_value(ComparisonInputs::from(&report))
             .map_err(|e| format!("cannot serialize comparison inputs: {e}"))?,
-        measurement_evidence: source.get("measurement_evidence").cloned().unwrap_or_else(|| json!({
-            "command":null,"dirty":null,"cli_exit":null,"outer_exit":null,"thresholds":null,"wall_caps":null,"inheritance":null
-        })),
-        conversion: provenance.clone(),
-        raw: RawProvenance { sha256:format!("{:x}",hasher.finalize()), bytes:offset, path:resolved,
-            availability:"verified_local".into(), verified_at:provenance.verified_at.clone() },
+        measurement_evidence,
+        conversion,
+        raw: RawProvenance {
+            sha256: format!("{:x}", hasher.finalize()),
+            bytes: offset,
+            path: recorded_path(&resolved, &anchor),
+            availability: "verified_local".into(),
+            verified_at: provenance.verified_at.clone(),
+        },
         claims: claims(&source),
-        omitted_details: ["full genomes and genome deltas", "per-proposal rows", "scene, signature, route and state traces",
-            "replay paths", "per-genome neighborhood rows (pooled readings retained)", "persistence checkpoints beyond 21 evenly spaced source indices"]
-            .into_iter().map(str::to_string).collect(),
+        omitted_details: [
+            "full genomes and genome deltas",
+            "per-proposal rows",
+            "scene, signature, route and state traces",
+            "replay paths",
+            "per-genome neighborhood rows (pooled readings retained)",
+            "persistence checkpoints beyond 21 evenly spaced source indices",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
     })
 }
 
@@ -1120,6 +1192,31 @@ fn git_output(cwd: &Path, args: &[&str]) -> Result<String, String> {
     String::from_utf8(output.stdout).map_err(|e| format!("Git path is not UTF-8: {e}"))
 }
 
+/// The main (non-bare) checkout of the repository `cwd` is inside, from a
+/// linked worktree too.
+fn main_checkout(cwd: &Path) -> Result<PathBuf, String> {
+    if git_output(cwd, &["rev-parse", "--is-inside-work-tree"])?.trim() != "true" {
+        return Err("usable Git checkout required for default outputs".into());
+    }
+    let worktrees = git_output(cwd, &["worktree", "list", "--porcelain", "-z"])?;
+    if worktrees
+        .split('\0')
+        .take_while(|field| !field.is_empty())
+        .any(|field| field == "bare")
+    {
+        return Err("main Git worktree is bare; supply explicit --out and --summary-out".into());
+    }
+    let main = worktrees
+        .split('\0')
+        .next()
+        .and_then(|line| line.strip_prefix("worktree "))
+        .ok_or("Git did not identify the main checkout")?;
+    if !Path::new(main).is_dir() {
+        return Err("main checkout is unavailable; supply explicit output paths".into());
+    }
+    Ok(PathBuf::from(main))
+}
+
 #[derive(Debug, Clone)]
 pub struct OutputPaths {
     pub raw: PathBuf,
@@ -1165,28 +1262,7 @@ pub fn output_paths_with_suffix(
         cwd.join(raw)
     } else {
         let feature = feature.ok_or("--feature or explicit --out is required for sweep")?;
-        if git_output(cwd, &["rev-parse", "--is-inside-work-tree"])?.trim() != "true" {
-            return Err("usable Git checkout required for default outputs".into());
-        }
-        let worktrees = git_output(cwd, &["worktree", "list", "--porcelain", "-z"])?;
-        if worktrees
-            .split('\0')
-            .take_while(|field| !field.is_empty())
-            .any(|field| field == "bare")
-        {
-            return Err(
-                "main Git worktree is bare; supply explicit --out and --summary-out".into(),
-            );
-        }
-        let main = worktrees
-            .split('\0')
-            .next()
-            .and_then(|line| line.strip_prefix("worktree "))
-            .ok_or("Git did not identify the main checkout")?;
-        if !Path::new(main).is_dir() {
-            return Err("main checkout is unavailable; supply explicit output paths".into());
-        }
-        Path::new(main)
+        main_checkout(cwd)?
             .join(".bench-artifacts")
             .join(feature)
             .join(format!("{profile}.json"))
@@ -1276,10 +1352,11 @@ pub fn convert_summary_v1(input: &Path, output: &Path) -> Result<Summary, String
     }
     let mut v1: Summary =
         serde_json::from_slice(&bytes).map_err(|e| format!("invalid v1 summary: {e}"))?;
+    let input = input
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve {}: {e}", input.display()))?;
     v1.conversion.from_summary_v1 = Some(SourceSummary {
-        path: input
-            .canonicalize()
-            .map_err(|e| format!("cannot resolve {}: {e}", input.display()))?,
+        path: recorded_path(&input, &record_anchor(&input)),
         sha256: sha256(&bytes),
         bytes: bytes.len(),
     });
