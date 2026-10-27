@@ -17,15 +17,11 @@ separate operators (`AddSensorLive` / `AddSensorSilent`, `AddBundleLive` /
 `AddBundleSilent`), not a draw inside one. Every bundle is built, composed,
 learned, decayed, inherited, detached, retargeted and removed by one member
 law; `Ring` and `DirectionPair` differ from `Plain` only in geometry-aware
-wiring. The three routes of today (`InputRefAdd`, `RecruitNeutralInput`, the
-four `Add*Group` operators) and the `neutral_input_recruitment` config are
-deleted.
+wiring. Today's three routes and their config are deleted (invariant 7).
 
 Natural analogs: retinotectal map formation, one program wiring a whole map
 (T25.F03, F04); silent synapses beside transmitting ones (Isaac, Nicoll and
-Malenka 1995; Liao, Hessler and Malinow 1995). It reaches creatures through
-the genome: what a mutation can build, and at what cost, is what selection
-can find.
+Malenka 1995; Liao, Hessler and Malinow 1995).
 
 ## Non-Goals
 
@@ -80,37 +76,30 @@ a node. A **kind** is one directed action's nine vote sinks.
 | 10 | **Identity and determinism, three commits.** Commit 1 (seams): the descriptor, the vocabulary moves, `plans`, `add_bundle`, `add_sensor` and the birth policy exist and the three routes call them with their exact draw order, count and answers; no trajectory, draw-stream, digest or fixture moves (a moved pin is a defect). Commit 2 (rename, text only): bundle names in live identifiers, JSON keys (`bundles`, `bundle`), operator keys, counters, metrics, wire types and readers; comments that describe historical pins or retired operators keep their historical names; trajectory and draw-stream pins hold; text digests (genome JSON, summary fixtures, `bench_artifacts` digests), `PROTOCOL_VERSION` and the generated frontend types move. Commit 3 (the model): invariants 1–9 and the readings, the record's `Shape` → `source` + `wiring` restructure included (structural, so it is not commit 2's); every Graph and InputRef draw, every mutation-on pin, the slow-tier readings, the reference specs and both epochs (gate, goal-worlds) re-pin with that one cause; commit 1's per-route answers are deleted, none survives as a switch. In every commit the founder-only viability digests do not move. No new per-tick work: a bundle member is composed exactly as a group member is today; a fact member's term is `scale × 1` where it was `scale × 0`. |
 | 11 | **Readers.** The `bundles` block (`bundles-v1`) replaces `pair_groups` (`pair-groups-v2`) and `structure_means.groups` / `.members`: per sample, creatures carrying a bundle on a reachable node; per wiring (`plain`, `ring`, `pair`) `bundles`, `genomic_nonzero` (`\|scale\| > 1e-3`), `learned_nonzero` (bundles whose runtime learned scale, read through the runtime's learned-state view the inspector's `learned_scale` uses, is initialized and `\|value\| > 1e-3`; absent, never zero, where no runtime is sampled), `members`, `own_nonzero` (`\|own\| > PATH_WEIGHT_FLOOR`), `unreachable`; `created` by operator, wiring and form from `bundles_created_total`; rows by (wiring, kind or sink), every key a stable `as_key` string (`VoteSink::as_key` added in `contracts`), never a `Debug` rendering. The input-use block drops its beyond-draw-width `*` marker (every channel below the width is drawn; past it is `OutOfWidth`) and becomes `input-use-v5`. The summary projection's keep-list retains the block's per-wiring aggregates under the existing last-sample-only row policy with a conversion fixture. The plasticity census and `ring_rules` keep their definitions over bundles. `BrainBundle { source, wiring, scale, inherit_scale, retention, learned_scale, coordinates: [{ field, site, present }] }` replaces `BrainGroup`, `GroupShape`, `GroupCoordinate`, `GroupFact`; its coordinates resolve under the run's `SensorContext` from the session's config (a reader, like the censuses; `WIDEST` is validation's only), so an `ActionQueue` bundle lists the current width's fields; the inspector's bundle card lists members by coordinate from the generated types. `recruitment_paths` qualifies through `AddSensorLive`; because a sensor arrives whole, the `graph_unprepared` path becomes four events: the live `Ring` bundle into `Move` at offset 0, `RemoveGraphEdge` on the incumbent's independent `Move(N)` edge (predicate: `Move(N)`'s independent prefix empty, members unchanged), `RemoveGraphEdge` on the bundle's `Move(N)` member (predicate: that coordinate absent, every other present, nothing else changed), then the swap; its seeds and the tier's readings re-pin. `docs/progress/benchmark-series.json` records `counter_definition_changes` for `pair_groups` → `bundles`, `structure_means` (groups and members dropped), `groups_removed_total` → `bundles_removed_total` and `input_use` (`v4` → `v5`). |
 
-Options weighed, nominal operator shares, the preparatory refactor audit
-and the Codex rounds: [the readings file](../../progress/readings/t25-f11.md).
+Options, operator shares, the refactor audit and the Codex rounds:
+[the readings file](../../progress/readings/t25-f11.md).
 
 ## Architecture
 
-Owners touched: `contracts` (the sensor descriptor, `UpstreamBus`, the vote
-catalog, outcome channels and `OUTPUT_SLOT_COUNT` moved in), genome (the
-bundle, its wiring, plan enumeration, the `add_bundle` and `add_sensor`
-transactions, the node's declaration edits), `mutation` (four creation operators, one birth
-policy, the catalog), `simulation` (the witness retired), readers (the
-`bundles` census), and the outer crates for the renamed wire, metrics and
-summary blocks. Debts paid: G1, G13, G14, and G2's vocabulary half (the five
-vocabulary lines leave `scripts/architecture-debts.txt`; the G2 row keeps
-routes and jumps for T30.F05). No boundary changes: `docs/architecture.md`
-already places descriptors in `contracts`, bundles and wiring in the genome
-as aggregate root, and sampling apart from application, so the plan commit
-does not edit it; closure deletes the paid rows. Shared rules this feature
-changes, each kept under its owner: the member composition law (owner
+Owners touched: `contracts` (descriptor, `UpstreamBus`, the vote catalog,
+outcome channels and `OUTPUT_SLOT_COUNT` moved in), genome (bundle, wiring,
+plans, the `add_bundle` / `add_sensor` transactions, declaration edits),
+`mutation` (four creation operators, one birth policy, the catalog),
+`simulation` (witness retired), readers (`bundles` census), and the outer
+crates for the renamed wire, metrics and summary blocks. Debts paid: G1,
+G13, G14, G2's vocabulary half (its five lines leave
+`scripts/architecture-debts.txt`; the row keeps routes and jumps for
+T30.F05). No boundary changes: `docs/architecture.md` already states this
+ownership, so the plan commit does not edit it; closure deletes the paid
+rows. Shared rules changed under their owners: the composition law (owner
 `genome::cgp::compose`; applied by `container.genomic_weight`,
-`runtime/plasticity/learned.rs:324-329`, `v3-server/src/transport/brain.rs:531`
-and the detach path) keeps one formula and changes only the pattern a fact
-or `Plain` member reads; the sensor width and field-set rule (owner the
-descriptor under a `SensorContext` that `config` builds; read by
-`input_ref_kind`, the Graph source and raw-field draws and the reader
-censuses) replaces `mutation::compound` and the bare `food_type_count`
-parameter; the vote catalog (owner
-`contracts::votes` after the move; the VM's `AddVote`, the graph sink
-catalog, decoding and traces update imports only). Retained debts used as
-they stand: G4 (birth seeds ride in the container, `spawn_child` builds the
-child) because T29.F01 owns the birth transaction; G3 (learning on edges,
-`Scope::Group` branches) because T25.F12 owns learning.
+`runtime/plasticity/learned.rs:324-329`, `transport/brain.rs:531`, detach)
+keeps one formula, only a fact's or `Plain` member's pattern changes; the
+width and field-set rule (owner the descriptor under `config`'s
+`SensorContext`; read by `input_ref_kind`, the Graph draws, the censuses)
+replaces `mutation::compound`; the vote catalog (owner `contracts::votes`;
+consumers update imports only). Retained as they stand: G4 (seeds in the
+container, `spawn_child`) for T29.F01; G3 (learning on edges) for T25.F12.
 
 ## Telemetry
 
@@ -123,9 +112,8 @@ child) because T29.F01 owns the birth transaction; G3 (learning on edges,
 | `mutation.neutral_input_recruitment` | recorded configuration, removed from the `run.started` body with the field | — | — |
 | `runtime.max_actions_per_turn` | recorded configuration, already in the `run.started` body; it now also governs `ActionQueue`'s sensor width | — | — |
 
-Each new or renamed family gets its row in `metrics/tests.rs` and its
-Prometheus name in `scripts/telemetry-dashboards-check` (`keyed_names` for
-the counter keyed by wiring and form).
+Each new or renamed family gets its `metrics/tests.rs` row and its
+`scripts/telemetry-dashboards-check` name (`keyed_names` for the keyed one).
 
 ## Verification Plan
 
@@ -157,11 +145,16 @@ mechanics change).
       `CopyEdgeBundle` → `CopyNodeInputs`, wire types, `PROTOCOL_VERSION`,
       generated frontend types, metric and counter names, with the
       predeclared text re-pins.
-- [ ] Commit 3 (the model): the four creation operators and their weights,
+- [x] Commit 3 (the model): the four creation operators and their weights,
       the deletions of invariant 7, the one member law of invariants 3–4 with
       the fact branches removed, the config and its consumers deleted, the
       witness retired, `bundles-v1`, the server bundle view, the reference
-      specs, the series entries, and every re-pin of invariant 10.
+      specs, the series `counter_definition_changes` entries, and every
+      code-side re-pin of invariant 10 (tests, fixtures, the slow tier).
+- [ ] Epoch re-pins (benchmark step; the orchestrator checks this at
+      closure): the final-code gate and goal summaries become both epochs
+      in the closing commit (Notes, decision "A"); until then the gate
+      regression test fails on the accepted `plasticity_updates` rise.
 - [x] The `WORKAROUND(T25.F08)` marker on the VM and Topology samplers
       names those two domains only.
 - [x] Tests: the in-domain guard of the track Notes (each creation operator
@@ -174,9 +167,7 @@ mechanics change).
       one; the descriptor's field sets partition each slot family;
       `add_sensor` one record below capacity returns `Err` and writes
       nothing, and the capacity precheck is tested directly at
-      `existing + births == u16::MAX` (admits) and one above (rejects),
-      since a filled container cannot carry valid records for the success
-      half; `ActionQueue`'s width is `3 × max_actions_per_turn` (30 at
+      `existing + births == u16::MAX` (admits) and one above (rejects); `ActionQueue`'s width is `3 × max_actions_per_turn` (30 at
       the default, 60 at 20) and every slot below it is addressable; one
       engine-level draw-stream pin under the default `MutationConfig` (a
       fixed seed, the applied event sequence and the RNG state after)
@@ -298,6 +289,16 @@ are marked in the series, so those columns are not like-for-like.
 - Decision: a field set with no admissible plan skips after its draws
   under the engine's gated restore; no sensor redraw and no filtered
   universe.
+- Decision: (user, 2026-10-27, "A") the `plasticity_updates` compute rise
+  measured at the gate (0.577 per tick against T27.F03's 0.122, about
+  4.7×; compute only, the plasticity update's energy cost is 0) is accepted
+  as this feature's justified cost. Mechanism: each bundle's learning mode
+  is drawn `gen_range(0..3)` over static, Hebbian and reward-modulated (two
+  in three learn), as T25.F08 defines, and whole-sensor arrivals wire many
+  more edges under that draw where `InputRef.Add` made one lone static
+  edge. The benchmark specialist's final-code gate summary becomes the gate
+  epoch in this feature's closing commit; no threshold and no stored
+  baseline is edited.
 - Deferred: bloat under bundles arriving at the declaration rate is read
   by T27.F02's goal-long (bundle count, members, own corrections, with
   compute and energy), naming every feature closed in between.
