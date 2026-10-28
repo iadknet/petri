@@ -125,6 +125,12 @@ impl CreatureBundles {
             let BackendDef::Graph(def) = &node.backend_def else {
                 continue;
             };
+            if !reachable.contains(&index) {
+                for bundle in def.bundles() {
+                    reading.wirings[wiring_index(&bundle.wiring())].unreachable += 1;
+                }
+                continue;
+            }
             let scales: BTreeMap<BundleId, Option<f32>> = learned
                 .map(|learned| {
                     learned
@@ -136,10 +142,6 @@ impl CreatureBundles {
             for (id, bundle) in def.indexed_bundles() {
                 let wiring = bundle.wiring();
                 let row = wiring_index(&wiring);
-                if !reachable.contains(&index) {
-                    reading.wirings[row].unreachable += 1;
-                    continue;
-                }
                 let members = def.members(id).count() as u64;
                 let own_nonzero = def
                     .members(id)

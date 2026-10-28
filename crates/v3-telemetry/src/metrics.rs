@@ -22,7 +22,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::votes::DirectedVoteKind;
-use v3_core::contracts::{ActionType, WorldInputKey};
+use v3_core::contracts::ActionType;
 use v3_core::genome::cgp::Scope;
 use v3_core::ledger::DeathCause;
 use v3_core::mutation::{FORM_KEYS, WIRING_KEYS};
@@ -30,7 +30,7 @@ use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::neighborhood::sensor_census::{
-    sensor_use_census, world_input_key_label, SensorUseRow,
+    sensor_use_census, world_input_catalog, world_input_key_label, SensorUseRow,
 };
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
@@ -150,13 +150,7 @@ impl Census {
     pub fn of(sim: &Simulation) -> Self {
         let census = PopulationCensus::of(sim);
         let population = census.population();
-        let catalog = WorldInputKey::universe(
-            sim.world
-                .food()
-                .food_types()
-                .iter()
-                .map(|food_type| food_type.id),
-        );
+        let catalog = world_input_catalog(sim);
         let sensors = sensor_use_census(
             &catalog,
             sim.creatures.values().map(|c| {

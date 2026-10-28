@@ -11,6 +11,19 @@ use crate::genome::CreatureGenome;
 use crate::sensors::reads::WorldKeySet;
 use crate::simulation::Simulation;
 
+/// The world input keys of `sim`'s food catalog: the row set of every
+/// population sensor census.
+#[must_use]
+pub fn world_input_catalog(sim: &Simulation) -> BTreeSet<WorldInputKey> {
+    WorldInputKey::universe(
+        sim.world
+            .food()
+            .food_types()
+            .iter()
+            .map(|food_type| food_type.id),
+    )
+}
+
 /// Per world input key of a world's catalog, how many creatures carry it,
 /// wire it and read it (the live sensor census telemetry exports).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,13 +133,7 @@ impl ReferenceCensus {
     #[must_use]
     pub fn of(sim: &Simulation) -> Self {
         Self::observe(
-            WorldInputKey::universe(
-                sim.world
-                    .food()
-                    .food_types()
-                    .iter()
-                    .map(|food_type| food_type.id),
-            ),
+            world_input_catalog(sim),
             sim.creatures
                 .values()
                 .map(|creature| (creature.genome(), creature.reachable_nodes())),
