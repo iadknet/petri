@@ -235,6 +235,40 @@ scripts/architecture-check.mjs`. `v3-cli bench-summarize` parity on both
 stored reports ran on the build at `aa3cc6402` (readings); the later commits
 change no converter code. Every pin literal is unchanged. `make check` and the gate are not yet run.
 
+## Performance and Goal Impact
+
+**Predeclaration — written before the run.** Not a mechanism feature; no
+simulation code changes, so no indicator can move and the epoch is not
+re-pinned. Reference: the series' epoch baseline
+(`docs/progress/features/t25-f11.json`), at the standard thresholds (flag
+10%, severe 50%). Expected: the gate's deterministic blocks byte-identical
+to the epoch's, and all nine work counters at 0.000000%, since they count
+simulation work and the moved censuses run outside it. Expected cost:
+observation only, at the sampling cadence (one sample per gate seed): the
+readers may walk the population once per census where one CLI loop served
+several, allocate their own per-sample vectors and maps, and the bundle
+census now also tallies ring totals per creature; no tick-loop work is
+added. Wall-clock time per creature tick is compared on the same host
+and labelled (flag 25%, severe 100%) but cannot mark the comparison
+severe; expected inside the flag threshold, a change there being
+observation cost within run-to-run noise. A counter off
+0%, or a deterministic block that differs, is a defect, not a cost.
+
+**Measured verdict.** Pending.
+
+- Summary of the declared profile: [gate](../../progress/features/t30-f13.json).
+- Full readings: [`docs/progress/readings/t30-f13.md`](../../progress/readings/t30-f13.md).
+
+## Success Criteria
+
+- [ ] Every inventory census is computed once, in readers; outer crates
+      format only (invariants 1–3).
+- [ ] A persistence sample is one composed record whose retention
+      declarations derive the summary keep-lists, and the summary for any
+      full report is unchanged (invariants 4–6).
+- [ ] Gate deterministic blocks identical to the epoch; every existing pin
+      unchanged.
+
 ## Notes for AI Agents
 
 - Decision: R1–R3 and R7–R10 of the readings' audit are in-feature.
