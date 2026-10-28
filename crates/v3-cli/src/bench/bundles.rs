@@ -68,9 +68,8 @@ pub struct Bundles {
 fn target(wiring: &Wiring) -> String {
     match wiring {
         Wiring::Plain { sink } => sink.as_key(),
-        Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. } => kind.as_key(),
+        Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. } => kind.as_key().to_owned(),
     }
-    .to_owned()
 }
 
 impl Bundles {

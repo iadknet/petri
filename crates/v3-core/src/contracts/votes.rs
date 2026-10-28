@@ -26,49 +26,6 @@ const FIRST_DRIVE_SINK: usize = 1 + VOTE_DIRECTION_COUNT as usize * DIRECTED_VOT
 const _: () = assert!(VOTE_DIRECTION_COUNT as usize == crate::contracts::Direction::ALL.len());
 const _: () = assert!(FIRST_DRIVE_SINK + DIRECTED_VOTE_KIND_COUNT == VOTE_SINK_COUNT - 2);
 
-/// [`VoteSink::as_key`] in catalog index order.
-const VOTE_SINK_KEYS: [&str; VOTE_SINK_COUNT] = [
-    "Eat",
-    "Move.0",
-    "Move.1",
-    "Move.2",
-    "Move.3",
-    "Move.4",
-    "Move.5",
-    "Move.6",
-    "Move.7",
-    "Reproduce.0",
-    "Reproduce.1",
-    "Reproduce.2",
-    "Reproduce.3",
-    "Reproduce.4",
-    "Reproduce.5",
-    "Reproduce.6",
-    "Reproduce.7",
-    "StealEnergy.0",
-    "StealEnergy.1",
-    "StealEnergy.2",
-    "StealEnergy.3",
-    "StealEnergy.4",
-    "StealEnergy.5",
-    "StealEnergy.6",
-    "StealEnergy.7",
-    "GiveEnergy.0",
-    "GiveEnergy.1",
-    "GiveEnergy.2",
-    "GiveEnergy.3",
-    "GiveEnergy.4",
-    "GiveEnergy.5",
-    "GiveEnergy.6",
-    "GiveEnergy.7",
-    "Drive.Move",
-    "Drive.Reproduce",
-    "Drive.StealEnergy",
-    "Drive.GiveEnergy",
-    "Terminate",
-    "Decide",
-];
-
 /// One node's contribution, or the mesh's accumulated vote, over the catalog.
 pub type VoteVector = [f32; VOTE_SINK_COUNT];
 
@@ -227,8 +184,14 @@ impl VoteSink {
     /// kind's serde name and the `Direction::ALL` index), `Drive.Move`,
     /// `Terminate`, `Decide`. Never a `Debug` rendering.
     #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        VOTE_SINK_KEYS[self.index()]
+    pub fn as_key(self) -> String {
+        match self {
+            Self::Eat => "Eat".to_owned(),
+            Self::Directed(kind, d) => format!("{}.{d}", kind.as_key()),
+            Self::Drive(kind) => format!("Drive.{}", kind.as_key()),
+            Self::Terminate => "Terminate".to_owned(),
+            Self::Decide => "Decide".to_owned(),
+        }
     }
 
     /// Every sink in catalog index order.
@@ -519,8 +482,55 @@ mod tests {
     /// (T25.F11 invariant 11: stable keys, never a `Debug` rendering).
     #[test]
     fn vote_sink_keys_are_unique_and_follow_the_catalog() {
-        let keys: std::collections::BTreeSet<_> = VoteSink::all().map(VoteSink::as_key).collect();
-        assert_eq!(keys.len(), VOTE_SINK_COUNT);
+        let keys: Vec<_> = VoteSink::all().map(VoteSink::as_key).collect();
+        assert_eq!(
+            keys,
+            [
+                "Eat",
+                "Move.0",
+                "Move.1",
+                "Move.2",
+                "Move.3",
+                "Move.4",
+                "Move.5",
+                "Move.6",
+                "Move.7",
+                "Reproduce.0",
+                "Reproduce.1",
+                "Reproduce.2",
+                "Reproduce.3",
+                "Reproduce.4",
+                "Reproduce.5",
+                "Reproduce.6",
+                "Reproduce.7",
+                "StealEnergy.0",
+                "StealEnergy.1",
+                "StealEnergy.2",
+                "StealEnergy.3",
+                "StealEnergy.4",
+                "StealEnergy.5",
+                "StealEnergy.6",
+                "StealEnergy.7",
+                "GiveEnergy.0",
+                "GiveEnergy.1",
+                "GiveEnergy.2",
+                "GiveEnergy.3",
+                "GiveEnergy.4",
+                "GiveEnergy.5",
+                "GiveEnergy.6",
+                "GiveEnergy.7",
+                "Drive.Move",
+                "Drive.Reproduce",
+                "Drive.StealEnergy",
+                "Drive.GiveEnergy",
+                "Terminate",
+                "Decide",
+            ]
+        );
+        assert_eq!(
+            keys.iter().collect::<std::collections::BTreeSet<_>>().len(),
+            VOTE_SINK_COUNT
+        );
         assert_eq!(VoteSink::Eat.as_key(), "Eat");
         assert_eq!(
             VoteSink::Directed(DirectedVoteKind::GiveEnergy, 7).as_key(),
