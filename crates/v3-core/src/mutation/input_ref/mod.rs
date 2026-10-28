@@ -163,7 +163,9 @@ impl InputRefMutator {
         )
     }
 
-    /// Apply an input ref operator under the run's sensor context.
+    /// [`Self::apply_classified`], reachability only: the tests' entry under
+    /// a chosen sensor context.
+    #[cfg(test)]
     pub fn apply_in(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
@@ -176,10 +178,10 @@ impl InputRefMutator {
             .map(|(reachability, _)| reachability)
     }
 
-    /// [`Self::apply_in`] with what the event reports
-    /// ([`EventReport`]: the vote-sink class of an `AddSensor*` that made
-    /// exactly one `Plain` bundle, T11.F30 and T25.F11 invariant 8, and its
-    /// bundle edits); the same draws.
+    /// Apply an input ref operator under the run's sensor context, with what
+    /// the event reports ([`EventReport`]: the vote-sink class of an
+    /// `AddSensor*` that made exactly one `Plain` bundle, T11.F30 and T25.F11
+    /// invariant 8, and its bundle edits).
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: InputRefOperator,

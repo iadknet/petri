@@ -488,7 +488,8 @@ fn apply_gated<T>(
 
 /// Apply `operator` through its domain's production entry, ungated: the one
 /// dispatch from the catalog to the four domain mutators. The engine gates
-/// it ([`apply_event`]); the per-operator battery calls it directly.
+/// it ([`apply_event`]); the per-operator battery and the recruitment-path
+/// replay call it directly.
 pub(crate) fn dispatch(
     genome: &mut CreatureGenome,
     operator: MutationOperator,

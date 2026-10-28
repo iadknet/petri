@@ -37,7 +37,7 @@ use crate::mutation::types::MutationSkipReason;
 // ─── Applicability predicates ───────────────────────────────────────────────
 //
 // The per-edge predicates the plasticity operators draw their target from.
-// `GraphMutator::apply` filters Graph-backend nodes by [`any_edge`] over the
+// `GraphMutator::apply_classified` filters Graph-backend nodes by [`any_edge`] over the
 // same predicate, so an operator is never selected onto a module with no
 // edge it can touch. A `ClearSlot` edge never matches
 // (`CgpGraphBackendDef::can_learn`); a member does (T25.F07).

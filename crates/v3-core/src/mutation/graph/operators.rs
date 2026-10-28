@@ -891,7 +891,7 @@ pub(crate) fn raw_field_mutation(
 // ─── Applicability predicates ───────────────────────────────────────────────
 //
 // One predicate per Graph operator, over a single node's backend def (and
-// its `input_refs` where the operator reads them). `GraphMutator::apply`
+// its `input_refs` where the operator reads them). `GraphMutator::apply_classified`
 // filters the Graph-backend node indices by the operator's predicate before
 // the biased draw, so an operator is never selected onto a node it cannot
 // apply to. Each predicate tests exactly the site enumeration its operator

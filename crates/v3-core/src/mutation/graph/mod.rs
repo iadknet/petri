@@ -308,13 +308,8 @@ impl GraphMutator {
             .collect()
     }
 
-    /// Apply a graph operator to the genome under the world's sensor
-    /// context.
-    ///
-    /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
-    /// if no Graph-backend node has a site this operator can apply to. The
-    /// skip happens before the draw, so the engine records it as
-    /// no-eligible-node with no selected target.
+    /// [`Self::apply_classified`] reachability only: the tests' entry.
+    #[cfg(test)]
     pub fn apply_in(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -327,8 +322,14 @@ impl GraphMutator {
             .map(|(reachability, _)| reachability)
     }
 
-    /// [`Self::apply_in`] with what the event reports
-    /// beside its reachability ([`EventReport`]); the same draws.
+    /// Apply a graph operator to the genome under the world's sensor
+    /// context, with what the event reports beside its reachability
+    /// ([`EventReport`]).
+    ///
+    /// # Errors
+    /// `MutationSkipReason::NoApplicableTarget` if no Graph-backend node has
+    /// a site this operator can apply to. The skip happens before the draw,
+    /// so the engine records it as no-eligible-node with no selected target.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: GraphOperator,

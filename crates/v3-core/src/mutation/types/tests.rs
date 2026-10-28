@@ -285,135 +285,42 @@ fn operator_domain_mapping_is_consistent() {
     }
 }
 
+/// Every domain operator maps through `From` to its own nested variant and
+/// keeps its domain's complexity effect there.
 #[test]
 fn complexity_effect_cross_consistency_with_domain_operators() {
-    use crate::mutation::graph::GraphOperator as G;
-    use crate::mutation::input_ref::InputRefOperator as I;
-    use crate::mutation::topology::TopologyOperator as T;
-    use crate::mutation::vm::VmOperator as V;
-    use MutationOperator as M;
+    use crate::mutation::graph::GraphOperator;
+    use crate::mutation::input_ref::InputRefOperator;
+    use crate::mutation::topology::TopologyOperator;
+    use crate::mutation::vm::VmOperator;
 
-    for &top in &T::ALL {
-        let mo = match top {
-            T::AddNode => M::Topology(T::AddNode),
-            T::RemoveNode => M::Topology(T::RemoveNode),
-            T::RetargetNodeTarget => M::Topology(T::RetargetNodeTarget),
-            T::AddRouteTarget => M::Topology(T::AddRouteTarget),
-            T::AddFeedbackRoute => M::Topology(T::AddFeedbackRoute),
-            T::RemoveRouteTarget => M::Topology(T::RemoveRouteTarget),
-            T::ChangeEntryNode => M::Topology(T::ChangeEntryNode),
-            T::SwapNodeBackend => M::Topology(T::SwapNodeBackend),
-            T::CopyNode => M::Topology(T::CopyNode),
-            T::CopyMeshBackwardSlice => M::Topology(T::CopyMeshBackwardSlice),
-            T::CopyMeshForwardSlice => M::Topology(T::CopyMeshForwardSlice),
-            T::SpliceNode => M::Topology(T::SpliceNode),
-            T::SwapRouteTargets => M::Topology(T::SwapRouteTargets),
-            T::MutateGateBias => M::Topology(T::MutateGateBias),
-        };
-        assert_eq!(
-            mo.complexity_effect(),
-            top.complexity_effect(),
-            "MutationOperator and TopologyOperator disagree for {:?}",
-            top
-        );
+    for op in TopologyOperator::ALL {
+        let mapped = MutationOperator::from(op);
+        assert_eq!(mapped, MutationOperator::Topology(op));
+        assert_eq!(mapped.complexity_effect(), op.complexity_effect(), "{op:?}");
     }
-
-    for &vm in &V::ALL {
-        let mo = match vm {
-            V::VmConstantMutation => M::Vm(V::VmConstantMutation),
-            V::VmInstructionMutation => M::Vm(V::VmInstructionMutation),
-            V::VmDeleteInstruction => M::Vm(V::VmDeleteInstruction),
-            V::VmRegisterCountMutation => M::Vm(V::VmRegisterCountMutation),
-            V::VmInstructionRawFieldMutation => M::Vm(V::VmInstructionRawFieldMutation),
-            V::VmCopyInstructionBlock => M::Vm(V::VmCopyInstructionBlock),
-            V::VmCopyInstructionBlockRemapped => M::Vm(V::VmCopyInstructionBlockRemapped),
-            V::VmCopyConstantBlock => M::Vm(V::VmCopyConstantBlock),
-            V::VmCopyGeneBackwardSlice => M::Vm(V::VmCopyGeneBackwardSlice),
-            V::VmCopyGeneForwardSlice => M::Vm(V::VmCopyGeneForwardSlice),
-            V::VmInsertReadStoreMotif => M::Vm(V::VmInsertReadStoreMotif),
-            V::VmInsertReadBidMotif => M::Vm(V::VmInsertReadBidMotif),
-            V::VmInsertLoadCompareMotif => M::Vm(V::VmInsertLoadCompareMotif),
-            V::VmMutateSlotAddress => M::Vm(V::VmMutateSlotAddress),
-            V::VmMutatePairedSlotAddress => M::Vm(V::VmMutatePairedSlotAddress),
-        };
-        assert_eq!(
-            mo.complexity_effect(),
-            vm.complexity_effect(),
-            "MutationOperator and VmOperator disagree for {:?}",
-            vm
-        );
+    for op in VmOperator::ALL {
+        let mapped = MutationOperator::from(op);
+        assert_eq!(mapped, MutationOperator::Vm(op));
+        assert_eq!(mapped.complexity_effect(), op.complexity_effect(), "{op:?}");
     }
-
-    for &graph in &G::ALL {
-        let mo = match graph {
-            G::AlterGraphEdgeWeight => M::Graph(G::AlterGraphEdgeWeight),
-            G::SwapGraphOperator => M::Graph(G::SwapGraphOperator),
-            G::MutateGraphOperatorParam => M::Graph(G::MutateGraphOperatorParam),
-            G::AddInternalGraphNode => M::Graph(G::AddInternalGraphNode),
-            G::RemoveInternalGraphNode => M::Graph(G::RemoveInternalGraphNode),
-            G::AddGraphEdge => M::Graph(G::AddGraphEdge),
-            G::RetargetGraphEdge => M::Graph(G::RetargetGraphEdge),
-            G::RemoveGraphEdge => M::Graph(G::RemoveGraphEdge),
-            G::GraphRawFieldMutation => M::Graph(G::GraphRawFieldMutation),
-            G::CopyInternalNode => M::Graph(G::CopyInternalNode),
-            G::CopySubgraph => M::Graph(G::CopySubgraph),
-            G::CopyNodeInputs => M::Graph(G::CopyNodeInputs),
-            G::EnableHebbian => M::Graph(G::EnableHebbian),
-            G::DisableHebbian => M::Graph(G::DisableHebbian),
-            G::MutateHebbianRule => M::Graph(G::MutateHebbianRule),
-            G::MutateHebbianRate => M::Graph(G::MutateHebbianRate),
-            G::ToggleHebbianLamarckian => M::Graph(G::ToggleHebbianLamarckian),
-            G::EnableRewardModulation => M::Graph(G::EnableRewardModulation),
-            G::DisableRewardModulation => M::Graph(G::DisableRewardModulation),
-            G::MutateRewardSource => M::Graph(G::MutateRewardSource),
-            G::MutateTraceDecay => M::Graph(G::MutateTraceDecay),
-            G::AddBundleLive => M::Graph(G::AddBundleLive),
-            G::AddBundleSilent => M::Graph(G::AddBundleSilent),
-            G::AlterBundleScale => M::Graph(G::AlterBundleScale),
-            G::ShiftBundleOffset => M::Graph(G::ShiftBundleOffset),
-            G::RetargetBundle => M::Graph(G::RetargetBundle),
-            G::RemoveBundle => M::Graph(G::RemoveBundle),
-            G::SetScope => M::Graph(G::SetScope),
-            G::DetachGraphEdge => M::Graph(G::DetachGraphEdge),
-            G::EnableRetention => M::Graph(G::EnableRetention),
-            G::DisableRetention => M::Graph(G::DisableRetention),
-            G::MutateRetention => M::Graph(G::MutateRetention),
-            G::EnableBundleRetention => M::Graph(G::EnableBundleRetention),
-            G::DisableBundleRetention => M::Graph(G::DisableBundleRetention),
-            G::MutateBundleRetention => M::Graph(G::MutateBundleRetention),
-        };
-        // `From` is the one mapping into the catalog, so pinning it pins
-        // the operator every classification reads.
-        assert_eq!(
-            mo,
-            M::from(graph),
-            "GraphOperator maps {:?} to the wrong MutationOperator",
-            graph
-        );
+    for op in GraphOperator::ALL {
+        let mapped = MutationOperator::from(op);
+        assert_eq!(mapped, MutationOperator::Graph(op));
+        assert_eq!(mapped.complexity_effect(), op.complexity_effect(), "{op:?}");
     }
-
-    for &ir in &I::ALL {
-        let mo = match ir {
-            I::AddSensorLive => M::InputRef(I::AddSensorLive),
-            I::AddSensorSilent => M::InputRef(I::AddSensorSilent),
-            I::Prune => M::InputRef(I::Prune),
-            I::Swap => M::InputRef(I::Swap),
-            I::RawFieldMutation => M::InputRef(I::RawFieldMutation),
-        };
-        assert_eq!(
-            mo.complexity_effect(),
-            ir.complexity_effect(),
-            "MutationOperator and InputRefOperator disagree for {:?}",
-            ir
-        );
+    for op in InputRefOperator::ALL {
+        let mapped = MutationOperator::from(op);
+        assert_eq!(mapped, MutationOperator::InputRef(op));
+        assert_eq!(mapped.complexity_effect(), op.complexity_effect(), "{op:?}");
     }
 }
 
 /// The Graph catalog is one consistent set (T25.F08 invariant 1): `ALL`
-/// covers every variant once, `operator()` is injective onto exactly the
+/// covers every variant once, `From` is injective onto exactly the
 /// Graph-domain members of `MutationOperator::ALL`, every key is unique
-/// and `Graph.`-prefixed, and `all()` is the four domains' catalogs. The hand-written map above stays the
-/// identity oracle.
+/// and `Graph.`-prefixed, and `MutationOperator::ALL` is the four domains'
+/// catalogs.
 #[test]
 fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
     use crate::mutation::graph::GraphOperator;

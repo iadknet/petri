@@ -206,7 +206,7 @@ regression past its threshold would show it wrong.
       5); delete the three key functions, the four wrappers,
       `ClassifiedResult` and the `too_many_lines` allowance; the battery
       in `neighborhood/operators.rs` drops `OperatorKind` for the dispatch.
-- [ ] 4. Callers of invariant 6 (compiler-driven): readers,
+- [x] 4. Callers of invariant 6 (compiler-driven): readers,
       `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
       `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of` and its tests; the
       v2 fixture stays), and every test file naming a flat variant.
@@ -232,6 +232,12 @@ regression past its threshold would show it wrong.
       equal to the epoch, raw hash and size in the readings, series entry
       added, no full report staged.
 - [ ] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
+
+| Self-review check (2026-10-28, after `simplify`) | Result |
+| --- | --- |
+| `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` | clean, exit 0 |
+| `cargo test -p v3-core` | pass; draw-stream hash unchanged, `reproducibility` 4 passed |
+| `cargo test -p v3-cli` | pass |
 
 ## Performance and Goal Impact
 
