@@ -27,7 +27,7 @@ use super::schema::{
     SeedThroughput, SeedWallClock, StructuralCompanionsSeed, TemporalMemorySensitivitySeed,
     Throughput, ThroughputRates, Totals,
 };
-use super::tracking::{PersistenceAccumulator, PopulationReadings, WorldTracking};
+use super::tracking::{PersistenceAccumulator, SampleBlocks, WorldTracking};
 use std::num::NonZeroUsize;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use v3_core::config::SimulationConfig;
@@ -186,12 +186,7 @@ pub(super) fn run_one_seed(
             sim.tick,
             population,
             sim.stats.reproduction_actions_spawned_total,
-            || {
-                v3_core::neighborhood::population::PopulationCensus::of(&sim)
-                    .mean_energy()
-                    .expect("read only while the population lives")
-            },
-            || PopulationReadings::observe(&sim),
+            || SampleBlocks::observe(&sim),
             || WorldTracking::observe(&sim),
         );
         if population == 0 {

@@ -9,7 +9,7 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use v3_core::neighborhood::mesh_summary::{MeshRowReading, MeshSummary};
 
-use super::{ComparisonInputs, Report};
+use super::{retention, ComparisonInputs, Report};
 
 pub const SUMMARY_KIND: &str = "petri-benchmark-summary";
 pub const SUMMARY_VERSION: u32 = 2;
@@ -308,30 +308,10 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                         let sample = &samples[source_index];
                         let mut selected =
                             aggregate_fields(sample, &measured.samples[source_index].tracking)?;
-                        for (key, value) in pick(
-                            sample,
-                            &[
-                                "tick",
-                                "population",
-                                "mean_energy",
-                                "births_total",
-                                "mean_genome_size",
-                                "mean_mesh_nodes",
-                                "mean_generation",
-                                "mean_wired_sinks",
-                                "surviving_founder_clade_count",
-                                "shannon_entropy_nats",
-                                "sensor_census",
-                                "occupancy_grid",
-                                "bundles",
-                                "plasticity_census",
-                                "capacity",
-                                "shares",
-                            ],
-                        )
-                        .as_object()
-                        .into_iter()
-                        .flatten()
+                        for (key, value) in pick(sample, &retention::sample_fields())
+                            .as_object()
+                            .into_iter()
+                            .flatten()
                         {
                             selected[key] = value.clone();
                         }
@@ -588,34 +568,6 @@ const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
     "plateau_population",
     "mean_energy",
 ];
-/// Persistence checkpoint fields the page reads, each kept whole, and
-/// `mean_wired_sinks` (T25.F02), `bundles` (T25.F11) and
-/// `plasticity_census` (T25.F06), `capacity` (T26.F02) and `shares` (T27.F03), which the page
-/// does not read but the readings do; `keep_sample` projects `bundles`
-/// further.
-const KEPT_SAMPLE_FIELDS: [&str; 17] = [
-    "tick",
-    "population",
-    "mean_energy",
-    "mean_genome_size",
-    "mean_mesh_nodes",
-    "mean_wired_sinks",
-    "shannon_entropy_nats",
-    "surviving_founder_clade_count",
-    "food_density_total",
-    "grazed_cell_share",
-    "grazing_modifier_mean",
-    "occupancy_grid",
-    "sensor_census",
-    "bundles",
-    "plasticity_census",
-    "capacity",
-    "shares",
-];
-/// `bundles` aggregates every checkpoint keeps (T25.F11): the per-wiring
-/// totals and the creations; `rows` is kept only on each world's last
-/// checkpoint.
-const KEPT_BUNDLE_FIELDS: [&str; 5] = ["version", "creatures", "carriers", "wirings", "created"];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
 /// `action_attempts` (T16.F02), `ring_rules` (T11.F31), and `drives` and
 /// `mutation_value_totals_by_birth_edge_class` (T11.F30) and `giving`
@@ -710,19 +662,26 @@ fn keep_neighborhood(source: &Value) -> Value {
     })
 }
 
-/// Project a checkpoint; `last` keeps its `bundles.rows`.
+/// Project a checkpoint by the sample's retention declarations
+/// (`retention`): kept keys whole, each projected block narrowed to its
+/// every-checkpoint fields, and on the `last` checkpoint its last-only
+/// fields too.
 fn keep_sample(source: &Value, last: bool) -> Value {
     keep_object(source, |sample| {
-        let mut out = pick(sample, &KEPT_SAMPLE_FIELDS);
-        keep_field(&mut out, sample, "bundles", |bundles| {
-            keep_object(bundles, |bundles| {
-                let mut out = pick(bundles, &KEPT_BUNDLE_FIELDS);
-                if last {
-                    keep_field(&mut out, bundles, "rows", Value::clone);
-                }
-                out
-            })
-        });
+        let mut out = pick(sample, &retention::kept_sample_fields());
+        for (key, every, last_only) in retention::projected_sample_fields() {
+            keep_field(&mut out, sample, key, |block| {
+                keep_object(block, |block| {
+                    let mut out = pick(block, &every);
+                    if last {
+                        for field in &last_only {
+                            keep_field(&mut out, block, field, Value::clone);
+                        }
+                    }
+                    out
+                })
+            });
+        }
         out
     })
 }

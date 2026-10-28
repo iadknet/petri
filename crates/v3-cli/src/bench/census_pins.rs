@@ -478,18 +478,14 @@ fn crafted_simulation() -> Simulation {
 /// The sample a run records at `sim`'s tick, built the way the benchmark
 /// run builds it.
 fn sample(sim: &Simulation) -> Value {
-    use super::tracking::{PersistenceAccumulator, PopulationReadings, WorldTracking};
+    use super::tracking::{PersistenceAccumulator, SampleBlocks, WorldTracking};
     let population = sim.creatures.len() as u64;
     let mut accumulator = PersistenceAccumulator::new(sim.tick, population);
     accumulator.observe(
         sim.tick,
         population,
         sim.stats.reproduction_actions_spawned_total,
-        || {
-            let total: f64 = sim.creatures.values().map(|c| f64::from(c.energy)).sum();
-            total / population as f64
-        },
-        || PopulationReadings::observe(sim),
+        || SampleBlocks::observe(sim),
         || WorldTracking::observe(sim),
     );
     serde_json::to_value(accumulator.finish(0)).expect("a persistence row serializes")

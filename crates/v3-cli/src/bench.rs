@@ -17,6 +17,7 @@ pub mod input_use;
 pub mod mutation_effects;
 mod profiles;
 mod progress;
+mod retention;
 pub mod ring_rules;
 mod run;
 mod schema;

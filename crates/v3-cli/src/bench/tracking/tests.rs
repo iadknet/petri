@@ -177,21 +177,22 @@ fn a_census_block_without_retention_rows_still_reads() {
     assert!(stored.edges_by_retention.is_empty() && stored.scales_by_retention.is_empty());
 }
 
-/// The reading `PopulationReadings::observe` produces for an empty
-/// population: zero means that never reach the report, no surviving clade,
-/// undefined entropy, and an all-zero census.
-fn empty_readings() -> PopulationReadings {
-    PopulationReadings {
-        mean_genome_size: 0.0,
-        mean_mesh_nodes: 0.0,
-        mean_generation: 0.0,
-        mean_wired_sinks: 0.0,
-        surviving_founder_clade_count: 0,
-        shannon_entropy_nats: UNDEFINED.to_string(),
-        sensor_census: census_for(0),
-        occupancy_grid: grid_for(0),
+/// The blocks `SampleBlocks::observe` produces for an empty population: no
+/// means, no surviving clade, undefined entropy, all-zero censuses and grid,
+/// and no bundle or trait distribution.
+fn empty_blocks() -> SampleBlocks {
+    SampleBlocks {
+        mean_energy: None,
+        mean_genome_size: None,
+        mean_mesh_nodes: None,
+        mean_generation: None,
+        mean_wired_sinks: None,
+        surviving_founder_clade_count: Some(0),
+        shannon_entropy_nats: Some(UNDEFINED.to_string()),
+        sensor_census: Some(census_for(0)),
+        occupancy_grid: Some(grid_for(0)),
         bundles: None,
-        plasticity_census: plasticity_for(0),
+        plasticity_census: Some(plasticity_for(0)),
         capacity: None,
         shares: None,
     }
@@ -219,25 +220,26 @@ fn capacity_block(value: f64) -> crate::bench::capacity::CapacityDistribution {
     }
 }
 
-/// Population readings a living tick stands in with: values keyed to the
-/// tick so a sample can be traced back to the tick it was taken on. An
-/// empty population reads [`empty_readings`], exactly as
-/// `PopulationReadings::observe` does.
-fn readings_for(tick: u64, population: u64) -> PopulationReadings {
+/// The blocks a living tick stands in with: values keyed to the tick so a
+/// sample can be traced back to the tick it was taken on, at mean energy
+/// `energy`. An empty population reads [`empty_blocks`], exactly as
+/// `SampleBlocks::observe` does.
+fn blocks_for(tick: u64, population: u64, energy: f64) -> SampleBlocks {
     if population == 0 {
-        return empty_readings();
+        return empty_blocks();
     }
-    PopulationReadings {
-        mean_genome_size: tick as f64,
-        mean_mesh_nodes: tick as f64 * 2.0,
-        mean_generation: tick as f64 * 3.0,
-        mean_wired_sinks: tick as f64 * 5.0,
-        surviving_founder_clade_count: population,
-        shannon_entropy_nats: six(tick as f64 / 4.0),
-        sensor_census: census_for(population),
-        occupancy_grid: grid_for(population),
+    SampleBlocks {
+        mean_energy: Some(six(energy)),
+        mean_genome_size: Some(six(tick as f64)),
+        mean_mesh_nodes: Some(six(tick as f64 * 2.0)),
+        mean_generation: Some(six(tick as f64 * 3.0)),
+        mean_wired_sinks: Some(six(tick as f64 * 5.0)),
+        surviving_founder_clade_count: Some(population),
+        shannon_entropy_nats: Some(six(tick as f64 / 4.0)),
+        sensor_census: Some(census_for(population)),
+        occupancy_grid: Some(grid_for(population)),
         bundles: Some(bundles_for(tick)),
-        plasticity_census: plasticity_for(population),
+        plasticity_census: Some(plasticity_for(population)),
         capacity: Some(capacity_block(tick as f64)),
         shares: Some(shares_block(tick as f64 / 1000.0)),
     }
@@ -245,7 +247,7 @@ fn readings_for(tick: u64, population: u64) -> PopulationReadings {
 
 /// Feed the accumulator one observation per tick from a population
 /// series (index 0 is tick 1), with a constant mean creature energy, a
-/// cumulative birth count equal to the tick, and [`readings_for`].
+/// cumulative birth count equal to the tick, and [`blocks_for`].
 fn observe_series(
     horizon: u64,
     seeded_population: u64,
@@ -259,8 +261,7 @@ fn observe_series(
             tick,
             population,
             tick,
-            || energy,
-            || readings_for(tick, population),
+            || blocks_for(tick, population, energy),
             WorldTracking::default,
         );
     }
@@ -314,6 +315,7 @@ fn mean_energy_is_null_at_extinction_and_the_final_value_otherwise() {
             .samples
             .last()
             .expect("the extinction tick is sampled")
+            .blocks
             .mean_energy,
         None
     );
@@ -323,7 +325,7 @@ fn mean_energy_is_null_at_extinction_and_the_final_value_otherwise() {
 }
 
 #[test]
-fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
+fn every_checkpoint_carries_the_population_blocks_of_its_own_tick() {
     let populations = [6_u64; 250];
     let summary = observe_series(250, 6, &populations, 1.0);
 
@@ -332,29 +334,11 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
         vec![100, 200, 250]
     );
     for sample in &summary.samples {
-        let expected = readings_for(sample.tick, sample.population);
         assert_eq!(
-            sample.mean_genome_size.as_deref(),
-            Some(six(expected.mean_genome_size).as_str()),
+            sample.blocks,
+            blocks_for(sample.tick, sample.population, 1.0),
             "tick {}",
             sample.tick
-        );
-        assert_eq!(
-            sample.mean_mesh_nodes.as_deref(),
-            Some(six(expected.mean_mesh_nodes).as_str())
-        );
-        assert_eq!(
-            sample.mean_generation.as_deref(),
-            Some(six(expected.mean_generation).as_str())
-        );
-        assert_eq!(
-            sample.mean_wired_sinks.as_deref(),
-            Some(six(expected.mean_wired_sinks).as_str())
-        );
-        assert_eq!(sample.surviving_founder_clade_count, Some(6));
-        assert_eq!(
-            sample.shannon_entropy_nats.as_deref(),
-            Some(expected.shannon_entropy_nats.as_str())
         );
     }
 }
@@ -440,13 +424,14 @@ fn the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count() {
         .expect("the extinction tick is sampled");
 
     assert_eq!(last.population, 0);
-    assert_eq!(last.mean_genome_size, None);
-    assert_eq!(last.mean_mesh_nodes, None);
-    assert_eq!(last.mean_generation, None);
-    assert_eq!(last.surviving_founder_clade_count, Some(0));
-    assert_eq!(last.shannon_entropy_nats.as_deref(), Some(UNDEFINED));
+    assert_eq!(last.blocks.mean_genome_size, None);
+    assert_eq!(last.blocks.mean_mesh_nodes, None);
+    assert_eq!(last.blocks.mean_generation, None);
+    assert_eq!(last.blocks.surviving_founder_clade_count, Some(0));
+    assert_eq!(last.blocks.shannon_entropy_nats.as_deref(), Some(UNDEFINED));
 
     let census = last
+        .blocks
         .sensor_census
         .as_ref()
         .expect("a census of an empty population is zero, not unmeasured");
@@ -469,6 +454,7 @@ fn the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count() {
     assert_eq!(census.creatures_with_any_stateful_read, 0);
 
     let grid = last
+        .blocks
         .occupancy_grid
         .as_ref()
         .expect("the grid of an empty population is zero, not unmeasured");
@@ -520,7 +506,7 @@ fn the_observed_grid_separates_clades_by_where_they_stand() {
 }
 
 #[test]
-fn population_readings_average_the_living_population_and_count_its_clades() {
+fn sample_blocks_average_the_living_population_and_count_its_clades() {
     let mut config = SimulationConfig::default();
     config.world.width = 32;
     config.world.height = 32;
@@ -530,31 +516,33 @@ fn population_readings_average_the_living_population_and_count_its_clades() {
 
     let expected_genome_size =
         f64::from(sim.creatures.values().map(|c| c.genome_size()).sum::<u32>()) / 4.0;
-    let readings = PopulationReadings::observe(&sim);
-    assert_eq!(readings.mean_genome_size, expected_genome_size);
-    assert_eq!(readings.mean_mesh_nodes, 2.0);
-    assert_eq!(readings.mean_generation, 0.0);
+    let blocks = SampleBlocks::observe(&sim);
+    assert_eq!(blocks.mean_genome_size, Some(six(expected_genome_size)));
+    assert_eq!(blocks.mean_mesh_nodes, Some(six(2.0)));
+    assert_eq!(blocks.mean_generation, Some(six(0.0)));
     // Every founder is its own clade, so the distribution is uniform and
     // the entropy is ln(4).
-    assert_eq!(readings.surviving_founder_clade_count, 4);
-    assert_eq!(readings.shannon_entropy_nats, six(4.0_f64.ln()));
+    assert_eq!(blocks.surviving_founder_clade_count, Some(4));
+    assert_eq!(blocks.shannon_entropy_nats, Some(six(4.0_f64.ln())));
     assert_eq!(
-        readings.shannon_entropy_nats,
-        lineage_diversity(
-            42,
-            sim.creatures.values().map(|c| c.body.identity.lineage_id)
-        )
-        .shannon_entropy_nats,
+        blocks.shannon_entropy_nats,
+        Some(
+            lineage_diversity(
+                42,
+                sim.creatures.values().map(|c| c.body.identity.lineage_id)
+            )
+            .shannon_entropy_nats
+        ),
         "the checkpoint reading and the terminal reading share one computation"
     );
 }
 
 proptest! {
-    /// The optional readings survive a JSON round trip beside the
-    /// flattened tracking block, and a wire form without them reads them
-    /// as absent rather than as zero.
+    /// The optional blocks survive a JSON round trip beside the flattened
+    /// tracking block, and a wire form without them reads them as absent
+    /// rather than as zero.
     #[test]
-    fn persistence_sample_readings_survive_a_json_round_trip(
+    fn persistence_sample_blocks_survive_a_json_round_trip(
         mean_genome_size in proptest::option::of(0.0f64..1e6),
         mean_mesh_nodes in proptest::option::of(0.0f64..1e6),
         mean_generation in proptest::option::of(0.0f64..1e6),
@@ -566,20 +554,22 @@ proptest! {
         let sample = PersistenceSample {
             tick: 100,
             population,
-            mean_energy: None,
             births_total: 7,
-            mean_genome_size: mean_genome_size.map(six),
-            mean_mesh_nodes: mean_mesh_nodes.map(six),
-            mean_generation: mean_generation.map(six),
-            mean_wired_sinks: mean_wired_sinks.map(six),
-            surviving_founder_clade_count,
-            shannon_entropy_nats: shannon_entropy_nats.map(six),
-            sensor_census: Some(census_for(population)),
-            occupancy_grid: Some(grid_for(population)),
-            bundles: None,
-            plasticity_census: Some(plasticity_for(population)),
-            capacity: (population > 0).then(|| capacity_block(population as f64)),
-            shares: (population > 0).then(|| shares_block(population as f64 / 1000.0)),
+            blocks: SampleBlocks {
+                mean_energy: None,
+                mean_genome_size: mean_genome_size.map(six),
+                mean_mesh_nodes: mean_mesh_nodes.map(six),
+                mean_generation: mean_generation.map(six),
+                mean_wired_sinks: mean_wired_sinks.map(six),
+                surviving_founder_clade_count,
+                shannon_entropy_nats: shannon_entropy_nats.map(six),
+                sensor_census: Some(census_for(population)),
+                occupancy_grid: Some(grid_for(population)),
+                bundles: None,
+                plasticity_census: Some(plasticity_for(population)),
+                capacity: (population > 0).then(|| capacity_block(population as f64)),
+                shares: (population > 0).then(|| shares_block(population as f64 / 1000.0)),
+            },
             tracking: WorldTracking::default(),
         };
 
@@ -587,19 +577,8 @@ proptest! {
         let decoded: PersistenceSample =
             serde_json::from_str(&wire).expect("deserializable");
         prop_assert_eq!(decoded.population, sample.population);
-        prop_assert_eq!(&decoded.mean_genome_size, &sample.mean_genome_size);
-        prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
-        prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
-        prop_assert_eq!(&decoded.mean_wired_sinks, &sample.mean_wired_sinks);
-        prop_assert_eq!(
-            decoded.surviving_founder_clade_count,
-            sample.surviving_founder_clade_count
-        );
-        prop_assert_eq!(&decoded.shannon_entropy_nats, &sample.shannon_entropy_nats);
-        prop_assert_eq!(&decoded.sensor_census, &sample.sensor_census);
-        prop_assert_eq!(&decoded.occupancy_grid, &sample.occupancy_grid);
-        prop_assert_eq!(&decoded.plasticity_census, &sample.plasticity_census);
-        prop_assert_eq!(&decoded.capacity, &sample.capacity);
+        prop_assert_eq!(decoded.births_total, sample.births_total);
+        prop_assert_eq!(&decoded.blocks, &sample.blocks);
         prop_assert_eq!(&decoded.tracking, &sample.tracking);
 
         let mut stripped: serde_json::Value =
@@ -622,21 +601,29 @@ proptest! {
         }
         let historical: PersistenceSample =
             serde_json::from_value(stripped).expect("a historical sample must parse");
-        prop_assert_eq!(historical.mean_genome_size, None);
-        prop_assert_eq!(historical.mean_mesh_nodes, None);
-        prop_assert_eq!(historical.mean_generation, None);
-        prop_assert_eq!(historical.mean_wired_sinks, None);
-        prop_assert_eq!(historical.surviving_founder_clade_count, None);
-        prop_assert_eq!(historical.shannon_entropy_nats, None);
-        prop_assert_eq!(historical.sensor_census, None);
-        prop_assert_eq!(historical.occupancy_grid, None);
-        prop_assert_eq!(historical.capacity, None);
-        prop_assert_eq!(historical.shares, None);
+        prop_assert_eq!(
+            historical.blocks,
+            SampleBlocks {
+                mean_energy: None,
+                mean_genome_size: None,
+                mean_mesh_nodes: None,
+                mean_generation: None,
+                mean_wired_sinks: None,
+                surviving_founder_clade_count: None,
+                shannon_entropy_nats: None,
+                sensor_census: None,
+                occupancy_grid: None,
+                bundles: None,
+                plasticity_census: None,
+                capacity: None,
+                shares: None,
+            }
+        );
     }
 }
 
 #[test]
-fn population_readings_of_an_empty_population_are_zero_means_and_undefined_entropy() {
+fn sample_blocks_of_an_empty_population_are_absent_means_and_undefined_entropy() {
     let mut config = SimulationConfig::default();
     config.world.width = 32;
     config.world.height = 32;
@@ -644,7 +631,7 @@ fn population_readings_of_an_empty_population_are_zero_means_and_undefined_entro
     let sim = seed_simulation(config, 42);
     assert_eq!(sim.creatures.len(), 0);
 
-    assert_eq!(PopulationReadings::observe(&sim), empty_readings());
+    assert_eq!(SampleBlocks::observe(&sim), empty_blocks());
 }
 
 #[test]
@@ -1406,16 +1393,16 @@ fn tracking_fields_default_when_absent() {
     }))
     .expect("a pre-T12.F04 sample must still parse");
     assert_eq!(legacy.tracking, WorldTracking::default());
-    assert_eq!(legacy.mean_genome_size, None);
-    assert_eq!(legacy.mean_mesh_nodes, None);
-    assert_eq!(legacy.mean_generation, None);
-    assert_eq!(legacy.mean_wired_sinks, None);
-    assert_eq!(legacy.surviving_founder_clade_count, None);
-    assert_eq!(legacy.shannon_entropy_nats, None);
-    assert_eq!(legacy.sensor_census, None);
-    assert_eq!(legacy.occupancy_grid, None);
-    assert_eq!(legacy.capacity, None);
-    assert_eq!(legacy.shares, None);
+    assert_eq!(legacy.blocks.mean_genome_size, None);
+    assert_eq!(legacy.blocks.mean_mesh_nodes, None);
+    assert_eq!(legacy.blocks.mean_generation, None);
+    assert_eq!(legacy.blocks.mean_wired_sinks, None);
+    assert_eq!(legacy.blocks.surviving_founder_clade_count, None);
+    assert_eq!(legacy.blocks.shannon_entropy_nats, None);
+    assert_eq!(legacy.blocks.sensor_census, None);
+    assert_eq!(legacy.blocks.occupancy_grid, None);
+    assert_eq!(legacy.blocks.capacity, None);
+    assert_eq!(legacy.blocks.shares, None);
 }
 
 /// A round trip of a current report keeps every tracking field flat on the
@@ -1425,20 +1412,22 @@ fn tracking_fields_survive_a_round_trip() {
     let sample = PersistenceSample {
         tick: 100,
         population: 5,
-        mean_energy: None,
         births_total: 2,
-        mean_genome_size: Some(six(111.0)),
-        mean_mesh_nodes: Some(six(8.0)),
-        mean_generation: Some(six(3.5)),
-        mean_wired_sinks: Some(six(17.0)),
-        surviving_founder_clade_count: Some(4),
-        shannon_entropy_nats: Some(six(1.25)),
-        sensor_census: Some(census_for(5)),
-        occupancy_grid: Some(grid_for(5)),
-        bundles: Some(bundles_for(100)),
-        plasticity_census: Some(plasticity_for(5)),
-        capacity: Some(capacity_block(200.0)),
-        shares: Some(shares_block(0.2)),
+        blocks: SampleBlocks {
+            mean_energy: None,
+            mean_genome_size: Some(six(111.0)),
+            mean_mesh_nodes: Some(six(8.0)),
+            mean_generation: Some(six(3.5)),
+            mean_wired_sinks: Some(six(17.0)),
+            surviving_founder_clade_count: Some(4),
+            shannon_entropy_nats: Some(six(1.25)),
+            sensor_census: Some(census_for(5)),
+            occupancy_grid: Some(grid_for(5)),
+            bundles: Some(bundles_for(100)),
+            plasticity_census: Some(plasticity_for(5)),
+            capacity: Some(capacity_block(200.0)),
+            shares: Some(shares_block(0.2)),
+        },
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],

@@ -580,7 +580,7 @@ fn tiny_sweep_records_persistence_fields_identically_across_two_runs() {
         "the final sample is the last executed tick"
     );
     assert_eq!(last.population, seed.final_population);
-    assert_eq!(last.mean_energy, seed.mean_energy);
+    assert_eq!(last.blocks.mean_energy, seed.mean_energy);
     assert_eq!(
         seed.mean_energy.is_none(),
         seed.final_population == 0,

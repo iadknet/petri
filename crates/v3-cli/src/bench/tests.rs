@@ -6,8 +6,7 @@ use super::profiles::{
 };
 use super::run::{build_report, run_deterministic, run_one_seed};
 use super::schema::Report;
-use super::tracking::{OccupancyGrid, PopulationReadings, SensorCensus, WorldTracking};
-use crate::six;
+use super::tracking::{OccupancyGrid, SampleBlocks, SensorCensus, WorldTracking};
 use v3_core::contracts::WorldInputKey;
 use v3_core::neighborhood::occupancy::OCCUPANCY_CELLS_PER_AXIS;
 use v3_core::neighborhood::occupancy::OCCUPANCY_CELL_COUNT;
@@ -178,7 +177,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     for _ in 0..HORIZON {
         run_tick(&mut oracle, &mut None);
     }
-    let terminal = PopulationReadings::observe(&oracle);
+    let terminal = SampleBlocks::observe(&oracle);
 
     // Assert: the run reached the horizon alive, so the horizon readings
     // are measured values and the comparison below is not `None` against
@@ -196,26 +195,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     assert_eq!(horizon_sample.population, oracle.creatures.len() as u64);
     assert!(horizon_sample.population > 0);
 
-    assert_eq!(
-        horizon_sample.mean_genome_size.as_deref(),
-        Some(six(terminal.mean_genome_size).as_str())
-    );
-    assert_eq!(
-        horizon_sample.mean_mesh_nodes.as_deref(),
-        Some(six(terminal.mean_mesh_nodes).as_str())
-    );
-    assert_eq!(
-        horizon_sample.mean_generation.as_deref(),
-        Some(six(terminal.mean_generation).as_str())
-    );
-    assert_eq!(
-        horizon_sample.surviving_founder_clade_count,
-        Some(terminal.surviving_founder_clade_count)
-    );
-    assert_eq!(
-        horizon_sample.shannon_entropy_nats.as_deref(),
-        Some(terminal.shannon_entropy_nats.as_str())
-    );
+    assert_eq!(horizon_sample.blocks, terminal);
 
     // A checkpoint carries its own tick's readings, not the run's.
     let early_sample = run
@@ -225,11 +205,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
         .find(|sample| sample.tick == 100)
         .expect("tick 100 is sampled");
     assert_ne!(
-        early_sample.mean_generation, horizon_sample.mean_generation,
+        early_sample.blocks.mean_generation, horizon_sample.blocks.mean_generation,
         "generations advance between tick 100 and the horizon"
     );
     assert_ne!(
-        early_sample.surviving_founder_clade_count, horizon_sample.surviving_founder_clade_count,
+        early_sample.blocks.surviving_founder_clade_count,
+        horizon_sample.blocks.surviving_founder_clade_count,
         "founder clades are lost between tick 100 and the horizon"
     );
 }
@@ -281,6 +262,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     assert!(!run.persistence.samples.is_empty());
     for sample in &run.persistence.samples {
         let census = sample
+            .blocks
             .sensor_census
             .as_ref()
             .expect("every checkpoint carries a census");
@@ -339,12 +321,13 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
         .expect("the horizon tick is sampled");
     assert!(horizon_sample.population > 0);
     assert_eq!(
-        horizon_sample.sensor_census.as_ref(),
+        horizon_sample.blocks.sensor_census.as_ref(),
         Some(&SensorCensus::observe(&oracle))
     );
 
     // The founder population's graph-backend references are visible.
     let first = run.persistence.samples[0]
+        .blocks
         .sensor_census
         .as_ref()
         .expect("the first checkpoint carries a census");
@@ -421,6 +404,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     assert!(!run.persistence.samples.is_empty());
     for sample in &run.persistence.samples {
         let grid = sample
+            .blocks
             .occupancy_grid
             .as_ref()
             .expect("every checkpoint carries an occupancy grid");
@@ -453,11 +437,12 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
         .expect("the horizon tick is sampled");
     assert!(horizon_sample.population > 0);
     assert_eq!(
-        horizon_sample.occupancy_grid.as_ref(),
+        horizon_sample.blocks.occupancy_grid.as_ref(),
         Some(&OccupancyGrid::observe(&oracle))
     );
     assert!(
         horizon_sample
+            .blocks
             .occupancy_grid
             .as_ref()
             .is_some_and(|grid| grid.population.iter().filter(|&&count| count > 0).count() > 1),

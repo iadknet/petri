@@ -2,6 +2,7 @@
 
 use super::indicators::clade_diversity;
 use super::profiles::SAMPLE_EVERY_TICKS;
+use super::retention::{retained_struct, Retention};
 use super::schema::{
     ratio, ByReaderState, MovesBlockedByCause, MutationSupply, PopulationPersistenceSeed,
     TrackedFractions,
@@ -488,6 +489,14 @@ fn by_food_type(
 }
 
 impl WorldTracking {
+    /// The fields a sample's summary keeps (T30.F13 retention); every
+    /// other field stays in the full report only.
+    pub(super) const SAMPLE_SUMMARY_FIELDS: [&'static str; 3] = [
+        "food_density_total",
+        "grazed_cell_share",
+        "grazing_modifier_mean",
+    ];
+
     /// Read the cumulative per-world counters out of a running simulation.
     /// The T14.F02 transferred blocks are left absent here; only the
     /// end-of-run per-case block carries them, via
@@ -716,70 +725,119 @@ impl WorldTracking {
     }
 }
 
-/// One persistence sample, taken after `run_tick` on every executed tick that
-/// is a multiple of [`SAMPLE_EVERY_TICKS`] and on the last executed tick.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistenceSample {
-    pub tick: u64,
-    pub population: u64,
-    pub mean_energy: Option<String>,
-    /// Cumulative `reproduction_actions_spawned_total` at this tick.
-    pub births_total: u64,
-    /// Mean genome size of the living population, junk included. `null` at
-    /// extinction and absent in reports stored before T14.F04.
-    #[serde(default)]
-    pub mean_genome_size: Option<String>,
-    /// Mean mesh node count of the living population. `null` at extinction and
-    /// absent in reports stored before T14.F04.
-    #[serde(default)]
-    pub mean_mesh_nodes: Option<String>,
-    /// Mean generation of the living population. `null` at extinction and
-    /// absent in reports stored before T14.F04.
-    #[serde(default)]
-    pub mean_generation: Option<String>,
-    /// Mean count of wired output sinks (at least one edge) per living
-    /// creature: the per-sink unit T25.F02 stopped charging. `null` at
-    /// extinction and absent in reports stored before T25.F02.
-    #[serde(default)]
-    pub mean_wired_sinks: Option<String>,
-    /// Founder clades with at least one living creature — a true `0` at
-    /// extinction, absent in reports stored before T14.F04.
-    #[serde(default)]
-    pub surviving_founder_clade_count: Option<u64>,
-    /// Shannon entropy of the living clade distribution, in nats. `UNDEFINED`
-    /// at extinction and absent in reports stored before T14.F04.
-    #[serde(default)]
-    pub shannon_entropy_nats: Option<String>,
-    /// What the living population can perceive and remember at this tick. A
-    /// true all-zero census at extinction, absent in reports stored before
-    /// T14.F08.
-    #[serde(default)]
-    pub sensor_census: Option<SensorCensus>,
-    /// Where the living population stands, on a fixed 16x16 grid over the
-    /// world. A true all-zero grid at extinction, absent in reports stored
-    /// before T14.F10.
-    #[serde(default)]
-    pub occupancy_grid: Option<OccupancyGrid>,
-    /// The bundles the living population carries, by wiring (T25.F11,
-    /// `bundles-v1`). `null` at extinction, absent in reports stored before
-    /// T25.F11.
-    #[serde(default)]
-    pub bundles: Option<super::bundles::Bundles>,
-    /// The plastic edges the living population carries on reachable nodes
-    /// (T25.F06), beside `sensor_census`. A true all-zero census at
-    /// extinction, absent in reports stored before T25.F06.
-    #[serde(default)]
-    pub plasticity_census: Option<PlasticityCensusBlock>,
-    /// The living population's heritable energy capacity (T26.F02). `null`
-    /// at extinction and absent in reports stored before T26.F02.
-    #[serde(default)]
-    pub capacity: Option<super::capacity::CapacityDistribution>,
-    /// The living population's two heritable exchange shares (T27.F03).
-    /// `null` at extinction and absent in reports stored before T27.F03.
-    #[serde(default)]
-    pub shares: Option<super::capacity::ShareDistributions>,
-    #[serde(flatten)]
-    pub tracking: WorldTracking,
+retained_struct! {
+    retention: Retention;
+    /// One persistence sample, taken after `run_tick` on every executed tick
+    /// that is a multiple of [`SAMPLE_EVERY_TICKS`] and on the last executed
+    /// tick: the tick, the population, the cumulative births, the
+    /// population's blocks and the per-world counters, the last two
+    /// flattened so a sample serializes as one flat record.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct PersistenceSample {
+        pub tick: u64 => Retention::Kept,
+        pub population: u64 => Retention::Kept,
+        /// Cumulative `reproduction_actions_spawned_total` at this tick.
+        pub births_total: u64 => Retention::FullReport,
+        #[serde(flatten)]
+        pub blocks: SampleBlocks => Retention::Flattened,
+        #[serde(flatten)]
+        pub tracking: WorldTracking => Retention::Flattened,
+    }
+}
+
+retained_struct! {
+    retention: Retention;
+    /// The population blocks a checkpoint sample carries, read from
+    /// post-tick state by the readers on sampled ticks only, each block
+    /// applying its own extinction rule.
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct SampleBlocks {
+        /// The benchmark mean energy (`f64`). `null` at extinction.
+        pub mean_energy: Option<String> => Retention::Kept,
+        /// Mean genome size of the living population, junk included. `null`
+        /// at extinction and absent in reports stored before T14.F04.
+        #[serde(default)]
+        pub mean_genome_size: Option<String> => Retention::Kept,
+        /// Mean mesh node count of the living population. `null` at
+        /// extinction and absent in reports stored before T14.F04.
+        #[serde(default)]
+        pub mean_mesh_nodes: Option<String> => Retention::Kept,
+        /// Mean generation of the living population. `null` at extinction
+        /// and absent in reports stored before T14.F04.
+        #[serde(default)]
+        pub mean_generation: Option<String> => Retention::FullReport,
+        /// Mean count of wired output sinks (at least one edge) per living
+        /// creature: the per-sink unit T25.F02 stopped charging. `null` at
+        /// extinction and absent in reports stored before T25.F02.
+        #[serde(default)]
+        pub mean_wired_sinks: Option<String> => Retention::Kept,
+        /// Founder clades with at least one living creature — a true `0` at
+        /// extinction, absent in reports stored before T14.F04.
+        #[serde(default)]
+        pub surviving_founder_clade_count: Option<u64> => Retention::Kept,
+        /// Shannon entropy of the living clade distribution, in nats.
+        /// `UNDEFINED` at extinction and absent in reports stored before
+        /// T14.F04.
+        #[serde(default)]
+        pub shannon_entropy_nats: Option<String> => Retention::Kept,
+        /// What the living population can perceive and remember at this
+        /// tick. A true all-zero census at extinction, absent in reports
+        /// stored before T14.F08.
+        #[serde(default)]
+        pub sensor_census: Option<SensorCensus> => Retention::Kept,
+        /// Where the living population stands, on a fixed 16x16 grid over
+        /// the world. A true all-zero grid at extinction, absent in reports
+        /// stored before T14.F10.
+        #[serde(default)]
+        pub occupancy_grid: Option<OccupancyGrid> => Retention::Kept,
+        /// The bundles the living population carries, by wiring (T25.F11,
+        /// `bundles-v1`). `null` at extinction, absent in reports stored
+        /// before T25.F11.
+        #[serde(default)]
+        pub bundles: Option<super::bundles::Bundles> => Retention::Projected(super::bundles::Bundles::RETENTION),
+        /// The plastic edges the living population carries on reachable
+        /// nodes (T25.F06), beside `sensor_census`. A true all-zero census at
+        /// extinction, absent in reports stored before T25.F06.
+        #[serde(default)]
+        pub plasticity_census: Option<PlasticityCensusBlock> => Retention::Kept,
+        /// The living population's heritable energy capacity (T26.F02).
+        /// `null` at extinction and absent in reports stored before T26.F02.
+        #[serde(default)]
+        pub capacity: Option<super::capacity::CapacityDistribution> => Retention::Kept,
+        /// The living population's two heritable exchange shares (T27.F03).
+        /// `null` at extinction and absent in reports stored before T27.F03.
+        #[serde(default)]
+        pub shares: Option<super::capacity::ShareDistributions> => Retention::Kept,
+    }
+}
+
+impl SampleBlocks {
+    /// The blocks of `sim`'s living population: the means and the
+    /// distributions `null` at extinction, the clade count, entropy,
+    /// censuses and grid always present.
+    pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        let census = PopulationCensus::of(sim);
+        let alive = !census.is_empty();
+        let means = census.structure_means();
+        let (surviving_founder_clade_count, shannon_entropy_nats) =
+            clade_diversity(census.lineage_ids());
+        let mean = |value: f64| alive.then(|| six(value));
+        Self {
+            mean_energy: census.mean_energy().map(six),
+            mean_genome_size: mean(means.genome_size),
+            mean_mesh_nodes: mean(means.mesh_nodes),
+            mean_generation: mean(means.generation),
+            mean_wired_sinks: mean(means.wired_sinks),
+            surviving_founder_clade_count: Some(surviving_founder_clade_count),
+            shannon_entropy_nats: Some(shannon_entropy_nats),
+            sensor_census: Some(SensorCensus::observe(sim)),
+            occupancy_grid: Some(OccupancyGrid::observe(sim)),
+            bundles: super::bundles::Bundles::observe(sim),
+            plasticity_census: Some(PlasticityCensusBlock::observe(sim)),
+            capacity: super::capacity::CapacityDistribution::observe(sim),
+            shares: super::capacity::ShareDistributions::observe(sim),
+        }
+    }
 }
 
 /// One (pathway, surface) cell of a checkpoint's plasticity census.
@@ -1037,47 +1095,6 @@ impl SensorCensus {
     }
 }
 
-/// The population readings a checkpoint sample carries, read from post-tick
-/// state through the same accessors the horizon readings use.
-#[derive(Debug, PartialEq)]
-pub(super) struct PopulationReadings {
-    pub(super) mean_genome_size: f64,
-    pub(super) mean_mesh_nodes: f64,
-    pub(super) mean_generation: f64,
-    pub(super) mean_wired_sinks: f64,
-    pub(super) surviving_founder_clade_count: u64,
-    pub(super) shannon_entropy_nats: String,
-    sensor_census: SensorCensus,
-    occupancy_grid: OccupancyGrid,
-    bundles: Option<super::bundles::Bundles>,
-    plasticity_census: PlasticityCensusBlock,
-    capacity: Option<super::capacity::CapacityDistribution>,
-    shares: Option<super::capacity::ShareDistributions>,
-}
-
-impl PopulationReadings {
-    pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        let census = PopulationCensus::of(sim);
-        let means = census.structure_means();
-        let (surviving_founder_clade_count, shannon_entropy_nats) =
-            clade_diversity(census.lineage_ids());
-        Self {
-            mean_genome_size: means.genome_size,
-            mean_mesh_nodes: means.mesh_nodes,
-            mean_generation: means.generation,
-            mean_wired_sinks: means.wired_sinks,
-            surviving_founder_clade_count,
-            shannon_entropy_nats,
-            sensor_census: SensorCensus::observe(sim),
-            occupancy_grid: OccupancyGrid::observe(sim),
-            bundles: super::bundles::Bundles::observe(sim),
-            plasticity_census: PlasticityCensusBlock::observe(sim),
-            capacity: super::capacity::CapacityDistribution::observe(sim),
-            shares: super::capacity::ShareDistributions::observe(sim),
-        }
-    }
-}
-
 /// Accumulates the per-seed persistence observations defined by the T01.F11
 /// spec. It never touches the simulation, so it is unit-testable from
 /// synthetic observations alone.
@@ -1124,18 +1141,15 @@ impl PersistenceAccumulator {
         tick.is_multiple_of(SAMPLE_EVERY_TICKS) || tick == self.horizon || population == 0
     }
 
-    /// Record one executed tick. `mean_energy`, `readings` and `tracking` are
-    /// evaluated only on sampled ticks — the first keeps the `O(population)`
-    /// energy sum to the predeclared cadence and leaves `null` at extinction,
-    /// the second keeps the structure and clade passes to that cadence, and the
-    /// third keeps the per-world counter reads there too.
+    /// Record one executed tick. `blocks` and `tracking` are evaluated only
+    /// on sampled ticks, which keeps the population passes and the
+    /// per-world counter reads to the predeclared cadence.
     pub(super) fn observe(
         &mut self,
         tick: u64,
         population: u64,
         births_total: u64,
-        mean_energy: impl FnOnce() -> f64,
-        readings: impl FnOnce() -> PopulationReadings,
+        blocks: impl FnOnce() -> SampleBlocks,
         tracking: impl FnOnce() -> WorldTracking,
     ) {
         self.population = population;
@@ -1152,25 +1166,11 @@ impl PersistenceAccumulator {
             self.plateau_ticks += 1;
         }
         if self.is_sampled(tick, population) {
-            let alive = population > 0;
-            let readings = readings();
             self.samples.push(PersistenceSample {
                 tick,
                 population,
-                mean_energy: alive.then(|| six(mean_energy())),
                 births_total,
-                mean_genome_size: alive.then(|| six(readings.mean_genome_size)),
-                mean_mesh_nodes: alive.then(|| six(readings.mean_mesh_nodes)),
-                mean_generation: alive.then(|| six(readings.mean_generation)),
-                mean_wired_sinks: alive.then(|| six(readings.mean_wired_sinks)),
-                surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
-                shannon_entropy_nats: Some(readings.shannon_entropy_nats),
-                sensor_census: Some(readings.sensor_census),
-                occupancy_grid: Some(readings.occupancy_grid),
-                bundles: readings.bundles.filter(|_| alive),
-                plasticity_census: Some(readings.plasticity_census),
-                capacity: readings.capacity.filter(|_| alive),
-                shares: readings.shares.filter(|_| alive),
+                blocks: blocks(),
                 tracking: tracking(),
             });
         }
@@ -1188,7 +1188,10 @@ impl PersistenceAccumulator {
                 .then(|| ratio(self.plateau_sum, self.plateau_ticks)),
             // The last executed tick is always sampled, so the run's final
             // mean energy is the last sample's.
-            mean_energy: self.samples.last().and_then(|s| s.mean_energy.clone()),
+            mean_energy: self
+                .samples
+                .last()
+                .and_then(|s| s.blocks.mean_energy.clone()),
             samples: self.samples,
         }
     }

@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 
+use super::retention::{retained_struct, CheckpointRetention};
 use serde::{Deserialize, Serialize};
 use v3_core::genome::CreatureGenome;
 use v3_core::mutation::types::{MutationOperator, FORM_KEYS, WIRING_KEYS};
@@ -45,19 +46,24 @@ pub struct BundleRow {
     pub members: u64,
 }
 
-/// One sample's `bundles` block.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Bundles {
-    pub version: String,
-    /// Living creatures.
-    pub creatures: u64,
-    /// Creatures carrying a bundle on a reachable node.
-    pub carriers: u64,
-    /// Totals by wiring key.
-    pub wirings: BTreeMap<String, WiringTotals>,
-    /// Cumulative committed creations by operator key, wiring and form.
-    pub created: BTreeMap<String, BTreeMap<String, BTreeMap<String, u64>>>,
-    pub rows: Vec<BundleRow>,
+retained_struct! {
+    retention: CheckpointRetention;
+    /// One sample's `bundles` block. The summary keeps the aggregates on
+    /// every checkpoint and the rows on each world's last checkpoint only.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Bundles {
+        pub version: String => CheckpointRetention::Every,
+        /// Living creatures.
+        pub creatures: u64 => CheckpointRetention::Every,
+        /// Creatures carrying a bundle on a reachable node.
+        pub carriers: u64 => CheckpointRetention::Every,
+        /// Totals by wiring key.
+        pub wirings: BTreeMap<String, WiringTotals> => CheckpointRetention::Every,
+        /// Cumulative committed creations by operator key, wiring and form.
+        pub created: BTreeMap<String, BTreeMap<String, BTreeMap<String, u64>>>
+            => CheckpointRetention::Every,
+        pub rows: Vec<BundleRow> => CheckpointRetention::Last,
+    }
 }
 
 /// The target key of a row.
